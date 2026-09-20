@@ -81,6 +81,8 @@ interface CreateChangeResult {
 
 Loads a change and reports its current lifecycle state, artifact statuses, and pre-computed lifecycle context including available transitions and blockers. For active changes, refreshes implementation tracking by default via `RefreshImplementationTracking` before loading status.
 
+`validTransitions` is the protocol list (`VALID_TRANSITIONS` for the current state). `availableTransitions` is **check-derived**: `GetStatus` gathers the same snapshots `TransitionChange` uses and evaluates every protocol candidate. Targets whose blocking predicates fail (incomplete artifacts or tasks, enter-`ready` deps/read-only, exit-`implementing` impl integrity, missing spec/signoff consent on the delivery edge) are omitted.
+
 **Constructor:** `new GetStatus(changes: ChangeRepository, schemaProvider: SchemaProvider, approvals: { spec: boolean; signoff: boolean }, refreshImplementationTracking: RefreshImplementationTracking)`
 
 **Input:**
@@ -113,7 +115,7 @@ interface ArtifactFileStatus {
 
 interface LifecycleContext {
   validTransitions: readonly ChangeState[]
-  availableTransitions: readonly ChangeState[] // subset where workflow requires are satisfied
+  availableTransitions: readonly ChangeState[] // protocol targets whose checks currently pass
   blockers: readonly TransitionBlocker[]
   approvals: { spec: boolean; signoff: boolean }
   nextArtifact: string | null // next artifact in the DAG whose requires are satisfied
@@ -138,24 +140,22 @@ interface TransitionBlocker {
 
 ### TransitionChange
 
-Performs a lifecycle state transition on a change. Enforces approval-gate routing, workflow `requires`, task completion gating (via `requiresTaskCompletion`), and executes `run:` hooks at step boundaries. For active changes, refreshes implementation tracking by default via `RefreshImplementationTracking` before lifecycle evaluation.
+Performs a lifecycle state transition on a change. Enforces the shared transition-check evaluation (protocol edge, workflow `requires`, task completion on the target step, enter-`ready` and exit-`implementing` guards, approval predicates on the requested delivery edge) and executes `run:` hooks at step boundaries. Source `post` `run:` hooks run only when the attempt is classified as `along = forward`. For active changes, refreshes implementation tracking by default via `RefreshImplementationTracking` before lifecycle evaluation.
 
-The final persisted lifecycle update is applied through `ChangeRepository.mutate(...)` so hook execution and routing stay outside the lock while the manifest mutation runs against fresh state.
+The final persisted lifecycle update is applied through `ChangeRepository.mutate(...)` so hook execution stays outside the lock while the manifest mutation runs against fresh state.
 
-Smart routing applies at two points:
+There is **no** approval-gate rewrite of the requested target:
 
-- `ready → implementing` is redirected to `ready → pending-spec-approval` when `approvalsSpec` is `true`.
-- `done → archivable` is redirected to `done → pending-signoff` when `approvalsSignoff` is `true`.
+- `ready → implementing` is evaluated as that pair. When `approvals.spec` is `true` and no spec approval is recorded, the use case throws `InvalidStateTransitionError` with `reason.type === 'approval-required'` and `gate: 'spec'`. The change stays in `ready`.
+- `done → archivable` is evaluated as that pair. When `approvals.signoff` is `true` and no signoff is recorded, the use case throws `InvalidStateTransitionError` with `reason.type === 'approval-required'` and `gate: 'signoff'`. The change stays in `done`.
 
-When the change is already at a human approval boundary, `TransitionChange` does
-not attempt to synthesize a forward transition. Instead, it throws
-`InvalidStateTransitionError` with `reason.type === 'approval-required'`:
+For in-flight changes already at a historic parking state, `TransitionChange` does not synthesize a forward delivery hop. It throws `InvalidStateTransitionError` with `reason.type === 'approval-required'` except for redesign:
 
-- `pending-spec-approval` -> any target other than `designing` yields `{ type: 'approval-required', gate: 'spec' }`
-- `pending-signoff` -> any target other than `designing` yields `{ type: 'approval-required', gate: 'signoff' }`
+- `pending-spec-approval` -> any target other than `designing` (and the drain target used by `ApproveSpec`) yields `{ type: 'approval-required', gate: 'spec' }`
+- `pending-signoff` -> any target other than `designing` (and the drain target used by `ApproveSignoff`) yields `{ type: 'approval-required', gate: 'signoff' }`
 
 This keeps redesign available while giving adapters enough context to explain why
-normal progression is blocked.
+normal progression is blocked. New work must use `ApproveSpec` / `ApproveSignoff` in `ready` / `done`, not `change transition` into pending states.
 
 **Constructor:** `new TransitionChange(changes: ChangeRepository, actor: ActorResolver, schemaProvider: SchemaProvider, runStepHooks: RunStepHooks, refreshImplementationTracking: RefreshImplementationTracking)`
 
@@ -418,9 +418,13 @@ Retrieves a single archived change by name.
 
 ### ApproveSpec
 
-Records a spec approval and transitions the change to `spec-approved`. Requires the spec approval gate to be enabled. Artifact hashes are computed internally from the change's artifacts on disk, applying schema-defined pre-hash cleanup rules.
+Records a spec approval. Requires the spec approval gate to be enabled. Artifact hashes are computed internally from the change's artifacts on disk, applying schema-defined pre-hash cleanup rules.
 
-Once prerequisites are ready, the approval event and state transition are persisted through `ChangeRepository.mutate(...)` on fresh change state.
+When the change is in `ready`, the use case records the approval and **does not** transition to `pending-spec-approval` or `spec-approved`. The change stays in `ready` so `approval.spec` can pass on the next `ready → implementing` attempt.
+
+Drain: when the change is already in `pending-spec-approval`, the use case may still transition to `spec-approved`.
+
+Once prerequisites are ready, the approval event is persisted through `ChangeRepository.mutate(...)` on fresh change state. A `ready` change is not transitioned; drain from `pending-spec-approval` still may transition to `spec-approved`.
 
 **Constructor:** `new ApproveSpec(changes: ChangeRepository, actor: ActorResolver, schemaProvider: SchemaProvider, hasher: ContentHasher)`
 
@@ -436,19 +440,23 @@ Once prerequisites are ready, the approval event and state transition are persis
 
 **Throws:**
 
-| Error                         | Condition                                       |
-| ----------------------------- | ----------------------------------------------- |
-| `ApprovalGateDisabledError`   | `approvalsSpec` is `false`.                     |
-| `ChangeNotFoundError`         | No change with the given name exists.           |
-| `InvalidStateTransitionError` | Change is not in `pending-spec-approval` state. |
+| Error                         | Condition                                                          |
+| ----------------------------- | ------------------------------------------------------------------ |
+| `ApprovalGateDisabledError`   | `approvalsSpec` is `false`.                                        |
+| `ChangeNotFoundError`         | No change with the given name exists.                              |
+| `InvalidStateTransitionError` | Change is neither `ready` nor drain-state `pending-spec-approval`. |
 
 ---
 
 ### ApproveSignoff
 
-Records a sign-off and transitions the change to `signed-off`. Requires the signoff gate to be enabled. Artifact hashes are computed internally.
+Records a sign-off. Requires the signoff gate to be enabled. Artifact hashes are computed internally.
 
-Once prerequisites are ready, the sign-off event and state transition are persisted through `ChangeRepository.mutate(...)` on fresh change state.
+When the change is in `done`, the use case records the sign-off and **does not** transition to `pending-signoff` or `signed-off`. The change stays in `done` so `approval.signoff` can pass on the next `done → archivable` attempt.
+
+Drain: when the change is already in `pending-signoff`, the use case may still transition to `signed-off`.
+
+Once prerequisites are ready, the sign-off event is persisted through `ChangeRepository.mutate(...)` on fresh change state. A `done` change is not transitioned; drain from `pending-signoff` still may transition to `signed-off`.
 
 **Constructor:** `new ApproveSignoff(changes: ChangeRepository, actor: ActorResolver, schemaProvider: SchemaProvider, hasher: ContentHasher)`
 
@@ -464,11 +472,11 @@ Once prerequisites are ready, the sign-off event and state transition are persis
 
 **Throws:**
 
-| Error                         | Condition                                 |
-| ----------------------------- | ----------------------------------------- |
-| `ApprovalGateDisabledError`   | `approvalsSignoff` is `false`.            |
-| `ChangeNotFoundError`         | No change with the given name exists.     |
-| `InvalidStateTransitionError` | Change is not in `pending-signoff` state. |
+| Error                         | Condition                                                   |
+| ----------------------------- | ----------------------------------------------------------- |
+| `ApprovalGateDisabledError`   | `approvalsSignoff` is `false`.                              |
+| `ChangeNotFoundError`         | No change with the given name exists.                       |
+| `InvalidStateTransitionError` | Change is neither `done` nor drain-state `pending-signoff`. |
 
 ---
 

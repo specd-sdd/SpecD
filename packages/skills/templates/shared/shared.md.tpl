@@ -153,6 +153,31 @@ If a transition fails, do not guess why. Read the blockers and follow the Repair
 Guide. Usually, this means redirecting to the recommended skill or performing
 the recommended repair command.
 
+## Implementation tracking
+
+Tracked files start **open**. `impl.filesResolved` blocks `implementing → verifying`
+and archive until none remain open. Skills that already loaded this file MUST use
+these commands instead of inventing a second cookbook:
+
+```bash
+specd changes implementation list <name>
+specd changes implementation review <name>
+specd changes implementation add <name> --spec <specId> --file <path> [--symbol "<SymbolName>"]
+specd changes implementation resolve <name> --file <path1>,<path2>
+specd changes implementation ignore <name> --file <path1>,<path2>
+```
+
+- **`resolve`** — the file belongs to this change and has been reviewed.
+- **`ignore`** — the file is not this change’s implementation surface (incidental
+  dirty files such as unrelated `spec-lock.json`). Files with confirmed links
+  **cannot** be ignored; `add` a link first if they actually implement a spec.
+- **`add`** — confirmed spec↔file (prefer `--symbol` on a **top-level** export:
+  function, class, type, method). Link only what **realizes that spec**. Skip
+  locals, variables, and anything incidental. No catch-all dumps. Out-of-scope
+  spec ids will fail archive — do not silently link outside the change.
+
+Comma-separated `--file` lists are supported for `resolve` and `ignore`.
+
 ## Artifact and File states
 
 SpecD uses several states to track artifacts and files:
@@ -349,13 +374,17 @@ Follow the processing rules below ("Processing `changes context` output").
 ## Approvals are human-only
 
 **You MUST NEVER run `changes approve` yourself.** Spec approval and signoff approval
-are exclusively human actions. When a change reaches `pending-spec-approval` or
-`pending-signoff`, your only job is to tell the user what command to run:
+are exclusively human actions. When the spec or signoff gate is on and consent is not
+recorded, the change **stays** in `ready` or `done`. Your only job is to tell the user
+what command to run:
 
 ```bash
 specd changes approve spec <name> --reason "..."
 specd changes approve signoff <name> --reason "..."
 ```
+
+Pending states (`pending-spec-approval`, `pending-signoff`) MAY appear only as **drain**
+for in-flight changes already in those states — not as the happy-path wait.
 
 Do not attempt to approve, do not offer to approve, do not auto-approve. Stop and wait.
 
@@ -470,11 +499,15 @@ after the last scenario is verified (verifying), etc. Do NOT wait, do NOT ask th
 anything first, do NOT present a summary before running them. The hooks are part of the
 phase completion, not a separate step that follows user interaction.
 
-Execute hooks for every state the change passes through, including intermediate ones
-(`pending-spec-approval`, `spec-approved`, `done`, `pending-signoff`, `signed-off`,
-`archivable`). In code, all 12 `ChangeState` values are valid hook steps — the system
-accepts them all and silently returns empty results if the schema doesn't define hooks
-for that step. Always call them; never skip a state assuming it has no hooks.
+Execute hooks for every **delivery** state the change passes through
+(`designing`, `ready`, `implementing`, `verifying`, `done`, `archivable`). Do **not**
+list `pending-spec-approval` / `pending-signoff` as happy-path intermediates. Drain from
+an already-pending change MAY still run hooks for those step ids. Skills that skip
+auto-hooks and run them manually MUST NOT run `source.post` on `along` backward,
+redesign, or recovery. In code, all 12 `ChangeState` values are valid hook steps — the
+system accepts them all and silently returns empty results if the schema doesn't define
+hooks for that step. Always call them for states you actually pass; never skip a state
+assuming it has no hooks.
 
 ## Code graph intelligence
 

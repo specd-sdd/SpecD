@@ -13,5 +13,41 @@
     "core:spec-id-format",
     "core:composition-resolver"
   ],
-  "implementation": []
+  "implementation": [],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "UpdatePersistedSpecSchema rebinds initialized lock to explicit schemaRef after parse+dep compatibility; never creates lock.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:c13b5076f6f90176ea1cabd6fbbb33369c92ea2ffb9606f90b62cbe988b93d3a",
+          "lastModified": "2026-08-25T15:37:19.356Z"
+        },
+        "verify.md": {
+          "hash": "sha256:5eeacb6729d6e125d125601dc8a59e76f5d74a75a6bd77d9ad62c6abb7e15ccd",
+          "lastModified": "2026-08-25T15:37:19.357Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# UpdatePersistedSpecSchema\n\n## Rules\n- Input: `specId`, `schemaRef` (required). No effective-project-schema fallback — reassignment always explicit.\n- `readPersistedState` first. null → `SpecNotInitializedError`. MUST NOT create state or delegate to `InitializePersistedSpecState` / initial-base path.\n- Unresolvable spec → `SpecNotFoundError` before init check.\n- Resolve `schemaRef` via `GetActiveSchema` `{ mode: 'ref', ref: schemaRef }`. No extra plugins/overrides beyond GetActiveSchema ref-mode.\n- Load current schema-declared artifacts; parse under target schema (same infra as deterministic metadata projection). Parse failure → typed error, no mutation.\n- Target identity equals current persisted schema → semantic no-op: no dep-conflict validation, no write, return unchanged identity `changed: false`.\n- Target schema does not extract deps → preserve current canonical `dependsOn`.\n- Target schema extracts deps: extract from current artifacts. Extracted ≠ current `dependsOn` → `PersistedSchemaDependencyConflictError` (specId, current, extracted); MUST NOT adopt extracted or mutate. Users change deps via `core:update-persisted-spec-deps`. Equal → proceed w/ current `dependsOn` unchanged.\n- Preserve `implementation` and `optimizations` verbatim including each field `value` + `artifactState`. MUST NOT clear/regenerate/re-baseline. Existing optimizations become stale vs new schema automatically via `core:get-persisted-spec-optimizations`.\n- MUST NOT use generic `applyPersistedSpecStatePatch()` to change schema (helper rejects schema replacement). Construct complete `PersistedSpecState` (new schema, determined dependsOn, preserved implementation/optimizations) → `writePersistedState` w/ `expectedRevision` = observed `originalHash`. No other use case may construct complete state w/ schema ≠ existing snapshot schema.\n- Revision mismatch → `ArtifactConflictError`.\n- Result: `{ specId, schema, dependsOn, changed }`.\n- Config factory via `resolveUpdatePersistedSpecSchemaDeps`: `specs`, `getActiveSchema`.\n\n## Constraints\n- Rebind compatible artifacts to new schema identity; MUST NOT transform artifact content between incompatible formats\n- `readOnly` workspace → `ReadOnlyWorkspaceError` before persisted-state I/O\n- MUST NOT import deps from persisted metadata\n- specs init and this use case mutually exclusive: init never rewrites existing lock; this never creates one",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:c13b5076f6f90176ea1cabd6fbbb33369c92ea2ffb9606f90b62cbe988b93d3a",
+          "lastModified": "2026-08-25T15:37:19.356Z"
+        },
+        "verify.md": {
+          "hash": "sha256:5eeacb6729d6e125d125601dc8a59e76f5d74a75a6bd77d9ad62c6abb7e15ccd",
+          "lastModified": "2026-08-25T15:37:19.357Z"
+        }
+      }
+    }
+  }
 }

@@ -22,6 +22,17 @@
 - **THEN** the command exits with code 1
 - **AND** stderr contains an `error:` message explaining that `<step>` and `--next` are mutually exclusive
 
+#### Scenario: Allow-out-of-scope is forwarded to execute
+
+- **GIVEN** the change is in `implementing` state
+- **WHEN** `specd change transition my-change verifying --allow-out-of-scope` is run
+- **THEN** `TransitionChange.execute` is called with `allowOutOfScope: true`
+
+#### Scenario: Allow-out-of-scope is omitted by default
+
+- **WHEN** `specd change transition my-change designing` is run without `--allow-out-of-scope`
+- **THEN** `TransitionChange.execute` is called without `allowOutOfScope` on the input
+
 ### Requirement: Next-transition resolution
 
 #### Scenario: Next flag advances designing to ready
@@ -30,12 +41,14 @@
 - **WHEN** `specd change transition my-change --next` is run
 - **THEN** the command requests transition to `ready`
 
-#### Scenario: Next flag honors approval routing from ready
+#### Scenario: Next flag from ready requests implementing and stays in ready when spec gate on
 
 - **GIVEN** `approvals.spec: true` and the change is in `ready` state
+- **AND** no spec approval is recorded
 - **WHEN** `specd change transition my-change --next` is run
 - **THEN** the command resolves `implementing` as the logical next target
-- **AND** the change transitions to `pending-spec-approval`
+- **AND** the change remains in `ready`
+- **AND** it does not persist `pending-spec-approval`
 
 #### Scenario: Next flag fails in pending spec approval state
 
@@ -57,6 +70,25 @@
 - **WHEN** `specd change transition my-change --next` is run
 - **THEN** the command exits with code 1
 - **AND** stderr contains an `error:` message explaining that archiving is not a lifecycle transition
+
+#### Scenario: Next flag from signed-off maps to archivable
+
+- **GIVEN** the change is in `signed-off` state
+- **WHEN** `specd change transition my-change --next` is run
+- **THEN** the CLI passes `to: 'next'` to `TransitionChange`
+- **AND** Core resolves `archivable` as the target state
+
+#### Scenario: CLI does not keep a from-to next table
+
+- **WHEN** `--next` is used
+- **THEN** the CLI does not resolve the target via a local from→to switch
+- **AND** `TransitionChange.execute` receives `to: 'next'`
+
+#### Scenario: Shared presentation with run-hooks is not the same JSON stream
+
+- **WHEN** `change transition` emits structured progress
+- **THEN** records use `stream: "change-transition"`
+- **AND** they do not use `stream: "hook-progress"`
 
 ### Requirement: Delegates refresh policy to TransitionChange
 
@@ -84,23 +116,28 @@
 #### Scenario: Spec approval gate active
 
 - **GIVEN** `approvals.spec: true` and the change is in `ready` state
+- **AND** no spec approval is recorded
 - **WHEN** `specd change transition my-change implementing` is run
-- **THEN** the change transitions to `pending-spec-approval`
-- **AND** stdout shows `transitioned my-change: ready → pending-spec-approval`
+- **THEN** the command exits with code 1
+- **AND** the change remains in `ready`
+- **AND** stdout does not show a transition to `pending-spec-approval`
 
 #### Scenario: Signoff gate active
 
 - **GIVEN** `approvals.signoff: true` and the change is in `done` state
+- **AND** no signoff is recorded
 - **WHEN** `specd change transition my-change archivable` is run
-- **THEN** the change transitions to `pending-signoff`
-- **AND** stdout shows `transitioned my-change: done → pending-signoff`
+- **THEN** the command exits with code 1
+- **AND** the change remains in `done`
+- **AND** stdout does not show a transition to `pending-signoff`
 
 #### Scenario: Transition execute omits approval flags
 
 - **GIVEN** `config.approvals.spec: true`
 - **WHEN** `specd change transition my-change implementing` runs
-- **THEN** `TransitionChange.execute` is called with `{ name, to }` only
-- **AND** approval gate flags are not passed on the input object
+- **THEN** `TransitionChange.execute` is called without approval gate flags on the input
+- **AND** the input MAY include `skipHookPhases` (empty set when `--skip-hooks` is omitted)
+- **AND** the input MUST NOT include `allowOutOfScope` unless `--allow-out-of-scope` was passed
 
 ### Requirement: Output on success
 
@@ -147,8 +184,25 @@
 - **GIVEN** a transition to `ready` fails because an artifact is missing
 - **WHEN** the command is run in text mode
 - **THEN** it prints an error message to stderr
-- **AND** it renders a `repair guide:` section to stdout
-- **AND** the guide includes the blocker code (e.g., `! MISSING_ARTIFACT`) and the recommended command
+- **AND** it renders a `repair guide:` section to stderr
+- **AND** the guide includes the blocker code (e.g., `! INCOMPLETE_ARTIFACT`) and the recommended command
+- **AND** stdout does not contain the repair guide
+
+#### Scenario: HookFailedError is exit 2 without repair guide
+
+- **GIVEN** a matching `hook.post` effect fails before persist
+- **WHEN** the command is run in text mode
+- **THEN** the process exits with code 2
+- **AND** the check bus shows `✗` for `Running post hooks`
+- **AND** stderr does not contain a `repair guide:` section
+
+#### Scenario: Repair guide recommends verify when tasks are complete
+
+- **GIVEN** a failed transition from `implementing` while tasks are complete
+- **AND** `GetStatus.nextAction` recommends `/specd-verify`
+- **WHEN** the command is run in text mode
+- **THEN** the repair guide command is the verify skill
+- **AND** it is not `/specd-implement`
 
 ### Requirement: Incomplete tasks error
 
@@ -158,6 +212,29 @@
 - **WHEN** `specd change transition my-change verifying` is run
 - **THEN** the command exits with code 1
 - **AND** stderr contains an `error:` message naming the blocking artifact
+
+#### Scenario: Status omitted verifying before the failed transition
+
+- **GIVEN** incomplete tasks
+- **WHEN** `specd changes status` is run before the transition attempt
+- **THEN** `availableTransitions` already omits `verifying`
+
+### Requirement: Check progress rendering
+
+#### Scenario: Predicate progress uses gerund label
+
+- **GIVEN** transition execute emits `check-start` / `check-done` for `impl.linksInScope`
+- **WHEN** the command runs in text mode
+- **THEN** progress includes `Checking implementation links (impl.linksInScope)`
+- **AND** a `✓` or `✗` line repeats that label
+- **AND** no `Executing:` prefix appears
+
+#### Scenario: Hook progress uses Running hooks labels
+
+- **GIVEN** matching post hooks stream output
+- **WHEN** the command runs in text mode
+- **THEN** progress uses `Running post hooks (hook.post)`
+- **AND** streamed lines appear as `check-progress` under that check
 
 ### Requirement: Hook execution
 
@@ -213,11 +290,11 @@
 
 #### Scenario: Structured formats emit progress on stdout
 
-- **GIVEN** a transition emits hook and lifecycle progress events
+- **GIVEN** a transition emits check and lifecycle progress events
 - **WHEN** `specd change transition my-change designing --format json` is run
 - **THEN** stdout emits newline-delimited structured records during the transition
-- **AND** hook lifecycle events use `stream: "hook-progress"`
-- **AND** transition lifecycle events use `stream: "change-transition"`
+- **AND** hook check events use `stream: "change-transition"`
+- **AND** no record uses `stream: "hook-progress"`
 
 ### Requirement: Transition hook observability
 
@@ -230,11 +307,11 @@
 
 ### Requirement: Shared hook progress presentation
 
-#### Scenario: Equivalent hook events render with the same presentation contract as run-hooks
+#### Scenario: Transition check bus does not share hook-progress stream
 
-- **GIVEN** `specd change transition` and `specd change run-hooks` observe the same sequence of hook events
-- **WHEN** both commands render hook progress in the same output format
-- **THEN** running status, recent output, liveness, and failed-hook output follow the same presentation rules
+- **WHEN** `specd change transition` emits structured progress
+- **THEN** records use `stream: "change-transition"`
+- **AND** they do not use `stream: "hook-progress"`
 
 ### Requirement: Post-hook failure warning
 

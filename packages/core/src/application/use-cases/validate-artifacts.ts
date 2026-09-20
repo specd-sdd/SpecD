@@ -24,7 +24,10 @@ import { expectedArtifactFilename } from '../../domain/services/artifact-filenam
 import { evaluateRules } from '../../domain/services/rule-evaluator.js'
 import { evaluateCrossArtifactRule } from '../../domain/services/cross-artifact-rule-evaluator.js'
 import { inferFormat } from '../../domain/services/format-inference.js'
-import { LifecycleEngine } from '../../domain/services/lifecycle-engine.js'
+import {
+  findBlockingParent,
+  evaluateLifecycleVerdict,
+} from '../../domain/services/lifecycle-verdict.js'
 import { type ContentHasher } from '../ports/content-hasher.js'
 import { type ExtractedMetadata } from '../../domain/services/extract-metadata.js'
 import { type SelectorNode } from '../../domain/services/selector-matching.js'
@@ -120,7 +123,6 @@ export class ValidateArtifacts {
   private readonly _hasher: ContentHasher
   private readonly _extractorTransforms: ExtractorTransformRegistry
   private readonly _workspaceRoutes: readonly SpecWorkspaceRoute[]
-  private readonly _lifecycle: LifecycleEngine
 
   /**
    * Creates a new `ValidateArtifacts` use case instance.
@@ -133,7 +135,6 @@ export class ValidateArtifacts {
    * @param hasher - Content hasher for computing artifact hashes
    * @param extractorTransforms - Shared extractor transform registry
    * @param workspaceRoutes - Workspace routing metadata for cross-workspace resolution
-   * @param lifecycle - Shared lifecycle interpreter
    */
   constructor(
     changes: ChangeRepository,
@@ -144,7 +145,6 @@ export class ValidateArtifacts {
     hasher: ContentHasher,
     extractorTransforms: ExtractorTransformRegistry = new Map(),
     workspaceRoutes: readonly SpecWorkspaceRoute[] = [],
-    lifecycle: LifecycleEngine = new LifecycleEngine(Logger.debug.bind(Logger)),
   ) {
     this._changes = changes
     this._listWorkspaces = listWorkspaces
@@ -154,7 +154,6 @@ export class ValidateArtifacts {
     this._hasher = hasher
     this._extractorTransforms = extractorTransforms
     this._workspaceRoutes = workspaceRoutes
-    this._lifecycle = lifecycle
   }
 
   /**
@@ -221,7 +220,9 @@ export class ValidateArtifacts {
     }> = []
     const readyParticipants = new Map<string, ReadyArtifactParticipant>()
     const specDependsOnUpdates = new Map<string, readonly string[]>()
-    const lifecycle = this._lifecycle.evaluate(change, schema)
+    const lifecycle = evaluateLifecycleVerdict(change, schema, {
+      checksByTarget: {},
+    })
     const artifactVerdicts = new Map(
       lifecycle.artifacts.map((artifact) => [artifact.type, artifact]),
     )
@@ -251,7 +252,7 @@ export class ValidateArtifacts {
       throw new SpecNotInChangeError('<specPath required>', input.name)
     }
 
-    Logger.debug('ValidateArtifacts projected lifecycle engine dependency state', {
+    Logger.debug('ValidateArtifacts projected evaluateLifecycleVerdict dependency state', {
       change: change.name,
       specPath: input.specPath ?? null,
       artifactId: input.artifactId ?? null,
@@ -344,8 +345,8 @@ export class ValidateArtifacts {
       if (blockedDep !== undefined) {
         const blockedByParent =
           blockedDep.status === 'pending-parent-artifact-review'
-            ? (this._lifecycle.findBlockingParent(change, schema, artifactType.id) ??
-              this._lifecycle.findBlockingParent(change, schema, blockedDep.reqId))
+            ? (findBlockingParent(change, schema, artifactType.id) ??
+              findBlockingParent(change, schema, blockedDep.reqId))
             : null
         failures.push({
           artifactId: artifactType.id,

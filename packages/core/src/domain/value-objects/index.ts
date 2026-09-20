@@ -6,7 +6,12 @@ export {
 export { DomainPath } from './domain-path.js'
 export { SpecPath } from './spec-path.js'
 export { SpecArtifact } from './spec-artifact.js'
-export { type ChangeState, VALID_TRANSITIONS, isValidTransition } from './change-state.js'
+export {
+  type ChangeState,
+  VALID_TRANSITIONS,
+  HAPPY_PATH_NEXT,
+  isValidTransition,
+} from './change-state.js'
 export { type ArtifactStatus } from './artifact-status.js'
 export { type ArtifactDisplayStatus } from './artifact-display-status.js'
 export {

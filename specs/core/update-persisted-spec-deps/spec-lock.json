@@ -9,5 +9,41 @@
     "core:update-spec-deps",
     "core:initialize-persisted-spec-state"
   ],
-  "implementation": []
+  "implementation": [],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "UpdatePersistedSpecDeps add/remove/set/clear lock dependsOn via applyPersistedSpecStatePatch; expectedRevision concurrency.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:2d0742a4ef476b5e012a54e443370d73f78ccc75ba2eec408ca22d83614b2065",
+          "lastModified": "2026-08-25T15:37:19.355Z"
+        },
+        "verify.md": {
+          "hash": "sha256:e7dcb9421c0d6dd961071ea45974fb3cb67f63116e792a452a0d52779ec679a2",
+          "lastModified": "2026-08-25T15:37:19.355Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# UpdatePersistedSpecDeps\n\n## Rules\n- Input: `specId`, optional `add`/`remove`/`set` arrays, optional `clear` boolean.\n- `set` and `clear` MUST NOT combine w/ each other or `add`/`remove`. None provided → typed validation error. Mutation semantics from `core:update-spec-deps`, applied to lock state not draft `specDependsOn`.\n- Same call: removals before additions; `add` idempotent after removals.\n- Read via `SpecRepository.readPersistedState(spec)` including `originalHash`.\n- Missing state + `set`/`clear`: construct initial base w/ effective project schema + `set` list or `[]` for clear. MUST NOT invoke artifact-based dep derivation.\n- Missing state + non-empty `add`: `resolveInitialPersistedDependsOn()` (same as `core:initialize-persisted-spec-state`) then apply `add`.\n- Missing state + `remove` or empty-merge `add`: no create, return `dependsOn: []`, `created: false`, no `writePersistedState`.\n- Patch via pure `applyPersistedSpecStatePatch()` then `writePersistedState` w/ `expectedRevision` = observed `originalHash` or `null` if absent. Revision mismatch → `ArtifactConflictError`; no retry/rebase.\n- Unresolvable spec → `SpecNotFoundError`.\n- Result: `{ specId, dependsOn, created }`.\n- Config factory via `resolveUpdatePersistedSpecDepsDeps`: `specs`, `initializePersistedSpecState` collaborator for `resolveInitialPersistedDependsOn()`.\n\n## Constraints\n- Mutates only canonical persisted lock state — never change draft `specDependsOn`\n- MUST NOT import deps from persisted metadata\n- `readOnly` workspace → `ReadOnlyWorkspaceError` before persisted-state I/O\n- No actor identity",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:2d0742a4ef476b5e012a54e443370d73f78ccc75ba2eec408ca22d83614b2065",
+          "lastModified": "2026-08-25T15:37:19.355Z"
+        },
+        "verify.md": {
+          "hash": "sha256:e7dcb9421c0d6dd961071ea45974fb3cb67f63116e792a452a0d52779ec679a2",
+          "lastModified": "2026-08-25T15:37:19.355Z"
+        }
+      }
+    }
+  }
 }

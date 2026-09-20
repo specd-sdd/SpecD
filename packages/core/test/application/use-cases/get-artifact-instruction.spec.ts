@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { GetArtifactInstruction } from '../../../src/application/use-cases/get-artifact-instruction.js'
 import { ChangeNotFoundError } from '../../../src/application/errors/change-not-found-error.js'
 import { SchemaNotFoundError } from '../../../src/application/errors/schema-not-found-error.js'
@@ -8,6 +8,7 @@ import { TemplateExpander } from '../../../src/application/template-expander.js'
 import { Change, type ChangeEvent } from '../../../src/domain/entities/change.js'
 import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
 import { ArtifactFile } from '../../../src/domain/value-objects/artifact-file.js'
+import * as lifecycleVerdict from '../../../src/domain/services/lifecycle-verdict.js'
 import {
   makeChangeRepository,
   makeSpecRepository,
@@ -94,8 +95,14 @@ describe('GetArtifactInstruction', () => {
       const schema = makeSchema({ name: 'test-schema', artifacts: [artifactType] })
       const change = makeChange('my-change', { schemaName: 'test-schema' })
       const { sut } = makeSut({ change, schema })
-
+      const evaluateSpy = vi.spyOn(lifecycleVerdict, 'evaluateLifecycleVerdict')
       const result = await sut.execute({ name: 'my-change', artifactId: 'spec' })
+      expect(evaluateSpy).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.anything(),
+        expect.objectContaining({ checksByTarget: {} }),
+      )
+      evaluateSpy.mockRestore()
 
       expect(result.template).toBe('Hello my-change')
     })
@@ -287,6 +294,56 @@ describe('GetArtifactInstruction', () => {
       const result = await sut.execute({ name: 'my-change' })
 
       expect(result.artifactId).toBe('specs')
+    })
+
+    it('does not auto-select a persisted-complete child blocked by parent review', async () => {
+      const change = makeChange('my-change', { schemaName: 'test-schema' })
+      change.setArtifact(
+        new ChangeArtifact({
+          type: 'proposal',
+          files: new Map([
+            [
+              'proposal',
+              new ArtifactFile({
+                key: 'proposal',
+                filename: 'proposal.md',
+                status: 'pending-review',
+                validatedHash: 'sha256:p',
+              }),
+            ],
+          ]),
+        }),
+      )
+      change.setArtifact(
+        new ChangeArtifact({
+          type: 'specs',
+          requires: ['proposal'],
+          files: new Map([
+            [
+              'specs',
+              new ArtifactFile({
+                key: 'specs',
+                filename: 'spec.md',
+                status: 'complete',
+                validatedHash: 'sha256:s',
+              }),
+            ],
+          ]),
+        }),
+      )
+
+      const schema = makeSchema({
+        name: 'test-schema',
+        artifacts: [
+          makeArtifactType('proposal'),
+          makeArtifactType('specs', { requires: ['proposal'] }),
+        ],
+      })
+      const { sut } = makeSut({ change, schema })
+
+      const result = await sut.execute({ name: 'my-change' })
+
+      expect(result.artifactId).toBe('proposal')
     })
 
     it('throws ArtifactNotFoundError when every artifact is complete or skipped', async () => {

@@ -6,13 +6,18 @@
   "dependsOn": [
     "core:change",
     "core:workflow-model",
+    "core:schema-format",
     "default:_global/architecture",
-    "core:schema-format"
+    "default:_global/logging",
+    "core:transition-checks"
   ],
   "implementation": [
     {
-      "file": "core:src/domain/services/lifecycle-engine.ts",
-      "symbols": ["LifecycleEngine"]
+      "file": "core:src/domain/services/lifecycle-verdict.ts",
+      "symbols": ["evaluateLifecycleVerdict"]
+    },
+    {
+      "file": "core:test/domain/services/lifecycle-verdict.spec.ts"
     }
   ],
   "optimizations": {

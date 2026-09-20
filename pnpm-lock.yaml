@@ -150,9 +150,6 @@ importers:
       '@clack/prompts':
         specifier: ^0.9.1
         version: 0.9.1
-      '@specd/code-graph':
-        specifier: workspace:*
-        version: link:../code-graph
       '@specd/plugin-agent-claude':
         specifier: workspace:*
         version: link:../plugin-agent-claude

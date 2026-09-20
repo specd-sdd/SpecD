@@ -17,36 +17,36 @@
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Defines specd-project-context-optimizer and specd-spec-context-optimizer agents to compress spec context using smart caveman style.",
+      "value": "Defines specd-project-context-optimizer and specd-spec-context-optimizer; gate on project status llmOptimizedContext.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:79cd593754e667f5cf8015f5db1cc64cc030db8d32d574d85aca316bfd859188",
-          "lastModified": "2026-07-27T07:22:53.667Z"
+          "hash": "sha256:eb4207a5b018b171342286b00fa1aa07209d3844d8ff4db1b44998c2f6b1871e",
+          "lastModified": "2026-08-25T15:37:19.388Z"
         },
         "verify.md": {
-          "hash": "sha256:87eac33c3da1f2e6314d63da7a136ef059d90131024139e0561aa543cf6cf9c2",
-          "lastModified": "2026-07-27T07:22:53.669Z"
+          "hash": "sha256:0935204d24fc0c7f5cbdb36a23ed26c5a521144204a7c6d980923ee4ca9b311d",
+          "lastModified": "2026-08-25T15:37:19.388Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# skills:agents\n\n## Rules\n- Provide specialized optimizer agents: `specd-project-context-optimizer` (project context) and `specd-spec-context-optimizer` (spec metadata).\n- Skills bundle MUST NOT publish standard `specd-metadata` skill. Metadata optimization via specialized agents only.\n- Prompts MUST use smart caveman style: drop articles/filler, use fragments, preserve technical exactness (symbols, APIs, values, constants), maintain Markdown headings (`## Rules`, `## Constraints`).\n- Target 50-70% token reduction vs full spec/metadata without normative loss.\n- Agent templates (e.g. `SPECD-AGENT.md.tpl`) MUST contain ONLY raw prompt/instructions — NO YAML frontmatter/metadata. Place metadata in `specd-agent.meta.json`.\n- Missing `agents` capability fallback: copy template file to directory of `shared.md` for orchestrator inspection/execution.\n- `llmOptimizedContext` gate: inspect effective project config. If not `true`, MUST exit without generating/persisting data. Proceed ONLY if `llmOptimizedContext: true`.\n- Persist via `specd spec optimizations set` (lock-owned state). MUST NOT use metadata editors (`update-metadata`/`write-metadata`). MUST NOT run `specd spec generate-metadata` after persisting.",
+      "value": "# skills:agents\n\n## Rules\n- Provide specialized optimizer agents: `specd-project-context-optimizer` (project context) and `specd-spec-context-optimizer` (spec metadata).\n- Skills bundle MUST NOT publish standard `specd-metadata` skill. Metadata optimization via specialized agents only.\n- Prompts MUST use smart caveman style: drop articles/filler, use fragments, preserve technical exactness (symbols, APIs, values, constants), maintain Markdown headings (`## Rules`, `## Constraints`).\n- Target 50-70% token reduction vs full spec/metadata without normative loss.\n- Agent templates (e.g. `SPECD-AGENT.md.tpl`) MUST contain ONLY raw prompt/instructions — NO YAML frontmatter/metadata. Place metadata in `specd-agent.meta.json`.\n- Missing `agents` capability fallback: copy template file to directory of `shared.md` for orchestrator inspection/execution.\n- `llmOptimizedContext` gate: run `specd project status --format toon` and read top-level `llmOptimizedContext`. MUST NOT use `specd specs metadata` as enablement gate (that is materialized spec projection, not effective project config). If field not exactly `true`, MUST exit without generating/persisting any optimized field, metadata document, or lock state.\n- Spec optimizer persist: `specd specs optimizations set <spec-id> --optimized-description <text> --optimized-context <text>` (`cli:spec-optimizations`). MAY omit one direct option. MUST NOT combine either direct option with `--input`.\n- Project optimizer persist: `specd project update-metadata --optimized-context <text>`. MUST NOT route project context through spec-scoped optimizations command.\n- Spec optimizer MUST NOT use metadata editors (`update-metadata`/`write-metadata`/equivalent) for spec-level optimized content. MUST NOT run `specd specs generate-metadata` after persist — consumers self-heal.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:79cd593754e667f5cf8015f5db1cc64cc030db8d32d574d85aca316bfd859188",
-          "lastModified": "2026-07-27T07:22:53.667Z"
+          "hash": "sha256:eb4207a5b018b171342286b00fa1aa07209d3844d8ff4db1b44998c2f6b1871e",
+          "lastModified": "2026-08-25T15:37:19.388Z"
         },
         "verify.md": {
-          "hash": "sha256:87eac33c3da1f2e6314d63da7a136ef059d90131024139e0561aa543cf6cf9c2",
-          "lastModified": "2026-07-27T07:22:53.669Z"
+          "hash": "sha256:0935204d24fc0c7f5cbdb36a23ed26c5a521144204a7c6d980923ee4ca9b311d",
+          "lastModified": "2026-08-25T15:37:19.388Z"
         }
       }
     }

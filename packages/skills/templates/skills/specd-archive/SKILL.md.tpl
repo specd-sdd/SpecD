@@ -5,8 +5,10 @@
 ## What this does
 
 Reviews deltas and archives the change. Archiving merges deltas into project specs
-and is irreversible. The change MUST already be in `archivable` state — the signoff
-gate is handled by `/specd-verify`, not by this skill.
+and is irreversible. The change MUST already be in `archivable` or `archiving`
+state (`archiving` is a retry after a failed archive commit). If signoff
+is on, `/specd-verify` waits in `done` for human `approve signoff`. This skill
+does not own that wait.
 
 ## Steps
 
@@ -22,7 +24,9 @@ specd changes status <name> --format text
 
 Identify any high-visibility blockers from the **blockers:** section (e.g. `ARTIFACT_DRIFT`,
 `OVERLAP_CONFLICT`, `REVIEW_REQUIRED`) and inform the user. Follow the **next action:**
-command recommendation.
+command recommendation. `OVERLAP_CONFLICT` means live overlap with other active
+changes; archive with `--allow-overlap` only for that case. If `review.reason` is
+`spec-overlap-conflict`, run `/specd-design` — do not use `--allow-overlap`.
 
 Extract the `path:` field from the "lifecycle:" section.
 
@@ -32,7 +36,7 @@ If the status output shows `review: required: yes`, tell the user:
 
 **Stop — do not continue.**
 
-If state is not `archivable`, this is the wrong skill.
+If state is not `archivable` or `archiving`, this is the wrong skill.
 Redirect based on the **next action:** `target` recommendation.
 
 **Stop — do not continue.**
@@ -135,8 +139,12 @@ resolved or ignored.
 
 ### 5. Archive
 
+`--skip-hooks pre` only. Pre `run:` / `instruction:` already ran in step 4.
+Post `run:` hooks MUST run inside `changes archive` after persist so they cannot
+be skipped if the agent forgets a later `run-hooks` call.
+
 ```bash
-specd changes archive <name> --skip-hooks all --format toon
+specd changes archive <name> --skip-hooks pre --format toon
 ```
 
 If the command fails with a `SpecOverlapError` (spec overlap detected), other active
@@ -149,19 +157,21 @@ changes target the same specs as this change. When this happens:
 If the user confirms, re-run the command with `--allow-overlap`:
 
 ```bash
-specd changes archive <name> --skip-hooks all --allow-overlap --format toon
+specd changes archive <name> --skip-hooks pre --allow-overlap --format toon
 ```
 
 If the command fails because implementation sidecar maintenance would update specs outside the change scope, stop and surface the affected specs to the user. Only retry after explicit confirmation with:
 
 ```bash
-specd changes archive <name> --skip-hooks all --allow-out-of-scope --format toon
+specd changes archive <name> --skip-hooks pre --allow-out-of-scope --format toon
 ```
 
-### 6. Post-archive hooks
+### 6. Post-archive instructions
+
+Post `run:` hooks already ran inside `changes archive` (after persist). Do **not**
+call `run-hooks <name> archiving --phase post` — that would run them twice.
 
 ```bash
-specd changes run-hooks <name> archiving --phase post
 specd changes hook-instruction <name> archiving --phase post --format text
 ```
 

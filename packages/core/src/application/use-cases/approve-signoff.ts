@@ -6,7 +6,9 @@ import { type ContentHasher } from '../ports/content-hasher.js'
 import { ApprovalGateDisabledError } from '../errors/approval-gate-disabled-error.js'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 import { SchemaMismatchError } from '../errors/schema-mismatch-error.js'
+import { InvalidStateTransitionError } from '../../domain/errors/invalid-state-transition-error.js'
 import { computeArtifactHash, buildCleanupMap } from './_shared/compute-artifact-hash.js'
+import { boundFromStates } from '../../domain/services/check-bindings.js'
 import { type ApprovalGates } from './transition-change.js'
 
 /** Input for the {@link ApproveSignoff} use case. */
@@ -18,7 +20,8 @@ export interface ApproveSignoffInput {
 }
 
 /**
- * Records a signoff, then transitions the change to `signed-off`.
+ * Records signoff-gate consent in every state the binding table lists as `from` for
+ * `approval.signoff` (today: `done`). Drain: `pending-signoff` → `signed-off`.
  *
  * Requires the signoff gate (`approvals.signoff: true`) to be active.
  * Artifact hashes are computed internally from the change's artifacts on disk,
@@ -61,7 +64,7 @@ export class ApproveSignoff {
    * @returns The updated change
    * @throws {ApprovalGateDisabledError} If the signoff gate is not enabled
    * @throws {ChangeNotFoundError} If no change with the given name exists
-   * @throws {InvalidStateTransitionError} If the change is not in `pending-signoff` state
+   * @throws {InvalidStateTransitionError} If the change is not in an `approval.signoff` `from` state or `pending-signoff`
    * @throws {SchemaMismatchError} If the change schema differs from the active schema
    */
   async execute(input: ApproveSignoffInput): Promise<Change> {
@@ -80,12 +83,19 @@ export class ApproveSignoff {
       throw new SchemaMismatchError(change.name, change.schemaName, schema.name())
     }
 
+    const consentFrom = boundFromStates('approval.signoff')
+    if (!consentFrom.includes(change.state) && change.state !== 'pending-signoff') {
+      throw new InvalidStateTransitionError(change.state, consentFrom[0] ?? 'done')
+    }
+
     const { change: updatedChange } = await this._changes.mutate(
       input.name,
       async (freshChange) => {
         const artifactHashes = await this._computeArtifactHashes(freshChange)
         freshChange.recordSignoff(input.reason, artifactHashes, actor)
-        freshChange.transition('signed-off', actor)
+        if (freshChange.state === 'pending-signoff') {
+          freshChange.transition('signed-off', actor)
+        }
       },
     )
     return updatedChange

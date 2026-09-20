@@ -22,13 +22,11 @@ import { type ValidationResultCache } from '../application/ports/validation-resu
 import { type VcsAdapter } from '../application/ports/vcs-adapter.js'
 import { type YamlSerializer } from '../application/ports/yaml-serializer.js'
 import { type SpecdConfig, type SpecdWorkspaceConfig } from '../application/specd-config.js'
-import { Logger } from '../application/logger.js'
 import { TemplateExpander } from '../application/template-expander.js'
 import { buildSchema } from '../domain/services/build-schema.js'
 import { type ExtractorTransformRegistry } from '../domain/services/content-extraction.js'
 import { ConfigValidationError } from '../domain/errors/config-validation-error.js'
 import { parseSpecId } from '../domain/services/parse-spec-id.js'
-import { LifecycleEngine } from '../domain/services/lifecycle-engine.js'
 import { SpecPath } from '../domain/value-objects/spec-path.js'
 import { FsFileReader } from '../infrastructure/fs/file-reader.js'
 import { FsFileWriter } from '../infrastructure/fs/file-writer.js'
@@ -237,13 +235,6 @@ export interface CompositionResolver {
   getTemplateExpander(): TemplateExpander
 
   /**
-   * Returns the shared lifecycle engine.
-   *
-   * @returns The lifecycle engine
-   */
-  getLifecycleEngine(): LifecycleEngine
-
-  /**
    * Returns the derived compile-context defaults for the project.
    *
    * @returns The compiled context defaults
@@ -382,7 +373,6 @@ export function createCompositionResolver(
   let schemaProvider: SchemaProvider | undefined
   let getActiveSchema: GetActiveSchema | undefined
   let listWorkspaces: ListWorkspaces | undefined
-  let lifecycleEngine: LifecycleEngine | undefined
   let runStepHooks: RunStepHooks | undefined
   let refreshImplementationTracking: RefreshImplementationTracking | undefined
   let compileContextConfig: ReturnType<typeof buildCompileContextConfig> | undefined
@@ -663,12 +653,6 @@ export function createCompositionResolver(
       if (templateExpander !== undefined) return templateExpander
       templateExpander = new TemplateExpander({ project: { root: config.projectRoot } })
       return templateExpander
-    },
-
-    getLifecycleEngine(): LifecycleEngine {
-      if (lifecycleEngine !== undefined) return lifecycleEngine
-      lifecycleEngine = new LifecycleEngine(Logger.debug.bind(Logger))
-      return lifecycleEngine
     },
 
     getCompileContextConfig(): ReturnType<typeof buildCompileContextConfig> {

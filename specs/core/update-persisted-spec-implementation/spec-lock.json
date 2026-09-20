@@ -11,5 +11,41 @@
     "core:workspace",
     "core:initialize-persisted-spec-state"
   ],
-  "implementation": []
+  "implementation": [],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "UpdatePersistedSpecImplementation add/remove canonical workspace:path links on lock state; add may create; remove missing is no-op.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:3105bed729dd811f07b0a026969df38e53cc65a82b0c824cc58e6d99d76a87bd",
+          "lastModified": "2026-08-25T15:37:19.356Z"
+        },
+        "verify.md": {
+          "hash": "sha256:fdfa225314486b370242438df664ed27635e1a9d51bfc091ba9f4e98a3cbe39f",
+          "lastModified": "2026-08-25T15:37:19.356Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# UpdatePersistedSpecImplementation\n\n## Rules\n- Input: `specId`, `action` `'add'|'remove'`, `file` (project-relative to workspace codeRoot), optional `symbols`.\n- `add`: file MUST exist on disk in codeRoot; else `ImplementationFileNotFoundError`, no mutation.\n- Normalize `file` to canonical `workspace:path` (`core:spec-lock`, `core:workspace`, `core:storage`). Outside codeRoot → `ImplementationWorkspaceBoundaryError`; no coerce/drop.\n- `add` + `symbols`: add symbols without discarding prior for same file. `add` without `symbols`: ensure file-level link (no `symbols` field); do not alter existing symbol-level entries.\n- `remove` + `symbols`: remove those names; empty remaining + no separate file-level link MAY drop entry. `remove` without `symbols`: remove whole entry including symbol refinements.\n- Missing state + `add`: `resolveInitialPersistedDependsOn()` then default `implementation: []` then apply add.\n- Missing state + `remove`: no create; `implementation: []`, `created: false`, no `writePersistedState`.\n- Patch via `applyPersistedSpecStatePatch()` then `writePersistedState` w/ `expectedRevision` = `originalHash` or `null`. Mismatch → `ArtifactConflictError`.\n- Unresolvable spec → `SpecNotFoundError`.\n- Result: `{ specId, implementation, created }`.\n- Config factory via `resolveUpdatePersistedSpecImplementationDeps`: `specs`, `workspaces`, `files: FileReader`, `initializePersistedSpecState` collaborator.\n\n## Constraints\n- Mutates only canonical persisted lock state — never change draft trackedImplementationFiles or in-progress confirmed links\n- `readOnly` workspace → `ReadOnlyWorkspaceError` before persisted-state I/O\n- Storage identity always canonical `workspace:path`, never raw project-relative paths",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:3105bed729dd811f07b0a026969df38e53cc65a82b0c824cc58e6d99d76a87bd",
+          "lastModified": "2026-08-25T15:37:19.356Z"
+        },
+        "verify.md": {
+          "hash": "sha256:fdfa225314486b370242438df664ed27635e1a9d51bfc091ba9f4e98a3cbe39f",
+          "lastModified": "2026-08-25T15:37:19.356Z"
+        }
+      }
+    }
+  }
 }

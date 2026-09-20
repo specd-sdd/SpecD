@@ -157,6 +157,16 @@ export interface RawSignedOffEvent {
   readonly artifactHashes: Record<string, string>
 }
 
+/** Raw JSON shape of a `signoff-invalidated` event. */
+export interface RawSignoffInvalidatedEvent {
+  /** Event discriminant. */
+  readonly type: 'signoff-invalidated'
+  /** ISO 8601 timestamp. */
+  readonly at: string
+  /** Actor who cleared the signoff. */
+  readonly by: ManifestActorIdentity
+}
+
 /** Raw JSON shape of an `invalidated` event. */
 export interface RawInvalidatedEvent {
   /** Event discriminant. */
@@ -271,6 +281,7 @@ export type RawChangeEvent =
   | RawTransitionedEvent
   | RawSpecApprovedEvent
   | RawSignedOffEvent
+  | RawSignoffInvalidatedEvent
   | RawInvalidatedEvent
   | RawArchiveFailedEvent
   | RawDraftedEvent
@@ -297,6 +308,7 @@ const artifactStatusSchema = z.enum([
   'skipped',
   'pending-review',
   'drifted-pending-review',
+  'pending-parent-artifact-review',
 ])
 
 export const manifestArtifactFileSchema = z.object({

@@ -37,25 +37,25 @@
 
 #### Scenario: Dependency complete — validation proceeds
 
-- **GIVEN** artifact `specs` requires `proposal`, and `LifecycleEngine` reports `proposal` as `complete`
+- **GIVEN** artifact `specs` requires `proposal`, and `projectArtifacts` reports `proposal` as `complete`
 - **WHEN** `ValidateArtifacts.execute` is called for `specs`
 - **THEN** validation of `specs` proceeds normally
 
 #### Scenario: Dependency skipped — validation proceeds
 
-- **GIVEN** artifact `tasks` requires `design`, and `LifecycleEngine` reports `design` as `skipped`
+- **GIVEN** artifact `tasks` requires `design`, and `projectArtifacts` reports `design` as `skipped`
 - **WHEN** `ValidateArtifacts.execute` is called for `tasks`
 - **THEN** validation of `tasks` proceeds — `skipped` satisfies the dependency
 
 #### Scenario: Dependency incomplete — validation blocked
 
-- **GIVEN** artifact `specs` requires `proposal`, and `LifecycleEngine` reports `proposal` as `in-progress`
+- **GIVEN** artifact `specs` requires `proposal`, and `projectArtifacts` reports `proposal` as `in-progress`
 - **WHEN** `ValidateArtifacts.execute` is called for `specs`
 - **THEN** `specs` is reported as dependency-blocked and `markComplete` is not called for it
 
 #### Scenario: Dependency-block failure includes effective dependency status
 
-- **GIVEN** artifact `specs` requires `proposal`, and `LifecycleEngine` reports `proposal` effective status as `missing`
+- **GIVEN** artifact `specs` requires `proposal`, and `projectArtifacts` reports `proposal` effective status as `missing`
 - **WHEN** `ValidateArtifacts.execute` is called for `specs`
 - **THEN** the dependency-blocked failure description includes dependency `proposal`
 - **AND** the description includes status `missing`
@@ -63,7 +63,7 @@
 #### Scenario: Review-propagation blocker includes recursive parent context
 
 - **GIVEN** artifact `verify` depends on `specs`
-- **AND** `LifecycleEngine` reports `specs` effective status as `pending-parent-artifact-review`
+- **AND** `projectArtifacts` reports `specs` effective status as `pending-parent-artifact-review`
 - **AND** recursive blocker resolution identifies parent artifact `proposal` with status `pending-review`
 - **WHEN** `ValidateArtifacts.execute` is called for `verify`
 - **THEN** the dependency-blocked failure description includes status `pending-parent-artifact-review`
@@ -72,7 +72,7 @@
 #### Scenario: Direct review blocker status is reported as review-state
 
 - **GIVEN** artifact `verify` depends on `specs`
-- **AND** `LifecycleEngine` reports `specs` effective status as `pending-review` or `drifted-pending-review`
+- **AND** `projectArtifacts` reports `specs` effective status as `pending-review` or `drifted-pending-review`
 - **WHEN** `ValidateArtifacts.execute` is called for `verify`
 - **THEN** the dependency-blocked failure description includes the exact dependency status
 - **AND** the status is presented as a review blocker, not as generic incompleteness
@@ -95,8 +95,9 @@
 #### Scenario: Lifecycle snapshot refreshes after markComplete in same execute
 
 - **GIVEN** a change where parent and child artifacts are both incomplete at `execute` start
-- **WHEN** the parent artifact validates successfully and is persisted as `complete` before the child is processed in the same `execute`
+- **WHEN** the parent artifact validates successfully and is marked `complete` before the child is processed in the same `execute`
 - **THEN** the child dependency check observes the parent as `complete`
+- **AND** `evaluateLifecycleVerdict` is not called again between those files
 
 ### Requirement: Complete and skipped file bypass
 
@@ -146,20 +147,27 @@
 
 ### Requirement: Policy-aware drift materialization
 
-#### Scenario: One invalidate call carries the focused drift payload
+#### Scenario: ValidateArtifacts does not own baseline validatedHash drift
 
-- **GIVEN** one file under `specs` and one file under `verify` mismatch their validated baselines
+- **GIVEN** a complete file whose content no longer matches `validatedHash`
+- **AND** the change has no active spec approval and no active signoff
 - **WHEN** `ValidateArtifacts.execute` runs
-- **THEN** it calls `Change.invalidate()` exactly once
-- **AND** the grouped payload identifies only those mismatching files
+- **THEN** it does not call `Change.invalidate` for that baseline mismatch
 
-#### Scenario: Policy none preserves complete while still marking drift
+#### Scenario: Consent-hash drift still invalidates once with a focused payload
 
-- **GIVEN** a complete file still exists on disk but its content hash changed
-- **AND** the change's effective invalidation policy is `none`
+- **GIVEN** a change with an active spec approval
+- **AND** one file's current hash differs from `activeSpecApproval.artifactHashes`
 - **WHEN** `ValidateArtifacts.execute` runs
-- **THEN** the file remains canonically `complete`
-- **AND** `hasDrift` becomes `true`
+- **THEN** it calls `Change.invalidate()` with cause `artifact-drift`
+- **AND** the grouped payload identifies only that file
+
+#### Scenario: Consent-hash scan is not scoped to artifactId
+
+- **GIVEN** an active spec approval whose hashes include more than one artifact type
+- **AND** `ValidateArtifacts.execute` is called with `artifactId` set to one of those types
+- **WHEN** a different artifact type's consent hash mismatches
+- **THEN** `Change.invalidate` still runs for that mismatch
 
 ### Requirement: Per-file validation
 
@@ -183,9 +191,10 @@
 #### Scenario: Missing file can still carry hasDrift without rendering complete-with-drift
 
 - **GIVEN** a file was previously validated and is now absent on disk
-- **WHEN** `ValidateArtifacts.execute` compares current state to the validated baseline
-- **THEN** `hasDrift` may remain `true`
-- **AND** the file is not treated as `complete-with-drift`
+- **AND** the change has no active spec approval and no active signoff
+- **WHEN** `ValidateArtifacts.execute` runs
+- **THEN** it does not call `Change.invalidate` for that absence
+- **AND** it does not treat the file as `complete-with-drift`
 
 ### Requirement: Expected file path validation
 
@@ -404,6 +413,15 @@
 - **WHEN** `ValidateArtifacts.execute` performs metadataExtraction validation
 - **THEN** the artifact records a validation failure instead of ignoring the transform
 
+#### Scenario: Partial extracted metadata does not require title description or contentHashes
+
+- **GIVEN** metadataExtraction binds `title` to artifact `specs`
+- **AND** `ValidateArtifacts.execute` is called with `artifactId: 'verify'`
+- **AND** extraction for `verify` does not produce `title`, `description`, or `contentHashes`
+- **WHEN** metadataExtraction validation runs
+- **THEN** the result is validated against `permissiveSpecMetadataSchema`
+- **AND** missing `title` / `description` / `contentHashes` do not cause a validation failure
+
 ### Requirement: Hash computation and markComplete
 
 #### Scenario: All validations pass — markComplete sets complete state
@@ -506,10 +524,11 @@
 
 ### Requirement: Ports and constructor
 
-#### Scenario: ValidateArtifacts is constructed with LifecycleEngine
+#### Scenario: ValidateArtifacts is constructed without LifecycleEngine
 
 - **WHEN** `ValidateArtifacts` is assembled
-- **THEN** the constructor receives a `LifecycleEngine` dependency
+- **THEN** the constructor does not receive a `LifecycleEngine` dependency
+- **AND** DAG answers come from `evaluateLifecycleVerdict` with empty `checksByTarget`
 
 #### Scenario: ValidateArtifacts is constructed with extractor runtime wiring
 
@@ -573,14 +592,14 @@
 #### Scenario: Dependency order still applies to the specified artifact
 
 - **GIVEN** `artifactId` is `"specs"` and artifact `specs` requires `proposal`
-- **AND** `LifecycleEngine` reports `proposal` as not `complete` or `skipped`
+- **AND** `projectArtifacts` reports `proposal` as not `complete` or `skipped`
 - **WHEN** `ValidateArtifacts.execute` is called
 - **THEN** `specs` is reported as dependency-blocked and `markComplete` is not called
 
 #### Scenario: Specified artifact with satisfied dependencies proceeds normally
 
 - **GIVEN** `artifactId` is `"specs"` and artifact `specs` requires `proposal`
-- **AND** `LifecycleEngine` reports `proposal` as `complete`
+- **AND** `projectArtifacts` reports `proposal` as `complete`
 - **WHEN** `ValidateArtifacts.execute` is called
 - **THEN** `specs` is validated normally and `markComplete` is called if all validations pass
 
@@ -634,8 +653,32 @@
 - `schemaProvider: SchemaProvider`
 - `parsers: ArtifactParserRegistry`
 - `actor: ActorResolver`
-- `hasher: ContentHasher`
+- `contentHasher: ContentHasher`
 - `extractorTransforms: ExtractorTransformRegistry`
 - `workspaceRoutes: readonly SpecWorkspaceRoute[]`
-- `lifecycle: LifecycleEngine`
+- **AND** it does not resolve `lifecycle` or `LifecycleEngine`
 - **AND** the factory delegates to canonical `createValidateArtifacts(deps)`
+
+### Requirement: DAG lifecycle from evaluateLifecycleVerdict
+
+#### Scenario: ValidateArtifacts uses empty checksByTarget
+
+- **GIVEN** a change that needs DAG-aware lifecycle answers during validation
+- **WHEN** `ValidateArtifacts` runs
+- **THEN** it calls `evaluateLifecycleVerdict` with empty `checksByTarget`
+- **AND** it does not run hop predicates
+- **AND** `gatherPredicateSnapshots` is not called
+
+#### Scenario: Constructor receives ListWorkspaces
+
+- **WHEN** `ValidateArtifacts` is assembled
+- **THEN** the constructor receives `ListWorkspaces`
+- **AND** it does not take a `ReadonlyMap` of `SpecRepository`
+
+### Requirement: Change must exist
+
+#### Scenario: Unknown change throws ChangeNotFoundError
+
+- **WHEN** `ValidateArtifacts.execute` is called with a change name that does not exist
+- **THEN** `ChangeNotFoundError` is thrown
+- **AND** no validation result object is returned

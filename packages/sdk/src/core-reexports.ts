@@ -136,6 +136,7 @@ export {
   type ArchiveChange,
   type ArchiveChangeInput,
   type ArchiveChangeResult,
+  type OnArchiveProgress,
   type InvalidatedChangesEntry,
   type ValidateArtifacts,
   type ValidateArtifactsInput,
@@ -423,6 +424,7 @@ export {
   SpecArtifact,
   type ChangeState,
   VALID_TRANSITIONS,
+  HAPPY_PATH_NEXT,
   isValidTransition,
   type ArtifactStatus,
   type ArtifactDisplayStatus,
@@ -471,6 +473,7 @@ export {
   SpecdError,
   InvalidStateTransitionError,
   type TransitionFailureReason,
+  HappyPathNextUnavailableError,
   ApprovalRequiredError,
   InvalidSpecPathError,
   ArtifactConflictError,
@@ -608,8 +611,8 @@ export {
 } from '@specd/core'
 export { detectSpecOverlap } from '@specd/core'
 export {
-  LifecycleEngine,
-  type LifecycleEngineOptions,
+  evaluateLifecycle,
+  type LifecycleVerdictInput,
   type LifecycleAffectedFile,
   type LifecycleAffectedArtifact,
   type LifecycleBlocker,
@@ -620,6 +623,16 @@ export {
   type LifecycleTransitionBlocker,
   type LifecycleStepVerdict,
   type LifecycleVerdict,
+} from '@specd/core'
+export {
+  classifyAlong,
+  checkLabel,
+  CHECK_LABELS,
+  type CheckId,
+  type CheckKind,
+  type CheckResult,
+  type CheckProgressEvent,
+  type OnCheckProgress,
 } from '@specd/core'
 
 export { CORE_VERSION } from '@specd/core'

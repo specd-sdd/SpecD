@@ -5,7 +5,6 @@ import { type SpecRepository } from '../../application/ports/spec-repository.js'
 import { type TemplateExpander } from '../../application/template-expander.js'
 import { GetArtifactInstruction } from '../../application/use-cases/get-artifact-instruction.js'
 import { type SpecdConfig } from '../../application/specd-config.js'
-import { type LifecycleEngine } from '../../domain/services/lifecycle-engine.js'
 import {
   createCompositionResolver,
   type CompositionResolver,
@@ -27,8 +26,6 @@ export interface GetArtifactInstructionDeps {
   readonly parsers: ArtifactParserRegistry
   /** Template expander used by the use case. */
   readonly templateExpander: TemplateExpander
-  /** Lifecycle engine used by the use case. */
-  readonly lifecycle: LifecycleEngine
 }
 
 /**
@@ -40,13 +37,14 @@ export interface GetArtifactInstructionDeps {
 export function resolveGetArtifactInstructionDeps(
   resolver: CompositionResolver,
 ): GetArtifactInstructionDeps {
+  const changes = resolver.getChangeRepository()
+  const parsers = resolver.getArtifactParserRegistry()
   return {
-    changes: resolver.getChangeRepository(),
+    changes,
     specs: resolver.getSpecRepositories(),
     schemaProvider: resolver.getSchemaProvider(),
-    parsers: resolver.getArtifactParserRegistry(),
+    parsers,
     templateExpander: resolver.getTemplateExpander(),
-    lifecycle: resolver.getLifecycleEngine(),
   }
 }
 
@@ -100,15 +98,8 @@ function createGetArtifactInstructionFromNormalized(
   input: FactoryInput<GetArtifactInstructionDeps, CompositionResolutionOptions>,
 ): GetArtifactInstruction {
   if (input.kind === 'deps') {
-    const { changes, specs, schemaProvider, parsers, templateExpander, lifecycle } = input.deps
-    return new GetArtifactInstruction(
-      changes,
-      specs,
-      schemaProvider,
-      parsers,
-      templateExpander,
-      lifecycle,
-    )
+    const { changes, specs, schemaProvider, parsers, templateExpander } = input.deps
+    return new GetArtifactInstruction(changes, specs, schemaProvider, parsers, templateExpander)
   }
 
   const resolver = createCompositionResolver(input.config, input.options)
@@ -129,7 +120,6 @@ function isGetArtifactInstructionDeps(
     'specs' in value &&
     'schemaProvider' in value &&
     'parsers' in value &&
-    'templateExpander' in value &&
-    'lifecycle' in value
+    'templateExpander' in value
   )
 }

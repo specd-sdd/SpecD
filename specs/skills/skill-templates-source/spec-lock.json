@@ -3,7 +3,12 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": ["skills:skill", "cli:spec-optimizations", "skills:workflow-automation"],
+  "dependsOn": [
+    "skills:skill",
+    "cli:spec-optimizations",
+    "skills:workflow-automation",
+    "core:transition-checks"
+  ],
   "implementation": [
     {
       "file": "skills:templates/skills/specd-fasttrack/SKILL.md.tpl"

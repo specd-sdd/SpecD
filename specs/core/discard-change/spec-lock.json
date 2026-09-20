@@ -8,5 +8,41 @@
     {
       "file": "core:src/composition/use-cases/discard-change.ts"
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "DiscardChange terminal: discarded event + mutate/mutateDraft to discarded/; reason required; force if ever implementing.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:245ba4ef6b444c02606244ca4676daeafe17ec04325046b3fb32ee3eaf6e20d5",
+          "lastModified": "2026-08-25T15:37:19.279Z"
+        },
+        "verify.md": {
+          "hash": "sha256:3ca130bd338c2b09f96bb6f116b1fa6a12ede1208d210c21e7e4ad40a023240c",
+          "lastModified": "2026-08-25T15:37:19.280Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# DiscardChange\n\n## Rules\n- Input: `name` (required), `reason` (required), optional `supersededBy` string[], optional `force`.\n- Locate: (1) `get(name)` → discard via `mutate(name, fn)`; (2) else `getDraft(name)` → `mutateDraft(name, fn)`; (3) else `ChangeNotFoundError`. MUST NOT load draft through `get(name)`.\n- Actor via `ActorResolver` on `discarded` event.\n- Historical implementation guard: if ever `implementing`, fail unless `input.force === true`.\n- After guard: `change.discard(reason, actor, supersededBy, force)`. Event: `type: 'discarded'`, `at`, `by`, `reason`, `supersededBy` only if provided.\n- Persist via mutate/mutateDraft; repo moves directory to `discarded/`. Returns updated `Change` from serialized mutation.\n- Deps: ChangeRepository, ActorResolver. Config factory via `resolveDiscardChangeDeps` only.\n\n## Constraints\n- No lifecycle state transitions — discarding orthogonal to lifecycle\n- `reason` mandatory at type level\n- Directory relocation entirely repository-owned\n- Discarded changes cannot be restored",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:245ba4ef6b444c02606244ca4676daeafe17ec04325046b3fb32ee3eaf6e20d5",
+          "lastModified": "2026-08-25T15:37:19.279Z"
+        },
+        "verify.md": {
+          "hash": "sha256:3ca130bd338c2b09f96bb6f116b1fa6a12ede1208d210c21e7e4ad40a023240c",
+          "lastModified": "2026-08-25T15:37:19.280Z"
+        }
+      }
+    }
+  }
 }

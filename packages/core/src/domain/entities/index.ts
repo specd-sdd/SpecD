@@ -7,6 +7,7 @@ export {
   type TransitionedEvent,
   type SpecApprovedEvent,
   type SignedOffEvent,
+  type SignoffInvalidatedEvent,
   type InvalidatedEvent,
   type DraftedEvent,
   type RestoredEvent,

@@ -16,36 +16,36 @@
   "implementation": [],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Workflow step semantics: state=step name, requires artifact gating, hooks, taskCompletion checks.",
+      "value": "Workflow maps schema rows onto fixed lifecycle states, evaluating artifact/task gates, progress axis, and bound hook effects.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:5865c596ff1ba22a31321bcd7e50b85d86547a611b595def6d71c0f88fb37864",
-          "lastModified": "2026-05-25T06:02:58.500Z"
+          "hash": "sha256:dec0dcf40d955780f9e347bb04a3904ce74b083df782c712466ba54b157b38d9",
+          "lastModified": "2026-08-29T22:53:45.558Z"
         },
         "verify.md": {
-          "hash": "sha256:ab90e870ac56a2accb79687d172b57bd9a69484b597848ed1411536ae8ac3e6e",
-          "lastModified": "2026-05-25T06:02:58.500Z"
+          "hash": "sha256:189bcf8229a5af5def36d78ba97c3e7c713760cd2ed1ec717621b98b21e7ad8d",
+          "lastModified": "2026-08-29T22:53:45.558Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# Workflow Model\n\n## Rules\n- `workflow[].step` = Change lifecycle state names; invalid → `InvalidStateTransitionError`. Schema selects visibility/order/gating — does not invent states.\n- Roles: designing (per-artifact CompileContext); implementing (once, artifacts review-complete); verifying (outcomes → implementing or designing); archiving (ArchiveChange atomic). `drifted-pending-review` → designing.\n- `requires` artifact IDs: state must be `complete|skipped` else InvalidStateTransitionError. Empty = ungated. missing/in-progress/pending-review/drifted-pending-review fail.\n- `requiresTaskCompletion` ⊂ `requires`, artifacts with `taskCompletionCheck`; validated in `buildSchema`. Check content via `incompletePattern` + `safeRegex` `'m'`; match → InvalidStateTransitionError `incomplete-tasks`. Absent array = no content gate.\n- Availability: `requires.every(id => state ∈ {complete,skipped})` — dynamic, uncached. Array order = display only, not sequential lock.\n- Step name IS target state. Hooks pre/post `run:`/`instruction:`; TransitionChange runs by default unless `skipHooks`. Agent-driven vs deterministic (ArchiveChange) modes.\n- Artifact DAG acyclic via buildSchema; step requires cannot form step cycles.\n\n## Constraints\n- States owned by Change entity. safeRegex fail/nested quantifiers → non-match (no throw). Archiving only step with dedicated use case.",
+      "value": "# Workflow Model\n\n## Rules\n- `workflow[].step` references fixed `ChangeState`: `drafting|designing|ready|implementing|verifying|done|archivable|archiving`; drain approval states cannot be rows. Unknown → `SchemaValidationError`. `VALID_TRANSITIONS` owns protocol; omitted row leaves legal hop ungated (`workflowStep()` null).\n- Roles: designing authors artifact DAG per artifact; implementing once after review; verifying returns `implementation-failure → implementing` or `artifact-review-required → designing`; drift always designing; archiving atomic `ArchiveChange`.\n- `requires` evaluates `workflow.requires` to `effective`; every required effective status must `complete|skipped`, else `InvalidStateTransitionError`. Empty/absent skips only artifact gate; other predicates still apply.\n- `requiresTaskCompletion` subset `requires`, each artifact has `taskCompletionCheck`; `buildSchema` validates. `CountTasks` via `createWorkflowTaskCompletion` reads existing files, `safeRegex(incompletePattern, 'm')`; match rejects `incomplete-tasks`; invalid/nested regex non-match. Absent array means no content gate.\n- Availability dynamic from `evaluateLifecycleVerdict` predicate `CheckResult`s; `GetStatus` shares it. `CompileContext` neither evaluates availability nor calls verdict. No independent requires walk / entity `effectiveStatus()`.\n- Workflow order = display + `along` progress axis. Missing delivery states spliced by `AXIS_FALLBACK`; order never mandates sequential occupancy. `to = designing` redesign; `archiving → archivable` recovery.\n- Step name is target state. `run:` effects use predicate matcher: pre enters target (`along:any`), post exits source forward-only; execute after predicates before persist unless skip. Archive uses operation `archive`, not lifecycle `along`. `instruction:` outside pipeline.\n\n## Constraints\n- Schema config adds flags/hooks only; never lifecycle state/hop membership.\n- Artifact DAG acyclic at schema load; requires names artifacts, never steps.\n- Archiving only workflow step with dedicated use case.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:5865c596ff1ba22a31321bcd7e50b85d86547a611b595def6d71c0f88fb37864",
-          "lastModified": "2026-05-25T06:02:58.500Z"
+          "hash": "sha256:dec0dcf40d955780f9e347bb04a3904ce74b083df782c712466ba54b157b38d9",
+          "lastModified": "2026-08-29T22:53:45.558Z"
         },
         "verify.md": {
-          "hash": "sha256:ab90e870ac56a2accb79687d172b57bd9a69484b597848ed1411536ae8ac3e6e",
-          "lastModified": "2026-05-25T06:02:58.500Z"
+          "hash": "sha256:189bcf8229a5af5def36d78ba97c3e7c713760cd2ed1ec717621b98b21e7ad8d",
+          "lastModified": "2026-08-29T22:53:45.558Z"
         }
       }
     }

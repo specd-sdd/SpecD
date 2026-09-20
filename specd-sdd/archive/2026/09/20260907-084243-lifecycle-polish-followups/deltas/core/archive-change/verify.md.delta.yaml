@@ -1,0 +1,14 @@
+- op: added
+  description: Cover rollback through the fallback snapshot port.
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    ### Requirement: Shared fallback batch snapshot lifetime
+
+    #### Scenario: Restore removes a file recorded after fallback snapshot
+
+    - **GIVEN** archive composition uses the fallback batch snapshot port
+    - **WHEN** it snapshots, records a newly created file, and restores
+    - **THEN** restore removes the newly created file through the same snapshot manifest

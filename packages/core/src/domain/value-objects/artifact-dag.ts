@@ -9,6 +9,7 @@ import { ArtifactType, type ArtifactScope } from './artifact-type.js'
 export class ArtifactDag {
   private readonly _roots: readonly string[]
   private readonly _children: ReadonlyMap<string, readonly string[]>
+  private readonly _parents: ReadonlyMap<string, readonly string[]>
   private readonly _topologicalOrder: readonly string[]
   private readonly _orderIndex: ReadonlyMap<string, number>
 
@@ -17,17 +18,20 @@ export class ArtifactDag {
    *
    * @param roots - Artifact ids with no incoming `requires` edges
    * @param children - Direct dependents keyed by parent id
+   * @param parents - Direct requirements keyed by child id
    * @param topologicalOrder - All ids in parent-before-child order
    * @param orderIndex - Schema declaration order for tie-breaking
    */
   private constructor(
     roots: readonly string[],
     children: ReadonlyMap<string, readonly string[]>,
+    parents: ReadonlyMap<string, readonly string[]>,
     topologicalOrder: readonly string[],
     orderIndex: ReadonlyMap<string, number>,
   ) {
     this._roots = roots
     this._children = children
+    this._parents = parents
     this._topologicalOrder = topologicalOrder
     this._orderIndex = orderIndex
   }
@@ -97,7 +101,15 @@ export class ArtifactDag {
       .map((a) => a.id)
       .sort((a, b) => (orderIndex.get(a) ?? 0) - (orderIndex.get(b) ?? 0))
 
-    return new ArtifactDag(roots, children, topologicalOrder, orderIndex)
+    const parents = new Map<string, readonly string[]>()
+    for (const artifact of artifacts) {
+      const required = [...artifact.requires].sort(
+        (a, b) => (orderIndex.get(a) ?? 0) - (orderIndex.get(b) ?? 0),
+      )
+      parents.set(artifact.id, required)
+    }
+
+    return new ArtifactDag(roots, children, parents, topologicalOrder, orderIndex)
   }
 
   /**
@@ -117,6 +129,16 @@ export class ArtifactDag {
    */
   childrenOf(id: string): readonly string[] {
     return this._children.get(id) ?? []
+  }
+
+  /**
+   * Direct requirements of `id` (`requires` edges), in schema declaration order.
+   *
+   * @param id - Child artifact type id
+   * @returns Parent artifact ids
+   */
+  parentsOf(id: string): readonly string[] {
+    return this._parents.get(id) ?? []
   }
 
   /**

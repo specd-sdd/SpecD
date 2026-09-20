@@ -4,46 +4,39 @@
     "version": 1
   },
   "dependsOn": [],
-  "implementation": [
-    {
-      "file": "default:packages/core/src/public.ts"
-    },
-    {
-      "file": "default:packages/core/src/composition/config-loader.ts"
-    }
-  ],
+  "implementation": [],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Hexagonal + DDD: domain center, I/O at edges. domain/application/infrastructure/composition layers for all business-logic packages.",
+      "value": "Hexagonal + DDD: pure domain, port-bound application, edge I/O, shared resolver-backed composition.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:693839342248443c83ea331bbd15812393070ff7c3c77ae972a6810474e088e3",
-          "lastModified": "2026-07-23T10:30:08.948Z"
+          "hash": "sha256:c8fc9c55d4a4d10d4fc83035d5d250dc7867830f3824fe8ab529ed89e04125a6",
+          "lastModified": "2026-08-29T22:56:09.779Z"
         },
         "verify.md": {
-          "hash": "sha256:c9e2b8088c46b58206fef1b1f5327be4924d2e3b4ce9114649b46b33eb6450a3",
-          "lastModified": "2026-07-23T10:28:25.732Z"
+          "hash": "sha256:3e01a0d769376c6d7931fc4128e903b49a6cd68342898fccb224eaed638cde75",
+          "lastModified": "2026-08-29T22:53:46.349Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# Architecture\n\n## Rules\n- Business-logic packages: `domain` / `application` / `infrastructure` + optional `composition/`; inner layers never import outer\n- `domain/`: zero I/O (no fs/net/child_process/HTTP); stdlib + domain types only\n- `application/`: outside world via ports in `application/ports/` only; never import infrastructure\n- Rich entities: own invariants + state transitions; throw typed domain errors; use cases don't duplicate entity checks\n- Value objects: behaviour via methods/getters; internal representation not exposed outside class hierarchy\n- Ports with shared constructor args: `abstract class` (not interface); invariant fields in constructor; all methods explicit (no property signatures)\n- Stateless domain services: plain functions in `domain/services/`, not classes\n- Manual DI at entry points; no IoC; constructors receive port implementations\n- `composition/`: only layer importing `infrastructure/`; wires Kernel + config loader/writer ports\n- Kernel: `createKernel(config, options?)` wires use cases; no config mutation in kernel; hosts read via `kernel.project.getConfig`\n- Every Kernel capability MUST be obtainable without `createKernel`; factories: `createX(deps)` canonical, `createX(config, options?)` convenience via shared composition-resolver\n- `createKernel`/`createKernelBuilder`: convenience over same resolver path; not second composition source of truth\n- Concrete adapters never exported from public entry points; delivery hosts (`@specd/cli`, `@specd/mcp`) import `@specd/sdk` per `sdk:composition`\n- Infrastructure YAML reads: validate at boundary with schema validator; failures as `ConfigValidationError`/`SchemaValidationError` extending `SpecdError`\n- Adapter packages (`@specd/cli`, `@specd/mcp`, `@specd/plugin-*`): no business logic; translate delivery ↔ use cases\n- Package deps one-way: `plugin-*` → `skills` → `core`; `cli` → `sdk`; `mcp` → `sdk`; `sdk` → `core`, `code-graph`; `schema-*` no specd deps\n- Public barrels via `package.json` exports: `\".\"` integrator surface (no concrete adapters); `\"./ports\"` port contracts; `\"./extensions\"` kernel registry/factory types; `\"./internal\"` dev-only\n- `@specd/sdk` re-exports `./ports` and `./extensions` from `@specd/core`\n\n## Constraints\n- domain/ must not import application/, infrastructure/, composition/\n- application/ must not import infrastructure/, composition/\n- infrastructure/ must not import composition/\n- Only composition/ imports infrastructure/; no concrete adapters from index.ts\n- Delivery: use factories/kernel/config ports only; no infrastructure imports or direct use-case construction\n- No module-level singletons; constructor DI everywhere\n- Domain errors extend SpecdError; stateless ops are functions not classes\n- Ports with invariant ctor args are abstract classes with explicit methods\n- No circular workspace:* dependencies\n- YAML validated at infrastructure boundary before domain/application\n- Public \".\" barrels: no concrete adapters; must export kernel-equivalent createX factories\n- Port contracts on `@specd/core/ports` + `@specd/sdk/ports`; extensions on `/extensions`\n- cli/mcp MUST NOT depend on both `@specd/core` and `@specd/code-graph` when `@specd/sdk` suffices",
+      "value": "# Architecture\n\n## Rules\n- Business-logic packages: `domain` / `application` / `infrastructure`; optional `composition/`; inner layers never import outer\n- `domain/`: zero I/O (`fs`/`net`/`child_process`/external HTTP); TypeScript stdlib + domain types only\n- Ambient `Logger` MAY be imported from any layer for diagnostics only; composition root wires implementation; not fourth layer\n- `application/`: outside world only via ports in `application/ports/`; never imports infrastructure; ambient `Logger` permitted\n- Entities own invariants/state transitions; invalid ops throw typed `SpecdError` subclasses; use cases do not duplicate checks\n- Value objects expose behaviour via methods/getters; representation private outside class hierarchy\n- Ports with invariant ctor args: `abstract class`, invariant fields set in ctor, all operations explicit abstract methods; no property signatures\n- Stateless domain services: exported functions in `domain/services/`, not classes\n- Manual DI: use-case ctors receive ports; no IoC or module singletons\n- `composition/` only layer importing `infrastructure/`; `createKernel(config, options?)` wires grouped use cases; no config mutation; hosts read `kernel.project.getConfig`\n- Every Kernel capability available without `createKernel`: `createX(deps)` canonical; `createX(config, options?)` optional convenience through shared normalized config resolver\n- `createKernel`/`createKernelBuilder`: convenience over same resolver; no second composition source\n- Concrete adapters never public-exported; `@specd/cli`/`@specd/mcp` use `@specd/sdk` when needing core + code-graph\n- YAML-reading adapters validate at filesystem boundary; failures `ConfigValidationError`/`SchemaValidationError` extending `SpecdError`; raw YAML never enters domain/application\n- Delivery packages (`@specd/cli`, `@specd/mcp`, `@specd/plugin-*`): no business logic; delivery-to-use-case translation only\n- Package deps: `plugin-*` → `skills` → `core`; `cli` → `sdk`; `mcp` → `sdk`; `sdk` → `core`, `code-graph`; `schema-*` no specd deps\n- Curated exports: `.` integrator surface/no adapters; `./ports` contracts; `./extensions` registry/factory types; `./internal` dev/advanced; `@specd/sdk` re-exports `./ports` + `./extensions`\n\n## Constraints\n- `domain/` must not import `application/`, `infrastructure/`, `composition/`\n- `application/` must not import `infrastructure/`, `composition/`; `infrastructure/` must not import `composition/`\n- Only `composition/` imports `infrastructure/`; `index.ts` must not export concrete adapters/repository factories\n- Delivery uses kernel/factories/config ports, calls returned port methods; no adapter imports/direct use-case construction\n- No circular `workspace:*` dependencies\n- Public `.` exports kernel-equivalent `createX` + repository factories for every Kernel capability; no adapters/infrastructure\n- Ports: `@specd/core/ports`, `@specd/sdk/ports`; extension types: `@specd/core/extensions`, `@specd/sdk/extensions`\n- `cli`/`mcp` must not directly depend on core + code-graph when `@specd/sdk` covers needs",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:693839342248443c83ea331bbd15812393070ff7c3c77ae972a6810474e088e3",
-          "lastModified": "2026-07-23T10:30:08.948Z"
+          "hash": "sha256:c8fc9c55d4a4d10d4fc83035d5d250dc7867830f3824fe8ab529ed89e04125a6",
+          "lastModified": "2026-08-29T22:56:09.779Z"
         },
         "verify.md": {
-          "hash": "sha256:c9e2b8088c46b58206fef1b1f5327be4924d2e3b4ce9114649b46b33eb6450a3",
-          "lastModified": "2026-07-23T10:28:25.732Z"
+          "hash": "sha256:3e01a0d769376c6d7931fc4128e903b49a6cd68342898fccb224eaed638cde75",
+          "lastModified": "2026-08-29T22:53:46.349Z"
         }
       }
     }

@@ -12,7 +12,7 @@ import { Spec, ABSENT_SPEC_SIDECAR } from '../../domain/entities/spec.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { parseSpecId } from '../../domain/services/parse-spec-id.js'
 import { inferFormat } from '../../domain/services/format-inference.js'
-import { LifecycleEngine } from '../../domain/services/lifecycle-engine.js'
+import { evaluateLifecycleVerdict } from '../../domain/services/lifecycle-verdict.js'
 import { Logger } from '../logger.js'
 
 /** Input for the {@link GetArtifactInstruction} use case. */
@@ -21,10 +21,8 @@ export interface GetArtifactInstructionInput {
   /**
    * The artifact ID from the schema (e.g. `specs`, `verify`, `tasks`).
    *
-   * When omitted, the use case auto-resolves the next artifact to work on
-   * by walking the schema's artifact dependency graph: the first artifact
-   * (in declaration order) whose `requires` are all satisfied (complete or
-   * skipped) but that is itself not yet complete or skipped.
+   * When omitted, the use case auto-resolves the next artifact from
+   * `evaluateLifecycleVerdict` topological `nextArtifact` (schema DAG order).
    */
   readonly artifactId?: string
 }
@@ -55,7 +53,6 @@ export class GetArtifactInstruction {
   private readonly _schemaProvider: SchemaProvider
   private readonly _parsers: ArtifactParserRegistry
   private readonly _templates: TemplateExpander
-  private readonly _lifecycle: LifecycleEngine
 
   /**
    * Creates a new `GetArtifactInstruction` use case.
@@ -65,7 +62,6 @@ export class GetArtifactInstruction {
    * @param schemaProvider - Provider for the fully-resolved schema
    * @param parsers - Registry of artifact parsers by format
    * @param templates - Template expander for variable substitution
-   * @param lifecycle - Shared lifecycle interpreter
    */
   constructor(
     changes: ChangeRepository,
@@ -73,14 +69,12 @@ export class GetArtifactInstruction {
     schemaProvider: SchemaProvider,
     parsers: ArtifactParserRegistry,
     templates: TemplateExpander,
-    lifecycle: LifecycleEngine = new LifecycleEngine(Logger.debug.bind(Logger)),
   ) {
     this._changes = changes
     this._specs = specs
     this._schemaProvider = schemaProvider
     this._parsers = parsers
     this._templates = templates
-    this._lifecycle = lifecycle
   }
 
   /**
@@ -100,18 +94,23 @@ export class GetArtifactInstruction {
     }
 
     // Resolve artifact ID — explicit or auto-detected from dependency graph
-    const lifecycle = this._lifecycle.evaluate(change, schema)
+    const lifecycle = evaluateLifecycleVerdict(change, schema, {
+      checksByTarget: {},
+    })
     const resolvedId = input.artifactId ?? lifecycle.nextArtifact
     if (resolvedId === null) {
       throw new ArtifactNotFoundError('(auto)', change.name)
     }
 
     if (input.artifactId === undefined) {
-      Logger.debug('GetArtifactInstruction auto-selected next artifact from lifecycle engine', {
-        change: change.name,
-        artifactId: resolvedId,
-        blockerCodes: lifecycle.blockers.map((blocker) => blocker.code),
-      })
+      Logger.debug(
+        'GetArtifactInstruction auto-selected next artifact from evaluateLifecycleVerdict',
+        {
+          change: change.name,
+          artifactId: resolvedId,
+          blockerCodes: lifecycle.blockers.map((blocker) => blocker.code),
+        },
+      )
     }
 
     const artifactType = schema.artifact(resolvedId)

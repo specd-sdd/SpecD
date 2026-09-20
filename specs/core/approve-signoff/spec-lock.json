@@ -8,11 +8,16 @@
     "core:schema-format",
     "core:composition",
     "core:kernel",
-    "core:composition-resolver"
+    "core:composition-resolver",
+    "core:transition-checks"
   ],
   "implementation": [
     {
-      "file": "core:src/composition/use-cases/approve-signoff.ts"
+      "file": "core:src/application/use-cases/approve-signoff.ts",
+      "symbols": ["ApproveSignoff"]
+    },
+    {
+      "file": "core:test/application/use-cases/approve-signoff.spec.ts"
     }
   ]
 }

@@ -34,7 +34,7 @@ The **schema** defines the artifact workflow for a project. It declares:
 - Which artifact types exist and what files they produce
 - The dependency order between artifacts (what requires what)
 - Validation rules applied to artifact content
-- The lifecycle steps and any hooks that run between them
+- Extras (`requires`, hooks) on existing lifecycle states — the protocol still owns which states exist
 - Instructions that guide the AI at each phase
 
 specd ships with `@specd/schema-std` as a default. You can customise it or replace it entirely. See [Schema Format Reference](../../../schemas/schema-format.md) for details.

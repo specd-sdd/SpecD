@@ -1,0 +1,137 @@
+- op: added
+  description: 'Cover skill-aligned VALID_TRANSITIONS hops'
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: Lifecycle$'
+    after:
+      type: section
+      matches: '^Scenario: Designing to designing does not downgrade artifacts or approvals$'
+  content: |
+    #### Scenario: done can hop to implementing
+
+    - **GIVEN** a Change in `done`
+    - **WHEN** it is transitioned to `implementing`
+    - **THEN** `isValidTransition` is true
+    - **AND** a `transitioned` event with `from: 'done'` and `to: 'implementing'` is appended
+
+    #### Scenario: archivable cannot hop to done
+
+    - **GIVEN** a Change in `archivable`
+    - **WHEN** a transition to `done` is attempted
+    - **THEN** the entity rejects the pair as invalid
+
+- op: added
+  description: 'Verify invalidation rules for skill-aligned hops'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Lifecycle$'
+  content: |
+    ### Requirement: Skill-aligned backward hops
+
+    #### Scenario: Hop from done invalidates signoff only
+
+    - **GIVEN** a Change in `done` with validated artifacts and an active signoff
+    - **WHEN** it transitions to `verifying`
+    - **THEN** signoff is invalidated
+    - **AND** unchanged artifacts remain `complete`
+    - **AND** spec approval is not invalidated
+
+- op: added
+  description: 'Late implementation-failure may use backward hops'
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: Implementation and verification loop$'
+    after:
+      type: section
+      matches: '^Scenario: drift during verification is not treated as implementation-only failure$'
+  content: |
+    #### Scenario: implementation-failure from done uses backward hop
+
+    - **GIVEN** a Change in `done` with validated artifacts
+    - **AND** a late implementation bug is found
+    - **WHEN** the operator retries via `done → implementing`
+    - **THEN** the hop succeeds without forcing redesign
+
+- op: modified
+  description: 'Spec gate stays in ready'
+  selector:
+    type: section
+    matches: '^Requirement: Spec approval gate$'
+  content: |
+    #### Scenario: Gate disabled — free transition to implementing
+
+    - **WHEN** `approvals.spec: false` (default) and a Change is in `ready` state
+    - **THEN** it transitions directly to `implementing` with no approval required
+
+    #### Scenario: Gate enabled — stays in ready until ApproveSpec
+
+    - **WHEN** `approvals.spec: true` and a Change is in `ready` state
+    - **AND** no spec approval is recorded
+    - **THEN** `ready → implementing` is not allowed
+    - **AND** the change does not enter `pending-spec-approval`
+
+    #### Scenario: Gate enabled — implementing after recorded approval in ready
+
+    - **WHEN** `approvals.spec: true` and a Change in `ready` has a recorded spec approval
+    - **THEN** `ready → implementing` is allowed
+    - **AND** no `transitioned` event to `pending-spec-approval` is required
+
+- op: modified
+  description: 'Signoff gate stays in done'
+  selector:
+    type: section
+    matches: '^Requirement: Signoff gate$'
+  content: |
+    #### Scenario: Gate disabled — free transition to archivable
+
+    - **WHEN** `approvals.signoff: false` (default) and a Change is in `done` state
+    - **THEN** it transitions directly to `archivable` regardless of change content
+
+    #### Scenario: Gate enabled — stays in done until ApproveSignoff
+
+    - **WHEN** `approvals.signoff: true` and a Change is in `done` state
+    - **AND** no signoff is recorded
+    - **THEN** `done → archivable` is not allowed
+    - **AND** the change does not enter `pending-signoff`
+
+    #### Scenario: Gate enabled — archivable after recorded signoff in done
+
+    - **WHEN** `approvals.signoff: true` and a Change in `done` has a recorded signoff
+    - **THEN** `done → archivable` is allowed
+
+    #### Scenario: Archive from non-archivable state throws
+
+    - **WHEN** archiving is attempted on a Change not in `archivable` or `archiving` state
+    - **THEN** `InvalidStateTransitionError` is thrown
+
+- op: modified
+  description: 'Entity transition validity is protocol not LifecycleEngine'
+  selector:
+    type: section
+    matches: '^Scenario: Valid transition — drafting to designing$'
+  content: |
+    #### Scenario: Valid transition — drafting to designing
+
+    - **WHEN** a Change in `drafting` state is transitioned to `designing`
+    - **THEN** `isValidTransition('drafting', 'designing')` is true
+    - **AND** a `transitioned` event with `from: 'drafting'` and `to: 'designing'` is appended
+
+- op: modified
+  description: 'Interpretation authority names evaluateLifecycleVerdict'
+  selector:
+    type: section
+    matches: '^Scenario: Dependency-aware lifecycle interpretation is external to Change$'
+  content: |
+    #### Scenario: Dependency-aware lifecycle interpretation is external to Change
+
+    - **GIVEN** an artifact appears persisted as `complete`
+    - **AND** an upstream dependency requires review under the active schema DAG
+    - **WHEN** lifecycle interpretation is requested
+    - **THEN** the `Change` entity remains the source of persisted facts only
+    - **AND** `evaluateLifecycleVerdict` / `projectArtifacts` is responsible for deriving the dependency-aware lifecycle meaning

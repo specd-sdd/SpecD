@@ -8,5 +8,41 @@
     {
       "file": "core:src/composition/use-cases/skip-artifact.ts"
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "SkipArtifact marks optional artifact skipped via mutate(); required artifacts throw ArtifactNotOptionalError.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:20cad6643fe92e27455b61070c54b052e6828b6c8ffd982f3e05d967fd5c57bd",
+          "lastModified": "2026-08-25T15:37:19.347Z"
+        },
+        "verify.md": {
+          "hash": "sha256:34fb3b2a83b3e285f1c97e0383a50e4feb6677cb4993eed3069d518e61c7ea23",
+          "lastModified": "2026-08-25T15:37:19.347Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# SkipArtifact\n\n## Rules\n- Input: `name`, `artifactId`, optional `reason`.\n- Load via `ChangeRepository.get`; missing → `ChangeNotFoundError`.\n- `change.getArtifact(artifactId)`; missing → `ArtifactNotFoundError`.\n- `optional: false` → `ArtifactNotOptionalError`. Required cannot be skipped.\n- When optional: `ActorResolver.identity()` → `change.recordArtifactSkipped(artifactId, actor, reason)` → `artifact.markSkipped()`.\n- Persist via `ChangeRepository.mutate(name, fn)` on fresh Change. Returns updated `Change`.\n- Config factory via `resolveSkipArtifactDeps` (changes, actor) only.\n\n## Constraints\n- Validate optionality before actor resolve — no actor if required or nonexistent\n- `reason` pass-through optional string; no extra validation",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:20cad6643fe92e27455b61070c54b052e6828b6c8ffd982f3e05d967fd5c57bd",
+          "lastModified": "2026-08-25T15:37:19.347Z"
+        },
+        "verify.md": {
+          "hash": "sha256:34fb3b2a83b3e285f1c97e0383a50e4feb6677cb4993eed3069d518e61c7ea23",
+          "lastModified": "2026-08-25T15:37:19.347Z"
+        }
+      }
+    }
+  }
 }

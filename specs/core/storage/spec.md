@@ -27,9 +27,20 @@ Artifact status (`missing`, `in-progress`, `complete`, `skipped`) must be derive
 
 To prevent false-drift detection and unnecessary write operations on uninitialized repositories, status derivation (including comparing current hashes to `validatedHash`) and drift invalidations must only be performed when the repository is fully initialized with resolved artifact types (i.e. `artifactTypes.length > 0`). If the repository is not initialized with artifact types, drift detection is bypassed.
 
+When artifact types are resolved, load MUST then detect baseline drift against `validatedHash` and, if any drifted files are found, call `Change.invalidate('artifact-drift', SYSTEM_ACTOR, …)` once with a focused grouped payload. A file is drifted when it has a non-sentinel `validatedHash` and is not already `pending-review`, `drifted-pending-review`, or `skipped`, and either:
+
+- its canonical status is `complete` but derived disk status is not `complete`, or
+- its canonical status is not `complete` (including `missing` after a validated file disappeared)
+
+`ValidateArtifacts` MUST NOT repeat this baseline comparison. Consent-hash drift (approval/signoff `artifactHashes`) remains that use case.
+
+Load-time invalidation uses `SYSTEM_ACTOR` (`specd` / `system@getspecd.dev` / `provider: system`), not `ActorResolver`. The entity applies the change's invalidation policy (including `none`). The adapter persists the resulting history when the load path writes the manifest.
+
 ### Requirement: Artifact dependency cascade
 
-`Change.effectiveStatus(type)` must cascade through the artifact dependency graph. An artifact whose own hash matches its `validatedHash` must still be reported as `in-progress` if any artifact in its `requires` chain is neither `complete` nor `skipped`. A `skipped` optional artifact satisfies the dependency — it does not block downstream artifacts.
+Artifact `requires` cascade is owned by `projectArtifacts` / `effectiveStatus` (see [`core:lifecycle-engine`](../lifecycle-engine/spec.md) and [`core:schema-format`](../schema-format/spec.md)). There is no `Change.effectiveStatus()` method.
+
+Load-time file status on the repository remains `missing` / `in-progress` / `complete` / `skipped` from hashes (Requirement: Artifact status derivation). If a persisted file token is `pending-parent-artifact-review`, load/save MUST rewrite it to `in-progress` (legacy sane). `ArtifactFile` still MUST NOT accept that token in memory. Effective DAG status MAY further report `pending-parent-artifact-review` when a complete file is blocked by an upstream parent in a review state. Incomplete, missing, or `in-progress` parents cascade the dependent to `in-progress`. A `skipped` optional artifact satisfies the dependency — it does not block downstream artifacts.
 
 ### Requirement: ValidateArtifacts is the sole path to complete
 
@@ -208,6 +219,8 @@ Runtime repository behaviour MUST create or update this file idempotently when t
 - [`core:change`](../change/spec.md) — Change domain model; defines event types, lifecycle states, and derivation rules serialized in the manifest
 - [`core:change-manifest`](../change-manifest/spec.md) — manifest format, event shapes, and schema version behavior
 - [`default:_global/logging`](../../_global/logging/spec.md) — debug logging requirements for repository diagnostics and staged archive persistence
+- [`core:lifecycle-engine`](../lifecycle-engine/spec.md) — DAG effective status (`projectArtifacts`); no `Change.effectiveStatus()`
+- [`core:schema-format`](../schema-format/spec.md) — artifact `requires` cascade rules
 
 ## ADRs
 

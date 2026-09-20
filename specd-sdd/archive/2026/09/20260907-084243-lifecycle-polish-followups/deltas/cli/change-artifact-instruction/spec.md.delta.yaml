@@ -1,0 +1,8 @@
+- op: added
+  description: Clarify artifact instruction timing.
+  position:
+    parent: { type: section, matches: '^Requirements$' }
+  content: |
+    ### Requirement: Artifact instruction retrieval timing
+
+    An agent workflow MUST load change context before requesting an artifact instruction, then retrieve the instruction immediately before authoring that artifact. It MUST NOT treat template I/O as context loading or prefetch instructions for later artifacts.

@@ -8,7 +8,6 @@ import { type ListWorkspaces } from '../../application/use-cases/list-workspaces
 import { ValidateArtifacts } from '../../application/use-cases/validate-artifacts.js'
 import { type SpecdConfig } from '../../application/specd-config.js'
 import { type ExtractorTransformRegistry } from '../../domain/services/content-extraction.js'
-import { type LifecycleEngine } from '../../domain/services/lifecycle-engine.js'
 import {
   createCompositionResolver,
   type CompositionResolver,
@@ -28,7 +27,6 @@ export interface ValidateArtifactsDeps {
   readonly contentHasher: ContentHasher
   readonly extractorTransforms: ExtractorTransformRegistry
   readonly workspaceRoutes: readonly SpecWorkspaceRoute[]
-  readonly lifecycle: LifecycleEngine
 }
 
 /**
@@ -38,16 +36,20 @@ export interface ValidateArtifactsDeps {
  * @returns The resolved dependencies for `ValidateArtifacts`
  */
 export function resolveValidateArtifactsDeps(resolver: CompositionResolver): ValidateArtifactsDeps {
+  const changes = resolver.getChangeRepository()
+  const listWorkspaces = resolver.getListWorkspaces()
+  const parsers = resolver.getArtifactParserRegistry()
+  const extractorTransforms = resolver.getExtractorTransforms()
+  const workspaceRoutes = resolver.getSpecWorkspaceRoutes()
   return {
-    changes: resolver.getChangeRepository(),
-    listWorkspaces: resolver.getListWorkspaces(),
+    changes,
+    listWorkspaces,
     schemaProvider: resolver.getSchemaProvider(),
-    parsers: resolver.getArtifactParserRegistry(),
+    parsers,
     actor: resolver.getActorResolver(),
     contentHasher: resolver.getContentHasher(),
-    extractorTransforms: resolver.getExtractorTransforms(),
-    workspaceRoutes: resolver.getSpecWorkspaceRoutes(),
-    lifecycle: resolver.getLifecycleEngine(),
+    extractorTransforms,
+    workspaceRoutes,
   }
 }
 
@@ -108,7 +110,6 @@ function createValidateArtifactsFromNormalized(
       contentHasher,
       extractorTransforms,
       workspaceRoutes,
-      lifecycle,
     } = input.deps
     return new ValidateArtifacts(
       changes,
@@ -119,7 +120,6 @@ function createValidateArtifactsFromNormalized(
       contentHasher,
       extractorTransforms,
       workspaceRoutes,
-      lifecycle,
     )
   }
 
@@ -144,7 +144,6 @@ function isValidateArtifactsDeps(
     'actor' in value &&
     'contentHasher' in value &&
     'extractorTransforms' in value &&
-    'workspaceRoutes' in value &&
-    'lifecycle' in value
+    'workspaceRoutes' in value
   )
 }

@@ -139,3 +139,10 @@
 
 - **WHEN** `InitProjectResult` interface is inspected
 - **THEN** it contains `configPath: string`, `schemaRef: string`, `workspaces: readonly string[]`, and `metadataCachePath: string`
+
+### Requirement: Optional initialization and plugin configuration
+
+#### Scenario: Initialization leaves optional plugin configuration absent
+
+- **WHEN** a project is initialized without a plugin requiring configuration
+- **THEN** no unrelated plugin configuration is synthesized

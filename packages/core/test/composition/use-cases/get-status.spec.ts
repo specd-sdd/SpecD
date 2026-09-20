@@ -1,6 +1,8 @@
 import * as fs from 'node:fs/promises'
+import { readFileSync } from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
 import { GetStatus } from '../../../src/application/use-cases/get-status.js'
 import { InvalidCompositionFactoryArgumentsError } from '../../../src/domain/errors/invalid-composition-factory-arguments-error.js'
@@ -78,8 +80,8 @@ describe('createGetStatus', () => {
       schemaProvider: {} as never,
       approvals: { spec: false, signoff: false },
       refreshImplementationTracking: {} as never,
-      lifecycle: {} as never,
-      countTasks: {} as never,
+      transitionBindings: [],
+      archiveBindings: [],
     }
     const useCase = createGetStatus(deps)
 
@@ -92,12 +94,23 @@ describe('createGetStatus', () => {
       schemaProvider: {} as never,
       approvals: { spec: false, signoff: false },
       refreshImplementationTracking: {} as never,
-      lifecycle: {} as never,
-      countTasks: {} as never,
+      transitionBindings: [],
+      archiveBindings: [],
     }
 
     expect(() =>
       createGetStatus(deps as unknown as SpecdConfig, { extraNodeModulesPaths: [] }),
     ).toThrow(InvalidCompositionFactoryArgumentsError)
+  })
+
+  it('wires includeOverlapDetection for archive predicates', () => {
+    const src = readFileSync(
+      path.join(
+        path.dirname(fileURLToPath(import.meta.url)),
+        '../../../src/composition/use-cases/get-status.ts',
+      ),
+      'utf8',
+    )
+    expect(src).toContain('includeOverlapDetection: true')
   })
 })

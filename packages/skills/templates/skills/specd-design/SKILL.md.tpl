@@ -40,14 +40,16 @@ specd changes status <name> --format text
 ```
 
 Identify any high-visibility blockers from the **blockers:** section (e.g. `ARTIFACT_DRIFT`,
-`OVERLAP_CONFLICT`, `REVIEW_REQUIRED`) and inform the user. Follow the **next action:**
-command recommendation.
+`REVIEW_REQUIRED`) and inform the user. Follow the **next action:**
+command recommendation. `OVERLAP_CONFLICT` is archive-only (live overlap while
+`archivable`, `--allow-overlap`). Invalidation overlap is `review.reason:
+spec-overlap-conflict` → `/specd-design`, not `--allow-overlap`.
 
 Extract the `path:` field from the "lifecycle:" section.
 
 If the status output shows `review: required: yes`, enter **artifact review mode**:
 
-- Treat the artifacts listed under `review:` as the first review scope
+- Treat artifacts marked `pending-review` / `[drift]` under `artifacts (details):` as the first review scope (JSON/TOON: `review.affectedArtifacts`). Text `review:` only has `required` / `route` / `reason` — not file paths.
 - Review those artifact files against the latest user conversation and the
   current change state before deciding what to rewrite
 - Do NOT revalidate or rewrite downstream artifacts blindly just because they
@@ -175,8 +177,7 @@ If the file does not exist, stop and tell the user you're missing the exploratio
 Have a natural conversation to fill in the gaps, then write a `<changePath>/.specd-exploration.md`
 yourself to capture what you learned before continuing with step 4.
 
-If `review: required: yes` was shown in step 1, use the reason and affected artifacts
-together with the current context to decide what actually needs revision.
+If `review: required: yes` was shown in step 1, use `reason`, `artifacts (details):`, and structured `affectedArtifacts` together with the current context to decide what actually needs revision.
 
 ### 4. Show context summary
 
@@ -394,6 +395,8 @@ Run `changes status <name> --format text` and check the **state:** and **approva
 
 > Approval required. Run: `specd changes approve spec <name> --reason "..."`
 > Then: `/specd-implement <name>`
+
+Stay in `ready`.
 
 **Stop.**
 Do not invoke `/specd-implement` automatically; wait for explicit user confirmation.

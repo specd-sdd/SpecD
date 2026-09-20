@@ -130,9 +130,11 @@ specd changes status <name> --format toon
 Read `state`, `blockers`, `nextAction`, and `review` from the response.
 
 **Always prioritize high-visibility blockers.** If `blockers` is not empty,
-identify which ones are blocking progress (e.g. `ARTIFACT_DRIFT`, `OVERLAP_CONFLICT`,
+identify which ones are blocking progress (e.g. `ARTIFACT_DRIFT`,
 `REVIEW_REQUIRED`) and inform the user. Follow the `nextAction.command`
-recommendation.
+recommendation. `OVERLAP_CONFLICT` is archive-only (live overlap while
+`archivable`). Invalidation overlap is `review.reason: spec-overlap-conflict` →
+`/specd-design`, not `--allow-overlap`.
 
 If `review.required` is `true`, suggest `/specd-design <name>` regardless of
 the lifecycle state. Summarize `review.reason` and `review.affectedArtifacts`,
@@ -143,13 +145,13 @@ If `review.required` is `false`, suggest based on `nextAction.targetStep`:
 | targetStep                       | Suggest                                                                     |
 | -------------------------------- | --------------------------------------------------------------------------- |
 | `drafting` / `designing`         | `/specd-design <name>`                                                      |
-| `ready`                          | Review artifacts, then `/specd-implement <name>` if approved                |
-| `implementing` / `spec-approved` | `/specd-implement <name>`                                                   |
+| `ready`                          | If spec gate on and unsatisfied: human `approve spec`. Else `/specd-implement <name>` |
+| `implementing` / `spec-approved` | `/specd-implement <name>` (`spec-approved` is drain-only)                   |
 | `verifying`                      | `/specd-verify <name>`                                                      |
-| `done` / `signed-off`            | `/specd-verify <name>` (handles done→archivable transition)                 |
-| `pending-signoff`                | "Signoff pending. Run: `specd changes approve signoff <name> --reason ...`" |
+| `done` / `signed-off`            | If signoff on and unsatisfied: human `approve signoff`. Else `/specd-archive <name>` when the hop is `archivable`; otherwise `/specd-verify <name>` |
+| `pending-signoff`                | Drain only: `specd changes approve signoff <name> --reason ...`             |
 | `archivable`                     | `/specd-archive <name>`                                                     |
-| `pending-spec-approval`          | "Approval pending. Run: `specd changes approve spec <name> --reason ...`"   |
+| `pending-spec-approval`          | Drain only: `specd changes approve spec <name> --reason ...`                |
 
 **Stop — do not continue.**
 

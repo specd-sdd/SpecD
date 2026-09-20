@@ -2,7 +2,7 @@ import * as fs from 'node:fs/promises'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { Change } from '../../../src/domain/entities/change.js'
+import { Change, SYSTEM_ACTOR } from '../../../src/domain/entities/change.js'
 import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
 import { ArtifactFile } from '../../../src/domain/value-objects/artifact-file.js'
 import { type ActorIdentity } from '../../../src/domain/entities/change.js'
@@ -661,6 +661,36 @@ describe('FsChangeRepository', () => {
       return change
     }
 
+    it('given wire pending-parent-artifact-review, when get then save, then status is in-progress', async () => {
+      const change = makeChangeWithArtifact('c1', null)
+      await persistChange(ctx.repo, change)
+      const dir = path.join(ctx.changesPath, '20240115-100000-c1')
+      const manifestPath = path.join(dir, 'manifest.json')
+      const manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8')) as {
+        artifacts: Array<{
+          state?: string
+          files: Array<{ state?: string }>
+        }>
+      }
+      manifest.artifacts[0]!.state = 'pending-parent-artifact-review'
+      manifest.artifacts[0]!.files[0]!.state = 'pending-parent-artifact-review'
+      await fs.writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8')
+
+      const loaded = await ctx.repo.get('c1')
+      expect(loaded?.getArtifact('proposal')?.status).toBe('in-progress')
+      expect(loaded?.getArtifact('proposal')?.getFile('proposal')?.status).toBe('in-progress')
+
+      await persistChange(ctx.repo, loaded!)
+      const saved = JSON.parse(await fs.readFile(manifestPath, 'utf8')) as {
+        artifacts: Array<{
+          state?: string
+          files: Array<{ state?: string }>
+        }>
+      }
+      expect(saved.artifacts[0]?.state).toBe('in-progress')
+      expect(saved.artifacts[0]?.files[0]?.state).toBe('in-progress')
+    })
+
     it('given validatedHash is null and no file on disk, when get is called, then artifact status is missing', async () => {
       const change = makeChangeWithArtifact('c1', null)
       await persistChange(ctx.repo, change)
@@ -692,7 +722,7 @@ describe('FsChangeRepository', () => {
       expect(loaded?.getArtifact('proposal')?.status).toBe('complete')
     })
 
-    it('given validatedHash does not match the file on disk, when get is called, then artifact status is drifted-pending-review', async () => {
+    it('Hash mismatch on load invalidates with artifact-drift', async () => {
       const change = makeChangeWithArtifact('c1', sha256('original content'))
       await persistChange(ctx.repo, change)
       const dir = path.join(ctx.changesPath, '20240115-100000-c1')
@@ -701,6 +731,13 @@ describe('FsChangeRepository', () => {
       const loaded = await ctx.repo.get('c1')
       expect(loaded?.state).toBe('designing')
       expect(loaded?.getArtifact('proposal')?.status).toBe('drifted-pending-review')
+      const invalidated = loaded?.history.filter(
+        (event): event is Extract<Change['history'][number], { type: 'invalidated' }> =>
+          event.type === 'invalidated',
+      )
+      expect(invalidated).toHaveLength(1)
+      expect(invalidated?.[0]?.cause).toBe('artifact-drift')
+      expect(invalidated?.[0]?.by).toEqual(SYSTEM_ACTOR)
 
       const reloaded = await ctx.repo.get('c1')
       expect(reloaded?.state).toBe('designing')
@@ -708,7 +745,7 @@ describe('FsChangeRepository', () => {
       expect(reloaded?.history.filter((event) => event.type === 'invalidated')).toHaveLength(1)
     })
 
-    it('given a drifted file is later revalidated, when get is called again, then it stays complete without a second invalidation', async () => {
+    it('Reloading after revalidation does not invalidate twice', async () => {
       const updatedContent = 'modified content'
       const updatedHash = sha256(updatedContent)
       const change = makeChangeWithArtifact('c1', sha256('original content'))
@@ -2488,7 +2525,7 @@ describe('FsChangeRepository', () => {
       expect(loaded?.getArtifact('design')?.status).toBe('drifted-pending-review')
     })
 
-    it('given an uninitialized repository (no artifactTypes) and a change with a drifted artifact, when get is called, then no invalidation occurs and no manifest is written to disk', async () => {
+    it('Uninitialized repository skips drift invalidation', async () => {
       const content = '# Proposal\n'
       const hash = sha256(content)
       const at = new Date('2024-01-15T10:00:00.000Z')

@@ -29,11 +29,11 @@ A change moves through a series of named states from creation to completion:
 
 ### Approval gates
 
-Two optional approval gates can be configured between lifecycle steps:
+Two optional human-approval gates can be configured on the same delivery edges:
 
 ```
-  ready --> [gate: plan vs specs] --> implementing
-  done  --> [gate: code vs specs] --> archivable
+  ready --> [approve spec, stay in ready] --> implementing
+  done  --> [approve signoff, stay in done] --> archivable
 ```
 
-When enabled, specd runs a compliance check at each gate. If the planned artifacts or implementation do not satisfy the specs, the change is pushed back with a violation report. The agent must address the issues before advancing. See [Workflow Reference](../../workflow.md) for details.
+When enabled, a human records consent with `specd changes approve spec` or `specd changes approve signoff`. The change does **not** move to a parking state. Until approval is recorded, `ready → implementing` / `done → archivable` is blocked (`APPROVAL_REQUIRED`). See [Change Lifecycle Guide](../../workflow.md#approval-gates) for details.

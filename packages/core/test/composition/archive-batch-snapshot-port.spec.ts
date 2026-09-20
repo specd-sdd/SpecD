@@ -58,4 +58,34 @@ describe('resolveArchiveBatchSnapshotPort', () => {
     expect(port.snapshot).toBeDefined()
     expect(port.restoreBatch).toBeDefined()
   })
+
+  it('retains the snapshot manifest across fallback port operations', async () => {
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'specd-compose-snapshot-shared-'))
+    tmpDirs.push(tmpDir)
+    const specsPath = path.join(tmpDir, 'specs')
+    const metadataPath = path.join(tmpDir, '.specd', 'metadata')
+    await Promise.all([
+      fs.mkdir(specsPath, { recursive: true }),
+      fs.mkdir(metadataPath, { recursive: true }),
+    ])
+    const repo = new FsSpecRepository({
+      workspace: 'default',
+      ownership: 'owned',
+      isExternal: false,
+      configPath: '/test',
+      specsPath,
+      metadataPath,
+    })
+    const port = resolveArchiveBatchSnapshotPort(makeListWorkspaces(new Map([['default', repo]])))
+    const specId = 'default:auth/oauth'
+    const specDir = path.join(specsPath, 'auth', 'oauth')
+    const created = path.join(specDir, 'spec.md')
+
+    await port.snapshot(specId, 'change')
+    await fs.writeFile(created, '# OAuth\n', 'utf8')
+    await port.recordCreatedFile(specId, 'spec.md')
+    await port.restoreBatch([specId], [specId])
+
+    await expect(fs.access(created)).rejects.toThrow()
+  })
 })

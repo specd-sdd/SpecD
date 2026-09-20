@@ -213,10 +213,6 @@ export class ChangeArtifact {
       this._status = 'pending-review'
       return
     }
-    if (states.some((state) => state === 'pending-parent-artifact-review')) {
-      this._status = 'pending-parent-artifact-review'
-      return
-    }
     if (states.every((state) => state === 'skipped')) {
       this._status = 'skipped'
       return

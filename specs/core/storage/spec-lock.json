@@ -7,46 +7,51 @@
     "default:_global/architecture",
     "core:change",
     "core:change-manifest",
-    "default:_global/logging"
+    "default:_global/logging",
+    "core:lifecycle-engine",
+    "core:schema-format"
   ],
   "implementation": [
     {
-      "file": "core:src/infrastructure/fs/fs-validation-result-cache.ts",
-      "symbols": ["FsValidationResultCache"]
+      "file": "core:src/domain/services/lifecycle-engine.ts",
+      "symbols": ["projectArtifacts"]
+    },
+    {
+      "file": "core:src/infrastructure/fs/manifest.ts"
     }
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Port/adapter storage layer; v1 fs adapter for changes, drafts, archives, indexes under configPath tmp.",
+      "value": "Storage ports and fs adapter manage change, draft, archive, cache, manifest, lock, and artifact-status persistence.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:45a0e1a88c4bf3a44c1b10d91f281237166fa638710291fa7546593170197021",
-          "lastModified": "2026-07-23T00:36:00.846Z"
+          "hash": "sha256:4a709a63c12b8faba402d4545b394bf13a9517964d2c817586019a6ae1892e16",
+          "lastModified": "2026-08-29T22:53:46.301Z"
         },
         "verify.md": {
-          "hash": "sha256:3b4f5e4a624158b300dcae0e8da6a23976b8383d98976b6c34330e82ae100137",
-          "lastModified": "2026-07-23T00:34:57.084Z"
+          "hash": "sha256:67c3242552e3338b939f66490d56bfbd52d425e1f6955c3c57b8606c42c7dffc",
+          "lastModified": "2026-08-29T22:53:46.302Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# Storage\n## Rules\n### Change directory naming\n- Format `YYYYMMDD-HHmmss-<name>` from create time. Prefix filesystem-only — not domain/manifest/CLI. Resolve by glob `*-<name>`.\n### Change directory listing order\n- `list()` → `createdAt` ascending. Fs: active-changes index under `{configPath}/tmp/fs-cache/changes/`.\n### Artifact status derivation\n- Status derived at load (not stored). Manifest stores `validatedHash` only. Precedence: `__skipped__`→skipped; absent→missing; cleaned hash match→complete; else in-progress.\n- Cleaned hash = `preHashCleanup` then SHA-256. Skip drift if `artifactTypes.length === 0`.\n### Artifact dependency cascade\n- `effectiveStatus`: complete hash still in-progress if any `requires` chain not complete/skipped. Skipped optional satisfies deps.\n### ValidateArtifacts sole path to complete\n- `markComplete` / `markSkipped` (`__skipped__`) only via validate/skip use cases.\n### Archive pattern\n- `storage.archive.pattern`: `{{year}}`, `{{month}}`, `{{day}}`, `{{change.name}}`, `{{change.archivedName}}`. Default `{{change.archivedName}}`.\n- NOT supported: `{{change.scope}}`, `{{change.workspace}}` → `UnsupportedPatternError` at construction.\n- `{{month}}`/`{{day}}` zero-padded; `{{year}}` four digits.\n### Archive index\n- List index under `{configPath}/tmp/fs-cache/archive/` — not archive root. Files: `.specd-index.jsonl` (`{ entry, sourceMtime?, sourceFiles? }`), `.specd-index-meta.json` (`{ totalCount, generatedAt, isInvalidated }`).\n- `reindex()` rebuilds fs-cache; migrate-and-forget legacy root indexes; orphan cleanup on rebuild only.\n- `get` MAY scan; MUST NOT depend on root JSONL for routine reads.\n### Archive runtime ignore\n- Archive root `.gitignore` MUST ignore `.staging`. Do not re-add obsolete index ignore lines after migration.\n### Named storage factories\n- Select by adapter name; VCS/null-VCS stays inside factory.\n### Change manifest / path confinement / staged archive\n- Manifest per core:change-manifest; atomic write (temp+rename).\n- Reject paths escaping storage root / untracked files.\n- Prefer staged commit for multi-update archive.\n### Change locks\n- `{configPath}/tmp/change-locks` derived from `ChangeRepositoryConfig.configPath`.\n### Fs list index cache layout\n```\n{configPath}/tmp/fs-cache/\n  archive/ changes/ drafts/ discarded/\n  specs/<workspace>/\n  validate-specs/<workspace>/\n```\n- Access only via index helpers (`FsChangeIndexCache`, `FsSpecIndexCache`). `include*` = projection only.\n### Validation result cache bucket\n- Extends meta with `schemaFingerprint`, `engineVersion`. Rows: `{ entry, stamps, cacheFingerprint }`. Hosts need no dedicated reindex surface.\n### configPath tmp gitignore\n- `{configPath}/tmp/.gitignore`: `*` + `!.gitignore`. Idempotent create on first use / initProject.\n## Constraints\n- Manifest writes atomic (temp+rename).\n- Fs-cache paths use forward slashes regardless of OS.\n- Dir-name timestamp from `change.createdAt`, not wall clock at write.\n- `{configPath}/tmp/fs-cache/` runtime caches — MUST NOT commit to VCS.",
+      "value": "# Storage\n## Rules\n- Change directories: `YYYYMMDD-HHmmss-<name>` from `createdAt`; prefix filesystem-only, resolve glob `*-<name>`. `list()` ascending `createdAt`; fs active index `{configPath}/tmp/fs-cache/changes/`.\n- Derive artifact status at load; manifest stores only `validatedHash`: `__skipped__` → skipped; absent → missing; `preHashCleanup` then SHA-256 match → complete; otherwise in-progress. Skip drift when `artifactTypes.length === 0`.\n- `effectiveStatus`: complete hash becomes in-progress if any recursive `requires` not complete/skipped; skipped optional satisfies. `markComplete`/`markSkipped` (`__skipped__`) only validate/skip use cases.\n- `storage.archive.pattern`: `{{year}}`, `{{month}}`, `{{day}}`, `{{change.name}}`, `{{change.archivedName}}`; default latter. Reject `{{change.scope}}`/`{{change.workspace}}` via `UnsupportedPatternError`; year 4 digits, month/day padded.\n- Archive index only `{configPath}/tmp/fs-cache/archive/`: `.specd-index.jsonl` `{ entry, sourceMtime?, sourceFiles? }`, `.specd-index-meta.json` `{ totalCount, generatedAt, isInvalidated }`. `reindex()` rebuilds, migrates/forgets legacy root indexes; orphan cleanup only rebuild. `get` may scan; routine reads never require root JSONL.\n- Archive root `.gitignore` ignores `.staging`, never obsolete index lines. Named factories choose adapter; VCS/null-VCS internal.\n- Per core:change-manifest atomic temp+rename; reject root escapes/untracked paths; staged commit preferred multi-update archive. Change locks `{configPath}/tmp/change-locks`.\n- Fs cache layout `{configPath}/tmp/fs-cache/{archive,changes,drafts,discarded,specs/<workspace>,validate-specs/<workspace>}/`; access only `FsChangeIndexCache`/`FsSpecIndexCache`; `include*` projection only. Validation cache adds `schemaFingerprint`, `engineVersion`; rows `{ entry, stamps, cacheFingerprint }`; hosts no reindex API.\n- First use/init creates idempotent `{configPath}/tmp/.gitignore` with `*` and `!.gitignore`.\n## Constraints\n- Atomic manifest writes; fs-cache forward-slash paths across OS.\n- Cache directory runtime-only; never VCS commit.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:45a0e1a88c4bf3a44c1b10d91f281237166fa638710291fa7546593170197021",
-          "lastModified": "2026-07-23T00:36:00.846Z"
+          "hash": "sha256:4a709a63c12b8faba402d4545b394bf13a9517964d2c817586019a6ae1892e16",
+          "lastModified": "2026-08-29T22:53:46.301Z"
         },
         "verify.md": {
-          "hash": "sha256:3b4f5e4a624158b300dcae0e8da6a23976b8383d98976b6c34330e82ae100137",
-          "lastModified": "2026-07-23T00:34:57.084Z"
+          "hash": "sha256:67c3242552e3338b939f66490d56bfbd52d425e1f6955c3c57b8606c42c7dffc",
+          "lastModified": "2026-08-29T22:53:46.302Z"
         }
       }
     }

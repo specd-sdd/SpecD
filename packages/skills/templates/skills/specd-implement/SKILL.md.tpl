@@ -20,8 +20,9 @@ specd changes status <name> --format text
 ```
 
 Identify any high-visibility blockers from the **blockers:** section (e.g. `ARTIFACT_DRIFT`,
-`OVERLAP_CONFLICT`, `REVIEW_REQUIRED`) and inform the user. Follow the **next action:**
-command recommendation.
+`REVIEW_REQUIRED`) and inform the user. Follow the **next action:**
+command recommendation. `OVERLAP_CONFLICT` is archive-only. Invalidation overlap
+is `review.reason: spec-overlap-conflict` → `/specd-design`, not `--allow-overlap`.
 
 Extract the `path:` field from the "lifecycle:" section.
 From the `artifacts (DAG):` section, note which artifact IDs are marked with
@@ -39,7 +40,14 @@ Redirect based on the **next action:** `target` recommendation.
 
 **Stop — do not continue.**
 
-If in `ready` or `spec-approved`, run pre-hooks and transition:
+If in `ready` and the spec gate is on with no recorded spec approval (status
+`approvals.spec=on` and an `APPROVAL_REQUIRED` blocker, or next action pointing at
+human `approve spec`): **stay in `ready`**. Tell the user to run
+`specd changes approve spec <name> --reason "..."`. Do **not** `transition implementing`.
+
+**Stop — do not continue.**
+
+If in `ready` with spec gate off (or spec already approved) or `spec-approved`, run pre-hooks and transition:
 
 ```bash
 specd changes run-hooks <name> implementing --phase pre
@@ -143,14 +151,20 @@ symbols that realize its requirements. These links feed into downstream tooling
 
 **What to link:**
 
-For each spec in the change, identify every file and symbol you create or modify that
-directly implements that spec's requirements. A link answers the question: _"which
-code makes this spec real?"_
+A link answers: _"which code makes this spec real?"_ Prefer **`--symbol` on a
+top-level** named construct (exported function, class, type, method) that
+implements a requirement. Do **not** link local variables, helpers that only
+happen to sit in the same file, or incidental dirty files.
+
+- If the symbol is not actually about that spec, **do not add the link**.
+- Links are not a catch-all: fewer high-value links beat dumping every touched name.
+- File-level links are the fallback when there is no stable top-level symbol
+  (config, templates, barrels, docs).
 
 **Symbol-level vs file-level links:**
 
-- **Symbol-level** (preferred) — link a specific function, class, type, method, or
-  constant to the spec. Use when the implementation maps to named code constructs.
+- **Symbol-level** (preferred) — link a **top-level** function, class, type, or
+  method that implements the spec. Do not link variables or incidental names.
 
   ```bash
   specd changes implementation add <name> --spec <specId> --file <path> --symbol "<SymbolName>"
@@ -171,34 +185,20 @@ code makes this spec real?"_
 After finishing each task, before marking its checkbox done:
 
 1. Identify which spec(s) the task's code fulfills
-2. For each file touched, determine the concrete symbols introduced or modified
+2. For each file, pick only the **top-level** symbols that actually implement
+   those specs (not every name you touched)
 3. Add implementation links: one `add` call per `(specId, file)` pair with `--symbol`
-   for each named construct
+   for each **relevant** construct. Skip the file if nothing in it is about the spec.
 4. If a file implements parts of multiple specs, add separate links per spec
 5. Mark the task checkbox done (`- [ ]` → `- [x]`) in the task-bearing artifact
 
-**Review and resolve:**
+**Review and resolve:** use `shared.md` — "Implementation tracking" for `list` /
+`review` / `resolve` / `ignore` command syntax. After each task (and again before
+recommending verify): `list`, then **resolve** in-scope files and **ignore**
+incidental ones. Files with confirmed links cannot be ignored.
 
-```bash
-specd changes implementation list <name>     # current tracking state
-specd changes implementation review <name>   # + stale symbol diagnostics from code graph
-specd changes implementation resolve <name> --file <path1>,<path2> # mark files fully reviewed
-```
-
-- `list` shows all tracked files (grouped by state) and confirmed links.
-- `review` adds graph-based diagnostics: symbols that no longer exist in the code
-  are flagged as stale.
-- `resolve` marks one or more tracked files as fully reviewed. It supports a
-  comma-separated list of paths for efficient bulk resolution.
-- `ignore` is for files that do **not** belong to the change's implementation surface.
-  It also supports comma-separated lists. Files with active confirmed links **cannot**
-  be ignored.
-  ```bash
-  specd changes implementation ignore <name> --file <path1>,<path2>
-  ```
-
-**Security & Integrity Guard:** All implementation management commands (`add`, `resolve`,
-`ignore`) validate that the target files exist on disk before updating the manifest.
+**Security & Integrity Guard:** `add`, `resolve`, and `ignore` validate that the
+target files exist on disk before updating the manifest.
 
 **Out-of-scope guard:**
 
@@ -269,6 +269,13 @@ specd changes hook-instruction <name> implementing --phase post --format text
 
 Follow guidance. If hooks fail (tests, lint), fix and re-run until they pass.
 
+**Before recommending verify:** run `specd changes implementation list <name>`.
+There MUST be **zero open** tracked files (`resolve` or `ignore` per `shared.md` —
+"Implementation tracking"). If `changes status` still shows `IMPLEMENTATION_STATE`,
+keep draining — do **not** tell the user to run `/specd-verify` yet.
+
+When open files are gone:
+
 > Implementation complete. Run `/specd-verify <name>` to verify against scenarios.
 
 **Stop.**
@@ -307,5 +314,6 @@ specd changes transition <name> designing --skip-hooks all
 - The change artifacts are the source of truth for implementation approach
 - If you touch code outside the change's spec scope, surface it to the user
 - Never skip the pre-hook — it tells you what to read
+- Never recommend `/specd-verify` while `implementation list` still shows `open` files
 - Any time a fresh `changes status` shows `review: required: yes`, stop
   implementation and redirect to `/specd-design <name>`

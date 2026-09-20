@@ -1,0 +1,10 @@
+- op: added
+  description: Keep the actionable artifact identity in predicate-backed blocker projections.
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    ### Requirement: Predicate blocker artifact identity
+
+    When `evaluateLifecycleVerdict` projects `transitionBlockers` from a failed `workflow.requires` predicate, it MUST preserve the blocking artifact ID from the predicate details. The projected `blocking` array MUST contain that artifact ID so lifecycle consumers receive the same actionable target as other blocker projections.

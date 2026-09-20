@@ -43,7 +43,7 @@ export {
   type ValidateSchemaInput,
   type ValidateSchemaResult,
 } from './validate-schema.js'
-export { type ListWorkspaces, type ProjectWorkspace } from './list-workspaces.js'
+export { ListWorkspaces, type ProjectWorkspace } from './list-workspaces.js'
 export {
   GetProjectSummary,
   type GetProjectSummaryInput,
@@ -119,6 +119,7 @@ export {
   type ArchiveChange,
   type ArchiveChangeInput,
   type ArchiveChangeResult,
+  type OnArchiveProgress,
   type InvalidatedChangesEntry,
 } from './archive-change.js'
 export {

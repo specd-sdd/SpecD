@@ -17,5 +17,41 @@
     {
       "file": "core:src/composition/use-cases/get-archived-change.ts"
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "GetArchivedChange read-only: ArchiveRepository.get(name) → ArchivedChange; null → ChangeNotFoundError CHANGE_NOT_FOUND.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:394450d21b57ce3c7d1d787ac5c78d1778deb14574e33ddd0d4246ae90064ecb",
+          "lastModified": "2026-08-25T15:37:19.290Z"
+        },
+        "verify.md": {
+          "hash": "sha256:d1c89675fd9fd5ea6466d0a999c0049de681da6515c65cc8f49c7a04d67759ee",
+          "lastModified": "2026-08-25T15:37:19.290Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# GetArchivedChange\n\n## Rules\n- Ctor: `ArchiveRepository` (default-workspace scoped, kernel-injected).\n- Input: `name` (required).\n- Success: `Promise<ArchivedChange>` from archived `manifest.json`. MUST extend `ReadOnlyChangeView` + archive metadata (`archivedAt`, `archivedBy`, `archivedName`).\n- MUST delegate to `ArchiveRepository.get(name)`; no own FS/index scan.\n- `get` returns null → `ChangeNotFoundError` code `'CHANGE_NOT_FOUND'`, message includes name.\n- No side effects (aside from possible `index.jsonl` recovery append inside `ArchiveRepository.get()`).\n- Config factory via `resolveGetArchivedChangeDeps` (archive) only.\n\n## Constraints\n- Only error thrown by use case itself is `ChangeNotFoundError` — other errors from ArchiveRepository\n- No workspace selection — single injected ArchiveRepository\n- Returned `ArchivedChange` immutable",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:394450d21b57ce3c7d1d787ac5c78d1778deb14574e33ddd0d4246ae90064ecb",
+          "lastModified": "2026-08-25T15:37:19.290Z"
+        },
+        "verify.md": {
+          "hash": "sha256:d1c89675fd9fd5ea6466d0a999c0049de681da6515c65cc8f49c7a04d67759ee",
+          "lastModified": "2026-08-25T15:37:19.290Z"
+        }
+      }
+    }
+  }
 }

@@ -12,36 +12,36 @@
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "mergeSchemaLayers aplica herencia, plugins y overrides a SchemaYamlData de forma pura, ordenada y validada.",
+      "value": "Pure mergeSchemaLayers applies ordered inheritance, plugin, and override operations to SchemaYamlData without mutation.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:c8d7fb7a2d6d4b2bd85d1b6bb0efedbc04065d165ef1042f24e4a106c2973793",
-          "lastModified": "2026-05-25T06:02:58.478Z"
+          "hash": "sha256:f58467b56b66c1df9eb246650ea615f84576822f14928d530a83ab20d2cf1e1a",
+          "lastModified": "2026-08-30T09:18:36.440Z"
         },
         "verify.md": {
-          "hash": "sha256:0fa37a203b34f0e652fe721e5e14f3291c4f17b699fb13f5eeb73173a385e2fb",
-          "lastModified": "2026-05-25T06:02:58.478Z"
+          "hash": "sha256:b14bcc4850b3399c18d0fee96a6618d68d6b9e35a77fab8d0c1b31b64e883041",
+          "lastModified": "2026-08-30T09:18:36.440Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# Schema Merge\n\n## Rules\n\n- Export synchronous pure mergeSchemaLayers(base: SchemaYamlData, layers: readonly SchemaLayer[]): SchemaYamlData in domain/services/merge-schema-layers.ts.\n- SchemaLayer source extends|plugin|override, human ref, optional operations remove/create/prepend/append/set.\n- Per-layer order remove → create → prepend → append → set. Layer order root-to-parent extends, declared plugins, one project override.\n- Identity: artifacts id; workflow step; hooks/validations/deltaValidations/rules/preHashCleanup id; metadataExtraction rules/constraints/scenarios/context id. Nested operation identifies parent then child.\n- remove deletes existing identity; null removes optional scalar; missing/required target throws SchemaValidationError. create/prepend/append reject collisions and preserve declared order. set scalars last-writer-wins, replaces existing array entry in-place.\n- Targets mirror top scalars, artifacts/workflow and nested fields. Post-merge validate unique IDs and artifact.requires references; errors identify layer/operation. Return new data, never mutate inputs.\n\n## Constraints\n\n- No I/O/fs/yaml/zod; synchronous domain service only.\n- No application/infrastructure/composition imports.\n- Operates intermediate SchemaYamlData below entities/buildSchema.",
+      "value": "# Schema Merge\n\n## Rules\n\n- Export sync pure mergeSchemaLayers(base: SchemaYamlData, layers: readonly SchemaLayer[]): SchemaYamlData from domain/services/merge-schema-layers.ts.\n- SchemaLayer: source extends|plugin|override, ref, operations remove/create/prepend/append/set.\n- Apply each layer order: remove → create → prepend → append → set; layer order: root-to-parent extends, declared schemaPlugins, one schemaOverrides.\n- Identities: artifacts id; workflow step; hooks/validations/deltaValidations/rules/preHashCleanup id; metadataExtraction rules/constraints/scenarios/context id. Nested targets identify parent then child.\n- remove deletes identity; null clears optional scalar; absent/required target throws SchemaValidationError. create/prepend/append reject collisions, preserve declaration order. set scalars last-writer-wins; replaces existing array entry in-place; absent target throws SchemaValidationError.\n- Targets mirror top scalars, artifacts, workflow, nested arrays. Post-merge reject duplicate identities and dangling artifact.requires; errors identify layer and operation. Return new data; never mutate inputs.\n\n## Constraints\n\n- No I/O, fs, yaml, zod; no application/, infrastructure/, composition/ imports.\n- Operates intermediate SchemaYamlData below entities/buildSchema.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:c8d7fb7a2d6d4b2bd85d1b6bb0efedbc04065d165ef1042f24e4a106c2973793",
-          "lastModified": "2026-05-25T06:02:58.478Z"
+          "hash": "sha256:f58467b56b66c1df9eb246650ea615f84576822f14928d530a83ab20d2cf1e1a",
+          "lastModified": "2026-08-30T09:18:36.440Z"
         },
         "verify.md": {
-          "hash": "sha256:0fa37a203b34f0e652fe721e5e14f3291c4f17b699fb13f5eeb73173a385e2fb",
-          "lastModified": "2026-05-25T06:02:58.478Z"
+          "hash": "sha256:b14bcc4850b3399c18d0fee96a6618d68d6b9e35a77fab8d0c1b31b64e883041",
+          "lastModified": "2026-08-30T09:18:36.440Z"
         }
       }
     }

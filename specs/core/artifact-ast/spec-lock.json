@@ -4,5 +4,41 @@
     "version": 1
   },
   "dependsOn": ["core:delta-format", "core:selector-model"],
-  "implementation": []
+  "implementation": [],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Normalized JSON-serializable AST contract lets every ArtifactParser parse and serialize Markdown, YAML, JSON, and plaintext.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:2a02f64e98a4187863106180d2057b68ec5d514361c8c883a7c9a2a627ec438c",
+          "lastModified": "2026-08-25T15:37:19.259Z"
+        },
+        "verify.md": {
+          "hash": "sha256:0999b3b7fa2795411473ab84c98ab3296b2d3804d7b994b7a496ce280816d09d",
+          "lastModified": "2026-08-25T15:37:19.259Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Artifact AST\n\n## Rules\n- Every normalized node plain object: required string `type`; optional string `label`; optional scalar `value` (`string | number | boolean | null`) or ordered `children`, never both. Node may have neither.\n- Markdown: `document`; nested heading `section` (`label`, `level` 1–6, `children`); `paragraph` (`value`); `list` (`ordered`, `children`); `list-item` (`label`, optional nested-list `children`); `code-block` (language `label`, `value`); `thematic-break`. Section parent = nearest preceding lower-level section; levels may skip.\n- YAML: `document` has top mapping pairs or one sequence; `mapping` → `pair`; `pair` has key `label` + scalar `value` or one nested `mapping|sequence`; `sequence` → `sequence-item`; item scalar `value` or one nested `mapping|sequence`.\n- JSON: `document` has one root; `object` → `property`; `property` key `label` + scalar `value` or one `object|array`; `array` → `array-item`; item scalar `value` or one `object|array`.\n- Plaintext: `document`; blank-line-separated `paragraph` (`value`); `line` (`value`).\n- Every adapter serializes normalized AST native format. Preserve all `label`, `value`, `children`; Markdown heading levels, `ordered`, code language, nesting, untouched inline-format metadata; source style `bullet`, `emphasis`, `strong` when clear, else deterministic convention. YAML mapping order and supported CST comments; JSON key order + two-space formatting. Preserve unrepresentable inline Markdown as `value` text.\n\n## Constraints\n- `label` only primary-identifier node types; absent on `document`, `paragraph`, `list`, `sequence`, `array`, `object`, `thematic-break`.\n- Fields JSON-serializable: no functions, circular references, class instances.\n- Only adapter parses/serializes native format; all other components use normalized AST.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:2a02f64e98a4187863106180d2057b68ec5d514361c8c883a7c9a2a627ec438c",
+          "lastModified": "2026-08-25T15:37:19.259Z"
+        },
+        "verify.md": {
+          "hash": "sha256:0999b3b7fa2795411473ab84c98ab3296b2d3804d7b994b7a496ce280816d09d",
+          "lastModified": "2026-08-25T15:37:19.259Z"
+        }
+      }
+    }
+  }
 }

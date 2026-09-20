@@ -17,6 +17,7 @@ import {
   type ArtifactNode,
 } from '../../../src/application/ports/artifact-parser.js'
 import { DeltaApplicationError } from '../../../src/domain/errors/delta-application-error.js'
+import * as lifecycleVerdict from '../../../src/domain/services/lifecycle-verdict.js'
 import { createBuiltinExtractorTransforms } from '../../../src/composition/extractor-transforms/index.js'
 import {
   makeChangeRepository,
@@ -236,6 +237,34 @@ describe('ValidateArtifacts', () => {
 
       expect(result.failures.some((f) => f.artifactId === 'design')).toBe(false)
     })
+
+    it('evaluates lifecycle with empty checksByTarget', async () => {
+      const designType = makeArtifactType('design', { optional: true })
+      const schema = makeSchema([designType])
+      const change = makeChangeWithArtifacts('c', [])
+      const repo = makeChangeRepository([change])
+      const evaluateSpy = vi.spyOn(lifecycleVerdict, 'evaluateLifecycleVerdict')
+      const uc = new ValidateArtifacts(
+        repo,
+        makeListWorkspaces(new Map()),
+        makeSchemaProvider(schema),
+        makeParsers(),
+        makeActorResolver(),
+        makeContentHasher(),
+      )
+
+      await uc.execute({
+        name: 'c',
+        specPath: 'default:auth',
+      })
+
+      expect(evaluateSpy).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.anything(),
+        expect.objectContaining({ checksByTarget: {} }),
+      )
+      evaluateSpy.mockRestore()
+    })
   })
 
   describe('Dependency order check', () => {
@@ -304,6 +333,69 @@ describe('ValidateArtifacts', () => {
       ).toBe(true)
     })
 
+    it('does not treat persisted complete as resolved when parent is pending-review', async () => {
+      const proposalType = makeArtifactType('proposal')
+      const specsType = makeArtifactType('specs', { requires: ['proposal'] })
+      const schema = makeSchema([proposalType, specsType])
+
+      const proposalArtifact = new ChangeArtifact({
+        type: 'proposal',
+        files: new Map([
+          [
+            'proposal',
+            new ArtifactFile({
+              key: 'proposal',
+              filename: 'proposal.md',
+              status: 'pending-review',
+              validatedHash: 'sha256:p',
+            }),
+          ],
+        ]),
+      })
+      const specsArtifact = new ChangeArtifact({
+        type: 'specs',
+        requires: ['proposal'],
+        files: new Map([
+          [
+            'specs',
+            new ArtifactFile({
+              key: 'specs',
+              filename: 'spec.md',
+              status: 'complete',
+              validatedHash: 'sha256:s',
+            }),
+          ],
+        ]),
+      })
+      const change = makeChangeWithArtifacts('c', [proposalArtifact, specsArtifact])
+      const repo = makeChangeRepository([change])
+      const uc = new ValidateArtifacts(
+        repo,
+        makeListWorkspaces(new Map()),
+        makeSchemaProvider(schema),
+        makeParsers(),
+        makeActorResolver(),
+        makeContentHasher(),
+      )
+
+      const result = await uc.execute({
+        name: 'c',
+        specPath: 'default:auth',
+      })
+
+      expect(
+        result.failures.some(
+          (f) =>
+            f.artifactId === 'specs' &&
+            f.description.includes('blocked') &&
+            f.description.includes('pending-review'),
+        ),
+      ).toBe(true)
+      expect(
+        result.files.some((file) => file.artifactId === 'specs' && file.status === 'validated'),
+      ).toBe(false)
+    })
+
     it('allows a child artifact to validate in the same execute after parent succeeds', async () => {
       const proposalType = makeArtifactType('proposal')
       const specsType = makeArtifactType('specs', { requires: ['proposal'] })
@@ -344,6 +436,7 @@ describe('ValidateArtifacts', () => {
         },
       })
 
+      const evaluateSpy = vi.spyOn(lifecycleVerdict, 'evaluateLifecycleVerdict')
       const uc = new ValidateArtifacts(
         repo,
         makeListWorkspaces(new Map()),
@@ -351,6 +444,8 @@ describe('ValidateArtifacts', () => {
         makeParsers(),
         makeActorResolver(),
         makeContentHasher(),
+        new Map(),
+        [],
       )
 
       const result = await uc.execute({
@@ -360,6 +455,7 @@ describe('ValidateArtifacts', () => {
 
       expect(result.passed).toBe(true)
       expect(result.failures.some((f) => f.artifactId === 'specs')).toBe(false)
+      expect(evaluateSpy).toHaveBeenCalledTimes(1)
     })
 
     it('proceeds when dependency is complete', async () => {
@@ -491,6 +587,90 @@ describe('ValidateArtifacts', () => {
   })
 
   describe('Approval invalidation on content change', () => {
+    it('ValidateArtifacts does not own baseline validatedHash drift', async () => {
+      const proposalType = makeArtifactType('proposal')
+      const schema = makeSchema([proposalType])
+      const proposalArt = new ChangeArtifact({
+        type: 'proposal',
+        files: new Map([
+          [
+            'proposal',
+            new ArtifactFile({
+              key: 'proposal',
+              filename: 'proposal.md',
+              status: 'complete',
+              validatedHash: sha256('old content'),
+            }),
+          ],
+        ]),
+      })
+      const change = makeChangeWithArtifacts('c', [proposalArt])
+      const repo = makeChangeRepository([change])
+      Object.assign(repo, {
+        async artifact(): Promise<SpecArtifact | null> {
+          return new SpecArtifact('proposal.md', 'new content')
+        },
+      })
+      const mutateSpy = vi.spyOn(repo, 'mutate')
+      const uc = new ValidateArtifacts(
+        repo,
+        makeListWorkspaces(new Map()),
+        makeSchemaProvider(schema),
+        makeParsers(),
+        makeActorResolver(),
+        makeContentHasher(),
+      )
+
+      await uc.execute({ name: 'c' })
+
+      expect(mutateSpy).not.toHaveBeenCalled()
+      expect(repo.store.get('c')?.history.some((event) => event.type === 'invalidated')).toBe(false)
+    })
+
+    it('ValidateArtifacts does not compare missing files to validatedHash for hasDrift', async () => {
+      const proposalType = makeArtifactType('proposal')
+      const schema = makeSchema([proposalType])
+      const proposalArt = new ChangeArtifact({
+        type: 'proposal',
+        files: new Map([
+          [
+            'proposal',
+            new ArtifactFile({
+              key: 'proposal',
+              filename: 'proposal.md',
+              status: 'missing',
+              validatedHash: sha256('old content'),
+              hasDrift: true,
+            }),
+          ],
+        ]),
+      })
+      const change = makeChangeWithArtifacts('c', [proposalArt])
+      const file = change.getArtifact('proposal')?.getFile('proposal')
+      expect(file?.displayStatus()).not.toBe('complete-with-drift')
+      const repo = makeChangeRepository([change])
+      Object.assign(repo, {
+        async artifact(): Promise<SpecArtifact | null> {
+          return null
+        },
+      })
+      const mutateSpy = vi.spyOn(repo, 'mutate')
+      const uc = new ValidateArtifacts(
+        repo,
+        makeListWorkspaces(new Map()),
+        makeSchemaProvider(schema),
+        makeParsers(),
+        makeActorResolver(),
+        makeContentHasher(),
+      )
+
+      const result = await uc.execute({ name: 'c' })
+
+      expect(mutateSpy).not.toHaveBeenCalled()
+      expect(result.passed).toBe(false)
+      expect(file?.displayStatus()).not.toBe('complete-with-drift')
+    })
+
     it('calls change.invalidate when cleaned hash differs from approval', async () => {
       const specsType = makeArtifactType('specs')
       const schema = makeSchema([specsType])
@@ -544,6 +724,82 @@ describe('ValidateArtifacts', () => {
       })
 
       // After invalidation, change should be back in designing state
+      const saved = repo.store.get('c')
+      expect(saved?.history.some((e) => e.type === 'invalidated')).toBe(true)
+    })
+
+    it('scans consent hashes across all artifacts even when artifactId is set', async () => {
+      const proposalType = makeArtifactType('proposal')
+      const specsType = makeArtifactType('specs')
+      const schema = makeSchema([proposalType, specsType])
+      const proposalContent = 'proposal ok'
+      const specsContent = 'specs changed'
+      const proposalArtifact = new ChangeArtifact({
+        type: 'proposal',
+        files: new Map([
+          [
+            'proposal',
+            new ArtifactFile({
+              key: 'proposal',
+              filename: 'proposal.md',
+              status: 'complete',
+              validatedHash: sha256(proposalContent),
+            }),
+          ],
+        ]),
+      })
+      const specsArtifact = new ChangeArtifact({
+        type: 'specs',
+        files: new Map([
+          [
+            'specs',
+            new ArtifactFile({
+              key: 'specs',
+              filename: 'spec.md',
+              status: 'in-progress',
+            }),
+          ],
+        ]),
+      })
+      const history: import('../../../src/domain/entities/change.js').ChangeEvent[] = [
+        {
+          type: 'spec-approved',
+          at: new Date(),
+          by: testActor,
+          reason: 'approved',
+          artifactHashes: {
+            'proposal:proposal': sha256(proposalContent),
+            'specs:specs': 'sha256:oldHash',
+          },
+        },
+      ]
+      const change = makeChangeWithArtifacts('c', [proposalArtifact, specsArtifact], { history })
+      const files = new Map([
+        ['proposal.md', proposalContent],
+        ['spec.md', specsContent],
+      ])
+      const repo = makeChangeRepository([change])
+      Object.assign(repo, {
+        async artifact(_change: Change, filename: string): Promise<SpecArtifact | null> {
+          const c = files.get(filename)
+          return c !== undefined ? new SpecArtifact(filename, c) : null
+        },
+      })
+      const uc = new ValidateArtifacts(
+        repo,
+        makeListWorkspaces(new Map()),
+        makeSchemaProvider(schema),
+        makeParsers(),
+        makeActorResolver(),
+        makeContentHasher(),
+      )
+
+      await uc.execute({
+        name: 'c',
+        specPath: 'default:auth',
+        artifactId: 'proposal',
+      })
+
       const saved = repo.store.get('c')
       expect(saved?.history.some((e) => e.type === 'invalidated')).toBe(true)
     })
@@ -610,7 +866,7 @@ describe('ValidateArtifacts', () => {
       expect(invalidatedCount).toBe(1)
     })
 
-    it('passes drifted artifact IDs to invalidate when single artifact changed', async () => {
+    it('Consent-hash drift still invalidates once with a focused payload', async () => {
       const proposalType = makeArtifactType('proposal')
       const designType = makeArtifactType('design', { requires: ['proposal'] })
       const schema = makeSchema([proposalType, designType])
@@ -2146,6 +2402,104 @@ describe('ValidateArtifacts', () => {
   })
 
   describe('transform-backed metadata extraction', () => {
+    it('Partial extracted metadata does not require title description or contentHashes', async () => {
+      const schema = makeSchema({
+        artifacts: [
+          makeArtifactType('specs', {
+            scope: 'spec',
+            output: 'spec.md',
+            format: 'markdown',
+          }),
+          makeArtifactType('verify', {
+            scope: 'spec',
+            output: 'verify.md',
+            format: 'markdown',
+          }),
+        ],
+        metadataExtraction: {
+          title: {
+            artifact: 'specs',
+            extractor: {
+              selector: { type: 'section', level: 1 },
+              extract: 'label',
+            },
+          },
+          description: {
+            artifact: 'specs',
+            extractor: {
+              selector: { type: 'section', matches: '^Overview$' },
+              extract: 'content',
+            },
+          },
+        },
+      })
+
+      const verifyArtifact = new ChangeArtifact({
+        type: 'verify',
+        files: new Map([
+          [
+            'default:auth/login',
+            new ArtifactFile({
+              key: 'default:auth/login',
+              filename: 'specs/default/auth/login/verify.md',
+              status: 'in-progress',
+            }),
+          ],
+        ]),
+      })
+      const change = makeChangeWithArtifacts('c', [verifyArtifact], {
+        specIds: ['default:auth/login'],
+      })
+
+      const repo = makeChangeRepository([change])
+      Object.assign(repo, {
+        async artifact(_change: Change, filename: string): Promise<SpecArtifact | null> {
+          if (filename !== 'specs/default/auth/login/verify.md') return null
+          return new SpecArtifact(
+            'specs/default/auth/login/verify.md',
+            '# Scenarios\n\n#### Scenario: login\n',
+          )
+        },
+      })
+
+      const markdownParser = makeParser({
+        parse: () => ({
+          root: {
+            type: 'document',
+            children: [
+              {
+                type: 'section',
+                label: 'Scenarios',
+                level: 1,
+                children: [],
+              },
+            ],
+          },
+        }),
+        renderSubtree: (node) => (node.value as string | undefined) ?? '',
+      })
+
+      const uc = new ValidateArtifacts(
+        repo,
+        makeListWorkspaces(new Map()),
+        makeSchemaProvider(schema),
+        makeParsers(markdownParser),
+        makeActorResolver(),
+        makeContentHasher(),
+      )
+
+      const result = await uc.execute({
+        name: 'c',
+        specPath: 'default:auth/login',
+        artifactId: 'verify',
+      })
+
+      expect(
+        result.failures.some((failure) => failure.description.includes('MetadataExtraction')),
+      ).toBe(false)
+      expect(result.passed).toBe(true)
+    })
+
     it('stores transform-normalized specDependsOn values during validation', async () => {
       const extractorTransforms = new Map([
         [

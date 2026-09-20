@@ -1,0 +1,61 @@
+- op: modified
+  description: 'Upstream in-progress uses projectArtifacts not Change.effectiveStatus'
+  selector:
+    type: section
+    matches: '^Scenario: Upstream artifact edited$'
+  content: |
+    #### Scenario: Upstream artifact edited
+
+    - **WHEN** artifact A is `complete` but its upstream dependency B is edited (becomes `in-progress`)
+    - **THEN** `projectArtifacts` effective status for `a` is `in-progress`
+    - **AND** there is no `Change.effectiveStatus()` method
+
+- op: modified
+  description: 'Skipped optional parent does not block via verdict cascade'
+  selector:
+    type: section
+    matches: '^Scenario: Upstream artifact skipped — downstream unblocked$'
+  content: |
+    #### Scenario: Upstream artifact skipped — downstream unblocked
+
+    - **GIVEN** artifact A requires optional artifact B, and B has `validatedHash: "__skipped__"`
+    - **WHEN** `projectArtifacts` runs
+    - **THEN** effective status for `a` is A's own derived status — B's `skipped` state does not block A
+    - **AND** there is no `Change.effectiveStatus()` method
+
+- op: modified
+  description: 'Hash mismatch on load invalidates rather than leaving in-progress'
+  selector:
+    type: section
+    matches: '^Scenario: Hash mismatch triggers in-progress status$'
+  content: |
+    #### Scenario: Hash mismatch on load invalidates with artifact-drift
+
+    - **GIVEN** an artifact was validated with content `some content`
+    - **AND** `artifactTypes.length > 0`
+    - **WHEN** the file is edited to `different content` and `FsChangeRepository.get` runs
+    - **THEN** the change is invalidated with cause `artifact-drift`
+    - **AND** the actor is `SYSTEM_ACTOR`
+    - **AND** the file status is `drifted-pending-review`
+
+    #### Scenario: Reloading after revalidation does not invalidate twice
+
+    - **GIVEN** load already invalidated a drifted complete file
+    - **AND** that file was then marked complete with the new hash and persisted
+    - **WHEN** `get` runs again
+    - **THEN** the file is `complete`
+    - **AND** history still has exactly one `invalidated` event
+
+- op: modified
+  description: 'Uninitialized get skips drift invalidation'
+  selector:
+    type: section
+    matches: '^Scenario: Status derivation bypassed when repository is uninitialized$'
+  content: |
+    #### Scenario: Uninitialized repository skips drift invalidation
+
+    - **GIVEN** a repository initialized without artifact types (`artifactTypes.length === 0`)
+    - **AND** a change with a drifted artifact
+    - **WHEN** `get` is called
+    - **THEN** no invalidation occurs
+    - **AND** no manifest is written for that drift

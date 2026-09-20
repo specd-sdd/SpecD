@@ -40,9 +40,22 @@
 
 #### Scenario: Hash mismatch triggers in-progress status
 
+#### Scenario: Hash mismatch on load invalidates with artifact-drift
+
 - **GIVEN** an artifact was validated with content `some content`
-- **WHEN** the file is edited to `different content`
-- **THEN** its status becomes `in-progress`
+- **AND** `artifactTypes.length > 0`
+- **WHEN** the file is edited to `different content` and `FsChangeRepository.get` runs
+- **THEN** the change is invalidated with cause `artifact-drift`
+- **AND** the actor is `SYSTEM_ACTOR`
+- **AND** the file status is `drifted-pending-review`
+
+#### Scenario: Reloading after revalidation does not invalidate twice
+
+- **GIVEN** load already invalidated a drifted complete file
+- **AND** that file was then marked complete with the new hash and persisted
+- **WHEN** `get` runs again
+- **THEN** the file is `complete`
+- **AND** history still has exactly one `invalidated` event
 
 #### Scenario: Missing validatedHash defaults to in-progress
 
@@ -77,22 +90,25 @@
 #### Scenario: Status derivation bypassed when repository is uninitialized
 
 - **GIVEN** a repository initialized without artifact types (`artifactTypes.length === 0`)
-- **WHEN** a change is loaded
-- **THEN** drift detection and status derivation are bypassed
-- **AND** files do not report drift or trigger auto-invalidations
+- **AND** a change with a drifted artifact
+- **WHEN** `get` is called
+- **THEN** no invalidation occurs
+- **AND** no manifest is written for that drift
 
 ### Requirement: Artifact dependency cascade
 
 #### Scenario: Upstream artifact edited
 
 - **WHEN** artifact A is `complete` but its upstream dependency B is edited (becomes `in-progress`)
-- **THEN** `Change.effectiveStatus('a')` returns `in-progress`
+- **THEN** `projectArtifacts` effective status for `a` is `in-progress`
+- **AND** there is no `Change.effectiveStatus()` method
 
 #### Scenario: Upstream artifact skipped — downstream unblocked
 
 - **GIVEN** artifact A requires optional artifact B, and B has `validatedHash: "__skipped__"`
-- **WHEN** `Change.effectiveStatus('a')` is called
-- **THEN** it returns A's own derived status — B's `skipped` state does not block A
+- **WHEN** `projectArtifacts` runs
+- **THEN** effective status for `a` is A's own derived status — B's `skipped` state does not block A
+- **AND** there is no `Change.effectiveStatus()` method
 
 ### Requirement: ValidateArtifacts is the sole path to complete
 

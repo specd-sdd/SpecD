@@ -20,8 +20,16 @@ specd changes status <name> --format text
 ```
 
 Identify any high-visibility blockers from the **blockers:** section (e.g. `ARTIFACT_DRIFT`,
-`OVERLAP_CONFLICT`, `REVIEW_REQUIRED`) and inform the user. Follow the **next action:**
-command recommendation.
+`REVIEW_REQUIRED`) and inform the user.
+
+`OVERLAP_CONFLICT` is archive-only. Invalidation overlap is `review.reason:
+spec-overlap-conflict` → `/specd-design`, not `--allow-overlap`.
+
+If the only (or remaining) blocker is `IMPLEMENTATION_STATE` / open tracked files,
+**stay in this skill** — drain tracking (see `shared.md` — "Implementation tracking")
+then continue. Do **not** redirect to `/specd-implement` solely for open files.
+
+For other blockers, follow the **next action:** command recommendation.
 
 Extract the `path:` field from the "lifecycle:" section.
 
@@ -53,7 +61,13 @@ Follow guidance.
 specd changes transition <name> verifying --skip-hooks all
 ```
 
-If it fails, follow the **Repair Guide** output.
+If it fails with `IMPLEMENTATION_STATE` / open tracked files: drain tracking using
+`shared.md` — "Implementation tracking" (`list` → `resolve` in-scope files, `ignore`
+incidental files, `add` links when a file actually implements a spec). Retry the
+transition. Do **not** stop and send the user to `/specd-implement` for this blocker
+alone.
+
+If it fails for any other reason, follow the **Repair Guide** output.
 
 **If in `verifying`** (resuming): run pre-hooks but skip the transition:
 
@@ -276,10 +290,10 @@ specd changes run-hooks <name> archivable --phase post
 specd changes hook-instruction <name> archivable --phase post --format text
 ```
 
-**If signoff=on:** transition routes to `pending-signoff`. Tell user:
+**If signoff=on:** stay in `done`. Tell user:
 
 > Signoff required. Run: `specd changes approve signoff <name> --reason "..."`
-> Then: `/specd-archive <name>`
+> Then continue this skill for `done → archivable`.
 
 **Stop.**
 Do not invoke `/specd-archive` automatically; wait for explicit user confirmation.
@@ -297,9 +311,16 @@ Do not invoke `/specd-archive` automatically; wait for explicit user confirmatio
 ## Handling failed transitions
 
 When `changes transition` fails, it renders a **Repair Guide** in text mode.
-Follow the recommended repair command based on the target recommendation.
 
-**Stop — do not continue after redirecting.**
+If the blocker is `IMPLEMENTATION_STATE` / `impl.filesResolved`, drain tracking
+(`shared.md` — "Implementation tracking") and **retry** — do not redirect to
+`/specd-implement` solely for open files.
+
+For any other blocker, follow the recommended repair command based on the target
+recommendation.
+
+**Stop — do not continue after redirecting** (except the open-files drain-and-retry
+path above).
 
 ## Returning to design
 

@@ -1,0 +1,15 @@
+- op: modified
+  selector:
+    type: section
+    matches: '^Scenario: Schema resolution failure degrades lifecycle fields$'
+  rename: 'Scenario: Schema resolution failure returns actionable read-only status'
+  content: |
+    - **GIVEN** `SchemaProvider.get()` throws `SchemaNotFoundError`
+    - **WHEN** `GetStatus.execute()` is called
+    - **THEN** the result does not throw
+    - **AND** `lifecycle.validTransitions` and `lifecycle.approvals` are populated normally
+    - **AND** `lifecycle.availableTransitions` is an empty array
+    - **AND** `lifecycle.blockers` is an empty array
+    - **AND** the public `blockers` array contains `SCHEMA_RESOLUTION_FAILED` with recovery guidance
+    - **AND** `lifecycle.nextArtifact` is `null`, `lifecycle.changePath` is populated normally, and `lifecycle.schemaInfo` is `null`
+    - **AND** the result does not enable a lifecycle mutation

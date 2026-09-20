@@ -4,5 +4,41 @@
     "version": 1
   },
   "dependsOn": ["core:project-metadata", "core:composition-resolver", "core:get-spec-metadata"],
-  "implementation": []
+  "implementation": [],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "UpdateProjectMetadata persists optimizedContext plus computed SHA-256 freshness; caller cannot supply hashes; write atomic.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:446c7abffb9e396c9dc00596d5bab197ad072c25fb0406bb2d4e3c3b07edad44",
+          "lastModified": "2026-08-25T15:37:19.357Z"
+        },
+        "verify.md": {
+          "hash": "sha256:3e49d15ee5bc67c39e73d04aaa4d626bc26100358c307c6e73db5d6fb0ac423c",
+          "lastModified": "2026-08-25T15:37:19.357Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# core:update-project-metadata\n\n## Rules\n- Hash SHA-256 of project `specd.yaml` + all config `contextFiles`.\n- For every spec in project context: `GetSpecMetadata.execute({ specId })` default `if-needed`; record `metadataFingerprint` in `freshness`. MUST NOT hash raw metadata-cache file or repo storage revision.\n- `project-metadata.json` update SHALL be atomic.\n- Caller supplies only `optimizedContext` string (wrapped in input object). MUST NOT accept caller freshness hashes or versioning. Maps to internal `optimized.context`.\n- Config factory via `resolveUpdateProjectMetadataDeps`: `config`, `listWorkspaces`, `specRepos`, `getMetadata`, `files`, `fileWriter`, `hasher`. MUST NOT reconstruct fs-shaped wiring inline.\n\n## Constraints\n- None beyond rules above.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:446c7abffb9e396c9dc00596d5bab197ad072c25fb0406bb2d4e3c3b07edad44",
+          "lastModified": "2026-08-25T15:37:19.357Z"
+        },
+        "verify.md": {
+          "hash": "sha256:3e49d15ee5bc67c39e73d04aaa4d626bc26100358c307c6e73db5d6fb0ac423c",
+          "lastModified": "2026-08-25T15:37:19.357Z"
+        }
+      }
+    }
+  }
 }

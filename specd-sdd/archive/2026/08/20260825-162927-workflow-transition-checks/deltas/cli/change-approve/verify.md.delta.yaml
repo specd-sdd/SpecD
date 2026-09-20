@@ -1,0 +1,44 @@
+- op: modified
+  description: 'CLI approve spec from ready'
+  selector:
+    type: section
+    matches: '^Scenario: Successful spec approval$'
+  rename: 'Scenario: Successful spec approval from ready'
+  content: |
+    #### Scenario: Successful spec approval from ready
+
+    - **GIVEN** the change is in `ready` and the spec gate is on
+    - **WHEN** `specd change approve spec my-change --reason "looks good"` is run
+    - **THEN** the change remains in `ready`
+    - **AND** a spec approval is recorded
+    - **AND** stdout contains `approved spec for my-change`
+    - **AND** the process exits with code 0
+
+- op: modified
+  description: 'CLI approve signoff from done'
+  selector:
+    type: section
+    matches: '^Scenario: Successful signoff$'
+  rename: 'Scenario: Successful signoff from done'
+  content: |
+    #### Scenario: Successful signoff from done
+
+    - **GIVEN** the change is in `done` and the signoff gate is on
+    - **WHEN** `specd change approve signoff my-change --reason "done"` is run
+    - **THEN** the change remains in `done`
+    - **AND** a signoff is recorded
+    - **AND** stdout contains `approved signoff for my-change`
+    - **AND** the process exits with code 0
+
+- op: modified
+  description: 'JSON approval GIVEN is ready'
+  selector:
+    type: section
+    matches: '^Scenario: JSON output on successful approval$'
+  content: |
+    #### Scenario: JSON output on successful approval
+
+    - **GIVEN** the change is in `ready` state
+    - **WHEN** `specd change approve spec my-change --reason "looks good" --format json` is run
+    - **THEN** stdout is valid JSON with `result` equal to `"ok"`, `gate` equal to `"spec"`, and `name` equal to `"my-change"`
+    - **AND** the process exits with code 0

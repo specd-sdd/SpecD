@@ -19,36 +19,36 @@
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Agent CLI policies: text diagnostics, toon extraction, plural cmds, skip-redundant, validate≠approve.",
+      "value": "Agent CLI policies: text diagnostics, toon extraction, spec read surfaces, plural cmds, skip-redundant, validate≠approve.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:b6dc905d620ba69ef503e6f2b6b3b5a35b3e12126da12d54e27057b0c90f33d8",
-          "lastModified": "2026-07-15T16:04:34.191Z"
+          "hash": "sha256:874e1c6648722f67ddeedb2eaa55955eee5374d471e6f45f62fdb4918f2df84e",
+          "lastModified": "2026-08-25T15:37:19.393Z"
         },
         "verify.md": {
-          "hash": "sha256:0163d75e677fb924e7bab04db37c1901ef7c321d0680cf0b8972ea5e5fa2f89a",
-          "lastModified": "2026-07-15T16:04:34.191Z"
+          "hash": "sha256:25116796863e67ad8a2b25f69c7409be1ab91572be775fcd3b6e58b0cb225056",
+          "lastModified": "2026-08-25T15:37:19.393Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# Workflow Automation\n\n## Rules\n\n### Diagnostic Priority\n- Agents SHALL prefer `--format text` for lifecycle status, transition, validation — human-readable blockers/notes.\n\n### Data Extraction\n- Machine formats ONLY when structured extraction needed for later tool calls/state.\n- MUST prefer `--format toon`. MAY use `--format json` only if `toon` unavailable or explicitly requested.\n\n### On-demand outline retrieval\n- When artifact-instruction gives only outline refs (e.g. `availableOutlines`), MUST fetch via:\n  `specd specs outline <specPath> --artifact <artifactId>`\n- MUST NOT rely on embedded full outline trees in `changes artifact-instruction` output.\n\n### Repair Strategy\n- Follow \"Next Action\" from command outputs before retrying failed lifecycle op.\n\n### Canonical Command References\n- Agent workflow instructions/examples MUST use plural groups: `changes`, `specs`, `archives`, `drafts`.\n- Singular forms MAY appear as aliases only.\n- Outline example canonical: `specd specs outline <specPath> --artifact <artifactId>`.\n\n### Command Necessity and Freshness\n- MUST avoid redundant cmds when prior cmd in same skill execution already supplies equivalent fields.\n- Skip ONLY if: (1) info already in current-step prior output, AND (2) still fresh for current decision boundary.\n- MUST NOT assume continuity across separate skill invocations — re-read minimal state when session/skill may differ.\n- Non-deterministic equivalence → run explicit command.\n\n### Structural Validation and Content Review\n- `specd changes validate` = structural/state only. Success MUST NOT mean semantic content approval.\n- MUST review requirements/constraints/intent before lifecycle steps needing artifact correctness.\n- Successful individual validate of delta-backed `scope: spec` artifact: review inline diff from `specd changes validate` for unintended removals/contract breakage.\n- If inline diff unavailable (validate failed / non-fatal diff-gen failure path), fall back:\n  `specd changes spec-preview <change-name> <specId> --diff --artifact <artifactId>`\n- Broader overlap/drift risk: verify merged content via `specd changes spec-preview <change-name> <specId>` before accepting delta.\n- Single-artifact review: prefer `specd changes spec-preview <change-name> <specId> --artifact <artifactId>`.\n\n### Implementation traceability policy\n- MUST use `specd changes implementation add` for spec-to-file/symbol links.\n- Tracked implementation files = review surface distinct from confirmed links.\n- MUST resolve or ignore tracked files before archive; multi-file: prefer comma-separated `--file`.\n- Use implementation integrity review for stale symbol links / sidecar issues.\n\n### Context optimization policy\n- When `llmOptimizedContext` enabled, prefer ultra-terse metadata-compiled context.\n- Orchestrators SHOULD delegate to `specd-project-context-optimizer` / `specd-spec-context-optimizer` when subagents supported.\n- Else orchestrator MUST optimize inline per smart caveman in `skills:agents`.\n\n## Constraints\n\n- None beyond rules above.\n",
+      "value": "# Workflow Automation\n\n## Rules\n\n### Diagnostic Priority\n- Agents SHALL prefer `--format text` for lifecycle status, transition, validation — human-readable blockers/notes.\n\n### Data Extraction\n- Machine formats ONLY when structured extraction needed for later tool calls/state.\n- MUST prefer `--format toon`. MAY use `--format json` only if `toon` unavailable or explicitly requested.\n\n### Spec read surface selection\n- `specd specs show <spec-id>` — exact raw artifact content (authoring, delta, content review)\n- `specd specs context <spec-id>` — semantic working context (section filter, dep traversal, optimized-content preference)\n- `specd specs metadata <spec-id>` — only for normalized metadata projection / materialization diagnostics (`source`, `regenerated`, warnings)\n- MUST NOT treat `specs metadata` as effective project config or default working-context load\n- Effective project config MUST come from project configuration or project status command exposing required field\n\n### On-demand outline retrieval\n- When artifact-instruction gives only outline refs (e.g. `availableOutlines`), MUST fetch via:\n  `specd specs outline <specPath> --artifact <artifactId>`\n- MUST NOT rely on embedded full outline trees in `changes artifact-instruction` output.\n\n### Repair Strategy\n- Follow \"Next Action\" from command outputs before retrying failed lifecycle op.\n\n### Canonical Command References\n- Agent workflow instructions/examples MUST use plural groups: `changes`, `specs`, `archives`, `drafts`.\n- Singular forms MAY appear as aliases only.\n- Outline example canonical: `specd specs outline <specPath> --artifact <artifactId>`.\n\n### Command Necessity and Freshness\n- MUST avoid redundant cmds when prior cmd in same skill execution already supplies equivalent fields.\n- Skip ONLY if: (1) info already in current-step prior output, AND (2) still fresh for current decision boundary.\n- MUST NOT assume continuity across separate skill invocations — re-read minimal state when session/skill may differ.\n- Non-deterministic equivalence → run explicit command.\n\n### Structural Validation and Content Review\n- `specd changes validate` = structural/state only. Success MUST NOT mean semantic content approval.\n- MUST review requirements/constraints/intent before lifecycle steps needing artifact correctness.\n- Successful individual validate of delta-backed `scope: spec` artifact: review inline diff from `specd changes validate` for unintended removals/contract breakage.\n- If inline diff unavailable (validate failed / non-fatal diff-gen failure path), fall back:\n  `specd changes spec-preview <change-name> <specId> --diff --artifact <artifactId>`\n- Broader overlap/drift risk: verify merged content via `specd changes spec-preview <change-name> <specId>` before accepting delta.\n- Single-artifact review: prefer `specd changes spec-preview <change-name> <specId> --artifact <artifactId>`.\n\n### Implementation traceability policy\n- MUST use `specd changes implementation add` for spec-to-file/symbol links.\n- Tracked implementation files = review surface distinct from confirmed links.\n- MUST resolve or ignore tracked files before archive; multi-file: prefer comma-separated `--file`.\n- Use implementation integrity review for stale symbol links / sidecar issues.\n\n### Context optimization policy\n- When `llmOptimizedContext` enabled, prefer ultra-terse metadata-compiled context.\n- Orchestrators SHOULD delegate to `specd-project-context-optimizer` / `specd-spec-context-optimizer` when subagents supported.\n- Else orchestrator MUST optimize inline per smart caveman in `skills:agents`.\n\n## Constraints\n- None beyond rules above.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:b6dc905d620ba69ef503e6f2b6b3b5a35b3e12126da12d54e27057b0c90f33d8",
-          "lastModified": "2026-07-15T16:04:34.191Z"
+          "hash": "sha256:874e1c6648722f67ddeedb2eaa55955eee5374d471e6f45f62fdb4918f2df84e",
+          "lastModified": "2026-08-25T15:37:19.393Z"
         },
         "verify.md": {
-          "hash": "sha256:0163d75e677fb924e7bab04db37c1901ef7c321d0680cf0b8972ea5e5fa2f89a",
-          "lastModified": "2026-07-15T16:04:34.191Z"
+          "hash": "sha256:25116796863e67ad8a2b25f69c7409be1ab91572be775fcd3b6e58b0cb225056",
+          "lastModified": "2026-08-25T15:37:19.393Z"
         }
       }
     }

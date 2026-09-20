@@ -76,32 +76,34 @@ type ChangeState =
   | 'archiving'
 ```
 
-The permitted transitions are defined in `VALID_TRANSITIONS`. Almost every active state can transition back to `'designing'` — this is the redesign path that allows rework at any point. From `'archiving'`, recovery transitions to `'archivable'` and `'designing'` are valid while the change is still active; a successful archive removes the change from the active set (archived record, not a lifecycle transition).
+The permitted transitions are defined in `VALID_TRANSITIONS` (protocol). Almost every active state can transition back to `'designing'` — this is the redesign path that allows rework at any point. From `'archiving'`, recovery transitions to `'archivable'` and `'designing'` are valid while the change is still active; a successful archive removes the change from the active set (archived record, not a lifecycle transition).
+
+Optional approval gates do **not** add edges from `ready` or `done` into parking states. Spec and signoff consent is recorded in place; `pending-spec-approval`, `spec-approved`, `pending-signoff`, and `signed-off` remain for **drain** of in-flight changes. `done`, `signed-off`, and `archivable` may hop to `implementing` or `verifying`.
+
+Which targets status reports as available is **not** this table alone — `availableTransitions` is the subset of protocol targets whose transition checks currently pass.
 
 ```
-drafting → designing ⇄ ready ──────────────────────────── → implementing ⇄ verifying → done ──────────────────── → archivable → archiving
-                     ↕        ╌→ pending-spec-approval               ↕               ↕      ╌→ pending-signoff ↕
-                     ↕             → spec-approved ──────── → implementing            ↕           → signed-off ↕
-                     ↕                                                                 ↕                        ↕
-                     ←─────────────────────────────── (redesign from any active state) ←───────────────────────┘
+drafting → designing ⇄ ready → implementing ⇄ verifying → done → archivable → archiving
+                     ↕                                      ↕               ↕
+                     ←──────── (redesign from any active state; hops from done / signed-off / archivable → implementing / verifying) ──┘
 ```
 
 Full transition table from `VALID_TRANSITIONS`:
 
-| From                    | To                                                   |
-| ----------------------- | ---------------------------------------------------- |
-| `drafting`              | `designing`                                          |
-| `designing`             | `ready`, `designing`                                 |
-| `ready`                 | `implementing`, `pending-spec-approval`, `designing` |
-| `pending-spec-approval` | `spec-approved`, `designing`                         |
-| `spec-approved`         | `implementing`, `designing`                          |
-| `implementing`          | `verifying`, `designing`                             |
-| `verifying`             | `implementing`, `done`, `designing`                  |
-| `done`                  | `archivable`, `pending-signoff`, `designing`         |
-| `pending-signoff`       | `signed-off`, `designing`                            |
-| `signed-off`            | `archivable`, `designing`                            |
-| `archivable`            | `archiving`, `designing`                             |
-| `archiving`             | `archivable`, `designing`                            |
+| From                    | To                                                     |
+| ----------------------- | ------------------------------------------------------ |
+| `drafting`              | `designing`                                            |
+| `designing`             | `ready`, `designing`                                   |
+| `ready`                 | `implementing`, `designing`                            |
+| `pending-spec-approval` | `spec-approved`, `designing` _(drain only)_            |
+| `spec-approved`         | `implementing`, `designing` _(drain only)_             |
+| `implementing`          | `verifying`, `designing`                               |
+| `verifying`             | `implementing`, `done`, `designing`                    |
+| `done`                  | `archivable`, `designing`, `implementing`, `verifying` |
+| `pending-signoff`       | `signed-off`, `designing` _(drain only)_               |
+| `signed-off`            | `archivable`, `designing`, `implementing`, `verifying` |
+| `archivable`            | `archiving`, `designing`, `implementing`, `verifying`  |
+| `archiving`             | `archivable`, `designing`                              |
 
 ```typescript
 import { VALID_TRANSITIONS, isValidTransition } from '@specd/core'
@@ -113,10 +115,10 @@ isValidTransition('archiving', 'archivable') // true
 isValidTransition('archiving', 'implementing') // false
 
 // Inspect valid targets from a given state
-VALID_TRANSITIONS['done'] // ['archivable', 'pending-signoff', 'designing']
+VALID_TRANSITIONS['done'] // ['archivable', 'designing', 'implementing', 'verifying']
 ```
 
-Use `isValidTransition` when you want to determine which actions are available in a given state without attempting the transition and catching an error.
+Use `isValidTransition` for the protocol graph. Use `GetStatus` `availableTransitions` when you need the check-derived subset that execute would currently allow.
 
 ## ChangeEvent
 

@@ -49,6 +49,19 @@ export class ListWorkspaces {
   }
 
   /**
+   * Graph exclusion prefixes for one workspace (project-level plus workspace-local).
+   *
+   * @param workspaceName - Workspace name from `specd.yaml`
+   * @returns De-duplicated portable exclusion prefixes
+   */
+  excludePathsFor(workspaceName: string): readonly string[] {
+    const global = this._config.graph?.excludePaths ?? []
+    const workspace = this._config.workspaces.find((entry) => entry.name === workspaceName)
+    const local = workspace?.graph?.excludePaths ?? []
+    return [...new Set([...global, ...local])]
+  }
+
+  /**
    * Returns the orchestrated list of all configured workspaces.
    *
    * Results preserve the declaration order from `specd.yaml`.

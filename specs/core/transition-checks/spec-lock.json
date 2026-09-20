@@ -1,0 +1,13 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "core:change",
+    "core:workflow-model",
+    "core:schema-format",
+    "default:_global/architecture"
+  ],
+  "implementation": []
+}

@@ -1,0 +1,107 @@
+- op: modified
+  description: 'Command signature lists allow-out-of-scope'
+  selector:
+    type: section
+    matches: '^Requirement: Command signature$'
+  content: |
+    ```
+    specd changes archive <name> [--skip-hooks <phases>] [--allow-overlap] [--allow-out-of-scope] [--format text|json|toon]
+    ```
+
+    Alias:
+
+    ```
+    specd change archive <name> [--skip-hooks <phases>] [--allow-overlap] [--allow-out-of-scope] [--format text|json|toon]
+    ```
+
+    - `<name>` — required positional; the name of the change to archive
+    - `--skip-hooks <phases>` — optional; comma-separated list of archive hook phases to skip. Valid values: `pre`, `post`, `all`. When `all` is specified, all hook execution is skipped. When omitted, both phases execute.
+    - `--allow-overlap` — optional flag; permits archiving despite spec overlap with other active changes
+    - `--allow-out-of-scope` — optional flag; permits archiving when implementation links resolve outside the change scope (`impl.linksInScope`)
+    - `--format text|json|toon` — optional; output format, defaults to `text`
+
+- op: added
+  description: 'Generic check progress bus for archive CLI'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Hook execution$'
+  content: |
+    ### Requirement: Check progress rendering
+
+    When `ArchiveChange` emits generic check progress events, the CLI MUST render them in text mode as:
+
+    ```text
+    <label> (<id>)
+      …optional check-progress lines…
+    ✓ <label>
+    # or
+    ✗ <label>: <reason>
+    ```
+
+    Labels are gerund phrases from each check. The CLI MUST NOT print an `Executing:` prefix. Hooks MUST appear on this same bus (`Running pre hooks` / `Running post hooks`), not as a separate public progress contract.
+
+- op: modified
+  description: 'Declare transition-checks dependency for progress bus'
+  selector:
+    type: section
+    matches: '^Spec Dependencies$'
+  content: |
+    - [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
+    - [`core:change`](../../core/change/spec.md) — archivable state, archive semantics
+    - [`core:archive-change`](../../core/archive-change/spec.md) — archive hook phase selectors and hook delegation
+    - [`core:hook-execution-model`](../../core/hook-execution-model/spec.md) — `--skip-hooks` manual-control pattern
+    - [`cli:command-resource-naming`](../command-resource-naming/spec.md) — canonical plural naming and singular alias policy
+    - [`core:transition-checks`](../../core/transition-checks/spec.md) — generic check progress bus and gerund labels
+
+- op: modified
+  description: 'Prerequisites allow archivable or archiving'
+  selector:
+    type: section
+    matches: '^Requirement: Prerequisites$'
+  content: |
+    The change must be in `archivable` or `archiving` state (`archiving` is a retry after a failed archive commit). If the change is in any other state, the command exits with code 1 and prints an `error:` message to stderr naming the current state. The CLI delegates this guard to `ArchiveChange` (`assertArchivable`); it MUST NOT apply a second, narrower state table.
+
+- op: modified
+  description: 'Error cases allow archiving retry'
+  selector:
+    type: section
+    matches: '^Requirement: Error cases$'
+  content: |
+    - If the change does not exist, exits with code 1.
+    - If the change is not in `archivable` or `archiving` state, exits with code 1.
+    - If a delta merge fails (conflict or parse error), exits with code 1 and prints a descriptive error.
+
+- op: modified
+  description: 'Constraints allow archiving retry'
+  selector:
+    type: section
+    matches: '^Constraints$'
+  content: |
+    - Only changes in `archivable` or `archiving` state may be archived
+    - The archive path is determined by `storage.archivePattern` in `specd.yaml`
+
+- op: modified
+  description: 'JSON success is a change-archive stream complete record'
+  selector:
+    type: section
+    matches: '^Requirement: JSON output on success$'
+  content: |
+    When `--format json` or `toon` is specified, success MUST emit a terminal structured stream record with `stream: "change-archive"`, `event.type: "complete"`, and `event.result` containing `result: "ok"`, `name`, `archivePath`, and `invalidatedChanges`. Progress records on the same stream MUST precede that complete record. Callers MUST NOT require a second unwrapped JSON object after the stream.
+
+- op: modified
+  description: 'Text Output on success is complete not garbled'
+  selector:
+    type: section
+    matches: '^Requirement: Output on success$'
+  content: |
+    On success, output depends on `--format`:
+
+    - `text` (default): prints to stdout:
+      - The archive path line
+      - If changes were invalidated due to overlap, a summary listing each invalidated change and the overlapping specs
+      - The invalidated changes section is omitted when no changes were invalidated
+    - `json` or `toon`: MUST follow Requirement: JSON output on success (NDJSON `stream: "change-archive"` complete record). MUST NOT emit a second unwrapped `{ result: "ok" }` object after the stream.

@@ -4,5 +4,41 @@
     "version": 1
   },
   "dependsOn": ["core:spec-repository-port", "core:spec-id-format"],
-  "implementation": []
+  "implementation": [],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "GetPersistedSpecSchema returns persisted {name, version}; uninitialized → SpecNotInitializedError; unknown spec first.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:3bfc9c4b0fbdfde0c5ee58924242297126b58901c61a6fb94e18ba83c11dc165",
+          "lastModified": "2026-08-25T15:37:19.294Z"
+        },
+        "verify.md": {
+          "hash": "sha256:6731c9d2b8a5bfa2de08141aef599816942e009c829c93e49700e0938eda71c9",
+          "lastModified": "2026-08-25T15:37:19.294Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# GetPersistedSpecSchema\n\n## Rules\n- Input: `specId` (required).\n- Resolve workspace repo; `SpecRepository.readPersistedState(spec)`. MUST NOT read `spec-lock.json` directly. MUST NOT materialize/read generated metadata.\n- `readPersistedState` null → `SpecNotInitializedError` identifying `specId`. No default/partial schema identity.\n- Initialized: `{ specId, schema: PersistedSchemaIdentity { name, version } }` exact stored identity.\n- Unresolvable spec → `SpecNotFoundError` BEFORE initialization check — unknown never reported as uninitialized.\n- Config factory via `resolveGetPersistedSpecSchemaDeps` (`specs`) only.\n\n## Constraints\n- Read-only — never create/mutate/write persisted state\n- Never resolves/validates schema reference; reports recorded identity only\n- `readOnly` workspace ownership does not affect — reads always permitted",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:3bfc9c4b0fbdfde0c5ee58924242297126b58901c61a6fb94e18ba83c11dc165",
+          "lastModified": "2026-08-25T15:37:19.294Z"
+        },
+        "verify.md": {
+          "hash": "sha256:6731c9d2b8a5bfa2de08141aef599816942e009c829c93e49700e0938eda71c9",
+          "lastModified": "2026-08-25T15:37:19.294Z"
+        }
+      }
+    }
+  }
 }

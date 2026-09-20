@@ -4,5 +4,41 @@
     "version": 1
   },
   "dependsOn": ["core:spec-repository-port", "core:spec-id-format"],
-  "implementation": []
+  "implementation": [],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "GetPersistedSpecImplementation returns lock-owned PersistedImplementationLink[]; uninitialized → [] + initialized:false.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:5ebc0af04feafc359527493b954b63662cb2a65d5b02a10bba95998b3ef3c5cd",
+          "lastModified": "2026-08-25T15:37:19.293Z"
+        },
+        "verify.md": {
+          "hash": "sha256:6f87ed47d97193e9136d4001cef5379ddb689cd987d88b46a40665f18cef9b8e",
+          "lastModified": "2026-08-25T15:37:19.293Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# GetPersistedSpecImplementation\n\n## Rules\n- Input: `specId` (required).\n- Resolve workspace repo; `SpecRepository.readPersistedState(spec)`. MUST NOT read `spec-lock.json` directly. MUST NOT materialize/read generated metadata.\n- Initialized: `{ specId, implementation, initialized: true }`. Exact stored `readonly PersistedImplementationLink[]` order. Preserve file-level (`symbols` absent) vs symbol-level (`symbols` present non-empty).\n- `readPersistedState` null → `implementation: []`, `initialized: false`. MUST NOT create state.\n- Unresolvable spec → `SpecNotFoundError`.\n- Config factory via `resolveGetPersistedSpecImplementationDeps` (`specs`) only.\n\n## Constraints\n- Read-only — never create/mutate/write persisted state\n- Returned list is durable archived traceability, not autodetect candidates or in-progress change tracking\n- `readOnly` workspace ownership does not affect — reads always permitted",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:5ebc0af04feafc359527493b954b63662cb2a65d5b02a10bba95998b3ef3c5cd",
+          "lastModified": "2026-08-25T15:37:19.293Z"
+        },
+        "verify.md": {
+          "hash": "sha256:6f87ed47d97193e9136d4001cef5379ddb689cd987d88b46a40665f18cef9b8e",
+          "lastModified": "2026-08-25T15:37:19.293Z"
+        }
+      }
+    }
+  }
 }

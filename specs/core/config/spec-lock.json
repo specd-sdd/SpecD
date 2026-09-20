@@ -3,75 +3,40 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": ["core:vcs-adapter-port", "default:_global/architecture"],
-  "implementation": [
-    {
-      "file": "core:src/application/ports/config-schema.ts",
-      "symbols": [
-        "SpecdYamlZodSchema",
-        "validateContextPattern",
-        "validateContextPatterns",
-        "PREFIX_SEGMENT_RE",
-        "PrefixZodSchema",
-        "WorkspaceGraphZodSchema",
-        "ProjectGraphZodSchema",
-        "WorkspaceRawZodSchema",
-        "SchemaOverridesZodSchema",
-        "PluginEntryZodSchema",
-        "PluginsZodSchema",
-        "LoggingZodSchema",
-        "isRecord",
-        "formatZodPath",
-        "deepMergeRawConfig"
-      ]
-    },
-    {
-      "file": "core:src/application/ports/index.ts"
-    },
-    {
-      "file": "core:src/ports.ts"
-    },
-    {
-      "file": "core:src/infrastructure/fs/config-loader.ts",
-      "symbols": ["resolveAdapterBinding", "_buildConfig"]
-    },
-    {
-      "file": "core:src/composition/composition-resolver.ts",
-      "symbols": ["resolveMetadataPathForWorkspace"]
-    }
-  ],
+  "dependsOn": ["core:vcs-adapter-port", "default:_global/architecture", "core:transition-checks"],
+  "implementation": [],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Authoritative project config via specd.yaml: schema, workspaces, storage, plugins, context, approvals, layered cascade.",
+      "value": "specd.yaml authoritatively configures schema, workspaces, storage, plugins, context, approvals, and layered overrides.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:bccf7ef7954faec0e00b381907d30b69bdd3a7c8e46b4a7eaca57329eb0ac023",
-          "lastModified": "2026-07-23T10:30:09.089Z"
+          "hash": "sha256:af6b123b60c8c88f3e78e9a615fe44c23d30ec6461c6ddad925a104efe68b0f5",
+          "lastModified": "2026-08-29T22:56:10.151Z"
         },
         "verify.md": {
-          "hash": "sha256:de2b436010b6e5bb7aa3085e4cd89af29305e089faf971b522419fd3d5f9b143",
-          "lastModified": "2026-07-23T10:28:25.652Z"
+          "hash": "sha256:e9d7cd61cfc0498a9de1e4f17c09463b5eb3cc0064a18a5901f75f3e64cc3186",
+          "lastModified": "2026-08-29T22:53:46.078Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# Config\n\n## Rules\n- Discovery: (1) `--config` = explicit file + its `extends` only; (2) walk CWD→VCS root, stop at first dir with candidates; (3) no VCS → CWD only. Candidates order: `specd.yaml`, `specd.*.yaml` alpha, `specd.local.yaml`, `specd.local.*.yaml` alpha. `extends: true` inherits previous layer; `extends: <path>` only if base already in chain. Never above VCS root.\n- `privacy`: `mode` `hash|mask|anonymous`; optional `salt`, `excludeActors` (default `[\"specd\",\"system@getspecd.dev\"]`), `allowedMetadataKeys`.\n- Env overrides win: `SPECD_ACTOR_PROVIDER`, `SPECD_PRIVACY_SALT`, `SPECD_PRIVACY_MODE` (+ `.env`/`.env.local`).\n- Optional `actorProvider` forces named registry provider.\n- Cascade: scalars last-wins; objects deep-merge; arrays append unless `remove`. `remove` only with `extends`. Identity: `context[].id`, `plugins.agents[].name`, map keys for workspaces/storage. Required fields (e.g. `schema`) not removable. `specd init` gitignores local variants.\n- Required `schema` prefixes: `@pkg`, `#ws:name`, `#name`/bare (=default), path. Resolve at command dispatch; skip for help/version/init/config validate/plugin cmds. Distinct `ConfigValidationError` vs `SchemaNotFoundError`/`SchemaValidationError`.\n- Optional `invalidationPolicy`: `none|surgical|downstream|global` — project default for new changes.\n- Workspaces: mandatory `default`; names `/^[a-z][a-z0-9-]*$/`; props `specs` (always), `codeRoot` (required non-default), `schemas`, `ownership` (default owned/readOnly), `prefix`, context patterns, graph filters. `isExternal` inferred.\n- Workspace `graph`: `allowedPaths`, `respectGitignore` (default true, absolute priority), `excludePaths` (replaces builtins when set).\n- Optional `storage` adapters for changes/drafts/discarded/archive; omit → fs defaults under `specdPath`. Named adapters via registry.\n- `specdPath` default `.specd`; derive graph/tmp/change-locks. Missing dirs → `StorageDirectoryNotFoundError`.\n- Unresolved `{{namespace.key}}` tokens preserved + warning.\n- `schemaPlugins` (same ref conventions, `kind: schema-plugin`); `schemaOverrides` = `SchemaOperations` after plugins.\n- Context patterns project vs workspace-level; active ws = change has its specs. Order: project context entries → project include/exclude → active ws include/exclude → dependsOn (excludes never apply to deps). Defaults: project include `['default:*']`, ws include `['*']`. Unknown qualifier: warn at runtime, error on `config validate`.\n- `contextMode`: `list|summary` (default)|`full|hybrid`; project-level only; no legacy `lazy`.\n- `context[]`: instruction or file (+ optional `id`).\n- `approvals.spec`/`approvals.signoff` default false.\n- Optional `logging.level` (default `info`); `llmOptimizedContext` default false.\n- `plugins.agents[]` validated by Zod; `ConfigWriter`: `initProject`, `addPlugin`, `removePlugin`, `listPlugins`.\n- Cascade validation failures → `ConfigValidationError`. Legacy shape → non-fatal `SpecdConfig.warnings`.\n- Project `graph.includePaths`/`excludePaths`; includePaths → `root:` unless owned by workspace codeRoot.\n\n## Constraints\n- Every field Zod-validated at load.\n- `privacy.mode=hash` requires salt (config or env) or validation fails.\n- Unknown top-level fields rejected (strict Zod).",
+      "value": "# Config\n\n## Rules\n- Discovery: `--config` = explicit file + own `extends`; else walk CWD→VCS root, stop first dir with candidates; no VCS → CWD only. Candidates order: `specd.yaml`, `specd.*.yaml` alpha, `specd.local.yaml`, `specd.local.*.yaml` alpha.\n- `extends: true` inherits prior active layer; `extends: <path>` activates only when base already chain. Never above VCS root. Bootstrap API may supply discovery root; command-specific unconfigured bootstrap allowed.\n- Cascade: scalars last-wins; objects deep-merge; arrays append unless `remove`. `remove` only with `extends`; required `schema` non-removable. Identities: `context[].id`, `plugins.agents[].name`, workspace/storage keys. `specd init` gitignores local variants.\n- `privacy`: `mode` `hash|mask|anonymous`; optional `salt`, `excludeActors` default `\"specd\", \"system@getspecd.dev\"`, `allowedMetadataKeys`. Env wins: `SPECD_ACTOR_PROVIDER`, `SPECD_PRIVACY_SALT`, `SPECD_PRIVACY_MODE` (+ `.env`/`.env.local`). `actorProvider` forces registry provider.\n- Required `schema` refs: `@pkg`, `#ws:name`, `#name`/bare (default), path. Resolve at dispatch; skip help/version/init/config validate/plugin. Distinct `ConfigValidationError`, `SchemaNotFoundError`, `SchemaValidationError`.\n- Optional `invalidationPolicy`: `none|surgical|downstream|global` default for new changes.\n- Workspaces: mandatory `default`; names `/^[a-z][a-z0-9-]*$/`; `specs` always; non-default `codeRoot` required; `schemas`, `ownership` default `owned`, `prefix`, context patterns, graph filters. `isExternal` inferred.\n- Workspace `graph`: `allowedPaths`, `respectGitignore` default `true`/absolute priority, `excludePaths` replaces builtins when set. Project `graph.includePaths`/`excludePaths`; include path maps `root:` unless inside owned `codeRoot`.\n- Optional named `storage` adapters changes/drafts/discarded/archive; omit = fs defaults under `specdPath`. `specdPath` default `.specd`; derives graph/tmp/change-locks; missing dirs → `StorageDirectoryNotFoundError`.\n- Preserve unresolved `{{namespace.key}}` + warning. `schemaPlugins` same refs, `kind: schema-plugin`; apply `schemaOverrides` (`SchemaOperations`) after plugins.\n- Context: project + workspace patterns; active workspace has change specs. Order project entries → project include/exclude → active ws include/exclude → `dependsOn`; exclusions never dependencies. Defaults project `default:*`, ws `*`. Unknown qualifier warns runtime, errors `config validate`.\n- `contextMode`: `list|summary` default|`full|hybrid`; project-only; no legacy `lazy`. `context[]`: instruction or file, optional `id`.\n- `approvals.spec`/`approvals.signoff` default false. `logging.level` default `info`; `llmOptimizedContext` default false. `plugins.agents[]` Zod-validated; `ConfigWriter`: `initProject`, `addPlugin`, `removePlugin`, `listPlugins`. Legacy shape yields non-fatal `SpecdConfig.warnings`.\n\n## Constraints\n- Zod validate every field at load; strict unknown top-level rejection.\n- `privacy.mode=hash` requires config/env salt.\n- Cascade failures throw `ConfigValidationError`.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:bccf7ef7954faec0e00b381907d30b69bdd3a7c8e46b4a7eaca57329eb0ac023",
-          "lastModified": "2026-07-23T10:30:09.089Z"
+          "hash": "sha256:af6b123b60c8c88f3e78e9a615fe44c23d30ec6461c6ddad925a104efe68b0f5",
+          "lastModified": "2026-08-29T22:56:10.151Z"
         },
         "verify.md": {
-          "hash": "sha256:de2b436010b6e5bb7aa3085e4cd89af29305e089faf971b522419fd3d5f9b143",
-          "lastModified": "2026-07-23T10:28:25.652Z"
+          "hash": "sha256:e9d7cd61cfc0498a9de1e4f17c09463b5eb3cc0064a18a5901f75f3e64cc3186",
+          "lastModified": "2026-08-29T22:53:46.078Z"
         }
       }
     }

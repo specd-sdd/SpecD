@@ -8,14 +8,12 @@
     "core:change",
     "core:archive-change",
     "core:hook-execution-model",
-    "cli:command-resource-naming"
+    "cli:command-resource-naming",
+    "core:transition-checks"
   ],
   "implementation": [
     {
-      "file": "cli:src/commands/change/archive.ts"
-    },
-    {
-      "file": "cli:src/index.ts"
+      "file": "cli:test/commands/change/archive.spec.ts"
     }
   ],
   "optimizations": {

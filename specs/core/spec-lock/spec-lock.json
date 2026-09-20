@@ -11,36 +11,36 @@
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "spec-lock.json durably records archived schema, dependencies, implementation links, and independently fresh LLM optimizations.",
+      "value": "spec-lock.json durably owns archived schema, dependencies, implementation links, and independently fresh LLM optimization baselines.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:0f811fee6fae100caff9ab7ac1cf70ed4778d19a97cc7285327f1d5b404876ad",
-          "lastModified": "2026-07-25T11:53:31.094Z"
+          "hash": "sha256:7349bce4e64f0a0207c921106d5d99396b20e752bd80004ed23abb59033c6953",
+          "lastModified": "2026-08-30T09:18:36.441Z"
         },
         "verify.md": {
-          "hash": "sha256:756e0476d04b063af10f47a0a17b556150017ab165d64fda7db70182be90556f",
-          "lastModified": "2026-07-25T11:53:31.095Z"
+          "hash": "sha256:743e05e416fb7ab6576013280a4df0ce9fcaf096b436b60e7d77bc048cfb7090",
+          "lastModified": "2026-08-30T09:18:36.441Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# Spec lock\n## Rules\n- Canonical sidecar: persisted spec directory/spec-lock.json, valid JSON.\n- schema.name/version required; immutable except explicit guarded reassignment. Reassign validates target artifacts; preserves implementation/optimizations; preserves dependencies without target extraction, otherwise requires extracted dependencies equal current. Same schema no-op.\n- dependsOn stores canonical persisted IDs; authoritative source for metadata projection, including schemas without extraction.\n- implementation entries need workspace:path file within spec workspace/codeRoot; optional non-empty symbols means symbol-level, absent means file-level. Use normalized forward slashes.\n- Optional optimizations fields optimizedDescription/optimizedContext each store value, captured schema, artifactState filename -> hash/lastModified. Fields baseline independently; setting/clearing one leaves other intact; omit optimizations when empty.\n- Optimization baseline becomes stale after reassignment; do not clear/regenerate it. Never synthesize optimization state from metadata.\n- Lock-less specs valid; ordinary reads never create lock. Creation only archive, explicit initialization, or create-worthy persisted mutation. Initialization only once, derives dependencies from artifacts/schema, implementation [], no optimizations. Lock-less semantic no-op mutation does not create state.\n- Writers: archive, explicit dependency/implementation/optimization/schema mutation, initialization, integrity maintenance. Use shared pure whole-document construction and conditional revision write.\n- Archive validates raw implementation paths belong to spec workspace; excludes graph.excludePaths, discards unnormalizable, fails confirmed path outside codeRoot.\n- Sidecar durable source for implementation and optimizations. metadata.json projection cannot invent/mutate/delete them; projects optimized field only when baseline fresh against artifacts/schema.\n- SpecRepository.persistedStateMeta(spec, { includeHash: true })?.hash returns SHA-256 sidecar bytes; callers never read sidecar. Spec.get().persistedStateStamp exposes presence/lastModified; no separate persistedStateHash port method.\n## Constraints\n- schema never replaced by non-reassignment writer.\n- Preserve file-level and symbol-level implementation links distinctly.\n- Concurrent writers cannot silently overwrite.",
+      "value": "# Spec lock\n## Rules\n- Canonical sidecar: persisted spec `spec-lock.json`, valid JSON. Lock-less specs valid; ordinary reads never create lock. Creation only archive, explicit initialization, create-worthy mutation; semantic no-op lock-less mutation creates none.\n- `schema.name`/version required, immutable except guarded reassignment: validate target artifacts; preserve implementation/optimizations; preserve dependencies without target extraction, otherwise target extraction must equal current; same schema no-op.\n- `dependsOn` canonical persisted IDs; authoritative metadata projection, including schemas without extraction.\n- Implementation entry: workspace:path under workspace/codeRoot, normalized forward slashes; optional nonempty symbols = symbol-level, absent = file-level.\n- Optional `optimizedDescription`/`optimizedContext`: each has value, captured schema, artifact-state filename→hash/lastModified; baseline independent, set/clear one preserves other, omit all-empty optimizations. Reassignment stales baseline without clearing/regenerating; never synthesize state from metadata.\n- Initialization one-time: derive dependencies schema/artifacts, `implementation: []`, omit optimizations. Writers: archive, dependency/implementation/optimization/schema mutation, initialization, integrity maintenance; shared pure whole-document build + conditional revision write.\n- Archive raw implementation path must belong spec workspace; exclude graph.excludePaths, discard unnormalizable, fail confirmed outside codeRoot.\n- Sidecar source for implementation/optimizations; metadata projection cannot invent/change/delete either, only projects fresh optimized field. `SpecRepository.persistedStateMeta(spec, { includeHash: true })?.hash` is SHA-256 sidecar bytes; callers never read sidecar; `Spec.get().persistedStateStamp` exposes presence/lastModified.\n## Constraints\n- Non-reassignment writer never replaces schema.\n- Preserve file- vs symbol-level links.\n- Concurrent writers never silently overwrite.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:0f811fee6fae100caff9ab7ac1cf70ed4778d19a97cc7285327f1d5b404876ad",
-          "lastModified": "2026-07-25T11:53:31.094Z"
+          "hash": "sha256:7349bce4e64f0a0207c921106d5d99396b20e752bd80004ed23abb59033c6953",
+          "lastModified": "2026-08-30T09:18:36.441Z"
         },
         "verify.md": {
-          "hash": "sha256:756e0476d04b063af10f47a0a17b556150017ab165d64fda7db70182be90556f",
-          "lastModified": "2026-07-25T11:53:31.095Z"
+          "hash": "sha256:743e05e416fb7ab6576013280a4df0ce9fcaf096b436b60e7d77bc048cfb7090",
+          "lastModified": "2026-08-30T09:18:36.441Z"
         }
       }
     }

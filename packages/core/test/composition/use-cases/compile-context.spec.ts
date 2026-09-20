@@ -66,15 +66,13 @@ describe('createCompileContext', () => {
     ).toThrow(InvalidCompositionFactoryArgumentsError)
   })
 
-  it('does not resolve LifecycleEngine through resolveCompileContextDeps', async () => {
+  it('resolveCompileContextDeps does not require lifecycle engine wiring', async () => {
     const setup = await setupCompositionFactoryConfig('specd-compile-context-deps')
     fixture = setup.fixture
     const resolver = createCompositionResolver(setup.config)
-    const getLifecycleEngine = vi.spyOn(resolver, 'getLifecycleEngine')
 
     const deps = resolveCompileContextDeps(resolver)
 
-    expect(getLifecycleEngine).not.toHaveBeenCalled()
     expect(deps).toMatchObject({
       changes: expect.anything(),
       listWorkspaces: expect.anything(),

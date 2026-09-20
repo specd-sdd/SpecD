@@ -84,7 +84,8 @@ function stripTerminalControlSequences(text: string): string {
 }
 
 /**
- * Creates the shared hook-progress presenter used by `change run-hooks` and `change transition`.
+ * Creates the hook-progress presenter used by `change run-hooks`.
+ * `change transition` uses the generic check-progress presenter (`stream: change-transition`).
  *
  * @param options - Rendering options for text or structured hook progress
  * @param options.format - Output format that determines text vs structured rendering

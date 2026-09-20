@@ -43,14 +43,20 @@
 
 ### Requirement: Approval recording and state transition
 
-#### Scenario: Change is in pending-spec-approval state
+#### Scenario: Change is in ready records approval without pending
+
+- **GIVEN** the change is in `ready` and the spec gate is on
+- **WHEN** `execute()` completes successfully
+- **THEN** the change history contains a `spec-approved` event with the provided reason, computed artifact hashes, and the resolved actor
+- **AND** the change state remains `ready`
+
+#### Scenario: Drain from pending-spec-approval still reaches spec-approved
 
 - **GIVEN** the change is in `pending-spec-approval` state
 - **WHEN** `execute()` completes successfully
-- **THEN** the change history contains a `spec-approved` event with the provided reason, computed artifact hashes, and the resolved actor
-- **AND** the change state is `spec-approved`
+- **THEN** the change state is `spec-approved`
 
-#### Scenario: Change is not in pending-spec-approval state
+#### Scenario: Change is not in ready or pending-spec-approval
 
 - **GIVEN** the change is in `drafting` state
 - **WHEN** `execute()` is called
@@ -60,11 +66,11 @@
 
 #### Scenario: Change is saved and returned through serialized mutation
 
-- **GIVEN** a successful approval
+- **GIVEN** a successful approval from `ready`
 - **WHEN** `execute()` returns
 - **THEN** `ChangeRepository.mutate(input.name, fn)` has been called
-- **AND** the callback records the approval and transitions the fresh persisted change to `spec-approved`
-- **AND** the returned `Change` has state `spec-approved`
+- **AND** the callback records the approval on the fresh persisted change
+- **AND** the returned `Change` has state `ready`
 
 ### Requirement: Input contract
 
@@ -102,10 +108,5 @@
 - **WHEN** `createApproveSpec(config, options?)` is invoked
 - **THEN** it creates a composition resolver for that composition session
 - **AND** it derives `ApproveSpecDeps` through `resolveApproveSpecDeps(resolver)`
-- **AND** `resolveApproveSpecDeps(resolver)` resolves:
-- `changes: ChangeRepository`
-- `actor: ActorResolver`
-- `schemaProvider: SchemaProvider`
-- `hasher: ContentHasher`
-- `approvals: ApprovalGates`
+- **AND** `resolveApproveSpecDeps(resolver)` resolves `contentHasher: ContentHasher`
 - **AND** the factory delegates to canonical `createApproveSpec(deps)`

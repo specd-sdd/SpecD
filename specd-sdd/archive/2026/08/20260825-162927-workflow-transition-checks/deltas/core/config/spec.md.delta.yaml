@@ -1,0 +1,29 @@
+- op: modified
+  description: 'approvals.spec is an in-place check not a pending hop'
+  selector:
+    type: section
+    matches: '^Requirement: Approvals$'
+  content: |
+    `specd.yaml` may include an `approvals` section to configure which lifecycle gates require explicit human approval. Both gates are disabled by default — teams opt in to the level of governance they need.
+
+    ```yaml
+    approvals:
+      spec: false # require approval of the spec before implementation (default: false)
+      signoff: false # require sign-off of the completed work before archiving (default: false)
+    ```
+
+    **`spec`** — when `true`, a change in `ready` cannot take any **forward** leave of `ready` (`approval.spec` is `from=ready`, `to=*`, `along=forward`) until `ApproveSpec` records consent. The change stays in `ready`. That includes `ready → implementing` and `ready → verifying` when `implementing` is omitted from `workflow[]`. Redesign (`ready → designing`) MUST NOT require the spec gate. The `approval.spec` check fails with `APPROVAL_REQUIRED` until that record exists. When `false` (default), forward leave of `ready` is free (`approval.spec` skips). New work MUST NOT enter `pending-spec-approval` as a happy-path hop. When a change is already in `pending-spec-approval`, drain (leave that state) remains legal. `change transition` targeting `pending-spec-approval` is never the next-action path.
+
+    **`signoff`** — when `true`, a change in `done` cannot transition to `archivable` until `ApproveSignoff` records consent. The change stays in `done`. When `false` (default), `done → archivable` is a free transition. New work MUST NOT enter `pending-signoff` as a happy-path hop. When a change is already in `pending-signoff`, drain remains legal. `change transition` targeting `pending-signoff` is never the next-action path.
+
+    Both flags are independent — any combination is valid.
+
+- op: modified
+  description: 'Depend on transition-checks for in-place gate model'
+  selector:
+    type: section
+    matches: '^Spec Dependencies$'
+  content: |
+    - [`core:vcs-adapter-port`](../vcs-adapter-port/spec.md) — configuration bounding relies on vcs adapter
+    - [`default:_global/architecture`](../../_global/architecture/spec.md)
+    - [`core:transition-checks`](../transition-checks/spec.md) — `approvals.spec` / `approvals.signoff` are in-place checks, not pending hops

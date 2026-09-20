@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Changes need a controlled gate where a human confirms the spec is correct before implementation proceeds, and artifact hashes must be captured at that moment to detect later tampering. The `ApproveSpec` use case records a spec approval on a change and transitions it to the `spec-approved` state, enforcing that the gate is enabled, computing artifact hashes using schema-defined pre-hash cleanup rules, and persisting the updated change. It is the only path through the spec approval gate in the change lifecycle.
+Human spec approval MUST record consent on a change that stays in `ready` (when the spec gate is on). This use case hashes in-scope artifacts, appends a spec-approval history event, and MUST NOT transition into `pending-spec-approval` or `spec-approved` on that happy path. Drain from `pending-spec-approval` remains for in-flight changes.
 
 ## Requirements
 
@@ -22,31 +22,28 @@ The use case MUST load the change by name from the `ChangeRepository`. If no cha
 
 ### Requirement: Artifact hash computation
 
-Before recording the approval, the use case MUST compute a content hash for every file across all artifacts in the change. For each artifact, it iterates over the artifact's `files` map. For each file:
+Before recording the approval, the use case MUST compute a content hash for every file across all artifacts in the change. Obtain the schema once from `SchemaProvider.get()`. Build a cleanup map from that schema. For each artifact, iterate the artifact's `files` map. For each file:
 
 1. Skip files with status `missing` or `skipped`.
 2. Load the file content from the repository via `ChangeRepository.artifact(change, file.filename)`.
 3. If the file cannot be loaded (returns `null`), skip it silently.
-4. Resolve the active schema from the `SchemaRegistry` using the configured schema reference and workspace schema paths.
-5. If the schema resolves, build a cleanup map of artifact-type to pre-hash cleanup rules; if it does not resolve, use an empty cleanup map.
-6. Apply the matching cleanup rules (by artifact type) to the content, then hash the cleaned content via the `ContentHasher`.
+4. Apply the matching cleanup rules (by artifact type) to the content, then hash the cleaned content via the `ContentHasher`.
 
 The result is a `Record<string, string>` mapping `type:key` hash keys to hash strings (e.g. `"proposal:proposal"`, `"specs:default:auth/login"`), where `type` is the artifact type ID and `key` is the file key within the artifact.
 
 ### Requirement: Approval recording and state transition
 
-The use case MUST resolve the current actor identity via the `ActorResolver`, then:
+The use case MUST resolve the current actor identity via the `ActorResolver`, then call `change.recordSpecApproval(reason, artifactHashes, actor)` to append a `spec-approved` history event.
 
-1. Call `change.recordSpecApproval(reason, artifactHashes, actor)` to append a `spec-approved` history event.
-2. Call `change.transition('spec-approved', actor)` to advance the lifecycle state.
+When the change is in a state bound as `from` for `approval.spec` (check registry bindings; currently `ready`), it MUST NOT call `change.transition('spec-approved', actor)` or `change.transition('pending-spec-approval', actor)`. The change remains in that state so `approval.spec` can pass on the next bound delivery edge.
 
-The `Change` entity enforces that the transition from the current state to `spec-approved` is valid. If the change is not in `pending-spec-approval` state, the entity throws an `InvalidStateTransitionError`.
+Drain: when the change is already in `pending-spec-approval`, the use case MAY still `change.transition('spec-approved', actor)` so in-flight changes can leave that state. Drain states are not `approval.spec` bindings.
 
 ### Requirement: Persistence and return value
 
-After computing artifact hashes, the use case MUST record the approval and lifecycle transition through `ChangeRepository.mutate(name, fn)`.
+After computing artifact hashes, the use case MUST record the approval through `ChangeRepository.mutate(name, fn)`.
 
-Inside the mutation callback, the repository supplies the fresh persisted `Change` for `name`; the use case records the spec approval on that instance, transitions it to `spec-approved`, and returns the updated change. This ensures the approval event, artifact hashes, and lifecycle transition are persisted atomically with respect to other mutations of the same change.
+Inside the mutation callback, the repository supplies the fresh persisted `Change`. The use case records the spec approval on that instance. It MUST NOT transition a change whose state is bound as `from` for `approval.spec` into `pending-spec-approval` or `spec-approved`. Drain transitions from `pending-spec-approval` remain allowed.
 
 `ApproveSpec.execute` returns the updated `Change` entity produced by that serialized mutation.
 
@@ -80,7 +77,7 @@ The config-based `createApproveSpec(config, options?)` form MUST derive `Approve
 - `changes: ChangeRepository`
 - `actor: ActorResolver`
 - `schemaProvider: SchemaProvider`
-- `hasher: ContentHasher`
+- `contentHasher: ContentHasher`
 - `approvals: ApprovalGates`
 
 The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
@@ -99,3 +96,4 @@ The helper is the only use-case-specific composition entry for config-based boot
 - [`core:composition`](../composition/spec.md)
 - [`core:kernel`](../kernel/spec.md)
 - [`core:composition-resolver`](../composition-resolver/spec.md)
+- [`core:transition-checks`](../transition-checks/spec.md) — `from` states for `approval.spec` come from check registry bindings
