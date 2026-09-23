@@ -1,0 +1,40 @@
+- op: added
+  description: 'Verify visible status rendering and structured serialization'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Specs and dependencies section'
+  content: |
+    ### Requirement: Overlap dependency-change display
+
+    #### Scenario: Text status shows added and removed dependencies
+
+    - **GIVEN** `GetStatus` returns an overlap entry with one spec dependency change
+    - **WHEN** `changes status` runs in text mode
+    - **THEN** the review section shows the archived change and overlapping specs
+    - **AND** it visibly shows the affected `specId`, `added` dependencies, and `removed` dependencies
+
+    #### Scenario: Text status labels an empty side explicitly
+
+    - **GIVEN** an overlap dependency change has additions but no removals
+    - **WHEN** text status is rendered
+    - **THEN** the added list is shown
+    - **AND** the removed side is shown as `(none)`
+
+    #### Scenario: Unchanged or legacy overlap stays concise
+
+    - **GIVEN** an overlap entry has an empty `dependencyChanges` array
+    - **WHEN** text status is rendered
+    - **THEN** the archived change and overlapping specs remain visible
+    - **AND** no empty dependency-change subsection is printed
+
+    #### Scenario: JSON and TOON preserve structured dependency changes
+
+    - **GIVEN** `GetStatus` returns normalized overlap dependency changes
+    - **WHEN** status is rendered as JSON or TOON
+    - **THEN** each overlap entry includes `dependencyChanges` with `specId`, `added`, and `removed`
+    - **AND** empty arrays and Core ordering are preserved
+    - **AND** the CLI performs no message parsing or dependency recomputation

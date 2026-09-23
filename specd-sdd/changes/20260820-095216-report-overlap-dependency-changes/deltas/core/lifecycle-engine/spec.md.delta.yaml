@@ -1,0 +1,19 @@
+- op: added
+  description: 'Make structured overlap evidence authoritative in lifecycle review'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Review summary integration'
+  content: |
+    ### Requirement: Structured overlap review projection
+
+    When collecting unhandled `spec-overlap-conflict` invalidations, `LifecycleEngine` MUST project one overlap review entry per event in newest-first order. Each entry MUST contain `archivedChangeName`, `overlappingSpecIds`, and `dependencyChanges` with their structured `specId`, `added`, and `removed` arrays.
+
+    When an event contains `overlapDetail`, that object is authoritative. `LifecycleEngine` MUST copy its normalized fields and MUST NOT parse, merge, or override them from `invalidated.message`.
+
+    For a legacy overlap event without `overlapDetail`, `LifecycleEngine` MUST retain the existing message-based extraction of archived change name and overlapping spec IDs and MUST project an empty `dependencyChanges` array. Malformed legacy text MUST degrade to empty identity fields without throwing.
+
+    The existing handled-boundary rule remains unchanged: reverse collection MUST stop at the first `transitioned` event whose destination is not `designing`. Dependency-change evidence from handled overlap invalidations MUST NOT remain in the active review summary.

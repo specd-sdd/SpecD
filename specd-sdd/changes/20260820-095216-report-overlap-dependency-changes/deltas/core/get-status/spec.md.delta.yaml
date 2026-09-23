@@ -1,0 +1,31 @@
+- op: modified
+  description: 'Project structured dependency changes through ReviewSummary'
+  selector:
+    type: section
+    matches: 'Requirement: Returns lifecycle context'
+  content: |
+    `GetStatus` MUST compute a `ReviewSummary` that determines whether the change requires artifact review and why.
+
+    The review check MUST follow this priority order:
+
+    1. **If any artifact file is in `drifted-pending-review` state:** `required` is `true`, `reason` is `'artifact-drift'`, `route` is `'designing'`.
+    2. **Else if any artifact file is in `pending-review` state and there are unhandled `spec-overlap-conflict` invalidations:** `required` is `true`, `reason` is `'spec-overlap-conflict'`, `route` is `'designing'`.
+    3. **Else if any artifact file is in `pending-review` state:** `required` is `true`, `reason` is `'artifact-review-required'`, `route` is `'designing'`.
+    4. **Else:** `required` is `false`, `reason` is `null`, `route` is `null`.
+
+    `GetStatus` MAY compute this summary directly from the loaded change facts or obtain it from `LifecycleEngine`, but the outward-facing result MUST reflect the same authoritative lifecycle interpretation used by transition and validation flows.
+
+    **Unhandled overlap collection:** To determine unhandled `spec-overlap-conflict` invalidations, the authoritative lifecycle interpretation MUST scan `change.history` in reverse, collecting matching events newest-first. The scan MUST stop at the first `transitioned` event whose `to` field is not `'designing'`. If no such boundary event is found, the scan includes all matching events back to the beginning of history.
+
+    `ReviewSummary.reason` type MUST include `'artifact-drift' | 'artifact-review-required' | 'spec-overlap-conflict' | null`.
+
+    When `reason` is `'spec-overlap-conflict'`, `ReviewSummary` MUST additionally include:
+
+    - `overlapDetail` — an array with one entry per unhandled overlap invalidation, ordered newest-first. Each entry contains:
+      - `archivedChangeName` — the archived change that caused invalidation.
+      - `overlappingSpecIds` — readonly array of all overlapping spec IDs.
+      - `dependencyChanges` — readonly array of meaningful direct dependency changes, each containing `specId`, `added`, and `removed` arrays.
+
+    Structured event `overlapDetail` MUST be the authoritative source for new events. For legacy overlap events without structured detail, the existing message-based compatibility projection MUST supply `archivedChangeName` and `overlappingSpecIds` and MUST use an empty `dependencyChanges` array.
+
+    When `reason` is not `'spec-overlap-conflict'`, `overlapDetail` MUST be an empty array.

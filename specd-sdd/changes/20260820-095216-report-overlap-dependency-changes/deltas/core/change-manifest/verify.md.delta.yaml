@@ -1,0 +1,37 @@
+- op: added
+  description: 'Verify overlap detail round-trip and legacy compatibility'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Manifest structure'
+  content: |
+    ### Requirement: Overlap invalidation event serialization
+
+    #### Scenario: Structured overlap event round-trips exactly
+
+    - **GIVEN** a new `spec-overlap-conflict` event contains normalized archived identity, overlapping specs, and dependency changes
+    - **WHEN** the change is saved and loaded again
+    - **THEN** `overlapDetail`, `message`, `affectedArtifacts`, `at`, and `by` retain their values
+    - **AND** `added` and `removed` array ordering is unchanged
+
+    #### Scenario: Legacy overlap event without structured detail remains readable
+
+    - **GIVEN** an existing manifest contains a `spec-overlap-conflict` event without `overlapDetail`
+    - **WHEN** the manifest is loaded
+    - **THEN** loading succeeds without migration
+    - **AND** the event remains without fabricated dependency changes
+
+    #### Scenario: Other invalidation causes cannot persist overlap detail
+
+    - **GIVEN** an invalidation event has a cause other than `spec-overlap-conflict`
+    - **WHEN** serialization or manifest validation encounters `overlapDetail`
+    - **THEN** the invalid combination is rejected or the unrelated detail is omitted according to the canonical serializer contract
+
+    #### Scenario: Saving does not rewrite legacy append-only history
+
+    - **GIVEN** a loaded change contains legacy history entries
+    - **WHEN** a later operation saves the change
+    - **THEN** existing event payloads are not modified to add, parse, or normalize overlap detail retroactively

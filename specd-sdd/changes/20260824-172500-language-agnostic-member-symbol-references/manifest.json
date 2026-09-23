@@ -1,0 +1,978 @@
+{
+  "name": "language-agnostic-member-symbol-references",
+  "createdAt": "2026-08-24T17:25:00.628Z",
+  "updatedAt": "2026-09-23T10:39:18.859Z",
+  "description": "Add language-agnostic qualified member references and centralized Code Graph resolution while preserving lexical FTS discovery and all existing CLI/provider behavior.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "code-graph:symbol-model",
+    "code-graph:language-adapter",
+    "code-graph:resolve-symbol-reference",
+    "code-graph:graph-store",
+    "code-graph:sqlite-graph-store",
+    "code-graph:indexer",
+    "code-graph:composition",
+    "code-graph:traversal",
+    "cli:graph-search",
+    "cli:graph-impact",
+    "sdk:build-implementation-review"
+  ],
+  "specDependsOn": {
+    "code-graph:symbol-model": [
+      "default:_global/conventions",
+      "default:_global/error-handling-conventions",
+      "code-graph:document-model"
+    ],
+    "code-graph:language-adapter": ["code-graph:symbol-model"],
+    "code-graph:resolve-symbol-reference": [
+      "code-graph:symbol-model",
+      "code-graph:graph-store",
+      "code-graph:language-adapter",
+      "code-graph:workspace-integration"
+    ],
+    "code-graph:graph-store": [
+      "code-graph:symbol-model",
+      "default:_global/architecture",
+      "code-graph:staleness-detection",
+      "code-graph:document-model"
+    ],
+    "code-graph:sqlite-graph-store": [
+      "code-graph:graph-store",
+      "core:config",
+      "code-graph:symbol-model",
+      "code-graph:workspace-integration"
+    ],
+    "code-graph:indexer": [
+      "code-graph:graph-store",
+      "code-graph:language-adapter",
+      "code-graph:symbol-model",
+      "code-graph:workspace-integration",
+      "core:config",
+      "core:spec-repository-port",
+      "core:list-workspaces",
+      "code-graph:document-model",
+      "core:get-spec-metadata"
+    ],
+    "code-graph:composition": [
+      "code-graph:symbol-model",
+      "code-graph:graph-store",
+      "code-graph:indexer",
+      "code-graph:traversal",
+      "default:_global/architecture",
+      "code-graph:get-graph-health",
+      "code-graph:index-project-graph",
+      "code-graph:get-spec-coverage",
+      "code-graph:get-change-spec-coverage",
+      "code-graph:resolve-symbol-reference"
+    ],
+    "code-graph:traversal": [
+      "code-graph:symbol-model",
+      "code-graph:graph-store",
+      "code-graph:resolve-symbol-reference"
+    ],
+    "cli:graph-search": [
+      "cli:entrypoint",
+      "core:config",
+      "code-graph:composition",
+      "code-graph:document-model",
+      "code-graph:graph-store",
+      "cli:graph-cli-context",
+      "code-graph:resolve-symbol-reference"
+    ],
+    "cli:graph-impact": [
+      "cli:entrypoint",
+      "cli:graph-cli-context",
+      "core:config",
+      "code-graph:traversal",
+      "code-graph:workspace-integration",
+      "code-graph:resolve-symbol-reference"
+    ],
+    "sdk:build-implementation-review": [
+      "sdk:host-context",
+      "sdk:with-open-graph-provider",
+      "core:get-implementation-review",
+      "code-graph:resolve-symbol-reference",
+      "code-graph:get-graph-health"
+    ]
+  },
+  "invalidationPolicy": "downstream",
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "drifted-pending-review",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "drifted-pending-review",
+          "validatedHash": "sha256:b4b343b7a39cf82c6f20b4003b8abb142ddb79444748798c07d8e6eae1840198",
+          "hasDrift": true
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "missing",
+      "files": [
+        {
+          "key": "code-graph:symbol-model",
+          "filename": "deltas/code-graph/symbol-model/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "code-graph:language-adapter",
+          "filename": "deltas/code-graph/language-adapter/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "code-graph:resolve-symbol-reference",
+          "filename": "deltas/code-graph/resolve-symbol-reference/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "code-graph:graph-store",
+          "filename": "deltas/code-graph/graph-store/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "code-graph:sqlite-graph-store",
+          "filename": "deltas/code-graph/sqlite-graph-store/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "code-graph:indexer",
+          "filename": "deltas/code-graph/indexer/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "code-graph:composition",
+          "filename": "deltas/code-graph/composition/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "code-graph:traversal",
+          "filename": "deltas/code-graph/traversal/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "cli:graph-search",
+          "filename": "deltas/cli/graph-search/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "cli:graph-impact",
+          "filename": "deltas/cli/graph-impact/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "sdk:build-implementation-review",
+          "filename": "deltas/sdk/build-implementation-review/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "missing",
+      "files": [
+        {
+          "key": "code-graph:symbol-model",
+          "filename": "deltas/code-graph/symbol-model/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "code-graph:language-adapter",
+          "filename": "deltas/code-graph/language-adapter/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "code-graph:resolve-symbol-reference",
+          "filename": "deltas/code-graph/resolve-symbol-reference/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "code-graph:graph-store",
+          "filename": "deltas/code-graph/graph-store/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "code-graph:sqlite-graph-store",
+          "filename": "deltas/code-graph/sqlite-graph-store/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "code-graph:indexer",
+          "filename": "deltas/code-graph/indexer/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "code-graph:composition",
+          "filename": "deltas/code-graph/composition/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "code-graph:traversal",
+          "filename": "deltas/code-graph/traversal/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "cli:graph-search",
+          "filename": "deltas/cli/graph-search/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "cli:graph-impact",
+          "filename": "deltas/cli/graph-impact/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "sdk:build-implementation-review",
+          "filename": "deltas/sdk/build-implementation-review/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "missing",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "missing",
+          "validatedHash": null
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "missing",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "missing",
+          "validatedHash": null
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-08-24T17:25:00.628Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": [
+        "code-graph:symbol-model",
+        "code-graph:language-adapter",
+        "code-graph:resolve-symbol-reference",
+        "code-graph:graph-store",
+        "code-graph:sqlite-graph-store",
+        "code-graph:indexer",
+        "code-graph:composition",
+        "code-graph:traversal",
+        "cli:graph-search",
+        "cli:graph-impact",
+        "sdk:build-implementation-review"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-08-24T17:25:00.687Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:symbol-model"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:language-adapter"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:resolve-symbol-reference"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:graph-store"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:sqlite-graph-store"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:indexer"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:composition"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:traversal"
+        },
+        {
+          "type": "specs",
+          "key": "cli:graph-search"
+        },
+        {
+          "type": "specs",
+          "key": "cli:graph-impact"
+        },
+        {
+          "type": "specs",
+          "key": "sdk:build-implementation-review"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:symbol-model"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:language-adapter"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:resolve-symbol-reference"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:graph-store"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:sqlite-graph-store"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:indexer"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:composition"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:traversal"
+        },
+        {
+          "type": "verify",
+          "key": "cli:graph-search"
+        },
+        {
+          "type": "verify",
+          "key": "cli:graph-impact"
+        },
+        {
+          "type": "verify",
+          "key": "sdk:build-implementation-review"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-24T17:28:38.834Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-24T19:23:55.538Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:resolve-symbol-reference",
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:indexer",
+            "code-graph:composition",
+            "code-graph:traversal",
+            "cli:graph-search",
+            "cli:graph-impact",
+            "sdk:build-implementation-review"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:resolve-symbol-reference",
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:indexer",
+            "code-graph:composition",
+            "code-graph:traversal",
+            "cli:graph-search",
+            "cli:graph-impact",
+            "sdk:build-implementation-review"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-25T13:17:11.558Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-25T13:26:17.504Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:resolve-symbol-reference",
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:indexer",
+            "code-graph:composition",
+            "code-graph:traversal",
+            "cli:graph-search",
+            "cli:graph-impact",
+            "sdk:build-implementation-review"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:resolve-symbol-reference",
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:indexer",
+            "code-graph:composition",
+            "code-graph:traversal",
+            "cli:graph-search",
+            "cli:graph-impact",
+            "sdk:build-implementation-review"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-25T14:40:12.633Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'centralize-graph-index-worker' was archived with overlapping specs: code-graph:composition, code-graph:graph-store, code-graph:sqlite-graph-store",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:composition"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:composition"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-25T14:40:37.559Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'centralize-graph-index-worker' was archived with overlapping specs: code-graph:composition, code-graph:graph-store, code-graph:sqlite-graph-store",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:composition"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:composition"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-25T14:41:03.764Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'centralize-graph-index-worker' was archived with overlapping specs: code-graph:composition, code-graph:graph-store, code-graph:sqlite-graph-store",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:composition"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:composition"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-27T08:09:43.249Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'repair-code-graph-coverage-indexing' was archived with overlapping specs: code-graph:graph-store, code-graph:indexer, code-graph:sqlite-graph-store",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:graph-store", "code-graph:sqlite-graph-store", "code-graph:indexer"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:graph-store", "code-graph:sqlite-graph-store", "code-graph:indexer"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-27T08:10:29.860Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'repair-code-graph-coverage-indexing' was archived with overlapping specs: code-graph:graph-store, code-graph:indexer, code-graph:sqlite-graph-store",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:graph-store", "code-graph:sqlite-graph-store", "code-graph:indexer"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:graph-store", "code-graph:sqlite-graph-store", "code-graph:indexer"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-28T12:13:27.668Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'stabilize-isolated-index-worker' was archived with overlapping specs: code-graph:language-adapter",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:language-adapter"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:language-adapter"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-28T12:13:42.611Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'stabilize-isolated-index-worker' was archived with overlapping specs: code-graph:language-adapter",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:language-adapter"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:language-adapter"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-29T18:46:56.440Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'filter-impact-results-at-provider' was archived with overlapping specs: cli:graph-impact, code-graph:composition, code-graph:graph-store, code-graph:sqlite-graph-store, code-graph:traversal",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:composition",
+            "code-graph:traversal",
+            "cli:graph-impact"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:composition",
+            "code-graph:traversal",
+            "cli:graph-impact"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-29T18:47:07.995Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'filter-impact-results-at-provider' was archived with overlapping specs: cli:graph-impact, code-graph:composition, code-graph:graph-store, code-graph:sqlite-graph-store, code-graph:traversal",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:composition",
+            "code-graph:traversal",
+            "cli:graph-impact"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:composition",
+            "code-graph:traversal",
+            "cli:graph-impact"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-29T18:47:15.781Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'filter-impact-results-at-provider' was archived with overlapping specs: cli:graph-impact, code-graph:composition, code-graph:graph-store, code-graph:sqlite-graph-store, code-graph:traversal",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:composition",
+            "code-graph:traversal",
+            "cli:graph-impact"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:composition",
+            "code-graph:traversal",
+            "cli:graph-impact"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-29T20:01:47.349Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:resolve-symbol-reference",
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:indexer",
+            "code-graph:composition",
+            "code-graph:traversal",
+            "cli:graph-search",
+            "cli:graph-impact",
+            "sdk:build-implementation-review"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:resolve-symbol-reference",
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:indexer",
+            "code-graph:composition",
+            "code-graph:traversal",
+            "cli:graph-search",
+            "cli:graph-impact",
+            "sdk:build-implementation-review"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    }
+  ]
+}

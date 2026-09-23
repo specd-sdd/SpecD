@@ -1,0 +1,36 @@
+- op: added
+  description: 'Verify structured overlap evidence invariants and non-mutation'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: History and event sourcing'
+  content: |
+    ### Requirement: Structured overlap invalidation evidence
+
+    #### Scenario: New overlap invalidation appends structured evidence
+
+    - **GIVEN** normalized overlap detail for archived change `alpha`, overlapping spec `core:config`, and one added dependency
+    - **WHEN** `Change.invalidate()` is called with cause `spec-overlap-conflict`
+    - **THEN** the appended `invalidated` event contains the same `archivedChangeName`, `overlappingSpecIds`, and `dependencyChanges`
+    - **AND** the event retains its message and affected artifacts
+
+    #### Scenario: Meaningless or inconsistent dependency entries are rejected
+
+    - **GIVEN** overlap detail contains an entry with both arrays empty, a spec outside `overlappingSpecIds`, duplicates, or the same dependency in `added` and `removed`
+    - **WHEN** a new overlap invalidation is requested
+    - **THEN** the domain does not append an event with invalid structured evidence
+
+    #### Scenario: Other invalidation causes do not carry overlap detail
+
+    - **WHEN** `Change.invalidate()` appends an `artifact-drift`, `artifact-review-required`, or `spec-change` event
+    - **THEN** the event has no `overlapDetail`
+
+    #### Scenario: Overlap evidence does not reconcile declared dependencies
+
+    - **GIVEN** a change has an existing `specDependsOn` snapshot
+    - **WHEN** it receives structured overlap invalidation evidence with added or removed dependencies
+    - **THEN** `specDependsOn` remains unchanged
+    - **AND** only lifecycle history and policy-selected artifact review state are updated

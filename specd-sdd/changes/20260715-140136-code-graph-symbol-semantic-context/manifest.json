@@ -1,7 +1,7 @@
 {
   "name": "code-graph-symbol-semantic-context",
   "createdAt": "2026-07-15T14:01:36.552Z",
-  "updatedAt": "2026-08-27T08:10:29.879Z",
+  "updatedAt": "2026-09-22T14:52:17.165Z",
   "description": "Add deterministic symbol ownership and range context to support hierarchical purpose extraction and semantic search in code graph.",
   "schema": {
     "name": "schema-std",
@@ -32,13 +32,14 @@
       "type": "proposal",
       "optional": false,
       "requires": [],
-      "state": "complete",
+      "state": "drifted-pending-review",
       "files": [
         {
           "key": "proposal",
           "filename": "proposal.md",
-          "state": "complete",
-          "validatedHash": "sha256:277d57fbbefa70f437afa3680d69bfceb663c212699d9f1f655f3f3e636bf85f"
+          "state": "drifted-pending-review",
+          "validatedHash": "sha256:277d57fbbefa70f437afa3680d69bfceb663c212699d9f1f655f3f3e636bf85f",
+          "hasDrift": true
         }
       ]
     },
@@ -1503,6 +1504,97 @@
         {
           "type": "verify",
           "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-28T12:13:27.648Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'stabilize-isolated-index-worker' was archived with overlapping specs: code-graph:language-adapter",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:language-adapter"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:language-adapter"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-28T12:13:42.595Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'stabilize-isolated-index-worker' was archived with overlapping specs: code-graph:language-adapter",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:language-adapter"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:language-adapter"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-29T20:01:47.338Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["code-graph:symbol-model", "code-graph:language-adapter", "code-graph:indexer"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:symbol-model", "code-graph:language-adapter", "code-graph:indexer"]
         },
         {
           "type": "design",

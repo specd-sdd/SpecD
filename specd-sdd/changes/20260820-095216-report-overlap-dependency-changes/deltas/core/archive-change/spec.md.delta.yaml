@@ -1,0 +1,68 @@
+- op: modified
+  description: 'Separate overlap detection from post-commit peer invalidation'
+  selector:
+    type: section
+    matches: 'Requirement: Overlap guard'
+  content: |
+    After the archivable guard passes and before pre-archive hooks execute, `ArchiveChange` MUST check for spec overlap with other active changes. The change MUST still be in `archivable` during this check.
+
+    The check MUST:
+
+    1. Call `ChangeRepository.list()` to retrieve all active changes.
+    2. Exclude the change being archived from the list.
+    3. Call the `detectSpecOverlap` domain service with the remaining changes plus the change being archived.
+    4. Filter the result to entries where the change being archived participates.
+
+    **When `allowOverlap` is `false`:** If the filtered report has overlap, `ArchiveChange` MUST throw `SpecOverlapError` with the overlap entries. The error message MUST list the overlapping spec IDs and the names of the other changes targeting them.
+
+    **When `allowOverlap` is `true`:** If the filtered report has overlap, `ArchiveChange` MUST prepare one deduplicated invalidation plan per overlapping active change. The guard MUST NOT mutate or invalidate peer changes before the archive is durably committed.
+
+    If the filtered report has no overlap, the archive proceeds normally regardless of the `allowOverlap` flag.
+
+- op: added
+  description: 'Define dependency delta derivation and durable post-commit invalidation'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Overlap guard'
+  content: |
+    ### Requirement: Overlap dependency changes and post-commit invalidation
+
+    For every spec in a prepared overlap invalidation plan, `ArchiveChange` MUST compare the pre-archive direct dependency set with the fully preflighted `finalDependsOn` set that will be published.
+
+    The pre-archive baseline MUST be obtained from the existing persisted state when `spec-lock.json` exists. For a lock-less existing spec, the baseline MUST be resolved from the unchanged canonical spec through the shared initial-dependency resolution contract; for a new spec, the baseline is empty. `ArchiveChange` MUST NOT treat generated `metadata.json` as an independent comparison authority.
+
+    The comparison MUST use normalized sets and produce deterministic, lexicographically sorted arrays:
+
+    - `added` contains final dependency IDs absent from the baseline.
+    - `removed` contains baseline dependency IDs absent from the final set.
+    - `dependencyChanges` contains one `{ specId, added, removed }` entry per overlapping spec whose `added` or `removed` array is non-empty, sorted by `specId`.
+
+    `ArchiveChange` MUST derive this evidence from the same preflight objects used for canonical publication. It MUST NOT re-extract or independently recompute the final dependencies for output or invalidation.
+
+    After canonical publication, `ArchiveRepository.archive()`, and archive-backup cleanup all succeed, `ArchiveChange` MUST persist the planned invalidation on each still-active overlapping change before returning success. Each new `spec-overlap-conflict` event MUST include the archived change name, all overlapping spec IDs, and the meaningful `dependencyChanges` entries. Its human-readable message MUST mention added and removed dependencies when `dependencyChanges` is non-empty.
+
+    Failed preflight, publication, restore, or archive-move attempts MUST NOT append overlap invalidation events to peer changes. If peer invalidation persistence fails after the durable archive move, the failure MUST be surfaced as an actionable post-commit error that states the archive succeeded and identifies the peer that was not invalidated; the durable archive MUST NOT be rolled back or reported as uncommitted.
+
+- op: modified
+  description: 'Return dependency changes for every successfully invalidated peer'
+  selector:
+    type: section
+    matches: 'Requirement: Result shape'
+  content: |
+    `ArchiveChange.execute` must return a result object. The result must include:
+
+    - `archivedChange` — the `ArchivedChange` record that was persisted.
+    - `postHookFailures` — array of hook commands that failed post-archive, empty on full success.
+    - `staleMetadataSpecPaths` — array of spec paths where `metadata.json` generation failed during this archive; empty when all metadata was generated successfully.
+    - `invalidatedChanges` — array of objects describing changes successfully invalidated due to spec overlap, each containing:
+      - `name` — the invalidated change's name.
+      - `specIds` — sorted readonly array of all overlapping spec IDs that triggered the invalidation.
+      - `dependencyChanges` — sorted readonly array of meaningful direct dependency changes, each containing `specId`, sorted `added`, and sorted `removed` arrays.
+
+    `invalidatedChanges` MUST be empty when no peer was invalidated. An entry with unchanged dependencies MUST retain its `name` and `specIds` and use an empty `dependencyChanges` array.
+
+    `ArchiveChange` throws on pre-archive hook failure or `assertArchivable` failure. Post-archive hook and metadata failures are returned, not thrown. A post-commit peer-invalidation persistence failure follows the explicit post-commit error rule and MUST NOT produce a misleading successful result.

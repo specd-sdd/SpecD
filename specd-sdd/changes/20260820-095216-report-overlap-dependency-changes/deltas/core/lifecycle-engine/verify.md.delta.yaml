@@ -1,0 +1,41 @@
+- op: added
+  description: 'Verify structured-first lifecycle overlap projection'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Review summary integration'
+  content: |
+    ### Requirement: Structured overlap review projection
+
+    #### Scenario: Structured event is authoritative even when message disagrees
+
+    - **GIVEN** an unhandled overlap event contains structured detail for archived change `alpha`, spec `core:config`, and one added dependency
+    - **AND** its human message contains different parseable identity text
+    - **WHEN** `LifecycleEngine` builds the review summary
+    - **THEN** the overlap entry uses only the structured archived name, specs, and dependency changes
+    - **AND** it does not merge values parsed from the message
+
+    #### Scenario: Legacy event retains message fallback
+
+    - **GIVEN** an unhandled legacy `spec-overlap-conflict` event has no `overlapDetail`
+    - **AND** its message identifies archived change `alpha` and spec `core:config`
+    - **WHEN** the review summary is built
+    - **THEN** the overlap entry contains `alpha` and `core:config`
+    - **AND** `dependencyChanges` is empty
+
+    #### Scenario: Malformed legacy message degrades without throwing
+
+    - **GIVEN** an unhandled legacy overlap event has no structured detail and an unparseable message
+    - **WHEN** the review summary is built
+    - **THEN** collection succeeds with empty archived-change and spec identity fields
+    - **AND** `dependencyChanges` is empty
+
+    #### Scenario: Handled boundary removes older dependency evidence
+
+    - **GIVEN** structured overlap events exist on both sides of a forward transition from `designing`
+    - **WHEN** events are collected newest-first
+    - **THEN** only events after the boundary appear in `overlapDetail`
+    - **AND** older dependency changes are not projected

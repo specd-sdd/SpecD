@@ -1,0 +1,132 @@
+- op: modified
+  description: 'Verify overlap guard plans invalidation without mutating peers'
+  selector:
+    type: section
+    matches: 'Requirement: Overlap guard'
+  content: |
+    #### Scenario: Archive blocked when other changes target same specs
+
+    - **GIVEN** a change `alpha` in `archivable` state targeting `core:config`
+    - **AND** another active change `beta` also targets `core:config`
+    - **WHEN** `ArchiveChange.execute({ name: 'alpha' })` is called without `allowOverlap`
+    - **THEN** `SpecOverlapError` is thrown
+    - **AND** the error message includes `core:config` and `beta`
+    - **AND** no files are modified and no hooks are executed
+
+    #### Scenario: Allow-overlap guard prepares one plan per peer
+
+    - **GIVEN** `alpha` targets `core:config` and `core:kernel`
+    - **AND** `beta` overlaps both specs and `gamma` overlaps `core:kernel`
+    - **WHEN** the overlap guard runs with `allowOverlap: true`
+    - **THEN** it prepares one deduplicated plan for `beta` and one for `gamma`
+    - **AND** neither peer has been mutated or invalidated yet
+
+    #### Scenario: No overlap with allowOverlap produces no plans
+
+    - **GIVEN** a change `alpha` in `archivable` state targeting `core:config`
+    - **AND** no other active change targets `core:config`
+    - **WHEN** `ArchiveChange.execute({ name: 'alpha', allowOverlap: true })` is called
+    - **THEN** the archive proceeds normally
+    - **AND** `result.invalidatedChanges` is an empty array
+
+    #### Scenario: Overlap check excludes the change being archived
+
+    - **GIVEN** a change `alpha` in `archivable` state targeting `core:config`
+    - **AND** no other active change targets `core:config`
+    - **WHEN** `ArchiveChange.execute({ name: 'alpha' })` is called
+    - **THEN** `alpha` itself does not cause an overlap detection
+
+- op: added
+  description: 'Verify dependency comparison, ordering, durability, and failure boundaries'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Overlap guard'
+  content: |
+    ### Requirement: Overlap dependency changes and post-commit invalidation
+
+    #### Scenario: Added and removed direct dependencies are derived from preflight
+
+    - **GIVEN** `core:config` has persisted dependencies `core:old` and `core:stable` before archive
+    - **AND** its fully preflighted `finalDependsOn` contains `core:new` and `core:stable`
+    - **AND** peer `beta` overlaps `core:config`
+    - **WHEN** `alpha` archives successfully with `allowOverlap: true`
+    - **THEN** `beta` receives one dependency change for `core:config`
+    - **AND** `added` is `['core:new']` and `removed` is `['core:old']`
+    - **AND** the evidence comes from the preflight publication object
+
+    #### Scenario: Unchanged dependencies do not create a dependency-change entry
+
+    - **GIVEN** the baseline and final direct dependency sets are equal in different input orders
+    - **WHEN** a successful overlapping archive invalidates `beta`
+    - **THEN** `beta` is still invalidated for the spec overlap
+    - **AND** its `dependencyChanges` array is empty
+
+    #### Scenario: Multiple specs and dependency IDs are normalized deterministically
+
+    - **GIVEN** a peer overlaps multiple specs with unsorted and duplicated dependency inputs
+    - **WHEN** dependency changes are prepared
+    - **THEN** entries are sorted by `specId`
+    - **AND** every `added` and `removed` array is deduplicated and lexicographically sorted
+    - **AND** unchanged overlapping specs remain only in `specIds`
+
+    #### Scenario: Lock-less baseline uses the shared initialization contract
+
+    - **GIVEN** an existing canonical spec has no `spec-lock.json`
+    - **WHEN** its pre-archive baseline is prepared
+    - **THEN** `ArchiveChange` resolves the baseline through the shared initial-dependency resolution contract against the unchanged canonical spec
+    - **AND** it does not compare final dependencies directly against generated metadata
+
+    #### Scenario: Failed archive never invalidates peers
+
+    - **GIVEN** an overlap invalidation plan exists
+    - **WHEN** preflight, canonical publication, restore, or `ArchiveRepository.archive()` fails
+    - **THEN** no `spec-overlap-conflict` event is appended to any peer
+    - **AND** no successful `invalidatedChanges` result is returned
+
+    #### Scenario: Peer invalidation occurs only after durable archive and cleanup
+
+    - **GIVEN** canonical publication and `ArchiveRepository.archive()` succeed
+    - **WHEN** archive backup cleanup completes
+    - **THEN** each still-active peer is invalidated through `ChangeRepository.mutate`
+    - **AND** its event includes archived change identity, all overlapping specs, and meaningful dependency changes
+    - **AND** the human message names additions and removals when present
+
+    #### Scenario: Post-commit peer invalidation persistence fails
+
+    - **GIVEN** the archive move is durable and backup cleanup succeeded
+    - **AND** persisting invalidation for peer `beta` fails
+    - **WHEN** `ArchiveChange.execute` reports the failure
+    - **THEN** the error states that `alpha` was archived successfully
+    - **AND** it identifies `beta` as not invalidated
+    - **AND** the durable archive is not rolled back or described as uncommitted
+
+- op: modified
+  description: 'Verify result entries expose normalized dependency changes'
+  selector:
+    type: section
+    matches: 'Requirement: Result shape'
+  content: |
+    #### Scenario: Successful archive returns result with empty invalidatedChanges
+
+    - **WHEN** `ArchiveChange.execute` completes successfully with no overlap
+    - **THEN** the result includes the `ArchivedChange` record
+    - **AND** `postHookFailures` is empty
+    - **AND** `invalidatedChanges` is empty
+
+    #### Scenario: Result includes dependency changes after overlap
+
+    - **GIVEN** two overlapping peers were successfully invalidated
+    - **AND** one peer has added and removed dependencies while the other has no dependency changes
+    - **WHEN** the successful result is returned
+    - **THEN** `invalidatedChanges` has two entries with `name`, sorted `specIds`, and `dependencyChanges`
+    - **AND** the changed peer contains normalized `{ specId, added, removed }` evidence
+    - **AND** the unchanged peer contains an empty `dependencyChanges` array
+
+    #### Scenario: Pre-archive failure throws
+
+    - **WHEN** a pre-archive hook fails
+    - **THEN** `ArchiveChange.execute` throws and does not return a result

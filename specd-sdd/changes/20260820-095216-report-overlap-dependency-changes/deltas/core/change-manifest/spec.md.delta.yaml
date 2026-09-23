@@ -1,0 +1,33 @@
+- op: added
+  description: 'Persist structured overlap invalidation detail compatibly'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Manifest structure'
+  content: |
+    ### Requirement: Overlap invalidation event serialization
+
+    A newly persisted `invalidated` history event with `cause: "spec-overlap-conflict"` MUST serialize an `overlapDetail` object with this JSON shape:
+
+    ```jsonc
+    {
+      "archivedChangeName": "archived-change",
+      "overlappingSpecIds": ["core:example"],
+      "dependencyChanges": [
+        {
+          "specId": "core:example",
+          "added": ["core:new-dependency"],
+          "removed": ["core:old-dependency"]
+        }
+      ]
+    }
+    ```
+
+    Serialization and deserialization MUST preserve the normalized array values exactly and MUST retain the existing `cause`, `message`, `affectedArtifacts`, `at`, and `by` fields.
+
+    The manifest loader MUST accept legacy `spec-overlap-conflict` events where `overlapDetail` is absent and MUST expose them as events without structured detail so read models can apply their compatibility fallback. It MUST NOT fabricate dependency changes from the message during persistence loading.
+
+    `overlapDetail` MUST be rejected or omitted for invalidation causes other than `spec-overlap-conflict`. Existing manifests MUST remain readable without a schema migration or rewrite, and saving a change MUST NOT modify previously persisted append-only history entries.
