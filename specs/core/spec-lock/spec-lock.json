@@ -11,36 +11,36 @@
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "spec-lock.json durably records archived schema, dependencies, implementation links, and independently fresh LLM optimizations.",
+      "value": "Durably records schema, dependencies, implementation links, and independently fresh LLM optimization baselines.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:0f811fee6fae100caff9ab7ac1cf70ed4778d19a97cc7285327f1d5b404876ad",
-          "lastModified": "2026-07-25T11:53:31.094Z"
+          "hash": "sha256:7349bce4e64f0a0207c921106d5d99396b20e752bd80004ed23abb59033c6953",
+          "lastModified": "2026-08-26T22:11:47.208Z"
         },
         "verify.md": {
-          "hash": "sha256:756e0476d04b063af10f47a0a17b556150017ab165d64fda7db70182be90556f",
-          "lastModified": "2026-07-25T11:53:31.095Z"
+          "hash": "sha256:743e05e416fb7ab6576013280a4df0ce9fcaf096b436b60e7d77bc048cfb7090",
+          "lastModified": "2026-08-26T22:11:47.208Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# Spec lock\n## Rules\n- Canonical sidecar: persisted spec directory/spec-lock.json, valid JSON.\n- schema.name/version required; immutable except explicit guarded reassignment. Reassign validates target artifacts; preserves implementation/optimizations; preserves dependencies without target extraction, otherwise requires extracted dependencies equal current. Same schema no-op.\n- dependsOn stores canonical persisted IDs; authoritative source for metadata projection, including schemas without extraction.\n- implementation entries need workspace:path file within spec workspace/codeRoot; optional non-empty symbols means symbol-level, absent means file-level. Use normalized forward slashes.\n- Optional optimizations fields optimizedDescription/optimizedContext each store value, captured schema, artifactState filename -> hash/lastModified. Fields baseline independently; setting/clearing one leaves other intact; omit optimizations when empty.\n- Optimization baseline becomes stale after reassignment; do not clear/regenerate it. Never synthesize optimization state from metadata.\n- Lock-less specs valid; ordinary reads never create lock. Creation only archive, explicit initialization, or create-worthy persisted mutation. Initialization only once, derives dependencies from artifacts/schema, implementation [], no optimizations. Lock-less semantic no-op mutation does not create state.\n- Writers: archive, explicit dependency/implementation/optimization/schema mutation, initialization, integrity maintenance. Use shared pure whole-document construction and conditional revision write.\n- Archive validates raw implementation paths belong to spec workspace; excludes graph.excludePaths, discards unnormalizable, fails confirmed path outside codeRoot.\n- Sidecar durable source for implementation and optimizations. metadata.json projection cannot invent/mutate/delete them; projects optimized field only when baseline fresh against artifacts/schema.\n- SpecRepository.persistedStateMeta(spec, { includeHash: true })?.hash returns SHA-256 sidecar bytes; callers never read sidecar. Spec.get().persistedStateStamp exposes presence/lastModified; no separate persistedStateHash port method.\n## Constraints\n- schema never replaced by non-reassignment writer.\n- Preserve file-level and symbol-level implementation links distinctly.\n- Concurrent writers cannot silently overwrite.",
+      "value": "# Spec Lock\n\n## Rules\n\n- Canonical sidecar: valid JSON `spec-lock.json` beside canonical persisted spec artifacts.\n- `schema.name`/`schema.version` required and immutable except explicit guarded reassignment. Reassignment parses target-schema artifacts; preserves implementation/optimizations; preserves dependencies if no extraction, otherwise requires extracted dependencies equal current. Same schema is no-op. Existing optimization baselines become stale but remain stored.\n- `dependsOn` stores canonical persisted spec IDs; authoritative for metadata projection, including schemas without dependency extraction.\n- `implementation` entries require normalized forward-slash `workspace:path` within spec workspace/codeRoot; optional `symbols` must be non-empty. Absent symbols means file-level; present means symbol-level; preserve both forms distinctly.\n- Optional `optimizations.optimizedDescription` and `optimizedContext` each store value, captured schema, and artifact filename to hash/lastModified baseline. Fields independent; setting/clearing one preserves other. Omit empty optimizations. Never synthesize from metadata.\n- Canonical artifacts may exist without lock. Ordinary read never creates lock. Creation only archive publication targeting that spec, explicit one-time initialization/adoption, or create-worthy persisted dependency/implementation/optimization mutation for existing canonical spec.\n- Persisted sidecar MUST NOT be created or published in isolation without canonical spec artifacts. Lock-less semantic no-op mutation MUST NOT create state.\n- Initialization fails if state exists; derives dependencies from current artifacts/schema, sets implementation empty, omits optimizations.\n- Writers limited to archive materialization, explicit persisted-state mutations, initialization, integrity maintenance. Non-archive writers use shared pure whole-document construction and revision-guarded conditional write; concurrent changes never silently overwrite.\n- Archive reads raw project-relative links, validates workspace implied by `specId`, ignores `graph.excludePaths`, discards unnormalizable paths, fails confirmed path outside implied codeRoot.\n- Sidecar is durable truth for implementation/optimizations. `metadata.json` may project/cache but never invent, mutate, or delete them; optimized projection only when field baseline fresh against artifacts/schema.\n- `SpecRepository.persistedStateMeta(spec, { includeHash: true })?.hash` returns SHA-256 of sidecar bytes. Callers never read sidecar or use separate hash port method. `Spec.persistedStateStamp` exposes presence/lastModified, not schema artifact filenames.\n\n## Constraints\n\n- No non-reassignment writer may replace schema.\n- Canonical implementation identities use normalized `workspace:path`; symbols non-empty when present.\n- Preserve file-level and symbol-level links distinctly.\n- Never publish orphan lock without canonical spec artifacts.\n- Concurrent writers cannot silently overwrite.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:0f811fee6fae100caff9ab7ac1cf70ed4778d19a97cc7285327f1d5b404876ad",
-          "lastModified": "2026-07-25T11:53:31.094Z"
+          "hash": "sha256:7349bce4e64f0a0207c921106d5d99396b20e752bd80004ed23abb59033c6953",
+          "lastModified": "2026-08-26T22:11:47.208Z"
         },
         "verify.md": {
-          "hash": "sha256:756e0476d04b063af10f47a0a17b556150017ab165d64fda7db70182be90556f",
-          "lastModified": "2026-07-25T11:53:31.095Z"
+          "hash": "sha256:743e05e416fb7ab6576013280a4df0ce9fcaf096b436b60e7d77bc048cfb7090",
+          "lastModified": "2026-08-26T22:11:47.208Z"
         }
       }
     }

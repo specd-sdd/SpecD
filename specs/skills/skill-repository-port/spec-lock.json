@@ -4,5 +4,41 @@
     "version": 1
   },
   "dependsOn": ["core:config", "skills:skill", "skills:skill-bundle"],
-  "implementation": []
+  "implementation": [],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Abstract skill storage contract: lists skills/shared files and resolves template bundles with config and shared provenance.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:f15f4aa3d875deebcb8255847c09c903b1359b075be2681d35d1217d77a68629",
+          "lastModified": "2026-05-25T06:02:58.507Z"
+        },
+        "verify.md": {
+          "hash": "sha256:d7812b57a78f408a8e1116092c0a62419b1beb74ed68f85a06787031cb0c6da2",
+          "lastModified": "2026-05-25T06:02:58.507Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Skill Repository Port\n\n## Rules\n- `SkillRepositoryPort`: `list(): Skill[]`; `get(name): Skill|undefined`; `getBundle(name, variables?: Record<string,string>, config?: SpecdConfig): SkillBundle`; `listSharedFiles(): SharedFile[]`.\n- `getBundle` accepts `SpecdConfig` for built-in template variable injection. Files from `listSharedFiles()` retain `shared:true`; skill-local files never marked shared.\n\n## Constraints\n- Abstract port only; no I/O. Concrete fs implementations are infrastructure.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:f15f4aa3d875deebcb8255847c09c903b1359b075be2681d35d1217d77a68629",
+          "lastModified": "2026-05-25T06:02:58.507Z"
+        },
+        "verify.md": {
+          "hash": "sha256:d7812b57a78f408a8e1116092c0a62419b1beb74ed68f85a06787031cb0c6da2",
+          "lastModified": "2026-05-25T06:02:58.507Z"
+        }
+      }
+    }
+  }
 }

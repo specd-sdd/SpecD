@@ -36,5 +36,41 @@
     {
       "file": "skills:src/index.ts"
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Shared base agent-instruction template, renderer, safe managed Markdown blocks, plugin registrations, and JSON merge utilities.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:59e88440c799c00dde9fcc434545475384c11748633dc28a132ce32ded67ae99",
+          "lastModified": "2026-07-27T18:08:40.434Z"
+        },
+        "verify.md": {
+          "hash": "sha256:fa2345b738486896ea159c337e853137797585a8380b61c84b6cc6233f226635",
+          "lastModified": "2026-07-27T18:02:24.377Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Agent Instruction Template\n\n## Rules\n- Export shared Handlebars `templates/prompt/agent-instruction.md.tpl`: `/specd` orientation (`project status --context --graph`), `/specd-new`, graph-first research (generic search/read fallback), stale index→`graph index --format toon`, TOON examples for symbol/impact/dependency/hotspot/spec search, workflow/skill-stop/escape-hatch rules. Optional nonempty `extraInstructions` renders inside base `<!-- <specd> -->` block.\n- Export `renderBaseAgentInstruction(options?): Promise<string>`; `options.extraInstructions?:string`. Empty/omitted produces clean prompt, no empty trailing section.\n- Export `injectSpecdBlock(filePath, content, blockId?)` and `removeSpecdBlock(filePath, blockId?)`. Base delimiters: `<!-- <specd> -->…<!-- </specd> -->`; identified delimiters: `<!-- <specd-plugin:<blockId>> -->…<!-- </specd-plugin:<blockId>> -->`. Inject inserts/updates while preserving surrounding user content.\n- Empty inject: base does not add empty tags; identified block removes existing and adds none. Remove leaves no orphan tags. When final plugin-specific block removed from shared file, remove base block too.\n- Shared instruction targets: each plugin injects nonempty identifying registration with `blockId=pluginName` alongside base. Exclusive files use base only.\n- Export `mergeJsonConfig<T>(filePath, updater)` / `unmergeJsonConfig<T>(filePath, updater)`. Merge parses existing or uses `{}` for absent/invalid, creates parents, preserves untouched top-level properties; unmerge absent/invalid = no-op. Both formatted 2 spaces + trailing newline.\n\n## Constraints\n- Preserve user content; marker registration enables reference-count cleanup.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:59e88440c799c00dde9fcc434545475384c11748633dc28a132ce32ded67ae99",
+          "lastModified": "2026-07-27T18:08:40.434Z"
+        },
+        "verify.md": {
+          "hash": "sha256:fa2345b738486896ea159c337e853137797585a8380b61c84b6cc6233f226635",
+          "lastModified": "2026-07-27T18:02:24.377Z"
+        }
+      }
+    }
+  }
 }

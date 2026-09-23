@@ -8,5 +8,41 @@
     {
       "file": "skills:test/infrastructure/skill-repository.spec.ts"
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "SkillRepository discovers metadata and safely renders capability-aware skill bundles.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:e309d1b040b8fe61a70644333146b9b03ed8409614f74ed5a14315aa007f460c",
+          "lastModified": "2026-08-27T16:46:08.181Z"
+        },
+        "verify.md": {
+          "hash": "sha256:65e87e3669de49aacc7abf59eefcce74bea8bf1694ccb351679598a7f3dd4e34",
+          "lastModified": "2026-08-27T16:46:08.181Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# SkillRepository\n\n## Rules\n\n- `list()`: scan `templates/skills/`, `templates/agents/`; metadata-only `readonly Skill[]`; set `kind` from parent.\n- `get(name: string)`: matching `Skill | undefined`.\n- `getBundle(name, context?)`: load `skill.meta.json`; normalize capabilities; enforce `requiredCapabilities`; reject undeclared shared-template dependencies; recursively render variables + capabilities; return resolved `SkillBundle`. Callers never pre-normalize capabilities.\n- `listSharedFiles()`: scan `templates/shared/`; return `SharedFile[]` (`filename`, `content`); select bundle shared files from skill `requiredSharedTemplates`, never inverse consumer index.\n- Discover `specd-fasttrack` normally: metadata, local `SKILL.md`, declared shared files via list/get/bundle; never require `.agents/skills`, hard-coded registry, or plugin distribution path.\n\n## Constraints\n\n- Interface has no I/O; implementations do I/O.\n- Bundle rendering supports structured install-time context, not only flat substitution.\n- Source `.md.tpl` in `packages/skills/templates/` emits `.md`; filenames stay distinct.\n- Variables support recursive template-path traversal.\n- Preserve shared-file routing metadata.\n- Shared inclusion follows `requiredSharedTemplates`.\n- Normalize `sharedFolder` internally; rendered output never exposes absolute paths.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:e309d1b040b8fe61a70644333146b9b03ed8409614f74ed5a14315aa007f460c",
+          "lastModified": "2026-08-27T16:46:08.181Z"
+        },
+        "verify.md": {
+          "hash": "sha256:65e87e3669de49aacc7abf59eefcce74bea8bf1694ccb351679598a7f3dd4e34",
+          "lastModified": "2026-08-27T16:46:08.181Z"
+        }
+      }
+    }
+  }
 }

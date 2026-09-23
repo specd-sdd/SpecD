@@ -4,5 +4,41 @@
     "version": 1
   },
   "dependsOn": ["core:config", "default:_global/architecture"],
-  "implementation": []
+  "implementation": [],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Base plugin runtime type contract: manifest-sourced identity, resolved config lifecycle, schemas, and strict pure guard.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:4bcf43c289de774e4e0486400bab8c1c97927ab226899d6786ae87529371af84",
+          "lastModified": "2026-07-01T16:02:44.622Z"
+        },
+        "verify.md": {
+          "hash": "sha256:f181eac7a678b0ce8e7289c8ae1e73c839a2e6980070d2ac05111e09fa2ad549",
+          "lastModified": "2026-05-25T06:02:58.504Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Specd Plugin Type\n\n## Rules\n- Define `PLUGIN_TYPES = ['agent'] as const`; derive `PluginType`; append strings to add compile/runtime types.\n- `SpecdPlugin`: manifest-sourced `name:string`, `version:string`; hardcoded `type:PluginType`; `configSchema:Record<string,ConfigSchemaEntry>`; `init(context:PluginContext):Promise<void>`; `destroy():Promise<void>`. Factory reads `specd-plugin.json` and passes name/version; never hardcode them.\n- `PluginContext` only `readonly config: SpecdConfig` (fully resolved); no `projectRoot`, `typeContext`, separate config.\n- `ConfigSchemaEntry`: `type:'string'|'boolean'|'number'`, `description:string`, optional `default`, `required`.\n- Export pure `isSpecdPlugin(value:unknown): value is SpecdPlugin`: non-null object; string name/type/version; non-null object configSchema; functional init/destroy; type ∈ `PLUGIN_TYPES`.\n\n## Constraints\n- Interface has no direct I/O; init/destroy own lifecycle. `PLUGIN_TYPES` sole compile/runtime type source; hardcoded class type prevents invalid manifest type.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:4bcf43c289de774e4e0486400bab8c1c97927ab226899d6786ae87529371af84",
+          "lastModified": "2026-07-01T16:02:44.622Z"
+        },
+        "verify.md": {
+          "hash": "sha256:f181eac7a678b0ce8e7289c8ae1e73c839a2e6980070d2ac05111e09fa2ad549",
+          "lastModified": "2026-05-25T06:02:58.504Z"
+        }
+      }
+    }
+  }
 }

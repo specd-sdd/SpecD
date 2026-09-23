@@ -20,36 +20,36 @@
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "GetGraphHealth aggregates GraphStatistics, VCS ref staleness, derivation fingerprint mismatches, and workspace health on an open provider.",
+      "value": "GetGraphHealth agrega estadísticas, frescura, cobertura, VCS y fingerprint de un proveedor abierto.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:a83a32a04eb506afef9f60c8008ce61e4c8c36eb111ca54dbceb7137659a28a3",
-          "lastModified": "2026-08-16T08:12:48.242Z"
+          "hash": "sha256:08bde58552e9eb27c03b3604ef6fea16e15de415e0709b10d7632eb7228be34f",
+          "lastModified": "2026-08-27T08:10:30.485Z"
         },
         "verify.md": {
-          "hash": "sha256:d7bd080c049f1afb821c5604a155d2d4a36f1e3c254f5951bd600fcc304e3e20",
-          "lastModified": "2026-08-16T08:12:48.245Z"
+          "hash": "sha256:3ea3a96cb1fb86d467a65d45eaa117752c5e8de1292f8208602d6d7258cf367f",
+          "lastModified": "2026-08-27T08:10:30.485Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# Get Graph Health\n\n## Rules\n\n- Returns enriched health: `GetGraphHealth.execute(input)` -> `GetGraphHealthResult` containing all `GraphStatistics` plus:\n  - `stale: boolean | null` (VCS staleness via `isGraphStale`).\n  - `currentRef: string | null` (VCS ref via `createVcsAdapter(config.projectRoot)`).\n  - `fingerprintMismatch: boolean | null` (derivation mismatch when workspaces/version allow comparison).\n  - `state: 'current' | 'stale' | 'unknown'`, `knownStaleSinceLastIndex`, stable reason codes, and per-workspace health breakdowns (`name`, `state`, latch, mode, reasons).\n- Provider availability: relies on `provider.getStatistics()`; busy/stale provider errors propagate unchanged. No external lock helpers or lock-assertion escape hatches.\n- Staleness calculation: compares `lastIndexedRef` with `currentRef`. `lastIndexedRef === null` -> `stale: null`.\n- Derivation mismatch: when `workspaces` provided and `stats.graphFingerprint != null`, calls `detectFingerprintMismatch` with `codeGraphVersion`, `projectRoot`, `workspaces`, effective graph config.\n- Input & Lifecycle: `GetGraphHealthInput` contains `config: SpecdConfig`, `provider: CodeGraphProvider` (must be open), `codeGraphVersion: string`, optional `workspaces`. MUST NOT open or close provider.\n- Factory: `createGetGraphHealth()` returns stateless instance; all inputs passed per `execute()`.\n- Scope assessment: VCS workspaces sharing repo root share modified-path evaluation filtered by effective graph config. Non-VCS workspaces compare visible membership and stored observations, stop on first mismatch. Aggregate precedence: `stale > unknown > current`.\n\n## Constraints\n\n- MUST NOT trigger indexing, destructive recreation, or arbitrary graph mutation.\n- MUST NOT open or close the provider.\n- MUST NOT load change entities or compile project context.",
+      "value": "# Get Graph Health\n\n## Rules\n\n- `GetGraphHealth.execute(input)` devuelve todos `GraphStatistics` + `stale`, `currentRef`, `fingerprintMismatch`, contenido/cobertura, `state`, `knownStaleSinceLastIndex`, reason codes y salud ordenada por workspace.\n- Disponibilidad vía `provider.getStatistics()`; propaga sin cambio busy/stale. Sin lock helpers ni escape caller. Input: `config`, proveedor abierto, `codeGraphVersion`, workspaces opcionales; nunca open/close. `createGetGraphHealth()` stateless, sin config capturada.\n- VCS: `createVcsAdapter(config.projectRoot)` + `isGraphStale(lastIndexedRef, currentRef)`; `lastIndexedRef === null` → `stale: null`.\n- Fingerprint: si workspaces y `stats.graphFingerprint` existen, config efectiva + `detectFingerprintMismatch(codeGraphVersion, projectRoot, workspaces, graphConfig)`; si no comparable → `null`.\n- Frescura/cobertura: expone estado working-tree/content, compatibilidad schema/generación, parcial, y resúmenes/razones para excluded, unsupported, parse-failed, partial. `excluded`/`unsupported` terminales visibles, no incompletan cobertura; `parse-failed`/`partial` sí. Fallo discovery/stat/read/hash → unknown, nunca falso mismatch/latch stale. Sin indexing; solo refresh observaciones igual-content y latches monotónicos workspace/global.\n- Integridad: cobertura indexed debe corresponder a File/Document esperado en misma generación. Nodo faltante, conteos imposibles o generación completa sobre grafo vacío/parcial → `contentFresh` y `coverageComplete` false, estado no current, `GRAPH_CONTENT_INCONSISTENT`. Excluded/unsupported no requieren nodo. Sin repair; diagnóstico para reindex/recovery.\n- Agregación: `state` current/stale/unknown; prioridad stale > unknown > current. Latch aggregate true → stale sin scan. Fallo transitorio → unknown sin cambiar latch. Fallos globales pueden afectar aggregate sin falsa causa workspace. Estructurado conserva todo workspace; texto solo aggregate + no-current; sin roots absolutos.\n- Eficiencia: workspaces VCS por repo root comparten paths modificados normalizados, filtrados por visibilidad. Cambios solo excluidos no cambian latch. No-VCS compara membership/observaciones visibles, hashea solo mtime/tamaño distinto, refresca hash igual, para primer mismatch probado. Error inspección → unknown salvo evidencia stale independiente; nunca todos símbolos ni assessment dirigido de todo grafo.\n\n## Constraints\n\n- No indexing, recreación destructiva ni mutación arbitraria del grafo.\n- Solo mutar cache semántica de frescura: observaciones iguales y latches monotónicos.\n- No cargar change entities ni compilar contexto proyecto.\n- Proveedor ya abierto: nunca abrir/cerrar.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:a83a32a04eb506afef9f60c8008ce61e4c8c36eb111ca54dbceb7137659a28a3",
-          "lastModified": "2026-08-16T08:12:48.242Z"
+          "hash": "sha256:08bde58552e9eb27c03b3604ef6fea16e15de415e0709b10d7632eb7228be34f",
+          "lastModified": "2026-08-27T08:10:30.485Z"
         },
         "verify.md": {
-          "hash": "sha256:d7bd080c049f1afb821c5604a155d2d4a36f1e3c254f5951bd600fcc304e3e20",
-          "lastModified": "2026-08-16T08:12:48.245Z"
+          "hash": "sha256:3ea3a96cb1fb86d467a65d45eaa117752c5e8de1292f8208602d6d7258cf367f",
+          "lastModified": "2026-08-27T08:10:30.485Z"
         }
       }
     }

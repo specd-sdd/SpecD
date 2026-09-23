@@ -57,36 +57,36 @@
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "IndexCodeGraph extrae en dos pases, detecta incompatibilidades y persiste código, documentos y specs en bulk.",
+      "value": "IndexCodeGraph descubre, analiza, resuelve y persiste grafo incremental o reconstruido por fingerprint.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:c33d4c342751510911da9e93208700b42adec1e156ea771716bba85d69a322d3",
-          "lastModified": "2026-08-16T10:48:01.560Z"
+          "hash": "sha256:80e5ada5b428e82bc0e2e88aebf989de989779960c58e9caec2991d1d88955a0",
+          "lastModified": "2026-08-27T08:36:44.622Z"
         },
         "verify.md": {
-          "hash": "sha256:c56966849ab60e45ae5022dc06588c68828227776a57a199a355d439c6cb2ece",
-          "lastModified": "2026-08-16T10:48:01.592Z"
+          "hash": "sha256:ae1f09fcbab885c5597153755f59c40fc718027f1152ce597c71d88329fda48e",
+          "lastModified": "2026-08-27T08:36:44.696Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# Indexer\n\n## Rules\n\n- IndexCodeGraph discovers workspaces/resources, diffs hashes/fingerprints, extracts Pass 1, resolves Pass 2, indexes specs with SpecRepository/GetSpecMetadata, bulk persists and records ref/observations.\n- Fingerprint: code-graph version + canonical workspace hash. Fingerprint/backend mismatch causes provider recreate() full rebuild with reason.\n- Discovery merges include/exclude/allowed paths/gitignore and excludes spec root from docs. Decode UTF-8/UTF-16LE/UTF-16BE/Windows-1252 sans NUL; filter binaries.\n- Pass 1 all workspaces: FileAnalysis, DEFINES/EXPORTS. Then Pass 2 from in-memory facts only: IMPORTS, CALLS, CONSTRUCTS, USES_TYPE, EXTENDS, IMPLEMENTS, OVERRIDES; deterministic, no self/unresolved/store queries.\n- Specs: repo.list(), metadata fingerprint, optimizedDescription-preferred title/description, coverage/DEPENDS_ON. One bulkLoad(), then rebuildFtsIndexes().\n- Package resolution via LanguageAdapter.getPackageIdentity. onProgress 0–100; per-file errors collected, infrastructure faults abort. IndexResult returns counts/errors/duration/workspaces/ref/fingerprint/rebuild fields.\n\n## Constraints\n\n- Store pre-opened; indexer no lifecycle/backend ownership.\n- Forward-slash paths; supplied excludePaths replaces defaults; gitignore priority.\n- No language rules here; specs exclusively SpecRepository.",
+      "value": "# Indexer\n\n## Rules\n\n- `IndexCodeGraph`: entrada aplicación; descubre, diferencia, extrae, indexa specs, almacena, elimina, persiste `lastIndexedRef`; incluye `EXTENDS`, `IMPLEMENTS`, `OVERRIDES`. Lee `SpecRepository` (`list`, `artifact`, `readPersistedState`) y `GetSpecMetadata`; no sidecars/raw metadata.\n- Fingerprint = versión efectiva `@specd/code-graph` + hash canónico workspaces + config descubrimiento efectiva (include/exclude global, allowed/exclude/respectGitignore workspace, exclusiones specs). Mismatch: recrear proveedor/reindexar todo, razón visible; backend inseguro puede exigir force.\n- Incremental con fingerprint válido: solo nuevos/cambiados/eliminados; hash igual + recurso persistido requerido existe = skip. Delete solo workspaces indexados. Force reconsidera todo: ningún artefacto persistido autoriza skip; generación completa equivalente. Cambiados se eliminan antes de `bulkLoad()`.\n- Descubrimiento: por workspace (`codeRoot`, allowed, exclusión global+spec root+workspace, prefijo `{workspace}:`) y global (`includePaths`, prefijo `root:`, solo fuera `codeRoot`). Adaptador → `FileNode`; texto → `DocumentNode`; specs solo indexado specs. Rutas `/`.\n- `discoverFiles`: `respectGitignore` default true y prioridad absoluta; `excludePaths` default `.git/`, `.hg/`, `.svn/`; `vcsRoot` explícito/null, nunca detectar repo. Filtro binario antes de decode. Decode BOM UTF-8/16 LE/BE; UTF-8; UTF-16 por NUL; Windows-1252 sin NUL; sino omite.\n- Análisis 2 pasos + `IndexSession` run-scoped: Pass 1 por workspace analiza `FileAnalysis`, registra facts, `DEFINES`/`EXPORTS`; Pass 2 global resuelve desde sesión `IMPORTS`, `CALLS`, `CONSTRUCTS`, `USES_TYPE`, jerarquía. Sin reparse/store queries. Una vez `GraphStore.bulkLoad()`, luego `rebuildFtsIndexes()`.\n- Sesión: IDs/facts compactos files, analyses, symbols, documents, specs, lookups y relaciones deduplicadas; API común adapters, caches compactas permitidas; nunca mapas internos/store schema/IDs/semántica final. No retener AST.\n- Entorno scoped central: scope, shadowing, bindings, receivers, calls; solo persiste relaciones deterministas. Sin reglas lenguaje en `IndexCodeGraph`, self-relation descartada; ambiguas/no resueltas sin relación (diagnóstico opcional).\n- Cobertura: proyectar estado canónico contra generación actual; file → `COVERS_FILE` si existe; símbolo solo resolución lógica única → `COVERS_SYMBOL`. Reproyectar cambios specs/código; nunca fallback/adivinación. Diagnóstico estable por link no resoluble.\n- Specs: `count`, `list`, `GetSpecMetadata`/`metadataFingerprint`; título/descripción materializada; `readPersistedState` una vez para cobertura/deps. `optimizedDescription` no vacía preferida para BM25/display.\n- Resolver paquetes: `adapter.getPackageIdentity(codeRoot)` por workspace, primer identity gana; imports no relativos → workspace y sesión.\n- Memoria: chunks `IndexOptions.chunkBytes` default 20 MB; opcional staging bajo temp config, run-scoped, limpiar éxito y preferiblemente fallo. Lookups/indexes una vez, batches acotados, sin scans completos/N+1.\n- Observaciones y hechos referencia se reemplazan atómicamente en commit; errores/parcial no limpian stale. Normal: mtime/tamaño evita lectura; hash autoritativo cuando cambian. Reextraer nuevos/cambiados + cierre dependiente; adición puede reextraer importadores sin contar content-indexed. Generación sin cambios conserva facts, actualiza metadata/freshness, sin FTS.\n- Progreso `onProgress(percent, phase)` 0–5 discovery/hash, 5–7 diff/cleanup, 7–50 Pass 1, 50–80 Pass 2, 80–83 specs, 83–95 bulk, 100 done; detalle por elemento y update al cerrar fase. Debug timings fases.\n- Error por archivo: recoger y continuar; infraestructura aborta. `IndexResult`: contadores, errores, duración, breakdown workspace, `vcsRef`, fingerprint, `fullRebuild`, `fullRebuildReason`.\n\n## Constraints\n\n- Store abierto; indexer no ciclo de vida/backend.\n- Default excludes cuando no `excludePaths`: `node_modules/`, `.git/`, `.specd/`, `dist/`, `build/`, `coverage/`, `.next/`, `.nuxt/`; opción reemplaza defaults.\n- Pass 2 tras Pass 1 todos workspaces; no interleave. `workspace.specs()` exclusivo; sin fallback FS.\n- Entorno scoped solo datos Pass/adapters, nunca store; relaciones no resueltas o self no se persisten.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:c33d4c342751510911da9e93208700b42adec1e156ea771716bba85d69a322d3",
-          "lastModified": "2026-08-16T10:48:01.560Z"
+          "hash": "sha256:80e5ada5b428e82bc0e2e88aebf989de989779960c58e9caec2991d1d88955a0",
+          "lastModified": "2026-08-27T08:36:44.622Z"
         },
         "verify.md": {
-          "hash": "sha256:c56966849ab60e45ae5022dc06588c68828227776a57a199a355d439c6cb2ece",
-          "lastModified": "2026-08-16T10:48:01.592Z"
+          "hash": "sha256:ae1f09fcbab885c5597153755f59c40fc718027f1152ce597c71d88329fda48e",
+          "lastModified": "2026-08-27T08:36:44.696Z"
         }
       }
     }
