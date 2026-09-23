@@ -38,8 +38,6 @@
 - **WHEN** the file is loaded
 - **THEN** its status becomes `complete`
 
-#### Scenario: Hash mismatch triggers in-progress status
-
 #### Scenario: Hash mismatch on load invalidates with artifact-drift
 
 - **GIVEN** an artifact was validated with content `some content`
