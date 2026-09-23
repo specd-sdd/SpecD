@@ -1,0 +1,75 @@
+- op: modified
+  description: 'Update Purpose to state specification is superseded by schema-std'
+  selector:
+    type: section
+    matches: '^Purpose$'
+  content: |
+    This specification previously defined spec directory organization and artifact formatting.
+    All spec layout, artifact structure, AST-based validations, and verification scenario rules
+    are now formally specified and enforced by `@specd/schema-std` (`schema-std:standard-schema`).
+    This spec is retained for historical continuity and imposes no active requirements.
+
+- op: removed
+  description: 'Remove obsolete requirement on global specs'
+  selector:
+    type: section
+    matches: '^Requirement: Global specs for cross-cutting constraints$'
+
+- op: removed
+  description: 'Remove obsolete requirement on package specs'
+  selector:
+    type: section
+    matches: '^Requirement: Package specs for package-internal concerns$'
+
+- op: removed
+  description: 'Remove obsolete requirement on spec file naming'
+  selector:
+    type: section
+    matches: '^Requirement: Spec file naming$'
+
+- op: removed
+  description: 'Remove obsolete requirement on spec.md structure'
+  selector:
+    type: section
+    matches: '^Requirement: spec\.md structure$'
+
+- op: removed
+  description: 'Remove obsolete requirement on verify.md structure'
+  selector:
+    type: section
+    matches: '^Requirement: verify\.md structure$'
+
+- op: removed
+  description: 'Remove obsolete requirement on Spec Dependencies section'
+  selector:
+    type: section
+    matches: '^Requirement: Spec Dependencies section$'
+
+- op: added
+  description: 'Add superseded requirement'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    ### Requirement: Superseded by schema-std
+
+    Spec layout, artifact document structures, section hierarchies, and scenario conventions
+    SHALL be governed exclusively by the project's active schema (`@specd/schema-std`).
+    This spec imposes no additional constraints on packages or tooling.
+
+- op: modified
+  description: 'Update Constraints to reflect superseded state'
+  selector:
+    type: section
+    matches: '^Constraints$'
+  content: |
+    - None — all constraints are superseded by `@specd/schema-std` and project configuration in `specd.yaml`.
+
+- op: modified
+  description: 'Clear spec dependencies'
+  selector:
+    type: section
+    matches: '^Spec Dependencies$'
+  content: |
+    _none — this specification is superseded and inert_

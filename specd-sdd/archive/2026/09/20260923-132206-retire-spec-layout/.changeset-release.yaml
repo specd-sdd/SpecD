@@ -1,0 +1,3 @@
+releases:
+  cli:spec-search: patch
+  default:_global/spec-layout: patch

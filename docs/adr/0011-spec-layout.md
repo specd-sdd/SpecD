@@ -50,4 +50,10 @@ The flat layout is simple but conflates cross-cutting constraints with package i
 
 ### Spec
 
-- [`default:_global/spec-layout-layout`](../../specs/_global/spec-layout/spec.md)
+- [`default:_global/spec-layout`](../../specs/_global/spec-layout/spec.md)
+
+## Amendment (2026-09-23)
+
+With the introduction and formalization of `@specd/schema-std` (`schema-std:standard-schema`), the markdown document structures, AST-based validations, scenario rules, and metadata extractions originally specified in `specs/_global/spec-layout/` are now natively enforced by the schema engine.
+
+Furthermore, repository workspace layout and spec paths are dynamically configured in `specd.yaml` under `workspaces`. As a result, `default:_global/spec-layout` has been neutralized to an inert spec imposing no active constraints.
