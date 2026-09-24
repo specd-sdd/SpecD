@@ -4,13 +4,21 @@
 
 ### Requirement: Shared Base Instruction Template
 
-#### Scenario: Renders standard specd entry points and rules
+#### Scenario: Renders standard specd entry points, code graph protocol, and rules
 
 - **GIVEN** `@specd/skills` template renderer
 - **WHEN** `renderBaseAgentInstruction()` is called
 - **THEN** output contains `<!-- <specd> -->` and `<!-- </specd> -->`
 - **AND** output contains `/specd` and `/specd-new` entry point directives
 - **AND** output contains Code Graph mandatory research protocol and `stale: true` re-indexing instructions
+
+#### Scenario: Renders specd guide on-demand documentation protocol
+
+- **GIVEN** `@specd/skills` template renderer
+- **WHEN** `renderBaseAgentInstruction()` is called
+- **THEN** output contains explicit instructions telling agents to consult `specd guide` for documentation on configuration, schemas, deltas, workflow lifecycle, and CLI commands
+- **AND** output contains concrete CLI examples: `specd guide [topic] --format toon`, `specd guide <topic> --meta --format toon`, `specd guide <topic> --section <name> --format toon`, and `specd guide search "<query>" --format toon`
+- **AND** output warns agents against guessing or hallucinating conventions
 
 ### Requirement: Base Prompt Rendering Interface
 

@@ -1,0 +1,26 @@
+- op: added
+  description: 'Add verification scenarios for terminal-aware table rendering and program factory'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Terminal-aware table rendering
+
+    #### Scenario: Table columns reduce right-to-left when terminal is constrained
+    - **GIVEN** a table with columns whose total width exceeds the terminal width
+    - **WHEN** `renderTable` or `fitColumnsToTerminal` is invoked with a constrained terminal width
+    - **THEN** the rightmost column width is reduced first down to the minimum threshold (default 10)
+    - **AND** preceding columns are reduced progressively only after subsequent columns reach the minimum threshold
+
+    #### Scenario: Unconstrained non-TTY rendering preserves natural widths
+    - **GIVEN** a non-interactive environment where `process.stdout.columns` is undefined
+    - **WHEN** `renderTable` is called without explicit terminal width override
+    - **THEN** column widths are preserved at their natural unconstrained dimensions
+
+    ### Requirement: Decoupled program instantiation
+
+    #### Scenario: Factory returns executable Commander instance without argument parsing
+    - **WHEN** `createProgram()` is invoked
+    - **THEN** a fully assembled Commander `Command` instance is returned with all top-level commands registered
+    - **AND** the instance can be introspected without parsing CLI arguments or calling `process.exit`

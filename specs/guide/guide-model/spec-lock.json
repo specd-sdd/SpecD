@@ -1,0 +1,38 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["guide:conventions"],
+  "implementation": [
+    {
+      "file": "guide:src/domain/models/guide-section.ts",
+      "symbols": ["GuideSection"]
+    },
+    {
+      "file": "guide:src/domain/models/guide-topic.ts",
+      "symbols": ["GuideTopic"]
+    },
+    {
+      "file": "guide:src/domain/models/guide-summary.ts",
+      "symbols": ["GuideSummary"]
+    },
+    {
+      "file": "guide:src/domain/models/guide-outline.ts",
+      "symbols": ["GuideOutline"]
+    },
+    {
+      "file": "guide:src/domain/models/guide-search-hit.ts",
+      "symbols": ["GuideSearchHit"]
+    },
+    {
+      "file": "guide:src/domain/models/index.ts"
+    },
+    {
+      "file": "guide:src/domain/index.ts"
+    },
+    {
+      "file": "guide:test/unit/domain/models.test.ts"
+    }
+  ]
+}

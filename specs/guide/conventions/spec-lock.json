@@ -1,0 +1,21 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [],
+  "implementation": [
+    {
+      "file": "guide:package.json"
+    },
+    {
+      "file": "guide:tsconfig.json"
+    },
+    {
+      "file": "guide:vitest.config.ts"
+    },
+    {
+      "file": "guide:README.md"
+    }
+  ]
+}

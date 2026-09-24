@@ -1,0 +1,34 @@
+{
+  "name": "@specd/guide",
+  "version": "0.3.0",
+  "license": "MIT",
+  "private": false,
+  "repository": "https://github.com/specd-sdd/SpecD",
+  "homepage": "https://getspecd.dev",
+  "files": [
+    "dist/"
+  ],
+  "type": "module",
+  "dependencies": {
+    "minisearch": "^7.1.2"
+  },
+  "exports": {
+    ".": {
+      "import": "./dist/public.js",
+      "types": "./dist/public.d.ts"
+    },
+    "./internal": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "bundle:guides": "tsx scripts/bundle-guides.ts",
+    "build": "tsx scripts/bundle-guides.ts && tsup src/public.ts src/index.ts --format esm --dts --clean",
+    "build:dev": "tsx scripts/bundle-guides.ts && tsup src/public.ts src/index.ts --format esm --dts --sourcemap --clean",
+    "dev": "tsup src/public.ts src/index.ts --format esm --dts --sourcemap --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "eslint ."
+  }
+}

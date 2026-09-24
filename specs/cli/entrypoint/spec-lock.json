@@ -6,13 +6,22 @@
   "dependsOn": ["core:config", "default:_global/error-handling-conventions"],
   "implementation": [
     {
+      "file": "cli:src/helpers/table.ts"
+    },
+    {
+      "file": "cli:src/program.ts"
+    },
+    {
       "file": "cli:src/index.ts"
     },
     {
-      "file": "cli:src/helpers/list-pagination.ts"
+      "file": "cli:test/helpers/table.spec.ts"
     },
     {
-      "file": "cli:src/commands/change/validate.ts"
+      "file": "cli:test/documentation-coverage.spec.ts"
+    },
+    {
+      "file": "cli:test/configuration-coverage.spec.ts"
     }
   ],
   "optimizations": {

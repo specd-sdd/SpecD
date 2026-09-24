@@ -1,0 +1,24 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["guide:conventions", "guide:guide-model"],
+  "implementation": [
+    {
+      "file": "guide:src/application/ports/guide-search-port.ts",
+      "symbols": ["GuideSearchPort", "GuideSearchOptions"]
+    },
+    {
+      "file": "guide:src/application/queries/search-guides-query.ts",
+      "symbols": ["SearchGuidesQuery", "SearchGuidesInput"]
+    },
+    {
+      "file": "guide:src/infrastructure/adapters/minisearch-guide-engine-adapter.ts",
+      "symbols": ["MiniSearchGuideEngineAdapter"]
+    },
+    {
+      "file": "guide:test/unit/infrastructure/search.test.ts"
+    }
+  ]
+}

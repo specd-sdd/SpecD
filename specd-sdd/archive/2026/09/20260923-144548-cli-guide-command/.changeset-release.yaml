@@ -1,0 +1,15 @@
+releases:
+  cli:guide: minor
+  default:_global/docs: minor
+  skills:agent-instruction-template: patch
+  guide:conventions: minor
+  guide:guide-model: minor
+  guide:bundle-guides: minor
+  guide:list-guides: minor
+  guide:get-guide: minor
+  guide:get-guide-outline: minor
+  guide:slice-guide-content: minor
+  guide:search-guides: minor
+  guide:composition: minor
+  guide:errors: minor
+  cli:entrypoint: patch
