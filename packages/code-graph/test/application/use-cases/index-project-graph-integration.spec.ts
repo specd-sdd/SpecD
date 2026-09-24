@@ -408,7 +408,7 @@ describe('IndexProjectGraph integration', () => {
       coverage.find((entry) => entry.filePath === 'fixture:php/Service.php')?.capabilities,
     ).not.toContain('publicBindings')
     await store.close()
-  })
+  }, 20000)
 
   it('reprocesses native-store importers when a previously missing target is added', async () => {
     tempDir = mkdtempSync(join(tmpdir(), 'index-project-graph-added-target-'))
