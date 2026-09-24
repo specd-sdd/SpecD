@@ -30,6 +30,8 @@ pnpm test        # run all tests
 pnpm typecheck   # type-check all packages
 pnpm lint        # lint + typecheck
 pnpm lint:fix    # lint with auto-fix
+pnpm web:dev     # start documentation site in dev mode (see docs/public-web/index.md)
+pnpm web:build   # build static documentation site and API reference
 ```
 
 ## Code style

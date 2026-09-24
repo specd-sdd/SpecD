@@ -1,3 +1,9 @@
+---
+title: Workspaces & Multi-Package Organization
+description: Managing monolithic and multi-workspace projects, ownership, and spec locations.
+sidebar_position: 5
+---
+
 # Workspaces
 
 A workspace is the fundamental unit of organization in specd. It groups a set of specs, a code location, and an ownership relationship under a single named entry in `specd.yaml`. Everything in specd that involves specs — context compilation, archiving, change tracking, schema resolution — resolves through workspaces.
@@ -364,10 +370,10 @@ Available template variables in archive patterns:
 
 ## Where to go next
 
-| Topic                                                      | Document                                                               |
-| ---------------------------------------------------------- | ---------------------------------------------------------------------- |
-| Full field-by-field reference for all workspace options    | [Configuration Reference](../config/config-reference.md)               |
-| Getting started and project structure overview             | [Getting Started](getting-started.md)                                  |
-| How changes move through the lifecycle and span workspaces | [Workflow Reference](workflow.md)                                      |
-| All `specd.yaml` configuration options explained           | [Configuring Your Project](configuration.md)                           |
-| Annotated multi-repo coordinator example                   | [Multi-Repo Coordinator](../config/examples/multi-repo-coordinator.md) |
+| Topic                                                      | Document                                                                                            |
+| ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Full field-by-field reference for all workspace options    | [Configuration Guide](configuration.md)                                                             |
+| Getting started and project structure overview             | [Getting Started](getting-started.md)                                                               |
+| How changes move through the lifecycle and span workspaces | [Workflow Reference](workflow.md)                                                                   |
+| All `specd.yaml` configuration options explained           | [Configuring Your Project](configuration.md)                                                        |
+| Annotated multi-workspace coordinator example              | [Configuration Examples](configuration-examples.md#example-3-multi-workspace-monorepo--coordinator) |

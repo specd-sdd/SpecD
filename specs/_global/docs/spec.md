@@ -11,13 +11,39 @@ Scattered or inconsistently structured documentation slows onboarding and makes 
 ```
 docs/
 ├── adr/        # Architecture Decision Records
-├── cli/        # CLI commands reference
+├── cli/        # CLI commands reference (one doc per command + index.md)
+├── code-graph/ # Code Graph package reference
+├── core/       # @specd/core API and domain model package reference
+├── guide/      # User-facing conceptual guides, workflows, and tutorials
 ├── mcp/        # MCP server tools and resources reference
-├── core/       # @specd/core API and domain model documentation
-└── schemas/    # Schema authoring guide
+├── schemas/    # Schema specification and authoring reference
+├── sdk/        # SDK integrator host guide
+└── skills/     # Skills runtime and template rendering reference
 ```
 
 No documentation lives outside `docs/` except `README.md` at the project root and `AGENTS.md` / `CLAUDE.md` for agent instructions.
+
+### Requirement: User guide documentation and frontmatter
+
+All user-facing guides MUST live under `docs/guide/`. Developer-internal monorepo documentation (such as internal package internals, skills template rendering details, and low-level subsystem references) MUST NOT live under `docs/guide/` and SHALL be placed in their respective package reference directories under `docs/` (e.g. `docs/skills/`, `docs/core/`, `docs/code-graph/`).
+
+Every document under `docs/guide/` MUST include Docusaurus-compatible YAML frontmatter containing:
+
+- `title`: Human-readable title of the guide.
+- `description`: A concise summary of the guide topic used for search indexing and metadata.
+- `sidebar_position`: An integer defining the navigation ordering in Docusaurus sidebars.
+
+All user guides under `docs/guide/` MUST be compatible with static website generation in `apps/public-web` and build-time bundling in `@specd/guide`.
+
+### Requirement: Skills guide documentation
+
+A user-facing guide `docs/guide/skills.md` MUST exist documenting the SpecD skills layer. It MUST cover:
+
+- What skills are and how they act as the interface between the user and the CLI.
+- The interaction pattern: user types a slash command → agent executes steps → CLI is called.
+- A catalog of all built-in skills (`/specd`, `/specd-new`, `/specd-design`, `/specd-implement`, `/specd-verify`, `/specd-archive`, `/specd-compliance`, `/specd-fasttrack`) with a concise description of each and guidance on when to use it.
+- How skills use `--format toon` and `specd guide` for on-demand documentation.
+- Where skill files are stored in the repository (`.agents/skills/`).
 
 ### Requirement: ADR format
 
@@ -108,11 +134,11 @@ An ADR is created for every significant architectural or design decision. Signif
 
 ### Requirement: CLI documentation
 
-Every `specd` command has a corresponding doc file in `docs/cli/` describing its purpose, flags, examples, and exit codes.
+Every `specd` command has a corresponding doc file in `docs/cli/` describing its purpose, flags, examples, and exit codes. The `docs/cli/` directory MUST include an `index.md` serving as the comprehensive CLI command directory and entry point, and MUST provide dedicated docs for all CLI commands, including `guide.md` and lifecycle command groups.
 
 When a command's contract includes command-specific output semantics, caching semantics, or other machine-consumed response behavior, the corresponding CLI documentation MUST describe those behaviors clearly enough for a reader to understand how the command behaves without reading the implementation.
 
-Changes to a command's documented output contract MUST update the corresponding `docs/cli/` reference in the same change.
+Changes to a command's documented output contract MUST update the corresponding `docs/cli/` reference in the same change. User-facing CLI overviews, tutorials, and scenario recipes MUST be maintained in `docs/guide/cli.md`.
 
 ### Requirement: MCP documentation
 
@@ -188,11 +214,16 @@ When composition factories change their public contract shape, the documentation
 
 ### Requirement: Documentation stays aligned with removed/renamed template variables and list/summary contracts
 
-When a change removes or renames a public template variable token (for example `{{change.workspace}}`), or changes the shape of a listing/summary use case's inputs, outputs, or dependency-resolution contract, that change MUST update every in-repo doc under `docs/` that documents the old token or shape, in the same change — not as separate follow-up work.
+When a change removes or renames a public template variable token (for example `{{change.workspace}}`), changes configuration cascade semantics, or changes the shape of a listing/summary use case's inputs, outputs, or dependency-resolution contract, that change MUST update every in-repo doc under `docs/` that documents the old token, cascade rule, or shape, in the same change — not as separate follow-up work.
+
+Configuration documentation across `docs/guide/configuration.md` and `docs/guide/configuration-examples.md` MUST remain consistent regarding the layered config cascade (`specd.yaml` + `specd.*.yaml` + `specd.local.yaml`), avoiding conflicting or outdated claims about local overrides.
 
 This includes, when applicable to the change:
 
-- `docs/config/config-reference.md` — archive pattern variable tables and other config examples
+- `docs/guide/configuration.md` — user guide for configuration, archive pattern variable tables, and cascade layering
+- `docs/guide/configuration-examples.md` — scenario-based configuration examples and exhaustive reference
+- `docs/guide/installation.md` — user guide for installation, initialization, and prerequisites
+- `docs/guide/getting-started.md` — quickstart tutorial and skills router introduction
 - `docs/guide/workspaces.md` — workspace/template variable guidance
 - `docs/guide/workflow.md` — hook and template variable examples
 - `docs/guide/schemas.md` and `docs/schemas/schema-format.md` — schema-authoring examples that reference template variables

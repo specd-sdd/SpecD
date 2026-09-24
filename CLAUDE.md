@@ -46,13 +46,34 @@ You are a **Graph-First Agent**. Generic search tools (`grep`, `glob`) and direc
   specd graph search "<query>" --specs --format toon
   ```
 
-## 3. Mandatory Workflow & Skill Rules
+## 3. Mandatory On-Demand Documentation Protocol (Guide-First)
+
+Do NOT guess, assume, or hallucinate SpecD configuration syntax, workflow lifecycle behaviors, schema rules, spec delta operations, or CLI arguments. Always query the built-in documentation system via `specd guide` on demand.
+
+- **List All Available Guides:**
+  ```bash
+  specd guide --format toon
+  ```
+- **Inspect Topic Outline & Structure:**
+  ```bash
+  specd guide <topic> --meta --format toon
+  ```
+- **Read Targeted Section by Name or Index:**
+  ```bash
+  specd guide <topic> --section "<heading|index>" --format toon
+  ```
+- **Search Across Guides with BM25:**
+  ```bash
+  specd guide search "<query>" --format toon
+  ```
+
+## 4. Mandatory Workflow & Skill Rules
 
 - **Enter Through specd:** Every meaningful code change MUST go through a `specd` change workflow. Specs are the source of truth; code follows specs. Do not edit source files directly without an active change workflow.
 - **Follow Skills Literally:** When a `specd` skill is invoked (`specd` or `specd-*`), treat every instruction inside the active skill as binding (especially lines that say "stop", "ask the user", "present and stop"). Do not replace required stop points with autonomous execution.
 - **No Autonomous Workflow Progression:** Do NOT advance workflow state (create changes, write artifacts, transition, approve, archive) unless the active skill explicitly permits it without asking.
 
-## 4. Explicit User Override (Escape Hatch)
+## 5. Explicit User Override (Escape Hatch)
 
 A direct, explicit user instruction in the current turn may authorize a one-off code or repository edit outside the normal `specd` workflow ONLY IF:
 
@@ -61,7 +82,7 @@ A direct, explicit user instruction in the current turn may authorize a one-off 
 - The agent does NOT perform any `specd` lifecycle operations (create/approve/archive) autonomously.
 - This override applies only to the current task and turn context. Default to `specd` when in doubt.
 
-## 5. Instruction Precedence
+## 6. Instruction Precedence
 
 1. Repository-local instructions in `<specd>` block / agent files
 2. Explicit instructions inside the active skill

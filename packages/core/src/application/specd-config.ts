@@ -48,7 +48,7 @@ export interface PrivacyConfig {
   readonly salt?: string | undefined
   /**
    * Actors to exclude from obfuscation (case-insensitive name or email).
-   * Defaults to `['specd', 'system@getspecd.dev']`.
+   * Defaults to `['specd', 'system@getspecd.dev']` when absent. When specified, replaces built-in defaults entirely.
    */
   readonly excludeActors?: readonly string[] | undefined
   /** Whitelisted metadata keys to preserve under privacy modes. */
@@ -90,6 +90,7 @@ export interface SpecdGraphConfig {
    * Optional global exclusion patterns applied to file/document discovery.
    *
    * When omitted, the code-graph layer applies its built-in defaults.
+   * When specified, replaces the built-in defaults entirely.
    * Workspace-local graph excludes are additive on top of this set.
    */
   readonly excludePaths?: readonly string[]
@@ -226,7 +227,7 @@ export interface SpecdConfig {
   readonly context?: readonly SpecdContextEntry[]
   /**
    * Project-level context spec include patterns. Always applied regardless of active workspace.
-   * Defaults to `['default:*']` when absent.
+   * When omitted, no project-level include patterns are applied.
    */
   readonly contextIncludeSpecs?: readonly string[]
   /**

@@ -6,7 +6,7 @@ For annotated, scenario-based examples see the [`examples/`](examples/) director
 
 ## Overview
 
-Every SpecD project has exactly one active schema. The schema is declared in `specd.yaml` via the `schema` field and resolved at command dispatch time. For how schema references are resolved, see the [configuration reference](../config/config-reference.md#schema).
+Every SpecD project has exactly one active schema. The schema is declared in `specd.yaml` via the `schema` field and resolved at command dispatch time. For how schema references are resolved, see the [configuration guide](../guide/configuration.md#schema-selection).
 
 The schema controls:
 
@@ -725,7 +725,7 @@ Explicit external hooks are part of the workflow model, not ad hoc shell escapes
 
 ### Relationship with schemaOverrides hooks
 
-`schemaOverrides` in `specd.yaml` can append, prepend, or remove individual hook entries on any step declared in the schema by targeting them via `id`. Schema hooks always fire first. See the [configuration reference](../config/config-reference.md#schemaoverrides).
+`schemaOverrides` in `specd.yaml` can append, prepend, or remove individual hook entries on any step declared in the schema by targeting them via `id`. Schema hooks always fire first. See the [configuration guide](../guide/configuration.md#schema-overrides).
 
 ```yaml
 workflow:

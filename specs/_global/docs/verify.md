@@ -9,6 +9,40 @@
 - **WHEN** a documentation file is created outside `docs/` (excluding `README.md`, `AGENTS.md`, `CLAUDE.md`)
 - **THEN** it must be moved to the appropriate subdirectory under `docs/`
 
+### Requirement: User guide documentation and frontmatter
+
+#### Scenario: User guide placed under docs/guide/ with valid Docusaurus frontmatter
+
+- **WHEN** a user guide is added or updated under `docs/guide/`
+- **THEN** it must contain YAML frontmatter with non-empty `title`, `description`, and positive integer `sidebar_position`
+- **AND** it must not contain developer-internal package implementation details
+
+#### Scenario: User guide missing required frontmatter fails validation
+
+- **WHEN** a guide in `docs/guide/` is missing `title`, `description`, or `sidebar_position`
+- **THEN** validation and bundler compilation reject the file as malformed
+
+#### Scenario: Developer-internal doc placed in docs/guide/ is rejected
+
+- **WHEN** internal runtime mechanics (e.g. skills template compilation internals) are placed in `docs/guide/`
+- **THEN** the review rejects the placement and requires it to live in `docs/skills/`, `docs/core/`, or `docs/code-graph/`
+
+### Requirement: Skills guide documentation
+
+#### Scenario: Skills guide exists with complete catalog
+
+- **WHEN** reviewing `docs/guide/skills.md`
+- **THEN** the file exists and contains valid Docusaurus frontmatter (`title`, `description`, `sidebar_position`)
+- **AND** it describes what skills are and how they interact with the SpecD CLI
+- **AND** it catalogs all built-in skills: `/specd`, `/specd-new`, `/specd-design`, `/specd-implement`, `/specd-verify`, `/specd-archive`, `/specd-compliance`, `/specd-fasttrack`
+- **AND** each skill entry includes a description and guidance on when to use it
+
+#### Scenario: Skills guide accessible via specd guide command
+
+- **WHEN** running `specd guide skills`
+- **THEN** the guide content is returned without error
+- **AND** the guide appears in the catalog returned by `specd guide`
+
 ### Requirement: ADR format
 
 #### Scenario: ADR missing required section
@@ -61,6 +95,17 @@
 
 - **WHEN** an existing `specd` command changes its output semantics, caching behavior, or other documented response contract
 - **THEN** the corresponding `docs/cli/` reference must be updated in the same change
+
+#### Scenario: docs/cli/index.md serves as complete CLI directory
+
+- **WHEN** inspecting `docs/cli/`
+- **THEN** `docs/cli/index.md` exists and indexes every available CLI command and subcommand group
+- **AND** every CLI command has a dedicated reference file in `docs/cli/`
+
+#### Scenario: User-facing CLI recipes and workflows maintained in docs/guide/cli.md
+
+- **WHEN** reviewing CLI user documentation
+- **THEN** `docs/guide/cli.md` provides scenario-based usage recipes, flags, and examples for end users and AI agents
 
 ### Requirement: MCP documentation
 
@@ -146,9 +191,16 @@
 - **WHEN** the change is reviewed for documentation alignment
 - **THEN** `docs/cli/cli-reference.md` is updated in the same change
 
+#### Scenario: Configuration cascade docs must remain aligned without contradiction
+
+- **GIVEN** documentation covering configuration cascade layering (`specd.yaml`, `specd.*.yaml`, `specd.local.yaml`)
+- **WHEN** `docs/guide/configuration.md` and `docs/guide/configuration-examples.md` are reviewed
+- **THEN** both accurately document the layered cascade merge behavior
+- **AND** neither file asserts that `specd.local.yaml` is not merged or layered
+
 #### Scenario: Illustrative doc list is not exhaustive
 
-- **GIVEN** a doc file not among `docs/config/config-reference.md`, `docs/guide/workspaces.md`, `docs/guide/workflow.md`, `docs/guide/schemas.md`, `docs/schemas/schema-format.md`, `docs/adr/0013-workspaces-not-scopes.md`, `docs/core/use-cases.md`, `docs/cli/cli-reference.md`
+- **GIVEN** a doc file not among `docs/guide/configuration.md`, `docs/guide/configuration-examples.md`, `docs/guide/workspaces.md`, `docs/guide/workflow.md`, `docs/guide/schemas.md`, `docs/schemas/schema-format.md`, `docs/adr/0013-workspaces-not-scopes.md`, `docs/core/use-cases.md`, `docs/cli/cli-reference.md`
 - **AND** that file documents the same removed/renamed token or stale contract shape
 - **WHEN** the change is reviewed for documentation alignment
 - **THEN** that file is equally in scope and must be updated in the same change

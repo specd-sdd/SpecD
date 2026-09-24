@@ -1,3 +1,9 @@
+---
+title: Workflow Schemas
+description: Understanding and customizing development workflow schemas and lifecycle phases.
+sidebar_position: 6
+---
+
 # Schemas
 
 A schema defines the shape of your development workflow. It declares which artifact files exist, what order they are produced in, what rules govern them, and which lifecycle phases gate progression from design to archive.
@@ -308,24 +314,11 @@ Schemas also declare how to extract structured metadata from artifact content �
 
 For the full extractor syntax, see [selectors.md](selectors.md).
 
-## Skill Authoring: Built-in Variables
-
-When authoring skill templates, certain variables are automatically available for substitution. You don't need to declare them in your plugin configuration or pass them manually during installation.
-
-The following built-in variables are injected automatically by the platform during skill bundle resolution:
-
-| Variable          | Description                                              | Source               |
-| :---------------- | :------------------------------------------------------- | :------------------- |
-| `{{projectRoot}}` | The absolute path to the project root directory.         | `config.projectRoot` |
-| `{{configPath}}`  | The absolute path to the active `specd.yaml` file.       | `config.configPath`  |
-| `{{schemaRef}}`   | The schema reference string (e.g., `@specd/schema-std`). | `config.schemaRef`   |
-
-These variables are particularly useful for generating skill metadata (frontmatter) or configuring paths within the installed skill files.
-
 ## Where to go next
 
+- [standard-schema.md](standard-schema.md) — complete reference for `@specd/schema-std` artifacts, DAG, and gates
+- [custom-schemas.md](custom-schemas.md) — authoring custom schemas, `schemaOverrides`, plugins, and forks
 - [selectors.md](selectors.md) — deep dive into selectors, extractors, and validation rules
 - [workflow.md](workflow.md) — lifecycle states, transitions, and approval gates
 - [docs/schemas/schema-format.md](../schemas/schema-format.md) — complete technical reference for the schema YAML format
-- [docs/schemas/examples/](../schemas/examples/) — annotated schema examples
-- [docs/config/config-reference.md](../config/config-reference.md) — `specd.yaml` reference, including `schemaOverrides` and `schemaPlugins`
+- [configuration.md](configuration.md) — `specd.yaml` reference, including `schemaOverrides` and `schemaPlugins`

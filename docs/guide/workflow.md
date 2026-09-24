@@ -1,3 +1,9 @@
+---
+title: Change Lifecycle Guide
+description: Guide to SpecD change lifecycles, states, transitions, approvals, hooks, and verification.
+sidebar_position: 2
+---
+
 # Change Lifecycle Guide
 
 Every piece of work in specd is a **change**. A change tracks everything related to modifying one or more specs — the proposal, the spec files, the design, the implementation tasks, and the final archive record. This guide explains how changes move through their lifecycle, what each state means, and how approval gates, task completion checks, and hooks affect that progression.
@@ -717,6 +723,6 @@ Time passes between exploration and design. Code changes, specs get renamed, dec
 ## Where to go next
 
 - [Schema format reference](../schemas/schema-format.md) — define custom workflow steps, artifacts, hooks, and task completion checks for your project.
-- [Configuration reference](../config/config-reference.md) — enable approval gates, configure workspaces, and add schema overrides.
+- [Configuration guide](configuration.md) — enable approval gates, configure workspaces, and add schema overrides.
 - [CLI reference](../cli/cli-reference.md) — all `specd changes`, `specd drafts`, `specd discard`, and `specd archives` commands.
 - [Domain model](../core/domain-model.md) — the `Change`, `ChangeState`, `ChangeEvent`, and `ChangeArtifact` types returned by `@specd/core` use cases.
