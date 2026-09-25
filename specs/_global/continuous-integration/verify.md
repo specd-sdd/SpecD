@@ -47,7 +47,7 @@
 #### Scenario: The three commands run in order
 
 - **WHEN** a job runs after install
-- **THEN** it runs `pnpm typecheck`, then `pnpm build`, then `pnpm test`
+- **THEN** it runs `pnpm build`, then `pnpm typecheck`, then `pnpm test`
 
 #### Scenario: pnpm test includes guide, sdk, skills, and plugins
 

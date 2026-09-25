@@ -26,7 +26,7 @@ That install MUST be what builds the native modules the repo still depends on: `
 
 ### Requirement: Checks
 
-Each job MUST run `pnpm typecheck`, `pnpm build`, and `pnpm test`, in that order.
+Each job MUST run `pnpm build`, `pnpm typecheck`, and `pnpm test`, in that order.
 
 `typecheck` and `build` MUST skip `@specd/public-web`.
 
