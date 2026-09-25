@@ -17,6 +17,17 @@ const publishShapedWorkerConsumer = join(
   'test/fixtures/publish-shaped-worker-consumer.ts',
 )
 
+/** `execFileSync('pnpm')` cannot resolve `pnpm.cmd` unless Windows uses a shell. */
+function runPnpm(args: readonly string[], cwd: string): void {
+  const command = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm'
+  execFileSync(command, args, {
+    cwd,
+    stdio: 'pipe',
+    shell: process.platform === 'win32',
+    windowsHide: true,
+  })
+}
+
 describe('@specd/sdk barrel', () => {
   it('exports SDK_VERSION matching package.json', () => {
     expect(sdk.SDK_VERSION).toBe(packageJson.version)
@@ -93,15 +104,11 @@ describe('@specd/sdk barrel', () => {
   })
 
   it('compiles every documented worker contract and failure from the built package entrypoint', () => {
-    execFileSync('pnpm', ['--filter', '@specd/sdk', 'build'], {
-      cwd: join(packageRoot, '../..'),
-      stdio: 'pipe',
-    })
+    runPnpm(['--filter', '@specd/sdk', 'build'], join(packageRoot, '../..'))
     expect(existsSync(join(packageRoot, 'dist/index.js'))).toBe(true)
     expect(existsSync(join(packageRoot, 'dist/index.d.ts'))).toBe(true)
 
-    execFileSync(
-      'pnpm',
+    runPnpm(
       [
         'exec',
         'tsc',
@@ -116,7 +123,7 @@ describe('@specd/sdk barrel', () => {
         '--skipLibCheck',
         publishShapedWorkerConsumer,
       ],
-      { cwd: packageRoot, stdio: 'pipe' },
+      packageRoot,
     )
   }, 15_000)
 
