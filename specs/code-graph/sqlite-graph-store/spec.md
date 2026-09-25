@@ -47,7 +47,11 @@ to these invariants:
    MUST NOT claim a hard wall-clock bound while native code is executing.
 7. SQLite runtime configuration crossing the boundary MUST use a serializable
    `SqliteRuntimeDescriptor`. A custom `modulePath` MAY select a compatible
-   runtime binding. Internal worker-path test overrides MUST NOT be public options.
+   runtime binding. When `modulePath` is an absolute filesystem path, the loader
+   MUST convert it to a `file:` URL before dynamic `import()` so Windows
+   drive-letter paths are not misread as URL schemes. Package specifiers and
+   already-qualified `file:`, `data:`, and `node:` URLs MUST pass through unchanged.
+   Internal worker-path test overrides MUST NOT be public options.
 8. Unexpected worker error or exit MUST fault the store and reject outstanding
    operations with `StoreWorkerError`. Recovery is explicit `close()` then
    `open()`; the store MUST NOT silently restart.

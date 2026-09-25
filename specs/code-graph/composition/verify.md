@@ -101,6 +101,7 @@
 - **WHEN** `createCodeGraphProvider` or `createSqliteGraphStoreFactory` is configured with that descriptor
 - **THEN** the factory creates the provider synchronously without error
 - **AND** the descriptor is passed to the underlying SQLite worker during `open()`
+- **AND** an absolute filesystem `modulePath` is loaded via a `file:` URL so Windows drive-letter paths succeed
 
 ### Requirement: Package exports
 

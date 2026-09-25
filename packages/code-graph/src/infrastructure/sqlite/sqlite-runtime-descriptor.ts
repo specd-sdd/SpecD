@@ -5,7 +5,12 @@
  * across process and worker boundaries.
  */
 export interface SqliteRuntimeDescriptor {
-  /** Optional custom path or specifier to load the SQLite database module. */
+  /**
+   * Optional custom path or specifier to load the SQLite database module.
+   * Absolute filesystem paths are converted to `file:` URLs before dynamic import
+   * so Windows drive-letter paths load correctly. Package names and already-qualified
+   * `file:`, `data:`, and `node:` URLs are used as-is.
+   */
   readonly modulePath?: string | undefined
 }
 

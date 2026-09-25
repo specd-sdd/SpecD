@@ -86,7 +86,7 @@ The built-in graph-store registry SHALL contain exactly the `sqlite` backend. Th
 
 `graphStoreFactories` SHALL remain a supported additive registration seam for future graph-store plugins. External factories MUST obey the same lifecycle and storage-root contract as the built-in factory. A registration whose id collides with the built-in `sqlite` id MUST fail deterministically and MUST NOT replace the built-in factory. The `Readonly<Record<string, GraphStoreFactory>>` input structurally provides at most one external factory per id.
 
-`createSqliteGraphStoreFactory()` SHALL accept `SqliteGraphStoreFactoryOptions`, including an optional serializable `SqliteRuntimeDescriptor`. Factory creation MUST remain synchronous. Native SQLite module loading, worker startup, schema preparation, and runtime-specific binding resolution MUST happen during `open()`, not during `createCodeGraphProvider(...)`.
+`createSqliteGraphStoreFactory()` SHALL accept `SqliteGraphStoreFactoryOptions`, including an optional serializable `SqliteRuntimeDescriptor`. Factory creation MUST remain synchronous. Native SQLite module loading, worker startup, schema preparation, and runtime-specific binding resolution MUST happen during `open()`, not during `createCodeGraphProvider(...)`. Absolute `modulePath` values MUST be converted to `file:` URLs before dynamic import so Windows drive-letter paths load correctly.
 
 `CodeGraphProvider` SHALL be a type-only public interface describing the provider lifecycle and query surface. The concrete implementation class, its constructor, `GraphStore`, worker protocol, and `IndexCodeGraph` inputs MUST remain internal to the package. Callers MUST obtain the interface only from `createCodeGraphProvider(...)` and MUST NOT construct a provider directly.
 

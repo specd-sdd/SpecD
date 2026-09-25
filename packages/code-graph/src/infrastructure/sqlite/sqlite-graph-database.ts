@@ -1,5 +1,6 @@
 import { mkdirSync, rmSync } from 'node:fs'
-import { join } from 'node:path'
+import { isAbsolute, join } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { StoreNotOpenError } from '../../domain/errors/store-not-open-error.js'
 import { GraphSchemaIncompatibleError } from '../../domain/errors/graph-schema-incompatible-error.js'
 import {
@@ -103,6 +104,24 @@ const SYMBOL_DEPENDENCY_RELATION_TYPES = [
 const SQLITE_BATCH_PARAMETER_LIMIT = 900
 const SYMBOL_ROW_COLUMNS =
   'id, name, kind, file_path, parent_id, line, column_number, end_line, end_column, selection_start_line, selection_start_column, selection_end_line, selection_end_column, comment'
+
+/**
+ * Converts a SqliteRuntimeDescriptor modulePath into a dynamic-import target.
+ * Absolute filesystem paths become `file:` URLs so Windows drive letters are not
+ * misread as URL schemes. Package specifiers and already-qualified URLs pass through.
+ * @param modulePath - Path or module specifier from the runtime descriptor.
+ * @returns Specifier safe for `import()`.
+ */
+export function resolveSqliteModuleImportTarget(modulePath: string): string {
+  const trimmed = modulePath.trim()
+  if (trimmed.startsWith('file:') || trimmed.startsWith('data:') || trimmed.startsWith('node:')) {
+    return trimmed
+  }
+  if (isAbsolute(trimmed)) {
+    return pathToFileURL(trimmed).href
+  }
+  return trimmed
+}
 
 /** Raw SQLite row projected into a domain symbol. */
 interface SymbolRow {
@@ -330,7 +349,8 @@ export class SQLiteGraphDatabase {
     runtime?: SqliteRuntimeDescriptor,
   ): Promise<SqliteDatabaseModule> {
     if (runtime?.modulePath && runtime.modulePath.trim().length > 0) {
-      return (await import(runtime.modulePath)) as unknown as SqliteDatabaseModule
+      const importTarget = resolveSqliteModuleImportTarget(runtime.modulePath)
+      return (await import(importTarget)) as unknown as SqliteDatabaseModule
     }
     return (await import('better-sqlite3')) as unknown as SqliteDatabaseModule
   }

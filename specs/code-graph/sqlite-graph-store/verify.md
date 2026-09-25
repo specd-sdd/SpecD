@@ -59,6 +59,14 @@
 - **WHEN** `SQLiteGraphStore.open()` starts the worker
 - **THEN** the worker dynamically loads the specified SQLite module inside its execution context without requiring function-valued loaders across IPC
 
+#### Scenario: Absolute filesystem modulePath uses a file URL for dynamic import
+
+- **GIVEN** a `SqliteRuntimeDescriptor` whose `modulePath` is an absolute filesystem path, including a Windows drive-letter path
+- **WHEN** the SQLite runtime module is loaded during `open()`
+- **THEN** the path is converted to a `file:` URL before dynamic `import()`
+- **AND** package specifiers and already-qualified `file:`, `data:`, and `node:` URLs are imported unchanged
+- **AND** a resolvable absolute path loads the module successfully
+
 #### Scenario: Deterministic error propagation on unexpected worker termination and manual recovery
 
 - **GIVEN** an open `SQLiteGraphStore` with in-flight and pending operations

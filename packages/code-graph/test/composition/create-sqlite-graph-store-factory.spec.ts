@@ -3,9 +3,10 @@ import { createRequire } from 'node:module'
 import { existsSync, mkdtempSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { createSqliteGraphStoreFactory } from '../../src/composition/create-sqlite-graph-store-factory.js'
 import { InvalidGraphStoreConfigurationError } from '../../src/domain/errors/invalid-graph-store-configuration-error.js'
+import { resolveSqliteModuleImportTarget } from '../../src/infrastructure/sqlite/sqlite-graph-database.js'
 import { resolveSqliteWorkerPath } from '../../src/infrastructure/sqlite/resolve-worker-path.js'
 
 let tempDir: string | undefined
@@ -20,6 +21,13 @@ afterEach(() => {
 })
 
 describe('createSqliteGraphStoreFactory', () => {
+  it('converts absolute modulePath values to file URLs for dynamic import', () => {
+    const absolutePath = join(tmpdir(), 'better-sqlite3-binding.js')
+    expect(resolveSqliteModuleImportTarget(absolutePath)).toBe(pathToFileURL(absolutePath).href)
+    expect(resolveSqliteModuleImportTarget('better-sqlite3')).toBe('better-sqlite3')
+    expect(resolveSqliteModuleImportTarget('file:///tmp/custom.js')).toBe('file:///tmp/custom.js')
+  })
+
   it('constructs an openable SQLite store by default', async () => {
     tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-factory-default-'))
     const factory = createSqliteGraphStoreFactory()
