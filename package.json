@@ -60,15 +60,5 @@
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.58.2",
     "vitest": "^4.1.10"
-  },
-  "lint-staged": {
-    "*.ts": [
-      "eslint --fix",
-      "prettier --write",
-      "bash -c 'pnpm typecheck'"
-    ],
-    "*.{json,yaml,yml,md}": [
-      "prettier --write"
-    ]
   }
 }
