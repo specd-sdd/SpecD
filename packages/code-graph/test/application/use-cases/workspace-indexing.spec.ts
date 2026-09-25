@@ -4,7 +4,7 @@ import { makeListResult, makeMockSpecRepository } from '../../helpers/make-mock-
 
 const makeMockRepo = makeMockSpecRepository
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync, utimesSync } from 'node:fs'
-import { join, dirname, resolve } from 'node:path'
+import { join, dirname, resolve, sep } from 'node:path'
 import { tmpdir } from 'node:os'
 import { SpecRepository, Spec, SpecPath } from '@specd/core'
 import { IndexCodeGraph } from '../../../src/application/use-cases/index-code-graph.js'
@@ -48,6 +48,24 @@ function createWorkspaceDir(
 const registry = new AdapterRegistry()
 registry.register(new TypeScriptLanguageAdapter())
 
+/**
+ * In-memory manifest port keyed by absolute paths from `resolve`.
+ * Directory membership uses the platform separator so Windows keys match.
+ * @param files - Absolute manifest path to file text.
+ * @returns A `ResolutionManifestSource` over that map.
+ */
+function manifestSource(files: Map<string, string>): ResolutionManifestSource {
+  return {
+    directoryExists: (path) => {
+      const dir = resolve(path)
+      const prefix = dir.endsWith(sep) ? dir : `${dir}${sep}`
+      return [...files.keys()].some((file) => file === dir || file.startsWith(prefix))
+    },
+    isRegularFile: (path) => files.has(resolve(path)),
+    readText: (path) => files.get(resolve(path)),
+  }
+}
+
 describe('Workspace indexing', () => {
   let tempDir: string
   let store: GraphStore
@@ -69,14 +87,7 @@ describe('Workspace indexing', () => {
     })
     const manifest = resolve(join(wsDir, 'package.json'))
     const files = new Map<string, string>([[manifest, '{\n  "name": "demo"\n}\n']])
-    const source: ResolutionManifestSource = {
-      directoryExists: (path) => {
-        const dir = resolve(path)
-        return [...files.keys()].some((file) => file === dir || file.startsWith(`${dir}/`))
-      },
-      isRegularFile: (path) => files.has(resolve(path)),
-      readText: (path) => files.get(resolve(path)),
-    }
+    const source = manifestSource(files)
     const indexer = new IndexCodeGraph(store, registry, source)
     const options: IndexOptions = {
       projectRoot: tempDir,
@@ -106,14 +117,7 @@ describe('Workspace indexing', () => {
     })
     const manifest = resolve(join(wsDir, 'package.json'))
     const files = new Map<string, string>([[manifest, '{"name":"before"}']])
-    const source: ResolutionManifestSource = {
-      directoryExists: (path) => {
-        const dir = resolve(path)
-        return [...files.keys()].some((file) => file === dir || file.startsWith(`${dir}/`))
-      },
-      isRegularFile: (path) => files.has(resolve(path)),
-      readText: (path) => files.get(resolve(path)),
-    }
+    const source = manifestSource(files)
     const indexer = new IndexCodeGraph(store, registry, source)
     const options: IndexOptions = {
       projectRoot: tempDir,
