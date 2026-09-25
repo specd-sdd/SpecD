@@ -30,13 +30,19 @@ describe('sidebar configuration', () => {
 
     const labels = docsSidebar.map((section) => section.label)
 
+    const gettingStarted = docsSidebar.find((section) => section.label === 'Getting Started')
+    const guide = docsSidebar.find((section) => section.label === 'Guide')
+
+    expect(gettingStarted?.items[0]).toBe('guide/what-is-specd')
+    expect(guide?.items[0]).toBe('guide/code-graph')
+
     expect(labels).toEqual([
       'Getting Started',
       'Guide',
       'CLI',
+      'Skills',
       'SDK',
       'Core',
-      'Configuration',
       'Schemas',
       'Code graph',
     ])
@@ -57,15 +63,9 @@ describe('sidebar configuration', () => {
       docsSidebar.find((section) => section.label === label)
 
     const coreSection = findSection('Core')
-    const configurationSection = findSection('Configuration')
     const schemasSection = findSection('Schemas')
 
     expect(coreSection?.items).toContainEqual({
-      type: 'category',
-      label: 'Examples',
-      items: expect.any(Array),
-    })
-    expect(configurationSection?.items).toContainEqual({
       type: 'category',
       label: 'Examples',
       items: expect.any(Array),

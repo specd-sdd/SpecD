@@ -30,27 +30,32 @@ schema: '@specd/schema-std'
 workspaces:
   default:
     specs:
-      adapter: fs
-      fs:
-        path: specs/
+      adapter:
+        type: fs
+        config:
+          path: specs/
 
 storage:
   changes:
-    adapter: fs
-    fs:
-      path: .specd/changes
+    adapter:
+      type: fs
+      config:
+        path: .specd/changes
   drafts:
-    adapter: fs
-    fs:
-      path: .specd/drafts
+    adapter:
+      type: fs
+      config:
+        path: .specd/drafts
   discarded:
-    adapter: fs
-    fs:
-      path: .specd/discarded
+    adapter:
+      type: fs
+      config:
+        path: .specd/discarded
   archive:
-    adapter: fs
-    fs:
-      path: .specd/archive
+    adapter:
+      type: fs
+      config:
+        path: .specd/archive
 ```
 
 Every other field covered in this guide is optional. Start here and add what you need.
@@ -355,28 +360,34 @@ In a monorepo or multi-repo setup, you can declare workspaces that point elsewhe
 workspaces:
   default:
     specs:
-      adapter: fs
-      fs:
-        path: specs/
+      adapter:
+        type: fs
+        config:
+          path: specs/
 
   payments:
     specs:
-      adapter: fs
-      fs:
-        path: packages/payments/specs
+      adapter:
+        type: fs
+        config:
+          path: packages/payments/specs
     codeRoot: packages/payments
     ownership: owned
 
   platform:
     specs:
-      adapter: fs
-      fs:
-        path: ../platform-repo/specd/specs
+      adapter:
+        type: fs
+        config:
+          path: ../platform-repo/specd/specs
     codeRoot: ../platform-repo
     ownership: readOnly
 ```
 
 `codeRoot` is required for any workspace that is not `default` — there is no sensible default.
+
+> [!IMPORTANT]
+> The workspace identifier `'root'` is reserved for project-global graph identities and cannot be used as a workspace name in `workspaces`.
 
 The `ownership` field describes the project's relationship with each workspace's specs:
 
@@ -388,6 +399,26 @@ The `ownership` field describes the project's relationship with each workspace's
 
 `readOnly` is the default for non-`default` workspaces. Use it for external dependencies whose specs you want in context but do not control.
 
+### Custom spec metadata location (`metadataPath`)
+
+By default, spec metadata (`metadata.json`, validation status cache) is resolved automatically:
+
+- For internal workspaces: `{specdPath}/metadata`
+- For external workspaces: The nearest `.specd/metadata` traversing upwards from `codeRoot`
+
+You can customize this location on the specs adapter via `metadataPath`:
+
+```yaml
+workspaces:
+  payments:
+    specs:
+      adapter:
+        type: fs
+        config:
+          path: packages/payments/specs
+          metadataPath: packages/payments/.specd/metadata
+```
+
 ### Workspace prefixes
 
 Spec IDs always use the form `workspace:capability-path`. A spec in the `payments` workspace at `specs/checkout.md` has the ID `payments:checkout`. If you want every spec in a workspace to live under a leading path segment — for example to mirror a directory structure — you can declare `prefix`:
@@ -397,9 +428,10 @@ workspaces:
   default:
     prefix: _global
     specs:
-      adapter: fs
-      fs:
-        path: specs/_global
+      adapter:
+        type: fs
+        config:
+          path: specs/_global
 ```
 
 With this configuration, specs under `specs/_global/` are addressed as `default:_global/architecture`.
@@ -409,6 +441,8 @@ With this configuration, specs under `specs/_global/` are addressed as `default:
 - workspace name: `default`
 - prefix: `_global`
 - resulting spec ID: `default:_global/architecture`
+
+Each prefix segment must match `/^[a-z0-9_][a-z0-9_-]*$/`. Multi-segment prefixes (e.g. `shared/utils`) are separated by `/`, without leading or trailing slashes.
 
 Concrete example:
 
@@ -429,13 +463,15 @@ Workspaces can optionally declare their own schema repository using the `schemas
 workspaces:
   default:
     specs:
-      adapter: fs
-      fs:
-        path: specs/
+      adapter:
+        type: fs
+        config:
+          path: specs/
     schemas:
-      adapter: fs
-      fs:
-        path: .specd/schemas
+      adapter:
+        type: fs
+        config:
+          path: .specd/schemas
 ```
 
 - When declared, schemas in that directory can be referenced via `#workspace:schema-name` (or `#schema-name` for `default`).
@@ -522,9 +558,10 @@ workspaces:
 
     core:
       specs:
-        adapter: fs
-        fs:
-          path: specs/core
+        adapter:
+          type: fs
+          config:
+            path: specs/core
       codeRoot: packages/core
   ```
 
@@ -541,21 +578,25 @@ workspaces:
 ```yaml
 storage:
   changes:
-    adapter: fs
-    fs:
-      path: .specd/changes
+    adapter:
+      type: fs
+      config:
+        path: .specd/changes
   drafts:
-    adapter: fs
-    fs:
-      path: .specd/drafts
+    adapter:
+      type: fs
+      config:
+        path: .specd/drafts
   discarded:
-    adapter: fs
-    fs:
-      path: .specd/discarded
+    adapter:
+      type: fs
+      config:
+        path: .specd/discarded
   archive:
-    adapter: fs
-    fs:
-      path: .specd/archive
+    adapter:
+      type: fs
+      config:
+        path: .specd/archive
 ```
 
 Each directory holds changes in a different state:
@@ -573,12 +614,13 @@ Every workspace and storage declaration is a named adapter binding:
 
 ```yaml
 specs:
-  adapter: fs
-  fs:
-    path: specs/
+  adapter:
+    type: fs
+    config:
+      path: specs/
 ```
 
-The built-in path is `fs`, but `createKernel(config, options)` and `createKernelBuilder(config)` can register additive storage factories under other adapter names. The config loader preserves the selected adapter name and its opaque config block; the kernel then validates that the named factory exists in the merged registry.
+The built-in path is `fs`, but `createKernel(config, options)` and `createKernelBuilder(config)` can register additive storage factories under other adapter names. The config loader preserves the selected adapter name and its configuration block; the kernel then validates that the named factory exists in the merged registry.
 
 That split is deliberate:
 
@@ -591,27 +633,27 @@ By default, `specd project init` adds `.specd/drafts/` and `.specd/discarded/` t
 
 ### Organising the archive
 
-By default, archived changes are stored with the name `{{change.archivedName}}` — a slug prefixed with the archive date, for example `2024-01-15-add-auth-flow`. You can customise this with the `pattern` field:
+By default, archived changes are stored with the name `{{change.archivedName}}` — a timestamped directory name in the format `YYYYMMDD-HHmmss-<name>`, for example `20260924-143511-add-auth-flow`. You can customise this hierarchy with the `pattern` field using direct token replacement:
 
 ```yaml
 archive:
-  adapter: fs
-  fs:
-    path: .specd/archive
-    pattern: '{{year}}/{{change.archivedName}}'
+  adapter:
+    type: fs
+    config:
+      path: .specd/archive
+      pattern: '{{year}}/{{month}}/{{change.archivedName}}'
 ```
 
-This organises archived changes into yearly subdirectories.
+This organises archived changes into structured subdirectories (e.g. yearly and monthly folders).
 
-| Variable                  | Value                                    | Example                    |
-| :------------------------ | :--------------------------------------- | :------------------------- |
-| `{{change.archivedName}}` | Full archived directory name (default)   | `2024-01-15-add-auth-flow` |
-| `{{change.name}}`         | Change slug name                         | `add-auth-flow`            |
-| `{{year}}`                | Four-digit calendar year at archive time | `2024`                     |
-| `{{date}}`                | ISO calendar date at archive time        | `2024-01-15`               |
-
-> [!NOTE]
-> `{{change.workspace}}` is not supported because changes in SpecD can touch multiple workspaces simultaneously and have no single primary workspace. Use `{{change.name}}` or `{{change.archivedName}}` instead.
+| Variable                  | Value                                                             | Example                         |
+| :------------------------ | :---------------------------------------------------------------- | :------------------------------ |
+| `{{change.archivedName}}` | Full timestamped directory name (default)                         | `20260924-143511-add-auth-flow` |
+| `{{change.name}}`         | Change slug name                                                  | `add-auth-flow`                 |
+| `{{year}}`                | Four-digit calendar year at archive time (`YYYY`)                 | `2026`                          |
+| `{{month}}`               | Two-digit calendar month at archive time (`MM`, `01`–`12`)        | `09`                            |
+| `{{day}}`                 | Two-digit calendar day of month at archive time (`DD`, `01`–`31`) | `24`                            |
+| `{{date}}`                | Calendar date at archive time (`YYYY-MM-DD`)                      | `2026-09-24`                    |
 
 ---
 
@@ -625,12 +667,15 @@ The `context` field at the top level injects content before any spec content, fo
 
 ```yaml
 context:
-  - file: AGENTS.md
-  - instruction: 'Always prefer editing existing files over creating new ones.'
+  - id: agents-guidance
+    file: AGENTS.md
+  - id: edit-preference
+    instruction: 'Always prefer editing existing files over creating new ones.'
 ```
 
 - `file` entries are read at compile time and injected verbatim. If the file does not exist, a warning is emitted and the entry is skipped.
 - `instruction` entries are injected as-is.
+- `id` is an optional unique identifier for the entry. Specifying an `id` allows downstream cascade layers (such as `specd.local.yaml`) to cleanly remove or replace the entry via `remove.context: [{ id: 'edit-preference' }]`.
 
 This is the right place for project-wide agent guidance — coding conventions, team norms, architectural principles.
 
@@ -960,6 +1005,20 @@ plugins:
   - _Default:_ None (no third-party plugins loaded; built-in plugins activate via project defaults).
   - _Cascade behavior:_ Array — an overlay config **appends** new plugin declarations to the inherited list. To remove an inherited plugin in an overlay config, use `remove.plugins.agents: [{ name: '@specd/plugin-agent-copilot' }]`.
 
+### Synchronizing plugin assets with `specd project update`
+
+Declaring agent plugins in `specd.yaml` registers their configuration in the project, but does not alter files on disk automatically. To synthesize, regenerate, or update the agent instruction files (`AGENTS.md`, `CLAUDE.md`, `.github/copilot-instructions.md`, etc.) and skill assets corresponding to declared plugins, run:
+
+```bash
+specd project update
+```
+
+- **When `specd project update` is required:**
+  - After manually editing `plugins.agents` in `specd.yaml` (e.g. adding, removing, or reconfiguring plugins by hand rather than using `specd plugins install`).
+  - After upgrading SpecD CLI or agent plugin packages (`pnpm update @specd/cli` or `@specd/plugin-agent-*`), to regenerate agent instructions and skill templates with the newest upstream definitions.
+- **When `specd project update` is NOT required:**
+  - For normal configuration changes (`workspaces`, `codeRoot`, `ownership`, `specs`, `archivePattern`, `contextIncludeSpecs`, etc.). SpecD reloads `specd.yaml` dynamically on every command execution, so general configuration updates take effect immediately in real time without needing any update command.
+
 ---
 
 ## Config cascade and local variants
@@ -1042,11 +1101,10 @@ The following conditions are hard errors — SpecD exits immediately:
 
 #### Warnings that allow startup to proceed
 
-| Condition                                                                     | Warning Behavior                                                               |
-| :---------------------------------------------------------------------------- | :----------------------------------------------------------------------------- |
-| Duplicate workspace names                                                     | YAML parser retains last-wins; the duplicate is flagged as a probable error.   |
-| Unknown workspace qualifier in a context pattern (runtime)                    | A typo silently excludes specs; warned at runtime.                             |
-| Legacy configuration format declared (`adapter: fs` with sibling `fs:` block) | Emits a deprecation warning advising migration to `adapter: { type, config }`. |
+| Condition                                                  | Warning Behavior                                                             |
+| :--------------------------------------------------------- | :--------------------------------------------------------------------------- |
+| Duplicate workspace names                                  | YAML parser retains last-wins; the duplicate is flagged as a probable error. |
+| Unknown workspace qualifier in a context pattern (runtime) | A typo silently excludes specs; warned at runtime.                           |
 
 #### Commands that skip validation entirely
 
@@ -1062,52 +1120,53 @@ The following lightweight or bootstrap commands do not require a valid `specd.ya
 
 The table below catalogs every configuration option supported by `specd.yaml` and its cascade layers, including its level, data type, default value, how it behaves under the layered configuration cascade (whether overlay values **replace** base scalars, **append** to arrays, or **deep-merge** objects), and its operational effect.
 
-| Option                                     | Level         | Type                                                            | Default                                          | Cascade Rule                                  | Effect & Description                                                                                                                                                             |
-| :----------------------------------------- | :------------ | :-------------------------------------------------------------- | :----------------------------------------------- | :-------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `schema`                                   | Project       | `string`                                                        | _(Required)_                                     | **Replaces**                                  | Reference to the active workflow schema (e.g. `'@specd/schema-std'`, `'#workspace:schema'`, `'./path'`). Overridden by `SPECD_SCHEMA`.                                           |
-| `specdPath`                                | Project       | `string`                                                        | `'.specd'`                                       | **Replaces**                                  | Directory for SpecD state and change tracking directories (`changes/`, `drafts/`, `discarded/`, `archive/`).                                                                     |
-| `configPath`                               | Project       | `string`                                                        | `'.specd/config'`                                | **Replaces**                                  | Root directory for backend-owned operational data (graph databases, logs, temporary scratch files).                                                                              |
-| `workspaces`                               | Project       | `Record<string, Workspace>`                                     | `{ default: ... }`                               | **Deep-merges**                               | Map of workspace definitions. Must contain at least `default`. Merged per workspace name; remove with `remove.workspaces`.                                                       |
-| `workspaces.<name>.specs`                  | Workspace     | `AdapterBinding`                                                | _(Required)_                                     | **Deep-merges**                               | Named adapter binding for specs repository (e.g. `adapter: fs`, `fs.path: specs/`).                                                                                              |
-| `workspaces.<name>.prefix`                 | Workspace     | `string`                                                        | `null` (None)                                    | **Replaces**                                  | Logical path prefix prepended to all spec IDs in this workspace (e.g. `_global` -> `default:_global/spec`).                                                                      |
-| `workspaces.<name>.schemas`                | Workspace     | `AdapterBinding`                                                | `null` (None)                                    | **Deep-merges**                               | Optional adapter binding for workspace-local custom schemas.                                                                                                                     |
-| `workspaces.<name>.codeRoot`               | Workspace     | `string`                                                        | `'.'` for `default`, _(Required)_ for others     | **Replaces**                                  | Filesystem directory where implementation source code lives relative to `specd.yaml`.                                                                                            |
-| `workspaces.<name>.ownership`              | Workspace     | `'owned' \| 'shared' \| 'readOnly'`                             | `'owned'` for `default`, `'readOnly'` for others | **Replaces**                                  | Governance relationship: `owned` (fully mutable), `shared` (co-owned), or `readOnly` (context-only).                                                                             |
-| `workspaces.<name>.contextIncludeSpecs`    | Workspace     | `string[]`                                                      | `[]` (None)                                      | **Appends**                                   | Patterns matching specs in this workspace that must be included in context when this workspace is active.                                                                        |
-| `workspaces.<name>.contextExcludeSpecs`    | Workspace     | `string[]`                                                      | `[]` (None)                                      | **Appends**                                   | Patterns matching specs in this workspace to exclude from context when this workspace is active.                                                                                 |
-| `workspaces.<name>.graph.respectGitignore` | Workspace     | `boolean`                                                       | `true`                                           | **Replaces**                                  | When `true`, Git-ignored files in `codeRoot` are skipped during code graph indexing. When `false`, they are discovered.                                                          |
-| `workspaces.<name>.graph.excludePaths`     | Workspace     | `string[]`                                                      | `[]` (None)                                      | **Appends**                                   | Gitignore-syntax patterns relative to `codeRoot` excluded from graph indexing. Additive over project excludes.                                                                   |
-| `workspaces.<name>.graph.allowedPaths`     | Workspace     | `string[]`                                                      | `[]` (Entire codeRoot)                           | **Appends**                                   | Inclusions restricting code graph index visibility to specific subdirectories within `codeRoot`.                                                                                 |
-| `actorProvider`                            | Project       | `string`                                                        | Auto-detected                                    | **Replaces**                                  | Forces a specific VCS actor identity provider (e.g. `'git'`, `'hg'`). Overridden by `SPECD_ACTOR_PROVIDER`.                                                                      |
-| `privacy.mode`                             | Project       | `'hash' \| 'mask' \| 'anonymous'`                               | `null` (None)                                    | **Replaces**                                  | Identity obfuscation strategy for manifests and archives. Overridden by `SPECD_PRIVACY_MODE`.                                                                                    |
-| `privacy.salt`                             | Project       | `string`                                                        | `null`                                           | **Replaces**                                  | Secret salt string required when `privacy.mode` is `'hash'`. Overridden by `SPECD_PRIVACY_SALT`.                                                                                 |
-| `privacy.excludeActors`                    | Project       | `string[]`                                                      | `['specd', 'system@getspecd.dev']`               | **Appends** (cascade) / **Replaces defaults** | Case-insensitive actors exempt from obfuscation. When specified, replaces built-in defaults (`specd`, `system@getspecd.dev`). Overlay files in cascade append to base config.    |
-| `privacy.allowedMetadataKeys`              | Project       | `string[]`                                                      | `[]` (Strips all)                                | **Appends**                                   | Whitelist of non-PII metadata keys preserved under active privacy modes.                                                                                                         |
-| `storage.changes`                          | Project       | `AdapterBinding`                                                | `.specd/changes`                                 | **Deep-merges**                               | Named adapter binding for in-progress change directories.                                                                                                                        |
-| `storage.drafts`                           | Project       | `AdapterBinding`                                                | `.specd/drafts`                                  | **Deep-merges**                               | Named adapter binding for shelved drafts.                                                                                                                                        |
-| `storage.discarded`                        | Project       | `AdapterBinding`                                                | `.specd/discarded`                               | **Deep-merges**                               | Named adapter binding for abandoned changes.                                                                                                                                     |
-| `storage.archive`                          | Project       | `AdapterBinding`                                                | `.specd/archive`                                 | **Deep-merges**                               | Named adapter binding for permanent change archive records.                                                                                                                      |
-| `storage.archive.pattern`                  | Project       | `string`                                                        | `'{{change.archivedName}}'`                      | **Replaces**                                  | Nunjucks template defining archive subfolder hierarchy (e.g. `'{{year}}/{{change.archivedName}}'`).                                                                              |
-| `approvals.spec`                           | Project       | `boolean`                                                       | `false`                                          | **Replaces**                                  | When `true`, blocks `ready → implementing` until human reviewer records `specd changes approve-spec`.                                                                            |
-| `approvals.signoff`                        | Project       | `boolean`                                                       | `false`                                          | **Replaces**                                  | When `true`, blocks `done → archivable` until human reviewer records `specd changes signoff`.                                                                                    |
-| `graph.includePaths`                       | Project       | `string[]`                                                      | `[]` (None)                                      | **Appends**                                   | Global file globs included in code graph indexing under reserved `root:` namespace.                                                                                              |
-| `graph.excludePaths`                       | Project       | `string[]`                                                      | Built-in defaults                                | **Appends** (cascade) / **Replaces defaults** | Global file globs excluded from discovery. When specified, replaces built-in defaults (`node_modules/`, `.git/`, `dist/`, etc.). Overlay files in cascade append to base config. |
-| `logging.level`                            | Project       | `'trace' \| 'debug' \| 'info' \| 'warn' \| 'error' \| 'silent'` | `'info'`                                         | **Replaces**                                  | Minimum threshold for `{configPath}/log/specd.log`. Overridden by `SPECD_LOG_LEVEL`.                                                                                             |
-| `context`                                  | Project       | `ContextEntry[]`                                                | `[]` (None)                                      | **Appends**                                   | Static `{ file: string }` or `{ instruction: string }` blocks injected into every compiled context for AI agents.                                                                |
-| `contextIncludeSpecs`                      | Project       | `string[]`                                                      | `[]` (None)                                      | **Appends**                                   | Global spec inclusion patterns applied across all compiled contexts regardless of active workspace.                                                                              |
-| `contextExcludeSpecs`                      | Project       | `string[]`                                                      | `[]` (None)                                      | **Appends**                                   | Global spec exclusion patterns applied across all compiled contexts.                                                                                                             |
-| `contextMode`                              | Project       | `'list' \| 'summary' \| 'full' \| 'hybrid'`                     | `'summary'`                                      | **Replaces**                                  | Spec presentation format in compiled context. Overridden by `SPECD_CONTEXT_MODE`.                                                                                                |
-| `llmOptimizedContext`                      | Project       | `boolean`                                                       | `false`                                          | **Replaces**                                  | When `true`, prefers condensed descriptions from metadata cache. Overridden by `SPECD_LLM_OPTIMIZED`.                                                                            |
-| `schemaPlugins`                            | Project       | `string[]`                                                      | `[]` (None)                                      | **Appends**                                   | Schema package references merged into active schema prior to inline `schemaOverrides`.                                                                                           |
-| `schemaOverrides`                          | Project       | `SchemaOverrides`                                               | `null` (None)                                    | **Deep-merges**                               | Inline schema modification operations: `create`, `remove`, `set`, `append`, `prepend`.                                                                                           |
-| `invalidationPolicy`                       | Project       | `'none' \| 'surgical' \| 'downstream' \| 'global'`              | `'downstream'`                                   | **Replaces**                                  | Default artifact invalidation propagation policy assigned to newly created changes.                                                                                              |
-| `plugins.agents`                           | Project       | `PluginEntry[]`                                                 | `[]` (None)                                      | **Appends**                                   | Registered agent plugin definitions (`name` and optional `config`). Remove with `remove.plugins.agents`.                                                                         |
-| `extends`                                  | Cascade Layer | `true \| string`                                                | `null` (Standalone)                              | _Special_                                     | Controls inheritance: `true` inherits from preceding layer; `<path>` inherits from specific active file.                                                                         |
-| `remove.root`                              | Cascade Layer | `string[]`                                                      | `null`                                           | _Removal_                                     | Drops inherited top-level fields (e.g. `contextExcludeSpecs`, `actorProvider`). Cannot remove `schema`.                                                                          |
-| `remove.workspaces`                        | Cascade Layer | `string[]`                                                      | `null`                                           | _Removal_                                     | Drops inherited workspace definitions by name.                                                                                                                                   |
-| `remove.storage`                           | Cascade Layer | `string[]`                                                      | `null`                                           | _Removal_                                     | Drops inherited storage adapter bindings by key (`changes`, `drafts`, `discarded`, `archive`).                                                                                   |
-| `remove.context`                           | Cascade Layer | `RemovalMatcher[]`                                              | `null`                                           | _Removal_                                     | Drops matching inherited context injection entries by `id`, `file`, or `instruction`.                                                                                            |
-| `remove.plugins.agents`                    | Cascade Layer | `{ name: string }[]`                                            | `null`                                           | _Removal_                                     | Drops inherited agent plugin declarations by package name.                                                                                                                       |
+| Option                                     | Level         | Type                                                            | Default                                          | Cascade Rule                                  | Effect & Description                                                                                                                                                                                                                |
+| :----------------------------------------- | :------------ | :-------------------------------------------------------------- | :----------------------------------------------- | :-------------------------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `schema`                                   | Project       | `string`                                                        | _(Required)_                                     | **Replaces**                                  | Reference to the active workflow schema (e.g. `'@specd/schema-std'`, `'#workspace:schema'`, `'./path'`). Overridden by `SPECD_SCHEMA`.                                                                                              |
+| `specdPath`                                | Project       | `string`                                                        | `'.specd'`                                       | **Replaces**                                  | Directory for SpecD state and change tracking directories (`changes/`, `drafts/`, `discarded/`, `archive/`).                                                                                                                        |
+| `configPath`                               | Project       | `string`                                                        | `'.specd/config'`                                | **Replaces**                                  | Root directory for backend-owned operational data (graph databases, logs, temporary scratch files).                                                                                                                                 |
+| `workspaces`                               | Project       | `Record<string, Workspace>`                                     | `{ default: ... }`                               | **Deep-merges**                               | Map of workspace definitions. Must contain at least `default`. Merged per workspace name; remove with `remove.workspaces`. Identifier `'root'` is reserved and rejected.                                                            |
+| `workspaces.<name>.specs`                  | Workspace     | `AdapterBinding`                                                | _(Required)_                                     | **Deep-merges**                               | Named adapter binding for specs repository (e.g. `adapter: { type: 'fs', config: { path: 'specs/' } }`).                                                                                                                            |
+| `workspaces.<name>.specs.metadataPath`     | Workspace     | `string`                                                        | `{specdPath}/metadata`                           | **Replaces**                                  | Optional custom path for workspace spec metadata and validation status cache (`metadata.json`). Resolves to nearest `.specd/metadata` upwards for external workspaces.                                                              |
+| `workspaces.<name>.prefix`                 | Workspace     | `string`                                                        | `null` (None)                                    | **Replaces**                                  | Logical path prefix prepended to all spec IDs in this workspace (e.g. `_global` -> `default:_global/spec`). Must match `/^[a-z0-9_][a-z0-9_-]*$/` per segment.                                                                      |
+| `workspaces.<name>.schemas`                | Workspace     | `AdapterBinding`                                                | `null` (None)                                    | **Deep-merges**                               | Optional adapter binding for workspace-local custom schemas.                                                                                                                                                                        |
+| `workspaces.<name>.codeRoot`               | Workspace     | `string`                                                        | `'.'` for `default`, _(Required)_ for others     | **Replaces**                                  | Filesystem directory where implementation source code lives relative to `specd.yaml`.                                                                                                                                               |
+| `workspaces.<name>.ownership`              | Workspace     | `'owned' \| 'shared' \| 'readOnly'`                             | `'owned'` for `default`, `'readOnly'` for others | **Replaces**                                  | Governance relationship: `owned` (fully mutable), `shared` (co-owned), or `readOnly` (context-only).                                                                                                                                |
+| `workspaces.<name>.contextIncludeSpecs`    | Workspace     | `string[]`                                                      | `[]` (None)                                      | **Appends**                                   | Patterns matching specs in this workspace that must be included in context when this workspace is active.                                                                                                                           |
+| `workspaces.<name>.contextExcludeSpecs`    | Workspace     | `string[]`                                                      | `[]` (None)                                      | **Appends**                                   | Patterns matching specs in this workspace to exclude from context when this workspace is active.                                                                                                                                    |
+| `workspaces.<name>.graph.respectGitignore` | Workspace     | `boolean`                                                       | `true`                                           | **Replaces**                                  | When `true`, Git-ignored files in `codeRoot` are skipped during code graph indexing. When `false`, they are discovered.                                                                                                             |
+| `workspaces.<name>.graph.excludePaths`     | Workspace     | `string[]`                                                      | `[]` (None)                                      | **Appends**                                   | Gitignore-syntax patterns relative to `codeRoot` excluded from graph indexing. Additive over project excludes.                                                                                                                      |
+| `workspaces.<name>.graph.allowedPaths`     | Workspace     | `string[]`                                                      | `[]` (Entire codeRoot)                           | **Appends**                                   | Inclusions restricting code graph index visibility to specific subdirectories within `codeRoot`.                                                                                                                                    |
+| `actorProvider`                            | Project       | `string`                                                        | Auto-detected                                    | **Replaces**                                  | Forces a specific VCS actor identity provider (e.g. `'git'`, `'hg'`). Overridden by `SPECD_ACTOR_PROVIDER`.                                                                                                                         |
+| `privacy.mode`                             | Project       | `'hash' \| 'mask' \| 'anonymous'`                               | `null` (None)                                    | **Replaces**                                  | Identity obfuscation strategy for manifests and archives. Overridden by `SPECD_PRIVACY_MODE`.                                                                                                                                       |
+| `privacy.salt`                             | Project       | `string`                                                        | `null`                                           | **Replaces**                                  | Secret salt string required when `privacy.mode` is `'hash'`. Overridden by `SPECD_PRIVACY_SALT`.                                                                                                                                    |
+| `privacy.excludeActors`                    | Project       | `string[]`                                                      | `['specd', 'system@getspecd.dev']`               | **Appends** (cascade) / **Replaces defaults** | Case-insensitive actors exempt from obfuscation. When specified, replaces built-in defaults (`specd`, `system@getspecd.dev`). Overlay files in cascade append to base config.                                                       |
+| `privacy.allowedMetadataKeys`              | Project       | `string[]`                                                      | `[]` (Strips all)                                | **Appends**                                   | Whitelist of non-PII metadata keys preserved under active privacy modes.                                                                                                                                                            |
+| `storage.changes`                          | Project       | `AdapterBinding`                                                | `.specd/changes`                                 | **Deep-merges**                               | Named adapter binding for in-progress change directories.                                                                                                                                                                           |
+| `storage.drafts`                           | Project       | `AdapterBinding`                                                | `.specd/drafts`                                  | **Deep-merges**                               | Named adapter binding for shelved drafts.                                                                                                                                                                                           |
+| `storage.discarded`                        | Project       | `AdapterBinding`                                                | `.specd/discarded`                               | **Deep-merges**                               | Named adapter binding for abandoned changes.                                                                                                                                                                                        |
+| `storage.archive`                          | Project       | `AdapterBinding`                                                | `.specd/archive`                                 | **Deep-merges**                               | Named adapter binding for permanent change archive records.                                                                                                                                                                         |
+| `storage.archive.pattern`                  | Project       | `string`                                                        | `'{{change.archivedName}}'`                      | **Replaces**                                  | Direct token replacement pattern defining archive subfolder hierarchy (e.g. `'{{year}}/{{month}}/{{change.archivedName}}'`). Supports `{{year}}`, `{{month}}`, `{{day}}`, `{{date}}`, `{{change.name}}`, `{{change.archivedName}}`. |
+| `approvals.spec`                           | Project       | `boolean`                                                       | `false`                                          | **Replaces**                                  | When `true`, blocks `ready → implementing` until human reviewer records `specd changes approve-spec`.                                                                                                                               |
+| `approvals.signoff`                        | Project       | `boolean`                                                       | `false`                                          | **Replaces**                                  | When `true`, blocks `done → archivable` until human reviewer records `specd changes signoff`.                                                                                                                                       |
+| `graph.includePaths`                       | Project       | `string[]`                                                      | `[]` (None)                                      | **Appends**                                   | Global file globs included in code graph indexing under reserved `root:` namespace.                                                                                                                                                 |
+| `graph.excludePaths`                       | Project       | `string[]`                                                      | Built-in defaults                                | **Appends** (cascade) / **Replaces defaults** | Global file globs excluded from discovery. When specified, replaces built-in defaults (`node_modules/`, `.git/`, `dist/`, etc.). Overlay files in cascade append to base config.                                                    |
+| `logging.level`                            | Project       | `'trace' \| 'debug' \| 'info' \| 'warn' \| 'error' \| 'silent'` | `'info'`                                         | **Replaces**                                  | Minimum threshold for `{configPath}/log/specd.log`. Overridden by `SPECD_LOG_LEVEL`.                                                                                                                                                |
+| `context`                                  | Project       | `ContextEntry[]`                                                | `[]` (None)                                      | **Appends**                                   | Static `{ id?: string, file?: string }` or `{ id?: string, instruction?: string }` blocks injected into every compiled context for AI agents.                                                                                       |
+| `contextIncludeSpecs`                      | Project       | `string[]`                                                      | `[]` (None)                                      | **Appends**                                   | Global spec inclusion patterns applied across all compiled contexts regardless of active workspace.                                                                                                                                 |
+| `contextExcludeSpecs`                      | Project       | `string[]`                                                      | `[]` (None)                                      | **Appends**                                   | Global spec exclusion patterns applied across all compiled contexts.                                                                                                                                                                |
+| `contextMode`                              | Project       | `'list' \| 'summary' \| 'full' \| 'hybrid'`                     | `'summary'`                                      | **Replaces**                                  | Spec presentation format in compiled context. Overridden by `SPECD_CONTEXT_MODE`.                                                                                                                                                   |
+| `llmOptimizedContext`                      | Project       | `boolean`                                                       | `false`                                          | **Replaces**                                  | When `true`, prefers condensed descriptions from metadata cache. Overridden by `SPECD_LLM_OPTIMIZED`.                                                                                                                               |
+| `schemaPlugins`                            | Project       | `string[]`                                                      | `[]` (None)                                      | **Appends**                                   | Schema package references merged into active schema prior to inline `schemaOverrides`.                                                                                                                                              |
+| `schemaOverrides`                          | Project       | `SchemaOverrides`                                               | `null` (None)                                    | **Deep-merges**                               | Inline schema modification operations: `create`, `remove`, `set`, `append`, `prepend`.                                                                                                                                              |
+| `invalidationPolicy`                       | Project       | `'none' \| 'surgical' \| 'downstream' \| 'global'`              | `'downstream'`                                   | **Replaces**                                  | Default artifact invalidation propagation policy assigned to newly created changes.                                                                                                                                                 |
+| `plugins.agents`                           | Project       | `PluginEntry[]`                                                 | `[]` (None)                                      | **Appends**                                   | Registered agent plugin definitions (`name` and optional `config`). Remove with `remove.plugins.agents`.                                                                                                                            |
+| `extends`                                  | Cascade Layer | `true \| string`                                                | `null` (Standalone)                              | _Special_                                     | Controls inheritance: `true` inherits from preceding layer; `<path>` inherits from specific active file.                                                                                                                            |
+| `remove.root`                              | Cascade Layer | `string[]`                                                      | `null`                                           | _Removal_                                     | Drops inherited top-level fields (e.g. `contextExcludeSpecs`, `actorProvider`). Cannot remove `schema`.                                                                                                                             |
+| `remove.workspaces`                        | Cascade Layer | `string[]`                                                      | `null`                                           | _Removal_                                     | Drops inherited workspace definitions by name.                                                                                                                                                                                      |
+| `remove.storage`                           | Cascade Layer | `string[]`                                                      | `null`                                           | _Removal_                                     | Drops inherited storage adapter bindings by key (`changes`, `drafts`, `discarded`, `archive`).                                                                                                                                      |
+| `remove.context`                           | Cascade Layer | `RemovalMatcher[]`                                              | `null`                                           | _Removal_                                     | Drops matching inherited context injection entries by `id`, `file`, or `instruction`.                                                                                                                                               |
+| `remove.plugins.agents`                    | Cascade Layer | `{ name: string }[]`                                            | `null`                                           | _Removal_                                     | Drops inherited agent plugin declarations by package name.                                                                                                                                                                          |
 
 ---
 

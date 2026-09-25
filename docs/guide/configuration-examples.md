@@ -24,27 +24,32 @@ schema: '@specd/schema-std'
 workspaces:
   default:
     specs:
-      adapter: fs
-      fs:
-        path: specs/
+      adapter:
+        type: fs
+        config:
+          path: specs/
 
 storage:
   changes:
-    adapter: fs
-    fs:
-      path: .specd/changes
+    adapter:
+      type: fs
+      config:
+        path: .specd/changes
   drafts:
-    adapter: fs
-    fs:
-      path: .specd/drafts
+    adapter:
+      type: fs
+      config:
+        path: .specd/drafts
   discarded:
-    adapter: fs
-    fs:
-      path: .specd/discarded
+    adapter:
+      type: fs
+      config:
+        path: .specd/discarded
   archive:
-    adapter: fs
-    fs:
-      path: .specd/archive
+    adapter:
+      type: fs
+      config:
+        path: .specd/archive
 ```
 
 ### Key behaviors
@@ -81,36 +86,42 @@ schema: 'custom-workflow' # Resolves to .specd/schemas/custom-workflow/schema.ya
 workspaces:
   default:
     specs:
-      adapter: fs
-      fs:
-        path: specs/
+      adapter:
+        type: fs
+        config:
+          path: specs/
     schemas:
-      adapter: fs
-      fs:
-        path: .specd/schemas # Optional: this is the default path for 'default'
+      adapter:
+        type: fs
+        config:
+          path: .specd/schemas # Optional: this is the default path for 'default'
 
 storage:
   changes:
-    adapter: fs
-    fs:
-      path: .specd/changes
+    adapter:
+      type: fs
+      config:
+        path: .specd/changes
   drafts:
-    adapter: fs
-    fs:
-      path: .specd/drafts
+    adapter:
+      type: fs
+      config:
+        path: .specd/drafts
   discarded:
-    adapter: fs
-    fs:
-      path: .specd/discarded
+    adapter:
+      type: fs
+      config:
+        path: .specd/discarded
   archive:
-    adapter: fs
-    fs:
-      path: .specd/archive
+    adapter:
+      type: fs
+      config:
+        path: .specd/archive
 ```
 
 ### Key behaviors
 
-- **Schema reference:** Bare names (e.g. `'custom-workflow'`) or hashed names (e.g. `'#custom-workflow'`) resolve against `schemas.adapter.fs.path` of the `default` workspace.
+- **Schema reference:** Bare names (e.g. `'custom-workflow'`) or hashed names (e.g. `'#custom-workflow'`) resolve against `schemas.adapter.config.path` of the `default` workspace.
 - **Local versioning:** The schema is committed and versioned alongside your application code. Updates take effect immediately for new changes.
 
 ---
@@ -132,9 +143,10 @@ workspaces:
   default:
     prefix: _global
     specs:
-      adapter: fs
-      fs:
-        path: specs/_global
+      adapter:
+        type: fs
+        config:
+          path: specs/_global
     codeRoot: .
     ownership: owned
     graph:
@@ -152,9 +164,11 @@ workspaces:
 
   core:
     specs:
-      adapter: fs
-      fs:
-        path: specs/core
+      adapter:
+        type: fs
+        config:
+          path: specs/core
+          metadataPath: packages/core/.specd/metadata
     codeRoot: packages/core
     ownership: owned
     contextIncludeSpecs:
@@ -162,38 +176,44 @@ workspaces:
 
   cli:
     specs:
-      adapter: fs
-      fs:
-        path: specs/cli
+      adapter:
+        type: fs
+        config:
+          path: specs/cli
     codeRoot: packages/cli
     ownership: owned
 
   platform:
     specs:
-      adapter: fs
-      fs:
-        path: ../platform-core/specs
+      adapter:
+        type: fs
+        config:
+          path: ../platform-core/specs
     codeRoot: ../platform-core
     ownership: readOnly # Read-only: context only, modifications rejected
 
 storage:
   changes:
-    adapter: fs
-    fs:
-      path: .specd/changes
+    adapter:
+      type: fs
+      config:
+        path: .specd/changes
   drafts:
-    adapter: fs
-    fs:
-      path: .specd/drafts
+    adapter:
+      type: fs
+      config:
+        path: .specd/drafts
   discarded:
-    adapter: fs
-    fs:
-      path: .specd/discarded
+    adapter:
+      type: fs
+      config:
+        path: .specd/discarded
   archive:
-    adapter: fs
-    fs:
-      path: .specd/archive
-      pattern: '{{year}}/{{change.archivedName}}'
+    adapter:
+      type: fs
+      config:
+        path: .specd/archive
+        pattern: '{{year}}/{{month}}/{{change.archivedName}}'
 ```
 
 ### Key behaviors
@@ -202,7 +222,7 @@ storage:
 - **`ownership: readOnly`:** The coordinator can include specs from `platform` into compiled context for AI agents, but SpecD rejects changes that propose mutations to `platform` specs.
 - **`prefix: _global`:** Specs located under `specs/_global/architecture.md` are referenced with ID `default:_global/architecture`.
 - **Targeted context filters:** When `core` is active in a change, its `composition` specs are automatically pulled into context.
-- **Yearly archive folders:** Changes archive into `.specd/archive/2026/2026-09-24-my-change/`.
+- **Yearly and monthly archive folders:** Changes archive into `.specd/archive/2026/09/20260924-143511-my-change/`.
 
 ---
 
@@ -240,29 +260,34 @@ invalidationPolicy: downstream # Automatically reopen drifted files and their DA
 
 storage:
   changes:
-    adapter: fs
-    fs:
-      path: .specd/changes
+    adapter:
+      type: fs
+      config:
+        path: .specd/changes
   drafts:
-    adapter: fs
-    fs:
-      path: .specd/drafts
+    adapter:
+      type: fs
+      config:
+        path: .specd/drafts
   discarded:
-    adapter: fs
-    fs:
-      path: .specd/discarded
+    adapter:
+      type: fs
+      config:
+        path: .specd/discarded
   archive:
-    adapter: fs
-    fs:
-      path: .specd/archive
-      pattern: '{{year}}/{{change.name}}/{{change.archivedName}}'
+    adapter:
+      type: fs
+      config:
+        path: .specd/archive
+        pattern: '{{year}}/{{month}}/{{change.name}}/{{change.archivedName}}'
 
 workspaces:
   default:
     specs:
-      adapter: fs
-      fs:
-        path: specs/
+      adapter:
+        type: fs
+        config:
+          path: specs/
 
 # Inline schema overrides for lifecycle automation hooks
 schemaOverrides:
@@ -301,33 +326,39 @@ logging:
 workspaces:
   default:
     specs:
-      adapter: fs
-      fs:
-        path: specs/
-  legacy:
+      adapter:
+        type: fs
+        config:
+          path: specs/
+  reporting:
     specs:
-      adapter: fs
-      fs:
-        path: legacy/specs/
-    codeRoot: legacy/
+      adapter:
+        type: fs
+        config:
+          path: reporting/specs/
+    codeRoot: reporting/
 
 storage:
   changes:
-    adapter: fs
-    fs:
-      path: .specd/changes
+    adapter:
+      type: fs
+      config:
+        path: .specd/changes
   drafts:
-    adapter: fs
-    fs:
-      path: .specd/drafts
+    adapter:
+      type: fs
+      config:
+        path: .specd/drafts
   discarded:
-    adapter: fs
-    fs:
-      path: .specd/discarded
+    adapter:
+      type: fs
+      config:
+        path: .specd/discarded
   archive:
-    adapter: fs
-    fs:
-      path: .specd/archive
+    adapter:
+      type: fs
+      config:
+        path: .specd/archive
 
 context:
   - id: global-rules
@@ -349,7 +380,7 @@ context:
 
 remove:
   workspaces:
-    - legacy # Do not index or load legacy workspace on this dev machine
+    - reporting # Do not index or load reporting workspace on this dev machine
 ```
 
 ---
@@ -461,13 +492,15 @@ workspaces:
   default:
     prefix: _global # Logical prefix prepended to all spec IDs in this workspace
     specs:
-      adapter: fs
-      fs:
-        path: specs/_global # Path to specs folder
+      adapter:
+        type: fs
+        config:
+          path: specs/_global # Path to specs folder
     schemas:
-      adapter: fs
-      fs:
-        path: .specd/schemas # Path to local schemas (Default: .specd/schemas)
+      adapter:
+        type: fs
+        config:
+          path: .specd/schemas # Path to local schemas (Default: .specd/schemas)
     codeRoot: . # Implementation source code root (Default: '.' for default)
     ownership: owned # 'owned' | 'shared' | 'readOnly' (Default: 'owned')
     contextIncludeSpecs:
@@ -486,9 +519,11 @@ workspaces:
 
   core:
     specs:
-      adapter: fs
-      fs:
-        path: packages/core/specs
+      adapter:
+        type: fs
+        config:
+          path: packages/core/specs
+          metadataPath: packages/core/.specd/metadata
     codeRoot: packages/core # Required for non-default workspaces
     ownership: owned
     contextIncludeSpecs:
@@ -496,9 +531,10 @@ workspaces:
 
   external-service:
     specs:
-      adapter: fs
-      fs:
-        path: ../service/specd/specs
+      adapter:
+        type: fs
+        config:
+          path: ../service/specd/specs
     codeRoot: ../service
     ownership: readOnly # Read-only workspace: context-only, cannot be modified
 
@@ -506,22 +542,26 @@ workspaces:
 # Persistent storage directories for the change lifecycle stages.
 storage:
   changes:
-    adapter: fs
-    fs:
-      path: .specd/changes # Active changes
+    adapter:
+      type: fs
+      config:
+        path: .specd/changes # Active changes
   drafts:
-    adapter: fs
-    fs:
-      path: .specd/drafts # Shelved drafts
+    adapter:
+      type: fs
+      config:
+        path: .specd/drafts # Shelved drafts
   discarded:
-    adapter: fs
-    fs:
-      path: .specd/discarded # Abandoned changes
+    adapter:
+      type: fs
+      config:
+        path: .specd/discarded # Abandoned changes
   archive:
-    adapter: fs
-    fs:
-      path: .specd/archive # Completed changes
-      pattern: '{{year}}/{{change.archivedName}}' # Directory template for archives
+    adapter:
+      type: fs
+      config:
+        path: .specd/archive # Completed changes
+        pattern: '{{year}}/{{month}}/{{change.archivedName}}' # Directory template for archives
 
 # 14. Schema Plugins
 # Schema extension packages loaded and merged before schemaOverrides.

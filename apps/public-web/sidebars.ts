@@ -5,12 +5,13 @@ const sidebars: SidebarsConfig = {
     {
       type: 'category',
       label: 'Getting Started',
-      items: ['guide/index', 'guide/installation', 'guide/getting-started'],
+      items: ['guide/what-is-specd', 'guide/index', 'guide/installation', 'guide/getting-started'],
     },
     {
       type: 'category',
       label: 'Guide',
       items: [
+        'guide/code-graph',
         'guide/philosophy',
         'guide/specs',
         'guide/changes',
@@ -28,7 +29,6 @@ const sidebars: SidebarsConfig = {
         'guide/selectors',
         'guide/artifacts',
         'guide/deltas',
-        'guide/code-graph',
       ],
     },
     {

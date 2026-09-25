@@ -49,13 +49,17 @@ Every project has at least one workspace: `default`. Most single-repo projects o
 
 `default` is a reserved name that identifies the local project workspace — the specs this repository owns. Every `specd.yaml` must declare it.
 
+> [!IMPORTANT]
+> The workspace identifier `'root'` is reserved for project-global graph identities and cannot be declared as a workspace name in `workspaces`.
+
 ```yaml
 workspaces:
   default:
     specs:
-      adapter: fs
-      fs:
-        path: specs/
+      adapter:
+        type: fs
+        config:
+          path: specs/
 ```
 
 The `default` workspace has sensible defaults that make minimal configuration sufficient:
@@ -84,14 +88,17 @@ workspaces:
   default:
     prefix: _global
     specs:
-      adapter: fs
-      fs:
-        path: specs/_global
+      adapter:
+        type: fs
+        config:
+          path: specs/_global
 ```
 
 With this configuration, specs under `specs/_global/` are addressed as `default:_global/architecture` — not `_global:architecture`.
 
 The workspace is still named `default`, and the workspace name still appears before the colon in spec IDs. The prefix only affects the capability-path portion after the colon.
+
+Each prefix segment must match `/^[a-z0-9_][a-z0-9_-]*$/`. Multi-segment prefixes (e.g. `shared/utils`) are separated by `/`, without leading or trailing slashes.
 
 Concrete example:
 
@@ -112,15 +119,17 @@ This is exactly how specd's own project uses it: the `default` workspace has `pr
 
 The full set of fields available on any workspace:
 
-| Field                 | Required           | Default (`default` ws)  | Default (non-`default` ws)            | Description                                            |
-| --------------------- | ------------------ | ----------------------- | ------------------------------------- | ------------------------------------------------------ |
-| `specs`               | always             | —                       | —                                     | Storage adapter and path where spec files live         |
-| `codeRoot`            | non-`default` only | project root            | (must be declared)                    | Directory where implementation code lives              |
-| `schemas`             | no                 | `.specd/schemas`        | (none)                                | Storage adapter and path for named local schemas       |
-| `ownership`           | no                 | `owned`                 | `readOnly`                            | The project's relationship to these specs              |
-| `prefix`              | no                 | (none)                  | (none)                                | Override the qualifier used in spec IDs                |
-| `contextIncludeSpecs` | no                 | (project-level default) | `['*']` (all specs in this workspace) | Include patterns applied when this workspace is active |
-| `contextExcludeSpecs` | no                 | `[]`                    | `[]`                                  | Exclude patterns applied when this workspace is active |
+| Field                 | Required           | Default (`default` ws) | Default (non-`default` ws)                                               | Description                                                                        |
+| --------------------- | ------------------ | ---------------------- | ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------- |
+| `specs`               | always             | —                      | —                                                                        | Storage adapter and path where spec files live                                     |
+| `specs.metadataPath`  | no                 | `{specdPath}/metadata` | `{specdPath}/metadata` (internal) / nearest `.specd/metadata` (external) | Custom path for workspace spec metadata (`metadata.json`)                          |
+| `codeRoot`            | non-`default` only | project root           | (must be declared)                                                       | Directory where implementation code lives                                          |
+| `schemas`             | no                 | `.specd/schemas`       | (none)                                                                   | Storage adapter and path for named local schemas                                   |
+| `ownership`           | no                 | `owned`                | `readOnly`                                                               | The project's relationship to these specs (`owned`, `shared`, `readOnly`)          |
+| `prefix`              | no                 | (none)                 | (none)                                                                   | Prepend leading path segment to capability path in spec IDs (display only)         |
+| `contextIncludeSpecs` | no                 | `[]` (None)            | `[]` (None)                                                              | Include patterns applied when this workspace is active                             |
+| `contextExcludeSpecs` | no                 | `[]`                   | `[]`                                                                     | Exclude patterns applied when this workspace is active                             |
+| `graph`               | no                 | (defaults)             | (defaults)                                                               | Code graph discovery settings (`respectGitignore`, `excludePaths`, `allowedPaths`) |
 
 All relative paths resolve from the directory containing `specd.yaml`.
 
@@ -166,9 +175,10 @@ contextIncludeSpecs:
 workspaces:
   core:
     specs:
-      adapter: fs
-      fs:
-        path: specs/core
+      adapter:
+        type: fs
+        config:
+          path: specs/core
     codeRoot: packages/core
     # When the core workspace is active, include all core specs
     contextIncludeSpecs:
@@ -266,32 +276,36 @@ Both the `default` and `core` workspaces are active for that change. Context com
 workspaces:
   default:
     specs:
-      adapter: fs
-      fs:
-        path: specs/
+      adapter:
+        type: fs
+        config:
+          path: specs/
     codeRoot: ./
 
   auth:
     specs:
-      adapter: fs
-      fs:
-        path: ../auth-service/specd/specs
+      adapter:
+        type: fs
+        config:
+          path: ../auth-service/specd/specs
     codeRoot: ../auth-service
     ownership: owned
 
   payments:
     specs:
-      adapter: fs
-      fs:
-        path: ../payments-service/specd/specs
+      adapter:
+        type: fs
+        config:
+          path: ../payments-service/specd/specs
     codeRoot: ../payments-service
     ownership: owned
 
   platform:
     specs:
-      adapter: fs
-      fs:
-        path: ../platform-repo/specd/specs
+      adapter:
+        type: fs
+        config:
+          path: ../platform-repo/specd/specs
     codeRoot: ../platform-repo
     ownership: readOnly
 ```
@@ -326,13 +340,15 @@ The `default` workspace has a schemas directory by default (`.specd/schemas`). N
 workspaces:
   billing:
     specs:
-      adapter: fs
-      fs:
-        path: ../billing/specd/specs
+      adapter:
+        type: fs
+        config:
+          path: ../billing/specd/specs
     schemas:
-      adapter: fs
-      fs:
-        path: ../billing/dev/schemas
+      adapter:
+        type: fs
+        config:
+          path: ../billing/dev/schemas
     codeRoot: ../billing
 ```
 
@@ -342,29 +358,30 @@ Without the `schemas` section, any schema reference targeting the `billing` work
 
 ## Archive patterns
 
-When changes are archived, their location in the archive directory is controlled by the `pattern` field. Archive patterns support `{{change.name}}`, `{{change.archivedName}}`, and date tokens — not a singular workspace token.
+When changes are archived, their location in the archive directory is controlled by the `pattern` field using direct token replacement.
 
-Example — organise by change slug:
+Example — organise by year, month, and change name:
 
 ```yaml
 storage:
   archive:
-    adapter: fs
-    fs:
-      path: .specd/archive
-      pattern: '{{change.name}}/{{change.archivedName}}'
+    adapter:
+      type: fs
+      config:
+        path: .specd/archive
+        pattern: '{{year}}/{{month}}/{{change.archivedName}}'
 ```
 
 Available template variables in archive patterns:
 
-| Variable                  | Value                                                              |
-| ------------------------- | ------------------------------------------------------------------ |
-| `{{change.name}}`         | The change's slug name                                             |
-| `{{change.archivedName}}` | Date-prefixed slug (e.g. `2024-01-15-add-auth-flow`) — the default |
-| `{{year}}`                | Four-digit year at archive time                                    |
-| `{{date}}`                | ISO date at archive time                                           |
-
-`{{change.workspace}}` is not supported. A change may touch multiple workspaces (derived from its `specIds`); there is no primary workspace for path templating.
+| Variable                  | Value                                                             | Example                         |
+| :------------------------ | :---------------------------------------------------------------- | :------------------------------ |
+| `{{change.archivedName}}` | Full timestamped directory name (default)                         | `20260924-143511-add-auth-flow` |
+| `{{change.name}}`         | Change slug name                                                  | `add-auth-flow`                 |
+| `{{year}}`                | Four-digit calendar year at archive time (`YYYY`)                 | `2026`                          |
+| `{{month}}`               | Two-digit calendar month at archive time (`MM`, `01`–`12`)        | `09`                            |
+| `{{day}}`                 | Two-digit calendar day of month at archive time (`DD`, `01`–`31`) | `24`                            |
+| `{{date}}`                | Calendar date at archive time (`YYYY-MM-DD`)                      | `2026-09-24`                    |
 
 ---
 

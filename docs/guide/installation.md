@@ -241,6 +241,20 @@ specd plugins update @specd/plugin-agent-claude
 specd plugins uninstall @specd/plugin-agent-copilot
 ```
 
+### Synchronizing Project Assets (`specd project update`)
+
+When you manually add, remove, or edit plugins in `specd.yaml` (under `plugins.agents`) rather than using `specd plugins install`, or when you update `@specd/cli` or plugin packages via your package manager (`pnpm update`, `npm update`), run:
+
+```bash
+specd project update
+```
+
+This command inspects all declared plugins in `specd.yaml` and executes their installation orchestration to regenerate and synchronize project-managed assets on disk (`AGENTS.md`, `CLAUDE.md`, `.github/copilot-instructions.md`, and skill templates).
+
+- **Required:** After manual modifications to `plugins.agents` in `specd.yaml`.
+- **Recommended:** After upgrading SpecD CLI or agent plugin package versions.
+- **Not required:** When changing general configuration options in `specd.yaml` (`workspaces`, `codeRoot`, `ownership`, `specs`, etc.), which are read dynamically on every CLI command with zero update step required.
+
 ---
 
 ## 6. Verifying Your Setup

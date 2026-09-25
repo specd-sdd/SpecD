@@ -1,7 +1,7 @@
 ---
 title: Guides Overview
 description: Comprehensive guides, tutorials, and deep dives for SpecD.
-sidebar_position: 0
+sidebar_position: 1
 slug: /guide
 ---
 
@@ -9,7 +9,7 @@ slug: /guide
 
 Welcome to the SpecD User Guides! SpecD is a spec-driven development platform and codebase intelligence system designed to keep humans and AI agents perfectly aligned through structured specifications, explicit change lifecycles, and deterministic context compilation.
 
-Explore the topics below to understand SpecD from foundational principles to advanced customization.
+Start with [What is SpecD?](./what-is-specd.md) if you want the product in one page: what it is, what you can do with it, and how the Code Graph fits in. The sections below are the map of every guide.
 
 ---
 
@@ -36,12 +36,12 @@ Learn the fundamental building blocks of SpecD and how changes evolve:
 
 ---
 
-## 3. Workspaces & Intelligence
+## 3. Codebase Intelligence & Workspaces
 
-Scale SpecD across large codebases and leverage graph intelligence:
+Scale SpecD across large codebases and leverage AST-powered graph intelligence:
 
+- **[Code Graph & Intelligence](./code-graph.md)** — The architectural intelligence layer of SpecD: AST symbol indexing, multi-modal search (symbols, source code, specs, and documents), pre-calculated blast radius impact analysis, and architectural hotspot detection.
 - **[Workspaces](./workspaces.md)** — Configuring monorepos, multi-repo coordinator setups, owned vs. read-only workspaces, and spec namespacing.
-- **[Code Graph](./code-graph.md)** — Codebase intelligence, symbol indexing, dependency blast-radius analysis, and hotspot detection.
 
 ---
 

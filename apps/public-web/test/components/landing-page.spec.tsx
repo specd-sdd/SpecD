@@ -48,7 +48,7 @@ describe('LandingPage', () => {
       links.some(
         (link) =>
           link.textContent === 'Get Started' &&
-          link.getAttribute('href') === '/docs/guide/getting-started',
+          link.getAttribute('href') === '/docs/guide/what-is-specd',
       ),
     ).toBe(true)
     expect(

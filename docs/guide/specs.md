@@ -245,7 +245,7 @@ SpecD indexes your source code and links it directly to specification files:
 
 - **`COVERS_FILE`**: Identifies which specs govern each source code file.
 - **`COVERS_SYMBOL`**: Links individual functions, classes, and exported APIs directly to the specific requirement they satisfy.
-- **Blast Radius Analysis**: When a spec is modified, `specd graph impact --spec <id> --direction dependents` reveals all downstream files, symbols, and dependent specs that require re-verification.
+- **Blast Radius Analysis**: When a spec is modified, `specd graph impact --spec <workspace:capability-path> --direction dependents` reveals the files, symbols, and specs linked to that requirement. Search requirement text with `specd graph search "<query>" --specs`. The full command set is in [Code Graph & Intelligence](./code-graph.md).
 
 ### 2. Context Compilation for AI Agents
 

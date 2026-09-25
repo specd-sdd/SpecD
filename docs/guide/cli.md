@@ -86,7 +86,8 @@ Inspects project health, compiles context, and monitors change pipelines.
   ```
 - **`specd project context-specs`**: Discovers matching spec IDs for project and workspace include/exclude patterns without rendering full markdown.
 - **`specd project metadata`**: Inspects compiled project-level metadata and layout.
-- **`specd project update` / `update-metadata`**: Updates project settings or synchronizes metadata caches.
+- **`specd project update`**: Updates project-managed assets to match the currently declared plugin set in `specd.yaml`. It triggers plugin installation orchestration, synthesizing and refreshing agent instruction files (`AGENTS.md`, `CLAUDE.md`, `.github/copilot-instructions.md`) and skill templates across the project.
+- **`specd project update-metadata`**: Updates project-level metadata with LLM-optimized context and input freshness hashes.
 
 👉 _See [Project Reference](../cli/project.md) for full options and examples._
 
@@ -220,22 +221,33 @@ Access and search documentation topics directly within your terminal without ope
 
 ### 8. `specd graph` — Codebase Intelligence
 
-AST-based code graph indexing, dependency blast radius, and symbol resolution.
+The Code Graph is a core SpecD pillar: AST symbols, call and import edges, spec links, and markdown documents. Use it before reading files at random. The full walkthrough, risk model, and playbooks are in [Code Graph & Intelligence](./code-graph.md).
 
-- **`specd graph index`**: Builds or updates the AST dependency graph index.
+- **`specd graph index`**: Incremental index. `--force` rebuilds from scratch. `--exclude-path <glob>` drops paths from the index. Text and structured output include `coverage diagnostics` (`FILE_NOT_INDEXED`, `SYMBOL_NOT_FOUND`, `SYMBOL_AMBIGUOUS`).
   ```bash
   specd graph index --format toon
+  specd graph index --force --exclude-path "**/dist/**"
   ```
-- **`specd graph search "<query>"`**: Fast fuzzy search across symbols (`--symbols`) or specifications (`--specs`).
-- **`specd graph impact`**: Evaluates blast-radius impact before modifying code:
+- **`specd graph stats`**: File, document, symbol, and spec counts, relation totals, and freshness (`Content fresh`, `Known stale`, coverage completeness).
+- **`specd graph search "<query>"`**: With no category flag, searches symbols, source files, specs, and documents. Narrow with `--symbols`, `--files`, `--specs`, or `--documents`. Useful flags: `--kind`, `--snippet`, `--spec-content` (json/toon only), `--workspace`, `--exclude-workspace`, `--file`, `--exclude-path`, `--limit`.
   ```bash
-  specd graph impact --symbol "renderTable" --direction dependents --format toon
-  specd graph impact --file "packages/cli/src/helpers/table.ts" --direction dependents
+  specd graph search "archive pattern" --specs --spec-content --format toon
+  specd graph search "cascade resolution" --documents --snippet --format text
+  specd graph search "createChange" --symbols --kind function --exclude-path "*:test/*"
   ```
-- **`specd graph stats`**: Displays total symbols, edges, file coverage, and index freshness.
-- **`specd graph hotspots`**: Identifies high-risk, heavily coupled files requiring extra care.
+- **`specd graph impact`**: Blast radius. Pass exactly one of `--symbol`, `--file` (repeatable, aggregated), `--spec <workspace:capability-path>`, or `--export <name> --from <surface>`. `--direction` is `dependents` (default; alias `upstream`), `dependencies` (alias `downstream`), or `both`. `--depth` defaults to `3`.
+  ```bash
+  specd graph impact --symbol "resolveCliContext" --direction dependents --format toon
+  specd graph impact --file "packages/core/src/domain/entities/change.ts" --file "packages/core/src/application/use-cases/edit-change.ts" --direction dependents
+  specd graph impact --spec "core:core/transition-change" --direction both --depth 2
+  specd graph impact --export "SpecdConfig" --from "core:src/public.ts" --direction dependents
+  ```
+- **`specd graph hotspots`**: Ranks coupled symbols. Defaults: kinds `class,method,function`, `--min-risk MEDIUM`, `--min-score 1`, `--limit 20`. `--kind` replaces the default kinds. `--include-importer-only` adds symbols scored only from imports.
+  ```bash
+  specd graph hotspots --min-risk HIGH --exclude-path "*:test/*" --format toon
+  ```
 
-👉 _See [Graph Reference](../cli/graph.md) for full options and examples._
+👉 _See [Code Graph & Intelligence](./code-graph.md) for playbooks, and [Graph Reference](../cli/graph.md) for the command contract._
 
 ---
 
@@ -328,10 +340,19 @@ specd changes context 20260924-user-profile implementing --format toon
 specd guide search "approval gates" --format toon
 ```
 
-### Recipe 3: Blast-Radius Impact Analysis Before Refactoring
+### Recipe 3: Investigate, then measure blast radius
 
-Before modifying a function or file, check who depends on it:
+Find the definition, then measure who depends on it, then check whether the area is already a hotspot:
 
 ```bash
-specd graph impact --file packages/cli/src/helpers/table.ts --direction dependents --format text
+specd graph search "resolveCliContext" --symbols --kind function --format toon
+specd graph impact --symbol "resolveCliContext" --direction dependents --depth 3 --format toon
+specd graph impact --file packages/cli/src/helpers/cli-context.ts --direction dependencies --format text
+specd graph hotspots --workspace cli --min-risk HIGH --exclude-path "*:test/*" --format toon
+```
+
+For a public export, name the barrel file as `--from`, not the package name:
+
+```bash
+specd graph impact --export "SpecdConfig" --from "core:src/public.ts" --direction dependents --format toon
 ```

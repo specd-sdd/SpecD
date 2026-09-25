@@ -106,6 +106,15 @@ specd guide workflow --section "Approval Gates"
 specd guide search "delta three-way merge"
 ```
 
+### The Graph-First Protocol
+
+Agents executing `/specd-design` and `/specd-implement` follow the **Graph-First Protocol**:
+
+- **Finding Symbols & Definitions:** Agents must not use blind lexical grep. They search the AST graph directly via `specd graph search "<query>" --symbols`.
+- **Pre-calculating Blast Radius:** Before drafting changes in `design.md`, agents calculate downstream impact with `specd graph impact --symbol "<name>" --direction dependents` or `specd graph impact --file "<path>"`.
+- **Auditing Hotspots:** When editing core or shared modules, agents check `specd graph hotspots --min-risk HIGH` to exercise caution in fragile areas.
+- **Traceable Spec Verification:** During `/specd-verify`, agents trace implementations back to specs using `specd graph impact --spec "<id>"`.
+
 ---
 
 ## Where skills live
@@ -130,6 +139,7 @@ Shared context and configuration used by all skills is in `.specd/config/skills/
 
 ## Next steps
 
+- **[Code Graph & Intelligence](./code-graph.md)** — AST-powered codebase intelligence, multi-modal search (symbols, files, specs, documents), and blast radius impact analysis.
 - **[Workflow & Lifecycle](./workflow.md)** — Full walkthrough of lifecycle states, transitions, approval gates, hooks, and a complete end-to-end example showing how skills and CLI interact at each step.
 - **[Changes](./changes.md)** — What a change is, what artifacts it tracks, and how the DAG is organized.
 - **[CLI Reference](./cli.md)** — All CLI commands that skills call under the hood.

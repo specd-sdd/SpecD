@@ -37,11 +37,20 @@ flowchart TD
 
 ### 1. Project-level include/exclude patterns
 
-Specs configured under `context.include` in `specd.yaml` (e.g. `_global/architecture`, `_global/security`) are considered universally applicable and are automatically included in every compiled context. Conversely, patterns in `context.exclude` are filtered out.
+Specs configured under `contextIncludeSpecs` in `specd.yaml` (e.g. `'default:_global/*'`) are considered universally applicable and are automatically included in every compiled context. Conversely, patterns in `contextExcludeSpecs` are filtered out.
 
 ### 2. Workspace-level patterns
 
-Each workspace defined in `specd.yaml` can specify its own include and exclude rules. When compiling context for a workspace or package, only relevant workspace specs participate.
+Each workspace defined in `specd.yaml` can specify its own `contextIncludeSpecs` and `contextExcludeSpecs` rules. When compiling context for an active change, only patterns from workspaces touched by the change participate.
+
+#### Pattern syntax and wildcard rules
+
+Pattern matching follows strict structural rules:
+
+- `*` alone: Matches all specs in the scope (project-wide if at project level, or all specs within the workspace if at workspace level).
+- `workspace:*`: Matches all specs belonging to the specified workspace (e.g. `'default:*'`).
+- `prefix/*` or `workspace:prefix/*`: Matches all specs under that path prefix (e.g. `'default:_global/*'`).
+- Wildcards are valid **only** alone (`*`), immediately after a workspace colon (`workspace:*`), or as a trailing segment after a slash (`prefix/*`). Embedded or substring wildcards (such as `*auth*` or `auth/*/login`) are invalid and rejected.
 
 ### 3. Change seeding (Change context only)
 
@@ -52,7 +61,7 @@ When compiling context for a change via `specd change context <change-id>`, the 
 
 ### 4. Dependency graph traversal
 
-Starting from the selected seeds, SpecD queries the `@specd/code-graph` or spec metadata and transitively traverses all `dependsOn` links. For instance, if `auth/oauth` depends on `auth/tokens`, both are collected.
+Starting from the selected seeds, SpecD queries the code graph (or spec metadata) and transitively follows `dependsOn` links. For instance, if `auth/oauth` depends on `auth/tokens`, both are collected. That traversal is spec-to-spec. Symbol search, document search, and blast radius live in [Code Graph & Intelligence](./code-graph.md).
 
 ### 5. Display mode rendering
 
@@ -61,6 +70,8 @@ Specs are formatted according to the configured `contextMode` to minimize token 
 ### 6. Assembly
 
 The collected components are assembled into an ordered markdown payload ready to inject into the agent prompt or stdout.
+
+Any custom `instruction` entries configured in `context` support template variable substitution: `{{change.name}}`, `{{change.path}}`, and `{{project.root}}` are expanded dynamically before injection.
 
 ---
 

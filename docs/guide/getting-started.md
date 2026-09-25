@@ -57,7 +57,7 @@ _(Tip: If you're not sure if a change is already in progress, run `/specd` first
 
 **What happens:**
 
-1. The agent analyzes existing code and specs using the code graph to identify impacted modules.
+1. The agent analyzes existing code and specs using the [Code Graph](./code-graph.md) (`specd graph search`, `specd graph impact`) to identify impacted modules.
 2. The agent asks clarifying questions to pin down requirements and scope.
 3. SpecD scaffolds `.specd/changes/<timestamp>-<name>/` containing `manifest.yaml` and `proposal.md`.
 

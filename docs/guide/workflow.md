@@ -70,7 +70,7 @@ The initial state. A newly created change starts here before any work has been d
 The active design and specification phase. This is where the bulk of artifact work happens.
 
 - **What it means:** You are writing the proposal, specs, verify files, design, and tasks.
-- **What you do:** Create and refine the five standard artifacts (proposal, specs, verify, design, tasks). Run `specd changes status <name>` to check artifact progress.
+- **What you do:** Create and refine the five standard artifacts (proposal, specs, verify, design, tasks). Run `specd changes status <name>` to check artifact progress. Before writing `design.md`, use the [Code Graph](./code-graph.md) to locate symbols (`specd graph search`) and record blast radius (`specd graph impact`) for the files and symbols the design will change.
 - **Transition out:** `specd changes transition <name> ready` once all required artifacts are complete and validated.
 - **What can block it:** The `ready` step requires all artifacts listed in the schema's `requires` field (by default: proposal, specs, verify, design, tasks) to have `complete` status. The CLI reports which artifacts are still missing or in progress.
 
@@ -118,7 +118,7 @@ A human has reviewed and approved the spec artifacts.
 Active development is in progress.
 
 - **What it means:** The implementation tasks are being worked through.
-- **What you do:** Work through the task list in `tasks.md`, checking off items as you go (`- [x]`). Run `specd changes status <name>` to see task progress.
+- **What you do:** Work through the task list in `tasks.md`, checking off items as you go (`- [x]`). Run `specd changes status <name>` to see task progress. Re-check `specd graph impact` when a task touches a symbol or file that `design.md` did not already cover, and prefer `specd graph search` over repository-wide text search.
 - **Transition out:** `verifying` once all tasks are complete, or back to `designing` (redesign). The transition to `verifying` is blocked if any tasks remain incomplete.
 - **What can block it:** The `taskCompletionCheck` defined in the schema. By default, any unchecked `- [ ]` line in `tasks.md` prevents advancing to `verifying`. The CLI reports "N/M tasks complete" when this gate is active.
 
@@ -392,13 +392,18 @@ External hooks use the same workflow phase semantics as shell hooks:
 
 ### Template variables
 
-Hook `run:` commands support template variable substitution:
+Hook commands (`run:`) and instructions (`instruction:`) support dynamic template variable substitution:
 
-| Variable           | Value                                                        |
-| ------------------ | ------------------------------------------------------------ |
-| `{{change.name}}`  | The change's slug name (e.g. `add-auth`)                     |
-| `{{change.path}}`  | Absolute path to the change directory                        |
-| `{{project.root}}` | Absolute path to the project root (where `specd.yaml` lives) |
+| Variable                  | Availability       | Description                                                              |
+| :------------------------ | :----------------- | :----------------------------------------------------------------------- |
+| `{{project.root}}`        | All hooks          | Absolute path to the repository root directory                           |
+| `{{change.name}}`         | All hooks          | The change's slug name (e.g. `add-auth`)                                 |
+| `{{change.path}}`         | All hooks          | Absolute path to the active change (or archive) directory                |
+| `{{change.archivedName}}` | Post-archive hooks | The timestamped archive directory name (e.g. `20260924-143511-add-auth`) |
+
+#### Shell escaping in `run:` hooks
+
+To protect against shell injection attacks, SpecD automatically applies shell escaping to variables substituted into `run:` commands (wrapping substituted values in safe single quotes). For `instruction:` text consumed by agents, values are substituted verbatim without escaping.
 
 ### Hook execution order
 
@@ -574,7 +579,7 @@ Each scenario mirrors a requirement from `spec.md`.
 **Step 3d: Design** — The agent writes `design.md`:
 
 - Reads the proposal, specs, and verify files
-- Analyses the existing codebase to identify affected areas
+- Analyses the existing codebase with `specd graph search` and `specd graph impact` (see [Code Graph](./code-graph.md)) to identify affected areas, and records `HIGH` or `CRITICAL` risk in the design
 - Lists new constructs: `AuthService`, `SessionStore`, login/logout route handlers, auth middleware
 - Documents the approach, key decisions, and trade-offs
 - Maps every requirement and scenario to a concrete implementation path
@@ -724,5 +729,6 @@ Time passes between exploration and design. Code changes, specs get renamed, dec
 
 - [Schema format reference](../schemas/schema-format.md) — define custom workflow steps, artifacts, hooks, and task completion checks for your project.
 - [Configuration guide](configuration.md) — enable approval gates, configure workspaces, and add schema overrides.
+- [Code Graph](./code-graph.md) — search symbols, specs, and documents, and measure blast radius before design and implementation.
 - [CLI reference](../cli/cli-reference.md) — all `specd changes`, `specd drafts`, `specd discard`, and `specd archives` commands.
 - [Domain model](../core/domain-model.md) — the `Change`, `ChangeState`, `ChangeEvent`, and `ChangeArtifact` types returned by `@specd/core` use cases.

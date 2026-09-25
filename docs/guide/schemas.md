@@ -95,9 +95,15 @@ At archive time the picture is:
 
 ## Templates
 
-Each artifact type in `@specd/schema-std` ships with a template — a plain Markdown file used as scaffolding when the agent creates the artifact for the first time.
+Each artifact type in `@specd/schema-std` ships with a template — a Markdown file used as scaffolding when the agent creates the artifact for the first time.
 
-Templates are plain text. SpecD performs no variable substitution on them. HTML comments (`<!-- ... -->`) are preserved as-is and serve as guidance hints for the AI agent, pointing it toward intent, format requirements, and common pitfalls.
+SpecD performs template variable expansion across artifact `template`, `instruction`, `deltaInstruction`, and `rules` fields. The following variables are substituted dynamically:
+
+- `{{project.root}}` — Absolute path to the project root directory
+- `{{change.name}}` — The slug name of the active change
+- `{{change.path}}` — Absolute filesystem path to the active change directory
+
+HTML comments (`<!-- ... -->`) are preserved as-is and serve as guidance hints for the AI agent, pointing it toward intent, format requirements, and common pitfalls.
 
 Here is the shape of each template:
 

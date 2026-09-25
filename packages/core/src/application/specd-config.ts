@@ -183,8 +183,8 @@ export interface SpecdStorageConfig {
   /**
    * Optional pattern controlling the archive directory structure.
    *
-   * Supports variables: `{{change.name}}`, `{{change.archivedName}}`,
-   * `{{year}}`, `{{date}}`. `{{change.workspace}}` is not supported.
+   * Supports variables: `{{year}}`, `{{month}}`, `{{day}}`, `{{date}}`,
+   * `{{change.name}}`, `{{change.archivedName}}` (format: `YYYYMMDD-HHmmss-<name>`).
    * Defaults to `{{change.archivedName}}`.
    */
   readonly archivePattern?: string

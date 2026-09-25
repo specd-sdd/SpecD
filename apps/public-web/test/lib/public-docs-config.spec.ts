@@ -28,7 +28,7 @@ describe('public docs config', () => {
   })
 
   it('publishes stable navigation routes and repository links', () => {
-    expect(publicDocsHref).toBe('/docs/guide/getting-started')
+    expect(publicDocsHref).toBe('/docs/guide/what-is-specd')
     expect(publicApiHref).toBe('/api')
     expect(publicGithubHref).toBe('https://github.com/specd-sdd/SpecD')
   })

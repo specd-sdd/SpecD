@@ -194,7 +194,7 @@ describe('CLI guide command', () => {
       expect(err).toContain('AMBIGUOUS_GUIDE_SECTION')
       expect(err).toContain('Matching sections:')
       expect(err).toContain('[12]')
-      expect(err).toContain('[47]')
+      expect(err).toContain('[49]')
       expect(err).toContain('Disambiguate with:')
     })
 

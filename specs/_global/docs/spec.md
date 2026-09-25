@@ -35,6 +35,15 @@ Every document under `docs/guide/` MUST include Docusaurus-compatible YAML front
 
 All user guides under `docs/guide/` MUST be compatible with static website generation in `apps/public-web` and build-time bundling in `@specd/guide`.
 
+Configuration, workflow, schema, and lifecycle guides under `docs/guide/` MUST maintain complete parity with the `@specd/core` implementation and schemas. In particular:
+
+- All archive pattern variables supported by `FsArchiveRepository` (`{{year}}`, `{{month}}`, `{{day}}`, `{{date}}`, `{{change.name}}`, `{{change.archivedName}}`) SHALL be accurately documented without referencing uninstalled template engines.
+- Template variable substitution supported across lifecycle hooks (`run:`, `instruction:`) and schema artifact templates (`template`, `instruction`, `deltaInstruction`, rules) SHALL be accurately documented, including shell escaping for `run:` commands.
+- Workspace configuration options (including `metadataPath`, `graph` discovery settings, segment rules for `prefix`, and the reserved status of `'root'`) SHALL be exhaustively documented.
+- Project update behavior via `specd project update` SHALL be clearly documented in user guides, specifying that it orchestrates declared agent plugins and synthesizes project-managed assets (`AGENTS.md`, `CLAUDE.md`, skill templates), detailing when it is necessary (after manual edits to `plugins.agents` or upgrading SpecD packages) versus general configuration changes that are resolved dynamically at runtime without requiring an update command.
+- Code Graph intelligence SHALL be prominently documented as a core platform capability across user guides (`code-graph.md`, `index.md`, `philosophy.md`, `skills.md`, `cli.md`), exhaustively detailing document indexing and search (`--documents`), indexed source file search (`--files`), spec search and spec-level blast radius (`--spec <id>`), public export surface impact (`--export <name> --from <surface>`), multi-file aggregated blast radius, traversal directions and depth, hotspot detection, and implementation coverage diagnostics.
+- The user guide and the public docs SHALL open on a page that explains what SpecD is and what a reader can do with it. That page MUST live at `docs/guide/what-is-specd.md`, MUST be the first guide in sidebar order, and MUST be the public docs entry target. It MUST present the Code Graph as a core capability (symbol and document search, blast radius, and spec-to-code traceability) and MUST link to installation, the quickstart, philosophy, the guide index, and `docs/guide/code-graph.md`. The guide index MUST remain the topic map and MUST link to the opening page.
+
 ### Requirement: Skills guide documentation
 
 A user-facing guide `docs/guide/skills.md` MUST exist documenting the SpecD skills layer. It MUST cover:
