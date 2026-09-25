@@ -53,7 +53,7 @@ By default, `TransitionChange` and `ArchiveChange` auto-execute `run:` hooks at 
 - **`TransitionChange`** — when transitioning to a state that has a workflow step with `run:` hooks, executes pre-hooks before the state change and post-hooks after. Pre-hook failure aborts the transition (fail-fast). Post-hook failures are collected but do not roll back (fail-soft). Hook execution is delegated to `RunStepHooks`.
 - **`ArchiveChange`** — executes pre-archive hooks before any file modifications and post-archive hooks after the archive completes. Pre-hook failure aborts the archive. Post-hook failures are collected. Hook execution is delegated to `RunStepHooks`.
 
-Both use cases delegate hook execution to `RunStepHooks`, which handles hook collection, variable expansion, and execution semantics.
+Both use cases delegate hook execution to `RunStepHooks`, which collects the hooks and records the schema command. `HookRunner` expands `{{...}}` and translates quotes. `RunStepHooks` MUST NOT expand the command itself.
 
 ### Requirement: Two execution modes for run hooks
 
@@ -119,7 +119,7 @@ Before executing a `run:` hook command, `HookRunner` expands `{{key.path}}` temp
 
 `{{change.workspace}}` MUST NOT be a supported token. A change has no single primary workspace — workspaces touched by the change are derived from `specIds` and MUST NOT be injected into `HookVariables` as a singular workspace field. See [`core:template-variables`](../template-variables/spec.md) and [`core:change`](../change/spec.md).
 
-Unknown variable paths are left unexpanded (the original `{{key.path}}` token is preserved). All substituted values are shell-escaped to prevent injection attacks.
+Unknown variable paths are left unexpanded (the original `{{key.path}}` token is preserved). Substituted values MUST be inserted verbatim. The developer writes any quotes. Host-shell quote translation is defined by [`core:hook-runner-port`](../hook-runner-port/spec.md).
 
 ## Constraints
 
@@ -131,7 +131,7 @@ Unknown variable paths are left unexpanded (the original `{{key.path}}` token is
 - Schema-level hooks always precede project-level hooks within the same phase
 - `TransitionChange` and `ArchiveChange` delegate hook execution to `RunStepHooks`
 - `RunStepHooks` is the single hook execution engine used by all use cases and the CLI
-- Template variable expansion and shell escaping are handled by `HookRunner`, not by callers
+- Template variable expansion for developer `run:` hooks is verbatim. `HookRunner` then translates only quote syntax the host shell does not understand. Callers do not shell-escape those values.
 
 ## Examples
 

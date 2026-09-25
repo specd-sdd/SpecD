@@ -25,6 +25,13 @@ describe('HgVcsAdapter', () => {
     expect(hgSyncMock).not.toHaveBeenCalled()
   })
 
+  it('uppercases a Windows drive letter from hg stdout', () => {
+    hgSyncMock.mockReturnValue('c:\\repo')
+    const adapter = new HgVcsAdapter('/repo/worktree')
+
+    expect(adapter.rootDir()).toBe('C:\\repo')
+  })
+
   it('queries hg synchronously for the repository root when uncached', () => {
     hgSyncMock.mockReturnValue('/repo')
     const adapter = new HgVcsAdapter('/repo/worktree')
@@ -88,6 +95,13 @@ describe('HgVcsAdapter', () => {
       'nested/portable.ts',
     ])
     expect(hgMock).toHaveBeenCalledWith('/repo', 'status', '--rev', 'base123', '--print0')
+  })
+
+  it('keeps parent segments when making modified paths portable', async () => {
+    hgMock.mockResolvedValue('M src\\..\\secret\0')
+    const adapter = new HgVcsAdapter('/repo/nested', '/repo')
+
+    await expect(adapter.modifiedFiles('base123')).resolves.toEqual(['src/../secret'])
   })
 
   it('rejects modified-file enumeration failures', async () => {

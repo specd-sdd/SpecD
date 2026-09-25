@@ -6,16 +6,40 @@ import {
   type TemplateExpander,
   type TemplateVariables,
 } from '../../application/template-expander.js'
+import { translateHookCommand } from './translate-hook-command.js'
 
 const HEARTBEAT_INTERVAL_MS = 5000
+
+/**
+ * Spawns the host shell for a developer hook command.
+ *
+ * @param command - Command after substitution and quote translation
+ * @returns The child process
+ */
+function spawnHook(command: string): ReturnType<typeof spawn> {
+  if (process.platform === 'win32') {
+    return spawn('cmd.exe', ['/d', '/s', '/c', command], {
+      stdio: ['ignore', 'pipe', 'pipe'],
+      windowsVerbatimArguments: true,
+      windowsHide: true,
+    })
+  }
+  const envShell = process.env['SHELL']
+  const shell = envShell !== undefined && path.isAbsolute(envShell) ? envShell : '/bin/sh'
+  return spawn(shell, ['-c', command], {
+    stdio: ['ignore', 'pipe', 'pipe'],
+  })
+}
 
 /**
  * Node.js `child_process` implementation of the {@link HookRunner} port.
  *
  * Delegates template variable expansion to the injected {@link TemplateExpander},
- * then spawns a shell subprocess. Uses `$SHELL` (Unix) or `%COMSPEC%` (Windows)
- * with sensible fallbacks. Captures stdout and stderr, and returns them along
- * with the process exit code in a {@link HookResult}.
+ * then spawns a shell subprocess. Template values are inserted verbatim.
+ * On Windows the command runs in `cmd.exe`; single quotes the developer wrote
+ * are translated to double quotes. On other platforms `""` inside double quotes
+ * is translated to a POSIX escaped quote. Captures stdout and stderr, and
+ * returns them along with the process exit code in a {@link HookResult}.
  */
 export class NodeHookRunner implements HookRunner {
   private readonly _expander: TemplateExpander
@@ -23,7 +47,7 @@ export class NodeHookRunner implements HookRunner {
   /**
    * Creates a new `NodeHookRunner` with the given template expander.
    *
-   * @param expander - The template expander for shell-safe variable substitution
+   * @param expander - The template expander for verbatim variable substitution
    */
   constructor(expander: TemplateExpander) {
     this._expander = expander
@@ -42,15 +66,12 @@ export class NodeHookRunner implements HookRunner {
     variables: TemplateVariables,
     onProgress?: OnHookRunnerProgress,
   ): Promise<HookResult> {
-    const expanded = this._expander.expandForShell(command, variables)
+    const expanded = translateHookCommand(
+      this._expander.expand(command, variables),
+      process.platform === 'win32' ? 'cmd' : 'posix',
+    )
     return new Promise((resolve) => {
-      const defaultShell = process.platform === 'win32' ? 'cmd.exe' : '/bin/sh'
-      const envShell = process.platform === 'win32' ? process.env['COMSPEC'] : process.env['SHELL']
-      const shell = envShell !== undefined && path.isAbsolute(envShell) ? envShell : defaultShell
-      const shellFlag = process.platform === 'win32' ? '/c' : '-c'
-      const child = spawn(shell, [shellFlag, expanded], {
-        stdio: ['ignore', 'pipe', 'pipe'],
-      })
+      const child = spawnHook(expanded)
 
       let stdout = ''
       let stderr = ''

@@ -4,7 +4,26 @@
     "version": 1
   },
   "dependsOn": ["core:config"],
-  "implementation": [],
+  "implementation": [
+    {
+      "file": "code-graph:src/infrastructure/sqlite/sqlite-graph-database.ts",
+      "symbols": ["SQLiteGraphDatabase"]
+    },
+    {
+      "file": "code-graph:src/domain/services/split-workspace-identity.ts",
+      "symbols": ["isDriveLetterPath", "splitWorkspaceIdentity"]
+    },
+    {
+      "file": "code-graph:test/infrastructure/sqlite/split-workspace-identity.spec.ts"
+    },
+    {
+      "file": "code-graph:src/domain/services/matches-exclude.ts",
+      "symbols": ["matchesExclude"]
+    },
+    {
+      "file": "code-graph:test/domain/services/matches-exclude.spec.ts"
+    }
+  ],
   "optimizations": {
     "optimizedDescription": {
       "value": "Indexes multi-workspace code and specs into unified graph with collision-free identities, config-relative lookups, and cross-workspace resolution.",

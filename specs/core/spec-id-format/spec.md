@@ -37,6 +37,10 @@ Parsing a spec ID string SHALL follow these steps:
 
 There is no slash-based workspace detection. The `/` character is never used as a workspace separator.
 
+### Requirement: Capability segments reject Windows device names
+
+A capability-path segment that is a Windows device name MUST be rejected on every operating system. The reserved names are `con`, `prn`, `aux`, `nul`, `com1` through `com9`, and `lpt1` through `lpt9`, compared case-insensitively as the whole segment. A segment such as `con-foo` MUST remain legal. This rule does not treat a Windows drive letter as a workspace name; spec IDs are not filesystem paths.
+
 ### Requirement: Normalization
 
 Functions that accept spec IDs SHOULD normalize bare paths to fully-qualified form (`default:capPath`) at the system boundary. Domain-layer code MAY assume spec IDs are already qualified.

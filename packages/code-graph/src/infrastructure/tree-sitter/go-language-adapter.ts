@@ -12,6 +12,7 @@ import { type Relation, createRelation } from '../../domain/value-objects/relati
 import { SymbolKind } from '../../domain/value-objects/symbol-kind.js'
 import { RelationType } from '../../domain/value-objects/relation-type.js'
 import { findManifestField } from './find-manifest-field.js'
+import { splitWorkspaceIdentity } from '../../domain/services/split-workspace-identity.js'
 import { type ImportDeclaration } from '../../domain/value-objects/import-declaration.js'
 import { ImportDeclarationKind } from '../../domain/value-objects/import-declaration-kind.js'
 import { BindingSourceKind, type BindingFact } from '../../domain/value-objects/binding-fact.js'
@@ -148,8 +149,8 @@ interface GoReceiverFacts {
 function goPackageSurface(filePath: string): string {
   const slash = filePath.lastIndexOf('/')
   if (slash >= 0) return filePath.slice(0, slash)
-  const workspaceSeparator = filePath.indexOf(':')
-  return workspaceSeparator >= 0 ? filePath.slice(0, workspaceSeparator + 1) : '.'
+  const identity = splitWorkspaceIdentity(filePath)
+  return identity === null ? '.' : `${identity.workspace}:`
 }
 
 /**

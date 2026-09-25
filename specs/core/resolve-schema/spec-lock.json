@@ -20,36 +20,36 @@
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "ResolveSchema pipeline: base→extends→plugins→overrides→merge→buildSchema; construction-time config.",
+      "value": "ResolveSchema runs base lookup, extends, plugins, overrides, mergeSchemaLayers, and buildSchema as the single schema entry point.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:0b57840d11314533eced2b59fc70824768e6108d306beaa4638bc2e1760f86b5",
-          "lastModified": "2026-07-06T14:22:55.215Z"
+          "hash": "sha256:69a626c2c2cf1877b3094b4ee1062656168a021b9d16890b65f9797a59cd4f0f",
+          "lastModified": "2026-08-27T00:15:51.006Z"
         },
         "verify.md": {
-          "hash": "sha256:e0bc39911eb456cd9ae7cec500115e9cc5f02e506d833825ddab5a6548ffeb70",
-          "lastModified": "2026-07-06T14:22:55.216Z"
+          "hash": "sha256:cafdffb5cf24dc96bc0bf3b0b4552eb99b06e2d03c3812f4c63a8377ac6ae3be",
+          "lastModified": "2026-08-27T00:15:51.007Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# ResolveSchema\n\n## Rules\n- Deps: SchemaRegistry, schemaRef, workspaceSchemasPaths, schemaPlugins[], schemaOverrides?. `execute()` no args.\n- Pipeline: (1) resolve base — null→SchemaNotFoundError; (2) recursive extends + cycle detect→SchemaValidationError; (3) extends layers root→parent `source:'extends'`; (4) plugins must `kind:schema-plugin` else SchemaValidationError; (5) normalize override hooks YAML→domain recursively, layer `source:'override'`; (6) mergeSchemaLayers; (7) if layers: pre-merge buildSchema on inherited for base-error attribution; (8) buildSchema — with layers ref `\"<schemaRef> (resolved)\"` else schemaRef. Child templates override parent same path.\n- Returns `Promise<Schema>`. Idempotent, deterministic. Config factory via `resolveResolveSchemaDeps`.\n\n## Constraints\n- application/use-cases/; domain services + SchemaRegistry only — no infra imports. Plugin miss = hard error. Extends unlimited depth, cycles detected.",
+      "value": "# ResolveSchema\n\n## Rules\n\n- Construct with `schemas: SchemaRegistry`, `schemaRef: string` (from `specd.yaml`), `workspaceSchemasPaths: ReadonlyMap<string, string>`, `schemaPlugins: readonly string[]` (declaration order), `schemaOverrides: SchemaOperations | undefined`.\n- `execute()` takes no arguments. Returns `Promise<Schema>`. `GetActiveSchema` delegates here.\n- Pipeline order:\n  1. `SchemaRegistry.resolve(schemaRef, workspaceSchemasPaths)`. `null` → `SchemaNotFoundError`. Templates load here.\n  2. If base declares `extends`, resolve parents recursively to a schema with no `extends`. Each resolved schema is an `extends` layer. Track file paths; cycle → `SchemaValidationError`. `overlayData` cascade: child inherits parent `compat` unless child overrides it.\n  3. `SchemaLayer[]` root ancestor → immediate parent, `source: \"extends\"`.\n  4. Each `schemaPlugins` ref: `resolve`; `null` → `SchemaNotFoundError`; `kind: schema` instead of `kind: schema-plugin` → `SchemaValidationError`. Layer `source: \"plugin\"`.\n  5. If `schemaOverrides` defined, normalize workflow hooks before the layer, recursively on `append|prepend|create|set`: `{ id, run }` → `{ id, type: \"run\", command }`; `{ id, instruction }` → `{ id, type: \"instruction\", text }`. One layer `source: \"override\"`.\n  6. When plugins or overrides present, `buildSchema(schemaRef, inheritedData, templates)` on pre-merge data first so base errors attribute to the base ref. Throw propagates immediately.\n  7. `mergeSchemaLayers(base, [...extendsLayers, ...pluginLayers, ...overrideLayers])`.\n  8. `buildSchema(ref, mergedData, templates)`. If any layers applied, ref MUST be `\"<schemaRef> (resolved)\"`; else original `schemaRef`.\n- Extends templates accumulate. Child template overrides parent on the same relative path. Final map goes to `buildSchema`.\n- `SchemaRegistry.resolve()` must expose parsed `SchemaYamlData`, loaded templates, and resolved file path (cycle detection). Richer result or a lower-level intermediate method is allowed.\n- Idempotent: same construction config → equivalent `Schema`. No side effects that alter later calls.\n- Factory `createResolveSchema(config, options?)` → `resolveResolveSchemaDeps(resolver)` → canonical `createResolveSchema(deps)`. Resolver: `schemas`, `schemaRef`, `schemaPlugins`, `schemaOverrides`. No inline fs wiring.\n\n## Constraints\n\n- Application use case in `application/use-cases/`.\n- Imports domain `mergeSchemaLayers`, `buildSchema`, and `SchemaRegistry`. MUST NOT import infrastructure.\n- Deterministic: same inputs → same schema.\n- Plugin resolution failures are hard errors, not warnings.\n- Extends chain has no depth limit; cycles are detected.\n",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:0b57840d11314533eced2b59fc70824768e6108d306beaa4638bc2e1760f86b5",
-          "lastModified": "2026-07-06T14:22:55.215Z"
+          "hash": "sha256:69a626c2c2cf1877b3094b4ee1062656168a021b9d16890b65f9797a59cd4f0f",
+          "lastModified": "2026-08-27T00:15:51.006Z"
         },
         "verify.md": {
-          "hash": "sha256:e0bc39911eb456cd9ae7cec500115e9cc5f02e506d833825ddab5a6548ffeb70",
-          "lastModified": "2026-07-06T14:22:55.216Z"
+          "hash": "sha256:cafdffb5cf24dc96bc0bf3b0b4552eb99b06e2d03c3812f4c63a8377ac6ae3be",
+          "lastModified": "2026-08-27T00:15:51.007Z"
         }
       }
     }

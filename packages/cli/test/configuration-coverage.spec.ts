@@ -192,8 +192,8 @@ describe('Configuration Documentation Coverage (dynamic introspection)', () => {
     })
 
     it('contains comprehensive reference table with default values column', () => {
-      expect(guideContent.includes('| Default |')).toBe(true)
-      expect(guideContent.includes('| Cascade Rule |')).toBe(true)
+      expect(guideContent.includes('| Default')).toBe(true)
+      expect(guideContent.includes('| Cascade Rule')).toBe(true)
     })
   })
 })

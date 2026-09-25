@@ -10,6 +10,14 @@
 - **THEN** it receives `ChangeRepository`, `ArchiveRepository`, `HookRunner`, `ReadonlyMap<string, ExternalHookRunner>`, and `SchemaProvider`
 - **AND** they are stored as instance properties for use during `execute`
 
+#### Scenario: Developer hook text is passed to HookRunner verbatim
+
+- **GIVEN** a `run:` hook command `echo "Resultado: {{change.name}}"`
+- **WHEN** `RunStepHooks` builds the variables and calls `HookRunner.run`
+- **THEN** the command string still contains the developer quotes around `{{change.name}}`
+- **AND** the recorded result command is that same schema string
+- **AND** `RunStepHooks` does not call `expandForShell()`
+
 ### Requirement: Input
 
 #### Scenario: execute receives name, step, phase, and optional only

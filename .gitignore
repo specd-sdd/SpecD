@@ -17,7 +17,9 @@ apps/public-web/.generated/
 .codex/
 .opencode/
 .gemini/
-.github/
+.github/*
+!.github/workflows/
+!.github/workflows/**
 skills-lock.json
 
 # Environment

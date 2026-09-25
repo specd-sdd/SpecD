@@ -3,6 +3,7 @@ import { type ChildProcess } from 'node:child_process'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { acquireGraphIndexLockLeaseByStoragePath } from '../../../src/infrastructure/index-lock.js'
 import {
@@ -37,12 +38,16 @@ describe('isolated graph-index supervisor signals', () => {
           execPath: process.execPath,
           env: {},
         }) as unknown as IsolatedGraphIndexRuntime['process'],
-        workerUrl: new URL('file:///tmp/isolated-worker.js'),
+        workerUrl: pathToFileURL(join(tmpdir(), 'specd-isolated-worker.js')),
         acquireLock: (storageRoot) =>
           acquireGraphIndexLockLeaseByStoragePath(storageRoot, { signalCleanup: 'exit-only' }),
       }
       const pending = runIsolatedGraphIndexWithRuntime(
-        { storageRoot: root, taskModule: new URL('file:///tmp/task.js'), taskInput: null },
+        {
+          storageRoot: root,
+          taskModule: pathToFileURL(join(tmpdir(), 'specd-isolated-task.js')),
+          taskInput: null,
+        },
         runtime,
       )
       events.emit(signal)

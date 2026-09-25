@@ -25,6 +25,13 @@ describe('GitVcsAdapter', () => {
     expect(gitSyncMock).not.toHaveBeenCalled()
   })
 
+  it('uppercases a Windows drive letter from git stdout', () => {
+    gitSyncMock.mockReturnValue('c:/repo')
+    const adapter = new GitVcsAdapter('/repo/worktree')
+
+    expect(adapter.rootDir()).toBe('C:\\repo')
+  })
+
   it('queries git synchronously for the repository root when uncached', () => {
     gitSyncMock.mockReturnValue('/repo')
     const adapter = new GitVcsAdapter('/repo/worktree')
@@ -106,6 +113,13 @@ describe('GitVcsAdapter', () => {
       '--others',
       '--exclude-standard',
     )
+  })
+
+  it('keeps parent segments when making modified paths portable', async () => {
+    gitMock.mockResolvedValueOnce(['M', 'src\\..\\secret', ''].join('\0')).mockResolvedValueOnce('')
+    const adapter = new GitVcsAdapter('/repo/nested', '/repo')
+
+    await expect(adapter.modifiedFiles('base123')).resolves.toEqual(['src/../secret'])
   })
 
   it('rejects modified-file enumeration failures', async () => {

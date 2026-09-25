@@ -6,11 +6,47 @@
   "dependsOn": ["core:composition", "default:_global/architecture"],
   "implementation": [
     {
-      "file": "core:test/composition/vcs-adapter.spec.ts"
+      "file": "core:src/infrastructure/fs/path-platform.ts",
+      "symbols": ["normalizeVcsRoot", "toPortablePath"]
     },
     {
-      "file": "core:src/composition/vcs-adapter.ts",
-      "symbols": ["createVcsAdapter"]
+      "file": "core:src/infrastructure/git/vcs-adapter.ts",
+      "symbols": ["GitVcsAdapter", "addPortablePath"]
+    },
+    {
+      "file": "core:src/infrastructure/hg/vcs-adapter.ts",
+      "symbols": ["HgVcsAdapter"]
+    },
+    {
+      "file": "core:src/infrastructure/svn/vcs-adapter.ts",
+      "symbols": ["SvnVcsAdapter"]
+    },
+    {
+      "file": "core:src/infrastructure/git/exec.ts",
+      "symbols": ["git", "gitSync", "spawnOptions"]
+    },
+    {
+      "file": "core:src/infrastructure/hg/exec.ts",
+      "symbols": ["hg", "hgSync", "spawnOptions"]
+    },
+    {
+      "file": "core:src/infrastructure/svn/exec.ts",
+      "symbols": ["svn", "svnSync", "spawnOptions"]
+    },
+    {
+      "file": "core:test/infrastructure/fs/path-platform.spec.ts"
+    },
+    {
+      "file": "core:test/infrastructure/git/vcs-adapter.spec.ts"
+    },
+    {
+      "file": "core:test/infrastructure/hg/vcs-adapter.spec.ts"
+    },
+    {
+      "file": "core:test/infrastructure/svn/vcs-adapter.spec.ts"
+    },
+    {
+      "file": "core:test/infrastructure/vcs-spawn-options.spec.ts"
     }
   ],
   "optimizations": {

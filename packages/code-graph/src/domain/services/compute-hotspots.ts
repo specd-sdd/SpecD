@@ -9,6 +9,7 @@ import {
 import { computeRiskLevel, RISK_ORDER } from '../value-objects/risk-level.js'
 import { type SymbolNode } from '../value-objects/symbol-node.js'
 import { matchesExclude } from './matches-exclude.js'
+import { isDriveLetterPath, splitWorkspaceIdentity } from './split-workspace-identity.js'
 
 /**
  * Extracts the workspace prefix from a colon-separated file path (workspace:relative-path).
@@ -16,8 +17,8 @@ import { matchesExclude } from './matches-exclude.js'
  * @returns The workspace name, or the entire path if no colon is present.
  */
 function extractWorkspace(filePath: string): string {
-  const idx = filePath.indexOf(':')
-  return idx === -1 ? filePath : filePath.substring(0, idx)
+  if (isDriveLetterPath(filePath)) return ''
+  return splitWorkspaceIdentity(filePath)?.workspace ?? filePath
 }
 
 /**
@@ -218,7 +219,11 @@ export async function computeHotspots(
   let filtered = entries.filter((e) => {
     if (e.score < minScore) return false
     if (RISK_ORDER[e.riskLevel] < minRiskOrder) return false
-    if (options?.workspace && !e.symbol.filePath.startsWith(options.workspace + ':')) return false
+    if (
+      options?.workspace &&
+      splitWorkspaceIdentity(e.symbol.filePath)?.workspace !== options.workspace
+    )
+      return false
     if (
       effectiveKinds !== undefined &&
       effectiveKinds.length > 0 &&

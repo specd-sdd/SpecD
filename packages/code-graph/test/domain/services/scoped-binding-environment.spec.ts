@@ -87,6 +87,36 @@ describe('scoped binding environment', () => {
     expect(ambiguous.lookup('service', filePath)).toHaveLength(0)
   })
 
+  it('does not treat a drive letter as a workspace prefix', () => {
+    const drivePath = 'C:/repo/src/a.ts'
+    const target = createSymbolNode({
+      name: 'Widget',
+      kind: SymbolKind.Function,
+      filePath: drivePath,
+      line: 1,
+      column: 0,
+    })
+    const prefixes: Array<string | undefined> = []
+    const environment = buildScopedBindingEnvironment({
+      analysis: mockAnalysis({
+        facts: [{ ...fact('widget', 'Widget', filePath), filePath: drivePath }],
+      }),
+      importMap: new Map(),
+      symbolLookup: {
+        findByName: (name, filePrefix) => {
+          prefixes.push(filePrefix)
+          return name === 'Widget' ? [target] : []
+        },
+        findByFile: () => [],
+      },
+    })
+
+    const binding = environment.lookup('widget', filePath)[0]
+    expect(environment.resolveTargetSymbol(binding!)).toBe(target)
+    expect(prefixes).toContain(undefined)
+    expect(prefixes).not.toContain('C:')
+  })
+
   it('resolves constructor and type facts into distinct dependency relations', () => {
     const source = createSymbolNode({
       name: 'create',

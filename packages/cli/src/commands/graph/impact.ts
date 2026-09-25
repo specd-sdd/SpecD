@@ -11,7 +11,11 @@ import { output, parseFormat } from '../../formatter.js'
 import { resolveGraphCliContext } from './resolve-graph-cli-context.js'
 import { withProvider } from './with-provider.js'
 import { warnGraphStale } from './warn-graph-staleness.js'
-import { resolveImpactFileSelectors, toGraphDisplayPath } from './resolve-impact-file-selectors.js'
+import {
+  resolveImpactFileSelectors,
+  splitWorkspaceIdentity,
+  toGraphDisplayPath,
+} from './resolve-impact-file-selectors.js'
 import { parseGraphKinds } from './parse-graph-kinds.js'
 
 /** Provider-supported graph impact traversal directions. */
@@ -460,9 +464,7 @@ async function handlePublicExportImpact(
     }
     if (matches.length === 1) canonicalSurface = matches[0]!.canonicalPath
   }
-  const workspaceSeparator = canonicalSurface.indexOf(':')
-  const workspace =
-    workspaceSeparator > 0 ? canonicalSurface.slice(0, workspaceSeparator) : 'default'
+  const workspace = splitWorkspaceIdentity(canonicalSurface)?.workspace ?? 'default'
   const resolution = await provider.resolveSymbolReference({
     workspace,
     requested: exportedName,

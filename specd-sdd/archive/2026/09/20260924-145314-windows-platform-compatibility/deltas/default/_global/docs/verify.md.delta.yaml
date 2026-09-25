@@ -1,0 +1,10 @@
+- op: modified
+  description: 'The workflow guide scenario matches verbatim hook substitution.'
+  selector:
+    type: section
+    matches: 'Scenario: Configuration and workflow guide parameters match core implementation'
+  content: |
+    - **WHEN** reviewing `docs/guide/configuration.md`, `docs/guide/workspaces.md`, `docs/guide/schemas.md`, and `docs/guide/workflow.md`
+    - **THEN** all supported archive pattern variables (`{{year}}`, `{{month}}`, `{{day}}`, `{{date}}`, `{{change.name}}`, `{{change.archivedName}}`) MUST be accurately documented without mentioning unsupported variables
+    - **AND** hook and artifact template substitution MUST be accurately documented, including verbatim `run:` values, host quote translation, and non-Windows execution via absolute `SHELL` or `/bin/sh`
+    - **AND** workspace adapter options (`metadataPath`), graph settings, and reserved workspace names (`root`) MUST be documented without contradictions

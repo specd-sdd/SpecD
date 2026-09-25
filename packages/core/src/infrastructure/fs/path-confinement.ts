@@ -1,5 +1,6 @@
 import * as path from 'node:path'
 import { PathTraversalError } from '../../domain/errors/path-traversal-error.js'
+import { isPathInside } from './path-platform.js'
 
 /**
  * Resolves a relative path against a storage root while enforcing confinement.
@@ -32,7 +33,7 @@ export function resolveConfinedPath(
   }
 
   const resolved = path.resolve(normalizedRoot, ...normalizedRelative.split('/'))
-  if (resolved !== normalizedRoot && !resolved.startsWith(normalizedRoot + path.sep)) {
+  if (!isPathInside(normalizedRoot, resolved)) {
     throw new PathTraversalError(relative)
   }
 

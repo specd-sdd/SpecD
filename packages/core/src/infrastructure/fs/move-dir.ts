@@ -5,7 +5,7 @@ import * as fs from 'node:fs/promises'
  * as needed.
  *
  * Attempts an atomic `fs.rename` first. If the target already exists
- * (`ENOTEMPTY` or `EEXIST`), falls back to a recursive copy followed by
+ * (`ENOTEMPTY`, `EEXIST`, `EPERM`, or `EXDEV`), falls back to a recursive copy followed by
  * removal of the source. The fallback is not atomic but avoids data loss —
  * the source is only removed after the copy succeeds.
  *
@@ -27,10 +27,10 @@ export async function moveDir(source: string, target: string): Promise<void> {
  * directory already existing.
  *
  * @param err - The caught error value to inspect
- * @returns Whether the error is ENOTEMPTY or EEXIST
+ * @returns Whether the error is ENOTEMPTY, EEXIST, EPERM, or EXDEV
  */
 function isRenameConflict(err: unknown): boolean {
   if (typeof err !== 'object' || err === null) return false
   const code = (err as NodeJS.ErrnoException).code
-  return code === 'ENOTEMPTY' || code === 'EEXIST'
+  return code === 'ENOTEMPTY' || code === 'EEXIST' || code === 'EPERM' || code === 'EXDEV'
 }

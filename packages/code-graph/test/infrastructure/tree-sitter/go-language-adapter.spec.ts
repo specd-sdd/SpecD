@@ -206,6 +206,25 @@ describe('GoLanguageAdapter', () => {
     expect(second.publicBindings[0]?.surface).toBe('workspace:')
   })
 
+  it('keeps a drive letter in the package surface', () => {
+    const facts = baseAdapter.analyzeFile('C:/repo/src/a.go', 'package src\ntype Widget struct{}', {
+      session: new InMemoryIndexSession(),
+      workspaceName: 'ws',
+    }).referenceFacts!
+
+    expect(facts.publicBindings[0]?.surface).toBe('C:/repo/src')
+    expect(facts.publicBindings[0]?.surface).not.toBe('C:')
+  })
+
+  it('keeps a drive-root package surface from becoming workspace C', () => {
+    const facts = baseAdapter.analyzeFile('C:/a.go', 'package root\ntype Widget struct{}', {
+      session: new InMemoryIndexSession(),
+      workspaceName: 'ws',
+    }).referenceFacts!
+
+    expect(facts.publicBindings[0]?.surface).toBe('C:')
+  })
+
   it('owner-qualifies receiver methods and emits interface evidence', () => {
     const session = new InMemoryIndexSession()
     const facts = baseAdapter.analyzeFile(

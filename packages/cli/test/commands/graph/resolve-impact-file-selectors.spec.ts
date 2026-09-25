@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { toGraphDisplayPath } from '../../../src/commands/graph/resolve-impact-file-selectors.js'
+import {
+  toGraphDisplayPath,
+  splitWorkspaceIdentity,
+} from '../../../src/commands/graph/resolve-impact-file-selectors.js'
 import { makeMockConfig } from '../helpers.js'
 
 function configWithCoreWorkspace(): ReturnType<typeof makeMockConfig> {
@@ -54,5 +57,11 @@ describe('toGraphDisplayPath', () => {
     expect(toGraphDisplayPath(config, 'no-separator.ts')).toBe('no-separator.ts')
     expect(toGraphDisplayPath(config, ':leading-colon')).toBe(':leading-colon')
     expect(toGraphDisplayPath(config, 'core:')).toBe('core:')
+    expect(toGraphDisplayPath(config, 'C:/repo/src/a.ts')).toBe('C:/repo/src/a.ts')
+  })
+
+  it('does not parse a bare drive letter as workspace C', () => {
+    expect(splitWorkspaceIdentity('C:')).toBeNull()
+    expect(splitWorkspaceIdentity('C:/repo/src/a.ts')).toBeNull()
   })
 })

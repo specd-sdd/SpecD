@@ -142,6 +142,12 @@ unrelated I/O errors MUST propagate without recreation authority.
 A healthy forced reindex SHALL use the existing opened-store logical clear path and
 MUST NOT implement force by closing, deleting, reopening, or re-closing SQLite.
 
+### Requirement: Locked recreation preserves the index lease
+
+When `recreate()` deletes the SQLite database or its WAL sidecars and the deletion fails with `EPERM`, `EBUSY`, or `EACCES`, it MUST retry a bounded number of times and then MUST surface the original error.
+
+`recreate()` MUST NOT delete a live `index.lock`. A lock that is held by a running index MUST survive recreation of the database files.
+
 ### Requirement: SQLite logical clear parity
 
 The SQLite implementation of `clear()` SHALL execute one atomic logical-generation reset while the worker remains open. The transaction MUST remove physical graph rows, specs, relations, indexed-input observations, index-coverage rows, logical symbols and declarations, public and local bindings, reference and resolution facts, freshness latches, derivation metadata, and full-text index contents that belong to the cleared generation.

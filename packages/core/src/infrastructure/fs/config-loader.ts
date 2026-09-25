@@ -12,6 +12,8 @@ import {
 } from '../../application/specd-config.js'
 import { type SchemaOperations } from '../../domain/services/merge-schema-layers.js'
 import { ConfigValidationError } from '../../domain/errors/config-validation-error.js'
+import { isPathInside } from './path-platform.js'
+import { isWindowsDeviceName } from '../../domain/services/windows-device-name.js'
 import { StorageDirectoryNotFoundError } from '../../domain/errors/index.js'
 import {
   isRecord,
@@ -384,6 +386,12 @@ export class FsConfigLoader extends ConfigLoader {
     const warnings: string[] = []
 
     const workspaces: SpecdWorkspaceConfig[] = Object.entries(data.workspaces).map(([name, ws]) => {
+      if (isWindowsDeviceName(name)) {
+        throw new ConfigValidationError(
+          rootConfigPath,
+          `'workspaces.${name}' is invalid because '${name}' is a Windows device name`,
+        )
+      }
       const specsBinding = resolveAdapterBinding(
         configDir,
         rootConfigPath,
@@ -426,8 +434,7 @@ export class FsConfigLoader extends ConfigLoader {
       const ownership = ws.ownership ?? (name === 'default' ? 'owned' : 'readOnly')
       const isExternal =
         this.rootPath !== null && specsBinding.binding.adapter === 'fs'
-          ? !specsBinding.legacyPath.startsWith(this.rootPath + path.sep) &&
-            specsBinding.legacyPath !== this.rootPath
+          ? !isPathInside(this.rootPath, specsBinding.legacyPath)
           : false
       return {
         name,
@@ -527,10 +534,10 @@ export class FsConfigLoader extends ConfigLoader {
     )
 
     if (this.rootPath !== null) {
-      if (
-        !resolvedConfigPath.startsWith(this.rootPath + path.sep) &&
-        resolvedConfigPath !== this.rootPath
-      ) {
+      if (!isPathInside(this.rootPath, rootConfigPath)) {
+        throw new ConfigValidationError(rootConfigPath, 'config file resolves outside VCS root')
+      }
+      if (!isPathInside(this.rootPath, resolvedConfigPath)) {
         throw new ConfigValidationError(rootConfigPath, 'configPath resolves outside VCS root')
       }
       for (const [key, binding] of [
@@ -540,10 +547,7 @@ export class FsConfigLoader extends ConfigLoader {
         ['archive', archiveBinding],
       ] as const) {
         if (binding.binding.adapter !== 'fs') continue
-        if (
-          !binding.legacyPath.startsWith(this.rootPath + path.sep) &&
-          binding.legacyPath !== this.rootPath
-        ) {
+        if (!isPathInside(this.rootPath, binding.legacyPath)) {
           throw new ConfigValidationError(
             rootConfigPath,
             `storage path '${key}' resolves outside VCS root`,

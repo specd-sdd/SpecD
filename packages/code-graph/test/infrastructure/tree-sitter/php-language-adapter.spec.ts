@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from 'vitest'
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { tmpdir } from 'node:os'
 import { PhpLanguageAdapter } from '../../../src/infrastructure/tree-sitter/php-language-adapter.js'
 import { SymbolKind } from '../../../src/domain/value-objects/symbol-kind.js'
@@ -691,22 +691,23 @@ class ArticlesController {
 
   describe('extractRelations — require/include', () => {
     it('require_once with relative string literal emits IMPORTS', () => {
-      const filePath = '/var/www/app/controllers/PostsController.php'
+      const root = join(tmpdir(), 'php-require')
+      const filePath = join(root, 'app', 'controllers', 'PostsController.php')
       const content = `<?php\nrequire_once '../models/Post.php';`
       const relations = adapter.extractRelations(filePath, content, [], new Map())
       const importsRels = relations.filter((r: Relation) => r.type === RelationType.Imports)
       expect(importsRels).toHaveLength(1)
-      // path.resolve('/var/www/app/controllers', '../models/Post.php') = '/var/www/app/models/Post.php'
-      expect(importsRels[0]!.target).toBe('/var/www/app/models/Post.php')
+      expect(importsRels[0]!.target).toBe(resolve(root, 'app', 'models', 'Post.php'))
     })
 
     it('include with relative path emits IMPORTS', () => {
-      const filePath = '/var/www/app/bootstrap.php'
+      const root = join(tmpdir(), 'php-include')
+      const filePath = join(root, 'app', 'bootstrap.php')
       const content = `<?php\ninclude 'helpers/url_helper.php';`
       const relations = adapter.extractRelations(filePath, content, [], new Map())
       const importsRels = relations.filter((r: Relation) => r.type === RelationType.Imports)
       expect(importsRels).toHaveLength(1)
-      expect(importsRels[0]!.target).toBe('/var/www/app/helpers/url_helper.php')
+      expect(importsRels[0]!.target).toBe(resolve(root, 'app', 'helpers', 'url_helper.php'))
     })
 
     it('require with variable is silently dropped', () => {
@@ -722,13 +723,16 @@ class ArticlesController {
     })
 
     it('require_once alongside use statements produces require relation', () => {
-      const filePath = '/var/www/app/controllers/PostsController.php'
+      const root = join(tmpdir(), 'php-require-use')
+      const filePath = join(root, 'app', 'controllers', 'PostsController.php')
       const content = `<?php\nuse App\\Models\\User;\nrequire_once 'bootstrap.php';`
       const importMap = new Map([['User', 'myws:src/Models/User.php:class:User:1']])
       const relations = adapter.extractRelations(filePath, content, [], importMap)
       const importsRels = relations.filter((r: Relation) => r.type === RelationType.Imports)
       expect(
-        importsRels.some((r: Relation) => r.target === '/var/www/app/controllers/bootstrap.php'),
+        importsRels.some(
+          (r: Relation) => r.target === join(root, 'app', 'controllers', 'bootstrap.php'),
+        ),
       ).toBe(true)
       expect(importsRels.some((r: Relation) => r.target === 'myws:src/Models/User.php')).toBe(true)
     })
@@ -1292,5 +1296,12 @@ class ArticlesController {
         relations.filter((relation: Relation) => relation.type === RelationType.Calls),
       ).toHaveLength(0)
     })
+  })
+})
+
+describe('PhpLanguageAdapter drive-letter paths', () => {
+  it('keeps a drive letter in the resolved import path', () => {
+    const resolved = baseAdapter.resolveRelativeImportPath('C:/repo/src/a.php', './b.php')
+    expect(resolved).toBe('C:/repo/src/b.php')
   })
 })

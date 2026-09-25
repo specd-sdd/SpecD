@@ -1,0 +1,23 @@
+- op: added
+  description: 'Text hashes normalize newlines before the digest.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: 'Requirement: Hash input'
+  content: |
+    ### Requirement: Text newline normalization
+
+    `ContentHasher.hash` and the shared text `sha256` helper MUST normalize line endings before the digest: every `\r\n` and every remaining `\r` MUST become `\n`. Every string passed to those functions is text. There is no binary string mode on this port.
+
+    Artifact hashes are a different contract. Pre-hash cleanup collapses whitespace before the digest, so an artifact hash MUST NOT be required to preserve line endings. Callers that hash raw file bytes MUST NOT send those bytes through the text helper.
+
+- op: modified
+  description: 'Identical hashes follow newline normalization.'
+  selector:
+    type: section
+    matches: 'Requirement: Determinism'
+  content: |
+    The same input string MUST always produce the same output after text newline normalization. Two calls whose content is identical once `\r\n` and `\r` are normalized to `\n` MUST return identical results.

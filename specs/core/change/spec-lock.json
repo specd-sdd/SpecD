@@ -15,12 +15,15 @@
   ],
   "implementation": [
     {
+      "file": "core:src/domain/services/windows-device-name.ts",
+      "symbols": ["isWindowsDeviceName"]
+    },
+    {
       "file": "core:src/domain/entities/change.ts",
-      "symbols": [
-        "Change.startImplementationTracking",
-        "Change.implementationTrackingStartedAt",
-        "Change.isImplementationTrackingActive"
-      ]
+      "symbols": ["Change"]
+    },
+    {
+      "file": "core:test/domain/entities/change-device-name.spec.ts"
     }
   ],
   "optimizations": {

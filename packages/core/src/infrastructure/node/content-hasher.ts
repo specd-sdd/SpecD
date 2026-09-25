@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import { ContentHasher } from '../../application/ports/content-hasher.js'
+import { normalizeNewlines } from '../../domain/services/normalize-newlines.js'
 
 /** SHA-256 content hasher using Node.js crypto module. */
 export class NodeContentHasher extends ContentHasher {
@@ -10,6 +11,6 @@ export class NodeContentHasher extends ContentHasher {
    * @returns The hash in `sha256:<hex>` format
    */
   hash(content: string): string {
-    return `sha256:${createHash('sha256').update(content, 'utf8').digest('hex')}`
+    return `sha256:${createHash('sha256').update(normalizeNewlines(content), 'utf8').digest('hex')}`
   }
 }

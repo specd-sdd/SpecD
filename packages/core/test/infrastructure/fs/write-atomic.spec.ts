@@ -2,6 +2,31 @@ import * as fs from 'node:fs/promises'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+const renameControl = vi.hoisted(() => ({
+  remaining: 0,
+  error: null as NodeJS.ErrnoException | null,
+  calls: 0,
+}))
+
+vi.mock('node:fs/promises', async () => {
+  const actual = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises')
+  return {
+    ...actual,
+    rename: async (
+      from: Parameters<typeof actual.rename>[0],
+      to: Parameters<typeof actual.rename>[1],
+    ) => {
+      renameControl.calls += 1
+      if (renameControl.remaining > 0) {
+        renameControl.remaining -= 1
+        throw renameControl.error ?? Object.assign(new Error('busy'), { code: 'EBUSY' })
+      }
+      return actual.rename(from, to)
+    },
+  }
+})
+
 import { writeFileAtomic } from '../../../src/infrastructure/fs/write-atomic.js'
 
 // ---------------------------------------------------------------------------
@@ -69,5 +94,31 @@ describe('writeFileAtomic', () => {
     const entries = await fs.readdir(tmpDir)
     const tmpFiles = entries.filter((e) => e.includes('.tmp-'))
     expect(tmpFiles).toHaveLength(0)
+  })
+
+  it('retries one EBUSY and then writes the file', async () => {
+    const filePath = path.join(tmpDir, 'retry.txt')
+    const busy = Object.assign(new Error('busy'), { code: 'EBUSY' })
+    renameControl.remaining = 1
+    renameControl.error = busy
+    renameControl.calls = 0
+
+    await writeFileAtomic(filePath, 'ok')
+
+    expect(await fs.readFile(filePath, 'utf8')).toBe('ok')
+    expect(renameControl.calls).toBe(2)
+    renameControl.remaining = 0
+  })
+
+  it('throws the original error after five EBUSY failures', async () => {
+    const filePath = path.join(tmpDir, 'stuck.txt')
+    const busy = Object.assign(new Error('busy'), { code: 'EBUSY' })
+    renameControl.remaining = 5
+    renameControl.error = busy
+    renameControl.calls = 0
+
+    await expect(writeFileAtomic(filePath, 'nope')).rejects.toBe(busy)
+    expect(renameControl.calls).toBe(5)
+    renameControl.remaining = 0
   })
 })

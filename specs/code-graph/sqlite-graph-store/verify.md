@@ -302,6 +302,20 @@
 - **WHEN** force indexing runs
 - **THEN** it uses logical clear and full reanalysis without physical recreation
 
+### Requirement: Locked recreation preserves the index lease
+
+#### Scenario: A locked WAL file surfaces the original error after retries
+
+- **GIVEN** deleting a WAL sidecar keeps failing with `EBUSY`
+- **WHEN** `recreate()` exhausts its bounded retries
+- **THEN** the original error is surfaced
+
+#### Scenario: A live index lock is not deleted
+
+- **GIVEN** an index process holds `index.lock`
+- **WHEN** `recreate()` removes the database files
+- **THEN** `index.lock` is still present
+
 ### Requirement: SQLite logical clear parity
 
 #### Scenario: Healthy force clear empties all generation-owned tables

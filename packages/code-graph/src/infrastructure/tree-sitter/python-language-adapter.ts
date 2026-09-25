@@ -12,6 +12,7 @@ import { type Relation, createRelation } from '../../domain/value-objects/relati
 import { SymbolKind } from '../../domain/value-objects/symbol-kind.js'
 import { RelationType } from '../../domain/value-objects/relation-type.js'
 import { findManifestField } from './find-manifest-field.js'
+import { splitWorkspaceIdentity } from '../../domain/services/split-workspace-identity.js'
 import { type ImportDeclaration } from '../../domain/value-objects/import-declaration.js'
 import { ImportDeclarationKind } from '../../domain/value-objects/import-declaration-kind.js'
 import { BindingSourceKind, type BindingFact } from '../../domain/value-objects/binding-fact.js'
@@ -1139,9 +1140,9 @@ export class PythonLanguageAdapter implements LanguageAdapter {
    */
   resolveRelativeImportPath(fromFile: string, specifier: string): string | string[] {
     // Separate workspace prefix (e.g. "core:src/models/user.py" → "core:", "src/models/user.py")
-    const colonIdx = fromFile.indexOf(':')
-    const wsPrefix = colonIdx === -1 ? '' : fromFile.substring(0, colonIdx + 1)
-    const relFile = colonIdx === -1 ? fromFile : fromFile.substring(colonIdx + 1)
+    const identity = splitWorkspaceIdentity(fromFile)
+    const wsPrefix = identity === null ? '' : `${identity.workspace}:`
+    const relFile = identity === null ? fromFile : identity.relativePath
 
     const relDir = relFile.substring(0, relFile.lastIndexOf('/'))
     const segments = relDir ? relDir.split('/') : []

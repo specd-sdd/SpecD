@@ -1,0 +1,18 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["default:_global/testing"],
+  "implementation": [
+    {
+      "file": "default:.github/workflows/ci.yml"
+    },
+    {
+      "file": "default:.gitignore"
+    },
+    {
+      "file": "default:pnpm-workspace.yaml"
+    }
+  ]
+}

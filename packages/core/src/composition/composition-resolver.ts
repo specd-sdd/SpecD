@@ -3,6 +3,7 @@ import * as path from 'node:path'
 import { GetActiveSchema } from '../application/use-cases/get-active-schema.js'
 import { ListWorkspaces } from '../application/use-cases/list-workspaces.js'
 import { RefreshImplementationTracking } from '../application/use-cases/refresh-implementation-tracking.js'
+import { isPathInside, normalizeVcsRoot } from '../infrastructure/fs/path-platform.js'
 import { ResolveSchema } from '../application/use-cases/resolve-schema.js'
 import { RunStepHooks } from '../application/use-cases/run-step-hooks.js'
 import { type ActorResolver } from '../application/ports/actor-resolver.js'
@@ -583,6 +584,7 @@ export function createCompositionResolver(
         implementationDetector,
         resolver.getFileReader(),
         config.projectRoot,
+        { isPathInside, normalizeVcsRoot },
       )
       return refreshImplementationTracking
     },

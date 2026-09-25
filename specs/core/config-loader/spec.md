@@ -111,15 +111,21 @@ When `specs.fs.metadataPath` is explicitly declared, the loader MUST resolve it 
 
 ### Requirement: Storage path containment
 
-When `rootPath` is non-null, every resolved storage path (`changes`, `drafts`, `discarded`, `archive`) MUST resolve to a location within or equal to `rootPath`. If any storage path resolves outside `rootPath`, `load()` MUST throw `ConfigValidationError` identifying the offending storage key.
+When `rootPath` is non-null, every resolved storage path (`changes`, `drafts`, `discarded`, `archive`) whose adapter is `fs` MUST be equal to `rootPath` or inside it. A candidate is inside when, after both paths are resolved, the relative path from `rootPath` to the candidate is empty, or that relative path does not start with `..` and is not absolute. Drive-letter case MUST NOT make an inside path look outside. A string prefix of `rootPath` plus a separator MUST NOT be the containment test. If any `fs` storage path is outside `rootPath`, `load()` MUST throw `ConfigValidationError` identifying the offending storage key. A binding whose adapter is not `fs` is not a filesystem path. The loader MUST NOT apply this inside-root check to it.
 
 When `rootPath` is `null`, the containment check SHALL NOT apply — storage paths are accepted as resolved.
 
+`rootPath` MUST be the normalized repository root returned by the VCS adapter, not raw CLI stdout.
+
 ### Requirement: isExternal inference for workspaces
 
-For each workspace, the loader MUST infer the `isExternal` flag by comparing the resolved `specsPath` against `rootPath`. A workspace is external when its `specsPath` neither equals `rootPath` nor starts with `rootPath` followed by a path separator.
+For each workspace whose specs adapter is `fs`, the loader MUST infer the `isExternal` flag by testing whether the resolved `specsPath` is inside `rootPath` with the same rule as storage-path containment, including drive-letter case. A workspace is external when that `specsPath` is outside `rootPath`. When the specs adapter is not `fs`, `isExternal` MUST be `false`.
 
 When `rootPath` is `null`, `isExternal` MUST be `false` for all workspaces.
+
+### Requirement: Config file stays inside the repository root
+
+When `rootPath` is non-null, the resolved config file path MUST be inside `rootPath` under the same inside-root rule as storage-path containment. A separator mismatch or a drive-letter case difference MUST NOT reject a config file that is inside the repository. When the config file is outside `rootPath`, `load()` MUST throw `ConfigValidationError`.
 
 ### Requirement: Default values for workspace fields
 
@@ -177,4 +183,5 @@ No generic YAML/runtime exception SHALL escape for configuration validation fail
 - [`core:composition`](../composition/spec.md) — composition layer design and factory conventions
 - [`core:schema-merge`](../schema-merge/spec.md) — schema merge operations and `schemaOverrides` structure
 - [`core:vcs-adapter-port`](../vcs-adapter-port/spec.md) — default factory resolves the repository root from the VCS adapter contract
+- [`core:vcs-adapter`](../vcs-adapter/spec.md) — built-in adapters normalize the repository root before it is used as `rootPath`
 - [`default:_global/architecture`](../../_global/architecture/spec.md) — port and adapter design

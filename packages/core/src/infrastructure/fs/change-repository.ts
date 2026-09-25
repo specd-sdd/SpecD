@@ -16,6 +16,7 @@ import { ArtifactConflictError } from '../../domain/errors/artifact-conflict-err
 import { DraftedChangeReadOnlyError } from '../../domain/errors/drafted-change-read-only-error.js'
 import { ChangeMutationRequiredError } from '../../domain/errors/change-mutation-required-error.js'
 import { InvalidChangeError } from '../../domain/errors/invalid-change-error.js'
+import { isPathInside, normalizeVcsRoot } from './path-platform.js'
 import {
   toDiscardedChangeView,
   toDraftedChangeView,
@@ -235,10 +236,9 @@ export class FsChangeRepository extends ChangeRepository {
    * @returns The lifecycle bucket kind, or `null` if `dir` is not under any known root
    */
   private _bucketKindForDir(dir: string): ChangeBucketKind | null {
-    if (dir === this._changesPath || dir.startsWith(this._changesPath + path.sep)) return 'active'
-    if (dir === this._draftsPath || dir.startsWith(this._draftsPath + path.sep)) return 'drafted'
-    if (dir === this._discardedPath || dir.startsWith(this._discardedPath + path.sep))
-      return 'discarded'
+    if (isPathInside(this._changesPath, dir)) return 'active'
+    if (isPathInside(this._draftsPath, dir)) return 'drafted'
+    if (isPathInside(this._discardedPath, dir)) return 'discarded'
     return null
   }
 
@@ -1243,7 +1243,7 @@ export class FsChangeRepository extends ChangeRepository {
     })
     if (realBoundary === null) return
 
-    if (!realRoot.startsWith(realBoundary + path.sep)) return
+    if (!isStrictlyInside(realBoundary, realRoot)) return
 
     // Resolve child's parent via realpath (child itself was already removed).
     // path.resolve alone won't resolve symlinks (e.g. /tmp → /private/tmp on macOS).
@@ -1253,7 +1253,7 @@ export class FsChangeRepository extends ChangeRepository {
       throw err
     })
     if (realChildParent === null) return
-    if (realChildParent !== realRoot && !realChildParent.startsWith(realRoot + path.sep)) return
+    if (!isPathInside(realRoot, realChildParent)) return
 
     let current = childParent
 
@@ -1263,8 +1263,8 @@ export class FsChangeRepository extends ChangeRepository {
         throw err
       })
       if (realCurrent === null) break
-      if (realCurrent === realRoot || !realCurrent.startsWith(realRoot + path.sep)) break
-      if (!realCurrent.startsWith(realBoundary + path.sep)) break
+      if (!isStrictlyInside(realRoot, realCurrent)) break
+      if (!isStrictlyInside(realBoundary, realCurrent)) break
 
       let entries: string[]
       try {
@@ -2034,6 +2034,17 @@ function isDiscardedChange(change: Change): boolean {
 }
 
 // ---- Error helpers ----
+
+/**
+ * Returns whether `candidate` is inside `root` and is not the root itself.
+ *
+ * @param root - Boundary directory
+ * @param candidate - Path to test
+ * @returns True when the candidate is strictly inside the root
+ */
+function isStrictlyInside(root: string, candidate: string): boolean {
+  return isPathInside(root, candidate) && normalizeVcsRoot(root) !== normalizeVcsRoot(candidate)
+}
 
 /**
  * Returns `true` if `err` is a Node.js `EEXIST` filesystem error.

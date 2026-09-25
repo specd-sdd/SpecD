@@ -4,7 +4,17 @@
     "version": 1
   },
   "dependsOn": ["default:_global/architecture", "default:_global/conventions"],
-  "implementation": [],
+  "implementation": [
+    {
+      "file": "default:.gitattributes"
+    },
+    {
+      "file": "default:package.json"
+    },
+    {
+      "file": "default:packages/sdk/test/fixtures/publish-shaped-worker-consumer.ts"
+    }
+  ],
   "optimizations": {
     "optimizedDescription": {
       "value": "Vitest strategy: unit tests (domain/application, mocked ports) + integration tests (infrastructure, temp filesystem). No snapshots.",

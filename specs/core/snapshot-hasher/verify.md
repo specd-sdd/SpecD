@@ -21,6 +21,18 @@
 - **WHEN** two files have different content — including content that differs only in whitespace
 - **THEN** their hashes are different
 
+#### Scenario: Text file CRLF matches LF
+
+- **GIVEN** the same text path with `\r\n` content and with `\n` content
+- **WHEN** the snapshot hasher digests each
+- **THEN** the digests are equal
+
+#### Scenario: hashFiles forwards the string
+
+- **GIVEN** a string that contains `\r\n`
+- **WHEN** `hashFiles` digests it
+- **THEN** `hashContent` receives that same string, including `\r\n`
+
 ### Requirement: Path preservation
 
 #### Scenario: Path used as key

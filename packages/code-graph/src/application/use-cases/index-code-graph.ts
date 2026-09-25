@@ -38,6 +38,10 @@ import {
   type SymbolLookup,
 } from '../../domain/services/index.js'
 import { discoverFiles } from './discover-files.js'
+import {
+  splitWorkspaceIdentity,
+  toPortableGraphPath,
+} from '../../domain/services/split-workspace-identity.js'
 import { computeContentHash } from './compute-content-hash.js'
 import { InMemoryIndexSession } from './in-memory-index-session.js'
 import {
@@ -84,6 +88,26 @@ interface PreparedSpecProjection {
   readonly dependsOn: readonly string[]
   readonly implementation: readonly PersistedImplementationLink[]
   readonly changed: boolean
+}
+
+/**
+ * Returns the path after the workspace prefix.
+ *
+ * @param filePath - Canonical graph identity
+ * @returns The relative path, or the original string when there is no workspace prefix
+ */
+function relativeIdentityPath(filePath: string): string {
+  return splitWorkspaceIdentity(filePath)?.relativePath ?? filePath
+}
+
+/**
+ * Returns the workspace prefix of a graph identity.
+ *
+ * @param filePath - Canonical graph identity
+ * @returns The workspace name, or an empty string when the path is not a workspace identity
+ */
+function workspaceIdentityName(filePath: string): string {
+  return splitWorkspaceIdentity(filePath)?.workspace ?? ''
 }
 
 /**
@@ -400,7 +424,7 @@ function groupIntoChunks(
  * @returns True when the file is inside the workspace tree.
  */
 function isWithinCodeRoot(filePath: string, codeRoot: string): boolean {
-  const codeRelativePath = relative(codeRoot, filePath).replaceAll('\\', '/')
+  const codeRelativePath = toPortableGraphPath(relative(codeRoot, filePath))
   return (
     codeRelativePath === '' || (codeRelativePath !== '..' && !codeRelativePath.startsWith('../'))
   )
@@ -502,7 +526,7 @@ export class IndexCodeGraph {
         const state = analysis?.parserState as TypeScriptReExportState | undefined
         if (state?.kind !== 'typescript' || !state.reExports?.length) continue
 
-        const relPath = filePath.substring(filePath.indexOf(':') + 1)
+        const relPath = relativeIdentityPath(filePath)
         const adapter = this.registry.getAdapterForFile(relPath)
         if (!adapter?.resolveRelativeImportPath) continue
 
@@ -581,7 +605,7 @@ export class IndexCodeGraph {
     for (const filePath of session.getAllFilePaths()) {
       const analysis = session.getAnalysis(filePath)
       if (!analysis) continue
-      const relPath = filePath.substring(filePath.indexOf(':') + 1)
+      const relPath = relativeIdentityPath(filePath)
       const adapter = this.registry.getAdapterForFile(relPath)
       if (!adapter?.resolveRelativeImportPath) continue
       const importsByLocalName = new Map(
@@ -699,7 +723,7 @@ export class IndexCodeGraph {
         for (const relPath of discovered) {
           const prefixed = `${ws.name}:${relPath}`
           const absPath = join(ws.codeRoot, relPath)
-          const configRel = relative(options.projectRoot, absPath).replaceAll('\\', '/')
+          const configRel = toPortableGraphPath(relative(options.projectRoot, absPath))
 
           allDiscoveredPaths.push(prefixed)
           absolutePaths.set(prefixed, absPath)
@@ -741,7 +765,7 @@ export class IndexCodeGraph {
           const absPath = join(options.projectRoot, relPath)
           allDiscoveredPaths.push(prefixed)
           absolutePaths.set(prefixed, absPath)
-          configRelativePaths.set(prefixed, relPath.replaceAll('\\', '/'))
+          configRelativePaths.set(prefixed, toPortableGraphPath(relPath))
         }
       }
 
@@ -916,7 +940,7 @@ export class IndexCodeGraph {
           ...existingCoverage.map((coverage) => coverage.filePath),
         ])
         for (const existingPath of existingPaths) {
-          const workspace = existingPath.slice(0, existingPath.indexOf(':'))
+          const workspace = workspaceIdentityName(existingPath)
           if (!discoveredSet.has(existingPath) && indexedWorkspaceNames.has(workspace)) {
             deletedFiles.push(existingPath)
           }
@@ -965,7 +989,7 @@ export class IndexCodeGraph {
       for (const filePath of toRemove) {
         if (deletedSet.has(filePath)) {
           filesRemovedCount++
-          const wsName = filePath.substring(0, filePath.indexOf(':'))
+          const wsName = workspaceIdentityName(filePath)
           const breakdown = wsBreakdowns.get(wsName)
           if (breakdown) breakdown.filesRemoved++
         }
@@ -1059,7 +1083,7 @@ export class IndexCodeGraph {
             const contentBuffer = readFileSync(absPath)
             const decodedContent = decodeTextualContent(contentBuffer)
             // Use the relative-to-codeRoot path for adapter matching (extension-based)
-            const relPath = prefixedPath.substring(prefixedPath.indexOf(':') + 1)
+            const relPath = relativeIdentityPath(prefixedPath)
             const adapter = this.registry.getAdapterForFile(relPath)
             if (!adapter) {
               if (decodedContent === null) {
@@ -1078,7 +1102,7 @@ export class IndexCodeGraph {
                 }
                 continue
               }
-              const wsName = prefixedPath.substring(0, prefixedPath.indexOf(':'))
+              const wsName = workspaceIdentityName(prefixedPath)
               const hash = fileHashes.get(prefixedPath) ?? computeContentHash(decodedContent)
               const document = createDocumentNode({
                 path: prefixedPath,
@@ -1117,7 +1141,7 @@ export class IndexCodeGraph {
             const language = this.registry.getLanguageForFile(relPath) ?? 'unknown'
             const content = contentBuffer.toString('utf-8')
             const hash = fileHashes.get(prefixedPath) ?? computeContentHash(content)
-            const wsName = prefixedPath.substring(0, prefixedPath.indexOf(':'))
+            const wsName = workspaceIdentityName(prefixedPath)
             const ws = options.workspaces.find((w) => w.name === wsName)
 
             const draft = adapter.analyzeFile(prefixedPath, content, {
@@ -1226,7 +1250,7 @@ export class IndexCodeGraph {
             configRelativePath: configRelativePaths.get(prefixedPath) ?? '',
             language: fileLanguages.get(prefixedPath) ?? 'unknown',
             contentHash: existingArtifactHashes.get(prefixedPath) ?? '',
-            workspace: prefixedPath.substring(0, prefixedPath.indexOf(':')),
+            workspace: workspaceIdentityName(prefixedPath),
           })
           session.registerAnalysis({
             filePath: prefixedPath,
@@ -1274,11 +1298,11 @@ export class IndexCodeGraph {
             )
           }
           try {
-            const relPath = prefixedPath.substring(prefixedPath.indexOf(':') + 1)
+            const relPath = relativeIdentityPath(prefixedPath)
             const adapter = this.registry.getAdapterForFile(relPath)
             if (!adapter) continue
 
-            const wsName = prefixedPath.substring(0, prefixedPath.indexOf(':'))
+            const wsName = workspaceIdentityName(prefixedPath)
             const ws = options.workspaces.find((w) => w.name === wsName)
 
             const analysis = session.getAnalysis(prefixedPath)
@@ -1310,11 +1334,11 @@ export class IndexCodeGraph {
             )
           }
           try {
-            const relPath = prefixedPath.substring(prefixedPath.indexOf(':') + 1)
+            const relPath = relativeIdentityPath(prefixedPath)
             const adapter = this.registry.getAdapterForFile(relPath)
             if (!adapter) continue
 
-            const wsName = prefixedPath.substring(0, prefixedPath.indexOf(':'))
+            const wsName = workspaceIdentityName(prefixedPath)
             const ws = options.workspaces.find((w) => w.name === wsName)
 
             const analysis = session.getAnalysis(prefixedPath)
@@ -1680,7 +1704,7 @@ export class IndexCodeGraph {
 
       // Compute per-workspace skipped counts
       for (const filePath of skippedFiles) {
-        const wsName = filePath.substring(0, filePath.indexOf(':'))
+        const wsName = workspaceIdentityName(filePath)
         const breakdown = wsBreakdowns.get(wsName)
         if (breakdown) breakdown.filesSkipped++
       }
@@ -1724,7 +1748,7 @@ export class IndexCodeGraph {
           }
           const stat = statSync(absolutePath)
           observations.push({
-            workspace: resourceId.slice(0, resourceId.indexOf(':')),
+            workspace: workspaceIdentityName(resourceId),
             resourceKind,
             resourceId,
             inputKind: IndexedInputKind.Filesystem,

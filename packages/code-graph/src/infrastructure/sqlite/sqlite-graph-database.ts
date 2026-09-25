@@ -10,6 +10,7 @@ import { GraphStoreRecreateRequiresClosedError } from '../../domain/errors/graph
 import { expandSearchQuery } from '../../domain/services/expand-search-query.js'
 import { expandSymbolName } from '../../domain/services/expand-symbol-name.js'
 import { matchesExclude } from '../../domain/services/matches-exclude.js'
+import { splitWorkspaceIdentity } from '../../domain/services/split-workspace-identity.js'
 import { createDocumentNode, type DocumentNode } from '../../domain/value-objects/document-node.js'
 import { createFileNode, type FileNode } from '../../domain/value-objects/file-node.js'
 import { type GraphStatistics } from '../../domain/value-objects/graph-statistics.js'
@@ -54,6 +55,7 @@ import { SQLITE_SCHEMA_DDL, SQLITE_SCHEMA_VERSION } from './schema.js'
 import {
   ensureStorageGeneration,
   readStorageGeneration,
+  retryLocked,
   rotateStorageGeneration,
 } from '../storage-generation.js'
 import { type SqliteRuntimeDescriptor } from './sqlite-runtime-descriptor.js'
@@ -353,7 +355,12 @@ export class SQLiteGraphDatabase {
     if (this.db !== undefined) {
       throw new GraphStoreRecreateRequiresClosedError()
     }
-    rmSync(this.graphDir, { recursive: true, force: true })
+    const dbPath = join(this.graphDir, 'code-graph.sqlite')
+    for (const suffix of ['', '-wal', '-shm']) {
+      retryLocked(() => {
+        rmSync(`${dbPath}${suffix}`, { force: true })
+      })
+    }
     rotateStorageGeneration(this.storagePath)
     this._lastIndexedAt = undefined
     this._lastIndexedRef = null
@@ -1466,12 +1473,15 @@ export class SQLiteGraphDatabase {
         )
         if (!pattern.test(row.file_path)) return false
       }
-      if (options.workspace !== undefined && !row.file_path.startsWith(options.workspace + ':')) {
+      if (
+        options.workspace !== undefined &&
+        splitWorkspaceIdentity(row.file_path)?.workspace !== options.workspace
+      ) {
         return false
       }
       if (options.excludeWorkspaces !== undefined) {
-        const wsName = row.file_path.substring(0, row.file_path.indexOf(':'))
-        if (options.excludeWorkspaces.includes(wsName)) return false
+        const wsName = splitWorkspaceIdentity(row.file_path)?.workspace
+        if (wsName !== undefined && options.excludeWorkspaces.includes(wsName)) return false
       }
       return !matchesExclude(row.file_path, options.excludePaths, options.excludeWorkspaces)
     })

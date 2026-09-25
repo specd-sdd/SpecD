@@ -3,22 +3,28 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": ["default:_global/architecture"],
+  "dependsOn": ["default:_global/architecture", "core:template-variables"],
   "implementation": [
     {
-      "file": "core:src/application/ports/hook-runner.ts",
-      "symbols": ["HookRunnerProgressEvent", "OnHookRunnerProgress", "HookRunner"]
+      "file": "core:src/infrastructure/node/translate-hook-command.ts",
+      "symbols": ["translateHookCommand"]
     },
     {
       "file": "core:src/infrastructure/node/hook-runner.ts",
       "symbols": ["NodeHookRunner"]
     },
     {
-      "file": "core:test/application/use-cases/helpers.ts",
-      "symbols": ["makeHookRunner"]
+      "file": "core:test/infrastructure/node/hook-runner-spawn.spec.ts"
     },
     {
       "file": "core:test/infrastructure/node/hook-runner.spec.ts"
+    },
+    {
+      "file": "core:src/application/ports/hook-runner.ts",
+      "symbols": ["HookRunner"]
+    },
+    {
+      "file": "core:test/infrastructure/node/translate-hook-command.spec.ts"
     }
   ],
   "optimizations": {

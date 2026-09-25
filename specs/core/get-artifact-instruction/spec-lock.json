@@ -17,5 +17,41 @@
       "file": "core:src/application/use-cases/get-artifact-instruction.ts",
       "symbols": ["GetArtifactInstruction"]
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "GetArtifactInstruction returns schema instruction, rules, template, and delta guidance for one change artifact.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:2896763c4007388bdb429a4662438b6e54cfbd16000ce372a50a1297d9e6fb3f",
+          "lastModified": "2026-07-22T16:55:46.121Z"
+        },
+        "verify.md": {
+          "hash": "sha256:e631dae8eeed9fbc3f7a2435316cb2f1732b9bb714ad15ac252619202006471f",
+          "lastModified": "2026-07-22T16:55:46.122Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# GetArtifactInstruction\n\n## Rules\n\n- Constructor: `ChangeRepository`, `ReadonlyMap<string, SpecRepository>`, `SchemaProvider`, `ArtifactParserRegistry`, `TemplateExpander`, `LifecycleEngine`.\n- `expand()` on `instruction`, `template`, `deltaInstruction`, and `rules` text before return. Parsers supply delta format + outlines; specs read existing files; lifecycle auto-selects when `artifactId` omitted.\n- Input: `name` required; `artifactId` optional. Omitted → `LifecycleEngine.nextArtifact`: first in `schema.artifactDag().topologicalOrder()` whose deps are effectively `complete` or `skipped` and itself is not. All done → `ArtifactNotFoundError`.\n- Missing change → `ChangeNotFoundError`. `schema.name()` vs `change.schemaName` mismatch → `SchemaMismatchError`. Unknown artifact id → `ArtifactNotFoundError`.\n- Template vars only `change.name` and `change.path` via `ChangeRepository.changePath()`. MUST NOT inject `change.workspace` or primary workspace (`workspaces[0]`, default).\n- Resolve independently, declaration order:\n  - `rulesPre`: `rules.pre` texts; else `[]`\n  - `instruction`: schema field or `null`\n  - `template`: read schema-dir file via `SchemaRegistry`, expand same vars; no template → `null`\n  - `delta` when `delta: true`: `formatInstructions` = `parsers.get(artifact.format).deltaInstructions()`; `domainInstructions` = `deltaInstruction` or `null`; `availableOutlines` = `string[]` of `change.specIds` whose artifact file exists in `SpecRepository`. MUST NOT embed outline trees; full content via `GetSpecOutline` / `specd specs outline <specPath> --artifact <artifactId>`. `delta: false` → `delta: null`\n  - `rulesPost`: `rules.post` texts; else `[]`\n- Result: `artifactId`, `rulesPre`, `instruction`, `template`, `delta` (`formatInstructions`, `domainInstructions`, `availableOutlines`), `rulesPost`. Scratch work uses rules+instruction+template; deltas use rules+`delta` and fetch outlines on demand.\n- Factory `createGetArtifactInstruction(config, options?)` → `resolveGetArtifactInstructionDeps(resolver)` → canonical deps form. Resolver: `changes`, `specs`, `schemaProvider`, `parsers`, `templates`, `lifecycle`. No inline fs wiring.\n\n## Constraints\n\n- Read-only: no change mutation, no commands.\n- `rules.pre` / `rules.post` augment instruction; they do not replace it.\n- Does not evaluate step availability or artifact status.\n- Missing spec artifact files skipped silently when building `availableOutlines`.\n- Full outline trees excluded; consumers call `GetSpecOutline` / `specd specs outline`.\n- Unregistered artifact format → `ParserNotRegisteredError`.\n",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:2896763c4007388bdb429a4662438b6e54cfbd16000ce372a50a1297d9e6fb3f",
+          "lastModified": "2026-07-22T16:55:46.121Z"
+        },
+        "verify.md": {
+          "hash": "sha256:e631dae8eeed9fbc3f7a2435316cb2f1732b9bb714ad15ac252619202006471f",
+          "lastModified": "2026-07-22T16:55:46.122Z"
+        }
+      }
+    }
+  }
 }

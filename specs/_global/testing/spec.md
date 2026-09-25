@@ -22,6 +22,12 @@ Port mocks implement the port interface fully. No partial mocks with `as unknown
 
 `FsSpecRepository`, `FsChangeRepository`, and other infrastructure adapters have integration tests that run against a real temporary directory (using `os.tmpdir()` + a unique subfolder per test). The temp directory is cleaned up after each test.
 
+### Requirement: Fixtures are valid on Windows
+
+Filesystem tests MUST locate temporary directories with `os.tmpdir()` and MUST build file URLs from the local path. Tests MUST NOT depend on hardcoded `/tmp`, `/var/www`, or `file:///tmp/...` paths.
+
+A test that needs an unreadable file MUST NOT use `chmod 0o000` as that condition on Windows. The setup MUST produce a file the Windows process cannot read, or the scenario MUST be skipped where that permission bit has no effect.
+
 ### Requirement: Test naming
 
 Test files use the `.spec.ts` suffix and match the name of the source file they test (`change.ts` → `change.spec.ts`). Test descriptions follow the pattern `"given <state>, when <action>, then <outcome>"` for behaviour tests. Setup/teardown helpers are named `setup<Thing>` and `cleanup<Thing>`.

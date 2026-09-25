@@ -54,6 +54,33 @@ async function resolveOne(provider: CodeGraphProvider, raw: string): Promise<Res
   )
 }
 
+const DRIVE_LETTER_PATH = /^[A-Za-z]:(?:[/\\]|$)/
+
+/**
+ * Reports whether a graph path starts with a Windows drive letter.
+ *
+ * @param value - Candidate path
+ * @returns True for `C:`, `C:/...`, and `C:\\...`
+ */
+function isDriveLetterPath(value: string): boolean {
+  return DRIVE_LETTER_PATH.test(value)
+}
+
+/**
+ * Splits a workspace identity without treating a Windows drive letter as the workspace.
+ *
+ * @param value - Canonical graph path
+ * @returns The workspace and relative path, or null when `value` has no workspace prefix
+ */
+export function splitWorkspaceIdentity(
+  value: string,
+): { workspace: string; relativePath: string } | null {
+  if (isDriveLetterPath(value)) return null
+  const index = value.indexOf(':')
+  if (index <= 0) return null
+  return { workspace: value.slice(0, index), relativePath: value.slice(index + 1) }
+}
+
 /**
  * Projects a canonical graph resource path onto its config-relative display path.
  *
@@ -68,21 +95,17 @@ async function resolveOne(provider: CodeGraphProvider, raw: string): Promise<Res
  * @returns Project-relative display path, or the canonical input on fallback.
  */
 export function toGraphDisplayPath(config: SpecdConfig, canonicalPath: string): string {
-  const firstColon = canonicalPath.indexOf(':')
-  if (firstColon <= 0) return canonicalPath
+  const identity = splitWorkspaceIdentity(canonicalPath)
+  if (identity === null || identity.relativePath.length === 0) return canonicalPath
 
-  const identity = canonicalPath.slice(0, firstColon)
-  const rest = canonicalPath.slice(firstColon + 1)
-  if (rest.length === 0) return canonicalPath
-
-  if (identity === 'root') {
-    return toDisplaySeparators(rest)
+  if (identity.workspace === 'root') {
+    return toDisplaySeparators(identity.relativePath)
   }
 
-  const workspace = config.workspaces.find((ws) => ws.name === identity)
+  const workspace = config.workspaces.find((ws) => ws.name === identity.workspace)
   if (workspace === undefined) return canonicalPath
 
-  const display = relative(config.projectRoot, join(workspace.codeRoot, rest))
+  const display = relative(config.projectRoot, join(workspace.codeRoot, identity.relativePath))
   return toDisplaySeparators(display)
 }
 

@@ -25,6 +25,13 @@ describe('SvnVcsAdapter', () => {
     expect(svnSyncMock).not.toHaveBeenCalled()
   })
 
+  it('uppercases a Windows drive letter from svn stdout', () => {
+    svnSyncMock.mockReturnValue('c:\\repo')
+    const adapter = new SvnVcsAdapter('/repo/worktree')
+
+    expect(adapter.rootDir()).toBe('C:\\repo')
+  })
+
   it('queries svn synchronously for the working-copy root when uncached', () => {
     svnSyncMock.mockReturnValue('/repo')
     const adapter = new SvnVcsAdapter('/repo/worktree')
@@ -84,6 +91,13 @@ describe('SvnVcsAdapter', () => {
     ])
     expect(svnMock).toHaveBeenNthCalledWith(1, '/repo', 'diff', '--summarize', '-r', '42:WORKING')
     expect(svnMock).toHaveBeenNthCalledWith(2, '/repo', 'status')
+  })
+
+  it('keeps parent segments when making modified paths portable', async () => {
+    svnMock.mockResolvedValueOnce('M       src\\..\\secret').mockResolvedValueOnce('')
+    const adapter = new SvnVcsAdapter('/repo/nested', '/repo')
+
+    await expect(adapter.modifiedFiles('42')).resolves.toEqual(['src/../secret'])
   })
 
   it('rejects modified-file enumeration failures', async () => {

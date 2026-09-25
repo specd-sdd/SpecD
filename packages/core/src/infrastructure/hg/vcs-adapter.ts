@@ -1,4 +1,5 @@
 import { VcsAdapter, type VcsIdentity } from '../../application/ports/vcs-adapter.js'
+import { normalizeVcsRoot, toPortablePath } from '../fs/path-platform.js'
 import { hg, hgSync } from './exec.js'
 
 /**
@@ -19,7 +20,7 @@ export class HgVcsAdapter extends VcsAdapter {
    */
   constructor(cwd: string = process.cwd(), rootDir?: string) {
     super(cwd)
-    this._rootDir = rootDir ?? null
+    this._rootDir = rootDir === undefined ? null : normalizeVcsRoot(rootDir)
   }
 
   /**
@@ -39,7 +40,7 @@ export class HgVcsAdapter extends VcsAdapter {
 
   /** @inheritdoc */
   rootDir(): string {
-    return this._rootDir ?? hgSync(this.cwd, 'root')
+    return this._rootDir ?? normalizeVcsRoot(hgSync(this.cwd, 'root'))
   }
 
   /** @inheritdoc */
@@ -91,7 +92,7 @@ export class HgVcsAdapter extends VcsAdapter {
       if (status !== 'M' && status !== 'A' && status !== 'R' && status !== '!' && status !== '?') {
         continue
       }
-      const filePath = entry.slice(2).replaceAll('\\', '/')
+      const filePath = toPortablePath(entry.slice(2))
       if (filePath.length > 0) {
         files.add(filePath)
       }

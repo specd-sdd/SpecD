@@ -31,7 +31,7 @@
 
 - **WHEN** reviewing `docs/guide/configuration.md`, `docs/guide/workspaces.md`, `docs/guide/schemas.md`, and `docs/guide/workflow.md`
 - **THEN** all supported archive pattern variables (`{{year}}`, `{{month}}`, `{{day}}`, `{{date}}`, `{{change.name}}`, `{{change.archivedName}}`) MUST be accurately documented without mentioning unsupported variables
-- **AND** hook and artifact template variable substitution and shell escaping behavior MUST be accurately documented
+- **AND** hook and artifact template substitution MUST be accurately documented, including verbatim `run:` values, host quote translation, and non-Windows execution via absolute `SHELL` or `/bin/sh`
 - **AND** workspace adapter options (`metadataPath`), graph settings, and reserved workspace names (`root`) MUST be documented without contradictions
 
 #### Scenario: Project update command and plugin asset orchestration are documented

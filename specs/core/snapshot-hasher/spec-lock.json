@@ -3,6 +3,22 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": ["default:_global/architecture"],
-  "implementation": []
+  "dependsOn": ["default:_global/architecture", "core:content-hasher-port"],
+  "implementation": [
+    {
+      "file": "core:src/application/use-cases/_shared/compute-artifact-hash.ts",
+      "symbols": ["computeArtifactHash"]
+    },
+    {
+      "file": "core:src/domain/services/hash-files.ts",
+      "symbols": ["hashFiles"]
+    },
+    {
+      "file": "core:test/domain/services/hash-files.spec.ts"
+    },
+    {
+      "file": "core:src/domain/services/normalize-newlines.ts",
+      "symbols": ["normalizeNewlines"]
+    }
+  ]
 }

@@ -11,6 +11,30 @@ describe('NodeHookRunner', () => {
   const runner = new NodeHookRunner(expander)
 
   describe('run', () => {
+    it('inserts a developer-quoted value without adding quotes', async () => {
+      const result = await runner.run('printf %s "{{change.name}}"', {
+        change: { name: 'a b %PATH% &' },
+      })
+
+      expect(result.exitCode()).toBe(0)
+      expect(result.stdout()).toBe('a b %PATH% &')
+    })
+
+    it('keeps several variables inside one pair of quotes', async () => {
+      const result = await runner.run('printf %s "{{project.root}}/{{change.name}}"', {
+        change: { name: 'add-auth' },
+      })
+
+      expect(result.stdout()).toBe('/my/project/add-auth')
+    })
+
+    it('treats doubled quotes inside double quotes as one literal quote', async () => {
+      const result = await runner.run('printf %s "Resultado: ""listo"""', {})
+
+      expect(result.exitCode()).toBe(0)
+      expect(result.stdout()).toBe('Resultado: "listo"')
+    })
+
     it('runs a shell command and returns exit code 0 on success', async () => {
       const result = await runner.run('echo "hello"', {})
 
@@ -77,7 +101,7 @@ describe('NodeHookRunner', () => {
 
     it('expands change variables when present', async () => {
       const result = await runner.run('echo {{change.name}}', {
-        change: { name: 'add-auth', workspace: 'default', path: '/tmp/changes/add-auth' },
+        change: { name: 'add-auth', path: '/tmp/changes/add-auth' },
       })
 
       expect(result.stdout().trim()).toBe('add-auth')

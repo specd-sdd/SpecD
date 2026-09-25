@@ -43,7 +43,7 @@ import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { SQLiteWorkerClient } from './sqlite-worker-client.js'
 import { type InternalSQLiteGraphStoreOptions } from './sqlite-runtime-descriptor.js'
-import { rotateStorageGenerationAsync } from '../storage-generation.js'
+import { rotateStorageGenerationAsync, retryLockedAsync } from '../storage-generation.js'
 import { StoreNotOpenError } from '../../domain/errors/store-not-open-error.js'
 import { BulkSessionStateError } from '../../domain/errors/bulk-session-state-error.js'
 import { GraphStoreRecreateRequiresClosedError } from '../../domain/errors/graph-store-recreate-requires-closed-error.js'
@@ -752,7 +752,12 @@ export class SQLiteGraphStore extends GraphStore {
       throw new GraphStoreRecreateRequiresClosedError()
     }
     const graphDir = join(this.storagePath, 'graph')
-    await rm(graphDir, { recursive: true, force: true })
+    const dbPath = join(graphDir, 'code-graph.sqlite')
+    for (const suffix of ['', '-wal', '-shm']) {
+      await retryLockedAsync(async () => {
+        await rm(`${dbPath}${suffix}`, { force: true })
+      })
+    }
     await rotateStorageGenerationAsync(this.storagePath)
   }
 

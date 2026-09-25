@@ -170,6 +170,29 @@ describe('RunStepHooks', () => {
       expect(result.hooks[0]!.id).toBe('lint')
     })
 
+    it('records the schema command with template tokens intact', async () => {
+      const change = makeChange('my-change')
+      const command = 'echo "Resultado: {{change.name}}"'
+      const runHook: HookEntry = { id: 'echo-name', type: 'run', command }
+      const commands: string[] = []
+      const hookRunner = {
+        async run(received: string): Promise<HookResult> {
+          commands.push(received)
+          return new HookResult(0, '', '')
+        },
+      }
+      const uc = makeUseCase({
+        changes: makeChangeRepository([change]),
+        schema: makeSchemaWithHooks([runHook]),
+        hookRunner,
+      })
+
+      const result = await uc.execute({ name: 'my-change', step: 'implementing', phase: 'pre' })
+
+      expect(commands).toEqual([command])
+      expect(result.hooks[0]!.command).toBe(command)
+    })
+
     it('dispatches explicit external hooks through accepted-type runners', async () => {
       const change = makeChange('my-change')
       const dockerHook: HookEntry = {

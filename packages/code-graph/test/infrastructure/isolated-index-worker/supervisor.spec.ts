@@ -2,6 +2,7 @@ import { EventEmitter } from 'node:events'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { type ChildProcess } from 'node:child_process'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
@@ -10,6 +11,7 @@ import {
   GraphIndexWorkerExitError,
   GraphIndexProgressHandlerError,
   GraphIndexWorkerProtocolError,
+  GraphIndexWorkerSignalError,
   GraphIndexWorkerStartError,
 } from '../../../src/domain/errors/isolated-graph-index-errors.js'
 import { acquireGraphIndexLockLeaseByStoragePath } from '../../../src/infrastructure/index-lock.js'
@@ -17,6 +19,9 @@ import {
   runIsolatedGraphIndexWithRuntime,
   type IsolatedGraphIndexRuntime,
 } from '../../../src/infrastructure/isolated-index-worker/supervisor.js'
+
+const taskModuleUrl = pathToFileURL(join(tmpdir(), 'specd-isolated-task.js'))
+const workerModuleUrl = pathToFileURL(join(tmpdir(), 'specd-isolated-worker.js'))
 
 function fakeChild(): ChildProcess & EventEmitter {
   const child = new EventEmitter() as ChildProcess & EventEmitter
@@ -48,7 +53,7 @@ describe('isolated graph-index supervisor', () => {
         execPath: process.execPath,
         env: {},
       }) as unknown as IsolatedGraphIndexRuntime['process'],
-      workerUrl: new URL('file:///tmp/isolated-worker.js'),
+      workerUrl: workerModuleUrl,
       acquireLock: (storageRoot) =>
         acquireGraphIndexLockLeaseByStoragePath(storageRoot, { signalCleanup: 'exit-only' }),
     }
@@ -66,7 +71,7 @@ describe('isolated graph-index supervisor', () => {
     >(
       {
         storageRoot: root!,
-        taskModule: new URL('file:///tmp/task.js'),
+        taskModule: taskModuleUrl,
         taskInput: { id: 'x' },
         onProgress: (value) => progress.push(value),
       },
@@ -92,7 +97,7 @@ describe('isolated graph-index supervisor', () => {
     const current = runtime(child)
     const input = {
       storageRoot: root!,
-      taskModule: new URL('file:///tmp/task.js'),
+      taskModule: taskModuleUrl,
       taskInput: { unsupported: () => undefined },
     }
 
@@ -106,7 +111,7 @@ describe('isolated graph-index supervisor', () => {
     const child = fakeChild()
     const current = runtime(child)
     const pending = runIsolatedGraphIndexWithRuntime(
-      { storageRoot: root!, taskModule: new URL('file:///tmp/task.js'), taskInput: null },
+      { storageRoot: root!, taskModule: taskModuleUrl, taskInput: null },
       current,
     )
     child.emit('message', { protocol: 'specd.graph-index.v1', type: 'result', value: null })
@@ -120,7 +125,7 @@ describe('isolated graph-index supervisor', () => {
     const child = fakeChild()
     const current = runtime(child)
     const pending = runIsolatedGraphIndexWithRuntime(
-      { storageRoot: root!, taskModule: new URL('file:///tmp/task.js'), taskInput: null },
+      { storageRoot: root!, taskModule: taskModuleUrl, taskInput: null },
       current,
     )
     child.emit('message', { protocol: 'invalid', type: 'result', value: null })
@@ -135,7 +140,7 @@ describe('isolated graph-index supervisor', () => {
     const pending = runIsolatedGraphIndexWithRuntime(
       {
         storageRoot: root!,
-        taskModule: new URL('file:///tmp/task.js'),
+        taskModule: taskModuleUrl,
         taskInput: null,
         onProgress: () => {
           throw new Error('progress failed')
@@ -154,7 +159,7 @@ describe('isolated graph-index supervisor', () => {
     const child = fakeChild()
     const current = runtime(child)
     const pending = runIsolatedGraphIndexWithRuntime(
-      { storageRoot: root!, taskModule: new URL('file:///tmp/task.js'), taskInput: null },
+      { storageRoot: root!, taskModule: taskModuleUrl, taskInput: null },
       current,
     )
     child.emit('message', {
@@ -173,7 +178,7 @@ describe('isolated graph-index supervisor', () => {
     const child = fakeChild()
     const current = runtime(child)
     const pending = runIsolatedGraphIndexWithRuntime(
-      { storageRoot: root!, taskModule: new URL('file:///tmp/task.js'), taskInput: null },
+      { storageRoot: root!, taskModule: taskModuleUrl, taskInput: null },
       current,
     )
     child.emit('exit', 0, null)
@@ -189,7 +194,7 @@ describe('isolated graph-index supervisor', () => {
     const events = new EventEmitter()
     const current = runtime(child, events)
     const pending = runIsolatedGraphIndexWithRuntime(
-      { storageRoot: root!, taskModule: new URL('file:///tmp/task.js'), taskInput: null },
+      { storageRoot: root!, taskModule: taskModuleUrl, taskInput: null },
       current,
     )
 
@@ -225,7 +230,7 @@ describe('isolated graph-index supervisor', () => {
     const events = new EventEmitter()
     const current = runtime(child, events)
     const pending = runIsolatedGraphIndexWithRuntime(
-      { storageRoot: root!, taskModule: new URL('file:///tmp/task.js'), taskInput: null },
+      { storageRoot: root!, taskModule: taskModuleUrl, taskInput: null },
       current,
     )
 
@@ -258,7 +263,7 @@ describe('isolated graph-index supervisor', () => {
     const events = new EventEmitter()
     const current = runtime(child, events)
     const pending = runIsolatedGraphIndexWithRuntime(
-      { storageRoot: root!, taskModule: new URL('file:///tmp/task.js'), taskInput: null },
+      { storageRoot: root!, taskModule: taskModuleUrl, taskInput: null },
       current,
     )
 
@@ -281,6 +286,24 @@ describe('isolated graph-index supervisor', () => {
     expect(child.kill).toHaveBeenCalledWith('SIGTERM')
     expect(events.listenerCount('SIGINT')).toBe(0)
     expect(events.listenerCount('SIGTERM')).toBe(0)
+    expect(() => current.acquireLock(root!)).not.toThrow()
+  })
+
+  it('releases the lease on SIGBREAK and process exit', async () => {
+    const child = fakeChild()
+    const events = new EventEmitter()
+    const current = runtime(child, events)
+    const pending = runIsolatedGraphIndexWithRuntime(
+      { storageRoot: root!, taskModule: taskModuleUrl, taskInput: null },
+      current,
+    )
+    events.emit('SIGBREAK')
+    events.emit('exit')
+    expect(child.kill).toHaveBeenCalledWith('SIGBREAK')
+    child.emit('exit', null, 'SIGBREAK')
+    await expect(pending).rejects.toBeInstanceOf(GraphIndexWorkerSignalError)
+    expect(events.listenerCount('SIGBREAK')).toBe(0)
+    expect(events.listenerCount('exit')).toBe(0)
     expect(() => current.acquireLock(root!)).not.toThrow()
   })
 })

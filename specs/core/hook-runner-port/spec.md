@@ -42,7 +42,14 @@ Before executing the command, implementations MUST expand all `{{key.path}}` tem
 
 ### Requirement: Shell escaping
 
-All substituted variable values MUST be shell-escaped before interpolation to prevent shell injection attacks. Only string, number, and boolean values SHALL be substituted; complex types (objects, arrays) MUST be left unexpanded.
+Substituted `run:` values MUST be inserted verbatim. Only string, number, and boolean values SHALL be substituted; complex types (objects, arrays) MUST be left unexpanded. The runner MUST NOT add quotes around a substituted value.
+
+After substitution, the runner MUST translate quote syntax for the host shell and MUST NOT rewrite `%`:
+
+- On Windows, a single-quoted span, including the POSIX `'\''` idiom, MUST become a double-quoted span. A `"` inside that span MUST become `""`. A POSIX `\"` inside an existing double-quoted span MUST become `""`. Existing double quotes otherwise stay. The runner MUST spawn `cmd.exe` with `/d /s /c`, verbatim arguments, and a hidden console.
+- On every other platform, a `""` pair inside a double-quoted span MUST become `\"` when a closing quote still follows that pair. An empty `""` argument MUST stay empty. Single-quoted spans MUST stay single-quoted. The runner MUST spawn the POSIX shell with `-c`.
+
+Hook command text stays a developer command. The runner MUST NOT translate program names, flags, or pipes. It MUST NOT invoke the command with `execFile` to skip the shell.
 
 ### Requirement: HookResult contract
 
@@ -57,10 +64,9 @@ Live progress reporting MUST NOT weaken or replace this final result contract. C
 
 ### Requirement: HookVariables shape
 
-The `HookVariables` type MUST contain:
+`HookVariables` is the `TemplateVariables` alias. It is not a separate domain value object. `HookResult` remains a domain value object re-exported by the port.
 
-- `change?` (optional) — an object with `name: string`, `workspace: string`, and `path: string` fields representing the active change context. Absent for lifecycle points with no active change.
-- `project` (required) — an object with `root: string` representing the absolute path to the git repository root.
+The object passed to `HookRunner.run()` MAY omit `project`. `TemplateExpander` merges the builtin `project.root` before substitution. After that merge the effective map MUST contain `project.root`. `change`, when present, is an object with `name: string` and `path: string`. It MUST NOT include `workspace`. It is absent for lifecycle points with no active change.
 
 ### Requirement: Hook type distinction
 
@@ -84,10 +90,11 @@ The port itself does not enforce lifecycle semantics, but callers rely on the fo
 
 - The port lives in `application/ports/` per the hexagonal architecture rule
 - No direct dependency on `child_process`, shell detection, or any I/O at the port level
-- `HookResult` and `HookVariables` are domain value objects re-exported by the port module
+- `HookResult` is a domain value object re-exported by the port module. `HookVariables` is the `TemplateVariables` alias, not a domain value object
 - The `run` method MUST always resolve — subprocess failures are captured in `HookResult`, not thrown as exceptions
 - Progress callbacks are observational only — they MUST NOT change hook success/failure semantics or replace final captured results
 
 ## Spec Dependencies
 
 - [`default:_global/architecture`](../../_global/architecture/spec.md) — hexagonal architecture and port placement rules
+- [`core:template-variables`](../template-variables/spec.md) — verbatim `run:` substitution; `expandForShell()` remains for commands SpecD builds itself

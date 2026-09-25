@@ -2,7 +2,27 @@ import * as fs from 'node:fs/promises'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import assert from 'node:assert/strict'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+const renameLock = vi.hoisted(() => ({
+  failTarget: null as string | null,
+}))
+
+vi.mock('node:fs/promises', async () => {
+  const actual = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises')
+  return {
+    ...actual,
+    rename: async (
+      from: Parameters<typeof actual.rename>[0],
+      to: Parameters<typeof actual.rename>[1],
+    ) => {
+      if (renameLock.failTarget !== null && String(to) === renameLock.failTarget) {
+        throw Object.assign(new Error('locked'), { code: 'EBUSY' })
+      }
+      return actual.rename(from, to)
+    },
+  }
+})
 import { makeSpec as buildTestSpec } from '../../helpers/make-spec.js'
 import { Spec } from '../../../src/domain/entities/spec.js'
 import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
@@ -558,6 +578,27 @@ describe('FsSpecRepository', () => {
 
       await expect(readSpecFile(ctx, 'auth/login', 'spec.md')).resolves.toBe('# New')
       await expect(readSpecFile(ctx, 'auth/login', 'verify.md')).resolves.toBe('new verify')
+    })
+
+    it('rethrows the original EBUSY when the spec directory stays locked', async () => {
+      await writeSpecFile(ctx, 'auth/login', 'spec.md', '# Stable')
+      const spec = buildTestSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
+      renameLock.failTarget = path.join(ctx.specsPath, 'auth', 'login')
+
+      try {
+        await expect(
+          ctx.repo.publish(spec, {
+            artifacts: [new SpecArtifact('spec.md', '# New')],
+            persistedState: defaultPersistedState(),
+          }),
+        ).rejects.toMatchObject({ code: 'EBUSY' })
+      } finally {
+        renameLock.failTarget = null
+      }
     })
 
     it('preserves canonical files when staged publication fails', async () => {

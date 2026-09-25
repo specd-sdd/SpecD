@@ -146,6 +146,10 @@ After forwarding a signal, the supervisor SHALL wait for child termination, rele
 lock, and report a typed signal-derived terminal failure to the host. It MUST NOT exit
 or re-signal the host process directly.
 
+### Requirement: Index lease release on exit
+
+The process that holds the index lease MUST release it on process exit. On Windows it MUST also release the lease on `SIGBREAK`. Releasing the lease on `SIGTERM` remains required where that signal is delivered. Failure to deliver `SIGTERM` MUST NOT leave the lease held after the process has exited.
+
 ### Requirement: Internal lock handoff
 
 The child SHALL receive a code-graph-owned internal indication that its supervisor holds
@@ -192,7 +196,7 @@ live child, or open IPC channel after a terminal outcome.
 
 ## Spec Dependencies
 
-_none_
+- [`code-graph:sqlite-graph-store`](../sqlite-graph-store/spec.md) — index lease and graph persistence layout that the worker must release
 
 ## ADRs
 

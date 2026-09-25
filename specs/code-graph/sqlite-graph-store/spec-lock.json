@@ -11,36 +11,19 @@
   ],
   "implementation": [
     {
-      "file": "code-graph:src/infrastructure/sqlite/sqlite-worker-protocol.ts",
-      "symbols": ["SQLiteWorkerOperationMap"]
-    },
-    {
-      "file": "code-graph:src/infrastructure/sqlite/sqlite-worker.ts",
-      "symbols": ["handleMessage"]
-    },
-    {
       "file": "code-graph:src/infrastructure/sqlite/sqlite-graph-store.ts",
       "symbols": ["SQLiteGraphStore"]
     },
     {
       "file": "code-graph:src/infrastructure/sqlite/sqlite-graph-database.ts",
-      "symbols": ["SQLiteGraphDatabase", "queryImpactFrontier"]
+      "symbols": ["SQLiteGraphDatabase"]
     },
     {
-      "file": "code-graph:src/infrastructure/sqlite/schema.ts"
-    },
-    {
-      "file": "code-graph:test/infrastructure/sqlite/sqlite-worker-protocol.spec.ts"
+      "file": "code-graph:src/infrastructure/storage-generation.ts",
+      "symbols": ["retryLocked", "retryLockedAsync"]
     },
     {
       "file": "code-graph:test/infrastructure/sqlite/sqlite-graph-store.spec.ts"
-    },
-    {
-      "file": "code-graph:test/integration/sqlite-wide-traversal.spec.ts"
-    },
-    {
-      "file": "code-graph:src/domain/services/analyze-spec-impact.ts",
-      "symbols": ["analyzeSpecImpact"]
     }
   ],
   "optimizations": {

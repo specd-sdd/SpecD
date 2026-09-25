@@ -569,3 +569,10 @@ HandlerFn: TypeAlias = Callable[[Event], Result]
     })
   })
 })
+
+describe('PythonLanguageAdapter drive-letter paths', () => {
+  it('keeps a drive letter in the resolved import path', () => {
+    const resolved = baseAdapter.resolveRelativeImportPath('C:/repo/src/a.py', '.b')
+    expect(String(resolved)).toContain('C:/repo/src')
+  })
+})

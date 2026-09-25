@@ -1,4 +1,5 @@
 import { InvalidSpecPathError } from '../errors/invalid-spec-path-error.js'
+import { isWindowsDeviceName } from '../services/windows-device-name.js'
 import { DomainPath } from './domain-path.js'
 
 /**
@@ -75,6 +76,9 @@ export class SpecPath extends DomainPath {
     for (const segment of segments) {
       if (segment === '.' || segment === '..') {
         throw new InvalidSpecPathError(`segment '${segment}' is not allowed`)
+      }
+      if (isWindowsDeviceName(segment)) {
+        throw new InvalidSpecPathError(`segment '${segment}' is a Windows device name`)
       }
       if (/[\\:*?"<>|]/.test(segment)) {
         throw new InvalidSpecPathError(`segment '${segment}' contains invalid characters`)

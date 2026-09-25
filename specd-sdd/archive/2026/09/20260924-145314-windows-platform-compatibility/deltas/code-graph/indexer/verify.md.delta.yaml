@@ -1,0 +1,36 @@
+- op: added
+  description: 'A drive letter is not a workspace, and persisted separators are slashes.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: 'Requirement: Multi-workspace file discovery'
+  content: |
+    ### Requirement: Portable graph paths
+
+    #### Scenario: A drive letter is not a workspace prefix
+
+    - **GIVEN** a path key `C:/repo/src/a.ts`
+    - **WHEN** the indexer splits a workspace identity
+    - **THEN** `C` is not the workspace name
+
+    #### Scenario: Persisted separators are slashes and parents stay
+
+    - **GIVEN** a relative path `src\..\secret`
+    - **WHEN** it is persisted
+    - **THEN** the stored path is `src/../secret`
+
+    #### Scenario: Adapter splits keep a drive letter in the path
+
+    - **GIVEN** a relative import key `C:/repo/src/a.ts`
+    - **WHEN** a language adapter splits the workspace prefix
+    - **THEN** the workspace name is not `C`
+
+    #### Scenario: A file at the drive root is not workspace C
+
+    - **GIVEN** a Go file `C:/a.go`
+    - **WHEN** the package surface is split as a graph identity
+    - **THEN** the surface is `C:`
+    - **AND** the workspace name is not `C`

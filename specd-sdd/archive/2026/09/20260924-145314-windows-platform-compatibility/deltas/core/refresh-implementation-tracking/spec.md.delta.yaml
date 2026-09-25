@@ -1,0 +1,28 @@
+- op: added
+  description: 'Project-relative paths require a separator boundary and ignore drive-letter case.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: 'Requirement: Internal directory filtering'
+  content: |
+    ### Requirement: Project-relative paths keep a separator boundary
+
+    A path is project-relative only when it is the project root or a descendant of that root. Matching MUST require a path-separator boundary after the root. A longer path that merely shares the root as a string prefix MUST NOT count as inside. Drive-letter case MUST NOT change the result.
+
+    The portable form of the project root itself is the empty string. That empty string means the path is inside. It MUST NOT be added as an exclusion prefix. An empty result is not the signal for a path outside the root.
+
+- op: modified
+  description: 'Project-relative checks depend on the normalized VCS root.'
+  selector:
+    type: section
+    matches: '^Spec Dependencies$'
+  content: |
+    - [`core:change`](../change/spec.md)
+    - [`core:implementation-detector-port`](../implementation-detector-port/spec.md)
+    - [`core:storage`](../storage/spec.md)
+    - [`core:archive-repository-port`](../archive-repository-port/spec.md)
+    - [`core:composition-resolver`](../composition-resolver/spec.md)
+    - [`core:vcs-adapter`](../vcs-adapter/spec.md) — repository root used for project-relative path checks is the normalized adapter root

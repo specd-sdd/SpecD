@@ -15,7 +15,15 @@
     "cli:change-transition",
     "cli:change-archive"
   ],
-  "implementation": [],
+  "implementation": [
+    {
+      "file": "core:src/infrastructure/node/hook-runner.ts",
+      "symbols": ["NodeHookRunner"]
+    },
+    {
+      "file": "core:test/infrastructure/node/hook-runner-spawn.spec.ts"
+    }
+  ],
   "optimizations": {
     "optimizedDescription": {
       "value": "Defines hook types, dispatch, phase ordering, failures, manual skipping, and safe variable expansion across lifecycle operations.",

@@ -11,6 +11,7 @@ import { ArtifactConflictError } from '../../domain/errors/artifact-conflict-err
 import { ReadOnlyWorkspaceError } from '../../domain/errors/read-only-workspace-error.js'
 import { SpecMetadataParseError } from '../../domain/errors/spec-metadata-parse-error.js'
 import { SpecPublicationError } from '../../domain/errors/spec-publication-error.js'
+import { isPathInside, retryOnLock } from './path-platform.js'
 import {
   specMetadataSchema,
   type MetadataSnapshot,
@@ -475,16 +476,16 @@ export class FsSpecRepository extends SpecRepository {
 
     try {
       if (specDirExists) {
-        await fs.rename(specDir, backupDir)
+        await retryOnLock(() => fs.rename(specDir, backupDir))
       }
 
       try {
-        await fs.rename(stagingDir, specDir)
+        await retryOnLock(() => fs.rename(stagingDir, specDir))
       } catch (error) {
         if (specDirExists) {
-          await fs.rename(backupDir, specDir).catch(() => {})
+          await retryOnLock(() => fs.rename(backupDir, specDir)).catch(() => {})
         }
-        throw new SpecPublicationError(specId, stagingDir, errorMessage(error))
+        throw publicationRenameError(specId, stagingDir, error)
       }
 
       if (specDirExists) {
@@ -492,7 +493,7 @@ export class FsSpecRepository extends SpecRepository {
       }
     } catch (error) {
       if (error instanceof SpecPublicationError) throw error
-      throw new SpecPublicationError(specId, stagingDir, errorMessage(error))
+      throw publicationRenameError(specId, stagingDir, error)
     }
 
     await this._indexCache.refresh(spec)
@@ -815,7 +816,7 @@ export class FsSpecRepository extends SpecRepository {
       return this._resolveRelative(inputPath, from)
     }
 
-    if (inputPath !== this._specsPath && !inputPath.startsWith(this._specsPath + path.sep)) {
+    if (!isPathInside(this._specsPath, inputPath)) {
       return null
     }
 
@@ -1152,6 +1153,31 @@ async function pathExists(targetPath: string): Promise<boolean> {
  */
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
+}
+
+/**
+ * Surfaces a locked rename as the original errno and wraps every other failure.
+ *
+ * @param specId - Spec whose publication failed
+ * @param stagingDir - Staging directory left in place
+ * @param error - Failure from the rename swap
+ * @returns The original lock error, or a publication error for every other failure
+ */
+function publicationRenameError(specId: string, stagingDir: string, error: unknown): Error {
+  if (isPublicationLockError(error)) return error
+  return new SpecPublicationError(specId, stagingDir, errorMessage(error))
+}
+
+/**
+ * Reports whether a rename failed because the destination stayed locked.
+ *
+ * @param error - Unknown thrown value
+ * @returns True for `EPERM`, `EBUSY`, and `EACCES`
+ */
+function isPublicationLockError(error: unknown): error is NodeJS.ErrnoException {
+  if (typeof error !== 'object' || error === null || !('code' in error)) return false
+  const code = error.code
+  return code === 'EPERM' || code === 'EBUSY' || code === 'EACCES'
 }
 
 /**

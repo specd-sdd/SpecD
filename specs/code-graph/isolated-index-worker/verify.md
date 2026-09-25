@@ -184,6 +184,20 @@
 - **THEN** only listeners installed by that run are removed
 - **AND** all pre-existing listeners remain registered
 
+### Requirement: Index lease release on exit
+
+#### Scenario: Process exit releases the lease
+
+- **GIVEN** the worker holds the index lease
+- **WHEN** the process exits
+- **THEN** the lease is released
+
+#### Scenario: SIGBREAK releases the lease on Windows
+
+- **GIVEN** the worker is running on Windows and holds the index lease
+- **WHEN** the process receives `SIGBREAK`
+- **THEN** the lease is released
+
 ### Requirement: Internal lock handoff
 
 #### Scenario: Child indexing does not reacquire parent lock

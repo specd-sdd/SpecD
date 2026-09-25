@@ -8,16 +8,28 @@
     "core:implementation-detector-port",
     "core:storage",
     "core:archive-repository-port",
-    "core:composition-resolver"
+    "core:composition-resolver",
+    "core:vcs-adapter"
   ],
   "implementation": [
     {
+      "file": "core:src/infrastructure/fs/path-platform.ts",
+      "symbols": ["isPathInside"]
+    },
+    {
       "file": "core:src/application/use-cases/refresh-implementation-tracking.ts",
-      "symbols": ["RefreshImplementationTracking._specSweep"]
+      "symbols": ["RefreshImplementationTracking", "ProjectPathHelpers"]
+    },
+    {
+      "file": "core:test/application/use-cases/refresh-implementation-tracking.spec.ts"
     },
     {
       "file": "core:src/composition/use-cases/refresh-implementation-tracking.ts",
-      "symbols": ["resolveRefreshImplementationTrackingDeps"]
+      "symbols": ["createRefreshImplementationTracking"]
+    },
+    {
+      "file": "core:src/composition/composition-resolver.ts",
+      "symbols": ["createCompositionResolver"]
     }
   ],
   "optimizations": {

@@ -5,6 +5,7 @@ import {
   type PublicBindingLookup,
   type GraphStore,
 } from '../../domain/ports/graph-store.js'
+import { splitWorkspaceIdentity } from '../../domain/services/split-workspace-identity.js'
 import { IndexCoverageStatus } from '../../domain/value-objects/index-session.js'
 import {
   FreshnessState,
@@ -350,8 +351,7 @@ function deduplicateFileResources(
  * @returns Encoded workspace or the supplied fallback.
  */
 function workspaceFromFilePath(filePath: string, fallback: string): string {
-  const separator = filePath.indexOf(':')
-  return separator > 0 ? filePath.slice(0, separator) : fallback
+  return splitWorkspaceIdentity(filePath)?.workspace ?? fallback
 }
 
 /**

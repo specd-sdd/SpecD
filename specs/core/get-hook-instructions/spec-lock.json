@@ -17,5 +17,41 @@
       "file": "core:src/application/use-cases/get-hook-instructions.ts",
       "symbols": ["GetHookInstructions"]
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "GetHookInstructions returns instruction: hook text for a change step and phase, optionally filtered by hook id.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:53f1845c5689fead4a65a832f9b2da1e42fd5fb0883b850a09ffa40a4f8324b8",
+          "lastModified": "2026-07-22T16:55:46.052Z"
+        },
+        "verify.md": {
+          "hash": "sha256:34f86afddb90f4fcdb374ea203d68fd3431d65c78c7278086a72920226d8fbd9",
+          "lastModified": "2026-07-22T16:55:46.052Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# GetHookInstructions\n\n## Rules\n\n- Constructor injects `ChangeRepository`, `ArchiveRepository`, `SchemaProvider`, `TemplateExpander`. Schema already includes plugins and `schemaOverrides` hooks. Kernel wires deps.\n- Input: `name`, `step`, `phase` `\"pre\"|\"post\"`, optional `only` (hook `id`).\n- Load change by name. Archive fallback only when missing AND step `\"archiving\"` phase `\"post\"`: `ArchiveRepository.get(name)`; use `ArchivedChange.name` and `archivePath` for `change.path`. Else missing → `ChangeNotFoundError`. Other step/phase: null from `ChangeRepository.get` → `ChangeNotFoundError` immediately.\n- MUST NOT build `change.workspace` or inject singular/primary workspace (`change.workspaces[0]`, `specIds[0]`) into `change` namespace for `TemplateExpander.expand()`. `change.workspace` is not a supported token.\n- After schema resolve: `schema.name()` vs `change.schemaName` mismatch → `SchemaMismatchError`.\n- `step` must be a domain `ChangeState` (includes `archiving`); else `StepNotValidError`. Valid state with no `schema.workflowStep(step)` → `{ phase, instructions: [] }`.\n- Collect `type: \"instruction\"` from `workflow[step].hooks[phase]` in declaration order. Skip `run:` (`type: \"run\"`). No separate project-level hook collection; `ResolveSchema` already merged them.\n- `only`: sole matching `id`. No match → `HookNotFoundError` reason `\"not-found\"`. Match is `run:` → reason `\"wrong-type\"`.\n- Result: `phase` plus `instructions[]` of `{ id, text }` verbatim. Empty when none.\n- Config factory `createGetHookInstructions(config, options?)` → `resolveGetHookInstructionsDeps(resolver)` → canonical `createGetHookInstructions(deps)`. Resolver: `changes`, `archive`, `schemaProvider`, `templates`. No inline fs wiring.\n\n## Constraints\n\n- Read-only: no change mutation, no command execution.\n- `run:` hooks always excluded.\n- Schema-level hooks precede project-level hooks.\n- Does not evaluate step availability; returns instructions regardless.\n",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:53f1845c5689fead4a65a832f9b2da1e42fd5fb0883b850a09ffa40a4f8324b8",
+          "lastModified": "2026-07-22T16:55:46.052Z"
+        },
+        "verify.md": {
+          "hash": "sha256:34f86afddb90f4fcdb374ea203d68fd3431d65c78c7278086a72920226d8fbd9",
+          "lastModified": "2026-07-22T16:55:46.052Z"
+        }
+      }
+    }
+  }
 }

@@ -10,7 +10,19 @@
     "core:compile-context",
     "core:workspace"
   ],
-  "implementation": [],
+  "implementation": [
+    {
+      "file": "core:src/domain/services/windows-device-name.ts",
+      "symbols": ["isWindowsDeviceName"]
+    },
+    {
+      "file": "core:src/domain/value-objects/spec-path.ts",
+      "symbols": ["SpecPath"]
+    },
+    {
+      "file": "core:test/domain/value-objects/spec-path.spec.ts"
+    }
+  ],
   "optimizations": {
     "optimizedDescription": {
       "value": "Canonical spec ID: workspace:capabilityPath; bare path → default workspace; reject unknown workspace.",

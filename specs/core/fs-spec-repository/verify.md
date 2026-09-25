@@ -226,3 +226,23 @@
 - **WHEN** `FsSpecRepository` operates
 - **THEN** it does not read or write `{configPath}/tmp/fs-cache/validate-specs/<workspace>/` rows
 - **AND** that bucket remains owned by the `ValidationResultCache` filesystem adapter
+
+### Requirement: Publication rename recovery
+
+#### Scenario: A locked publication rename eventually surfaces the error
+
+- **GIVEN** a publication rename keeps failing with `EBUSY`
+- **WHEN** the bounded retries are exhausted
+- **THEN** the caller receives the original `EBUSY` error, including its `code`
+
+#### Scenario: CRLF tmp gitignore matches the LF marker
+
+- **GIVEN** the temporary `.gitignore` contains the expected lines with `\r\n`
+- **WHEN** publication compares it
+- **THEN** the file counts as already correct
+
+#### Scenario: Different artifact bytes are not success
+
+- **GIVEN** a published artifact's bytes differ from the staged bytes
+- **WHEN** publication compares them
+- **THEN** the result is not treated as success

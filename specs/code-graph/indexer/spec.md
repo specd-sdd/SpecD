@@ -106,6 +106,12 @@ Textual fallback SHALL decode document content using this policy:
 - **`excludePaths`** (default: built-in list): gitignore-syntax patterns applied as an additional exclusion layer. Built-in default excludes MUST include `.git/`, `.hg/`, and `.svn/`.
 - **`vcsRoot`** (`string | null`): the root directory of the VCS repository, resolved upstream from `VcsAdapter.rootDir()` and used to bound hierarchical `.gitignore` searches. Callers MUST pass `null` explicitly when no repository root exists. `discoverFiles` MUST NOT probe for repository markers on its own.
 
+### Requirement: Portable graph paths
+
+Relative paths persisted by the indexer MUST use `/` as the separator. That conversion MUST NOT collapse `.` or `..` segments.
+
+A key that begins with a Windows drive letter, matching `^[A-Za-z]:[/\\]`, MUST NOT be split into a workspace name and a path. A bare drive letter, matching `^[A-Za-z]:$`, is the same kind of path: the directory of a file at the drive root. `goPackageSurface('C:/a.go')` is `C:`, and that string MUST NOT parse as workspace `C`. The drive letter is part of the path, not a workspace prefix. Every graph-identity split MUST use that rule, including language-adapter relative imports, package surfaces, scoped binding, and hotspot caller classification. A PHP namespace separator is not a graph identity and MUST stay local.
+
 ### Requirement: Binary file filtering
 
 The indexer's discovery process SHALL filter out known binary and non-source file extensions by default (e.g., `.gif`, `.png`, `.jpg`, `.jpeg`, `.pdf`, `.sql`, `.zip`, `.tiff`, `.pack`). This prevents the engine from attempting to parse large binary payloads as text or document nodes, which causes CPU saturation and out-of-memory errors during hashing and extraction. This global binary filter runs before any document decoding heuristics are applied.
@@ -321,6 +327,7 @@ await store.close()
 - [`code-graph:language-adapter`](../language-adapter/spec.md) — adapter extraction and resolution capabilities
 - [`code-graph:symbol-model`](../symbol-model/spec.md) — files, symbols, specs, relations, and result types
 - [`code-graph:workspace-integration`](../workspace-integration/spec.md) — workspace-prefixed path and spec identity rules
+- [`code-graph:sqlite-graph-store`](../sqlite-graph-store/spec.md) — persisted graph identity must survive SQLite storage
 - [`core:config`](../../core/config/spec.md) — graph discovery config and config-derived graph/temp directories
 - [`core:spec-repository-port`](../../core/spec-repository-port/spec.md) — semantic spec repository contract consumed during spec indexing
 - [`core:list-workspaces`](../../core/list-workspaces/spec.md) — orchestrated workspace and repository source for indexing

@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
+import { tmpdir } from 'node:os'
 import { describe, expect, it } from 'vitest'
 import {
   BulkSessionStateError,
@@ -214,8 +215,8 @@ describe('@specd/code-graph barrel', () => {
       expect(name in publicModule).toBe(false)
     }
     const input: RunIsolatedGraphIndexInput<{ readonly value: string }, never> = {
-      storageRoot: '/tmp/graph',
-      taskModule: new URL('file:///tmp/task.js'),
+      storageRoot: join(tmpdir(), 'specd-graph'),
+      taskModule: pathToFileURL(join(tmpdir(), 'specd-task.js')),
       taskInput: { value: 'ok' },
     }
     expect(input.taskInput.value).toBe('ok')

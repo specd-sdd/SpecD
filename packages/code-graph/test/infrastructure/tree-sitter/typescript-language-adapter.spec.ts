@@ -854,3 +854,10 @@ Article.formatTitle = (title) => { };`
     })
   })
 })
+
+describe('TypeScriptLanguageAdapter drive-letter paths', () => {
+  it('keeps a drive letter in the resolved import path', () => {
+    const resolved = baseAdapter.resolveRelativeImportPath('C:/repo/src/a.ts', './b')
+    expect(resolved).toContain('C:/repo/src/b.ts')
+  })
+})

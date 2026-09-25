@@ -1,4 +1,23 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+
+const deniedReads = vi.hoisted(() => new Set<string>())
+
+vi.mock('node:fs/promises', async () => {
+  const actual = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises')
+  return {
+    ...actual,
+    readFile: async (
+      path: Parameters<typeof actual.readFile>[0],
+      options?: Parameters<typeof actual.readFile>[1],
+    ) => {
+      if (typeof path === 'string' && deniedReads.has(path)) {
+        throw Object.assign(new Error('denied'), { code: 'EACCES' })
+      }
+      return actual.readFile(path, options)
+    },
+  }
+})
+
 import { GetGraphHealth } from '../../../src/application/use-cases/get-graph-health.js'
 import {
   computeRootFingerprint,
@@ -15,7 +34,7 @@ import { GraphProviderStaleError } from '../../../src/domain/errors/graph-provid
 import { IndexCoverageStatus } from '../../../src/domain/value-objects/index-session.js'
 import { FreshnessState } from '../../../src/domain/value-objects/indexed-input-freshness.js'
 import { createFileNode } from '../../../src/domain/value-objects/file-node.js'
-import { chmodSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 
@@ -233,7 +252,7 @@ describe('GetGraphHealth', () => {
     const sourcePath = join(codeRoot, 'index.ts')
     mkdirSync(codeRoot, { recursive: true })
     writeFileSync(sourcePath, 'export const value = 1\n')
-    chmodSync(sourcePath, 0o000)
+    deniedReads.add(sourcePath)
     createVcsAdapter.mockRejectedValue(new Error('no vcs'))
     const provider = {
       ...makeProvider(),
@@ -262,7 +281,7 @@ describe('GetGraphHealth', () => {
       expect(result.reasonCodes).toContain('CONTENT_UNKNOWN')
       expect(result.reasonCodes).not.toContain('CONTENT_DIRTY')
     } finally {
-      chmodSync(sourcePath, 0o600)
+      deniedReads.delete(sourcePath)
       rmSync(projectRoot, { recursive: true, force: true })
     }
   })

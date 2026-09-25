@@ -3,6 +3,7 @@ import {
   type LogicalDeclaration,
   type LogicalSymbolLookup,
 } from '../../domain/ports/graph-store.js'
+import { splitWorkspaceIdentity } from '../../domain/services/split-workspace-identity.js'
 import { expandSearchQuery } from '../../domain/services/expand-search-query.js'
 import { type DocumentNode } from '../../domain/value-objects/document-node.js'
 import { type SearchOptions } from '../../domain/value-objects/search-options.js'
@@ -602,8 +603,7 @@ function compareSourceMatchesByRelevance(
  * @returns Workspace name.
  */
 function workspaceFromPath(filePath: string, fallback: string | undefined): string {
-  const separator = filePath.indexOf(':')
-  return separator > 0 ? filePath.slice(0, separator) : (fallback ?? 'default')
+  return splitWorkspaceIdentity(filePath)?.workspace ?? fallback ?? 'default'
 }
 
 /**

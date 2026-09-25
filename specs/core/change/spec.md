@@ -18,6 +18,10 @@ Identities in specd are represented by the `ActorIdentity` interface:
 - **`providerId`** — optional unique ID within that provider (e.g. LDAP DN)
 - **`metadata`** — optional bag of arbitrary string-valued metadata (`Record<string, string>`)
 
+### Requirement: Change names reject Windows device names
+
+A change slug that is a Windows device name MUST be rejected on every operating system. The reserved names are `con`, `prn`, `aux`, `nul`, `com1` through `com9`, and `lpt1` through `lpt9`, compared case-insensitively as the whole slug. A slug that only contains a device name as part of a larger segment, such as `con-foo`, MUST remain legal when it matches the existing slug pattern.
+
 ### Requirement: Revision timestamp
 
 The `Change` entity SHALL maintain a `updatedAt` property representing its last modification timestamp.

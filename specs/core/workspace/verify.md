@@ -24,6 +24,19 @@
 - **WHEN** `specd.yaml` declares two workspaces with the same name
 - **THEN** a `ConfigValidationError` is thrown at startup
 
+#### Scenario: A device-name workspace is rejected
+
+- **GIVEN** the workspace name is `nul`
+- **WHEN** the name is validated
+- **THEN** it is rejected on every operating system
+
+#### Scenario: con-foo remains a legal workspace name
+
+- **GIVEN** the workspace name is `con-foo`
+- **WHEN** the name is validated
+- **THEN** it is accepted
+- **AND** `default` and `root` stay reserved
+
 ### Requirement: Workspace properties
 
 #### Scenario: Default workspace inherits defaults

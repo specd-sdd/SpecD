@@ -1,6 +1,7 @@
 import { type PreHashCleanup } from '../../../domain/value-objects/validation-rule.js'
 import { type Schema } from '../../../domain/value-objects/schema.js'
 import { applyPreHashCleanup } from '../../../domain/services/pre-hash-cleanup.js'
+import { normalizeNewlines } from '../../../domain/services/normalize-newlines.js'
 
 /**
  * Computes a hash of artifact content after applying pre-hash cleanup rules.
@@ -19,7 +20,7 @@ export function computeArtifactHash(
   hashContent: (content: string) => string,
   cleanups: readonly PreHashCleanup[] = [],
 ): string {
-  const cleaned = applyPreHashCleanup(content, cleanups)
+  const cleaned = normalizeNewlines(applyPreHashCleanup(content, cleanups))
   return hashContent(cleaned)
 }
 

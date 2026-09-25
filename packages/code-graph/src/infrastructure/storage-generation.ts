@@ -59,7 +59,9 @@ export function rotateStorageGeneration(storagePath: string): StorageGenerationS
   mkdirSync(dirname(path), { recursive: true })
   const temporaryPath = `${path}.${randomUUID()}.tmp`
   writeFileSync(temporaryPath, `${randomUUID()}\n`, 'utf-8')
-  renameSync(temporaryPath, path)
+  retryLocked(() => {
+    renameSync(temporaryPath, path)
+  })
   return readStorageGeneration(storagePath)
 }
 
@@ -76,7 +78,7 @@ export async function rotateStorageGenerationAsync(
   await mkdir(dirname(path), { recursive: true })
   const temporaryPath = `${path}.${randomUUID()}.tmp`
   await writeFile(temporaryPath, `${randomUUID()}\n`, 'utf-8')
-  await rename(temporaryPath, path)
+  await retryLockedAsync(() => rename(temporaryPath, path))
   return readStorageGenerationAsync(storagePath)
 }
 
@@ -115,4 +117,61 @@ export async function readStorageGenerationAsync(
   } finally {
     await handle.close()
   }
+}
+
+const LOCK_CODES = new Set(['EPERM', 'EBUSY', 'EACCES'])
+const RETRY_DELAYS_MS = [50, 100, 150, 200] as const
+
+/**
+ * Retries a synchronous rename that fails because the destination is locked.
+ *
+ * @param operation - Work to attempt up to five times
+ * @throws The original lock error after five failures
+ */
+export function retryLocked(operation: () => void): void {
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      operation()
+      return
+    } catch (error: unknown) {
+      if (!isLockError(error) || attempt === RETRY_DELAYS_MS.length) throw error
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, RETRY_DELAYS_MS[attempt] ?? 0)
+    }
+  }
+}
+
+/**
+ * Retries an asynchronous rename that fails because the destination is locked.
+ *
+ * @param operation - Work to attempt up to five times
+ * @throws The original lock error after five failures
+ */
+export async function retryLockedAsync(operation: () => Promise<void>): Promise<void> {
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      await operation()
+      return
+    } catch (error: unknown) {
+      if (!isLockError(error) || attempt === RETRY_DELAYS_MS.length) throw error
+      await new Promise((resolve) => {
+        setTimeout(resolve, RETRY_DELAYS_MS[attempt] ?? 0)
+      })
+    }
+  }
+}
+
+/**
+ * Reports whether an error is a Windows or POSIX file lock.
+ *
+ * @param error - Caught filesystem error
+ * @returns True for `EPERM`, `EBUSY`, or `EACCES`
+ */
+function isLockError(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    typeof error.code === 'string' &&
+    LOCK_CODES.has(error.code)
+  )
 }

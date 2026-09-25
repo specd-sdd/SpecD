@@ -723,6 +723,8 @@ Explicit external hooks are part of the workflow model, not ad hoc shell escapes
 | `{{change.path}}`  | Absolute path to the change directory                  |
 | `{{project.root}}` | Absolute path to the directory containing `specd.yaml` |
 
+Values are inserted verbatim. Quote a path yourself when it can contain spaces: `mkdir "{{project.root}}/{{change.name}}"`. On Windows, single quotes you wrote are turned into double quotes. On macOS and Linux, a doubled double quote inside double quotes (`""`) is a literal quote. SpecD does not rewrite `%` or translate program names. When a hook must choose different commands per operating system, call your own script. The [workflow guide](../guide/workflow.md#template-variables) has the full rules and the variable list, including `{{change.archivedName}}`.
+
 ### Relationship with schemaOverrides hooks
 
 `schemaOverrides` in `specd.yaml` can append, prepend, or remove individual hook entries on any step declared in the schema by targeting them via `id`. Schema hooks always fire first. See the [configuration guide](../guide/configuration.md#schema-overrides).

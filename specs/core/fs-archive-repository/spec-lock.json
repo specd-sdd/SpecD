@@ -12,8 +12,16 @@
   ],
   "implementation": [
     {
-      "file": "core:src/infrastructure/fs/fs-index-cache-base.ts",
-      "symbols": ["FsIndexCache", "_ensureFresh"]
+      "file": "core:src/infrastructure/fs/path-platform.ts",
+      "symbols": ["isPathInside"]
+    },
+    {
+      "file": "core:src/infrastructure/fs/move-dir.ts",
+      "symbols": ["moveDir"]
+    },
+    {
+      "file": "core:src/infrastructure/fs/archive-repository.ts",
+      "symbols": ["FsArchiveRepository"]
     }
   ]
 }

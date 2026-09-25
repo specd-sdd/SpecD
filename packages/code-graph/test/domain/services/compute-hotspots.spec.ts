@@ -476,4 +476,18 @@ describe('computeHotspots', () => {
     expect(rankOf(baseClass.id)).toBeLessThan(rankOf(contract.id))
     expect(rankOf(contract.id)).toBeLessThan(rankOf(parentMethod.id))
   })
+
+  it('does not treat a drive letter as workspace C', async () => {
+    const target = sym('target', 'C:/repo/src/a.ts', 1)
+    const caller = sym('caller', 'C:/repo/src/b.ts', 1)
+    await store.upsertFile(file('C:/repo/src/a.ts', ''), [target], [])
+    await store.upsertFile(
+      file('C:/repo/src/b.ts', ''),
+      [caller],
+      [createRelation({ source: caller.id, target: target.id, type: RelationType.Calls })],
+    )
+
+    const included = await computeHotspots(store, { workspace: 'C', minScore: 0, minRisk: 'LOW' })
+    expect(included.entries).toHaveLength(0)
+  })
 })

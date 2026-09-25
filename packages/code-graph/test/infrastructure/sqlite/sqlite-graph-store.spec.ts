@@ -1,4 +1,23 @@
 import { describe, afterEach, expect, it, vi } from 'vitest'
+
+const walLock = vi.hoisted(() => ({ failures: 0 }))
+
+vi.mock('node:fs/promises', async () => {
+  const actual = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises')
+  return {
+    ...actual,
+    rm: async (
+      target: Parameters<typeof actual.rm>[0],
+      options?: Parameters<typeof actual.rm>[1],
+    ) => {
+      if (walLock.failures > 0 && String(target).endsWith('code-graph.sqlite-wal')) {
+        walLock.failures -= 1
+        throw Object.assign(new Error('locked'), { code: 'EBUSY' })
+      }
+      return actual.rm(target, options)
+    },
+  }
+})
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
@@ -891,11 +910,45 @@ describe('SQLiteGraphStore', () => {
 
     expect(existsSync(join(tempDir, 'graph', 'code-graph.sqlite'))).toBe(true)
     expect(existsSync(join(tempDir, 'graph', 'storage.epoch'))).toBe(true)
+    writeFileSync(join(tempDir, 'graph', 'index.lock'), 'lease\n')
 
     await store.recreate()
 
     expect(existsSync(join(tempDir, 'graph', 'code-graph.sqlite'))).toBe(false)
     expect(existsSync(join(tempDir, 'graph', 'storage.epoch'))).toBe(true)
+    expect(existsSync(join(tempDir, 'graph', 'index.lock'))).toBe(true)
+  })
+
+  it('retries a locked WAL file while recreating the store', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-test-'))
+    const store = new SQLiteGraphStore(tempDir)
+    await store.open()
+    await store.close()
+    const walPath = join(tempDir, 'graph', 'code-graph.sqlite-wal')
+    writeFileSync(walPath, 'locked')
+    walLock.failures = 2
+
+    await store.recreate()
+
+    expect(walLock.failures).toBe(0)
+    expect(existsSync(walPath)).toBe(false)
+    expect(existsSync(join(tempDir, 'graph', 'index.lock'))).toBe(false)
+  })
+
+  it('surfaces the original lock error after five WAL failures', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-test-'))
+    const store = new SQLiteGraphStore(tempDir)
+    await store.open()
+    await store.close()
+    const walPath = join(tempDir, 'graph', 'code-graph.sqlite-wal')
+    writeFileSync(walPath, 'locked')
+    writeFileSync(join(tempDir, 'graph', 'index.lock'), 'lease\n')
+    walLock.failures = 5
+
+    await expect(store.recreate()).rejects.toMatchObject({ code: 'EBUSY' })
+
+    expect(existsSync(walPath)).toBe(true)
+    expect(existsSync(join(tempDir, 'graph', 'index.lock'))).toBe(true)
   })
 
   it('rejects recreation on an open store without closing or clearing it', async () => {
@@ -1052,6 +1105,36 @@ describe('SQLiteGraphStore', () => {
     expect(readFileSync(databasePath)).toEqual(databaseBeforeFailure)
     expect(readFileSync(epochPath)).toEqual(epochBeforeFailure)
     await failedStore.close()
+  })
+
+  it('does not treat a drive letter as a workspace name', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-test-'))
+    const store = new SQLiteGraphStore(tempDir)
+    await store.open()
+    const file = createFileNode({
+      path: 'C:/repo/src/a.ts',
+      configRelativePath: 'src/a.ts',
+      language: 'typescript',
+      contentHash: 'sha256:drive',
+      workspace: 'repo',
+    })
+    const symbol = createSymbolNode({
+      name: 'DriveLetterSymbol',
+      kind: SymbolKind.Function,
+      filePath: file.path,
+      line: 1,
+      column: 0,
+    })
+    await store.upsertFile(file, [symbol], [])
+
+    await expect(
+      store.searchSymbols({ query: 'DriveLetterSymbol', workspace: 'C' }),
+    ).resolves.toEqual([])
+    await expect(store.searchSymbols({ query: 'DriveLetterSymbol' })).resolves.toMatchObject([
+      { symbol: { id: symbol.id } },
+    ])
+
+    await store.close()
   })
 
   it('rebuilds symbol FTS from logical and public binding identities', async () => {

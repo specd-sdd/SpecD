@@ -6,7 +6,7 @@ import { parseGraphKinds } from './parse-graph-kinds.js'
 import { resolveGraphCliContext } from './resolve-graph-cli-context.js'
 import { withProvider } from './with-provider.js'
 import { normalizeSnippet } from './normalize-snippet.js'
-import { toGraphDisplayPath } from './resolve-impact-file-selectors.js'
+import { splitWorkspaceIdentity, toGraphDisplayPath } from './resolve-impact-file-selectors.js'
 
 import { warnGraphStale } from './warn-graph-staleness.js'
 
@@ -254,9 +254,8 @@ Exclude examples:
                   const target = group.logicalTarget
                   const firstHit = group.hits[0]
                   if (target === null && firstHit !== undefined) {
-                    const separator = firstHit.symbol.filePath.indexOf(':')
                     const workspace =
-                      separator < 0 ? '' : firstHit.symbol.filePath.slice(0, separator)
+                      splitWorkspaceIdentity(firstHit.symbol.filePath)?.workspace ?? ''
                     lines.push(`  [${workspace}] ${firstHit.symbol.kind} ${firstHit.symbol.name}`)
                     lines.push(
                       `    ${toDisplayPath(firstHit.symbol.filePath)}:${String(firstHit.symbol.line)}:${String(firstHit.symbol.column)}`,

@@ -1,0 +1,15 @@
+- op: added
+  description: 'Filesystem fixtures and unreadable-file setups are valid on Windows.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: 'Requirement: Integration tests for infrastructure adapters'
+  content: |
+    ### Requirement: Fixtures are valid on Windows
+
+    Filesystem tests MUST locate temporary directories with `os.tmpdir()` and MUST build file URLs from the local path. Tests MUST NOT depend on hardcoded `/tmp`, `/var/www`, or `file:///tmp/...` paths.
+
+    A test that needs an unreadable file MUST NOT use `chmod 0o000` as that condition on Windows. The setup MUST produce a file the Windows process cannot read, or the scenario MUST be skipped where that permission bit has no effect.

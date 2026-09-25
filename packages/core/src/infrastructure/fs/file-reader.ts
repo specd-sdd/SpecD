@@ -1,8 +1,8 @@
 import fs from 'node:fs/promises'
-import * as path from 'node:path'
 import { type FileReader } from '../../application/ports/file-reader.js'
 import { PathTraversalError } from '../../domain/errors/path-traversal-error.js'
 import { isEnoent } from './is-enoent.js'
+import { isPathInside, normalizeVcsRoot } from './path-platform.js'
 
 /**
  * Filesystem implementation of the {@link FileReader} port.
@@ -23,7 +23,7 @@ export class FsFileReader implements FileReader {
    *   whose resolved path escapes this directory throws an error.
    */
   constructor(basePath?: string) {
-    this._basePath = basePath !== undefined ? path.resolve(basePath) : undefined
+    this._basePath = basePath !== undefined ? normalizeVcsRoot(basePath) : undefined
   }
 
   /**
@@ -34,9 +34,9 @@ export class FsFileReader implements FileReader {
    * @throws {PathTraversalError} If the resolved path escapes the configured `basePath`
    */
   async read(absolutePath: string): Promise<string | null> {
-    const resolved = path.resolve(absolutePath)
+    const resolved = normalizeVcsRoot(absolutePath)
     if (this._basePath !== undefined) {
-      if (!resolved.startsWith(this._basePath + path.sep) && resolved !== this._basePath) {
+      if (!isPathInside(this._basePath, resolved)) {
         throw new PathTraversalError(absolutePath)
       }
     }

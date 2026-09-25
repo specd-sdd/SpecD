@@ -1,0 +1,19 @@
+- op: added
+  description: 'Device-name workspace names are reserved; con-foo stays legal.'
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Workspace identity'
+  content: |
+    #### Scenario: A device-name workspace is rejected
+
+    - **GIVEN** the workspace name is `nul`
+    - **WHEN** the name is validated
+    - **THEN** it is rejected on every operating system
+
+    #### Scenario: con-foo remains a legal workspace name
+
+    - **GIVEN** the workspace name is `con-foo`
+    - **WHEN** the name is validated
+    - **THEN** it is accepted
+    - **AND** `default` and `root` stay reserved

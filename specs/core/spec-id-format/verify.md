@@ -54,6 +54,20 @@
 - **WHEN** parsing `billing/auth/login` (no colon)
 - **THEN** workspace is `default` and capability path is `billing/auth/login`
 
+### Requirement: Capability segments reject Windows device names
+
+#### Scenario: A device-name segment is rejected
+
+- **GIVEN** a spec ID whose capability path contains the segment `com1`
+- **WHEN** the ID is validated
+- **THEN** it is rejected
+
+#### Scenario: con-foo remains a legal segment
+
+- **GIVEN** a spec ID whose capability path contains the segment `con-foo`
+- **WHEN** the ID is validated
+- **THEN** that segment is accepted
+
 ### Requirement: specDependsOn format
 
 #### Scenario: specDependsOn uses canonical format

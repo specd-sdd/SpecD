@@ -17,6 +17,7 @@ import { type ListResult } from '../../application/ports/repository.js'
 import { ChangeNotFoundError } from '../../application/errors/change-not-found-error.js'
 import { UnsupportedPatternError } from '../../domain/errors/unsupported-pattern-error.js'
 import { CorruptedManifestError } from '../../domain/errors/corrupted-manifest-error.js'
+import { isPathInside } from './path-platform.js'
 import { Logger } from '../../application/logger.js'
 import { changeDirName } from './dir-name.js'
 import { isEnoent } from './is-enoent.js'
@@ -633,7 +634,7 @@ function resolveArchiveDirPathSync(root: string, relPath: string): string {
   }
 
   const resolved = path.resolve(normalizedRoot, ...normalizedRelative.split('/'))
-  if (resolved !== normalizedRoot && !resolved.startsWith(normalizedRoot + path.sep)) {
+  if (!isPathInside(normalizedRoot, resolved)) {
     throw new CorruptedManifestError(relPath)
   }
 

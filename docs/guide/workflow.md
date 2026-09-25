@@ -401,9 +401,41 @@ Hook commands (`run:`) and instructions (`instruction:`) support dynamic templat
 | `{{change.path}}`         | All hooks          | Absolute path to the active change (or archive) directory                |
 | `{{change.archivedName}}` | Post-archive hooks | The timestamped archive directory name (e.g. `20260924-143511-add-auth`) |
 
-#### Shell escaping in `run:` hooks
+#### Substitution
 
-To protect against shell injection attacks, SpecD automatically applies shell escaping to variables substituted into `run:` commands (wrapping substituted values in safe single quotes). For `instruction:` text consumed by agents, values are substituted verbatim without escaping.
+`{{...}}` is replaced with the value exactly as it is. SpecD does not add quotes around it. You write the quotes in the command, around the whole string you want:
+
+```yaml
+run: echo "Resultado: {{change.name}}"
+run: mkdir "{{project.root}}/out/{{change.name}}"
+```
+
+`{{change.name}}` is a kebab-case slug. `{{project.root}}` and `{{change.path}}` are absolute paths and can contain spaces, so quote the whole path. A value inserted into the middle of a path stays one path: `mkdir "{{project.root}}/{{change.name}}"` becomes `mkdir "/repo/add-auth"`.
+
+`instruction:` text is also substituted verbatim. It is not a shell command, so the quote translation below does not apply.
+
+#### Running on macOS, Linux, and Windows
+
+A `run:` command is a shell command. macOS and Linux run it with the absolute `$SHELL` or `/bin/sh`. Windows runs it with `cmd.exe`. SpecD does not translate program names, flags, or pipes (`mkdir -p`, `rm -rf`, `$(...)`).
+
+It does translate quote syntax the host shell does not understand:
+
+| You write                     | On `$SHELL` or `/bin/sh`                  | On `cmd.exe`                         |
+| ----------------------------- | ----------------------------------------- | ------------------------------------ |
+| `mkdir '{{change.path}}'`     | unchanged, `sh` understands single quotes | `mkdir "C:\Users\Ada Lovelace\repo"` |
+| `mkdir "{{change.path}}"`     | unchanged                                 | unchanged                            |
+| `echo "Resultado: ""listo"""` | `echo "Resultado: \"listo\""`             | unchanged                            |
+| `echo "100%"`                 | unchanged                                 | unchanged                            |
+
+`cmd.exe` still expands `%NAME%` even inside double quotes. SpecD does not rewrite `%`. If you want a literal percent on Windows, write it the way `cmd.exe` expects.
+
+When the hook must run different commands per operating system, put that choice in your own script and call the script from the hook:
+
+```yaml
+run: node scripts/prepare-hook.js "{{change.path}}"
+```
+
+The script decides what to run. SpecD will not rewrite it.
 
 ### Hook execution order
 

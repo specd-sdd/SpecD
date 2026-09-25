@@ -17,6 +17,7 @@ import { type Relation, createRelation } from '../../domain/value-objects/relati
 import { SymbolKind } from '../../domain/value-objects/symbol-kind.js'
 import { RelationType } from '../../domain/value-objects/relation-type.js'
 import { findManifestField } from './find-manifest-field.js'
+import { splitWorkspaceIdentity } from '../../domain/services/split-workspace-identity.js'
 import {
   type FileAnalysisDraft,
   type FileAnalysis,
@@ -1811,9 +1812,9 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
    * @returns The resolved file path.
    */
   resolveRelativeImportPath(fromFile: string, specifier: string): string | string[] {
-    const colonIdx = fromFile.indexOf(':')
-    const wsPrefix = colonIdx === -1 ? '' : fromFile.substring(0, colonIdx + 1)
-    const relFile = colonIdx === -1 ? fromFile : fromFile.substring(colonIdx + 1)
+    const identity = splitWorkspaceIdentity(fromFile)
+    const wsPrefix = identity === null ? '' : `${identity.workspace}:`
+    const relFile = identity === null ? fromFile : identity.relativePath
 
     const relDir = relFile.substring(0, relFile.lastIndexOf('/'))
     const parts = specifier.split('/')

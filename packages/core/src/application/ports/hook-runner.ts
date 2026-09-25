@@ -18,8 +18,10 @@ export type OnHookRunnerProgress = (event: HookRunnerProgressEvent) => void
  * entries. They are executed by this port — not by the AI agent — and have
  * strong execution guarantees at `pre-*` lifecycle points.
  *
- * Template variables in command strings are expanded before execution
- * via `TemplateExpander.expandForShell()`.
+ * Template variables in command strings are expanded verbatim before
+ * execution. The developer writes any quotes. On Windows, single quotes in
+ * the command are translated to double quotes; on other platforms, a doubled
+ * double quote inside double quotes is translated to a POSIX escaped quote.
  *
  * Unlike the repository ports, `HookRunner` has no invariant constructor
  * arguments shared across all implementations, so it is declared as an

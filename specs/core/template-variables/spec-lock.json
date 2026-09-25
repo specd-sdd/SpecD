@@ -11,7 +11,19 @@
     "core:run-step-hooks",
     "core:archive-change"
   ],
-  "implementation": [],
+  "implementation": [
+    {
+      "file": "core:src/infrastructure/node/hook-runner.ts",
+      "symbols": ["NodeHookRunner"]
+    },
+    {
+      "file": "core:src/application/template-expander.ts",
+      "symbols": ["TemplateExpander"]
+    },
+    {
+      "file": "core:test/application/template-expander.spec.ts"
+    }
+  ],
   "optimizations": {
     "optimizedDescription": {
       "value": "Defines shared, single-pass template expansion with immutable built-ins, contextual namespaces, unknown-token handling, and shell safety.",

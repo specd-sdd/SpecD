@@ -35,6 +35,20 @@
 - **WHEN** an integration test creates a temp directory but does not remove it in `afterEach`
 - **THEN** it must be corrected — leftover temp dirs cause flaky tests across runs
 
+### Requirement: Fixtures are valid on Windows
+
+#### Scenario: Temporary paths come from the OS
+
+- **WHEN** a filesystem test creates a temporary directory
+- **THEN** the directory is under `os.tmpdir()`
+- **AND** the test does not hardcode `/tmp` or `file:///tmp/`
+
+#### Scenario: Unreadable files do not depend on chmod zero on Windows
+
+- **GIVEN** the test runs on Windows
+- **WHEN** it needs a file the process cannot read
+- **THEN** it does not use `chmod 0o000` as that condition
+
 ### Requirement: Test naming
 
 #### Scenario: Wrong test file suffix

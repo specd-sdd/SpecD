@@ -4,7 +4,22 @@
     "version": 1
   },
   "dependsOn": ["core:config", "core:spec-id-format"],
-  "implementation": [],
+  "implementation": [
+    {
+      "file": "core:src/domain/services/windows-device-name.ts",
+      "symbols": ["isWindowsDeviceName"]
+    },
+    {
+      "file": "core:test/domain/services/windows-device-name.spec.ts"
+    },
+    {
+      "file": "core:src/infrastructure/fs/config-loader.ts",
+      "symbols": ["FsConfigLoader"]
+    },
+    {
+      "file": "core:test/infrastructure/fs/config-loader.spec.ts"
+    }
+  ],
   "optimizations": {
     "optimizedDescription": {
       "value": "Named organizational unit for specs/code/schemas/ownership; every spec belongs to exactly one workspace.",
