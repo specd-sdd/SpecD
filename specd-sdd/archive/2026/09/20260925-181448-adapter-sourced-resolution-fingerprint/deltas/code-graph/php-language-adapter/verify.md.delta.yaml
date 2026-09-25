@@ -1,0 +1,16 @@
+- op: added
+  description: Verify PHP resolution manifest declaration
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: 'Requirement: Namespaces, use aliases, and Composer resolution'
+  content: |
+    ### Requirement: Resolution manifests
+
+    #### Scenario: PHP declares only composer.json
+
+    - **WHEN** the PHP adapter reports `resolutionManifests()`
+    - **THEN** the result is exactly `['composer.json']`

@@ -28,6 +28,14 @@
 - **THEN** only exported package names create public bindings
 - **AND** blank and dot imports retain their distinct dependency and binding semantics
 
+### Requirement: Resolution manifests
+
+#### Scenario: Go declares only go.mod
+
+- **WHEN** the Go adapter reports `resolutionManifests()`
+- **THEN** the result is exactly `['go.mod']`
+- **AND** `go.work` is not included
+
 ### Requirement: Go logical identity and declaring owners
 
 #### Scenario: Receiver types own methods

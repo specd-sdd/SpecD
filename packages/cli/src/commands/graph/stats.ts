@@ -66,6 +66,7 @@ JSON/TOON output schema:
             schemaCompatible,
             generationCurrent,
             reasonCodes,
+            fingerprintMismatch,
             ...stats
           } = health
           const coverageSummary = coverage ?? {
@@ -102,6 +103,11 @@ JSON/TOON output schema:
 
             if (stats.lastIndexedAt) {
               lines.push(`Last indexed: ${stats.lastIndexedAt}`)
+            }
+            if (fingerprintMismatch === true) {
+              lines.push(
+                '⚠ Derivation fingerprint mismatch — code-graph version, workspace configuration, or resolution manifest content changed',
+              )
             }
 
             lines.push(`Content fresh:    ${String(contentFresh)}`)

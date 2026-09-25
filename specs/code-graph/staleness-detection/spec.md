@@ -34,8 +34,14 @@ A graph has a **derivation mismatch** when the persisted graph fingerprint diffe
 
 - the effective `@specd/code-graph` package version loaded by the running CLI process
 - a canonical hash of the resolved workspace objects derived from the active `specd.yaml`
+- the effective discovery configuration used by the indexer
+- newline-normalized content hashes of the resolution manifests declared by registered language adapters
 
-A derivation mismatch means the graph was built under a different code-graph version or workspace layout, even if the current VCS ref is unchanged. This state is distinct from ordinary stale-by-VCS results and SHALL be surfaced explicitly in diagnostics.
+A derivation mismatch means the graph was built under a different code-graph version, workspace layout, discovery configuration, or resolution-manifest content, even if the current VCS ref is unchanged. This state is distinct from ordinary stale-by-VCS results and SHALL be surfaced explicitly in diagnostics.
+
+CRLF and LF encodings of an unchanged resolution manifest MUST NOT by themselves produce a derivation mismatch.
+
+When a declared resolution manifest's normalized text differs from the text hashed at index time, derivation freshness SHALL be mismatched even if the VCS ref is unchanged. VCS freshness SHALL stay fresh in that case.
 
 ### Requirement: Warn-not-block policy
 
@@ -64,7 +70,7 @@ This policy is independent of VCS freshness. A graph MAY be VCS-fresh and still 
 
 - After `Last indexed`, when stale, append: `⚠ Graph is stale (indexed at <7-char-ref>, current: <7-char-ref>)`
 - When `lastIndexedRef` is `null`, no staleness line SHALL be shown
-- When a derivation fingerprint mismatch is detected, append: `⚠ Derivation fingerprint mismatch — graph built with different code-graph version or workspace configuration`
+- When a derivation fingerprint mismatch is detected, append: `⚠ Derivation fingerprint mismatch — code-graph version, workspace configuration, or resolution manifest content changed`
 
 **JSON/TOON output**:
 
@@ -136,5 +142,6 @@ Non-VCS workspaces SHALL compare visible membership and persisted observations, 
 ## Spec Dependencies
 
 - [`code-graph:graph-store`](../graph-store/spec.md) — metadata keys for `lastIndexedRef`
-- [`code-graph:indexer`](../indexer/spec.md) — persists VCS ref at index time
+- [`code-graph:indexer`](../indexer/spec.md) — persists VCS ref at index time and computes the derivation fingerprint
 - [`code-graph:get-graph-health`](../get-graph-health/spec.md) — host orchestration for diagnostics
+- [`code-graph:language-adapter`](../language-adapter/spec.md) — adapters declare the resolution manifests included in the derivation fingerprint

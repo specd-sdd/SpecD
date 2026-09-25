@@ -1,0 +1,17 @@
+- op: added
+  description: Verify Go resolution manifest declaration
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: 'Requirement: Package identity, exports, and imports'
+  content: |
+    ### Requirement: Resolution manifests
+
+    #### Scenario: Go declares only go.mod
+
+    - **WHEN** the Go adapter reports `resolutionManifests()`
+    - **THEN** the result is exactly `['go.mod']`
+    - **AND** `go.work` is not included

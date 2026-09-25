@@ -1,7 +1,7 @@
 {
   "name": "language-agnostic-member-symbol-references",
   "createdAt": "2026-08-24T17:25:00.628Z",
-  "updatedAt": "2026-09-25T16:06:26.076Z",
+  "updatedAt": "2026-09-25T20:32:15.344Z",
   "description": "Add language-agnostic qualified member references and centralized Code Graph resolution while preserving lexical FTS discovery and all existing CLI/provider behavior.",
   "schema": {
     "name": "schema-std",
@@ -1021,6 +1021,64 @@
         {
           "type": "verify",
           "files": ["code-graph:sqlite-graph-store", "code-graph:indexer"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-09-25T20:31:48.473Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'adapter-sourced-resolution-fingerprint' was archived with overlapping specs: code-graph:indexer, code-graph:language-adapter",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:language-adapter", "code-graph:indexer"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:language-adapter", "code-graph:indexer"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-09-25T20:32:15.335Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'adapter-sourced-resolution-fingerprint' was archived with overlapping specs: code-graph:indexer, code-graph:language-adapter",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:language-adapter", "code-graph:indexer"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:language-adapter", "code-graph:indexer"]
         },
         {
           "type": "design",

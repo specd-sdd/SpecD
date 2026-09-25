@@ -2094,6 +2094,14 @@ export class PhpLanguageAdapter implements LanguageAdapter {
   }
 
   /**
+   * Declares the resolution manifests this adapter reads.
+   * @returns Exact basenames used for package identity and PSR-4 resolution.
+   */
+  resolutionManifests(): readonly string[] {
+    return ['composer.json']
+  }
+
+  /**
    * Retrieves the package identity from composer.json.
    * @param codeRoot - Workspace root path.
    * @param repoRoot - Repo root path.

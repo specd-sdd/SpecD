@@ -1,0 +1,15 @@
+- op: added
+  description: Python resolution fingerprint manifest is pyproject.toml
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: 'Requirement: Imports and package resolution'
+  content: |
+    ### Requirement: Resolution manifests
+
+    `resolutionManifests()` SHALL return exactly `['pyproject.toml']`.
+
+    The adapter MUST NOT declare `setup.cfg`, `setup.py`, or any other basename. Package identity MUST come from `[project].name` in the nearest bounded `pyproject.toml`, and MUST NOT come from a `name` key in another table of that file.

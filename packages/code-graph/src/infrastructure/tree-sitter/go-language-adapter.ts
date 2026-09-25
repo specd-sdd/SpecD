@@ -1052,6 +1052,14 @@ export class GoLanguageAdapter implements LanguageAdapter {
   }
 
   /**
+   * Declares the resolution manifests this adapter reads.
+   * @returns Exact basenames used for package identity.
+   */
+  resolutionManifests(): readonly string[] {
+    return ['go.mod']
+  }
+
+  /**
    * Reads the module identity by searching for `go.mod` at or above
    * the given directory, bounded by the repository root.
    * @param codeRoot - Absolute path to the workspace's code root.

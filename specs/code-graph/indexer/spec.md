@@ -30,6 +30,8 @@ The current graph fingerprint for this iteration SHALL be computed from:
 
 - the effective `@specd/code-graph` package version loaded by the running process
 - a canonical hash of the resolved workspace objects used for indexing
+- the effective discovery configuration in Requirement: Discovery fingerprint uses effective config
+- the adapter-declared resolution manifests in Requirement: Adapter-sourced resolution fingerprint
 
 Only three categories of files are processed during a normal incremental run when the graph fingerprint matches:
 
@@ -39,7 +41,7 @@ Only three categories of files are processed during a normal incremental run whe
 
 Files whose hash matches the stored hash are skipped entirely — no parsing, no I/O beyond the hash comparison — only during a non-forced run when the persisted graph fingerprint matches the current fingerprint and the persisted indexed resource needed by downstream phases still exists.
 
-When the persisted graph fingerprint differs from the current fingerprint, the indexer SHALL treat the run as a full rebuild of the active graph store rather than a normal incremental skip. The preferred behavior is to recreate the store and re-index every discovered file while surfacing a visible explanation that the code-graph version or resolved workspace configuration changed. If a backend cannot safely recreate in-place, the caller MAY fail fast and require an explicit force-reindex command instead.
+When the persisted graph fingerprint differs from the current fingerprint, the indexer SHALL treat the run as a full rebuild of the active graph store rather than a normal incremental skip. The preferred behavior is to recreate the store and re-index every discovered file while surfacing this visible explanation: `Graph derivation fingerprint mismatch — code-graph version, workspace configuration, or resolution manifest content changed`. If a backend cannot safely recreate in-place, the caller MAY fail fast and require an explicit force-reindex command instead.
 
 Changed files are removed from the store before bulk load, because CSV `COPY FROM` cannot upsert — it can only insert. Removing changed files first ensures the bulk load inserts fresh data without conflicts.
 
@@ -69,6 +71,21 @@ The effective fingerprint inputs MUST include:
 - each workspace's `excludePaths`
 - each workspace's `respectGitignore`
 - any synthetic exclusions derived from filesystem-backed repository `specsPath` roots
+- the newline-normalized resolution-manifest hashes from Requirement: Adapter-sourced resolution fingerprint
+
+### Requirement: Adapter-sourced resolution fingerprint
+
+Resolution manifests that participate in the graph fingerprint MUST come from `resolutionManifests()` on the registered language adapters. The indexer MUST NOT keep a separate hardcoded manifest list.
+
+For each workspace, discovery SHALL start at that workspace's `codeRoot` and walk parent directories until the repository root, inclusive. When the indexing run has no repository root, the project root is the bound. The walk MUST NOT continue above that bound.
+
+Every existing file on that walk whose basename is declared by a registered adapter SHALL be included. Missing basenames SHALL be omitted. `computeGraphFingerprint`, `computeWorkspaceFingerprint`, and `computeRootFingerprint` MUST use this same per-workspace set.
+
+Each included file SHALL be read as UTF-8 text. Its fingerprint digest SHALL be the SHA-256 hex of the text after the same newline normalization as `normalizeNewlines` in `@specd/core` (CRLF and a lone CR become LF). The fingerprint module MUST NOT depend on that symbol being imported when it is not part of the `@specd/core` public API; a private function with those same replacements is required in that case. The digest MUST NOT use a `sha256:` prefix and MUST NOT hash raw file bytes. CRLF and LF encodings of the same manifest MUST produce the same digest. A newline-only change of a declared manifest MUST NOT by itself make the persisted fingerprint differ, so it MUST NOT by itself escalate the run to a full rebuild.
+
+Application code that discovers or hashes these manifests MUST read existence and text through an application port. That application code MUST NOT import `node:fs` or `node:fs/promises`. An infrastructure adapter MUST implement the port with the filesystem. Composition MUST supply that adapter to indexing and graph-health callers.
+
+Project-relative paths in the fingerprint payload MUST be sorted deterministically.
 
 ### Requirement: Multi-workspace file discovery
 

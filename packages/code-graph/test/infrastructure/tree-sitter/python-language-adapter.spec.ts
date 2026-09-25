@@ -20,6 +20,7 @@ import { parseLogicalSymbol } from '../../../src/domain/value-objects/symbol-ref
 interface TestAdapter {
   languages(): string[]
   extensions(): Record<string, string>
+  resolutionManifests(): readonly string[]
   getPackageIdentity(codeRoot: string, repoRoot?: string): string | undefined
   resolvePackageFromSpecifier(specifier: string, knownPackages: string[]): string | undefined
   resolveRelativeImportPath(fromFile: string, specifier: string): string | string[]
@@ -542,6 +543,14 @@ HandlerFn: TypeAlias = Callable[[Event], Result]
     })
   })
 
+  describe('resolutionManifests', () => {
+    it('given python adapter, when asked for manifests, then returns pyproject.toml only', () => {
+      expect(adapter.resolutionManifests()).toEqual(['pyproject.toml'])
+      expect(adapter.resolutionManifests()).not.toContain('setup.cfg')
+      expect(adapter.resolutionManifests()).not.toContain('setup.py')
+    })
+  })
+
   describe('getPackageIdentity', () => {
     let tempDir: string
 
@@ -558,6 +567,35 @@ HandlerFn: TypeAlias = Callable[[Event], Result]
     it('returns undefined when no pyproject.toml', () => {
       tempDir = mkdtempSync(join(tmpdir(), 'py-pkg-'))
       expect(adapter.getPackageIdentity(tempDir)).toBeUndefined()
+    })
+
+    it('given poetry name before project name, when identity is read, then project name wins', () => {
+      tempDir = mkdtempSync(join(tmpdir(), 'py-pkg-'))
+      writeFileSync(
+        join(tempDir, 'pyproject.toml'),
+        '[tool.poetry]\nname = "poetry-name"\n\n[project]\nname = "project-name"\n',
+      )
+      expect(adapter.getPackageIdentity(tempDir)).toBe('project-name')
+    })
+
+    it('given a single-quoted project name, when identity is read, then that name is returned', () => {
+      tempDir = mkdtempSync(join(tmpdir(), 'py-pkg-'))
+      writeFileSync(join(tempDir, 'pyproject.toml'), "[project]\nname = 'quoted-name'\n")
+      expect(adapter.getPackageIdentity(tempDir)).toBe('quoted-name')
+    })
+
+    it('given a nearer file without project name, when a parent has one, then the parent name is returned', () => {
+      tempDir = mkdtempSync(join(tmpdir(), 'py-pkg-'))
+      writeFileSync(join(tempDir, 'pyproject.toml'), '[project]\nname = "project-name"\n')
+      const nested = join(tempDir, 'pkg')
+      mkdirSync(nested)
+      writeFileSync(join(nested, 'pyproject.toml'), '[tool.poetry]\nname = "poetry-name"\n')
+      expect(adapter.getPackageIdentity(nested, tempDir)).toBe('project-name')
+    })
+    it('given a poetry-only manifest and no parent project name, when identity is read, then the result is undefined', () => {
+      tempDir = mkdtempSync(join(tmpdir(), 'py-pkg-'))
+      writeFileSync(join(tempDir, 'pyproject.toml'), '[tool.poetry]\nname = "poetry-name"\n')
+      expect(adapter.getPackageIdentity(tempDir, tempDir)).toBeUndefined()
     })
 
     it('walks up to find pyproject.toml above codeRoot', () => {

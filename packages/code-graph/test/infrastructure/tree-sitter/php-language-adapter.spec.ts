@@ -20,6 +20,7 @@ import { parseLogicalSymbol } from '../../../src/domain/value-objects/symbol-ref
 interface TestAdapter {
   languages(): string[]
   extensions(): Record<string, string>
+  resolutionManifests(): readonly string[]
   getPackageIdentity(codeRoot: string, repoRoot?: string): string | undefined
   resolvePackageFromSpecifier(specifier: string, knownPackages: string[]): string | undefined
   buildQualifiedName(namespace: string, symbolName: string): string
@@ -602,6 +603,12 @@ class ArticlesController {
 
     it('works with single-level namespace', () => {
       expect(adapter.buildQualifiedName('App', 'Config')).toBe('App\\Config')
+    })
+  })
+
+  describe('resolutionManifests', () => {
+    it('given php adapter, when asked for manifests, then returns composer.json', () => {
+      expect(adapter.resolutionManifests()).toEqual(['composer.json'])
     })
   })
 

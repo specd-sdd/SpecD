@@ -42,6 +42,18 @@
 - **THEN** the update happens only through the `IndexSession` API provided in context
 - **AND** no side effect escapes the indexing session
 
+#### Scenario: Resolution manifests are declared without reading the filesystem
+
+- **WHEN** a language adapter implements `resolutionManifests()`
+- **THEN** the method returns exact basenames
+- **AND** it does not read or stat the filesystem
+- **AND** an adapter that reads no resolution manifest returns an empty array
+
+#### Scenario: TypeScript adapter declares package.json
+
+- **WHEN** the default TypeScript adapter reports resolution manifests
+- **THEN** the result is exactly `['package.json']`
+
 ### Requirement: Full-file analysis contract
 
 #### Scenario: Adapter emits all deterministic facts in one pass
@@ -325,6 +337,32 @@
 - **AND** `/package.json` exists above the repo root
 - **WHEN** `getPackageIdentity` is called
 - **THEN** it does not read `/package.json` — search stops at `/project`
+
+#### Scenario: Declared manifests are the files package identity reads
+
+- **GIVEN** a built-in adapter reads `package.json`, `pyproject.toml`, `go.mod`, or `composer.json` for package identity
+- **WHEN** that adapter reports `resolutionManifests()`
+- **THEN** the basename it reads is included
+- **AND** the result does not name a file that adapter does not read
+
+#### Scenario: Python identity is the project table name
+
+- **GIVEN** a `pyproject.toml` whose `[tool.poetry]` table has `name = "poetry-name"` and whose `[project]` table has `name = "project-name"`
+- **WHEN** the Python adapter reads package identity
+- **THEN** the result is `project-name`
+
+#### Scenario: Python identity accepts a single-quoted project name
+
+- **GIVEN** a `pyproject.toml` with `[project]` and `name = 'quoted-name'`
+- **WHEN** the Python adapter reads package identity
+- **THEN** the result is `quoted-name`
+
+#### Scenario: Python identity skips a file without a project name
+
+- **GIVEN** a nearer `pyproject.toml` has only `[tool.poetry]` `name = "poetry-name"`
+- **AND** a parent `pyproject.toml` inside the repository root has `[project]` `name = "project-name"`
+- **WHEN** the Python adapter reads package identity
+- **THEN** the result is `project-name`
 
 ### Requirement: Import specifier resolution
 

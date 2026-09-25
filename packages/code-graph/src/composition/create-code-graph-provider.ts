@@ -15,6 +15,7 @@ import { GraphStoreRegistryError } from '../domain/errors/graph-store-registry-e
 import { createSqliteGraphStoreFactory } from './create-sqlite-graph-store-factory.js'
 import { createGetGraphHealth } from './use-cases/get-graph-health.js'
 import { readInstalledCodeGraphVersion } from '../application/use-cases/_shared/installed-code-graph-version.js'
+import { NodeResolutionManifestSource } from '../infrastructure/fs/node-resolution-manifest-source.js'
 import { type WorkspaceIndexTarget } from '../domain/value-objects/index-options.js'
 
 const DEFAULT_GRAPH_STORE_ID = 'sqlite'
@@ -63,7 +64,8 @@ export function createCodeGraphProvider(
     registry.register(adapter)
   }
 
-  const indexer = new IndexCodeGraph(store, registry)
+  const manifestSource = new NodeResolutionManifestSource()
+  const indexer = new IndexCodeGraph(store, registry, manifestSource)
 
   const graphHealth = isSpecdConfig(options)
     ? {
@@ -71,6 +73,8 @@ export function createCodeGraphProvider(
         input: {
           config: options,
           codeGraphVersion: readInstalledCodeGraphVersion(),
+          adapters: registry.getAdapters(),
+          manifestSource,
           workspaces: options.workspaces.map(
             (workspace): WorkspaceIndexTarget => ({
               name: workspace.name,

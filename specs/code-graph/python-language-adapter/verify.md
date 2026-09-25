@@ -38,6 +38,20 @@
 - **THEN** deterministic forms retain their accessible and original names
 - **AND** the computed form is dropped without executing Python
 
+### Requirement: Resolution manifests
+
+#### Scenario: Python declares only pyproject.toml
+
+- **WHEN** the Python adapter reports `resolutionManifests()`
+- **THEN** the result is exactly `['pyproject.toml']`
+- **AND** `setup.cfg` and `setup.py` are not included
+
+#### Scenario: Python identity ignores an earlier table name
+
+- **GIVEN** `[tool.poetry]` declares `name = "poetry-name"` before `[project]` declares `name = "project-name"`
+- **WHEN** the Python adapter reads package identity from that file
+- **THEN** the result is `project-name`
+
 ### Requirement: Scoped bindings, calls, annotations, and construction
 
 #### Scenario: Annotation-proven receiver wins over runtime alias

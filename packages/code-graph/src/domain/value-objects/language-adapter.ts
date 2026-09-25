@@ -64,6 +64,15 @@ export interface LanguageAdapter {
   extensions(): Record<string, string>
 
   /**
+   * Returns the exact basenames of the manifests this adapter reads for package
+   * identity or import resolution. Does not perform I/O. Adapters that read no
+   * resolution manifest return an empty array. Values are exact filenames, not
+   * globs or directory paths.
+   * @returns Exact resolution-manifest basenames.
+   */
+  resolutionManifests(): readonly string[]
+
+  /**
    * Analyzes a single file and extracts its symbols, imports, binding/call facts,
    * namespace, and any optional parser-specific state.
    */

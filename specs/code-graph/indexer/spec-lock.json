@@ -17,102 +17,78 @@
   ],
   "implementation": [
     {
-      "file": "code-graph:src/domain/services/split-workspace-identity.ts",
-      "symbols": ["isDriveLetterPath", "splitWorkspaceIdentity", "toPortableGraphPath"]
-    },
-    {
-      "file": "code-graph:src/domain/services/compute-hotspots.ts",
-      "symbols": ["computeHotspots"]
-    },
-    {
-      "file": "code-graph:src/domain/services/scoped-binding-environment.ts",
-      "symbols": ["buildScopedBindingEnvironment"]
-    },
-    {
-      "file": "code-graph:src/infrastructure/tree-sitter/typescript-language-adapter.ts",
-      "symbols": ["TypeScriptLanguageAdapter"]
-    },
-    {
-      "file": "code-graph:src/infrastructure/tree-sitter/python-language-adapter.ts",
-      "symbols": ["PythonLanguageAdapter"]
-    },
-    {
-      "file": "code-graph:src/infrastructure/tree-sitter/php-language-adapter.ts",
-      "symbols": ["PhpLanguageAdapter"]
-    },
-    {
-      "file": "code-graph:src/infrastructure/tree-sitter/go-language-adapter.ts",
-      "symbols": ["GoLanguageAdapter"]
-    },
-    {
-      "file": "code-graph:test/infrastructure/tree-sitter/go-language-adapter.spec.ts"
-    },
-    {
-      "file": "code-graph:test/domain/services/scoped-binding-environment.spec.ts"
+      "file": "code-graph:src/application/use-cases/_shared/compute-graph-fingerprint.ts",
+      "symbols": [
+        "computeGraphFingerprint",
+        "computeWorkspaceFingerprint",
+        "computeRootFingerprint",
+        "detectFingerprintMismatch",
+        "discoverResolutionInputs",
+        "FULL_REBUILD_FINGERPRINT_REASON"
+      ]
     },
     {
       "file": "code-graph:src/application/use-cases/index-code-graph.ts",
       "symbols": ["IndexCodeGraph"]
     },
     {
-      "file": "code-graph:src/application/use-cases/resolve-symbol-reference.ts",
-      "symbols": ["ResolveSymbolReference"]
+      "file": "code-graph:src/composition/create-code-graph-provider.ts",
+      "symbols": ["createCodeGraphProvider"]
     },
     {
-      "file": "code-graph:src/application/use-cases/search-code-graph.ts",
-      "symbols": ["SearchCodeGraph"]
+      "file": "code-graph:test/helpers/expected-fingerprint-map.ts",
+      "symbols": ["buildExpectedFingerprintMap"]
     },
     {
-      "file": "code-graph:test/infrastructure/tree-sitter/python-language-adapter.spec.ts"
+      "file": "code-graph:src/application/ports/resolution-manifest-source.ts",
+      "symbols": ["ResolutionManifestSource", "emptyResolutionManifestSource"]
     },
     {
-      "file": "code-graph:test/infrastructure/tree-sitter/typescript-language-adapter.spec.ts"
+      "file": "code-graph:src/infrastructure/fs/node-resolution-manifest-source.ts",
+      "symbols": ["NodeResolutionManifestSource"]
     },
     {
-      "file": "code-graph:test/infrastructure/tree-sitter/php-language-adapter.spec.ts"
+      "file": "code-graph:test/application/use-cases/compute-graph-fingerprint.spec.ts"
     },
     {
-      "file": "code-graph:test/domain/services/compute-hotspots.spec.ts"
+      "file": "code-graph:test/application/use-cases/workspace-indexing.spec.ts"
     },
     {
-      "file": "code-graph:test/application/use-cases/get-graph-health.spec.ts"
-    },
-    {
-      "file": "code-graph:test/barrel.spec.ts"
+      "file": "code-graph:test/infrastructure/fs/node-resolution-manifest-source.spec.ts"
     }
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "IndexCodeGraph descubre, analiza, resuelve y persiste grafo incremental o reconstruido por fingerprint.",
+      "value": "IndexCodeGraph discovers, diffs, extracts, indexes specs, and persists graph incrementally or via fingerprint full rebuild.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:80e5ada5b428e82bc0e2e88aebf989de989779960c58e9caec2991d1d88955a0",
-          "lastModified": "2026-08-27T08:36:44.622Z"
+          "hash": "sha256:c800e87999d9a4d8be03c29699402fe97d335fddde87b906666753ae75f06bf8",
+          "lastModified": "2026-09-25T16:15:32.704Z"
         },
         "verify.md": {
-          "hash": "sha256:ae1f09fcbab885c5597153755f59c40fc718027f1152ce597c71d88329fda48e",
-          "lastModified": "2026-08-27T08:36:44.696Z"
+          "hash": "sha256:b37c79385a324654e47ea47090a12ead4eda2093e01a05bd25f47da0f96a6744",
+          "lastModified": "2026-09-25T16:15:32.746Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# Indexer\n\n## Rules\n\n- `IndexCodeGraph`: entrada aplicación; descubre, diferencia, extrae, indexa specs, almacena, elimina, persiste `lastIndexedRef`; incluye `EXTENDS`, `IMPLEMENTS`, `OVERRIDES`. Lee `SpecRepository` (`list`, `artifact`, `readPersistedState`) y `GetSpecMetadata`; no sidecars/raw metadata.\n- Fingerprint = versión efectiva `@specd/code-graph` + hash canónico workspaces + config descubrimiento efectiva (include/exclude global, allowed/exclude/respectGitignore workspace, exclusiones specs). Mismatch: recrear proveedor/reindexar todo, razón visible; backend inseguro puede exigir force.\n- Incremental con fingerprint válido: solo nuevos/cambiados/eliminados; hash igual + recurso persistido requerido existe = skip. Delete solo workspaces indexados. Force reconsidera todo: ningún artefacto persistido autoriza skip; generación completa equivalente. Cambiados se eliminan antes de `bulkLoad()`.\n- Descubrimiento: por workspace (`codeRoot`, allowed, exclusión global+spec root+workspace, prefijo `{workspace}:`) y global (`includePaths`, prefijo `root:`, solo fuera `codeRoot`). Adaptador → `FileNode`; texto → `DocumentNode`; specs solo indexado specs. Rutas `/`.\n- `discoverFiles`: `respectGitignore` default true y prioridad absoluta; `excludePaths` default `.git/`, `.hg/`, `.svn/`; `vcsRoot` explícito/null, nunca detectar repo. Filtro binario antes de decode. Decode BOM UTF-8/16 LE/BE; UTF-8; UTF-16 por NUL; Windows-1252 sin NUL; sino omite.\n- Análisis 2 pasos + `IndexSession` run-scoped: Pass 1 por workspace analiza `FileAnalysis`, registra facts, `DEFINES`/`EXPORTS`; Pass 2 global resuelve desde sesión `IMPORTS`, `CALLS`, `CONSTRUCTS`, `USES_TYPE`, jerarquía. Sin reparse/store queries. Una vez `GraphStore.bulkLoad()`, luego `rebuildFtsIndexes()`.\n- Sesión: IDs/facts compactos files, analyses, symbols, documents, specs, lookups y relaciones deduplicadas; API común adapters, caches compactas permitidas; nunca mapas internos/store schema/IDs/semántica final. No retener AST.\n- Entorno scoped central: scope, shadowing, bindings, receivers, calls; solo persiste relaciones deterministas. Sin reglas lenguaje en `IndexCodeGraph`, self-relation descartada; ambiguas/no resueltas sin relación (diagnóstico opcional).\n- Cobertura: proyectar estado canónico contra generación actual; file → `COVERS_FILE` si existe; símbolo solo resolución lógica única → `COVERS_SYMBOL`. Reproyectar cambios specs/código; nunca fallback/adivinación. Diagnóstico estable por link no resoluble.\n- Specs: `count`, `list`, `GetSpecMetadata`/`metadataFingerprint`; título/descripción materializada; `readPersistedState` una vez para cobertura/deps. `optimizedDescription` no vacía preferida para BM25/display.\n- Resolver paquetes: `adapter.getPackageIdentity(codeRoot)` por workspace, primer identity gana; imports no relativos → workspace y sesión.\n- Memoria: chunks `IndexOptions.chunkBytes` default 20 MB; opcional staging bajo temp config, run-scoped, limpiar éxito y preferiblemente fallo. Lookups/indexes una vez, batches acotados, sin scans completos/N+1.\n- Observaciones y hechos referencia se reemplazan atómicamente en commit; errores/parcial no limpian stale. Normal: mtime/tamaño evita lectura; hash autoritativo cuando cambian. Reextraer nuevos/cambiados + cierre dependiente; adición puede reextraer importadores sin contar content-indexed. Generación sin cambios conserva facts, actualiza metadata/freshness, sin FTS.\n- Progreso `onProgress(percent, phase)` 0–5 discovery/hash, 5–7 diff/cleanup, 7–50 Pass 1, 50–80 Pass 2, 80–83 specs, 83–95 bulk, 100 done; detalle por elemento y update al cerrar fase. Debug timings fases.\n- Error por archivo: recoger y continuar; infraestructura aborta. `IndexResult`: contadores, errores, duración, breakdown workspace, `vcsRef`, fingerprint, `fullRebuild`, `fullRebuildReason`.\n\n## Constraints\n\n- Store abierto; indexer no ciclo de vida/backend.\n- Default excludes cuando no `excludePaths`: `node_modules/`, `.git/`, `.specd/`, `dist/`, `build/`, `coverage/`, `.next/`, `.nuxt/`; opción reemplaza defaults.\n- Pass 2 tras Pass 1 todos workspaces; no interleave. `workspace.specs()` exclusivo; sin fallback FS.\n- Entorno scoped solo datos Pass/adapters, nunca store; relaciones no resueltas o self no se persisten.",
+      "value": "# Indexer\n\n## Rules\n\n- `IndexCodeGraph`: app entry; Discover → Diff → Extract → Spec Index → Store → Clean → Persist `lastIndexedRef`. Includes `EXTENDS`/`IMPLEMENTS`/`OVERRIDES`. Consumes `SpecRepository` (`list`, `artifact`, `readPersistedState`) + `GetSpecMetadata`; no raw sidecars/metadata snapshots when materialized projection available.\n- Fingerprint = effective `@specd/code-graph` version + canonical workspace-object hash + effective discovery config (`graph.includePaths`/`excludePaths`, workspace `allowedPaths`/`excludePaths`/`respectGitignore`, synthetic `specsPath` exclusions). Mismatch → full rebuild (recreate store preferred; unsafe backend MAY fail-fast needing force). Derivation/schema incompatible → visible destructive rebuild + generation rotate; read paths MUST NOT silent-repair/empty-serve.\n- Incremental (fingerprint match, non-force): process New/Changed/Deleted only; hash-match + needed persisted resource exists → skip. Delete scoped to indexed workspaces. Force: no skip from any persisted artifact; full reconsideration. Changed removed before `bulkLoad()` (COPY insert-only).\n- Discovery: workspace (`codeRoot`, allowed, global+spec-root+ws excludes, prefix `{workspace}:`) + global (`includePaths`, prefix `root:`, only outside all `codeRoot`). Adapter → `FileNode`; text → `DocumentNode`; specs via spec indexing only (synthetic exclude `specsPath`). Paths `/` (no collapse `.`/`..`). Drive keys `^[A-Za-z]:[/\\\\]` or `^[A-Za-z]:$` are path not workspace; PHP `\\` not graph identity.\n- `discoverFiles`: `respectGitignore` default true absolute priority; `excludePaths` default `.git/`/`.hg/`/`.svn/`; `vcsRoot` from `VcsAdapter.rootDir()` or explicit `null` — never probe. Binary-ext filter before decode. Decode: BOM utf-8/16le/16be → utf-8 → utf-16 by NUL layout → windows-1252 if no NUL → skip.\n- Two-pass + run-scoped `IndexSession`: Pass 1 per-ws `FileAnalysis`, register facts, `DEFINES`/`EXPORTS`; Pass 2 global resolve `IMPORTS`/`CALLS`/`CONSTRUCTS`/`USES_TYPE`/hierarchy from session — no reparse/store queries. Then once `GraphStore.bulkLoad()`, then `rebuildFtsIndexes()`.\n- Session: compact IDs/facts for files, analyses, symbols, documents, specs, lookups, deduped relations; common adapter API + compact caches OK; never raw maps/store schema/persisted IDs/final semantics. No retained ASTs across run.\n- Scoped env (shared, not adapter-local): scopes, shadowing, bindings, receivers, call candidates; persist only deterministic relations. No language rules in `IndexCodeGraph`; self-relations dropped; unresolved/ambiguous → no relation (optional diagnostic).\n- Coverage: project canonical `readPersistedState` against commit generation. File link → `COVERS_FILE` if target exists; symbol link → `COVERS_SYMBOL` only unique logical-symbol resolve (not occurrence ID). Reproject on code/spec change; never guess/`COVERS_FILE` fallback. Stable per-link diagnostic. Persist coverage outcomes (hash/excluded/unsupported/parse-fail/partial) beyond transient `IndexResult`.\n- Specs: `count`/`list`; `GetSpecMetadata` + `metadataFingerprint` for skip; title/description from materialization; one `readPersistedState` for coverage/deps. Prefer non-empty `optimizedDescription` for BM25/display.\n- Packages: `adapter.getPackageIdentity(codeRoot)` per ws, first identity wins; non-relative imports → package→workspace map + session.\n- Memory: chunks `IndexOptions.chunkBytes` default 20MB; optional staging under graph temp, run-scoped, clean success (+ preferably failure). Build declaration/logical-symbol/import/public-binding indexes once; bounded batches; no full scans/N+1. Retain indexed text + construct/name ranges through persistence.\n- Observations: success atomically replaces file/doc/spec observations (`stale: false`), VCS-scope evidence; clear stale latches only on full commit. Fail/partial MUST NOT clear stale. Prune removed/obsolete in same generation.\n- Incremental facts: mtime/size fast-path; hash authoritative. Re-extract new/changed + transitive importer/relation/hierarchy/public-route closure. Addition-only may re-extract unresolved-import candidates without content-indexed classify. Unchanged gen: keep ref facts, update metadata/freshness, no FTS rebuild. Force / incompatible / empty-graph only for full corpus replace. Equivalent source → equivalent graph.\n- Progress `onProgress(percent, phase)`: 0–5 discovery/hash, 5–7 diff/cleanup, 7–50 Pass1, 50–80 Pass2, 80–83 specs, 83–95 bulk, 100 done; per-item detail; fire on phase close. Debug phase timings + separate relation/persist/search timings.\n- Per-file errors collect+continue; infra aborts. `IndexResult`: counters, errors, duration, workspace breakdown, `vcsRef`, `graphFingerprint`, `fullRebuild`, `fullRebuildReason`.\n\n## Constraints\n\n- Store opened by caller; indexer owns no lifecycle/backend.\n- Default excludes if no `excludePaths`: `node_modules/`, `.git/`, `.specd/`, `dist/`, `build/`, `coverage/`, `.next/`, `.nuxt/`; provided option replaces entirely.\n- `respectGitignore` true → gitignore absolute over `excludePaths`.\n- Pass 2 after Pass 1 all files/all workspaces; no interleave. Specs via `workspace.specs()` only; no FS fallback.\n- Scoped env: in-memory pass/adapter facts only — never store during analysis. Unresolved/self relations not persisted.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:80e5ada5b428e82bc0e2e88aebf989de989779960c58e9caec2991d1d88955a0",
-          "lastModified": "2026-08-27T08:36:44.622Z"
+          "hash": "sha256:c800e87999d9a4d8be03c29699402fe97d335fddde87b906666753ae75f06bf8",
+          "lastModified": "2026-09-25T16:15:32.704Z"
         },
         "verify.md": {
-          "hash": "sha256:ae1f09fcbab885c5597153755f59c40fc718027f1152ce597c71d88329fda48e",
-          "lastModified": "2026-08-27T08:36:44.696Z"
+          "hash": "sha256:b37c79385a324654e47ea47090a12ead4eda2093e01a05bd25f47da0f96a6744",
+          "lastModified": "2026-09-25T16:15:32.746Z"
         }
       }
     }

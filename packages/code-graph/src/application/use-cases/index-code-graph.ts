@@ -19,6 +19,10 @@ import {
   type WorkspaceIndexBreakdown,
 } from '../../domain/value-objects/index-result.js'
 import { type AdapterRegistryPort } from '../../domain/ports/adapter-registry-port.js'
+import {
+  emptyResolutionManifestSource,
+  type ResolutionManifestSource,
+} from '../ports/resolution-manifest-source.js'
 import { type ResolvedImports } from '../../domain/value-objects/language-adapter.js'
 import { mapWithConcurrency } from '../../domain/services/map-with-concurrency.js'
 import {
@@ -54,6 +58,7 @@ import {
   parseFingerprintMap,
   serializeFingerprintMap,
   detectFingerprintMismatch,
+  FULL_REBUILD_FINGERPRINT_REASON,
 } from './_shared/compute-graph-fingerprint.js'
 import { resolveEffectiveGraphConfig } from './_shared/resolve-effective-graph-config.js'
 import { readInstalledCodeGraphVersion } from './_shared/installed-code-graph-version.js'
@@ -447,10 +452,12 @@ export class IndexCodeGraph {
    * Creates a new IndexCodeGraph use case.
    * @param store - The graph store to persist indexed data into.
    * @param registry - The adapter registry for resolving language adapters.
+   * @param manifestSource - Port that reads resolution-manifest existence and text.
    */
   constructor(
     private readonly store: GraphStore,
     private readonly registry: AdapterRegistryPort,
+    private readonly manifestSource: ResolutionManifestSource = emptyResolutionManifestSource,
   ) {}
 
   /**
@@ -791,6 +798,7 @@ export class IndexCodeGraph {
 
       // ── Fingerprint comparison ──
       const version = options.codeGraphVersion ?? readInstalledCodeGraphVersion()
+      const adapters = this.registry.getAdapters()
       const currentFingerprintMap = new Map<string, string>()
       for (const ws of options.workspaces) {
         currentFingerprintMap.set(
@@ -801,6 +809,9 @@ export class IndexCodeGraph {
             ws,
             options.workspaces,
             options.graphConfig,
+            adapters,
+            options.vcsRoot,
+            this.manifestSource,
           ),
         )
       }
@@ -811,6 +822,9 @@ export class IndexCodeGraph {
           options.projectRoot,
           options.workspaces,
           options.graphConfig,
+          adapters,
+          options.vcsRoot,
+          this.manifestSource,
         ),
       )
       const stats = await this.store.getStatistics()
@@ -821,6 +835,9 @@ export class IndexCodeGraph {
         options.projectRoot,
         options.workspaces,
         options.graphConfig,
+        adapters,
+        options.vcsRoot,
+        this.manifestSource,
       )
 
       // Merge stored fingerprints for workspaces NOT being indexed into the current map
@@ -844,8 +861,7 @@ export class IndexCodeGraph {
         if (options.force === true) {
           progress(5, 'Forced reindex', 'Reconsidering every selected input')
         } else {
-          fullRebuildReason =
-            'Graph derivation fingerprint mismatch — code-graph version or workspace configuration changed since last index'
+          fullRebuildReason = FULL_REBUILD_FINGERPRINT_REASON
           progress(5, 'Fingerprint mismatch', 'Forcing re-index of mismatched workspaces')
           // Remove all files from mismatched workspaces so they get re-processed
           // but do NOT recreate the store — other workspaces are unaffected
@@ -1032,7 +1048,6 @@ export class IndexCodeGraph {
 
       // Build package-name → workspace-name map for cross-workspace import resolution.
       const packageToWorkspace = new Map<string, string>()
-      const adapters = this.registry.getAdapters()
       for (const ws of options.workspaces) {
         for (const adapter of adapters) {
           if (adapter.getPackageIdentity) {

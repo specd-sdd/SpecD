@@ -6,7 +6,22 @@
   "dependsOn": ["code-graph:symbol-model"],
   "implementation": [
     {
-      "file": "code-graph:package.json"
+      "file": "code-graph:src/domain/value-objects/language-adapter.ts",
+      "symbols": ["LanguageAdapter"]
+    },
+    {
+      "file": "code-graph:src/infrastructure/tree-sitter/typescript-language-adapter.ts",
+      "symbols": ["TypeScriptLanguageAdapter"]
+    },
+    {
+      "file": "code-graph:src/infrastructure/tree-sitter/python-language-adapter.ts",
+      "symbols": ["readPythonProjectName"]
+    },
+    {
+      "file": "code-graph:test/infrastructure/tree-sitter/typescript-language-adapter.spec.ts"
+    },
+    {
+      "file": "code-graph:test/infrastructure/tree-sitter/resolution-manifests.spec.ts"
     }
   ],
   "optimizations": {

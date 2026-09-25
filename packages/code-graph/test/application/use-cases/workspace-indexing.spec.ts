@@ -4,10 +4,12 @@ import { makeListResult, makeMockSpecRepository } from '../../helpers/make-mock-
 
 const makeMockRepo = makeMockSpecRepository
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync, utimesSync } from 'node:fs'
-import { join, dirname } from 'node:path'
+import { join, dirname, resolve } from 'node:path'
 import { tmpdir } from 'node:os'
 import { SpecRepository, Spec, SpecPath } from '@specd/core'
 import { IndexCodeGraph } from '../../../src/application/use-cases/index-code-graph.js'
+import { FULL_REBUILD_FINGERPRINT_REASON } from '../../../src/application/use-cases/_shared/compute-graph-fingerprint.js'
+import { type ResolutionManifestSource } from '../../../src/application/ports/resolution-manifest-source.js'
 import { InMemoryGraphStore } from '../../helpers/in-memory-graph-store.js'
 import { type GraphStore } from '../../../src/domain/ports/graph-store.js'
 import { type IndexOptions } from '../../../src/domain/value-objects/index-options.js'
@@ -59,6 +61,82 @@ describe('Workspace indexing', () => {
   afterEach(async () => {
     await store.close()
     rmSync(tempDir, { recursive: true, force: true })
+  })
+
+  it('given a declared manifest changes only newlines, when indexing again, then fullRebuildReason stays null', async () => {
+    const wsDir = createWorkspaceDir(tempDir, 'ws', {
+      'src/code.ts': 'export const value = 1',
+    })
+    const manifest = resolve(join(wsDir, 'package.json'))
+    const files = new Map<string, string>([[manifest, '{\n  "name": "demo"\n}\n']])
+    const source: ResolutionManifestSource = {
+      directoryExists: (path) => {
+        const dir = resolve(path)
+        return [...files.keys()].some((file) => file === dir || file.startsWith(`${dir}/`))
+      },
+      isRegularFile: (path) => files.has(resolve(path)),
+      readText: (path) => files.get(resolve(path)),
+    }
+    const indexer = new IndexCodeGraph(store, registry, source)
+    const options: IndexOptions = {
+      projectRoot: tempDir,
+      vcsRoot: tempDir,
+      workspaces: [
+        {
+          name: 'ws',
+          prefix: null,
+          codeRoot: wsDir,
+          specRepo: makeMockRepo(),
+          ownership: 'owned',
+          isExternal: false,
+        },
+      ],
+      graphConfig: { includePaths: [], workspaces: new Map() },
+    }
+    await indexer.execute(options)
+    files.set(manifest, '{\r\n  "name": "demo"\r\n}\r\n')
+    const second = await indexer.execute(options)
+    expect(second.fullRebuildReason).toBeNull()
+    expect(second.fullRebuild).toBe(false)
+  })
+
+  it('given a declared manifest text changes, when indexing again, then fullRebuildReason names resolution manifests', async () => {
+    const wsDir = createWorkspaceDir(tempDir, 'ws', {
+      'src/code.ts': 'export const value = 1',
+    })
+    const manifest = resolve(join(wsDir, 'package.json'))
+    const files = new Map<string, string>([[manifest, '{"name":"before"}']])
+    const source: ResolutionManifestSource = {
+      directoryExists: (path) => {
+        const dir = resolve(path)
+        return [...files.keys()].some((file) => file === dir || file.startsWith(`${dir}/`))
+      },
+      isRegularFile: (path) => files.has(resolve(path)),
+      readText: (path) => files.get(resolve(path)),
+    }
+    const indexer = new IndexCodeGraph(store, registry, source)
+    const options: IndexOptions = {
+      projectRoot: tempDir,
+      vcsRoot: tempDir,
+      workspaces: [
+        {
+          name: 'ws',
+          prefix: null,
+          codeRoot: wsDir,
+          specRepo: makeMockRepo(),
+          ownership: 'owned',
+          isExternal: false,
+        },
+      ],
+      graphConfig: { includePaths: [], workspaces: new Map() },
+    }
+    await indexer.execute(options)
+    files.set(manifest, '{"name":"after"}')
+    const second = await indexer.execute(options)
+    expect(second.fullRebuildReason).toBe(FULL_REBUILD_FINGERPRINT_REASON)
+    expect(second.fullRebuild).toBe(true)
+    expect(second.filesSkipped).toBe(0)
+    expect(second.filesIndexed).toBeGreaterThan(0)
   })
 
   it('persists one durable coverage outcome for every considered source target', async () => {

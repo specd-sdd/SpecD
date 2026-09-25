@@ -1,0 +1,15 @@
+- op: added
+  description: Go resolution fingerprint manifest is go.mod
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: 'Requirement: Package identity, exports, and imports'
+  content: |
+    ### Requirement: Resolution manifests
+
+    `resolutionManifests()` SHALL return exactly `['go.mod']`.
+
+    The adapter MUST NOT declare `go.work` or any other basename. Package identity continues to come from the `module` path in `go.mod`.

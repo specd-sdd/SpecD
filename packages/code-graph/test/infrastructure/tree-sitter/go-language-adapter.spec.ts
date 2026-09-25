@@ -20,6 +20,7 @@ import { parseLogicalSymbol } from '../../../src/domain/value-objects/symbol-ref
 interface TestAdapter {
   languages(): string[]
   extensions(): Record<string, string>
+  resolutionManifests(): readonly string[]
   getPackageIdentity(codeRoot: string, repoRoot?: string): string | undefined
   resolvePackageFromSpecifier(specifier: string, knownPackages: string[]): string | undefined
   extractSymbols(filePath: string, content: string): SymbolNode[]
@@ -552,6 +553,13 @@ type HandlerFn func(event Event) Result`
       expect(adapter.resolvePackageFromSpecifier('github.com/acme/auth/models', known)).toBe(
         'github.com/acme/auth',
       )
+    })
+  })
+
+  describe('resolutionManifests', () => {
+    it('given go adapter, when asked for manifests, then returns go.mod only', () => {
+      expect(adapter.resolutionManifests()).toEqual(['go.mod'])
+      expect(adapter.resolutionManifests()).not.toContain('go.work')
     })
   })
 

@@ -1,0 +1,23 @@
+- op: added
+  description: Verify Python resolution manifest declaration
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: 'Requirement: Imports and package resolution'
+  content: |
+    ### Requirement: Resolution manifests
+
+    #### Scenario: Python declares only pyproject.toml
+
+    - **WHEN** the Python adapter reports `resolutionManifests()`
+    - **THEN** the result is exactly `['pyproject.toml']`
+    - **AND** `setup.cfg` and `setup.py` are not included
+
+    #### Scenario: Python identity ignores an earlier table name
+
+    - **GIVEN** `[tool.poetry]` declares `name = "poetry-name"` before `[project]` declares `name = "project-name"`
+    - **WHEN** the Python adapter reads package identity from that file
+    - **THEN** the result is `project-name`

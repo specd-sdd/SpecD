@@ -24,6 +24,12 @@ Logical declarations SHALL use the indexed Go package as their public surface. P
 
 The adapter SHALL extract single, grouped, aliased, dot, and blank imports. Blank imports SHALL create dependency evidence without a local symbol binding. Dot imports SHALL remain a distinct namespace-import form and MUST NOT cause unqualified names to bind unless a unique indexed target is proven. Import specifiers SHALL resolve by longest known `go.mod` module prefix.
 
+### Requirement: Resolution manifests
+
+`resolutionManifests()` SHALL return exactly `['go.mod']`.
+
+The adapter MUST NOT declare `go.work` or any other basename. Package identity continues to come from the `module` path in `go.mod`.
+
 ### Requirement: Go logical identity and declaring owners
 
 A receiver method SHALL use the logical identity of its declared receiver type as owner when that receiver type is present in the supported file analysis, normalizing pointer syntax while retaining pointer/value receiver evidence in parser state. Interface methods SHALL use the declaring interface logical owner. Package functions, types, variables, and constants SHALL have no declaring owner beyond their package surface. A receiver method whose owner cannot be proven SHALL be omitted from logical member facts rather than represented as ownerless.

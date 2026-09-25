@@ -118,8 +118,17 @@ function matchingFingerprint(version = codeGraphVersion): string {
     mockWorkspace,
     workspaces,
     graphConfig,
+    [],
+    null,
   )
-  const rootFp = computeRootFingerprint(version, config.projectRoot, workspaces, graphConfig)
+  const rootFp = computeRootFingerprint(
+    version,
+    config.projectRoot,
+    workspaces,
+    graphConfig,
+    [],
+    null,
+  )
   return serializeFingerprintMap(
     new Map([
       ['core', fp],

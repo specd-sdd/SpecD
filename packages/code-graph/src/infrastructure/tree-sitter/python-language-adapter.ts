@@ -1189,6 +1189,14 @@ export class PythonLanguageAdapter implements LanguageAdapter {
   }
 
   /**
+   * Declares the resolution manifests this adapter reads.
+   * @returns Exact basenames used for package identity.
+   */
+  resolutionManifests(): readonly string[] {
+    return ['pyproject.toml']
+  }
+
+  /**
    * Reads the package identity by searching for `pyproject.toml` at or above
    * the given directory, bounded by the repository root.
    * @param codeRoot - Absolute path to the workspace's code root.
@@ -1196,14 +1204,27 @@ export class PythonLanguageAdapter implements LanguageAdapter {
    * @returns The project name from the nearest `pyproject.toml`, or undefined.
    */
   getPackageIdentity(codeRoot: string, repoRoot?: string): string | undefined {
-    return findManifestField(
-      codeRoot,
-      'pyproject.toml',
-      (content) => {
-        const match = content.match(/^\s*name\s*=\s*"([^"]+)"/m)
-        return match?.[1]
-      },
-      repoRoot,
-    )
+    return findManifestField(codeRoot, 'pyproject.toml', readPythonProjectName, repoRoot)
   }
+}
+
+/**
+ * Reads `[project].name` from a pyproject.toml document.
+ * @param content - UTF-8 manifest text.
+ * @returns The project name, or undefined when `[project].name` is absent.
+ */
+function readPythonProjectName(content: string): string | undefined {
+  let inProject = false
+  for (const line of content.split(/\r?\n/)) {
+    const header = /^\s*\[([^\]]+)\]\s*(?:#.*)?$/.exec(line)
+    if (header?.[1] !== undefined) {
+      inProject = header[1] === 'project'
+      continue
+    }
+    if (!inProject) continue
+    const match = /^\s*name\s*=\s*(?:"([^"]*)"|'([^']*)')/.exec(line)
+    const name = match?.[1] ?? match?.[2]
+    if (name !== undefined && name !== '') return name
+  }
+  return undefined
 }

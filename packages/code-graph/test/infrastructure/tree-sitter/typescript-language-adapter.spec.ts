@@ -21,6 +21,7 @@ import { parseLogicalSymbol } from '../../../src/domain/value-objects/symbol-ref
 interface TestAdapter {
   languages(): string[]
   extensions(): Record<string, string>
+  resolutionManifests(): readonly string[]
   getPackageIdentity(codeRoot: string, repoRoot?: string): string | undefined
   resolvePackageFromSpecifier(specifier: string, knownPackages: string[]): string | undefined
   resolveRelativeImportPath(fromFile: string, specifier: string): string | string[]
@@ -813,6 +814,12 @@ Article.formatTitle = (title) => { };`
     it('resolves ./ specifier', () => {
       const result = adapter.resolveRelativeImportPath('core:src/index.ts', './utils.js')
       expect(result).toBe('core:src/utils.ts')
+    })
+  })
+
+  describe('resolutionManifests', () => {
+    it('given typescript adapter, when asked for manifests, then returns package.json', () => {
+      expect(adapter.resolutionManifests()).toEqual(['package.json'])
     })
   })
 

@@ -4,6 +4,7 @@ import { join, relative, resolve } from 'node:path'
 import { type CodeGraphHostPort } from '../ports/code-graph-host-port.js'
 import { type GraphStatistics } from '../../domain/value-objects/graph-statistics.js'
 import { type WorkspaceIndexTarget } from '../../domain/value-objects/index-options.js'
+import { type LanguageAdapter } from '../../domain/value-objects/language-adapter.js'
 import {
   IndexCoverageStatus,
   type IndexCoverage,
@@ -13,6 +14,10 @@ import {
   parseFingerprintMap,
   detectFingerprintMismatch,
 } from './_shared/compute-graph-fingerprint.js'
+import {
+  emptyResolutionManifestSource,
+  type ResolutionManifestSource,
+} from '../ports/resolution-manifest-source.js'
 import { buildProjectGraphConfig } from '../services/build-project-graph-config.js'
 import { computeContentHash } from './compute-content-hash.js'
 import { resolveEffectiveGraphConfig } from './_shared/resolve-effective-graph-config.js'
@@ -35,6 +40,8 @@ export interface GetGraphHealthInput {
   readonly provider: CodeGraphHostPort
   readonly codeGraphVersion: string
   readonly workspaces?: readonly WorkspaceIndexTarget[]
+  readonly adapters?: readonly LanguageAdapter[]
+  readonly manifestSource?: ResolutionManifestSource
 }
 
 /** Graph statistics enriched with staleness and fingerprint diagnostics. */
@@ -178,6 +185,9 @@ export class GetGraphHealth {
           input.config.projectRoot,
           [...input.workspaces],
           graphConfig,
+          input.adapters ?? [],
+          vcsRoot,
+          input.manifestSource ?? emptyResolutionManifestSource,
         )
       } catch {
         fingerprintMismatch = null

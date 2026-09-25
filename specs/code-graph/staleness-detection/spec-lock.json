@@ -3,28 +3,30 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": ["code-graph:graph-store", "code-graph:indexer", "code-graph:get-graph-health"],
+  "dependsOn": [
+    "code-graph:graph-store",
+    "code-graph:indexer",
+    "code-graph:get-graph-health",
+    "code-graph:language-adapter"
+  ],
   "implementation": [
     {
-      "file": "code-graph:package.json"
+      "file": "code-graph:src/application/use-cases/_shared/compute-graph-fingerprint.ts",
+      "symbols": [
+        "detectFingerprintMismatch",
+        "computeGraphFingerprint",
+        "GRAPH_STATS_FINGERPRINT_WARNING"
+      ]
     },
     {
-      "file": "code-graph:src/application/services/graph-input-visibility.ts"
+      "file": "code-graph:src/application/use-cases/get-graph-health.ts",
+      "symbols": ["GetGraphHealth"]
     },
     {
-      "file": "code-graph:src/application/use-cases/assess-indexed-resource-freshness.ts"
+      "file": "code-graph:test/application/use-cases/staleness-detection.verify.spec.ts"
     },
     {
-      "file": "code-graph:src/domain/value-objects/indexed-input-freshness.ts"
-    },
-    {
-      "file": "code-graph:test/application/use-cases/assess-indexed-resource-freshness.spec.ts"
-    },
-    {
-      "file": "code-graph:src/application/use-cases/_shared/compute-graph-fingerprint.ts"
-    },
-    {
-      "file": "code-graph:test/application/use-cases/compute-graph-fingerprint.spec.ts"
+      "file": "code-graph:test/application/use-cases/get-graph-health.spec.ts"
     }
   ],
   "optimizations": {

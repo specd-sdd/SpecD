@@ -46,7 +46,16 @@
 - **WHEN** `IndexCodeGraph.execute()` is called
 - **THEN** the run behaves as a full rebuild instead of skipping unchanged files
 - **AND** every discovered file is re-extracted
-- **AND** `fullRebuildReason` explains that the code-graph version or resolved workspace configuration changed
+- **AND** `fullRebuildReason` is `Graph derivation fingerprint mismatch — code-graph version, workspace configuration, or resolution manifest content changed`
+
+#### Scenario: Newline-only manifest change stays incremental
+
+- **GIVEN** a persisted fingerprint computed from an LF `package.json`
+- **AND** the working copy differs only by CRLF in that same manifest
+- **WHEN** the indexer compares fingerprints and runs `IndexCodeGraph.execute()` without force
+- **THEN** the resolution-manifest digest matches
+- **AND** the newline-only change does not by itself escalate the run to a full rebuild
+- **AND** `fullRebuildReason` is null
 
 #### Scenario: Deleted file removal remains scoped to indexed workspaces
 
@@ -186,6 +195,51 @@
 - **GIVEN** a filesystem-backed repository exposes a `specsPath`
 - **WHEN** the indexer computes the current graph fingerprint
 - **THEN** the synthetic exclusion derived from that spec root contributes to the fingerprint payload
+
+#### Scenario: Undeclared build files are not fingerprint inputs
+
+- **GIVEN** a workspace contains `tsconfig.json`, `jsconfig.json`, `setup.cfg`, `setup.py`, and `go.work`
+- **AND** no registered adapter declares those basenames
+- **WHEN** the discovery fingerprint is computed
+- **THEN** those files do not change the digest
+- **AND** changing any one of them, while declared manifests stay unchanged, leaves the digest unchanged
+
+### Requirement: Adapter-sourced resolution fingerprint
+
+#### Scenario: Manifest membership comes from adapters
+
+- **GIVEN** registered adapters declare `package.json`, `go.mod`, `composer.json`, and `pyproject.toml`
+- **WHEN** resolution inputs are discovered
+- **THEN** only files with those basenames are candidates
+- **AND** the fingerprint module does not apply its own manifest allow-list
+
+#### Scenario: Walk includes manifests between codeRoot and the repository root
+
+- **GIVEN** `composer.json` exists in a parent of `codeRoot` that is still inside the repository root
+- **AND** the PHP adapter declares `composer.json`
+- **WHEN** resolution inputs are discovered for that workspace
+- **THEN** that parent manifest is included
+
+#### Scenario: Walk stops at the repository root
+
+- **GIVEN** a declared manifest exists above the repository root
+- **WHEN** resolution inputs are discovered
+- **THEN** that file is omitted
+- **AND** when no repository root is available the walk stops at the project root
+
+#### Scenario: CRLF and LF manifests hash the same
+
+- **GIVEN** two copies of the same manifest whose only difference is CRLF versus LF
+- **WHEN** each copy is hashed for the fingerprint
+- **THEN** both digests are equal
+- **AND** each stored manifest `contentHash` is SHA-256 hex of the newline-normalized UTF-8 text
+- **AND** that `contentHash` has no `sha256:` prefix
+
+#### Scenario: Manifest discovery does not import the filesystem from application code
+
+- **WHEN** the application fingerprint module discovers resolution inputs
+- **THEN** it reads existence and text only through an application port
+- **AND** that module does not import `node:fs` or `node:fs/promises`
 
 ### Requirement: Two-pass extraction with in-memory index
 

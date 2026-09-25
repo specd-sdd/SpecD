@@ -1862,6 +1862,14 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
   }
 
   /**
+   * Declares the resolution manifests this adapter reads.
+   * @returns Exact basenames used for package identity.
+   */
+  resolutionManifests(): readonly string[] {
+    return ['package.json']
+  }
+
+  /**
    * Reads the package identity by searching for `package.json` at or above
    * the given directory, bounded by the repository root.
    * @param codeRoot - Absolute path to the workspace's code root.
