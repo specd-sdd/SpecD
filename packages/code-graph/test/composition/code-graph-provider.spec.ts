@@ -97,7 +97,7 @@ describe('CodeGraphProvider', () => {
 
   it('allows providing a custom store factory', async () => {
     tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-custom-'))
-    const customStore = new InMemoryGraphStore()
+    const customStore = new InMemoryGraphStore(tempDir)
 
     const provider = await createCodeGraphProvider({
       storagePath: tempDir,
@@ -116,7 +116,7 @@ describe('CodeGraphProvider', () => {
 
   it('selects an additive external factory and forwards its storage root', async () => {
     tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-external-'))
-    const externalStore = new InMemoryGraphStore()
+    const externalStore = new InMemoryGraphStore(tempDir)
     const create = vi.fn(() => externalStore)
 
     const provider = createCodeGraphProvider({
@@ -133,7 +133,7 @@ describe('CodeGraphProvider', () => {
 
   it('rejects an external collision with the sqlite built-in before store construction', () => {
     tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-collision-'))
-    const create = vi.fn(() => new InMemoryGraphStore())
+    const create = vi.fn(() => new InMemoryGraphStore(tempDir))
 
     expect(() =>
       createCodeGraphProvider({
@@ -197,7 +197,7 @@ describe('CodeGraphProvider', () => {
     const codeRoot = join(tempDir, 'workspace')
     mkdirSync(codeRoot, { recursive: true })
     writeFileSync(join(codeRoot, 'entry.ts'), 'export const forced = 1\n')
-    const store = new InMemoryGraphStore()
+    const store = new InMemoryGraphStore(tempDir)
     const clear = vi.spyOn(store, 'clear')
     const recreate = vi.spyOn(store, 'recreate')
     const provider = createCodeGraphProvider({
@@ -271,7 +271,7 @@ describe('CodeGraphProvider', () => {
     writeFileSync(lockPath, JSON.stringify({ ...lock, pid: process.ppid }))
     process.env['SPECD_GRAPH_INDEX_LOCK_ROOT'] = tempDir
     process.env['SPECD_GRAPH_INDEX_LOCK_TOKEN'] = lock.token
-    const store = new InMemoryGraphStore()
+    const store = new InMemoryGraphStore(tempDir)
     const provider = createCodeGraphProvider({
       storagePath: tempDir,
       projectRoot: tempDir,
@@ -299,8 +299,10 @@ describe('CodeGraphProvider', () => {
           graphConfig: { includePaths: [], workspaces: new Map() },
         }),
       ).resolves.toBeDefined()
-      // Indexing consumes the matching handoff, while the separate SQLite-backed
-      // reader-lock regression above proves reads never consume it.
+      // Indexing accepts the matching handoff; reads still honor the held lock
+      // (they never treat the handoff as a reader lease).
+      await expect(provider.getStatistics()).rejects.toBeInstanceOf(GraphBusyError)
+      release()
       await expect(provider.getStatistics()).resolves.toBeDefined()
     } finally {
       await provider.close()
@@ -326,7 +328,7 @@ describe('CodeGraphProvider', () => {
 
   it('clear on an open provider keeps the store ready for subsequent operations', async () => {
     tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-clear-open-'))
-    const customStore = new InMemoryGraphStore()
+    const customStore = new InMemoryGraphStore(tempDir)
     const provider = await createCodeGraphProvider({
       storagePath: tempDir,
       projectRoot: tempDir,
@@ -348,7 +350,7 @@ describe('CodeGraphProvider', () => {
 
   it('requires a provider to be closed before physical recreation', async () => {
     tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-stale-'))
-    const customStore = new InMemoryGraphStore()
+    const customStore = new InMemoryGraphStore(tempDir)
     const provider = await createCodeGraphProvider({
       storagePath: tempDir,
       projectRoot: tempDir,
@@ -407,7 +409,7 @@ describe('CodeGraphProvider', () => {
 
   it('resolves a config-relative file selector to the canonical workspace path', async () => {
     tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-file-resolve-'))
-    const store = new InMemoryGraphStore()
+    const store = new InMemoryGraphStore(tempDir)
     const provider = createCodeGraphProvider({
       storagePath: tempDir,
       projectRoot: tempDir,
@@ -444,7 +446,7 @@ describe('CodeGraphProvider', () => {
       projectRoot: tempDir,
       graphStoreFactories: {
         custom: {
-          create: () => new InMemoryGraphStore(),
+          create: () => new InMemoryGraphStore(tempDir),
         },
       },
       graphStoreId: 'custom',
@@ -460,7 +462,7 @@ describe('CodeGraphProvider', () => {
 
   it('retrieves an exact public binding without ranked search pagination', async () => {
     tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-exact-binding-'))
-    const store = new InMemoryGraphStore()
+    const store = new InMemoryGraphStore(tempDir)
     const provider = createCodeGraphProvider({
       storagePath: tempDir,
       projectRoot: tempDir,
@@ -537,7 +539,7 @@ describe('CodeGraphProvider', () => {
 
   it('exposes one unified Code Graph-owned search operation', async () => {
     tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-search-'))
-    const store = new InMemoryGraphStore()
+    const store = new InMemoryGraphStore(tempDir)
     const provider = createCodeGraphProvider({
       storagePath: tempDir,
       projectRoot: tempDir,
@@ -574,7 +576,7 @@ describe('CodeGraphProvider', () => {
 
   it('normalizes an exact config-relative search file and keeps every occurrence', async () => {
     tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-file-search-'))
-    const store = new InMemoryGraphStore()
+    const store = new InMemoryGraphStore(tempDir)
     const provider = createCodeGraphProvider({
       storagePath: tempDir,
       projectRoot: tempDir,
@@ -630,7 +632,7 @@ describe('CodeGraphProvider', () => {
         await super.recreate()
       }
     }
-    const store = new IncompatibleStore()
+    const store = new IncompatibleStore(tempDir)
     const createProvider = () =>
       createCodeGraphProvider({
         storagePath: tempDir,
@@ -708,7 +710,7 @@ describe('CodeGraphProvider', () => {
 
   it('forwards one exact filter through every impact facade under one availability check', async () => {
     tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-impact-filter-'))
-    const store = new InMemoryGraphStore()
+    const store = new InMemoryGraphStore(tempDir)
     const provider = createCodeGraphProvider({
       storagePath: tempDir,
       projectRoot: tempDir,

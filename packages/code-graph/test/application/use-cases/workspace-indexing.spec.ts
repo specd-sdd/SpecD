@@ -52,7 +52,7 @@ describe('Workspace indexing', () => {
 
   beforeEach(async () => {
     tempDir = mkdtempSync(join(tmpdir(), 'specd-workspace-indexing-'))
-    store = new InMemoryGraphStore()
+    store = new InMemoryGraphStore(tempDir)
     await store.open()
   })
 

@@ -641,10 +641,7 @@ describe('SQLiteGraphStore', () => {
         workspace: 'test',
       }),
     )
-    await store.bulkLoad({ files, symbols: [], specs, relations: [] })
-    for (const document of documents) {
-      await store.upsertDocument(document)
-    }
+    await store.bulkLoad({ files, symbols: [], documents, specs, relations: [] })
 
     const requestedFilePaths = [...files.map((file) => file.path).reverse(), files[0]!.path]
     const foundFiles = await store.getFilesByPaths(requestedFilePaths)

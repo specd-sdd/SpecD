@@ -1,3 +1,6 @@
+import { mkdtempSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import {
   GraphStore,
   type ImpactFrontierQuery,
@@ -115,8 +118,13 @@ export class InMemoryGraphStore extends GraphStore {
   private _lastIndexedRef: string | null = null
   private _graphFingerprint: string | null = null
 
-  constructor() {
-    super(':memory:')
+  /**
+   * @param storagePath - Real filesystem root for lock and index staging.
+   *   Graph payload stays in memory; this path must not be a sentinel like `:memory:`.
+   *   Defaults to a unique directory under `os.tmpdir()`.
+   */
+  constructor(storagePath: string = mkdtempSync(join(tmpdir(), 'specd-inmem-graph-'))) {
+    super(storagePath)
   }
 
   /**
