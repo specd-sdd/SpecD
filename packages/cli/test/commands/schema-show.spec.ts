@@ -1,3 +1,4 @@
+import { resolve } from 'node:path'
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import {
   makeMockConfig,
@@ -348,7 +349,7 @@ describe('File mode', () => {
     await program.parseAsync(['node', 'specd', 'schema', 'show', '--file', '/tmp/schema.yaml'])
 
     expect(kernel.specs.getActiveSchema.execute).toHaveBeenCalledWith(
-      { mode: 'file', filePath: '/tmp/schema.yaml' },
+      { mode: 'file', filePath: resolve('/tmp/schema.yaml') },
       { raw: undefined, resolveTemplates: false },
     )
     expect(stdout()).toContain('my-schema')
