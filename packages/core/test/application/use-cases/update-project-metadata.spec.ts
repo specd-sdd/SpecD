@@ -85,6 +85,6 @@ describe('UpdateProjectMetadata', () => {
     expect(savedMetadata.freshness.inputs.config.hash).toBe('hash(config content)')
     expect(savedMetadata.freshness.inputs.contextFiles[0].hash).toBe('hash(agents content)')
     expect(savedMetadata.freshness.inputs.specMetadata[0].hash).toBe('fp-auth-login')
-    expect(result.path).toBe('/project/.specd/project-metadata.json')
+    expect(result.path).toBe(join('/project/.specd', 'project-metadata.json'))
   })
 })
