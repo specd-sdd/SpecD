@@ -11,6 +11,9 @@ vi.mock('../../../src/infrastructure/svn/exec.js', () => ({
 }))
 
 import { SvnVcsAdapter } from '../../../src/infrastructure/svn/vcs-adapter.js'
+import { normalizeVcsRoot } from '../../../src/infrastructure/fs/path-platform.js'
+
+const repoRoot = normalizeVcsRoot('/repo')
 
 describe('SvnVcsAdapter', () => {
   beforeEach(() => {
@@ -21,7 +24,7 @@ describe('SvnVcsAdapter', () => {
   it('returns the cached working-copy root synchronously when provided', () => {
     const adapter = new SvnVcsAdapter('/repo/worktree', '/repo')
 
-    expect(adapter.rootDir()).toBe('/repo')
+    expect(adapter.rootDir()).toBe(repoRoot)
     expect(svnSyncMock).not.toHaveBeenCalled()
   })
 
@@ -36,7 +39,7 @@ describe('SvnVcsAdapter', () => {
     svnSyncMock.mockReturnValue('/repo')
     const adapter = new SvnVcsAdapter('/repo/worktree')
 
-    expect(adapter.rootDir()).toBe('/repo')
+    expect(adapter.rootDir()).toBe(repoRoot)
     expect(svnSyncMock).toHaveBeenCalledWith('/repo/worktree', 'info', '--show-item', 'wc-root')
   })
 
@@ -62,7 +65,7 @@ describe('SvnVcsAdapter', () => {
     const adapter = new SvnVcsAdapter('/repo/nested/project', '/repo')
 
     await expect(adapter.ref()).resolves.toBe('42')
-    expect(svnMock).toHaveBeenCalledWith('/repo', 'info', '--show-item', 'revision')
+    expect(svnMock).toHaveBeenCalledWith(repoRoot, 'info', '--show-item', 'revision')
   })
 
   it('enumerates versioned, missing, untracked, and rename-side paths at the root', async () => {
@@ -89,8 +92,8 @@ describe('SvnVcsAdapter', () => {
       'src/untracked.ts',
       'nested/portable.ts',
     ])
-    expect(svnMock).toHaveBeenNthCalledWith(1, '/repo', 'diff', '--summarize', '-r', '42:WORKING')
-    expect(svnMock).toHaveBeenNthCalledWith(2, '/repo', 'status')
+    expect(svnMock).toHaveBeenNthCalledWith(1, repoRoot, 'diff', '--summarize', '-r', '42:WORKING')
+    expect(svnMock).toHaveBeenNthCalledWith(2, repoRoot, 'status')
   })
 
   it('keeps parent segments when making modified paths portable', async () => {

@@ -1,3 +1,4 @@
+import path from 'node:path'
 import { describe, it, expect, vi } from 'vitest'
 import { RefreshImplementationTracking } from '../../../src/application/use-cases/refresh-implementation-tracking.js'
 import { ChangeNotFoundError } from '../../../src/application/errors/change-not-found-error.js'
@@ -13,6 +14,17 @@ import { isPathInside, normalizeVcsRoot } from '../../../src/infrastructure/fs/p
 const pathHelpers = { isPathInside, normalizeVcsRoot }
 
 const PROJECT_ROOT = '/test'
+
+function hostFiles(files: Record<string, string>): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(files).map(([file, content]) => [
+      file.startsWith(`${PROJECT_ROOT}/`)
+        ? path.resolve(PROJECT_ROOT, file.slice(PROJECT_ROOT.length + 1))
+        : file,
+      content,
+    ]),
+  )
+}
 
 function makeRefresh(
   repo: ReturnType<typeof makeChangeRepository>,
@@ -31,7 +43,7 @@ function makeRefresh(
     repo,
     archives,
     { detectModifiedFiles },
-    makeFileReader(files),
+    makeFileReader(hostFiles(files)),
     PROJECT_ROOT,
     pathHelpers,
     specRepositories,

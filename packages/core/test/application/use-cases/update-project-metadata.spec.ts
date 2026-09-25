@@ -1,3 +1,4 @@
+import { join } from 'node:path'
 import { describe, it, expect, vi } from 'vitest'
 import { UpdateProjectMetadata } from '../../../src/application/use-cases/update-project-metadata.js'
 import { type SpecdConfig } from '../../../src/application/specd-config.js'
@@ -35,7 +36,7 @@ describe('UpdateProjectMetadata', () => {
 
     const files = {
       read: vi.fn().mockImplementation((path) => {
-        if (path === '/project/specd.yaml') return 'config content'
+        if (path === join('/project', 'specd.yaml')) return 'config content'
         if (path.includes('AGENTS.md')) return 'agents content'
         return null
       }),
@@ -74,7 +75,7 @@ describe('UpdateProjectMetadata', () => {
     })
 
     expect(fileWriter.write).toHaveBeenCalledWith(
-      '/project/.specd/project-metadata.json',
+      join('/project/.specd', 'project-metadata.json'),
       expect.stringContaining('Optimized Context'),
     )
     const savedMetadataRaw = vi.mocked(fileWriter.write).mock.calls[0]?.[1]

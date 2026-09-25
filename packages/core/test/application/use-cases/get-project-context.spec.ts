@@ -1,3 +1,4 @@
+import { join } from 'node:path'
 import { describe, it, expect, vi } from 'vitest'
 import { makeSpec } from '../../helpers/make-spec.js'
 import {
@@ -588,8 +589,8 @@ describe('GetProjectContext', () => {
 
   describe('cache verification (llmOptimizedContext)', () => {
     const configPath = '/project/.specd'
-    const metadataPath = '/project/.specd/project-metadata.json'
-    const configYamlPath = '/project/specd.yaml'
+    const metadataPath = join(configPath, 'project-metadata.json')
+    const configYamlPath = join('/project', 'specd.yaml')
 
     it('returns optimized context when cache is fresh', async () => {
       const schema = makeSchema([])

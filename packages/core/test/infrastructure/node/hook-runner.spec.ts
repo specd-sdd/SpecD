@@ -12,46 +12,55 @@ describe('NodeHookRunner', () => {
 
   describe('run', () => {
     it('inserts a developer-quoted value without adding quotes', async () => {
-      const result = await runner.run('printf %s "{{change.name}}"', {
-        change: { name: 'a b %PATH% &' },
-      })
+      const result = await runner.run(
+        'node -e "process.stdout.write(process.argv[1])" "{{change.name}}"',
+        {
+          change: { name: 'a b %PATH% &' },
+        },
+      )
 
       expect(result.exitCode()).toBe(0)
-      expect(result.stdout()).toBe('a b %PATH% &')
+      const expandedPath = process.platform === 'win32' ? process.env['PATH'] : '%PATH%'
+      expect(result.stdout()).toBe(`a b ${expandedPath} &`)
     })
 
     it('keeps several variables inside one pair of quotes', async () => {
-      const result = await runner.run('printf %s "{{project.root}}/{{change.name}}"', {
-        change: { name: 'add-auth' },
-      })
+      const result = await runner.run(
+        'node -e "process.stdout.write(process.argv[1])" "{{project.root}}/{{change.name}}"',
+        {
+          change: { name: 'add-auth' },
+        },
+      )
 
       expect(result.stdout()).toBe('/my/project/add-auth')
     })
 
     it('treats doubled quotes inside double quotes as one literal quote', async () => {
-      const result = await runner.run('printf %s "Resultado: ""listo"""', {})
+      const result = await runner.run(
+        'node -e "process.stdout.write(process.argv[1])" "Resultado: ""listo"""',
+        {},
+      )
 
       expect(result.exitCode()).toBe(0)
       expect(result.stdout()).toBe('Resultado: "listo"')
     })
 
     it('runs a shell command and returns exit code 0 on success', async () => {
-      const result = await runner.run('echo "hello"', {})
+      const result = await runner.run('node -e "process.exit(0)"', {})
 
       expect(result.exitCode()).toBe(0)
-      expect(result.stdout().trim()).toBe('hello')
       expect(result.isSuccess()).toBe(true)
     })
 
     it('captures stdout', async () => {
-      const result = await runner.run('printf "line1\nline2"', {})
+      const result = await runner.run('node -e "process.stdout.write(\'line1\\nline2\')"', {})
 
       expect(result.stdout()).toContain('line1')
       expect(result.stdout()).toContain('line2')
     })
 
     it('captures stderr', async () => {
-      const result = await runner.run('echo "err" >&2', {})
+      const result = await runner.run('node -e "process.stderr.write(\'err\')"', {})
 
       expect(result.stderr().trim()).toBe('err')
     })
@@ -59,8 +68,10 @@ describe('NodeHookRunner', () => {
     it('emits stdout and stderr progress before completion', async () => {
       const events: Array<{ type: string; stream?: string; line?: string }> = []
 
-      const result = await runner.run('printf "line1\\n"; printf "line2\\n" >&2', {}, (event) =>
-        events.push(event),
+      const result = await runner.run(
+        "node -e \"process.stdout.write('line1\\n'); process.stderr.write('line2\\n')\"",
+        {},
+        (event) => events.push(event),
       )
 
       expect(events).toContainEqual({ type: 'output', stream: 'stdout', line: 'line1' })
@@ -72,7 +83,9 @@ describe('NodeHookRunner', () => {
     it('emits a heartbeat for a quiet but still-running process', async () => {
       const events: Array<{ type: string; elapsedMs?: number }> = []
 
-      const result = await runner.run('sleep 5.2', {}, (event) => events.push(event))
+      const result = await runner.run('node -e "setTimeout(() => {}, 5200)"', {}, (event) =>
+        events.push(event),
+      )
 
       expect(result.exitCode()).toBe(0)
       expect(
@@ -108,7 +121,10 @@ describe('NodeHookRunner', () => {
     })
 
     it('preserves unexpanded variables when path is unknown', async () => {
-      const result = await runner.run('echo "{{unknown.path}}"', {})
+      const result = await runner.run(
+        'node -e "process.stdout.write(process.argv[1])" "{{unknown.path}}"',
+        {},
+      )
 
       expect(result.stdout().trim()).toBe('{{unknown.path}}')
     })

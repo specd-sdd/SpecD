@@ -11,6 +11,9 @@ vi.mock('../../../src/infrastructure/git/exec.js', () => ({
 }))
 
 import { GitVcsAdapter } from '../../../src/infrastructure/git/vcs-adapter.js'
+import { normalizeVcsRoot } from '../../../src/infrastructure/fs/path-platform.js'
+
+const repoRoot = normalizeVcsRoot('/repo')
 
 describe('GitVcsAdapter', () => {
   beforeEach(() => {
@@ -21,7 +24,7 @@ describe('GitVcsAdapter', () => {
   it('returns the cached repository root synchronously when provided', () => {
     const adapter = new GitVcsAdapter('/repo/worktree', '/repo')
 
-    expect(adapter.rootDir()).toBe('/repo')
+    expect(adapter.rootDir()).toBe(repoRoot)
     expect(gitSyncMock).not.toHaveBeenCalled()
   })
 
@@ -36,7 +39,7 @@ describe('GitVcsAdapter', () => {
     gitSyncMock.mockReturnValue('/repo')
     const adapter = new GitVcsAdapter('/repo/worktree')
 
-    expect(adapter.rootDir()).toBe('/repo')
+    expect(adapter.rootDir()).toBe(repoRoot)
     expect(gitSyncMock).toHaveBeenCalledWith('/repo/worktree', 'rev-parse', '--show-toplevel')
   })
 
@@ -60,7 +63,7 @@ describe('GitVcsAdapter', () => {
 
     await expect(adapter.ref()).resolves.toBe('abc1234')
     expect(gitMock).toHaveBeenCalledOnce()
-    expect(gitMock).toHaveBeenCalledWith('/repo', 'rev-parse', '--short', 'HEAD')
+    expect(gitMock).toHaveBeenCalledWith(repoRoot, 'rev-parse', '--short', 'HEAD')
   })
 
   it('enumerates every worktree state from the repository root', async () => {
@@ -97,7 +100,7 @@ describe('GitVcsAdapter', () => {
     ])
     expect(gitMock).toHaveBeenNthCalledWith(
       1,
-      '/repo',
+      repoRoot,
       'diff',
       '--name-status',
       '-z',
@@ -107,7 +110,7 @@ describe('GitVcsAdapter', () => {
     )
     expect(gitMock).toHaveBeenNthCalledWith(
       2,
-      '/repo',
+      repoRoot,
       'ls-files',
       '-z',
       '--others',
