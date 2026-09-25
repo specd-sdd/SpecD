@@ -6,47 +6,44 @@
   "dependsOn": ["default:_global/architecture", "default:_global/conventions"],
   "implementation": [
     {
-      "file": "default:.gitattributes"
+      "file": "default:specd-sdd/changes/20260925-213024-posix-windows-test-compatibility/deltas/default/_global/testing/spec.md.delta.yaml"
     },
     {
-      "file": "default:package.json"
-    },
-    {
-      "file": "default:packages/sdk/test/fixtures/publish-shaped-worker-consumer.ts"
+      "file": "default:specd-sdd/changes/20260925-213024-posix-windows-test-compatibility/deltas/default/_global/testing/verify.md.delta.yaml"
     }
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Vitest strategy: unit tests (domain/application, mocked ports) + integration tests (infrastructure, temp filesystem). No snapshots.",
+      "value": "Vitest: unit tests mock ports; integration uses os.tmpdir(); POSIX+Windows path/shell/CRLF-safe. No snapshots.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:b95a4fd25c0d9f8e13e83e90892a68f1509dc6f00768c95de228839860715b82",
-          "lastModified": "2026-05-04T16:57:11.686Z"
+          "hash": "sha256:66e6152167311cc092f8c190b9727d9d00159efbf9e1c3cd7a7da07581518506",
+          "lastModified": "2026-09-25T22:08:57.005Z"
         },
         "verify.md": {
-          "hash": "sha256:7cdbf5af7e93cf8c770b7aed3c03672a2eec07b09e1c0466bd8f5ac3bb63c57e",
-          "lastModified": "2026-05-04T16:57:11.680Z"
+          "hash": "sha256:9c8a4cdc43df60b52b71a1f9ce881077557c5091c26647eb097e19ba05dc9083",
+          "lastModified": "2026-09-25T22:08:57.007Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# Testing Conventions\n\n## Rules\n- Vitest only; tests in `test/` mirroring `src/`; `change.ts` → `test/.../change.spec.ts`\n- Unit tests: every use case + entity invariant method; mocked ports; no fs/network\n- Port mocks: fully implement interface; no `as unknown as Port`; unused methods throw `new Error('not implemented')`\n- Integration tests: infrastructure adapters against real temp dir (`os.tmpdir()` + unique subfolder); cleanup after each test\n- Naming: `.spec.ts` suffix; descriptions `\"given <state>, when <action>, then <outcome>\"`; helpers `setup<Thing>`/`cleanup<Thing>`\n- No snapshot tests\n\n## Constraints\n- Vitest framework\n- Tests in test/ not co-located\n- `.spec.ts` suffix\n- Unit tests: no fs/network/spawn\n- Full port interface on mocks\n- Integration tests clean temp dirs\n- `toMatchSnapshot`/`toMatchInlineSnapshot` forbidden",
+      "value": "# Testing Conventions\n\n## Rules\n- Vitest only; no Jest; tests in `test/` mirroring `src/`; `src/domain/entities/change.ts` → `test/domain/entities/change.spec.ts`\n- Unit tests: every use case + every domain entity method that enforces an invariant; mocked ports; no real filesystem or network\n- Port mocks: fully implement interface; no `as unknown as Port`; unused methods throw `new Error('not implemented')`\n- Integration tests: `FsSpecRepository`, `FsChangeRepository`, other infra adapters against real temp dir (`os.tmpdir()` + unique subfolder per test); cleanup after each test\n- POSIX+Windows: every test MUST pass both families; MUST NOT encode host-specific assumptions\n- Paths: build/compare with `node:path` (`join`, `resolve`, `sep`); MUST NOT concat with hardcoded `/` or `\\`; MUST NOT assert hardcoded POSIX abs paths (`/tmp`, `/var/www`)\n- In-memory fixture maps with POSIX keys (e.g. `/project/...`): MUST remap to host abs paths (`path.resolve`) before comparing to host path API values\n- Windows drive/backslash rules on non-Windows host: MUST route via Windows path semantics (`path.win32` or equiv mock of `node:path`)\n- Spawn/hooks: prefer portable cmds (`node -e`) over POSIX-only builtins (`printf`, `echo`, `sleep`) when asserting product behaviour; Windows `*.cmd` (e.g. `pnpm.cmd`) MUST use shell when required, MAY set `windowsHide`; account for `%PATH%` expansion and cmd vs POSIX quoting\n- Logical text identity (content hashes, installed markers): CRLF and lone CR ≡ LF\n- Unix-only permission/symlink setups (incl. `chmod 0o000`): MUST NOT be sole unreadability path on Windows — Windows-safe setup or skip where bit has no effect\n- Fixtures Windows-valid: temp via `os.tmpdir()`; file URLs from local path (`pathToFileURL`); MUST NOT depend on `/tmp`, `/var/www`, `file:///tmp/...`\n- Naming: `.spec.ts` matching source; descriptions `\"given <state>, when <action>, then <outcome>\"`; helpers `setup<Thing>`/`cleanup<Thing>`\n- No snapshot tests; assertions explicit, readable without stored snapshot\n\n## Constraints\n- Vitest framework\n- Tests in `test/` mirroring `src/`, never co-located\n- `.spec.ts` suffix\n- Unit tests: no filesystem, network, or spawned processes\n- Port mocks fully implement port interface\n- Infra integration tests clean temp dirs after each test\n- `toMatchSnapshot` / `toMatchInlineSnapshot` forbidden\n- Compatible with POSIX and Windows hosts\n- Path construction/assertions via `node:path` (or Windows semantics when deliberately testing Windows rules); no hardcoded POSIX abs temp paths\n- Process/hook tests: no POSIX-only shell builtins for portable behaviour; handle Windows `*.cmd` spawn and shell expansion/quoting\n- Logical text identity for hashes/markers: CRLF/CR ≡ LF",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:b95a4fd25c0d9f8e13e83e90892a68f1509dc6f00768c95de228839860715b82",
-          "lastModified": "2026-05-04T16:57:11.686Z"
+          "hash": "sha256:66e6152167311cc092f8c190b9727d9d00159efbf9e1c3cd7a7da07581518506",
+          "lastModified": "2026-09-25T22:08:57.005Z"
         },
         "verify.md": {
-          "hash": "sha256:7cdbf5af7e93cf8c770b7aed3c03672a2eec07b09e1c0466bd8f5ac3bb63c57e",
-          "lastModified": "2026-05-04T16:57:11.680Z"
+          "hash": "sha256:9c8a4cdc43df60b52b71a1f9ce881077557c5091c26647eb097e19ba05dc9083",
+          "lastModified": "2026-09-25T22:08:57.007Z"
         }
       }
     }
