@@ -1019,38 +1019,34 @@ describe('SQLiteGraphStore', () => {
     )
   })
 
-  it('rejects schema versions 10 and 11 without altering the table', async () => {
-    for (const version of ['10', '11']) {
-      const dir = mkdtempSync(join(tmpdir(), `code-graph-sqlite-schema-v${version}-`))
-      const databasePath = join(dir, 'graph', 'code-graph.sqlite')
-      const initialStore = new SQLiteGraphStore(dir)
-      await initialStore.open()
-      await initialStore.close()
-      const db = new Database(databasePath)
-      const before = db.prepare('PRAGMA table_info(logical_symbols)').all()
-      db.prepare('UPDATE meta SET value = ? WHERE key = ?').run(version, 'schemaVersion')
-      db.close()
+  it.each(['10', '11'])('rejects schema version %s without altering the table', async (version) => {
+    const dir = mkdtempSync(join(tmpdir(), `code-graph-sqlite-schema-v${version}-`))
+    const databasePath = join(dir, 'graph', 'code-graph.sqlite')
+    const initialStore = new SQLiteGraphStore(dir)
+    await initialStore.open()
+    await initialStore.close()
+    const db = new Database(databasePath)
+    const before = db.prepare('PRAGMA table_info(logical_symbols)').all()
+    db.prepare('UPDATE meta SET value = ? WHERE key = ?').run(version, 'schemaVersion')
+    db.close()
 
-      const incompatibleStore = new SQLiteGraphStore(dir)
-      await expect(incompatibleStore.open()).rejects.toBeInstanceOf(
-        GraphStorageRecoveryRequiredError,
-      )
-      await expect(incompatibleStore.open()).rejects.toThrow(
-        `SQLite graph storage schema ${version} is incompatible with expected 12`,
-      )
+    const incompatibleStore = new SQLiteGraphStore(dir)
+    const openError = await incompatibleStore.open().catch((error: unknown) => error)
+    expect(openError).toBeInstanceOf(GraphStorageRecoveryRequiredError)
+    if (!(openError instanceof Error)) throw openError
+    expect(openError.message).toContain(
+      `SQLite graph storage schema ${version} is incompatible with expected 12`,
+    )
 
-      const afterDb = new Database(databasePath, { readonly: true })
-      try {
-        expect(afterDb.prepare('PRAGMA table_info(logical_symbols)').all()).toEqual(before)
-        expect(afterDb.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get()).toEqual(
-          {
-            value: version,
-          },
-        )
-      } finally {
-        afterDb.close()
-        rmSync(dir, { recursive: true, force: true })
-      }
+    const afterDb = new Database(databasePath, { readonly: true })
+    try {
+      expect(afterDb.prepare('PRAGMA table_info(logical_symbols)').all()).toEqual(before)
+      expect(afterDb.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get()).toEqual({
+        value: version,
+      })
+    } finally {
+      afterDb.close()
+      rmSync(dir, { recursive: true, force: true })
     }
   })
 
@@ -1249,7 +1245,7 @@ describe('SQLiteGraphStore', () => {
     const databaseBeforeFailure = readFileSync(databasePath)
     const epochBeforeFailure = readFileSync(epochPath)
     const failedStore = new SQLiteGraphStore(tempDir, {
-      runtime: { modulePath: '/nonexistent/not-a-sqlite-module.js' },
+      runtime: { modulePath: join(tempDir, 'not-a-sqlite-module.js') },
     })
 
     await expect(failedStore.open()).rejects.not.toBeInstanceOf(GraphStorageRecoveryRequiredError)
