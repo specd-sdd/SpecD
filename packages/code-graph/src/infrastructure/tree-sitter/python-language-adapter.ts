@@ -13,6 +13,10 @@ import { SymbolKind } from '../../domain/value-objects/symbol-kind.js'
 import { RelationType } from '../../domain/value-objects/relation-type.js'
 import { findManifestField } from './find-manifest-field.js'
 import { splitWorkspaceIdentity } from '../../domain/services/split-workspace-identity.js'
+import {
+  parseDottedMemberReference,
+  renderDottedMemberReference,
+} from '../../domain/services/parse-member-reference.js'
 import { type ImportDeclaration } from '../../domain/value-objects/import-declaration.js'
 import { ImportDeclarationKind } from '../../domain/value-objects/import-declaration-kind.js'
 import { BindingSourceKind, type BindingFact } from '../../domain/value-objects/binding-fact.js'
@@ -25,7 +29,10 @@ import {
 } from '../../domain/value-objects/file-analysis.js'
 import { type IndexSession } from '../../domain/value-objects/index-session.js'
 import {
-  MemberForm,
+  MemberAccessor,
+  MemberDispatch,
+  MemberKind,
+  type MemberSemantics,
   SymbolSpace,
   createLocalBinding,
   type AdapterCapabilities,
@@ -37,7 +44,12 @@ import {
   containsSymbolRange,
   createAdapterDeclarationDescriptor,
   type AdapterHierarchyDescriptor,
+  withEnclosingTypeParents,
 } from './reference-fact-helpers.js'
+import {
+  type LogicalSymbol,
+  type ParsedSymbolReference,
+} from '../../domain/value-objects/symbol-reference.js'
 
 /**
  * Determines whether an import declaration is file-only/side-effect only.
@@ -104,20 +116,26 @@ function normalizePythonTypeName(reference: string): string {
  * @param lines - Complete source split into lines.
  * @returns Proven shared member form.
  */
-function pythonMemberForm(symbol: SymbolNode, lines: readonly string[]): MemberForm {
-  if (symbol.name === '__init__' || symbol.name === '__new__') return MemberForm.Constructor
+function pythonMemberSemantics(symbol: SymbolNode, lines: readonly string[]): MemberSemantics {
+  if (symbol.name === '__init__' || symbol.name === '__new__') {
+    return { kind: MemberKind.Constructor }
+  }
   const decorators: string[] = []
   for (let index = symbol.line - 2; index >= 0; index -= 1) {
     const line = lines[index]?.trim() ?? ''
     if (!line.startsWith('@')) break
     decorators.unshift(line)
   }
-  if (decorators.some((line) => line === '@staticmethod' || line === '@classmethod')) {
-    return MemberForm.Static
+  const dispatch = decorators.some((line) => line === '@staticmethod' || line === '@classmethod')
+    ? MemberDispatch.Static
+    : MemberDispatch.Instance
+  if (decorators.some((line) => line.endsWith('.setter'))) {
+    return { kind: MemberKind.Property, dispatch, accessor: MemberAccessor.Set }
   }
-  if (decorators.some((line) => line.endsWith('.setter'))) return MemberForm.Setter
-  if (decorators.some((line) => line === '@property')) return MemberForm.Getter
-  return MemberForm.Instance
+  if (decorators.some((line) => line === '@property')) {
+    return { kind: MemberKind.Property, dispatch, accessor: MemberAccessor.Get }
+  }
+  return { kind: MemberKind.Method, dispatch }
 }
 
 /**
@@ -170,7 +188,7 @@ interface PythonClassInfo {
   readonly endLine: number
   readonly methodsByName: ReadonlyMap<string, string>
   readonly memberSymbolIds: readonly string[]
-  readonly memberFormsById: ReadonlyMap<string, MemberForm>
+  readonly memberFormsById: ReadonlyMap<string, MemberSemantics>
 }
 
 /**
@@ -186,7 +204,7 @@ interface SerializedPythonClassInfo {
   readonly endLine: number
   readonly methodsByName: Record<string, string>
   readonly memberSymbolIds: readonly string[]
-  readonly memberFormsById: Readonly<Record<string, MemberForm>>
+  readonly memberFormsById: Readonly<Record<string, MemberSemantics>>
 }
 
 /**
@@ -240,6 +258,28 @@ export class PythonLanguageAdapter implements LanguageAdapter {
    */
   languages(): string[] {
     return ['python']
+  }
+
+  /**
+   * Parses one Python dotted member spelling.
+   * @param text - Human reference text.
+   * @returns One owner-then-member candidate, or none.
+   */
+  parseSymbolReference(text: string): ParsedSymbolReference {
+    return parseDottedMemberReference(text)
+  }
+
+  /**
+   * Renders a Python member with the generic dotted spelling.
+   * @param symbol - Logical symbol.
+   * @param ownerPath - Owner simple names.
+   * @returns Generic dotted spelling.
+   */
+  renderSymbolReference(
+    symbol: LogicalSymbol,
+    ownerPath: readonly string[],
+  ): { readonly generic: string } {
+    return renderDottedMemberReference(symbol, ownerPath)
   }
 
   /**
@@ -416,7 +456,7 @@ export class PythonLanguageAdapter implements LanguageAdapter {
     const classes = this.collectClassInfo(content, filePath, symbols)
     const serializedClasses = classes.map((cls) => {
       const methodsByName: Record<string, string> = {}
-      const memberFormsById: Record<string, MemberForm> = {}
+      const memberFormsById: Record<string, MemberSemantics> = {}
       for (const [mName, mId] of cls.methodsByName.entries()) {
         methodsByName[mName] = mId
       }
@@ -437,7 +477,7 @@ export class PythonLanguageAdapter implements LanguageAdapter {
     )
     return {
       language: 'python',
-      symbols,
+      symbols: withEnclosingTypeParents(symbols),
       imports,
       bindingFacts,
       callFacts,
@@ -467,7 +507,7 @@ export class PythonLanguageAdapter implements LanguageAdapter {
   ): ReferenceFacts {
     const surface = filePath.replace(/(?:\/__init__)?\.pyi?$/, '')
     const ownerByMemberId = new Map<string, string>()
-    const formByMemberId = new Map<string, MemberForm>()
+    const formByMemberId = new Map<string, MemberSemantics>()
     for (const cls of classes) {
       if (cls.ownerSymbolId !== undefined) ownerByMemberId.set(cls.symbolId, cls.ownerSymbolId)
       for (const methodId of cls.memberSymbolIds) {
@@ -487,9 +527,12 @@ export class PythonLanguageAdapter implements LanguageAdapter {
               : SymbolSpace.Value,
           ownerSymbolId: ownerByMemberId.get(symbol.id),
           requiresOwner: symbol.kind === SymbolKind.Method,
-          memberForm:
+          memberSemantics:
             symbol.kind === SymbolKind.Method
-              ? (formByMemberId.get(symbol.id) ?? MemberForm.Instance)
+              ? (formByMemberId.get(symbol.id) ?? {
+                  kind: MemberKind.Method,
+                  dispatch: MemberDispatch.Instance,
+                })
               : undefined,
         }),
       ),
@@ -834,13 +877,13 @@ export class PythonLanguageAdapter implements LanguageAdapter {
 
       const methodsByName = new Map<string, string>()
       const memberSymbolIds: string[] = []
-      const memberFormsById = new Map<string, MemberForm>()
+      const memberFormsById = new Map<string, MemberSemantics>()
       for (const symbol of symbols) {
         if (symbol.filePath !== filePath || symbol.kind !== SymbolKind.Method) continue
         if (!containsSymbolRange(ownerSymbol, symbol)) continue
         memberSymbolIds.push(symbol.id)
         methodsByName.set(symbol.name, symbol.id)
-        memberFormsById.set(symbol.id, pythonMemberForm(symbol, lines))
+        memberFormsById.set(symbol.id, pythonMemberSemantics(symbol, lines))
       }
 
       const baseNames = (match[3] ?? '')

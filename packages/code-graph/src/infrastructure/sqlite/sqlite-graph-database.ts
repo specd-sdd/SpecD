@@ -25,8 +25,12 @@ import { createSpecNode, type SpecNode } from '../../domain/value-objects/spec-n
 import { createSymbolNode, type SymbolNode } from '../../domain/value-objects/symbol-node.js'
 import { type SymbolQuery } from '../../domain/value-objects/symbol-query.js'
 import {
+  MemberAccessor,
+  MemberDispatch,
+  MemberKind,
   type LocalBinding,
   type LogicalSymbol,
+  type MemberSemantics,
   type PublicBinding,
   type ResolutionStep,
 } from '../../domain/value-objects/symbol-reference.js'
@@ -161,7 +165,11 @@ interface LogicalSymbolRow {
   readonly name: string
   readonly space: LogicalSymbol['space']
   readonly owner_id: string | null
-  readonly member_form: LogicalSymbol['memberForm'] | null
+  readonly member_kind: string | null
+  readonly member_dispatch: string | null
+  readonly member_accessor: string | null
+  readonly native_kind: string | null
+  readonly qualified_name: string | null
 }
 
 /**
@@ -1148,7 +1156,7 @@ export class SQLiteGraphDatabase {
   getAllReferenceFacts(): ReferenceFactsWrite {
     const logicalSymbols = (
       this.statement(
-        'SELECT id, workspace, surface, name, space, owner_id, member_form FROM logical_symbols',
+        'SELECT id, workspace, surface, name, space, owner_id, member_kind, member_dispatch, member_accessor, native_kind, qualified_name FROM logical_symbols',
       ).all() as LogicalSymbolRow[]
     )
       .map((row) => this.mapLogicalSymbolRow(row))
@@ -1201,7 +1209,7 @@ export class SQLiteGraphDatabase {
     if (ids.length === 0) return []
     const placeholders = ids.map(() => '?').join(', ')
     const rows = this.statement(
-      `SELECT id, workspace, surface, name, space, owner_id, member_form FROM logical_symbols WHERE id IN (${placeholders}) ORDER BY workspace, surface, name, space, owner_id, member_form, id`,
+      `SELECT id, workspace, surface, name, space, owner_id, member_kind, member_dispatch, member_accessor, native_kind, qualified_name FROM logical_symbols WHERE id IN (${placeholders}) ORDER BY workspace, surface, name, space, owner_id, member_kind, member_dispatch, member_accessor, native_kind, id`,
     ).all(...ids) as LogicalSymbolRow[]
     return rows.map((row) => this.mapLogicalSymbolRow(row))
   }
@@ -2207,12 +2215,15 @@ export class SQLiteGraphDatabase {
   findLogicalSymbols(lookups: readonly LogicalSymbolLookup[]): LogicalSymbol[] {
     if (lookups.length === 0) return []
     const rows = this.statement(
-      `SELECT id, workspace, surface, name, space, owner_id, member_form FROM logical_symbols
+      `SELECT id, workspace, surface, name, space, owner_id, member_kind, member_dispatch, member_accessor, native_kind, qualified_name FROM logical_symbols
        WHERE workspace = ? AND name = ?
          AND (? IS NULL OR surface = ?)
          AND (? IS NULL OR space = ?)
          AND (? IS NULL OR owner_id = ?)
-         AND (? IS NULL OR member_form = ?)`,
+         AND (? IS NULL OR member_kind = ?)
+         AND (? IS NULL OR member_dispatch = ?)
+         AND (? IS NULL OR member_accessor = ?)
+         AND (? IS NULL OR native_kind = ?)`,
     )
     const results = new Map<string, LogicalSymbol>()
     for (const lookup of lookups) {
@@ -2225,14 +2236,36 @@ export class SQLiteGraphDatabase {
         lookup.space ?? null,
         lookup.ownerId ?? null,
         lookup.ownerId ?? null,
-        lookup.memberForm ?? null,
-        lookup.memberForm ?? null,
+        lookup.memberKind ?? null,
+        lookup.memberKind ?? null,
+        lookup.memberDispatch ?? null,
+        lookup.memberDispatch ?? null,
+        lookup.memberAccessor ?? null,
+        lookup.memberAccessor ?? null,
+        lookup.nativeKind ?? null,
+        lookup.nativeKind ?? null,
       ) as LogicalSymbolRow[]) {
         const symbol = this.mapLogicalSymbolRow(row)
         results.set(symbol.id, symbol)
       }
     }
     return [...results.values()].sort(compareLogicalSymbols)
+  }
+
+  /**
+   * Finds every logical symbol whose stored qualified spelling equals one of the names.
+   * @param qualifiedNames - Generic dotted spellings such as `GetStatus.execute`.
+   * @returns Matching logical symbols in deterministic order.
+   */
+  findLogicalSymbolsByQualifiedNames(qualifiedNames: readonly string[]): LogicalSymbol[] {
+    const names = [...new Set(qualifiedNames.filter((name) => name.length > 0))]
+    if (names.length === 0) return []
+    const placeholders = names.map(() => '?').join(', ')
+    const rows = this.statement(
+      `SELECT id, workspace, surface, name, space, owner_id, member_kind, member_dispatch, member_accessor, native_kind, qualified_name
+       FROM logical_symbols WHERE qualified_name IN (${placeholders})`,
+    ).all(...names) as LogicalSymbolRow[]
+    return rows.map((row) => this.mapLogicalSymbolRow(row)).sort(compareLogicalSymbols)
   }
 
   /**
@@ -3195,7 +3228,7 @@ export class SQLiteGraphDatabase {
 
     executeBatchedInsert(
       db,
-      'INSERT INTO logical_symbols (id, workspace, surface, name, space, owner_id, member_form)',
+      'INSERT INTO logical_symbols (id, workspace, surface, name, space, owner_id, member_kind, member_dispatch, member_accessor, native_kind, qualified_name)',
       facts.logicalSymbols.map((symbol) => [
         symbol.id,
         symbol.workspace,
@@ -3203,7 +3236,11 @@ export class SQLiteGraphDatabase {
         symbol.name,
         symbol.space,
         symbol.ownerId ?? null,
-        symbol.memberForm ?? null,
+        symbol.memberSemantics?.kind ?? null,
+        symbol.memberSemantics?.dispatch ?? null,
+        symbol.memberSemantics?.accessor ?? null,
+        symbol.memberSemantics?.nativeKind ?? null,
+        symbol.qualifiedName ?? null,
       ]),
     )
 
@@ -3296,7 +3333,8 @@ export class SQLiteGraphDatabase {
                 COALESCE(lb.local_name, '')
               )),
               ''
-            ) AS reference_search
+            ) AS reference_search,
+            COALESCE(group_concat(DISTINCT l.id), '') AS logical_ids
           FROM symbols s
           LEFT JOIN logical_declarations ld ON ld.symbol_id = s.id
           LEFT JOIN logical_symbols l ON l.id = ld.logical_symbol_id
@@ -3310,11 +3348,34 @@ export class SQLiteGraphDatabase {
       name: string
       comment: string | null
       reference_search: string
+      logical_ids: string
     }>
+    const logicalNames = new Map(
+      (
+        db.prepare('SELECT id, name, owner_id FROM logical_symbols').all() as Array<{
+          id: string
+          name: string
+          owner_id: string | null
+        }>
+      ).map((logical) => [logical.id, logical]),
+    )
+    const qualifiedPath = (id: string, seen = new Set<string>()): string => {
+      const logical = logicalNames.get(id)
+      if (logical === undefined || seen.has(id)) return ''
+      seen.add(id)
+      if (logical.owner_id === null) return logical.name
+      const owner = qualifiedPath(logical.owner_id, seen)
+      return owner.length === 0 ? logical.name : `${owner}.${logical.name}`
+    }
     for (const row of symbolRows) {
+      const qualified = row.logical_ids
+        .split(',')
+        .map((id) => qualifiedPath(id))
+        .filter((value) => value.length > 0)
+        .join(' ')
       symbolInsert.run(
         row.id,
-        expandSymbolName(`${row.name} ${row.reference_search}`),
+        expandSymbolName(`${row.name} ${row.reference_search} ${qualified}`),
         row.comment ?? '',
       )
     }
@@ -3558,7 +3619,10 @@ export class SQLiteGraphDatabase {
       name: row.name,
       space: row.space,
       ownerId: row.owner_id ?? undefined,
-      memberForm: row.member_form ?? undefined,
+      memberSemantics: memberSemanticsFromRow(row),
+      ...(row.qualified_name == null || row.qualified_name === ''
+        ? {}
+        : { qualifiedName: row.qualified_name }),
     }
   }
 
@@ -3718,11 +3782,60 @@ function compareStrings(left: readonly string[], right: readonly string[]): numb
 }
 
 /**
- * Executes compare logical symbols operation.
- *
- * @param left - Left parameter.
- * @param right - Right parameter.
- * @returns The result of compare logical symbols.
+ * Rebuilds member semantics from the four nullable columns.
+ * @param row - Logical-symbol table row.
+ * @returns Member semantics, or undefined when the kind column is empty.
+ */
+function memberSemanticsFromRow(row: LogicalSymbolRow): MemberSemantics | undefined {
+  if (row.member_kind == null || !isMemberKindValue(row.member_kind)) return undefined
+  const dispatch =
+    row.member_dispatch != null && isMemberDispatchValue(row.member_dispatch)
+      ? row.member_dispatch
+      : undefined
+  const accessor =
+    row.member_accessor != null && isMemberAccessorValue(row.member_accessor)
+      ? row.member_accessor
+      : undefined
+  return {
+    kind: row.member_kind,
+    ...(dispatch === undefined ? {} : { dispatch }),
+    ...(accessor === undefined ? {} : { accessor }),
+    ...(row.native_kind == null || row.native_kind === '' ? {} : { nativeKind: row.native_kind }),
+  }
+}
+
+/**
+ * Checks whether a stored column is a member kind.
+ * @param value - Column text.
+ * @returns Whether the value is a member kind.
+ */
+function isMemberKindValue(value: string): value is MemberSemantics['kind'] {
+  return Object.values(MemberKind).includes(value as MemberSemantics['kind'])
+}
+
+/**
+ * Checks whether a stored column is a member dispatch.
+ * @param value - Column text.
+ * @returns Whether the value is a member dispatch.
+ */
+function isMemberDispatchValue(value: string): value is NonNullable<MemberSemantics['dispatch']> {
+  return Object.values(MemberDispatch).includes(value as NonNullable<MemberSemantics['dispatch']>)
+}
+
+/**
+ * Checks whether a stored column is a member accessor.
+ * @param value - Column text.
+ * @returns Whether the value is a member accessor.
+ */
+function isMemberAccessorValue(value: string): value is NonNullable<MemberSemantics['accessor']> {
+  return Object.values(MemberAccessor).includes(value as NonNullable<MemberSemantics['accessor']>)
+}
+
+/**
+ * Orders logical symbols by workspace, surface, owner, space, and name.
+ * @param left - First logical symbol.
+ * @param right - Second logical symbol.
+ * @returns Locale comparison result.
  */
 function compareLogicalSymbols(left: LogicalSymbol, right: LogicalSymbol): number {
   return compareStrings(
@@ -3732,7 +3845,10 @@ function compareLogicalSymbols(left: LogicalSymbol, right: LogicalSymbol): numbe
       left.ownerId ?? '',
       left.space,
       left.name,
-      left.memberForm ?? '',
+      left.memberSemantics?.kind ?? '',
+      left.memberSemantics?.dispatch ?? '',
+      left.memberSemantics?.accessor ?? '',
+      left.memberSemantics?.nativeKind ?? '',
       left.id,
     ],
     [
@@ -3741,7 +3857,10 @@ function compareLogicalSymbols(left: LogicalSymbol, right: LogicalSymbol): numbe
       right.ownerId ?? '',
       right.space,
       right.name,
-      right.memberForm ?? '',
+      right.memberSemantics?.kind ?? '',
+      right.memberSemantics?.dispatch ?? '',
+      right.memberSemantics?.accessor ?? '',
+      right.memberSemantics?.nativeKind ?? '',
       right.id,
     ],
   )

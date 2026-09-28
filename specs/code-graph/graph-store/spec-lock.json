@@ -12,23 +12,11 @@
   "implementation": [
     {
       "file": "code-graph:src/domain/ports/graph-store.ts",
-      "symbols": [
-        "ImpactDirection",
-        "ImpactResourceKind",
-        "ImpactFrontierQuery",
-        "ImpactFrontierResult",
-        "GraphStore"
-      ]
+      "symbols": ["LogicalSymbolLookup", "findLogicalSymbolsByQualifiedNames"]
     },
     {
-      "file": "code-graph:test/helpers/in-memory-graph-store.ts",
-      "symbols": ["InMemoryGraphStore"]
-    },
-    {
-      "file": "code-graph:test/domain/ports/graph-store.contract.ts"
-    },
-    {
-      "file": "code-graph:test/infrastructure/sqlite/sqlite-graph-store.spec.ts"
+      "file": "code-graph:src/application/services/session-reference-store.ts",
+      "symbols": ["SessionReferenceStore"]
     }
   ],
   "optimizations": {

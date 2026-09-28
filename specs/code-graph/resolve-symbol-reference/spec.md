@@ -11,14 +11,13 @@ the outcomes consumers may rely on.
 
 ### Requirement: Structured reference input
 
-`ResolveSymbolReference` SHALL accept a workspace, requested symbol text, and optional
-file, public surface, symbol-space, broad kind, member-form, and build-context
-constraints. Structured identity fields SHALL be authoritative; rendered canonical
-references MUST round-trip with escaping and MUST NOT be interpreted by ad hoc
-delimiter splitting.
+`ResolveSymbolReference` SHALL accept a workspace, requested symbol text, and optional file, public surface, symbol-space, broad kind, member-semantics, owner, and build-context constraints. Structured identity fields SHALL be authoritative. Rendered canonical references MUST round-trip with escaping and MUST NOT be interpreted by ad hoc delimiter splitting.
 
-Identifier case and normalization SHALL follow the source language. Path and workspace
-normalization SHALL remain separate from symbol normalization.
+A request whose text is `Tipo.miembro` or `Tipo::miembro` SHALL resolve by equality on stored `qualified_name`. It MUST NOT require a file, public surface, or language, and the resolver MUST NOT run every adapter or pick a default language for that lookup. `::` MUST compare as the stored dotted spelling. One match resolves that member. Every match MUST be returned. A supplied file or public surface SHALL filter those matches to symbols visible there. No remaining match is unresolved.
+
+Other human owner-qualified text SHALL be parsed by the language adapter selected from proven context, in this order: an explicit language, the language of an anchored indexed file, or indexed public-surface metadata. When none of those identifies an adapter, that other text MUST resolve as unresolved.
+
+Identifier case and normalization SHALL follow the source language. Path and workspace normalization SHALL remain separate from symbol normalization. `MemberForm` MUST NOT remain an input field.
 
 ### Requirement: Logical canonical targets
 
@@ -49,15 +48,16 @@ even when their target declaration has no user-written name.
 
 Resolution SHALL apply this precedence:
 
-1. an exact declaration in the explicitly addressed file or owner;
-2. an exact public binding in the explicitly addressed public surface;
-3. a statically proven scoped import or alias;
-4. a statically proven hierarchy path using the source language's precedence rules.
+1. an exact current canonical logical id;
+2. equality on stored `qualified_name` for a dotted or `::` spelling, returning every equal logical symbol;
+3. an exact declaration in the explicitly addressed file or owner;
+4. an exact public binding in the explicitly addressed public surface;
+5. a statically proven scoped import or alias;
+6. a statically proven hierarchy path using the source language's precedence rules.
 
-A unique same-name symbol without a proven path SHALL NOT resolve the request.
-Conditional or platform alternatives SHALL remain separate unless the supplied build
-context deterministically selects one. Cyclic binding or hierarchy paths MUST
-terminate without duplicate candidates.
+An owner-qualified reference SHALL resolve the owner path first and the member second. The resolver MUST NOT search the graph for only the terminal member name and infer its owner from text rank. A unique same-name symbol without a proven path SHALL NOT resolve the request. Conditional or platform alternatives SHALL remain separate unless the supplied build context deterministically selects one. Cyclic binding or hierarchy paths MUST terminate without duplicate candidates.
+
+A public binding matches on public surface, exported name, and symbol space. File path alone MUST NOT select it. The binding's logical target MAY live in another workspace.
 
 ### Requirement: Resolution outcomes
 

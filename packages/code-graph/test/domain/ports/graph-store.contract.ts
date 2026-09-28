@@ -13,7 +13,9 @@ import {
   createLocalBinding,
   createLogicalSymbol,
   createPublicBinding,
-  MemberForm,
+  MemberAccessor,
+  MemberDispatch,
+  MemberKind,
   SymbolSpace,
 } from '../../../src/domain/value-objects/symbol-reference.js'
 import { IndexCoverageStatus } from '../../../src/domain/value-objects/index-session.js'
@@ -786,7 +788,7 @@ export function graphStoreContractTests(
           name: 'Alpha',
           space: SymbolSpace.Value,
           ownerId: undefined,
-          memberForm: undefined,
+          memberSemantics: undefined,
         })
         const member = createLogicalSymbol({
           workspace: 'code-graph',
@@ -794,7 +796,7 @@ export function graphStoreContractTests(
           name: 'run',
           space: SymbolSpace.Value,
           ownerId: primary.id,
-          memberForm: MemberForm.Instance,
+          memberSemantics: { kind: MemberKind.Method, dispatch: MemberDispatch.Instance },
         })
         const parallelBinding = createPublicBinding({
           surface: 'code-graph',
@@ -920,7 +922,10 @@ export function graphStoreContractTests(
               name: 'Alpha',
               space: SymbolSpace.Value,
               ownerId: undefined,
-              memberForm: undefined,
+              memberKind: undefined,
+              memberDispatch: undefined,
+              memberAccessor: undefined,
+              nativeKind: undefined,
             },
             {
               workspace: 'code-graph',
@@ -928,7 +933,10 @@ export function graphStoreContractTests(
               name: 'run',
               space: SymbolSpace.Value,
               ownerId: primary.id,
-              memberForm: MemberForm.Instance,
+              memberKind: MemberKind.Method,
+              memberDispatch: MemberDispatch.Instance,
+              memberAccessor: undefined,
+              nativeKind: undefined,
             },
           ]),
         ).toEqual([primary, member])
@@ -1006,7 +1014,10 @@ export function graphStoreContractTests(
               name: 'Alpha',
               space: SymbolSpace.Value,
               ownerId: undefined,
-              memberForm: undefined,
+              memberKind: undefined,
+              memberDispatch: undefined,
+              memberAccessor: undefined,
+              nativeKind: undefined,
             },
           ]),
         ).toEqual([])
@@ -1616,7 +1627,7 @@ export function graphStoreContractTests(
           name: 'login',
           space: SymbolSpace.Value,
           ownerId: undefined,
-          memberForm: undefined,
+          memberSemantics: undefined,
         })
         const rel = createRelation({
           source: spec.specId,
@@ -1706,7 +1717,7 @@ export function graphStoreContractTests(
             name: symbol.name,
             space: SymbolSpace.Value,
             ownerId: undefined,
-            memberForm: undefined,
+            memberSemantics: undefined,
           }),
         )
         await store.bulkLoad({

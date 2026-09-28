@@ -523,7 +523,7 @@ parentPort.on('message', (msg) => {
       name: 'alpha',
       space: SymbolSpace.Value,
       ownerId: undefined,
-      memberForm: undefined,
+      memberSemantics: undefined,
     })
     const chunk2 = createLogicalSymbol({
       workspace: 'core',
@@ -531,7 +531,7 @@ parentPort.on('message', (msg) => {
       name: 'beta',
       space: SymbolSpace.Value,
       ownerId: undefined,
-      memberForm: undefined,
+      memberSemantics: undefined,
     })
 
     const session = store.beginBulkIndexSession()

@@ -23,6 +23,8 @@ import {
   SymbolSpace,
 } from '../../src/domain/value-objects/symbol-reference.js'
 import { SymbolKind } from '../../src/domain/value-objects/symbol-kind.js'
+import { PhpLanguageAdapter } from '../../src/infrastructure/tree-sitter/php-language-adapter.js'
+import { readInstalledCodeGraphVersion } from '../../src/application/use-cases/_shared/installed-code-graph-version.js'
 import { acquireGraphIndexLockByStoragePath } from '../../src/infrastructure/index-lock.js'
 import { GraphBusyError } from '../../src/domain/errors/graph-busy-error.js'
 import { GraphStorageRecoveryRequiredError } from '../../src/domain/errors/graph-storage-recovery-required-error.js'
@@ -479,7 +481,7 @@ describe('CodeGraphProvider', () => {
         name: `run${index}`,
         space: SymbolSpace.Value,
         ownerId: undefined,
-        memberForm: undefined,
+        memberSemantics: undefined,
       })
       const symbol = createSymbolNode({
         name: logical.name,
@@ -793,7 +795,7 @@ describe('CodeGraphProvider', () => {
       name: 'target',
       space: SymbolSpace.Value,
       ownerId: undefined,
-      memberForm: undefined,
+      memberSemantics: undefined,
     })
     const binding = createPublicBinding({
       surface: logical.surface,
@@ -903,6 +905,70 @@ describe('CodeGraphProvider', () => {
       expect(symbolError).toBeInstanceOf(InvalidGraphSelectorError)
       expect((symbolError as InvalidGraphSelectorError).code).toBe('INVALID_GRAPH_SELECTOR')
       expect((symbolError as InvalidGraphSelectorError).message).toBe('empty symbol selector')
+    } finally {
+      await provider.close()
+    }
+  })
+
+  it('shares one adapter registry between indexing and resolution', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-shared-registry-'))
+    const codeRoot = join(tempDir, 'app')
+    mkdirSync(codeRoot, { recursive: true })
+    writeFileSync(
+      join(codeRoot, 'archive.php'),
+      '<?php\nclass ArchiveChange { function execute() {} }\n',
+    )
+    const custom = new PhpLanguageAdapter()
+    const analyze = vi.spyOn(custom, 'analyzeFile')
+    const parse = vi.spyOn(custom, 'parseSymbolReference')
+    const provider = await createCodeGraphProvider({
+      storagePath: tempDir,
+      projectRoot: tempDir,
+      adapters: [custom],
+    })
+    await provider.open()
+
+    try {
+      await expect(provider.getGraphHealth()).resolves.toEqual(
+        expect.objectContaining({ reasonCodes: ['GRAPH_HEALTH_UNAVAILABLE'] }),
+      )
+      const unanchored = await provider.resolveSymbolReference({
+        workspace: 'app',
+        requested: 'EditChange.execute',
+      })
+      expect(unanchored.status).toBe('unresolved')
+
+      await provider.index({
+        projectRoot: tempDir,
+        vcsRoot: null,
+        workspaces: [
+          {
+            name: 'app',
+            prefix: null,
+            codeRoot,
+            specRepo: makeMockRepo(),
+            ownership: 'owned',
+            isExternal: false,
+          },
+        ],
+        graphConfig: { includePaths: [], excludePaths: [], workspaces: new Map() },
+        codeGraphVersion: readInstalledCodeGraphVersion(),
+      })
+      expect(analyze).toHaveBeenCalled()
+
+      const resolved = await provider.resolveSymbolReference({
+        workspace: 'app',
+        requested: 'ArchiveChange::execute',
+      })
+      expect(resolved.status).toBe('resolved')
+      expect(parse).not.toHaveBeenCalled()
+      await provider.resolveSymbolReference({
+        workspace: 'app',
+        requested: 'ArchiveChange::execute()',
+        language: 'php',
+      })
+      expect(parse).toHaveBeenCalledWith('ArchiveChange::execute()')
+      expect(parse.mock.instances.every((instance) => instance === custom)).toBe(true)
     } finally {
       await provider.close()
     }

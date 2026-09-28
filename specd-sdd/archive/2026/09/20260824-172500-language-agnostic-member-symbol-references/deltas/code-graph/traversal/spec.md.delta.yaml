@@ -1,0 +1,15 @@
+- op: added
+  description: 'Impact selects one logical member through the shared resolver before traversal'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Resolved canonical and public-binding impact'
+  content: |
+    ### Requirement: Owner-qualified impact target
+
+    Symbol impact SHALL select its start symbol by calling the shared symbol resolver before traversal. An owner-qualified reference SHALL match stored `qualified_name` without requiring a file. Exactly one logical member SHALL traverse only that member. Several equal matches MUST all be reported and MUST NOT traverse one of them. Zero matches MUST NOT fall through to a terminal-name search. Public-binding and legacy location-backed selectors SHALL keep their existing exact outcomes.
+
+    Traversal algorithms SHALL keep operating on a proven symbol id. They MUST NOT parse human syntax.

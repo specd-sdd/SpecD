@@ -98,7 +98,7 @@ describe('@specd/code-graph barrel', () => {
       name: 'CODE_GRAPH_VERSION',
       space: SymbolSpace.Value,
       ownerId: undefined,
-      memberForm: undefined,
+      memberSemantics: undefined,
     })
 
     expect(symbol.id).toContain('logical|')

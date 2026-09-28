@@ -11,61 +11,8 @@
   ],
   "implementation": [
     {
-      "file": "code-graph:src/domain/value-objects/symbol-reference.ts",
-      "symbols": [
-        "SymbolSpace",
-        "MemberForm",
-        "DeclarationOccurrence",
-        "LogicalSymbol",
-        "createLogicalSymbol",
-        "PublicBinding",
-        "LocalBinding",
-        "ResolutionStep",
-        "createPublicBinding",
-        "createLocalBinding",
-        "ResolveSymbolReferenceInput"
-      ]
-    },
-    {
-      "file": "code-graph:src/domain/value-objects/index-session.ts",
-      "symbols": ["IndexCoverageStatus", "IndexCoverage"]
-    },
-    {
       "file": "code-graph:src/application/use-cases/resolve-symbol-reference.ts",
       "symbols": ["ResolveSymbolReference"]
-    },
-    {
-      "file": "code-graph:test/application/use-cases/resolve-symbol-reference.spec.ts"
-    },
-    {
-      "file": "code-graph:src/domain/ports/graph-store.ts",
-      "symbols": ["GraphStore"]
-    },
-    {
-      "file": "code-graph:src/infrastructure/sqlite/sqlite-graph-store.ts",
-      "symbols": ["SQLiteGraphStore"]
-    },
-    {
-      "file": "code-graph:src/infrastructure/ladybug/ladybug-graph-store.ts",
-      "symbols": ["LadybugGraphStore"]
-    },
-    {
-      "file": "code-graph:test/helpers/in-memory-graph-store.ts",
-      "symbols": ["InMemoryGraphStore"]
-    },
-    {
-      "file": "code-graph:test/application/use-cases/index-project-graph-integration.spec.ts"
-    },
-    {
-      "file": "code-graph:src/application/services/resolve-graph-selector.ts",
-      "symbols": ["resolveSymbolSelector"]
-    },
-    {
-      "file": "code-graph:test/application/services/resolve-graph-selector.spec.ts"
-    },
-    {
-      "file": "code-graph:src/composition/code-graph-provider.ts",
-      "symbols": ["resolveSymbolReferences"]
     }
   ],
   "optimizations": {

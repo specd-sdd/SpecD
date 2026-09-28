@@ -1,10 +1,12 @@
-import { type SymbolNode } from '../../domain/value-objects/symbol-node.js'
+import { createSymbolNode, type SymbolNode } from '../../domain/value-objects/symbol-node.js'
+import { SymbolKind } from '../../domain/value-objects/symbol-kind.js'
 import {
+  assignQualifiedNames,
   createLogicalSymbol,
   type DeclarationOccurrence,
   type HierarchyFact,
   type LogicalSymbol,
-  type MemberForm,
+  type MemberSemantics,
   type ResolutionStep,
   type SymbolSpace,
 } from '../../domain/value-objects/symbol-reference.js'
@@ -16,7 +18,7 @@ export interface AdapterDeclarationDescriptor {
   readonly space: SymbolSpace
   readonly ownerSymbolId?: string
   readonly requiresOwner?: boolean
-  readonly memberForm?: MemberForm
+  readonly memberSemantics?: MemberSemantics
 }
 
 /**
@@ -27,7 +29,7 @@ export interface AdapterDeclarationDescriptor {
  * @param input.space - Proven symbol space.
  * @param input.ownerSymbolId - Extracted owner identity, when proven.
  * @param input.requiresOwner - Whether logical projection requires an owner.
- * @param input.memberForm - Proven member form, when applicable.
+ * @param input.memberSemantics - Proven member axes, when applicable.
  * @returns Exact-optional-property-safe declaration descriptor.
  */
 export function createAdapterDeclarationDescriptor(input: {
@@ -36,7 +38,7 @@ export function createAdapterDeclarationDescriptor(input: {
   readonly space: SymbolSpace
   readonly ownerSymbolId: string | undefined
   readonly requiresOwner: boolean
-  readonly memberForm: MemberForm | undefined
+  readonly memberSemantics: MemberSemantics | undefined
 }): AdapterDeclarationDescriptor {
   return {
     symbol: input.symbol,
@@ -44,7 +46,7 @@ export function createAdapterDeclarationDescriptor(input: {
     space: input.space,
     requiresOwner: input.requiresOwner,
     ...(input.ownerSymbolId === undefined ? {} : { ownerSymbolId: input.ownerSymbolId }),
-    ...(input.memberForm === undefined ? {} : { memberForm: input.memberForm }),
+    ...(input.memberSemantics === undefined ? {} : { memberSemantics: input.memberSemantics }),
   }
 }
 
@@ -127,13 +129,21 @@ export function buildLogicalDeclarationFacts(input: {
       name: descriptor.symbol.name,
       space: descriptor.space,
       ownerId: owner?.id,
-      memberForm: descriptor.memberForm,
+      memberSemantics: descriptor.memberSemantics,
     })
     logicalBySymbolId.set(symbolId, logical)
     return logical
   }
 
   for (const descriptor of input.declarations) materialize(descriptor.symbol.id)
+
+  const named = new Map(
+    assignQualifiedNames([...logicalBySymbolId.values()]).map((symbol) => [symbol.id, symbol]),
+  )
+  for (const [symbolId, logical] of logicalBySymbolId) {
+    const updated = named.get(logical.id)
+    if (updated !== undefined) logicalBySymbolId.set(symbolId, updated)
+  }
 
   const declarations = input.declarations
     .flatMap((descriptor): DeclarationOccurrence[] => {
@@ -242,4 +252,56 @@ function comparePosition(
   rightColumn: number,
 ): number {
   return leftLine - rightLine || leftColumn - rightColumn
+}
+
+/**
+ * Copies symbols, setting `parentId` from a proven owner map.
+ * @param symbols - Extracted declarations.
+ * @param ownerByMemberId - Member symbol id to owner symbol id.
+ * @returns Symbols with declaration parents applied.
+ */
+export function withOwnerParents(
+  symbols: readonly SymbolNode[],
+  ownerByMemberId: ReadonlyMap<string, string>,
+): SymbolNode[] {
+  return symbols.map((symbol) => {
+    const parentId = ownerByMemberId.get(symbol.id)
+    if (parentId === undefined || symbol.parentId === parentId) return symbol
+    return createSymbolNode({
+      name: symbol.name,
+      kind: symbol.kind,
+      filePath: symbol.filePath,
+      line: symbol.line,
+      column: symbol.column,
+      endLine: symbol.endLine,
+      endColumn: symbol.endColumn,
+      selectionRange: symbol.selectionRange,
+      parentId,
+      comment: symbol.comment,
+    })
+  })
+}
+
+/**
+ * Assigns the nearest preceding class or interface as the parent of a method.
+ * Used by languages whose methods are nested in source order inside a type.
+ * @param symbols - Extracted declarations.
+ * @returns Symbols with enclosing type parents applied.
+ */
+export function withEnclosingTypeParents(symbols: readonly SymbolNode[]): SymbolNode[] {
+  const sorted = [...symbols].sort(
+    (left, right) => left.line - right.line || left.column - right.column,
+  )
+  const parentById = new Map<string, string>()
+  let currentOwnerId: string | undefined
+  for (const symbol of sorted) {
+    if (symbol.kind === SymbolKind.Class || symbol.kind === SymbolKind.Interface) {
+      currentOwnerId = symbol.id
+      continue
+    }
+    if (symbol.kind === SymbolKind.Method && currentOwnerId !== undefined) {
+      parentById.set(symbol.id, currentOwnerId)
+    }
+  }
+  return withOwnerParents(symbols, parentById)
 }

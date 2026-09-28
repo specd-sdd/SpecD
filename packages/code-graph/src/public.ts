@@ -82,12 +82,15 @@ export { ImportDeclarationKind } from './domain/value-objects/import-declaration
 export { type SourceLocation } from './domain/value-objects/source-location.js'
 export {
   SymbolSpace,
-  MemberForm,
+  MemberKind,
+  MemberDispatch,
+  MemberAccessor,
   createLogicalSymbol,
   parseLogicalSymbol,
   createPublicBinding,
   createLocalBinding,
   type DeclarationOccurrence,
+  type MemberSemantics,
   type LogicalSymbol,
   type PublicBinding,
   type LocalBinding,

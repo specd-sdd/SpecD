@@ -291,12 +291,12 @@ class Service {
     const forms = facts.declarations
       .map((declaration) => parseLogicalSymbol(declaration.logicalId))
       .filter((logical) => logical?.ownerId !== undefined)
-      .map((logical) => [logical?.name, logical?.memberForm])
+      .map((logical) => [logical?.name, logical?.memberSemantics])
     expect(forms).toEqual(
       expect.arrayContaining([
-        ['save', 'instance'],
-        ['__construct', 'constructor'],
-        ['create', 'static'],
+        ['save', { kind: 'method', dispatch: 'instance' }],
+        ['__construct', { kind: 'constructor' }],
+        ['create', { kind: 'method', dispatch: 'static' }],
       ]),
     )
     expect(facts.hierarchy).toEqual([expect.objectContaining({ kind: 'trait', precedence: 0 })])
@@ -1303,6 +1303,25 @@ class ArticlesController {
         relations.filter((relation: Relation) => relation.type === RelationType.Calls),
       ).toHaveLength(0)
     })
+  })
+})
+
+describe('PhpLanguageAdapter member spelling', () => {
+  it('parses :: and dotted spellings to the same segments', () => {
+    expect(baseAdapter.parseSymbolReference('ArchiveChange::execute')).toEqual(
+      baseAdapter.parseSymbolReference('ArchiveChange.execute'),
+    )
+    expect(
+      baseAdapter.parseSymbolReference('ArchiveChange::execute').candidates[0]?.segments,
+    ).toEqual([
+      { name: 'ArchiveChange', role: 'type' },
+      { name: 'execute', role: 'member' },
+    ])
+  })
+
+  it('does not claim TypeScript files', () => {
+    expect(baseAdapter.extensions()['.ts']).toBeUndefined()
+    expect(baseAdapter.languages()).not.toContain('typescript')
   })
 })
 

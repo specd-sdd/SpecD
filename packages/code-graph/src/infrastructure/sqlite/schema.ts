@@ -1,4 +1,4 @@
-export const SQLITE_SCHEMA_VERSION = 10
+export const SQLITE_SCHEMA_VERSION = 12
 
 export const SQLITE_SCHEMA_DDL = `
 PRAGMA foreign_keys = ON;
@@ -71,7 +71,11 @@ CREATE TABLE IF NOT EXISTS logical_symbols (
   name TEXT NOT NULL,
   space TEXT NOT NULL,
   owner_id TEXT,
-  member_form TEXT
+  member_kind TEXT,
+  member_dispatch TEXT,
+  member_accessor TEXT,
+  native_kind TEXT,
+  qualified_name TEXT
 );
 
 CREATE TABLE IF NOT EXISTS logical_declarations (
@@ -152,7 +156,8 @@ CREATE INDEX IF NOT EXISTS idx_relations_source_type ON relations(source, type);
 CREATE INDEX IF NOT EXISTS idx_relations_target_type ON relations(target, type);
 CREATE INDEX IF NOT EXISTS idx_relations_type ON relations(type);
 CREATE INDEX IF NOT EXISTS idx_logical_symbols_lookup ON logical_symbols(workspace, surface, name, space);
-CREATE INDEX IF NOT EXISTS idx_logical_symbols_member_lookup ON logical_symbols(workspace, surface, name, space, owner_id, member_form);
+CREATE INDEX IF NOT EXISTS idx_logical_symbols_member_lookup ON logical_symbols(workspace, surface, name, space, owner_id, member_kind, member_dispatch, member_accessor, native_kind);
+CREATE INDEX IF NOT EXISTS idx_logical_symbols_qualified_name ON logical_symbols(qualified_name);
 CREATE INDEX IF NOT EXISTS idx_logical_declarations_symbol ON logical_declarations(symbol_id);
 CREATE INDEX IF NOT EXISTS idx_public_bindings_lookup ON public_bindings(surface, exported_name, space);
 CREATE INDEX IF NOT EXISTS idx_public_bindings_name ON public_bindings(exported_name, surface, space);

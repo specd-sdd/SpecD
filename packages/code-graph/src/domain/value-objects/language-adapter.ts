@@ -1,7 +1,13 @@
 import { type Relation } from './relation.js'
 import { type IndexSession } from './index-session.js'
 import { type FileAnalysisDraft, type FileAnalysis } from './file-analysis.js'
-import { type AdapterCapabilities } from './symbol-reference.js'
+import {
+  type AdapterCapabilities,
+  type LogicalSymbol,
+  type ParsedSymbolReference,
+  type PublicBinding,
+  type ResolutionStep,
+} from './symbol-reference.js'
 
 /**
  * Exposes the shared run context available while analyzing a single file.
@@ -144,4 +150,39 @@ export interface LanguageAdapter {
     codeRoot: string,
     repoRoot?: string,
   ): string | undefined
+
+  /**
+   * Parses human reference text this adapter can prove.
+   * Pure: no I/O and no canonical-id decoding.
+   * @param text - Human reference text.
+   * @returns Zero or more structured candidates.
+   */
+  parseSymbolReference?(text: string): ParsedSymbolReference
+
+  /**
+   * Renders a logical symbol as generic and, when different, native text.
+   * Pure: walks the supplied owner names and does not query a store.
+   * @param symbol - Logical symbol to render.
+   * @param ownerPath - Owner simple names from the root to the immediate owner.
+   * @returns Generic dotted spelling and an optional native spelling.
+   */
+  renderSymbolReference?(
+    symbol: LogicalSymbol,
+    ownerPath: readonly string[],
+  ): { readonly generic: string; readonly native?: string }
+
+  /**
+   * Emits public bindings for re-exports this adapter can prove.
+   * May read package manifests. Does not guess a symbol by name order.
+   * @param session - Index session containing declarations and same-file bindings.
+   * @param packageToWorkspace - Package name to workspace name.
+   * @returns Bindings and provenance to merge into the session.
+   */
+  linkReExports?(
+    session: IndexSession,
+    packageToWorkspace: ReadonlyMap<string, string>,
+  ): {
+    readonly publicBindings: readonly PublicBinding[]
+    readonly steps: readonly ResolutionStep[]
+  }
 }

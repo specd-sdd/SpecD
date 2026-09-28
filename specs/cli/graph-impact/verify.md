@@ -65,7 +65,7 @@
 
 - **GIVEN** symbol `packages/core/src/auth.ts:function:validate` is indexed
 - **WHEN** `specd graph impact --symbol packages/core/src/auth.ts:function:validate` is run
-- **THEN** the command resolves the symbol through `resolveSymbolSelector`
+- **THEN** the command resolves the symbol through the provider's shared symbol resolver
 - **AND** analyzes impact for that exact symbol
 
 #### Scenario: Multiple symbol matches
@@ -87,6 +87,43 @@
 - **WHEN** `specd graph impact --symbol createKernel --depth 5` is run
 - **THEN** the analysis includes dependents up to depth 5
 - **AND** each affected symbol in the text output shows `(d=N)` with its depth
+
+#### Scenario: Ambiguous owner-qualified selector lists every match
+
+- **GIVEN** two logical symbols store `qualified_name` `Owner.execute`
+- **WHEN** `specd graph impact --symbol Owner.execute` is run
+- **THEN** the command lists both candidates
+- **AND** it does not analyze a guessed member
+- **AND** the CLI does not split the selector itself
+
+#### Scenario: Unanchored owner-qualified selector analyzes the one member
+
+- **GIVEN** one logical symbol stores `qualified_name` `EditChange.execute`
+- **AND** the command supplies no file and no language
+- **WHEN** `specd graph impact --symbol EditChange.execute` is run
+- **THEN** the report is for that method
+- **AND** other symbols named `execute` are not analyzed
+- **AND** the process exits with code 0
+
+#### Scenario: File-anchored owner-qualified selector filters to one member
+
+- **GIVEN** the selector includes the indexed TypeScript file that declares `EditChange`
+- **AND** other types declare `execute`
+- **WHEN** impact is requested for `EditChange.execute` in that file
+- **THEN** the report is for that method only
+
+#### Scenario: Missing member exits cleanly
+
+- **GIVEN** `EditChange.missing` resolves as unresolved
+- **WHEN** `specd graph impact --symbol EditChange.missing` is run
+- **THEN** stdout shows `No symbol found matching "EditChange.missing".`
+- **AND** the process exits with code 0
+
+#### Scenario: CLI does not open the database
+
+- **WHEN** any `--symbol` impact command runs
+- **THEN** storage is reached only through the provider
+- **AND** the CLI does not read `package.json` or SQLite itself
 
 ### Requirement: Spec impact analysis
 

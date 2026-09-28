@@ -851,6 +851,17 @@ export class SQLiteGraphStore extends GraphStore {
   }
 
   /**
+   * Looks up logical symbols by stored qualified spelling.
+   * @param qualifiedNames - Generic dotted spellings.
+   * @returns Promise resolving to every equal logical symbol.
+   */
+  override async findLogicalSymbolsByQualifiedNames(
+    qualifiedNames: readonly string[],
+  ): Promise<LogicalSymbol[]> {
+    return this.client.sendRequest('findLogicalSymbolsByQualifiedNames', { qualifiedNames })
+  }
+
+  /**
    * Retrieves all reference facts stored in the graph.
    *
    * @returns Promise resolving to all reference facts.

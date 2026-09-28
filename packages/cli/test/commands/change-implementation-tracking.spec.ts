@@ -58,7 +58,7 @@ describe('enrichImplementationTracking', () => {
                 name: 'transition',
                 space: 'property',
                 ownerId: 'logical-change',
-                memberForm: 'instance',
+                memberSemantics: { kind: 'method', dispatch: 'instance' },
               },
               candidates: [],
               path: [],

@@ -32,6 +32,7 @@ import { IndexedResourceKind } from '../../../src/domain/value-objects/indexed-i
 import { createSymbolNode } from '../../../src/domain/value-objects/symbol-node.js'
 import {
   createLogicalSymbol,
+  assignQualifiedNames,
   createPublicBinding,
   SymbolSpace,
 } from '../../../src/domain/value-objects/symbol-reference.js'
@@ -708,7 +709,7 @@ describe('SQLiteGraphStore', () => {
       name: 'staged',
       space: SymbolSpace.Value,
       ownerId: undefined,
-      memberForm: undefined,
+      memberSemantics: undefined,
     })
     const session = store.beginBulkIndexSession()
     await session.writeFiles([staged])
@@ -986,7 +987,7 @@ describe('SQLiteGraphStore', () => {
   })
 
   it('declares sqlite schema version and fts-backed ddl', () => {
-    expect(SQLITE_SCHEMA_VERSION).toBe(10)
+    expect(SQLITE_SCHEMA_VERSION).toBe(12)
     expect(SQLITE_SCHEMA_DDL).toContain('CREATE TABLE IF NOT EXISTS files')
     expect(SQLITE_SCHEMA_DDL).toContain('content TEXT')
     expect(SQLITE_SCHEMA_DDL).toContain('CREATE TABLE IF NOT EXISTS documents')
@@ -1001,6 +1002,160 @@ describe('SQLiteGraphStore', () => {
     expect(SQLITE_SCHEMA_DDL).toContain('selection_start_line INTEGER NOT NULL')
     expect(SQLITE_SCHEMA_DDL).toContain('CREATE INDEX IF NOT EXISTS idx_files_workspace')
     expect(SQLITE_SCHEMA_DDL).toContain('CREATE INDEX IF NOT EXISTS idx_symbols_kind_file_path')
+    expect(SQLITE_SCHEMA_DDL).toContain('member_kind TEXT')
+    expect(SQLITE_SCHEMA_DDL).toContain('member_dispatch TEXT')
+    expect(SQLITE_SCHEMA_DDL).toContain('member_accessor TEXT')
+    expect(SQLITE_SCHEMA_DDL).toContain('native_kind TEXT')
+    expect(SQLITE_SCHEMA_DDL).toContain('qualified_name TEXT')
+    expect(SQLITE_SCHEMA_DDL).toContain(
+      'CREATE INDEX IF NOT EXISTS idx_logical_symbols_qualified_name ON logical_symbols(qualified_name)',
+    )
+    expect(SQLITE_SCHEMA_DDL).not.toContain('member_form')
+    expect(SQLITE_SCHEMA_DDL).toContain(
+      'CREATE TABLE IF NOT EXISTS public_bindings (\n  id TEXT PRIMARY KEY,\n  surface TEXT NOT NULL,\n  exported_name TEXT NOT NULL,\n  space TEXT NOT NULL,\n  target_id TEXT\n);',
+    )
+    expect(SQLITE_SCHEMA_DDL).toContain(
+      'CREATE VIRTUAL TABLE IF NOT EXISTS symbol_fts USING fts5(\n  id UNINDEXED,\n  search_text,\n  comment,',
+    )
+  })
+
+  it('rejects schema versions 10 and 11 without altering the table', async () => {
+    for (const version of ['10', '11']) {
+      const dir = mkdtempSync(join(tmpdir(), `code-graph-sqlite-schema-v${version}-`))
+      const databasePath = join(dir, 'graph', 'code-graph.sqlite')
+      const initialStore = new SQLiteGraphStore(dir)
+      await initialStore.open()
+      await initialStore.close()
+      const db = new Database(databasePath)
+      const before = db.prepare('PRAGMA table_info(logical_symbols)').all()
+      db.prepare('UPDATE meta SET value = ? WHERE key = ?').run(version, 'schemaVersion')
+      db.close()
+
+      const incompatibleStore = new SQLiteGraphStore(dir)
+      await expect(incompatibleStore.open()).rejects.toBeInstanceOf(
+        GraphStorageRecoveryRequiredError,
+      )
+      await expect(incompatibleStore.open()).rejects.toThrow(
+        `SQLite graph storage schema ${version} is incompatible with expected 12`,
+      )
+
+      const afterDb = new Database(databasePath, { readonly: true })
+      try {
+        expect(afterDb.prepare('PRAGMA table_info(logical_symbols)').all()).toEqual(before)
+        expect(afterDb.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get()).toEqual(
+          {
+            value: version,
+          },
+        )
+      } finally {
+        afterDb.close()
+        rmSync(dir, { recursive: true, force: true })
+      }
+    }
+  })
+
+  it('reopens schema 12 without rebuilding stored member rows', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-schema-v11-'))
+    const owner = createLogicalSymbol({
+      workspace: 'core',
+      surface: 'core:src/edit.ts',
+      name: 'EditChange',
+      space: SymbolSpace.Type,
+      ownerId: undefined,
+      memberSemantics: undefined,
+    })
+    const instance = createLogicalSymbol({
+      workspace: 'core',
+      surface: 'core:src/edit.ts',
+      name: 'execute',
+      space: SymbolSpace.Value,
+      ownerId: owner.id,
+      memberSemantics: { kind: 'method', dispatch: 'instance' },
+    })
+    const staticGetter = createLogicalSymbol({
+      workspace: 'core',
+      surface: 'core:src/edit.ts',
+      name: 'execute',
+      space: SymbolSpace.Value,
+      ownerId: owner.id,
+      memberSemantics: { kind: 'property', dispatch: 'static', accessor: 'get' },
+    })
+    const topLevel = createLogicalSymbol({
+      workspace: 'core',
+      surface: 'core:src/edit.ts',
+      name: 'top',
+      space: SymbolSpace.Value,
+      ownerId: undefined,
+      memberSemantics: undefined,
+    })
+    const named = assignQualifiedNames([owner, instance, staticGetter, topLevel])
+    const store = new SQLiteGraphStore(tempDir)
+    await store.open()
+    await store.replaceReferenceFacts({
+      logicalSymbols: named,
+      declarations: [],
+      publicBindings: [],
+      localBindings: [],
+      steps: [],
+      coverage: [],
+    })
+    await store.close()
+
+    const reopened = new SQLiteGraphStore(tempDir)
+    await reopened.open()
+    const lookup = {
+      workspace: 'core',
+      surface: 'core:src/edit.ts' as string | undefined,
+      name: 'execute',
+      space: SymbolSpace.Value as string | undefined,
+      ownerId: owner.id as string | undefined,
+      memberKind: undefined as string | undefined,
+      memberDispatch: 'instance' as string | undefined,
+      memberAccessor: undefined as string | undefined,
+      nativeKind: undefined as string | undefined,
+    }
+    await expect(reopened.findLogicalSymbols([lookup])).resolves.toEqual([
+      expect.objectContaining({ id: instance.id, qualifiedName: 'EditChange.execute' }),
+    ])
+    await expect(
+      reopened.findLogicalSymbolsByQualifiedNames(['EditChange.execute']),
+    ).resolves.toHaveLength(2)
+    await expect(
+      reopened.findLogicalSymbols([{ ...lookup, memberDispatch: 'static', memberAccessor: 'get' }]),
+    ).resolves.toEqual([
+      expect.objectContaining({ id: staticGetter.id, qualifiedName: 'EditChange.execute' }),
+    ])
+    await expect(reopened.findLogicalSymbols([{ ...lookup, name: instance.id }])).resolves.toEqual(
+      [],
+    )
+    await reopened.close()
+
+    const db = new Database(join(tempDir, 'graph', 'code-graph.sqlite'), { readonly: true })
+    try {
+      const columns = (
+        db.prepare('PRAGMA table_info(logical_symbols)').all() as Array<{ name: string }>
+      ).map((column) => column.name)
+      expect(columns).toEqual(
+        expect.arrayContaining([
+          'member_kind',
+          'member_dispatch',
+          'member_accessor',
+          'native_kind',
+          'qualified_name',
+        ]),
+      )
+      expect(columns).not.toContain('member_form')
+      const indexes = db
+        .prepare("SELECT name FROM sqlite_master WHERE type = 'index'")
+        .all() as Array<{ name: string }>
+      expect(indexes.map((index) => index.name)).toContain('idx_logical_symbols_qualified_name')
+      const top = db
+        .prepare('SELECT member_kind, member_dispatch FROM logical_symbols WHERE name = ?')
+        .get('top')
+      expect(top).toEqual({ member_kind: null, member_dispatch: null })
+    } finally {
+      db.close()
+    }
   })
 
   it('creates the v10 workspace and kind indexes and rejects a version-9 store', async () => {
@@ -1025,7 +1180,7 @@ describe('SQLiteGraphStore', () => {
 
     const incompatibleStore = new SQLiteGraphStore(tempDir)
     await expect(incompatibleStore.open()).rejects.toThrow(
-      'SQLite graph storage schema 9 is incompatible with expected 10',
+      'SQLite graph storage schema 9 is incompatible with expected 12',
     )
     expect(existsSync(databasePath)).toBe(true)
   })
@@ -1044,7 +1199,7 @@ describe('SQLiteGraphStore', () => {
 
     const incompatibleStore = new SQLiteGraphStore(tempDir)
     await expect(incompatibleStore.open()).rejects.toThrow(
-      'SQLite graph storage schema 9 is incompatible with expected 10',
+      'SQLite graph storage schema 9 is incompatible with expected 12',
     )
     expect(existsSync(databasePath)).toBe(true)
   })
@@ -1158,7 +1313,7 @@ describe('SQLiteGraphStore', () => {
       name: 'Alpha',
       space: SymbolSpace.Value,
       ownerId: undefined,
-      memberForm: undefined,
+      memberSemantics: undefined,
     })
     await store.upsertFile(file, [symbol], [])
     await store.replaceReferenceFacts({

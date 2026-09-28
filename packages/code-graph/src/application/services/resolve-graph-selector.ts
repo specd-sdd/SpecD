@@ -5,6 +5,11 @@ import { mapWithConcurrency } from '../../domain/services/map-with-concurrency.j
 import { type DocumentNode } from '../../domain/value-objects/document-node.js'
 import { type FileNode } from '../../domain/value-objects/file-node.js'
 import { isSymbolKind, type SymbolKind } from '../../domain/value-objects/symbol-kind.js'
+import { isExactLaneQuery, qualifiedLookupText } from '../../domain/services/exact-lane-query.js'
+import {
+  type ResolveSymbolReferenceInput,
+  type SymbolResolutionResult,
+} from '../../domain/value-objects/symbol-reference.js'
 
 /**
  * Resolution options for file and symbol selector normalization.
@@ -12,6 +17,9 @@ import { isSymbolKind, type SymbolKind } from '../../domain/value-objects/symbol
 export interface ResolveSelectorOptions {
   readonly store: GraphStore
   readonly projectRoot?: string
+  readonly resolveReference?: (
+    input: ResolveSymbolReferenceInput,
+  ) => Promise<SymbolResolutionResult>
 }
 
 /**
@@ -130,9 +138,51 @@ export async function resolveSymbolSelector(
     )
   }
 
+  const unanchored = await resolveUnanchoredQualifiedSelector(trimmed, options)
+  if (unanchored !== undefined) return unanchored
+
   const qualified = parseQualifiedSelector(trimmed)
   if (qualified !== null) {
     const fileMatches = await resolveFileSelector(qualified.fileSelector, options)
+    if (isExactLaneQuery(qualified.name) && options.resolveReference !== undefined) {
+      const resolvedMembers = await mapWithConcurrency(
+        fileMatches,
+        RESOLVER_CONCURRENCY,
+        async (file) => {
+          const resolution = await options.resolveReference!({
+            workspace: file.workspace,
+            requested: qualified.name,
+            filePath: file.canonicalPath,
+            publicSurface: file.canonicalPath,
+          })
+          if (resolution.status === 'ambiguous') {
+            return resolution.candidates.flatMap((candidate) =>
+              candidate.declarations
+                .filter((declaration) => declaration.location.filePath === file.canonicalPath)
+                .map((declaration) => ({
+                  symbolId: declaration.symbolId,
+                  filePath: file.canonicalPath,
+                  matchKind: 'qualified' as const,
+                })),
+            )
+          }
+          if (resolution.status !== 'resolved' || resolution.target === null) return []
+          return (
+            resolution.candidates
+              .find((candidate) => candidate.target.id === resolution.target?.id)
+              ?.declarations.filter(
+                (declaration) => declaration.location.filePath === file.canonicalPath,
+              )
+              .map((declaration) => ({
+                symbolId: declaration.symbolId,
+                filePath: file.canonicalPath,
+                matchKind: 'qualified' as const,
+              })) ?? []
+          )
+        },
+      )
+      return resolvedResult(resolvedMembers.flat())
+    }
     const symbolMatches = await mapWithConcurrency(fileMatches, RESOLVER_CONCURRENCY, (file) =>
       options.store.findSymbols({
         filePath: file.canonicalPath,
@@ -161,6 +211,32 @@ export async function resolveSymbolSelector(
       matchKind: 'name' as const,
     })),
   )
+}
+
+/**
+ * Resolves one whole selector that is a qualified member spelling or canonical id.
+ * A file-qualified selector is left to the anchored path. Zero matches stay missing.
+ * @param trimmed - Trimmed selector.
+ * @param options - Graph resolution options.
+ * @returns A selector outcome, or undefined when this selector is not that spelling.
+ */
+async function resolveUnanchoredQualifiedSelector(
+  trimmed: string,
+  options: ResolveSelectorOptions,
+): Promise<ResolvedSymbolSelectorResult | undefined> {
+  if (options.resolveReference === undefined) return undefined
+  const spelling = qualifiedLookupText(trimmed)
+  if (spelling === undefined && !trimmed.startsWith('logical|2|')) return undefined
+  const resolution = await options.resolveReference({ workspace: '', requested: trimmed })
+  if (resolution.status === 'unresolved') return { status: 'missing', candidates: [] }
+  const matches = resolution.candidates.flatMap((candidate) =>
+    candidate.declarations.map((declaration) => ({
+      symbolId: declaration.symbolId,
+      filePath: declaration.location.filePath,
+      matchKind: 'qualified' as const,
+    })),
+  )
+  return resolvedResult(matches)
 }
 
 /**

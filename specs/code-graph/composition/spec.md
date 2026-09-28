@@ -207,6 +207,12 @@ Selector validation failures that are reachable from host input (for example an 
 
 The curated package surface SHALL export resolver input/result/status/reason/provenance types and factories, logical-symbol/public-binding/member/coverage vocabulary, and the enriched health/index result types. Concrete resolver implementations and backend storage details SHALL remain internal.
 
+### Requirement: Adapter-backed reference normalization
+
+`createCodeGraphProvider` SHALL pass the same `AdapterRegistry` used for indexing into provider symbol resolution. The provider MUST NOT build a second registry and MUST NOT hardcode language names to choose an adapter.
+
+An unanchored `Tipo.miembro` or `Tipo::miembro` request SHALL resolve by stored `qualified_name` equality and MUST NOT require an adapter. Other text normalization SHALL select an adapter only from an explicit language, an anchored indexed file, or indexed public-surface metadata. When none of those is present, that other text MUST return unresolved. The provider MUST NOT parse package manifests or member syntax itself.
+
 ### Requirement: Code Graph-orchestrated search surface
 
 `CodeGraphProvider` SHALL expose one multi-category search operation accepting the query, requested `symbols | files | specs | documents` categories, shared filters, per-category limit, and snippet preference. It SHALL normalize an exact file filter from canonical workspace-relative, config/project-relative, or absolute form to one graph file; wildcard filters SHALL remain patterns.

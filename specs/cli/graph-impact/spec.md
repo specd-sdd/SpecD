@@ -42,14 +42,15 @@ Platform symbols MUST come from `@specd/sdk`.
 
 When `--symbol` is provided:
 
-1. Resolves graph context via `resolveGraphCliContext` using explicit config, autodetected config, or bootstrap mode
-2. Opens the provider through `withProvider`
-3. Resolves the selector through `resolveSymbolSelector(symbolSelector)` to support bare names, qualified names, and full graph symbol ids (for example `packages/core/src/auth.ts:function:validate`)
-4. If no symbol matches, outputs `No symbol found matching "<selector>".` and exits with code 0
-5. If one symbol matches, calls `analyzeImpact(symbolId, direction)` and outputs the result
-6. If multiple symbols match, analyzes each one and outputs all results
+1. Resolves graph context via `resolveGraphCliContext` using explicit config, autodetected config, or bootstrap mode.
+2. Opens the provider through `withProvider`.
+3. Resolves the selector through the provider's shared symbol resolver, which still accepts bare names, file-qualified selectors, location-backed graph symbol ids, canonical logical ids, and owner-qualified member references.
+4. If no symbol matches, outputs `No symbol found matching "<selector>".` and exits with code 0.
+5. If one symbol matches, calls `analyzeImpact(symbolId, direction)` and outputs the result.
+6. If a bare or file-qualified selector matches multiple symbols, analyzes each one and outputs all results.
+7. If an owner-qualified selector matches stored `qualified_name`, one match analyzes that member. Several matches report every candidate and MUST NOT analyze a guessed member. Zero matches output `No symbol found matching "<selector>".` A file in the selector only filters those matches.
 
-Platform symbols MUST come from `@specd/sdk`. The CLI MUST NOT open or close the provider outside `withProvider`.
+The CLI MUST NOT split owner and member syntax and MUST NOT query storage. Platform symbols MUST come from `@specd/sdk`. The CLI MUST NOT open or close the provider outside `withProvider`.
 
 ### Requirement: Spec impact analysis
 

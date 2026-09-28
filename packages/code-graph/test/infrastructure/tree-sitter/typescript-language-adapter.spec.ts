@@ -226,14 +226,14 @@ class Service {
     const forms = facts.declarations
       .map((item) => parseLogicalSymbol(item.logicalId))
       .filter((item) => item?.ownerId !== undefined)
-      .map((item) => [item?.name, item?.memberForm])
+      .map((item) => [item?.name, item?.memberSemantics])
 
     expect(forms).toEqual(
       expect.arrayContaining([
-        ['save', 'signature'],
-        ['constructor', 'constructor'],
-        ['create', 'static'],
-        ['save', 'instance'],
+        ['save', { kind: 'signature' }],
+        ['constructor', { kind: 'constructor' }],
+        ['create', { kind: 'method', dispatch: 'static' }],
+        ['save', { kind: 'method', dispatch: 'instance' }],
       ]),
     )
   })
@@ -264,21 +264,24 @@ class Service {
     )
   })
 
-  it('emits an unresolved public binding for a named re-export alias', () => {
+  it('keeps a named re-export in parser state until pass 2 can prove its target', () => {
     const session = new InMemoryIndexSession()
-    const facts = baseAdapter.analyzeFile(
+    const draft = baseAdapter.analyzeFile(
       'workspace:src/index.ts',
       "export { Service as PublicService } from './service.js'",
       { session, workspaceName: 'workspace' },
-    ).referenceFacts
+    )
 
-    expect(facts?.publicBindings).toEqual([
-      expect.objectContaining({
-        surface: 'workspace:src/index.ts',
-        exportedName: 'PublicService',
-        targetId: undefined,
-      }),
-    ])
+    expect(draft.referenceFacts?.publicBindings).toEqual([])
+    expect(draft.parserState).toMatchObject({
+      reExports: [
+        {
+          specifier: './service.js',
+          importedName: 'Service',
+          exportedName: 'PublicService',
+        },
+      ],
+    })
   })
 
   it('retains export-star syntax for pass-2 expansion without inventing a wildcard binding', () => {
@@ -859,6 +862,303 @@ Article.formatTitle = (title) => { };`
       writeFileSync(join(tempDir, 'package.json'), JSON.stringify({ name: 'outside' }))
       expect(adapter.getPackageIdentity(innerDir, repoRoot)).toBeUndefined()
     })
+  })
+})
+
+describe('TypeScriptLanguageAdapter member references and re-exports', () => {
+  let tempDir: string
+
+  afterEach(() => {
+    if (tempDir !== undefined) rmSync(tempDir, { recursive: true, force: true })
+  })
+
+  function analyzedSession(
+    files: readonly { path: string; content: string; workspace: string; codeRoot?: string }[],
+  ): InMemoryIndexSession {
+    const session = new InMemoryIndexSession()
+    for (const file of files) {
+      session.registerFile({
+        filePath: file.path,
+        configRelativePath: file.path,
+        language: 'typescript',
+        contentHash: 'hash',
+        workspace: file.workspace,
+      })
+      const draft = baseAdapter.analyzeFile(file.path, file.content, {
+        session,
+        workspaceName: file.workspace,
+        ...(file.codeRoot === undefined ? {} : { codeRoot: file.codeRoot }),
+      })
+      session.registerAnalysis({ filePath: file.path, analysis: draft })
+    }
+    return session
+  }
+
+  it('parses EditChange.execute as owner then member and ignores dynamic or canonical text', () => {
+    expect(baseAdapter.parseSymbolReference('EditChange.execute')).toEqual({
+      candidates: [
+        {
+          segments: [
+            { name: 'EditChange', role: 'type' },
+            { name: 'execute', role: 'member' },
+          ],
+        },
+      ],
+    })
+    expect(baseAdapter.parseSymbolReference('obj[name]').candidates).toEqual([])
+    expect(baseAdapter.parseSymbolReference('EditChange.execute()').candidates).toEqual([])
+    const canonical = baseAdapter.parseSymbolReference(
+      'logical|2|4:core|7:src/a.ts|7:execute|5:value|0:|6:method|8:instance|0:|0:',
+    )
+    expect(canonical.candidates).toEqual([])
+    expect(parseLogicalSymbol('EditChange.execute')).toBeUndefined()
+    expect(baseAdapter.resolutionManifests()).toEqual(['package.json'])
+  })
+
+  it('binds a package root re-export to the published source file', () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'ts-reexport-'))
+    writeFileSync(
+      join(tempDir, 'package.json'),
+      JSON.stringify({
+        name: '@specd/code-graph',
+        exports: { '.': './dist/public.js', './internal': './dist/index.js' },
+      }),
+    )
+    const session = analyzedSession([
+      {
+        path: 'code-graph:src/public.ts',
+        workspace: 'code-graph',
+        codeRoot: tempDir,
+        content: 'export function runIsolatedGraphIndex(): void {}\n',
+      },
+      {
+        path: 'code-graph:src/index.ts',
+        workspace: 'code-graph',
+        codeRoot: tempDir,
+        content: 'export function internalOnly(): void {}\n',
+      },
+      {
+        path: 'sdk:src/index.ts',
+        workspace: 'sdk',
+        content: "export { runIsolatedGraphIndex } from '@specd/code-graph'\n",
+      },
+    ])
+    const linked = baseAdapter.linkReExports(
+      session,
+      new Map([['@specd/code-graph', 'code-graph']]),
+    )
+    const binding = linked.publicBindings.find(
+      (item) =>
+        item.surface === 'sdk:src/index.ts' && item.exportedName === 'runIsolatedGraphIndex',
+    )
+    const published = session
+      .getPublicBindings()
+      .find(
+        (item) =>
+          item.surface === 'code-graph:src/public.ts' &&
+          item.exportedName === 'runIsolatedGraphIndex',
+      )
+
+    expect(binding?.targetId).toBe(published?.targetId)
+    expect(binding?.targetId).toMatch(/^logical\|2\|/)
+    expect(linked.publicBindings.some((item) => item.surface.includes('@specd/code-graph'))).toBe(
+      false,
+    )
+  })
+
+  it('binds an internal subpath to index.ts', () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'ts-internal-'))
+    writeFileSync(
+      join(tempDir, 'package.json'),
+      JSON.stringify({
+        name: '@specd/code-graph',
+        exports: { '.': './dist/public.js', './internal': './dist/index.js' },
+      }),
+    )
+    const session = analyzedSession([
+      {
+        path: 'code-graph:src/index.ts',
+        workspace: 'code-graph',
+        codeRoot: tempDir,
+        content: 'export function internalOnly(): void {}\n',
+      },
+      {
+        path: 'sdk:src/index.ts',
+        workspace: 'sdk',
+        content: "export { internalOnly } from '@specd/code-graph/internal'\n",
+      },
+    ])
+    const linked = baseAdapter.linkReExports(
+      session,
+      new Map([['@specd/code-graph', 'code-graph']]),
+    )
+    const published = session
+      .getPublicBindings()
+      .find(
+        (item) =>
+          item.surface === 'code-graph:src/index.ts' && item.exportedName === 'internalOnly',
+      )
+
+    expect(linked.publicBindings).toEqual([
+      expect.objectContaining({
+        surface: 'sdk:src/index.ts',
+        exportedName: 'internalOnly',
+        targetId: published?.targetId,
+      }),
+    ])
+  })
+
+  it('resolves a relative ./public.js re-export without the package map', () => {
+    const session = analyzedSession([
+      {
+        path: 'code-graph:src/public.ts',
+        workspace: 'code-graph',
+        content: 'export function run(): void {}\n',
+      },
+      {
+        path: 'code-graph:src/index.ts',
+        workspace: 'code-graph',
+        content: "export { run } from './public.js'\n",
+      },
+    ])
+    const linked = baseAdapter.linkReExports(session, new Map())
+    const published = session
+      .getPublicBindings()
+      .find((item) => item.surface === 'code-graph:src/public.ts')
+
+    expect(linked.publicBindings).toEqual([
+      expect.objectContaining({
+        surface: 'code-graph:src/index.ts',
+        exportedName: 'run',
+        targetId: published?.targetId,
+      }),
+    ])
+  })
+
+  it('emits no binding for two entry candidates, a missing name, or an unknown package', () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'ts-ambiguous-entry-'))
+    writeFileSync(
+      join(tempDir, 'package.json'),
+      JSON.stringify({ name: '@specd/code-graph', exports: { '.': './dist/public.js' } }),
+    )
+    const twoCandidates = analyzedSession([
+      {
+        path: 'code-graph:src/public.ts',
+        workspace: 'code-graph',
+        codeRoot: tempDir,
+        content: 'export function run(): void {}\n',
+      },
+      {
+        path: 'code-graph:src/public.tsx',
+        workspace: 'code-graph',
+        codeRoot: tempDir,
+        content: 'export function run(): void {}\n',
+      },
+      {
+        path: 'sdk:src/index.ts',
+        workspace: 'sdk',
+        content: "export { run } from '@specd/code-graph'\n",
+      },
+    ])
+    expect(
+      baseAdapter.linkReExports(twoCandidates, new Map([['@specd/code-graph', 'code-graph']]))
+        .publicBindings,
+    ).toEqual([])
+
+    const missing = analyzedSession([
+      {
+        path: 'code-graph:src/public.ts',
+        workspace: 'code-graph',
+        codeRoot: tempDir,
+        content: 'export function run(): void {}\n',
+      },
+      {
+        path: 'sdk:src/index.ts',
+        workspace: 'sdk',
+        content: "export { Missing } from '@specd/code-graph'\n",
+      },
+    ])
+    expect(
+      baseAdapter.linkReExports(missing, new Map([['@specd/code-graph', 'code-graph']]))
+        .publicBindings,
+    ).toEqual([])
+
+    const unknown = analyzedSession([
+      {
+        path: 'sdk:src/index.ts',
+        workspace: 'sdk',
+        content: "export { run } from '@specd/unknown'\n",
+      },
+    ])
+    expect(baseAdapter.linkReExports(unknown, new Map()).publicBindings).toEqual([])
+  })
+
+  it('stores the alias exported name and skips default on a star re-export', () => {
+    const session = analyzedSession([
+      {
+        path: 'code-graph:src/public.ts',
+        workspace: 'code-graph',
+        content: 'export function Alpha(): void {}\nexport default function hidden(): void {}\n',
+      },
+      {
+        path: 'sdk:src/alias.ts',
+        workspace: 'sdk',
+        content: "export { Alpha as Beta } from './ignored.js'\n",
+      },
+    ])
+    const alias = baseAdapter.linkReExports(session, new Map())
+    expect(alias.publicBindings).toEqual([])
+
+    const relative = analyzedSession([
+      {
+        path: 'code-graph:src/public.ts',
+        workspace: 'code-graph',
+        content: 'export function Alpha(): void {}\nexport default function hidden(): void {}\n',
+      },
+      {
+        path: 'code-graph:src/alias.ts',
+        workspace: 'code-graph',
+        content: "export { Alpha as Beta } from './public.js'\n",
+      },
+      {
+        path: 'code-graph:src/star.ts',
+        workspace: 'code-graph',
+        content: "export * from './public.js'\n",
+      },
+    ])
+    const linked = baseAdapter.linkReExports(relative, new Map())
+    const alpha = relative
+      .getPublicBindings()
+      .find((item) => item.surface === 'code-graph:src/public.ts' && item.exportedName === 'Alpha')
+
+    expect(linked.publicBindings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          surface: 'code-graph:src/alias.ts',
+          exportedName: 'Beta',
+          targetId: alpha?.targetId,
+        }),
+        expect.objectContaining({
+          surface: 'code-graph:src/star.ts',
+          exportedName: 'Alpha',
+          targetId: alpha?.targetId,
+        }),
+      ]),
+    )
+    expect(linked.publicBindings.some((item) => item.exportedName === 'default')).toBe(false)
+  })
+
+  it('keeps value and type exports of one name as two bindings', () => {
+    const session = analyzedSession([
+      {
+        path: 'code-graph:src/shared.ts',
+        workspace: 'code-graph',
+        content: 'export interface Shared {}\nexport const Shared = 1\n',
+      },
+    ])
+    const bindings = session.getPublicBindings().filter((item) => item.exportedName === 'Shared')
+
+    expect(bindings.map((item) => item.space).sort()).toEqual(['type', 'value'])
   })
 })
 

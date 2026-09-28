@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { createSymbolNode } from '../../../src/domain/value-objects/symbol-node.js'
 import { SymbolKind } from '../../../src/domain/value-objects/symbol-kind.js'
-import { MemberForm, SymbolSpace } from '../../../src/domain/value-objects/symbol-reference.js'
+import {
+  MemberAccessor,
+  MemberDispatch,
+  MemberKind,
+  SymbolSpace,
+} from '../../../src/domain/value-objects/symbol-reference.js'
 import {
   buildHierarchyReferenceFacts,
   buildLogicalDeclarationFacts,
@@ -60,14 +65,14 @@ describe('reference fact helpers', () => {
           surface: firstMember.filePath,
           space: SymbolSpace.Value,
           ownerSymbolId: firstOwner.id,
-          memberForm: MemberForm.Instance,
+          memberSemantics: { kind: MemberKind.Method, dispatch: MemberDispatch.Instance },
         },
         {
           symbol: secondMember,
           surface: secondMember.filePath,
           space: SymbolSpace.Value,
           ownerSymbolId: secondOwner.id,
-          memberForm: MemberForm.Instance,
+          memberSemantics: { kind: MemberKind.Method, dispatch: MemberDispatch.Instance },
         },
         { symbol: firstOwner, surface: firstOwner.filePath, space: SymbolSpace.Type },
         { symbol: secondOwner, surface: secondOwner.filePath, space: SymbolSpace.Type },
@@ -91,7 +96,7 @@ describe('reference fact helpers', () => {
           surface: member.filePath,
           space: SymbolSpace.Value,
           ownerSymbolId: 'missing',
-          memberForm: MemberForm.Instance,
+          memberSemantics: { kind: MemberKind.Method, dispatch: MemberDispatch.Instance },
         },
       ],
     })
@@ -108,7 +113,7 @@ describe('reference fact helpers', () => {
           surface: member.filePath,
           space: SymbolSpace.Value,
           requiresOwner: true,
-          memberForm: MemberForm.Instance,
+          memberSemantics: { kind: MemberKind.Method, dispatch: MemberDispatch.Instance },
         },
       ],
     })
@@ -124,11 +129,11 @@ describe('reference fact helpers', () => {
       space: SymbolSpace.Value,
       ownerSymbolId: undefined,
       requiresOwner: true,
-      memberForm: undefined,
+      memberSemantics: undefined,
     })
 
     expect(declaration).not.toHaveProperty('ownerSymbolId')
-    expect(declaration).not.toHaveProperty('memberForm')
+    expect(declaration).not.toHaveProperty('memberSemantics')
   })
 
   it('deduplicates and orders hierarchy facts with matching steps', () => {

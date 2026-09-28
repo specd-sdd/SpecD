@@ -12,52 +12,19 @@
     {
       "file": "code-graph:src/domain/value-objects/symbol-reference.ts",
       "symbols": [
-        "SymbolSpace",
-        "MemberForm",
-        "DeclarationOccurrence",
-        "LogicalSymbol",
         "createLogicalSymbol",
-        "PublicBinding",
-        "LocalBinding",
-        "ResolutionStep",
-        "createPublicBinding",
-        "createLocalBinding",
-        "AdapterCapabilities",
-        "HierarchyFact",
-        "ReferenceFacts"
+        "parseLogicalSymbol",
+        "deriveQualifiedName",
+        "assignQualifiedNames"
       ]
     },
     {
-      "file": "code-graph:src/domain/value-objects/index-session.ts",
-      "symbols": ["IndexCoverageStatus", "IndexCoverage"]
+      "file": "code-graph:src/domain/services/exact-lane-query.ts",
+      "symbols": ["isExactLaneQuery", "qualifiedLookupText"]
     },
     {
-      "file": "code-graph:src/public.ts"
-    },
-    {
-      "file": "code-graph:src/index.ts"
-    },
-    {
-      "file": "code-graph:test/barrel.spec.ts"
-    },
-    {
-      "file": "code-graph:test/domain/value-objects/symbol-reference.spec.ts"
-    },
-    {
-      "file": "code-graph:src/domain/value-objects/symbol-node.ts"
-    },
-    {
-      "file": "code-graph:src/domain/value-objects/index.ts"
-    },
-    {
-      "file": "code-graph:test/domain/value-objects/symbol-node.spec.ts"
-    },
-    {
-      "file": "code-graph:test/application/use-cases/index-project-graph-integration.spec.ts"
-    },
-    {
-      "file": "code-graph:src/infrastructure/tree-sitter/reference-fact-helpers.ts",
-      "symbols": ["buildLogicalDeclarationFacts", "buildHierarchyReferenceFacts"]
+      "file": "code-graph:src/domain/services/parse-member-reference.ts",
+      "symbols": ["parseDottedMemberReference", "renderDottedMemberReference"]
     }
   ],
   "optimizations": {

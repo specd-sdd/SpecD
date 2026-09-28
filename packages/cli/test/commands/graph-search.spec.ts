@@ -41,7 +41,7 @@ function makeReferenceSymbolResult() {
       space: 'value',
       name: 'Change',
       ownerId: null,
-      memberForm: null,
+      memberSemantics: null,
       kind: 'class',
     },
     declarations: [

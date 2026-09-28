@@ -322,26 +322,17 @@ abstract `GraphStore` contract.
 
 ### Requirement: Reference schema upgrade
 
-SQLite SHALL persist the logical-symbol, declaration, member, symbol-space,
-binding, provenance, coverage, construct-range, and selection-range fields
-required by `GraphStore`. Structured lookup columns SHALL be indexed; serialized
-canonical ids MUST NOT be parsed or substring-ranked to implement semantic lookup.
-Canonical ids remain unique external identities; backend-local integer row keys
-MAY be used for physical joins when provider-visible ids do not change.
+SQLite SHALL persist the logical-symbol, declaration, member-semantics, symbol-space, binding, provenance, coverage, construct-range, and selection-range fields required by `GraphStore`. Structured lookup columns SHALL be indexed. Serialized canonical ids MUST NOT be parsed or substring-ranked to implement semantic lookup. Canonical ids remain unique external identities; backend-local integer row keys MAY be used for physical joins when provider-visible ids do not change.
 
-SQLite SHALL maintain the substring-capable source-content index and bounded
-short-query fallback required by the abstract store. Reverse coverage and new
-traversal batch reads SHALL use set-based predicates and deterministic ordering.
+The reference schema version MUST be **12**. `SQLITE_SCHEMA_VERSION` MUST change to 12 in the same revision as the DDL. `CREATE TABLE IF NOT EXISTS` does not alter an existing database, so the version mismatch MUST reject ordinary reads with `GraphSchemaIncompatibleError` and recovery reason `SCHEMA_INCOMPATIBLE`. `graph index` SHALL recreate derived storage, rotate `storage.epoch`, and rebuild search indexes before readiness. The implementation MUST NOT use `ALTER TABLE` and MUST NOT read version 10 or version 11 rows beside version 12 rows.
 
-The backend SHALL track reference schema version `9`. A later schema-affecting
-change SHALL increment the version exactly once. Incompatible data MUST reject
-ordinary reads; `graph index` SHALL rebuild destructively, rotate
-`storage.epoch`, and rebuild search indexes before readiness.
+`logical_symbols` SHALL drop `member_form` and SHALL add nullable `member_kind`, `member_dispatch`, `member_accessor`, `native_kind`, and `qualified_name`. `qualified_name` stores the generic dotted owner path and MUST have an equality index. `idx_logical_symbols_member_lookup` SHALL use the member-semantics columns in place of `member_form`. `id`, `workspace`, `surface`, `name`, `space`, and `owner_id` stay. Stored `id` text MUST use the versioned canonical encoding; previous ids are discarded by the rebuild.
 
-Indexed-input observations, freshness latches, VCS evidence, and compact
-unchanged-file facts SHALL remain persisted. One indexing run SHALL use one
-transaction, set-based endpoint validation, bounded writes, one commit, and one
-semantic/content index rebuild.
+`public_bindings`, `resolution_steps`, `symbols.parent_id`, `symbols.search_text`, `logical_declarations`, `local_bindings`, `index_coverage`, `relations`, and `symbol_fts` (`id`, `search_text`, `comment`) MUST keep their current columns. New re-export bindings and resolution steps are new rows. `symbol_fts.search_text` MAY still contain a qualified spelling for discovery. It MUST NOT be the exact-match key. `symbols.search_text` remains the expanded bare name.
+
+SQLite SHALL maintain the substring-capable source-content index and bounded short-query fallback required by the abstract store. Reverse coverage and traversal batch reads SHALL use set-based predicates and deterministic ordering.
+
+Indexed-input observations, freshness latches, VCS evidence, and compact unchanged-file facts SHALL remain persisted. One indexing run SHALL use one transaction, set-based endpoint validation, bounded writes, one commit, and one semantic and content index rebuild. Inserts, selects, and the worker row shape MUST use the version 12 columns in the same revision.
 
 ## Constraints
 

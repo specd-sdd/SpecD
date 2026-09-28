@@ -390,13 +390,78 @@
 - **THEN** each member stores its owner's canonical logical identity
 - **AND** line movement or parser-node replacement does not become part of the owner identity
 
-### Requirement: Member forms and symbol spaces
+#### Scenario: Previous member-form encoding is not current
+
+- **GIVEN** a stored logical id that embeds the retired member form
+- **WHEN** it is parsed as a current canonical reference
+- **THEN** it is rejected
+- **AND** the current id round-trips `kind`, `dispatch`, `accessor`, and `nativeKind` without using `.` or `::` as the identity delimiter
+
+#### Scenario: Qualified name is stored beside the simple name
+
+- **GIVEN** `EditChange` owns `execute`
+- **WHEN** the logical member is stored
+- **THEN** `qualified_name` is `EditChange.execute`
+- **AND** the simple name remains `execute`
+- **AND** the canonical id does not use `.` or `::`
+- **AND** there is no alias row
+- **AND** a symbol with no owner has no `qualified_name`
+
+#### Scenario: Declaration parent comes from the adapter
+
+- **GIVEN** a method is nested in a class
+- **WHEN** the declaration occurrence is stored
+- **THEN** `parentId` is the value emitted by the language adapter
+- **AND** a shared language-name list is not what assigned it
+
+#### Scenario: Value and type spellings stay distinct
+
+- **GIVEN** one file declares a value and a type with the same simple name
+- **WHEN** logical identities are built
+- **THEN** they remain two logical symbols
+- **AND** symbol space is what separates them
+
+#### Scenario: Unproven native kind is omitted
+
+- **GIVEN** a member whose grammar does not prove a language-native kind
+- **WHEN** member semantics are stored
+- **THEN** `nativeKind` is absent
+- **AND** `kind`, `dispatch`, and `accessor` are still stored when the grammar proves them
+
+#### Scenario: Line movement keeps the canonical id
+
+- **GIVEN** a member is moved to another line inside the same owner
+- **WHEN** the logical symbol is rebuilt
+- **THEN** its canonical id is unchanged
+- **AND** the declaration occurrence records the new line
+
+### Requirement: Member semantics and symbol spaces
 
 #### Scenario: Same-name forms remain distinct
 
-- **GIVEN** a type exposes a getter and setter with the same name in distinct spaces/forms
+- **GIVEN** a type exposes a getter and setter with the same name in distinct spaces
 - **WHEN** identities are built
-- **THEN** neither form nor language case semantics are collapsed
+- **THEN** neither symbol space nor language case semantics are collapsed
+
+#### Scenario: Accessor and dispatch are stored together
+
+- **GIVEN** an instance getter and a static getter share a simple name
+- **WHEN** member semantics are stored
+- **THEN** each record has both an accessor axis and a dispatch axis
+- **AND** no `memberForm` field remains
+
+#### Scenario: Constructor is not an instance method
+
+- **GIVEN** a class declares a constructor and an instance method
+- **WHEN** member semantics are stored
+- **THEN** the constructor's kind is constructor
+- **AND** the instance method's dispatch is instance
+
+#### Scenario: Case is not folded globally
+
+- **GIVEN** `Execute` and `execute` are members of the same owner in a case-sensitive language
+- **WHEN** identities are built
+- **THEN** they remain two logical symbols
 
 ### Requirement: First-class binding model
 
@@ -412,6 +477,34 @@
 - **WHEN** both proven routes are indexed into the same public export slot
 - **THEN** neither route overwrites the other
 - **AND** their independently addressable binding identities preserve both canonical targets
+
+#### Scenario: Package re-export keeps the publishing logical id
+
+- **GIVEN** `sdk:src/index.ts` re-exports `runIsolatedGraphIndex` from the code-graph public entry
+- **WHEN** the public binding is stored
+- **THEN** its surface is `sdk:src/index.ts`
+- **AND** its target is the logical id published by that entry file
+- **AND** the target is not the first same-named symbol found anywhere in code-graph
+
+#### Scenario: Export alias keeps the source target
+
+- **GIVEN** a file exports `runIsolatedGraphIndex` as `runIndex`
+- **WHEN** the public binding is stored
+- **THEN** the exported name is `runIndex`
+- **AND** the target is the logical id of `runIsolatedGraphIndex`
+
+#### Scenario: Default export stays addressable
+
+- **GIVEN** a module has a default export and a named export
+- **WHEN** both bindings are stored
+- **THEN** the default binding has its own identity
+- **AND** a star re-export does not copy that default binding
+
+#### Scenario: Same slot in two spaces stays two bindings
+
+- **GIVEN** one surface exports the same name as a value and as a type
+- **WHEN** both routes are stored
+- **THEN** symbol space keeps them as two bindings
 
 ### Requirement: Index coverage facts
 

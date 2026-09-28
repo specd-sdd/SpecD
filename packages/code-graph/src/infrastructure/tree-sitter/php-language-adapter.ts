@@ -14,6 +14,10 @@ import { SymbolKind } from '../../domain/value-objects/symbol-kind.js'
 import { RelationType } from '../../domain/value-objects/relation-type.js'
 import { findManifestField } from './find-manifest-field.js'
 import { splitWorkspaceIdentity } from '../../domain/services/split-workspace-identity.js'
+import {
+  parseDottedMemberReference,
+  renderDottedMemberReference,
+} from '../../domain/services/parse-member-reference.js'
 import { type ImportDeclaration } from '../../domain/value-objects/import-declaration.js'
 import { ImportDeclarationKind } from '../../domain/value-objects/import-declaration-kind.js'
 import { BindingSourceKind, type BindingFact } from '../../domain/value-objects/binding-fact.js'
@@ -26,10 +30,14 @@ import {
 } from '../../domain/value-objects/file-analysis.js'
 import { type IndexSession } from '../../domain/value-objects/index-session.js'
 import {
-  MemberForm,
+  MemberDispatch,
+  MemberKind,
+  type MemberSemantics,
   SymbolSpace,
   createLocalBinding,
   type AdapterCapabilities,
+  type LogicalSymbol,
+  type ParsedSymbolReference,
   type ReferenceFacts,
 } from '../../domain/value-objects/symbol-reference.js'
 import {
@@ -38,6 +46,7 @@ import {
   containsSymbolRange,
   createAdapterDeclarationDescriptor,
   type AdapterHierarchyDescriptor,
+  withEnclosingTypeParents,
 } from './reference-fact-helpers.js'
 
 /**
@@ -72,7 +81,7 @@ interface SerializedPhpTypeInfo {
   readonly traitNames: readonly string[]
   readonly methodsByName: Record<string, string>
   readonly memberSymbolIds: readonly string[]
-  readonly memberFormsById: Readonly<Record<string, MemberForm>>
+  readonly memberFormsById: Readonly<Record<string, MemberSemantics>>
 }
 
 /**
@@ -348,11 +357,13 @@ function getPhpClassTail(value: string): string {
  * @param lines - Complete source split into lines.
  * @returns Proven shared member form.
  */
-function phpMemberForm(symbol: SymbolNode, lines: readonly string[]): MemberForm {
-  if (symbol.name.toLowerCase() === '__construct') return MemberForm.Constructor
+function phpMemberSemantics(symbol: SymbolNode, lines: readonly string[]): MemberSemantics {
+  if (symbol.name.toLowerCase() === '__construct') return { kind: MemberKind.Constructor }
   const declarationLine = lines[symbol.line - 1] ?? ''
-  if (/\bstatic\s+function\b/i.test(declarationLine)) return MemberForm.Static
-  return MemberForm.Instance
+  if (/\bstatic\s+function\b/i.test(declarationLine)) {
+    return { kind: MemberKind.Method, dispatch: MemberDispatch.Static }
+  }
+  return { kind: MemberKind.Method, dispatch: MemberDispatch.Instance }
 }
 
 /**
@@ -401,7 +412,7 @@ interface PhpTypeInfo {
   readonly traitNames: readonly string[]
   readonly methodsByName: ReadonlyMap<string, string>
   readonly memberSymbolIds: readonly string[]
-  readonly memberFormsById: ReadonlyMap<string, MemberForm>
+  readonly memberFormsById: ReadonlyMap<string, MemberSemantics>
 }
 
 /**
@@ -1072,6 +1083,29 @@ export class PhpLanguageAdapter implements LanguageAdapter {
   }
 
   /**
+   * Parses PHP `::` and the generic dotted spelling into the same segments.
+   * @param text - Human reference text.
+   * @returns One owner-then-member candidate, or none.
+   */
+  parseSymbolReference(text: string): ParsedSymbolReference {
+    return parseDottedMemberReference(text)
+  }
+
+  /**
+   * Renders a PHP member with a native `::` spelling.
+   * @param symbol - Logical symbol.
+   * @param ownerPath - Owner simple names.
+   * @returns Generic dotted spelling and native `::` spelling.
+   */
+  renderSymbolReference(
+    symbol: LogicalSymbol,
+    ownerPath: readonly string[],
+  ): { readonly generic: string; readonly native: string } {
+    const generic = renderDottedMemberReference(symbol, ownerPath).generic
+    return { generic, native: [...ownerPath, symbol.name].join('::') }
+  }
+
+  /**
    * Returns the extension-to-language mapping for PHP files.
    * @returns The extension map for this adapter.
    */
@@ -1170,7 +1204,7 @@ export class PhpLanguageAdapter implements LanguageAdapter {
     const typeInfos = this.collectPhpTypeInfo(filePath, content, symbols)
     const serializedInfos = typeInfos.map((info) => {
       const methodsByName: Record<string, string> = {}
-      const memberFormsById: Record<string, MemberForm> = {}
+      const memberFormsById: Record<string, MemberSemantics> = {}
       for (const [mName, mId] of info.methodsByName.entries()) {
         methodsByName[mName] = mId
       }
@@ -1216,7 +1250,7 @@ export class PhpLanguageAdapter implements LanguageAdapter {
     return {
       language: 'php',
       ...(namespace ? { namespace } : {}),
-      symbols,
+      symbols: withEnclosingTypeParents(symbols),
       imports,
       bindingFacts,
       callFacts,
@@ -1251,7 +1285,7 @@ export class PhpLanguageAdapter implements LanguageAdapter {
   ): ReferenceFacts {
     const surface = namespace ?? filePath
     const ownerByMemberSymbolId = new Map<string, string>()
-    const formByMemberSymbolId = new Map<string, MemberForm>()
+    const formByMemberSymbolId = new Map<string, MemberSemantics>()
     const typeSymbolIdByName = new Map<string, string>()
     for (const info of typeInfos) {
       typeSymbolIdByName.set(info.name, info.symbolId)
@@ -1275,9 +1309,12 @@ export class PhpLanguageAdapter implements LanguageAdapter {
             : SymbolSpace.Value,
         ownerSymbolId: ownerByMemberSymbolId.get(symbol.id),
         requiresOwner: symbol.kind === SymbolKind.Method,
-        memberForm:
+        memberSemantics:
           symbol.kind === SymbolKind.Method
-            ? (formByMemberSymbolId.get(symbol.id) ?? MemberForm.Instance)
+            ? (formByMemberSymbolId.get(symbol.id) ?? {
+                kind: MemberKind.Method,
+                dispatch: MemberDispatch.Instance,
+              })
             : undefined,
       }),
     )
@@ -1734,7 +1771,7 @@ export class PhpLanguageAdapter implements LanguageAdapter {
 
       const methodsByName = new Map<string, string>()
       const memberSymbolIds: string[] = []
-      const memberFormsById = new Map<string, MemberForm>()
+      const memberFormsById = new Map<string, MemberSemantics>()
       for (const symbol of symbols) {
         if (
           symbol.filePath !== filePath ||
@@ -1746,7 +1783,7 @@ export class PhpLanguageAdapter implements LanguageAdapter {
         memberSymbolIds.push(symbol.id)
         if (symbol.kind !== SymbolKind.Method) continue
         methodsByName.set(symbol.name, symbol.id)
-        memberFormsById.set(symbol.id, phpMemberForm(symbol, lines))
+        memberFormsById.set(symbol.id, phpMemberSemantics(symbol, lines))
       }
 
       const traitNames = lines

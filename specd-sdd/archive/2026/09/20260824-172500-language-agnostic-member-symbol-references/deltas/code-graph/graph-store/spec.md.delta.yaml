@@ -1,0 +1,17 @@
+- op: added
+  description: 'Persist and look up MemberSemantics without a member-form column'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Reference and coverage persistence'
+  content: |
+    ### Requirement: Member-semantics persistence
+
+    `GraphStore` SHALL persist and look up logical symbols by workspace, surface, simple name, symbol space, owner id, and `MemberSemantics` (`kind`, `dispatch`, `accessor`, optional `nativeKind`). Lookups MUST be equality queries on those structured fields. The store MUST NOT keep a `memberForm` field beside those axes and MUST NOT parse a serialized canonical id to recover them.
+
+    The store SHALL persist `qualified_name` for a logical symbol that has an owner and SHALL look up every logical symbol whose `qualified_name` equals a requested spelling. The lookup MUST be equality and MUST return every match. The store MUST NOT use full-text search for that lookup, MUST NOT store the spelling only inside symbol search text, and MUST NOT add an alias table.
+
+    Public bindings SHALL remain addressable by surface, exported name, symbol space, and target id. The target id MAY identify a logical symbol whose workspace differs from the binding surface.

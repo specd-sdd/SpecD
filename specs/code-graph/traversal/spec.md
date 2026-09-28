@@ -201,6 +201,12 @@ Hierarchy traversal SHALL preserve edge direction and language precedence for co
 
 Traversal ordering SHALL be deterministic across backends and SHALL use indexed lookups and bounded cycle-safe traversal.
 
+### Requirement: Owner-qualified impact target
+
+Symbol impact SHALL select its start symbol by calling the shared symbol resolver before traversal. An owner-qualified reference SHALL match stored `qualified_name` without requiring a file. Exactly one logical member SHALL traverse only that member. Several equal matches MUST all be reported and MUST NOT traverse one of them. Zero matches MUST NOT fall through to a terminal-name search. Public-binding and legacy location-backed selectors SHALL keep their existing exact outcomes.
+
+Traversal algorithms SHALL keep operating on a proven symbol id. They MUST NOT parse human syntax.
+
 ### Requirement: File-impact covering specs
 
 `FileImpactResult` SHALL include a deterministically ordered `coveringSpecs` collection derived from reverse `COVERS_FILE` and `COVERS_SYMBOL` relations. Each spec SHALL appear once with its minimum impact depth and every distinct evidence item `{ kind: 'file' | 'symbol', target, depth }`.

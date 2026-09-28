@@ -141,7 +141,7 @@ describe('analyzeFilesImpact service', () => {
       name: 'target',
       space: SymbolSpace.Value,
       ownerId: undefined,
-      memberForm: undefined,
+      memberSemantics: undefined,
     })
     const declarations = [first, second].map((symbol) => ({
       logicalId: logical.id,
@@ -182,7 +182,7 @@ describe('analyzeFilesImpact service', () => {
       name: 'target',
       space: SymbolSpace.Value,
       ownerId: undefined,
-      memberForm: undefined,
+      memberSemantics: undefined,
     })
     const binding = createPublicBinding({
       surface: 'public.ts',

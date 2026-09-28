@@ -299,6 +299,14 @@ Search SHALL index structured simple name, owner, symbol space, member form, pub
 
 Reverse coverage queries SHALL accept batches of canonical file paths and symbol ids and return all matching `COVERS_FILE` or `COVERS_SYMBOL` relations in deterministic source/type/target order. Empty batches SHALL return empty results without backend work. File-impact traversal MUST be able to retrieve coverage for its complete deduplicated blast radius without one call per resource.
 
+### Requirement: Member-semantics persistence
+
+`GraphStore` SHALL persist and look up logical symbols by workspace, surface, simple name, symbol space, owner id, and `MemberSemantics` (`kind`, `dispatch`, `accessor`, optional `nativeKind`). Lookups MUST be equality queries on those structured fields. The store MUST NOT keep a `memberForm` field beside those axes and MUST NOT parse a serialized canonical id to recover them.
+
+The store SHALL persist `qualified_name` for a logical symbol that has an owner and SHALL look up every logical symbol whose `qualified_name` equals a requested spelling. The lookup MUST be equality and MUST return every match. The store MUST NOT use full-text search for that lookup, MUST NOT store the spelling only inside symbol search text, and MUST NOT add an alias table.
+
+Public bindings SHALL remain addressable by surface, exported name, symbol space, and target id. The target id MAY identify a logical symbol whose workspace differs from the binding surface.
+
 ### Requirement: Logical-symbol coverage endpoints
 
 `COVERS_SYMBOL` SHALL link a canonical spec ID to a current logical symbol ID. A declaration-occurrence `SymbolNode.id` MUST NOT be the canonical target of newly projected symbol coverage.

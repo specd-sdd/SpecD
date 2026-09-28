@@ -51,7 +51,9 @@ A forced run SHALL reconsider every discovered input selected for that run. Pers
 
 Spec indexing SHALL read implementation links through the canonical `SpecRepository` persisted-state API and project coverage against the semantic generation that will be committed by the same indexing run.
 
-A file-only implementation link SHALL produce `COVERS_FILE` when its canonical workspace-prefixed file target exists in that generation. A symbol-qualified implementation link SHALL produce `COVERS_SYMBOL` only when the named target resolves deterministically to exactly one current logical symbol declared by the linked file. The relation target MUST be that logical symbol identity rather than a declaration-occurrence ID.
+A file-only implementation link SHALL produce `COVERS_FILE` when its canonical workspace-prefixed file target exists in that generation. A symbol-qualified implementation link SHALL produce `COVERS_SYMBOL` only when the shared symbol resolver returns exactly one logical symbol for that link anchored to the linked file. The relation target MUST be that logical symbol identity rather than a declaration-occurrence ID.
+
+The anchored file's declarations and its public bindings SHALL both be visible to that resolution. A name that the file re-exports MUST match the public binding on that file. Qualified-member parsing MUST NOT move a link to a different file. Coverage projection MUST run after the adapter's re-export bindings for that generation are stored. Exact `SymbolNode.name` equality MUST NOT be the identity proof.
 
 Coverage projection SHALL have access to the current or persisted semantic state required for resolution even when no code file was analyzed in the current run. A persisted implementation-only change MUST therefore be able to add, remove, or replace coverage during an otherwise incremental run.
 
@@ -221,11 +223,11 @@ The indexer SHALL log the execution time of each major internal phase (e.g., Fil
 
 ### Requirement: Cross-workspace package resolution
 
-Before Pass 2, the indexer builds a `packageName → workspaceName` map by calling `adapter.getPackageIdentity(codeRoot)` for each workspace. The indexer iterates over all registered adapters and the first one to return a non-`undefined` identity wins. This is language-agnostic — each adapter reads its own manifest format (`package.json`, `go.mod`, `pyproject.toml`, `composer.json`).
+Before later resolution passes, the indexer SHALL build a `packageName → workspaceName` map by calling `adapter.getPackageIdentity(codeRoot)` for each workspace. The indexer iterates over registered adapters and the first one to return a non-`undefined` identity wins. Each adapter reads its own manifest. The indexer MUST NOT parse `package.json`, `exports`, `main`, `go.mod`, `pyproject.toml`, or `composer.json` itself.
 
-For non-relative import specifiers (e.g. `@specd/core`), the indexer extracts the package name from the specifier, looks it up in the `packageName → workspaceName` map, and searches the shared `IndexSession` lookups for symbols with the imported name within the matching workspace scope.
+Public re-export bindings, including bindings whose target is another workspace, SHALL be the facts the adapter emits after resolving the specifier to an entry file. The indexer MUST NOT extract a package specifier and then select the first symbol of that name in the target workspace.
 
-This works for both monorepo (workspaces in the same repo) and multirepo (workspaces in separate repos configured in `specd.yaml`) because the resolution depends only on the adapter reading each workspace's manifest — not on `pnpm-workspace.yaml` or any monorepo-specific tooling.
+The map SHALL work for workspaces in one repo and for workspaces configured from separate repos, because identity comes from the adapter reading each workspace manifest.
 
 ### Requirement: Error isolation
 
@@ -273,7 +275,7 @@ When indexing specs into the code graph, the indexer SHALL prefer `optimizedDesc
 
 ### Requirement: Reference fact indexing
 
-The two-pass indexing session SHALL group declaration occurrences into logical symbols, normalize member forms and symbol spaces, preserve public/local bindings and every proven route, and persist hierarchy and binding provenance atomically.
+The indexing session SHALL persist the logical symbols, member semantics, declaration occurrences, public bindings, local bindings, hierarchy facts, and resolution steps emitted by language adapters. Each persisted logical symbol that has an owner SHALL store `qualified_name` as the generic dotted path rebuilt from the owner chain and the simple name. A symbol with no owner MUST NOT store a qualified name. The indexer MUST NOT treat full-text search text as that exact spelling. The indexer MUST NOT hardcode a language name, parser-state kind, package manifest, or syntax rule. It MUST NOT contain a TypeScript re-export pass and MUST NOT assign declaration parents from a fixed language set.
 
 The indexer SHALL persist a coverage outcome for every discovered or considered source target, including indexed content hash, excluded, unsupported capability, parse-failed, and partial states. Index errors required for later absence decisions MUST NOT exist only in the transient `IndexResult`.
 
@@ -281,7 +283,7 @@ The indexer SHALL persist a coverage outcome for every discovered or considered 
 
 Every persisted source file SHALL retain the indexed textual content used for analysis. Every emitted symbol SHALL carry its parser-derived complete construct range and declared-name selection range through chunking, semantic reconstruction, backend persistence, and structured query results without recomputing ranges from neighboring symbols.
 
-Relation construction SHALL build reusable declaration, logical-symbol, import, and public-binding lookup indexes once per indexing session. Resolving an individual call, dependency, import, or re-export MUST NOT scan the complete logical declaration or symbol collection. Persistence SHALL retain bounded chunk/batch writes so the work of building relations grows with the processed relation facts rather than multiplying them by the full graph size.
+Relation construction SHALL build reusable declaration, logical-symbol, import, and public-binding lookup indexes once per indexing session. Resolving an individual call, dependency, import, or re-export MUST NOT scan the complete logical declaration or symbol collection. Persistence SHALL retain bounded chunk and batch writes so the work of building relations grows with the processed relation facts rather than multiplying them by the full graph size. Adapter-emitted reference facts SHALL be stored before spec-coverage projection.
 
 ### Requirement: Incompatible derivation rebuild
 

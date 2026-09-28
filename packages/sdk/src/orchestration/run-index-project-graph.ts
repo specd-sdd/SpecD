@@ -115,22 +115,16 @@ export async function runIndexProjectGraph(
     {
       ...(input.beforeOpen === undefined ? {} : { beforeOpen: input.beforeOpen }),
       ...(input.afterClose === undefined ? {} : { afterClose: input.afterClose }),
-      ...(input.force === true
-        ? {
-            recoverOpenFailure: async (
-              error: unknown,
-              provider: CodeGraphProvider,
-            ): Promise<boolean> => {
-              if (!(error instanceof GraphStorageRecoveryRequiredError)) return false
-              await provider.recreate()
-              repair = {
-                fullRebuild: true,
-                fullRebuildReason: error.reason,
-              }
-              return true
-            },
-          }
-        : {}),
+      recoverOpenFailure: async (error: unknown, provider: CodeGraphProvider): Promise<boolean> => {
+        if (!(error instanceof GraphStorageRecoveryRequiredError)) return false
+        if (input.force !== true && error.reason !== 'SCHEMA_INCOMPATIBLE') return false
+        await provider.recreate()
+        repair = {
+          fullRebuild: true,
+          fullRebuildReason: error.reason,
+        }
+        return true
+      },
     },
   )
 }

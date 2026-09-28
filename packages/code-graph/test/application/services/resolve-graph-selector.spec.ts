@@ -6,6 +6,11 @@ import {
 import { createDocumentNode } from '../../../src/domain/value-objects/document-node.js'
 import { createFileNode } from '../../../src/domain/value-objects/file-node.js'
 import { createSymbolNode } from '../../../src/domain/value-objects/symbol-node.js'
+import {
+  createLogicalSymbol,
+  SymbolSpace,
+} from '../../../src/domain/value-objects/symbol-reference.js'
+import { ResolveSymbolReference } from '../../../src/application/use-cases/resolve-symbol-reference.js'
 import { InMemoryGraphStore } from '../../helpers/in-memory-graph-store.js'
 
 describe('resolve-graph-selector', () => {
@@ -182,5 +187,121 @@ describe('resolve-graph-selector', () => {
       status: 'missing',
       candidates: [],
     })
+  })
+
+  it('resolves an unanchored qualified member without falling through to the bare name', async () => {
+    const file = createFileNode({
+      path: 'core:src/edit.ts',
+      configRelativePath: 'packages/core/src/edit.ts',
+      language: 'typescript',
+      contentHash: 'sha256:edit',
+      workspace: 'core',
+    })
+    const execute = createSymbolNode({
+      name: 'execute',
+      kind: 'method',
+      filePath: file.path,
+      line: 4,
+      column: 2,
+    })
+    const owner = createLogicalSymbol({
+      workspace: 'core',
+      surface: file.path,
+      name: 'EditChange',
+      space: SymbolSpace.Type,
+      ownerId: undefined,
+      memberSemantics: undefined,
+    })
+    const member = createLogicalSymbol({
+      workspace: 'core',
+      surface: file.path,
+      name: 'execute',
+      space: SymbolSpace.Value,
+      ownerId: owner.id,
+      memberSemantics: { kind: 'method', dispatch: 'instance' },
+    })
+    const otherOwner = createLogicalSymbol({
+      workspace: 'core',
+      surface: 'core:src/other.ts',
+      name: 'EditChange',
+      space: SymbolSpace.Type,
+      ownerId: undefined,
+      memberSemantics: undefined,
+    })
+    const otherMember = createLogicalSymbol({
+      workspace: 'core',
+      surface: 'core:src/other.ts',
+      name: 'execute',
+      space: SymbolSpace.Value,
+      ownerId: otherOwner.id,
+      memberSemantics: { kind: 'method', dispatch: 'instance' },
+    })
+    const otherFile = createFileNode({
+      path: 'core:src/other.ts',
+      configRelativePath: 'packages/core/src/other.ts',
+      language: 'typescript',
+      contentHash: 'sha256:other',
+      workspace: 'core',
+    })
+    const otherSymbol = createSymbolNode({
+      name: 'execute',
+      kind: 'method',
+      filePath: otherFile.path,
+      line: 2,
+      column: 0,
+    })
+    await store.upsertFile(file, [execute], [])
+    await store.upsertFile(otherFile, [otherSymbol], [])
+    await store.replaceReferenceFacts({
+      logicalSymbols: [owner, member, otherOwner, otherMember],
+      declarations: [
+        {
+          logicalSymbolId: member.id,
+          declaration: {
+            logicalId: member.id,
+            symbolId: execute.id,
+            location: { filePath: file.path, line: 4, column: 2, endLine: 4, endColumn: 8 },
+            kind: 'method',
+          },
+        },
+        {
+          logicalSymbolId: otherMember.id,
+          declaration: {
+            logicalId: otherMember.id,
+            symbolId: otherSymbol.id,
+            location: { filePath: otherFile.path, line: 2, column: 0, endLine: 2, endColumn: 6 },
+            kind: 'method',
+          },
+        },
+      ],
+      publicBindings: [],
+      localBindings: [],
+      steps: [],
+      coverage: [],
+    })
+    const resolveReference = (input: { workspace: string; requested: string }) =>
+      new ResolveSymbolReference(store, async () => ({
+        fresh: true,
+        complete: true,
+        reasonCodes: [],
+      })).execute(input)
+
+    const oneOwner = await resolveSymbolSelector('ArchiveChange::missing', {
+      store,
+      resolveReference,
+    })
+    expect(oneOwner).toEqual({ status: 'missing', candidates: [] })
+
+    const both = await resolveSymbolSelector('EditChange.execute', { store, resolveReference })
+    expect(both.status).toBe('ambiguous')
+    if (both.status === 'ambiguous') {
+      expect(both.totalCandidates).toBe(2)
+      expect(both.candidates.map((candidate) => candidate.symbolId).sort()).toEqual(
+        [execute.id, otherSymbol.id].sort(),
+      )
+    }
+
+    const native = await resolveSymbolSelector('EditChange::execute', { store, resolveReference })
+    expect(native).toEqual(both)
   })
 })

@@ -227,12 +227,12 @@ describe('PythonLanguageAdapter', () => {
     const forms = facts.declarations
       .map((item) => parseLogicalSymbol(item.logicalId))
       .filter((item) => item?.ownerId !== undefined)
-      .map((item) => [item?.name, item?.memberForm])
+      .map((item) => [item?.name, item?.memberSemantics])
     expect(forms).toEqual(
       expect.arrayContaining([
-        ['__init__', 'constructor'],
-        ['create', 'static'],
-        ['value', 'getter'],
+        ['__init__', { kind: 'constructor' }],
+        ['create', { kind: 'method', dispatch: 'static' }],
+        ['value', { kind: 'property', dispatch: 'instance', accessor: 'get' }],
       ]),
     )
   })

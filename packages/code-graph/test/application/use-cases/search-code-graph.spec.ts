@@ -55,7 +55,7 @@ describe('SearchCodeGraph', () => {
       name: 'run',
       space: SymbolSpace.Value,
       ownerId: undefined,
-      memberForm: undefined,
+      memberSemantics: undefined,
     })
     const binding = createPublicBinding({
       surface: logical.surface,
@@ -109,7 +109,7 @@ describe('SearchCodeGraph', () => {
       name: 'hiddenImplementation',
       space: SymbolSpace.Value,
       ownerId: undefined,
-      memberForm: undefined,
+      memberSemantics: undefined,
     })
     await store.replaceReferenceFacts({
       logicalSymbols: [logical],
@@ -196,7 +196,7 @@ describe('SearchCodeGraph', () => {
       name: exact.name,
       space: SymbolSpace.Value,
       ownerId: undefined,
-      memberForm: undefined,
+      memberSemantics: undefined,
     })
     await store.replaceReferenceFacts({
       logicalSymbols: [logical],
@@ -258,7 +258,7 @@ describe('SearchCodeGraph', () => {
       name: component.name,
       space: SymbolSpace.Value,
       ownerId: undefined,
-      memberForm: undefined,
+      memberSemantics: undefined,
     })
     await store.replaceReferenceFacts({
       logicalSymbols: [logical],
@@ -444,7 +444,7 @@ describe('SearchCodeGraph', () => {
       name: exact.name,
       space: SymbolSpace.Value,
       ownerId: undefined,
-      memberForm: undefined,
+      memberSemantics: undefined,
     })
     await store.replaceReferenceFacts({
       logicalSymbols: [logical],
@@ -674,7 +674,204 @@ describe('SearchCodeGraph', () => {
     expect(result.files[0]?.matches).toHaveLength(1)
     expect(visibleDeclarationLines.has(result.files[0]!.matches[0]!.range.startLine)).toBe(false)
   })
+
+  it('keeps ordinary names on the existing tiers and proves an unanchored member', async () => {
+    const owner = createLogicalSymbol({
+      workspace: 'core',
+      surface: 'core:src/edit.ts',
+      name: 'EditChange',
+      space: SymbolSpace.Type,
+      ownerId: undefined,
+      memberSemantics: undefined,
+    })
+    const member = createLogicalSymbol({
+      workspace: 'core',
+      surface: 'core:src/edit.ts',
+      name: 'execute',
+      space: SymbolSpace.Value,
+      ownerId: owner.id,
+      memberSemantics: { kind: 'method', dispatch: 'instance' },
+    })
+    const change = createSymbolNode({
+      name: 'Change',
+      kind: SymbolKind.Class,
+      filePath: 'core:src/change.ts',
+      line: 1,
+      column: 0,
+    })
+    await store.upsertFile(fileNode('core:src/change.ts', 'core'), [change], [])
+    await store.replaceReferenceFacts({
+      logicalSymbols: [owner, member],
+      declarations: [
+        declaration(owner.id, 'core:src/edit.ts', 'EditChange', SymbolKind.Class),
+        declaration(member.id, 'core:src/edit.ts', 'execute', SymbolKind.Method),
+      ],
+      publicBindings: [
+        createPublicBinding({
+          surface: 'core:src/index.ts',
+          exportedName: 'run',
+          space: SymbolSpace.Value,
+          targetId: member.id,
+        }),
+      ],
+      localBindings: [],
+      steps: [],
+      coverage: [],
+    })
+    const search = new SearchCodeGraph(store)
+
+    const ordinary = await search.executeSymbols({ query: 'Change' })
+    expect(ordinary.some((item) => item.matchTier === 'exact-logical-identity')).toBe(false)
+    const published = await new SearchCodeGraph(store).executeSymbols({ query: 'run' })
+    expect(published.some((item) => item.matchTier === 'exact-public-binding')).toBe(true)
+
+    const unanchored = await search.executeSymbols({ query: 'EditChange.execute' })
+    expect(unanchored.some((item) => item.matchTier === 'exact-logical-identity')).toBe(true)
+    expect(unanchored.some((item) => item.logicalTarget?.id === member.id)).toBe(true)
+
+    const mixed = await search.executeSymbols({ query: 'EditChange.execute Change' })
+    expect(mixed.some((item) => item.logicalTarget?.id === member.id)).toBe(true)
+    expect(mixed.some((item) => item.hits.some((hit) => hit.symbol.name === 'Change'))).toBe(true)
+
+    const anchored = await search.executeSymbols({
+      query: 'EditChange.execute',
+      filePattern: 'core:src/edit.ts',
+    })
+    expect(anchored[0]?.matchTier).toBe('exact-logical-identity')
+    expect(anchored[0]?.logicalTarget?.id).toBe(member.id)
+
+    const filtered = await search.executeSymbols({
+      query: 'EditChange.execute',
+      filePattern: 'core:src/edit.ts',
+      kinds: [SymbolKind.Variable],
+    })
+    expect(filtered).toEqual([])
+
+    const php = await search.executeSymbols({ query: 'ArchiveChange::execute' })
+    expect(php.some((item) => item.matchTier === 'exact-logical-identity')).toBe(false)
+  })
+
+  it('returns every equal qualified name as an exact identity', async () => {
+    const firstOwner = createLogicalSymbol({
+      workspace: 'core',
+      surface: 'core:src/owners.ts',
+      name: 'Owner',
+      space: SymbolSpace.Type,
+      ownerId: undefined,
+      memberSemantics: undefined,
+    })
+    const secondOwner = createLogicalSymbol({
+      workspace: 'core',
+      surface: 'core:src/owners.ts',
+      name: 'Owner',
+      space: SymbolSpace.Value,
+      ownerId: undefined,
+      memberSemantics: undefined,
+    })
+    const first = createLogicalSymbol({
+      workspace: 'core',
+      surface: 'core:src/owners.ts',
+      name: 'execute',
+      space: SymbolSpace.Value,
+      ownerId: firstOwner.id,
+      memberSemantics: { kind: 'method', dispatch: 'instance' },
+    })
+    const second = createLogicalSymbol({
+      workspace: 'core',
+      surface: 'core:src/owners.ts',
+      name: 'execute',
+      space: SymbolSpace.Value,
+      ownerId: secondOwner.id,
+      memberSemantics: { kind: 'method', dispatch: 'instance' },
+    })
+    await store.replaceReferenceFacts({
+      logicalSymbols: [firstOwner, secondOwner, first, second],
+      declarations: [firstOwner, secondOwner, first, second].map((symbol, index) =>
+        declaration(symbol.id, 'core:src/owners.ts', symbol.name, SymbolKind.Method, index + 1),
+      ),
+      publicBindings: [],
+      localBindings: [],
+      steps: [],
+      coverage: [],
+    })
+    const search = new SearchCodeGraph(store)
+
+    const results = await search.executeSymbols({
+      query: 'Owner.execute',
+      filePattern: 'core:src/owners.ts',
+    })
+
+    expect(results.map((item) => item.logicalTarget?.id).sort()).toEqual(
+      [first.id, second.id].sort(),
+    )
+    expect(results.every((item) => item.matchTier === 'exact-logical-identity')).toBe(true)
+  })
+
+  it('ranks an anchored PHP member first', async () => {
+    const owner = createLogicalSymbol({
+      workspace: 'app',
+      surface: 'app:src/ArchiveChange.php',
+      name: 'ArchiveChange',
+      space: SymbolSpace.Type,
+      ownerId: undefined,
+      memberSemantics: undefined,
+    })
+    const member = createLogicalSymbol({
+      workspace: 'app',
+      surface: 'app:src/ArchiveChange.php',
+      name: 'execute',
+      space: SymbolSpace.Value,
+      ownerId: owner.id,
+      memberSemantics: { kind: 'method', dispatch: 'instance' },
+    })
+    const other = createSymbolNode({
+      name: 'execute',
+      kind: SymbolKind.Function,
+      filePath: 'app:src/other.php',
+      line: 1,
+      column: 0,
+    })
+    await store.upsertFile(fileNode('app:src/other.php', 'app'), [other], [])
+    await store.replaceReferenceFacts({
+      logicalSymbols: [owner, member],
+      declarations: [
+        declaration(owner.id, 'app:src/ArchiveChange.php', 'ArchiveChange', SymbolKind.Class),
+        declaration(member.id, 'app:src/ArchiveChange.php', 'execute', SymbolKind.Method),
+      ],
+      publicBindings: [],
+      localBindings: [],
+      steps: [],
+      coverage: [],
+    })
+    const search = new SearchCodeGraph(store)
+
+    const results = await search.executeSymbols({
+      query: 'ArchiveChange::execute',
+      filePattern: 'app:src/ArchiveChange.php',
+    })
+
+    expect(results[0]?.logicalTarget?.id).toBe(member.id)
+    expect(results[0]?.matchTier).toBe('exact-logical-identity')
+  })
 })
+
+function declaration(
+  logicalSymbolId: string,
+  filePath: string,
+  name: string,
+  kind: SymbolKind,
+  line = 1,
+) {
+  return {
+    logicalSymbolId,
+    declaration: {
+      logicalId: logicalSymbolId,
+      symbolId: `${filePath}:${name}:${String(line)}`,
+      location: { filePath, line, column: 0, endLine: line, endColumn: 1 },
+      kind,
+    },
+  }
+}
 
 function fileNode(path: string, workspace: string) {
   return createFileNode({

@@ -1,0 +1,99 @@
+- op: modified
+  description: 'Exact qualified tokens plus the unchanged full-query search'
+  selector:
+    type: section
+    matches: 'Requirement: Semantic-first candidate lanes'
+  content: |
+    #### Scenario: Exact logical identity outranks local textual names
+
+    - **GIVEN** a logical class `Change` and CLI/test variables or helper functions named `change`
+    - **WHEN** an unfiltered search for `Change` runs
+    - **THEN** the exact logical declaration ranks first
+    - **AND** `--kind variable` still exposes the local values
+
+    #### Scenario: Logical-name equality is not canonical-identity equality
+
+    - **GIVEN** a logical target is named `run` and an exact public binding also exports `run`
+    - **WHEN** symbol search receives the ordinary text `run` rather than the target's canonical id
+    - **THEN** the public binding receives the exact-public-binding tier
+    - **AND** the logical target is not labeled exact-logical-identity solely because its name equals the query
+
+    #### Scenario: Canonical identity returns a non-exported target without text hits
+
+    - **GIVEN** a non-exported logical target has declarations but no public binding or backend text hit for its rendered canonical ID
+    - **WHEN** symbol search receives that exact canonical ID
+    - **THEN** the target is included directly with its declarations
+    - **AND** it receives the exact-logical-identity tier
+
+    #### Scenario: Prefix discovery remains visibly partial
+
+    - **GIVEN** `ValidateArtifacts` exists and `ValidateArtifact` does not
+    - **WHEN** symbol search receives `ValidateArtifact`
+    - **THEN** `ValidateArtifacts` MAY be returned after exact candidates as a prefix match
+    - **AND** its structured tier does not claim an exact match
+
+    #### Scenario: Semantic and textual lanes are limited after merge
+
+    - **GIVEN** semantic and backend text lanes return overlapping logical symbols
+    - **WHEN** the requested category limit is applied
+    - **THEN** duplicates are grouped before limiting
+    - **AND** stable `matchTier` and `matchReasons` explain the deterministic order
+
+    #### Scenario: Exact local tier remains reachable after logical components
+
+    - **GIVEN** one case-exact local symbol has no logical target
+    - **AND** another logical target matches only through a structural identity component
+    - **WHEN** both semantic lanes are classified and ordered
+    - **THEN** the logical component uses `logical-component`
+    - **AND** the local symbol uses `exact-local-symbol` rather than a declaration tier
+
+    #### Scenario: Ordinary text does not extract a qualified token
+
+    - **WHEN** symbol search receives `execute`
+    - **THEN** no qualified-name lookup runs
+    - **AND** the full query still uses the existing declaration, public-binding, and lexical tiers
+    - **AND** full-text rank is not treated as proof of an owner-qualified member
+
+    #### Scenario: Qualified text is an exact hit and the full query is still searched
+
+    - **GIVEN** `qualified_name` `EditChange.execute` exists and no file is supplied
+    - **WHEN** symbol search receives `EditChange.execute`
+    - **THEN** that member is an exact hit ahead of lexical relatives
+    - **AND** the original query is still searched, including full-text search
+    - **AND** the CLI did not parse the delimiter itself
+
+    #### Scenario: Extra words do not drop the qualified token or the rest of the query
+
+    - **GIVEN** `qualified_name` `GetStatus.execute` exists
+    - **WHEN** symbol search receives `GetStatus.execute otra cosa`
+    - **THEN** that member is an exact hit
+    - **AND** the full original query is still searched
+    - **AND** no token is removed from that search
+
+    #### Scenario: Several equal qualified names are all exact hits
+
+    - **GIVEN** two logical symbols store `Owner.execute`
+    - **WHEN** symbol search receives `Owner.execute`
+    - **THEN** both are exact hits
+    - **AND** the full-query results are still present
+
+    #### Scenario: A missing qualified token leaves the normal search
+
+    - **GIVEN** no logical symbol stores `EditChange.missing`
+    - **WHEN** symbol search receives `EditChange.missing`
+    - **THEN** there is no exact qualified hit
+    - **AND** the normal full-query search result remains
+
+    #### Scenario: Filters still apply after the exact lookup
+
+    - **GIVEN** `EditChange.execute` resolves to a method
+    - **WHEN** symbol search receives that text with `--kind variable`
+    - **THEN** the method is excluded by the kind filter
+
+    #### Scenario: PHP spelling is the same exact lookup
+
+    - **GIVEN** `qualified_name` is `ArchiveChange.execute` and no language or file is supplied
+    - **WHEN** symbol search receives `ArchiveChange::execute`
+    - **THEN** that member is an exact hit
+    - **AND** the full query is still searched
+    - **AND** the CLI does not treat `::` as its own syntax

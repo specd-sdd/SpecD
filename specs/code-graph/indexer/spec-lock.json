@@ -17,44 +17,16 @@
   ],
   "implementation": [
     {
-      "file": "code-graph:src/application/use-cases/_shared/compute-graph-fingerprint.ts",
-      "symbols": [
-        "computeGraphFingerprint",
-        "computeWorkspaceFingerprint",
-        "computeRootFingerprint",
-        "detectFingerprintMismatch",
-        "discoverResolutionInputs",
-        "FULL_REBUILD_FINGERPRINT_REASON"
-      ]
-    },
-    {
       "file": "code-graph:src/application/use-cases/index-code-graph.ts",
       "symbols": ["IndexCodeGraph"]
     },
     {
-      "file": "code-graph:src/composition/create-code-graph-provider.ts",
-      "symbols": ["createCodeGraphProvider"]
+      "file": "code-graph:src/application/services/project-spec-coverage.ts",
+      "symbols": ["projectSpecCoverage"]
     },
     {
-      "file": "code-graph:test/helpers/expected-fingerprint-map.ts",
-      "symbols": ["buildExpectedFingerprintMap"]
-    },
-    {
-      "file": "code-graph:src/application/ports/resolution-manifest-source.ts",
-      "symbols": ["ResolutionManifestSource", "emptyResolutionManifestSource"]
-    },
-    {
-      "file": "code-graph:src/infrastructure/fs/node-resolution-manifest-source.ts",
-      "symbols": ["NodeResolutionManifestSource"]
-    },
-    {
-      "file": "code-graph:test/application/use-cases/compute-graph-fingerprint.spec.ts"
-    },
-    {
-      "file": "code-graph:test/application/use-cases/workspace-indexing.spec.ts"
-    },
-    {
-      "file": "code-graph:test/infrastructure/fs/node-resolution-manifest-source.spec.ts"
+      "file": "code-graph:src/application/use-cases/in-memory-index-session.ts",
+      "symbols": ["InMemoryIndexSession"]
     }
   ],
   "optimizations": {

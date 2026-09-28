@@ -85,7 +85,10 @@ export interface LogicalSymbolLookup {
   readonly name: string
   readonly space: string | undefined
   readonly ownerId: string | undefined
-  readonly memberForm: string | undefined
+  readonly memberKind: string | undefined
+  readonly memberDispatch: string | undefined
+  readonly memberAccessor: string | undefined
+  readonly nativeKind: string | undefined
 }
 
 /** Indexed lookup key for a named public route. */
@@ -389,6 +392,16 @@ export abstract class GraphStore {
    */
   findLogicalSymbolsByIds(ids: readonly string[]): Promise<LogicalSymbol[]> {
     void ids
+    return Promise.reject(new Error('Reference facts are not supported by this graph store'))
+  }
+
+  /**
+   * Returns every logical symbol whose stored `qualifiedName` equals one of the spellings.
+   * @param qualifiedNames - Generic dotted spellings.
+   * @returns Matching logical symbols in deterministic order.
+   */
+  findLogicalSymbolsByQualifiedNames(qualifiedNames: readonly string[]): Promise<LogicalSymbol[]> {
+    void qualifiedNames
     return Promise.reject(new Error('Reference facts are not supported by this graph store'))
   }
 

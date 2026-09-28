@@ -308,6 +308,11 @@ export interface SQLiteWorkerOperationMap {
     payload: { lookups: readonly LogicalSymbolLookup[] }
     result: LogicalSymbol[]
   }
+  /** Finds logical symbols by stored qualified spelling. */
+  findLogicalSymbolsByQualifiedNames: {
+    payload: { qualifiedNames: readonly string[] }
+    result: LogicalSymbol[]
+  }
   /** Finds logical declarations. */
   findLogicalDeclarations: {
     payload: { logicalSymbolIds: readonly string[] }

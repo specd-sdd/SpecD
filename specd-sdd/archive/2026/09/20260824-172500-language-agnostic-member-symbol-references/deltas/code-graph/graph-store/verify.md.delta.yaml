@@ -1,0 +1,48 @@
+- op: added
+  description: 'Verify member-semantics lookup and qualified_name equality'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Reference and coverage persistence'
+  content: |
+    ### Requirement: Member-semantics persistence
+
+    #### Scenario: Lookup uses the four member axes
+
+    - **GIVEN** two logical symbols share workspace, surface, name, space, and owner
+    - **AND** their dispatch or accessor differs
+    - **WHEN** a lookup supplies one member-semantics value
+    - **THEN** only the matching symbol is returned
+    - **AND** the query does not parse the canonical id
+
+    #### Scenario: Qualified name equality returns every match
+
+    - **GIVEN** two logical symbols store `qualified_name` `GetStatus.execute`
+    - **WHEN** the store looks up that spelling
+    - **THEN** both symbols are returned
+    - **AND** the lookup is equality, not full-text search
+    - **AND** there is no alias table
+    - **AND** a cross-workspace public binding remains readable by surface, exported name, space, and target id
+
+    #### Scenario: Partial member axes do not match a different member
+
+    - **GIVEN** a lookup sets dispatch to instance and leaves accessor unset
+    - **AND** the stored member is a static getter
+    - **WHEN** the lookup runs
+    - **THEN** that static getter is not returned
+
+    #### Scenario: Non-member leaves member axes empty
+
+    - **GIVEN** a top-level function has no member semantics
+    - **WHEN** it is persisted and looked up by name and space
+    - **THEN** the row is returned
+    - **AND** its member axes are null
+
+    #### Scenario: Search text is not identity
+
+    - **GIVEN** search text contains the qualified spelling `EditChange.execute`
+    - **WHEN** an exact logical lookup asks for that string as a simple name
+    - **THEN** no logical symbol is returned from search text alone

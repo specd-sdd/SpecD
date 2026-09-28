@@ -1,0 +1,15 @@
+- op: added
+  description: 'Provider resolution uses one adapter registry and exact qualified_name lookup'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Symbol-reference provider surface'
+  content: |
+    ### Requirement: Adapter-backed reference normalization
+
+    `createCodeGraphProvider` SHALL pass the same `AdapterRegistry` used for indexing into provider symbol resolution. The provider MUST NOT build a second registry and MUST NOT hardcode language names to choose an adapter.
+
+    An unanchored `Tipo.miembro` or `Tipo::miembro` request SHALL resolve by stored `qualified_name` equality and MUST NOT require an adapter. Other text normalization SHALL select an adapter only from an explicit language, an anchored indexed file, or indexed public-surface metadata. When none of those is present, that other text MUST return unresolved. The provider MUST NOT parse package manifests or member syntax itself.

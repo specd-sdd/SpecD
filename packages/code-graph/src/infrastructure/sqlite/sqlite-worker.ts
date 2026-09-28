@@ -512,6 +512,11 @@ export async function handleMessage(
         result = database.findLogicalSymbols(p.lookups)
         break
       }
+      case 'findLogicalSymbolsByQualifiedNames': {
+        const p = payload as { qualifiedNames: readonly string[] }
+        result = database.findLogicalSymbolsByQualifiedNames(p.qualifiedNames)
+        break
+      }
       case 'findLogicalDeclarations': {
         const p = payload as { logicalSymbolIds: readonly string[] }
         result = database.findLogicalDeclarations(p.logicalSymbolIds)

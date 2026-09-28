@@ -965,6 +965,117 @@ describe('graph impact', () => {
       expect(out).toContain('No symbol found matching "nonexistent".')
       expect(process.exit).not.toHaveBeenCalledWith(1)
     })
+
+    it('analyzes one unanchored EditChange.execute and does not open storage itself', async () => {
+      const { mockProvider, getStdout } = setup()
+      const sym = {
+        id: 'core:src/edit.ts:method:execute:2:2',
+        name: 'execute',
+        kind: 'method',
+        filePath: 'core:src/edit.ts',
+        line: 2,
+        column: 2,
+      }
+      mockProvider.resolveSymbolSelector.mockResolvedValue({
+        status: 'resolved',
+        match: { symbolId: sym.id, filePath: sym.filePath, matchKind: 'qualified' },
+      })
+      mockProvider.analyzeImpact.mockResolvedValue({
+        target: sym.id,
+        directDependents: 0,
+        indirectDependents: 0,
+        transitiveDependents: 0,
+        riskLevel: 'LOW',
+        affectedFiles: [],
+        affectedSymbols: [],
+        affectedSpecs: [],
+        affectedProcesses: [],
+      })
+
+      await makeImpactProgram().parseAsync([
+        'node',
+        'specd',
+        'graph',
+        'impact',
+        '--symbol',
+        'EditChange.execute',
+      ])
+
+      expect(getStdout()).not.toContain('No symbol found matching "EditChange.execute".')
+      expect(process.exit).not.toHaveBeenCalledWith(1)
+      expect(mockProvider.analyzeImpact).toHaveBeenCalledWith(sym.id, 'upstream', 3)
+      expect(mockProvider.resolveSymbolSelector).toHaveBeenCalledWith('EditChange.execute')
+      expect(mockProvider).not.toHaveProperty('database')
+      expect(JSON.stringify(mockProvider.resolveSymbolSelector.mock.calls)).not.toContain(
+        'package.json',
+      )
+    })
+
+    it('reports ambiguous owner-qualified text without guessing a target', async () => {
+      const { mockProvider, getStdout } = setup()
+      mockProvider.resolveSymbolSelector.mockResolvedValue({
+        status: 'ambiguous',
+        candidates: [
+          { symbolId: 'a', filePath: 'core:src/a.ts', matchKind: 'name' },
+          { symbolId: 'b', filePath: 'core:src/b.ts', matchKind: 'name' },
+        ],
+        totalCandidates: 2,
+      })
+      mockProvider.getSymbolsByIds.mockResolvedValue([
+        { id: 'a', name: 'execute', kind: 'method', filePath: 'core:src/a.ts', line: 1, column: 0 },
+        { id: 'b', name: 'execute', kind: 'method', filePath: 'core:src/b.ts', line: 1, column: 0 },
+      ])
+
+      await makeImpactProgram().parseAsync([
+        'node',
+        'specd',
+        'graph',
+        'impact',
+        '--symbol',
+        'Owner.execute',
+      ])
+
+      expect(getStdout()).toContain('2 symbols exactly match "Owner.execute"')
+      expect(mockProvider.analyzeImpact).not.toHaveBeenCalled()
+    })
+
+    it('still reports every bare validate match', async () => {
+      const { mockProvider, getStdout } = setup()
+      const symbols = ['src/a.ts', 'src/b.ts', 'src/c.ts'].map((filePath, index) => ({
+        id: `${filePath}:function:validate:${String(index)}:0`,
+        name: 'validate',
+        kind: 'function',
+        filePath,
+        line: index + 1,
+        column: 0,
+      }))
+      mockProvider.resolveSymbolSelector.mockResolvedValue({
+        status: 'ambiguous',
+        candidates: symbols.map((symbol) => ({
+          symbolId: symbol.id,
+          filePath: symbol.filePath,
+          matchKind: 'name' as const,
+        })),
+        totalCandidates: symbols.length,
+      })
+      mockProvider.getSymbolsByIds.mockResolvedValue(symbols)
+
+      await makeImpactProgram().parseAsync([
+        'node',
+        'specd',
+        'graph',
+        'impact',
+        '--symbol',
+        'validate',
+      ])
+
+      const out = getStdout()
+      expect(out).toContain('3 symbols exactly match "validate"')
+      expect(out).toContain('src/a.ts')
+      expect(out).toContain('src/b.ts')
+      expect(out).toContain('src/c.ts')
+      expect(mockProvider.analyzeImpact).not.toHaveBeenCalled()
+    })
   })
 
   describe('multi-file aggregation', () => {
@@ -1300,7 +1411,7 @@ describe('graph impact', () => {
         name: 'createApi',
         space: 'value',
         ownerId: undefined,
-        memberForm: undefined,
+        memberSemantics: undefined,
       }
       const binding = {
         id: 'public-api',

@@ -27,6 +27,7 @@ import { expandSearchQuery } from '../../src/domain/services/expand-search-query
 import { expandSymbolName } from '../../src/domain/services/expand-symbol-name.js'
 import { matchesExclude } from '../../src/domain/services/matches-exclude.js'
 import {
+  deriveQualifiedName,
   type LocalBinding,
   type LogicalSymbol,
   type PublicBinding,
@@ -383,6 +384,20 @@ export class InMemoryGraphStore extends GraphStore {
     return [...new Set(ids)]
       .map((id) => this.logicalSymbols.get(id))
       .filter((symbol): symbol is LogicalSymbol => symbol !== undefined)
+      .sort(compareLogicalSymbols)
+  }
+
+  async findLogicalSymbolsByQualifiedNames(
+    qualifiedNames: readonly string[],
+  ): Promise<LogicalSymbol[]> {
+    this.ensureOpen()
+    const names = new Set(qualifiedNames)
+    return [...this.logicalSymbols.values()]
+      .flatMap((symbol) => {
+        const spelling = symbol.qualifiedName ?? deriveQualifiedName(symbol, this.logicalSymbols)
+        if (spelling === undefined || !names.has(spelling)) return []
+        return [symbol.qualifiedName === spelling ? symbol : { ...symbol, qualifiedName: spelling }]
+      })
       .sort(compareLogicalSymbols)
   }
 
@@ -1296,7 +1311,12 @@ function matchesLogicalSymbolLookup(symbol: LogicalSymbol, lookup: LogicalSymbol
     (lookup.surface === undefined || symbol.surface === lookup.surface) &&
     (lookup.space === undefined || symbol.space === lookup.space) &&
     (lookup.ownerId === undefined || symbol.ownerId === lookup.ownerId) &&
-    (lookup.memberForm === undefined || symbol.memberForm === lookup.memberForm)
+    (lookup.memberKind === undefined || symbol.memberSemantics?.kind === lookup.memberKind) &&
+    (lookup.memberDispatch === undefined ||
+      symbol.memberSemantics?.dispatch === lookup.memberDispatch) &&
+    (lookup.memberAccessor === undefined ||
+      symbol.memberSemantics?.accessor === lookup.memberAccessor) &&
+    (lookup.nativeKind === undefined || symbol.memberSemantics?.nativeKind === lookup.nativeKind)
   )
 }
 
@@ -1325,7 +1345,10 @@ function compareLogicalSymbols(left: LogicalSymbol, right: LogicalSymbol): numbe
       left.ownerId ?? '',
       left.space,
       left.name,
-      left.memberForm ?? '',
+      left.memberSemantics?.kind ?? '',
+      left.memberSemantics?.dispatch ?? '',
+      left.memberSemantics?.accessor ?? '',
+      left.memberSemantics?.nativeKind ?? '',
       left.id,
     ],
     [
@@ -1334,7 +1357,10 @@ function compareLogicalSymbols(left: LogicalSymbol, right: LogicalSymbol): numbe
       right.ownerId ?? '',
       right.space,
       right.name,
-      right.memberForm ?? '',
+      right.memberSemantics?.kind ?? '',
+      right.memberSemantics?.dispatch ?? '',
+      right.memberSemantics?.accessor ?? '',
+      right.memberSemantics?.nativeKind ?? '',
       right.id,
     ],
   )

@@ -1,7 +1,7 @@
 {
   "name": "code-graph-symbol-semantic-context",
   "createdAt": "2026-07-15T14:01:36.552Z",
-  "updatedAt": "2026-09-25T20:32:15.313Z",
+  "updatedAt": "2026-09-28T07:27:43.646Z",
   "description": "Add deterministic symbol ownership and range context to support hierarchical purpose extraction and semantic search in code graph.",
   "schema": {
     "name": "schema-std",
@@ -1711,6 +1711,122 @@
         {
           "type": "verify",
           "files": ["code-graph:language-adapter", "code-graph:indexer"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-09-28T07:26:18.359Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'language-agnostic-member-symbol-references' was archived with overlapping specs: code-graph:indexer, code-graph:language-adapter, code-graph:symbol-model",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:symbol-model", "code-graph:language-adapter", "code-graph:indexer"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:symbol-model", "code-graph:language-adapter", "code-graph:indexer"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-09-28T07:27:14.500Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'language-agnostic-member-symbol-references' was archived with overlapping specs: code-graph:indexer, code-graph:language-adapter, code-graph:symbol-model",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:symbol-model", "code-graph:language-adapter", "code-graph:indexer"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:symbol-model", "code-graph:language-adapter", "code-graph:indexer"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-09-28T07:27:30.074Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'language-agnostic-member-symbol-references' was archived with overlapping specs: code-graph:indexer, code-graph:language-adapter, code-graph:symbol-model",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:symbol-model", "code-graph:language-adapter", "code-graph:indexer"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:symbol-model", "code-graph:language-adapter", "code-graph:indexer"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-09-28T07:27:43.645Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'language-agnostic-member-symbol-references' was archived with overlapping specs: code-graph:indexer, code-graph:language-adapter, code-graph:symbol-model",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:symbol-model", "code-graph:language-adapter", "code-graph:indexer"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:symbol-model", "code-graph:language-adapter", "code-graph:indexer"]
         },
         {
           "type": "design",

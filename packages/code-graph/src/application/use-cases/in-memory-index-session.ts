@@ -8,6 +8,7 @@ import {
   type HierarchyFact,
   type LocalBinding,
   type LogicalSymbol,
+  assignQualifiedNames,
   parseLogicalSymbol,
   type PublicBinding,
   type ResolutionStep,
@@ -260,9 +261,10 @@ export class InMemoryIndexSession implements IndexSession {
    * @returns Logical symbols in deterministic order.
    */
   getLogicalSymbols(): readonly LogicalSymbol[] {
-    return [...this.logicalSymbolsById.values()].sort((left, right) =>
+    const symbols = [...this.logicalSymbolsById.values()].sort((left, right) =>
       left.id.localeCompare(right.id),
     )
+    return assignQualifiedNames(symbols)
   }
 
   /**
@@ -286,8 +288,24 @@ export class InMemoryIndexSession implements IndexSession {
   }
 
   /**
-   * Returns ordered, deduplicated alias/export/hierarchy provenance.
-   * @returns Resolution steps.
+   * Merges re-export bindings and steps into the session.
+   * @param facts - Bindings and steps to add.
+   * @param facts.publicBindings - Public bindings emitted by an adapter.
+   * @param facts.steps - Resolution steps emitted by an adapter.
+   */
+  addReferenceFacts(facts: {
+    readonly publicBindings: readonly PublicBinding[]
+    readonly steps: readonly ResolutionStep[]
+  }): void {
+    for (const binding of facts.publicBindings) this.publicBindingsById.set(binding.id, binding)
+    for (const step of facts.steps) {
+      this.resolutionStepsByKey.set(JSON.stringify([step.fromId, step.toId, step.kind]), step)
+    }
+  }
+
+  /**
+   * Returns resolution steps in deterministic key order.
+   * @returns Resolution steps recorded for this session.
    */
   getResolutionSteps(): readonly ResolutionStep[] {
     return [...this.resolutionStepsByKey.values()].sort((left, right) =>

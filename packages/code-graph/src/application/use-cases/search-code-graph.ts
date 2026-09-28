@@ -5,6 +5,7 @@ import {
 } from '../../domain/ports/graph-store.js'
 import { splitWorkspaceIdentity } from '../../domain/services/split-workspace-identity.js'
 import { expandSearchQuery } from '../../domain/services/expand-search-query.js'
+import { qualifiedLookupText } from '../../domain/services/exact-lane-query.js'
 import { type DocumentNode } from '../../domain/value-objects/document-node.js'
 import { type SearchOptions } from '../../domain/value-objects/search-options.js'
 import {
@@ -166,12 +167,18 @@ export class SearchCodeGraph {
    * @returns Logically grouped symbol results.
    */
   async executeSymbols(options: SearchOptions): Promise<readonly ReferenceAwareSymbolResult[]> {
-    const [hits, queriedBindings, directLogicalTargets] = await Promise.all([
+    const [hits, queriedBindings, directLogicalTargets, proven] = await Promise.all([
       this.store.searchSymbols(options),
       this.store.findPublicBindingsByExportedNames([options.query.trim()]),
       this.store.findLogicalSymbolsByIds([options.query.trim()]),
+      this.exactQualifiedTargets(options),
     ])
-    if (hits.length === 0 && queriedBindings.length === 0 && directLogicalTargets.length === 0) {
+    if (
+      proven.length === 0 &&
+      hits.length === 0 &&
+      queriedBindings.length === 0 &&
+      directLogicalTargets.length === 0
+    ) {
       return []
     }
 
@@ -182,7 +189,10 @@ export class SearchCodeGraph {
         name: symbol.name,
         space: undefined,
         ownerId: undefined,
-        memberForm: undefined,
+        memberKind: undefined,
+        memberDispatch: undefined,
+        memberAccessor: undefined,
+        nativeKind: undefined,
       })),
     )
     const [hitTargets, bindingTargets] = await Promise.all([
@@ -194,7 +204,7 @@ export class SearchCodeGraph {
       ),
     ])
     const logicalTargets = deduplicateBy(
-      [...directLogicalTargets, ...hitTargets, ...bindingTargets],
+      [...proven, ...directLogicalTargets, ...hitTargets, ...bindingTargets],
       (target) => target.id,
     )
     const declarations =
@@ -222,7 +232,9 @@ export class SearchCodeGraph {
       hits,
       ({ symbol }) => targetIdsBySymbolId.get(symbol.id) ?? symbol.id,
     )
+    const provenIds = new Set(proven.map((target) => target.id))
     const resultIds = new Set([
+      ...provenIds,
       ...directLogicalTargets.map((target) => target.id),
       ...hitsByTarget.keys(),
       ...publicBindings.flatMap((binding) =>
@@ -231,14 +243,29 @@ export class SearchCodeGraph {
     ])
 
     return [...resultIds]
-      .map((targetId): ReferenceAwareSymbolResult => {
+      .map((targetId): ReferenceAwareSymbolResult | null => {
         const groupedHits = hitsByTarget.get(targetId) ?? []
+        const targetDeclarations = declarationsByTarget.get(targetId) ?? []
+        if (
+          options.kinds !== undefined &&
+          options.kinds.length > 0 &&
+          !targetDeclarations.some((item) => options.kinds!.includes(item.declaration.kind)) &&
+          !groupedHits.some((hit) => options.kinds!.includes(hit.symbol.kind))
+        ) {
+          return null
+        }
         const logicalTarget = targetById.get(targetId) ?? null
         const bindings = sortBindings(bindingsByTarget.get(targetId) ?? [])
-        const semantic = classifySymbolMatch(options.query, logicalTarget, bindings, groupedHits)
+        const semantic = classifySymbolMatch(
+          options.query,
+          logicalTarget,
+          bindings,
+          groupedHits,
+          provenIds,
+        )
         return {
           logicalTarget,
-          declarations: sortDeclarations(declarationsByTarget.get(targetId) ?? []),
+          declarations: sortDeclarations(targetDeclarations),
           publicBindings: bindings,
           matchedPublicBindings: bindings.filter((binding) =>
             isExactBindingMatch(options.query, binding),
@@ -248,6 +275,7 @@ export class SearchCodeGraph {
           ...semantic,
         }
       })
+      .filter((item): item is ReferenceAwareSymbolResult => item !== null)
       .sort(compareResults)
       .slice(0, options.limit ?? 20)
   }
@@ -322,6 +350,46 @@ export class SearchCodeGraph {
       )
       .slice(0, input.limit)
   }
+
+  /**
+   * Looks up every qualified token in addition to the full-query symbol search.
+   * A missing qualified token leaves the normal search unchanged.
+   * @param options - Symbol search options.
+   * @returns Logical symbols whose stored spelling equals a query token.
+   */
+  private async exactQualifiedTargets(options: SearchOptions): Promise<LogicalSymbol[]> {
+    const tokens = options.query.split(/\s+/).filter((token) => token.length > 0)
+    const spellings = [
+      ...new Set(
+        tokens.flatMap((token) => {
+          const spelling = qualifiedLookupText(token)
+          return spelling === undefined ? [] : [spelling]
+        }),
+      ),
+    ]
+    const ids = tokens.filter((token) => token.startsWith('logical|2|'))
+    const [byName, byId] = await Promise.all([
+      spellings.length === 0 ? [] : this.store.findLogicalSymbolsByQualifiedNames(spellings),
+      ids.length === 0 ? [] : this.store.findLogicalSymbolsByIds(ids),
+    ])
+    const seen = new Map<string, LogicalSymbol>()
+    for (const target of [...byName, ...byId]) seen.set(target.id, target)
+    let targets = [...seen.values()]
+    if (options.workspace !== undefined && options.workspace.length > 0) {
+      targets = targets.filter((target) => target.workspace === options.workspace)
+    }
+    const anchored = options.filePattern?.includes(':') === true ? options.filePattern : undefined
+    if (anchored !== undefined && targets.length > 0) {
+      const declarations = await this.store.findDeclarations(targets.map((target) => target.id))
+      const visible = new Set(
+        declarations
+          .filter((item) => item.declaration.location.filePath === anchored)
+          .map((item) => item.logicalSymbolId),
+      )
+      targets = targets.filter((target) => visible.has(target.id) || target.surface === anchored)
+    }
+    return targets
+  }
 }
 
 /**
@@ -330,6 +398,7 @@ export class SearchCodeGraph {
  * @param target - Resolved logical target, when proven.
  * @param bindings - Public routes reaching the target.
  * @param hits - Backend declaration or textual hits.
+ * @param provenIds - Logical ids proven by qualified-token equality.
  * @returns Stable semantic tier and evidence reasons.
  */
 function classifySymbolMatch(
@@ -337,10 +406,11 @@ function classifySymbolMatch(
   target: LogicalSymbol | null,
   bindings: readonly PublicBinding[],
   hits: readonly ReferenceAwareSymbolHit[],
+  provenIds: ReadonlySet<string>,
 ): Pick<ReferenceAwareSymbolResult, 'matchTier' | 'matchReasons'> {
   const raw = query.trim()
   const normalized = raw.toLowerCase()
-  if (target !== null && target.id === raw) {
+  if (target !== null && (target.id === raw || provenIds.has(target.id))) {
     return { matchTier: 'exact-logical-identity', matchReasons: ['logical-identity-exact'] }
   }
   if (bindings.some((binding) => isExactBindingMatch(raw, binding))) {
@@ -629,7 +699,10 @@ function deduplicateLogicalLookups(lookups: readonly LogicalSymbolLookup[]): Log
       lookup.name,
       lookup.space,
       lookup.ownerId,
-      lookup.memberForm,
+      lookup.memberKind,
+      lookup.memberDispatch,
+      lookup.memberAccessor,
+      lookup.nativeKind,
     ]),
   )
 }

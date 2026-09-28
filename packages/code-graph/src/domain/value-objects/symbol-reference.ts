@@ -12,18 +12,75 @@ export const SymbolSpace = {
 /** A namespace in which a logical symbol or binding is resolved. */
 export type SymbolSpace = (typeof SymbolSpace)[keyof typeof SymbolSpace]
 
-/** Describes how a member participates in its owner’s API. */
-export const MemberForm = {
-  Instance: 'instance',
-  Static: 'static',
+/** Broad member classification, independent of dispatch and accessor role. */
+export const MemberKind = {
+  Method: 'method',
+  Property: 'property',
+  Field: 'field',
   Constructor: 'constructor',
-  Getter: 'getter',
-  Setter: 'setter',
   Signature: 'signature',
+  Indexer: 'indexer',
+  Operator: 'operator',
+  Event: 'event',
+  Other: 'other',
 } as const
 
-/** A language-neutral member form. */
-export type MemberForm = (typeof MemberForm)[keyof typeof MemberForm]
+/** A language-neutral member kind. */
+export type MemberKind = (typeof MemberKind)[keyof typeof MemberKind]
+
+/** How a member is selected on its owner. */
+export const MemberDispatch = {
+  Instance: 'instance',
+  Static: 'static',
+} as const
+
+/** Instance or static dispatch. */
+export type MemberDispatch = (typeof MemberDispatch)[keyof typeof MemberDispatch]
+
+/** Accessor role when a member is a getter or setter. */
+export const MemberAccessor = {
+  Get: 'get',
+  Set: 'set',
+} as const
+
+/** Getter or setter role. */
+export type MemberAccessor = (typeof MemberAccessor)[keyof typeof MemberAccessor]
+
+/** Independent member axes. A non-member omits this object. */
+export interface MemberSemantics {
+  /** Broad member classification. */
+  readonly kind: MemberKind
+  /** Instance or static selection, when the grammar proves it. */
+  readonly dispatch?: MemberDispatch
+  /** Getter or setter role, when the grammar proves it. */
+  readonly accessor?: MemberAccessor
+  /** Proven language-native nuance. Absent when the grammar does not prove one. */
+  readonly nativeKind?: string
+}
+
+/** One hop in a reconstructed owner path. */
+export interface SymbolPathSegment {
+  /** Simple name of this hop. */
+  readonly name: string
+  /** Whether the hop is a namespace, a type, or the member. */
+  readonly role: 'namespace' | 'type' | 'member'
+}
+
+/** Adapter-parsed owner-then-member selector. */
+export interface StructuredSymbolReference {
+  /** Owner hops followed by the member. */
+  readonly segments: readonly SymbolPathSegment[]
+  /** Proven member axes, when the text includes them. */
+  readonly memberSemantics?: MemberSemantics
+  /** Lookup space, when the text proves one. */
+  readonly space?: SymbolSpace
+}
+
+/** Zero or more explicit parse candidates. No guessed winner. */
+export interface ParsedSymbolReference {
+  /** Explicit structured candidates. */
+  readonly candidates: readonly StructuredSymbolReference[]
+}
 
 /** A source declaration that realizes one logical symbol. */
 export interface DeclarationOccurrence {
@@ -51,8 +108,13 @@ export interface LogicalSymbol {
   readonly space: SymbolSpace
   /** Optional enclosing logical target for members. */
   readonly ownerId: string | undefined
-  /** Optional member dispatch form. */
-  readonly memberForm: MemberForm | undefined
+  /** Optional member axes. Absent for non-members. */
+  readonly memberSemantics: MemberSemantics | undefined
+  /**
+   * Generic dotted owner path, such as `GetStatus.execute`.
+   * Absent when the symbol has no owner. Not part of the canonical id.
+   */
+  readonly qualifiedName?: string
 }
 
 /** A named route from a public module surface to a logical target. */
@@ -127,13 +189,14 @@ export interface ReferenceFacts {
 export interface ResolveSymbolReferenceInput {
   readonly workspace: string
   readonly requested: string
+  readonly language?: string
   readonly filePath?: string
   readonly publicSurface?: string
   readonly symbolSpace?: SymbolSpace
   readonly kind?: SymbolKind
   readonly logicalId?: string
   readonly ownerId?: string
-  readonly memberForm?: MemberForm
+  readonly memberSemantics?: MemberSemantics
   readonly scopeId?: string
   readonly buildContext?: Readonly<Record<string, string>>
 }
@@ -219,15 +282,59 @@ function encodePart(value: string): string {
 export function createLogicalSymbol(params: Omit<LogicalSymbol, 'id'>): LogicalSymbol {
   const id = [
     'logical',
+    '2',
     encodePart(params.workspace),
     encodePart(params.surface),
     encodePart(params.name),
     encodePart(params.space),
     encodePart(params.ownerId ?? ''),
-    encodePart(params.memberForm ?? ''),
+    encodePart(params.memberSemantics?.kind ?? ''),
+    encodePart(params.memberSemantics?.dispatch ?? ''),
+    encodePart(params.memberSemantics?.accessor ?? ''),
+    encodePart(params.memberSemantics?.nativeKind ?? ''),
   ].join('|')
 
   return { ...params, id }
+}
+
+/**
+ * Rebuilds the generic dotted spelling from an owner chain.
+ * @param symbol - Member whose path is requested.
+ * @param byId - Logical symbols addressable by id, including `symbol`.
+ * @returns `Owner.member`, or undefined when the symbol has no owner or the chain is incomplete.
+ */
+export function deriveQualifiedName(
+  symbol: LogicalSymbol,
+  byId: ReadonlyMap<string, LogicalSymbol>,
+): string | undefined {
+  if (symbol.ownerId === undefined) return undefined
+  const names = [symbol.name]
+  const seen = new Set<string>([symbol.id])
+  let ownerId: string | undefined = symbol.ownerId
+  while (ownerId !== undefined) {
+    if (seen.has(ownerId)) return undefined
+    seen.add(ownerId)
+    const owner = byId.get(ownerId)
+    if (owner === undefined) return undefined
+    names.unshift(owner.name)
+    ownerId = owner.ownerId
+  }
+  return names.join('.')
+}
+
+/**
+ * Copies logical symbols with `qualifiedName` set from the owner chain.
+ * Symbols without an owner keep no qualified name. Canonical ids do not change.
+ * @param symbols - Logical symbols that may reference each other by `ownerId`.
+ * @returns The same identities with stored qualified spellings.
+ */
+export function assignQualifiedNames(symbols: readonly LogicalSymbol[]): LogicalSymbol[] {
+  const byId = new Map(symbols.map((symbol) => [symbol.id, symbol]))
+  return symbols.map((symbol) => {
+    const qualifiedName = deriveQualifiedName(symbol, byId)
+    if (qualifiedName === undefined) return symbol
+    return { ...symbol, qualifiedName }
+  })
 }
 
 /**
@@ -236,10 +343,10 @@ export function createLogicalSymbol(params: Omit<LogicalSymbol, 'id'>): LogicalS
  * @returns Parsed logical symbol, or undefined for an invalid identifier.
  */
 export function parseLogicalSymbol(id: string): LogicalSymbol | undefined {
-  if (!id.startsWith('logical|')) return undefined
-  let cursor = 'logical|'.length
+  if (!id.startsWith('logical|2|')) return undefined
+  let cursor = 'logical|2|'.length
   const decoded: string[] = []
-  for (let index = 0; index < 6; index += 1) {
+  for (let index = 0; index < 9; index += 1) {
     const separator = id.indexOf(':', cursor)
     if (separator < cursor) return undefined
     const length = Number(id.slice(cursor, separator))
@@ -248,7 +355,7 @@ export function parseLogicalSymbol(id: string): LogicalSymbol | undefined {
     if (!Number.isSafeInteger(length) || length < 0 || valueEnd > id.length) return undefined
     decoded.push(id.slice(valueStart, valueEnd))
     cursor = valueEnd
-    if (index < 5) {
+    if (index < 8) {
       if (id[cursor] !== '|') return undefined
       cursor += 1
     }
@@ -260,8 +367,23 @@ export function parseLogicalSymbol(id: string): LogicalSymbol | undefined {
   const name = decoded[2]!
   const space = decoded[3]!
   const ownerId = decoded[4]!
-  const memberForm = decoded[5]!
-  if (!isSymbolSpace(space) || (memberForm !== '' && !isMemberForm(memberForm))) return undefined
+  const memberKind = decoded[5]!
+  const memberDispatch = decoded[6]!
+  const memberAccessor = decoded[7]!
+  const nativeKind = decoded[8]!
+  if (!isSymbolSpace(space)) return undefined
+  if (memberKind !== '' && !isMemberKind(memberKind)) return undefined
+  if (memberDispatch !== '' && !isMemberDispatch(memberDispatch)) return undefined
+  if (memberAccessor !== '' && !isMemberAccessor(memberAccessor)) return undefined
+  const memberSemantics =
+    memberKind === ''
+      ? undefined
+      : {
+          kind: memberKind,
+          ...(memberDispatch === '' ? {} : { dispatch: memberDispatch }),
+          ...(memberAccessor === '' ? {} : { accessor: memberAccessor }),
+          ...(nativeKind === '' ? {} : { nativeKind }),
+        }
 
   return {
     id,
@@ -270,7 +392,7 @@ export function parseLogicalSymbol(id: string): LogicalSymbol | undefined {
     name,
     space,
     ownerId: ownerId || undefined,
-    memberForm: memberForm || undefined,
+    memberSemantics,
   }
 }
 
@@ -288,6 +410,24 @@ function isSymbolSpace(value: string): value is SymbolSpace {
  * @param value - Candidate member-form value.
  * @returns Whether the value is a member form.
  */
-function isMemberForm(value: string): value is MemberForm {
-  return Object.values(MemberForm).includes(value as MemberForm)
+function isMemberKind(value: string): value is MemberKind {
+  return Object.values(MemberKind).includes(value as MemberKind)
+}
+
+/**
+ * Checks whether a string is a recognized member dispatch.
+ * @param value - Candidate dispatch value.
+ * @returns Whether the value is a member dispatch.
+ */
+function isMemberDispatch(value: string): value is MemberDispatch {
+  return Object.values(MemberDispatch).includes(value as MemberDispatch)
+}
+
+/**
+ * Checks whether a string is a recognized member accessor.
+ * @param value - Candidate accessor value.
+ * @returns Whether the value is a member accessor.
+ */
+function isMemberAccessor(value: string): value is MemberAccessor {
+  return Object.values(MemberAccessor).includes(value as MemberAccessor)
 }

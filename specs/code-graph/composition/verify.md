@@ -290,6 +290,42 @@
 - **THEN** exactly one exact batch symbol lookup serves all candidates
 - **AND** candidate order, missing-symbol handling, and deterministic output are preserved
 
+### Requirement: Adapter-backed reference normalization
+
+#### Scenario: Indexing and resolution share one registry
+
+- **WHEN** a provider is created
+- **THEN** symbol resolution uses the same adapter registry instance as indexing
+- **AND** no second registry is built
+
+#### Scenario: Unanchored qualified spelling does not guess a language
+
+- **GIVEN** `EditChange.execute` is stored and the request has no explicit language, anchored file, or public surface
+- **WHEN** the provider resolves it
+- **THEN** the result is that member
+- **AND** no adapter is selected
+
+#### Scenario: Other text without context stays unresolved
+
+- **GIVEN** reference text is not a `Tipo.miembro` or `Tipo::miembro` spelling
+- **AND** it has no explicit language, anchored file, or public surface
+- **WHEN** the provider normalizes it
+- **THEN** the result is unresolved
+
+#### Scenario: Anchored file filters a qualified spelling
+
+- **GIVEN** the anchored file is indexed as TypeScript and declares `EditChange.execute`
+- **WHEN** the provider resolves `EditChange.execute`
+- **THEN** the member in that file is returned
+- **AND** the provider does not read `package.json`
+
+#### Scenario: Custom adapter is visible to resolution
+
+- **GIVEN** a custom adapter is registered on the indexing registry
+- **WHEN** resolution needs that adapter's language
+- **THEN** the same registry returns it
+- **AND** no hardcoded built-in language list is consulted instead
+
 ### Requirement: Code Graph-orchestrated search surface
 
 #### Scenario: One provider call owns the unified search

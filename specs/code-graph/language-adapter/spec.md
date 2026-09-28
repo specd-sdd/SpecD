@@ -199,6 +199,28 @@ A specific adapter spec MAY impose stricter language semantics than this general
 
 An adapter that advertises member support SHALL derive a member's declaring owner from language syntax and map it to a logical owner identity before constructing the member identity. Raw parser-node identifiers and optional syntax-level parent fields MUST NOT be used as logical owner identities. Top-level declarations SHALL have no owner, and same-name members under different logical owners MUST remain distinct.
 
+### Requirement: Member semantics and declaration parent
+
+An adapter that proves a member SHALL emit `MemberSemantics` (`kind`, `dispatch`, `accessor`, and `nativeKind` only when the grammar proves it) on the logical member. It MUST NOT emit the retired single-axis member form.
+
+The same adapter SHALL set `parentId` on declaration occurrences whose syntax has a declaring owner. The indexer MUST NOT recompute that parent from a language name list. A top-level declaration SHALL omit `parentId`.
+
+### Requirement: Human reference parse and render
+
+`LanguageAdapter` SHALL parse supported human and native member-reference syntax into structured owner-then-member selectors, and SHALL render a generic spelling plus an optional language-native spelling from a structured logical member. Parsing MUST return zero, one, or many explicit candidates. Dynamic or ambiguous syntax MUST stay unresolved.
+
+Canonical and already-structured requests MUST NOT be parsed as human text. The adapter MUST NOT split a reference on `.` inside the shared domain. `resolutionManifests()` MUST remain the adapter-sourced fingerprint input and MUST NOT perform I/O.
+
+### Requirement: Re-export public bindings
+
+The adapter SHALL resolve each re-export specifier and emit the public bindings and resolution steps that are stored.
+
+A relative specifier SHALL resolve to a source file in the importing workspace. A non-relative package specifier SHALL resolve through that language's package identity and public entry map. For TypeScript, `package.json` `name` plus `exports` or `main`, including `.js` to the indexed source extension, is that map. `@specd/code-graph` MUST resolve through `exports["."]` to the indexed source of `dist/public.js`. `@specd/code-graph/internal` MUST resolve through the `./internal` export to the indexed source of `dist/index.js`.
+
+The emitted binding SHALL use the re-exporting file as `surface` and the logical id already published by the entry file as `targetId`, including when that id belongs to another workspace. The adapter MUST NOT choose the first symbol of that name anywhere in the target workspace. A specifier that does not resolve to exactly one indexed entry file MUST NOT produce a guessed binding.
+
+The indexer SHALL persist those facts. It MUST NOT read `package.json`, `exports`, `main`, or a TypeScript re-export route, and it MUST NOT copy bindings itself.
+
 ### Requirement: Hierarchy evidence consistency
 
 An adapter that advertises `hierarchy: true` SHALL emit shared hierarchy facts and ordered provenance steps sufficient for `ResolveSymbolReference` to traverse from a child owner to an ancestor, embedded, composed, or contract owner and subsequently query a requested member under that owner. It SHALL keep those facts semantically consistent with persisted `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES` relations.

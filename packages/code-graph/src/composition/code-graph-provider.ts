@@ -1,4 +1,5 @@
 import { type GraphStore, type StorageGenerationSnapshot } from '../domain/ports/graph-store.js'
+import { type AdapterRegistryPort } from '../domain/ports/adapter-registry-port.js'
 import { type IndexCodeGraph } from '../application/use-cases/index-code-graph.js'
 import { type IndexOptions } from '../domain/value-objects/index-options.js'
 import { type IndexResult } from '../domain/value-objects/index-result.js'
@@ -215,6 +216,7 @@ export class CodeGraphProviderImpl implements CodeGraphProvider {
    * @param graphHealth - Optional provider-owned graph-health composition.
    * @param graphHealth.useCase - Canonical health use case.
    * @param graphHealth.input - Config-bound health input excluding the provider.
+   * @param registry - Adapter registry shared by indexing and resolution.
    */
   constructor(
     private readonly store: GraphStore,
@@ -224,11 +226,13 @@ export class CodeGraphProviderImpl implements CodeGraphProvider {
       readonly useCase: GetGraphHealth
       readonly input: Omit<GetGraphHealthInput, 'provider'>
     },
+    private readonly registry?: AdapterRegistryPort,
   ) {
     this.resolver = new ResolveSymbolReference(
       store,
       async () => this.toResolutionHealth(await this.getGraphHealth()),
       (resources) => this.assessExactResources(resources),
+      this.registry,
     )
     this.referenceSearch = new SearchCodeGraph(store)
   }
@@ -511,6 +515,7 @@ export class CodeGraphProviderImpl implements CodeGraphProvider {
     return resolveSymbolSelector(input, {
       store: this.store,
       ...(this.projectRoot !== undefined ? { projectRoot: this.projectRoot } : {}),
+      resolveReference: (request) => this.resolver.execute(request),
     })
   }
 
@@ -650,6 +655,7 @@ export class CodeGraphProviderImpl implements CodeGraphProvider {
         this.store,
         () => Promise.resolve(this.toResolutionHealth(health)),
         (resources) => this.assessExactResources(resources),
+        this.registry,
       ).execute(normalizedInput!)
     }
     return this.resolver.execute(normalizedInput!)
@@ -692,6 +698,7 @@ export class CodeGraphProviderImpl implements CodeGraphProvider {
         this.store,
         () => Promise.resolve(this.toResolutionHealth(health)),
         (resources) => this.assessExactResources(resources),
+        this.registry,
       ).executeBatch(normalizedInputs)
     }
     return this.resolver.executeBatch(normalizedInputs)

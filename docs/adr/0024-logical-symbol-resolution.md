@@ -54,9 +54,12 @@ the public or lexical route by which a target is reached.
 
 - A **declaration occurrence** keeps the existing location-backed graph identity.
 - A **logical symbol** identifies the semantic target from structured workspace,
-  surface, owner, symbol-space, name, and member-form fields. Its canonical reference
-  is delimiter-safe, round-trippable, case-preserving, and independent of source
-  ranges.
+  surface, owner, symbol-space, name, and `MemberSemantics` (`kind`, `dispatch`,
+  `accessor`, optional `nativeKind`). Its canonical reference uses the `logical|2|`
+  prefix and is delimiter-safe, round-trippable, case-preserving, and independent of
+  source ranges. SQLite schema 12 stores `qualified_name` for equality lookup of a generic
+  dotted owner path and drops `member_form` in favor of the member-semantics columns.
+  `graph index` rebuilds derived storage when the stored schema is not 12.
 - **Public bindings** and **local bindings** are first-class identities. They retain
   aliases, scopes, shadowing, anonymous/default exports, and ordered provenance rather
   than relying only on relation metadata.

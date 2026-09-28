@@ -31,7 +31,7 @@ function resolution(requested: string, filePath: string): SymbolResolutionResult
       name: requested,
       space: 'value',
       ownerId: undefined,
-      memberForm: undefined,
+      memberSemantics: undefined,
     },
     candidates: [],
     path: [],
@@ -42,12 +42,19 @@ function setup(options?: {
   readonly openError?: Error
   readonly healthError?: Error
   readonly resolutionError?: Error
+  readonly links?: {
+    readonly specId: string
+    readonly file: string
+    readonly fileLinkExplicit: boolean
+    readonly symbols?: readonly string[]
+  }[]
+  readonly resolutions?: readonly SymbolResolutionResult[]
 }) {
   const rawReview = {
     specIds: ['sdk:build-implementation-review'],
     implementationTracking: {
       trackedFiles: [{ file: 'packages/sdk/src/file.ts', state: 'open' as const }],
-      links: [
+      links: options?.links ?? [
         {
           specId: 'sdk:build-implementation-review',
           file: 'packages/sdk/src/file.ts',
@@ -75,6 +82,7 @@ function setup(options?: {
   })
   const resolveSymbolReferences = vi.fn(async (): Promise<readonly SymbolResolutionResult[]> => {
     if (options?.resolutionError !== undefined) throw options.resolutionError
+    if (options?.resolutions !== undefined) return options.resolutions
     return [
       resolution('StoredAlias', 'packages/sdk/src/review.ts'),
       resolution('Owner.member', 'packages/sdk/src/review.ts'),
@@ -191,6 +199,84 @@ describe('buildImplementationReview', () => {
     expect(result.links[1]?.symbolResolutions[1]?.resolution.reasonCode).toBe(
       'CONTENT_HASH_CHANGED',
     )
+  })
+
+  it('forwards stored qualified text in one ordered batch and copies unresolved rows', async () => {
+    const links = [
+      {
+        specId: 'sdk:build-implementation-review',
+        file: 'packages/sdk/src/review.ts',
+        fileLinkExplicit: false,
+        symbols: ['EditChange.execute', 'StoredAlias', 'Owner.member'],
+      },
+      {
+        specId: 'sdk:build-implementation-review',
+        file: '',
+        fileLinkExplicit: false,
+        symbols: ['loose'],
+      },
+      {
+        specId: 'sdk:build-implementation-review',
+        file: 'packages/sdk/src/barrel.ts',
+        fileLinkExplicit: false,
+        symbols: ['@specd/sdk barrel'],
+      },
+    ]
+    const ambiguous = {
+      ...resolution('EditChange.execute', 'packages/sdk/src/review.ts'),
+      status: 'ambiguous' as const,
+      reasonCode: 'AMBIGUOUS_MULTIPLE_TARGETS',
+      target: null,
+    }
+    const unresolved = {
+      ...resolution('@specd/sdk barrel', 'packages/sdk/src/barrel.ts'),
+      status: 'unresolved' as const,
+      reasonCode: 'REFERENCE_UNPROVEN',
+      target: null,
+    }
+    const { ctx, resolveSymbolReferences } = setup({
+      links,
+      resolutions: [
+        ambiguous,
+        resolution('StoredAlias', 'packages/sdk/src/review.ts'),
+        resolution('Owner.member', 'packages/sdk/src/review.ts'),
+        resolution('loose', ''),
+        unresolved,
+      ],
+    })
+
+    const result = await buildImplementationReview(ctx, { changeName: 'logical-review' })
+
+    expect(resolveSymbolReferences).toHaveBeenCalledOnce()
+    expect(resolveSymbolReferences).toHaveBeenCalledWith(
+      [
+        {
+          workspace: 'sdk',
+          requested: 'EditChange.execute',
+          filePath: 'packages/sdk/src/review.ts',
+        },
+        {
+          workspace: 'sdk',
+          requested: 'StoredAlias',
+          filePath: 'packages/sdk/src/review.ts',
+        },
+        {
+          workspace: 'sdk',
+          requested: 'Owner.member',
+          filePath: 'packages/sdk/src/review.ts',
+        },
+        { workspace: 'sdk', requested: 'loose', filePath: '' },
+        {
+          workspace: 'sdk',
+          requested: '@specd/sdk barrel',
+          filePath: 'packages/sdk/src/barrel.ts',
+        },
+      ],
+      graphHealth,
+    )
+    expect(result.links[0]?.symbolResolutions[0]?.resolution.status).toBe('ambiguous')
+    expect(result.links[2]?.symbolResolutions[0]?.symbol).toBe('@specd/sdk barrel')
+    expect(result.links[2]?.symbolResolutions[0]?.resolution.status).toBe('unresolved')
   })
 
   it.each([

@@ -585,10 +585,53 @@
 
 #### Scenario: SQLite old schema rebuilds safely
 
-- **GIVEN** schema version 8 and the reference schema expects 9
+- **GIVEN** schema version 10 or 11 and the reference schema expects 12
 - **WHEN** normal read and then graph index are attempted
-- **THEN** read rejects without empty recreation
-- **AND** index rotates generation, rebuilds fields/FTS, and opens the new version
+- **THEN** read rejects with `GraphSchemaIncompatibleError` without empty recreation
+- **AND** index rotates generation, rebuilds fields and FTS, and opens version 12
+
+#### Scenario: member_form is replaced in place
+
+- **WHEN** a version 12 database is created
+- **THEN** `logical_symbols` has `member_kind`, `member_dispatch`, `member_accessor`, `native_kind`, and `qualified_name`
+- **AND** `qualified_name` has an equality index
+- **AND** it has no `member_form` column
+- **AND** `public_bindings`, `symbols.search_text`, and `symbol_fts` keep their previous columns
+
+#### Scenario: Version 12 opens without rebuild
+
+- **GIVEN** `meta.schemaVersion` is already 12
+- **WHEN** the store opens for a read
+- **THEN** it does not throw `GraphSchemaIncompatibleError`
+- **AND** it does not recreate the database
+
+#### Scenario: Any other version is incompatible
+
+- **GIVEN** `meta.schemaVersion` is 9 or 13
+- **WHEN** the store opens
+- **THEN** the error is `GraphSchemaIncompatibleError`
+- **AND** no `ALTER TABLE` is executed
+
+#### Scenario: Rebuild discards old logical ids
+
+- **GIVEN** a version 10 database contains logical ids that embed member form
+- **WHEN** graph index recreates version 12
+- **THEN** those old id strings are absent
+- **AND** new ids round-trip through the versioned encoding
+
+#### Scenario: Qualified spelling is an equality column
+
+- **GIVEN** `EditChange` owns `execute`
+- **WHEN** the member is indexed
+- **THEN** `logical_symbols.qualified_name` is `EditChange.execute`
+- **AND** `symbols.search_text` is the expanded bare name
+- **AND** `symbol_fts` has no extra column
+
+#### Scenario: Worker row uses the new columns
+
+- **WHEN** a logical symbol is inserted and selected through the worker
+- **THEN** the row carries `member_kind`, `member_dispatch`, `member_accessor`, `native_kind`, and `qualified_name`
+- **AND** the statement does not reference `member_form`
 
 #### Scenario: SQLite source search preserves occurrence and range semantics
 
