@@ -34,6 +34,20 @@ export { createPreviewSpec, type PreviewSpecDeps } from './preview-spec.js'
 export { createResolveSchema, type ResolveSchemaDeps } from './resolve-schema.js'
 export { createUpdateSpecDeps, type UpdateSpecDepsDeps } from './update-spec-deps.js'
 export { createInvalidateChange, type InvalidateChangeDeps } from './invalidate-change.js'
+export {
+  createReconcileChangeValidity,
+  createStartVerification,
+  createCompleteVerification,
+  createInvalidateVerification,
+  resolveReconcileChangeValidityDeps,
+  resolveStartVerificationDeps,
+  resolveCompleteVerificationDeps,
+  resolveInvalidateVerificationDeps,
+  type ReconcileChangeValidityDeps,
+  type StartVerificationDeps,
+  type CompleteVerificationDeps,
+  type InvalidateVerificationDeps,
+} from './verification-factories.js'
 export { createRunStepHooks, type RunStepHooksDeps } from './run-step-hooks.js'
 export { createGetHookInstructions, type GetHookInstructionsDeps } from './get-hook-instructions.js'
 export {

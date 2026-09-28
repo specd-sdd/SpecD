@@ -10,28 +10,20 @@ This spec defines `specd changes invalidate <name>` as the manual invalidation s
 
 ### Requirement: Command signature
 
-The canonical command is:
-
 ```text
-specd changes invalidate <name> --reason <text> [--policy <policy>] [--target <target> ...] [--force]
+specd changes invalidate <name> --reason <text>
+  [--artifact-policy none|surgical|downstream|global]
+  [--workflow-policy preserve|redesign]
+  [--target <artifactId>[@<specId>] ...]
+  [--force]
+  [--format text|json|toon]
 ```
 
-Where:
-
-- `<name>` is the required change name
-- `--reason <text>` is mandatory
-- `--policy <policy>` is optional and overrides the change's persisted `invalidationPolicy` for this execution only
-- `--target <target>` is optional or required depending on the effective policy and MAY be repeated
-- `--force` confirms invalidation when active approval or signoff would be removed
+Artifact policy values are `none`, `surgical`, `downstream`, and `global`; workflow policy values are `preserve` and `redesign`. Targets are valid only where required by the effective artifact policy. The CLI SHALL map these flags to the structured `InvalidateChange` input and MUST NOT implement recovery locally.
 
 ### Requirement: Effective policy resolution
 
-The command MUST first resolve the effective invalidation policy:
-
-- explicit `--policy`, when present
-- otherwise the change's persisted `invalidationPolicy`
-
-The command MUST use that effective policy for all later validation and execution behavior.
+The CLI SHALL obtain the persisted structured policy and compatibility-adapted project configuration through core. Overrides apply only to this invocation. The CLI MUST NOT interpret the deprecated configuration key independently or silently combine old and new shapes.
 
 ### Requirement: Target syntax
 
@@ -71,49 +63,23 @@ Validation errors MUST accumulate across the full requested set and report every
 
 ### Requirement: Approval guard
 
-If the change currently has an active spec approval or signoff, the command MUST stop by default and require `--force`.
+When the requested operation would revoke a currently valid spec approval or sign-off, the command SHALL stop without mutation unless `--force` is present. The warning SHALL identify each affected gate and its canonical recovery target from the Core result; it MUST NOT always promise a return to `designing` or choose a target in CLI code.
 
-Without `--force`, no mutation occurs.
-
-The warning MUST state that:
-
-- the change will return to `designing`
-- the active approval/signoff will be invalidated
-
-This guard applies even when the effective policy is `none`.
+Stale evidence does not require confirmation merely because its historical approval event exists. This guard applies independently of artifact policy, including `none`.
 
 ### Requirement: Change-level invalidation
 
-Once validation and approval guards pass, the command always invalidates the change and returns it to `designing`.
+Once validation and guards pass, the command delegates invalidation and recovery to core. Artifact reopening follows the effective artifact policy; lifecycle movement follows the effective workflow policy and mandatory gate precedence. The CLI MUST NOT always return the change to `designing`.
 
-The effective invalidation policy controls only artifact/file-state consequences, not whether the change itself is invalidated.
+### Requirement: none semantics
 
-### Requirement: `none` semantics
-
-When the effective policy is `none`, the command invalidates the change but performs no artifact/file-state invalidation.
-
-The command output MUST say explicitly that:
-
-- the change was invalidated and returned to `designing`
-- no artifacts were invalidated because the effective policy is `none`
+Artifact policy `none` reopens no additional artifact/file state. It does not clear existing drift, waive forward-progress blockers, restore stale evidence, or determine lifecycle recovery. Output SHALL state those facts together with the independently effective workflow policy and any gate-driven return.
 
 ### Requirement: Reporting
 
-The command MUST report:
+Success output SHALL report the recorded `reason`, both effective policy dimensions, affected artifact/file targets, approval or verification status changes, canonical blockers, next action, and any automatic return committed by the reconciler in text, JSON, and TOON. JSON and TOON SHALL expose `reason` as a named field rather than only embedding it in prose. When `--force` is required because valid consent would be revoked, the refusal SHALL render the exact affected gates and Core-selected recovery targets.
 
-- the effective invalidation policy
-- the final affected artifact/file set after normalization, deduplication, and policy expansion
-
-The final affected set MUST:
-
-- list each artifact/file at most once
-- be grouped by artifact
-- be emitted in linear DAG-forest traversal order:
-  - exhaust one root branch first
-  - then continue with the next remaining root
-  - never re-list entries already shown through a previous branch
-
-When an entry appears because of downstream/global expansion rather than direct targeting, the output MUST label that fact clearly.
+Output MUST NOT claim that `preserve` permits forward progress with drift. It means only that artifact drift itself did not move the current lifecycle state.
 
 ### Requirement: Error handling
 

@@ -8,17 +8,15 @@ Changes must advance through a strict lifecycle, and the rules for doing so — 
 
 ### Requirement: Input contract
 
-`TransitionChange.execute` SHALL accept a `TransitionChangeInput` with the following fields:
+`TransitionChange.execute` SHALL accept a `TransitionChangeInput` with:
 
-- `name` (string, required) — the change to transition
-- `to` (`ChangeState | 'next'`, required) — the requested target state, or the happy-path next sentinel (see Requirement: to next is the happy-path next state)
-- `skipHookPhases` (ReadonlySet\<HookPhaseSelector>, optional, default empty set) — which hook phases to skip. Valid values: `'source.pre'`, `'source.post'`, `'target.pre'`, `'target.post'`, `'all'`. When `'all'` is in the set, all hook phases are skipped. When the set is empty (default), all applicable hooks execute.
-- `refreshImplementationTrackingBefore` (boolean, optional) — when omitted or `true`, refresh tracked implementation files before transition for **active** changes only; when `false`, skip refresh
-- `allowOutOfScope` (boolean, optional) — when `true`, `impl.linksInScope` is skippable on the forward exit from `implementing`. It MUST NOT skip `impl.filesResolved`.
+- `name` (required string): the change name
+- `to` (required `ChangeState | 'next'`): a legal explicit target or the current happy-path next sentinel
+- `skipHookPhases` (optional `ReadonlySet<HookPhaseSelector>`): `source.pre`, `source.post`, `target.pre`, `target.post`, or `all`; empty means no phase is skipped
+- `refreshImplementationTrackingBefore` (optional boolean): defaults to true for active changes
+- `allowOutOfScope` (optional boolean): permits the registered `impl.linksInScope` skip where supported but never skips `impl.filesResolved`
 
-Approval gate state (`approvalsSpec`, `approvalsSignoff`) MUST NOT appear on `TransitionChangeInput`. Gate state is baked at construction from `SpecdConfig.approvals` (see Requirement: Approval gates baked at construction).
-
-The `implementingTaskChecks` and `implementingRequires` fields are removed. Task completion checks are now derived automatically from the schema during requires enforcement (see Requirement: Task completion check during requires enforcement). Artifact validation clearing on `verifying → implementing` reads the `implementing` step's `requires` from the schema directly.
+Approval gates are constructor configuration, not per-call flags. The removed `implementingTaskChecks` and `implementingRequires` inputs MUST NOT be accepted; task checks derive from the active schema. An implementation-only `verifying → implementing` retry MUST preserve unchanged validated artifacts rather than clear them from `implementing.requires`.
 
 ### Requirement: Approval gates baked at construction
 
@@ -48,11 +46,15 @@ Lifecycle rules MUST be evaluated against tracked implementation state after any
 
 ### Requirement: Spec approval is a check not a pending hop
 
-When the change is in `ready`, the requested target is `implementing`, and `approvals.spec` is `true`, `TransitionChange` MUST NOT rewrite the target to `pending-spec-approval`. It MUST evaluate `approval.spec`. If no spec approval is recorded, it MUST throw `InvalidStateTransitionError` with reason `{ type: 'approval-required', gate: 'spec' }` and leave the change in `ready`.
+For a forward attempt from `ready` with the spec gate enabled, `TransitionChange` SHALL require the materialized spec-approval projection to be `valid` for the current canonical spec scope and artifact fingerprint. Absence, `stale`, `revoked`, or legacy-unprovable scope/evidence fails with structured approval guidance. It MUST NOT rewrite the target to a pending approval state.
+
+Reconciliation runs first, so stale required consent has already committed the return to `designing`; the original transition then stops as inapplicable.
 
 ### Requirement: Signoff is a check not a pending hop
 
-When the change is in `done`, the requested target is `archivable`, and `approvals.signoff` is `true`, `TransitionChange` MUST NOT rewrite the target to `pending-signoff`. It MUST evaluate `approval.signoff`. If no signoff is recorded, it MUST throw `InvalidStateTransitionError` with reason `{ type: 'approval-required', gate: 'signoff' }` and leave the change in `done`.
+For `done → archivable` with the sign-off gate enabled, `TransitionChange` SHALL require materialized sign-off status `valid` for current artifact and implementation fingerprints and valid verification evidence. Absence, `stale`, `revoked`, or legacy-unprovable evidence fails with structured recovery guidance. It MUST NOT rewrite the target to a pending sign-off state.
+
+Reconciliation runs first, so stale required sign-off beyond `done` has already committed its return; stale verification remains a blocker that routes through verification before sign-off renewal.
 
 ### Requirement: Human-approval pending states produce explicit transition failures
 
@@ -63,6 +65,14 @@ When the change is in `ready` waiting on spec approval, callers MUST use `Approv
 ### Requirement: Direct transition when gates are inactive
 
 `TransitionChange` MUST persist the requested target when all predicates pass. There is no effective-target rewrite for approval gates.
+
+### Requirement: Canonical pre-transition validity reconciliation
+
+After pre-hooks that may modify files and before authorizing the requested hop, `TransitionChange` SHALL invoke the single application reconciler on fresh artifact, implementation, approval, and verification facts. It MUST consume the canonical verdict and MUST NOT independently infer invalidation or recovery.
+
+If reconciliation commits an automatic return that makes the requested transition inapplicable, the use case SHALL stop, preserve the committed recovery, and return a typed failure containing the reconciled state, blockers, reasons, and next action. A failed transition MUST NOT undo the recovery.
+
+Forward transitions SHALL fail while any non-task artifact has drift or pending review. Backward and recovery transitions remain available subject to their existing topology.
 
 ### Requirement: Workflow requires enforcement
 
@@ -93,46 +103,35 @@ When a required artifact's count has `incomplete > 0`, `TransitionChange` MUST e
 
 Only artifacts listed in `requiresTaskCompletion` are content-checked. When `requiresTaskCompletion` is absent or empty, no task completion gating applies.
 
-### Requirement: Artifact validation clearing on verifying to implementing
+### Requirement: Implementation-only retry from verifying
 
-When the current state is `verifying` and the effective target is `implementing`, the use case MUST treat that path as an implementation-only retry.
+`verifying → implementing` is an implementation-only retry. It is valid only when the current artifacts still express the intended behavior and the fix fits existing tasks. The transition MUST preserve unchanged validated artifacts and MUST NOT downgrade artifact or file states merely because a verification check failed.
 
-The transition is valid only when the current artifacts still correctly describe the intended behavior and the required fix fits within the already-defined tasks. In that case:
+If the desired behavior or task plan must change, callers MUST route to `designing` and review the affected artifacts instead. Any independently detected file drift or mandatory gate recovery is handled by canonical reconciliation, not by an unconditional retry-side clearing rule.
 
-- the use case transitions back to `implementing`
-- it MUST NOT clear unchanged validated artifacts
-- it MUST NOT downgrade artifact or file states merely because verification failed
+### Requirement: Verification attempt lifecycle
 
-If verification concludes that the artifacts must change, or that new tasks are required before implementation can resume, callers must route to `designing` instead of `implementing`.
+Every forward transition whose source is `implementing`, and every real transition whose target is `verifying`, SHALL refresh implementation tracking and link resolution and execute blocking `impl.filesResolved` and `impl.linksInScope` predicates before changing state. If both bindings match, each stable check ID executes once. If pre-persist hooks may change inputs, fresh tracking, reconciliation, and predicate evaluation SHALL run again before persistence. Failed readiness checks prevent the transition; transitions never capture an attempt baseline.
+
+`verifying → done` SHALL execute registered predicate `verification.current`, requiring an already-completed successful verification and comparing its fingerprint with fresh inputs. It shares the fingerprint-validity evaluator used by `CompleteVerification` but MUST NOT call that mutating use case, complete an active attempt, or replace a baseline. An unfinished attempt alone is insufficient evidence. The predicate skips only for an explicit canonical `not-required` verdict; an absent verdict blocks with typed unavailable-validity guidance. Recheck after mutation-capable hooks before persistence.
+
+Missing, stale, legacy-unknown, changed, or unresolvable evidence blocks exit. Fingerprint mismatch alone leaves the change in `verifying` and recommends running the verification skill in place. Independent mandatory approval recovery or artifact workflow policy may still change the state through canonical reconciliation; the failure reports that committed state accurately.
+
+Verification can be started and completed explicitly from any active lifecycle state. Lifecycle movement alone preserves unchanged completed verification. `TransitionChange` MUST NOT expose a restart flag or accept `verifying → verifying`; a new `verification start` replaces the active attempt without requiring any transition.
 
 ### Requirement: Skill-aligned backward hop invalidation
 
-When the source state is `done`, `signed-off`, or `archivable` and the effective target is `implementing` or `verifying`, `TransitionChange` MUST:
+A backward hop alone SHALL preserve unchanged completed verification. Returning from a post-signoff phase to `done`, `verifying`, or `implementing` marks sign-off stale or revoked as appropriate. It MUST NOT globally invalidate spec approval unless its artifact fingerprint or explicit consent is affected.
 
-- invalidate an active signoff if one exists
-- MUST NOT mass-invalidate or downgrade unchanged artifacts
-- MUST NOT invalidate spec approval unless artifact files actually change
-- MUST NOT run `source.post` effects (`along` is `backward`)
-
-Persistence MUST still go through `ChangeRepository.mutate`.
+All projection updates and any required recovery are applied by the central reconciler and persisted with the transition. History remains append-only.
 
 ### Requirement: Transition to designing from any state
 
-Every state except `drafting` SHALL include `designing` as a valid transition target. This includes `archiving`. This allows the user to return to the design phase at any point in the lifecycle when issues are discovered, including after a failed archive commit or incomplete batch restore.
+Every state except `drafting` SHALL retain `designing` as an explicit valid target, including `archiving`. Requesting it is an intentional redesign operation, not ordinary drift preservation.
 
-When the effective target is `designing` and the change is **not already in** `designing` or `drafting`, the use case MUST call `change.invalidate(...)` with cause `artifact-review-required`. That entity method:
+`TransitionChange` SHALL delegate review reopening and validity changes to the central reconciler inside the serialized transition. Explicit redesign revokes required spec consent, applies independent sign-off recovery and the configured artifact reopening breadth, appends focused audit evidence, and commits the transition to `designing`. Verification becomes stale only through affected inputs or explicit withdrawal, not phase movement alone. It MUST NOT unconditionally mark every artifact file pending review outside the effective artifact policy.
 
-1. Invalidates the active spec approval if one exists.
-2. Invalidates the active signoff if one exists — the first invalidation already clears both.
-3. Downgrades every artifact file to `pending-review`, except files already marked `drifted-pending-review`, which keep that more specific state.
-4. Recomputes every artifact's aggregate persisted `state`.
-5. Appends the `transitioned` event to `designing`.
-
-The use case MUST NOT call `change.transition('designing', actor)` after that invalidate. `invalidate()` **is** the hop.
-
-When the change is **already in** `designing` (a `designing → designing` transition) or in `drafting` (the natural first entry), the use case MUST NOT invalidate approvals, downgrade artifacts, or call `invalidate()`. It MUST proceed directly with the transition via `change.transition('designing', actor)`.
-
-Drift detection (artifact content changes) is handled independently at the repository layer and is not affected by this rule.
+Re-entering `designing` from `designing` remains a no-op for approval invalidation and artifact reopening.
 
 ### Requirement: Transition from archiving to archivable
 
@@ -249,25 +248,17 @@ For an in-flight change already in `pending-spec-approval` or `pending-signoff`,
 
 ## Constraints
 
-- The use case MUST NOT bypass the Change entity's transition validation — it only resolves the effective target and delegates
-- Task completion checks are controlled by `requiresTaskCompletion` on the workflow step — only listed artifacts are content-checked
-- Task completion checks use `safeRegex` to compile patterns; patterns that fail compilation or contain nested quantifiers are treated as non-matching (no error thrown)
-- `InvalidStateTransitionError` carries a structured `reason` field: `'incomplete-artifact'`, `'incomplete-tasks'`, `'missing-task-capability'`, `'invalid-transition'`, `'approval-required'`, or `'gate-not-required'`
-- Approval-gate routing is configuration-driven at construction time, but its interpretation is centralized through `evaluateLifecycle`
-- Failed predicates MUST map to those existing reasons; `TransitionChange` MUST NOT invent a parallel requires/task/deps/readOnly/impl-exit algorithm after a green `execute` of matching predicates for the same attempt
-- Enter-ready predicates (`deps.consistent`, `workspace.readOnly`) and **forward** exit-implementing predicates (`impl.filesResolved`, `impl.linksInScope`, `along = forward`) MUST use the same runners as `ArchiveChange`. Redesign MUST NOT run those impl checks.
-- Pre-hook failure aborts the transition — no state change occurs
-- Post-hook failure aborts the transition — no state change occurs (`onFailure = abort`, `phase = before-persist`). Post effects run only when `along = forward`
-- Artifact validation clearing on `verifying → implementing` reads the `implementing` step's `requires` from the schema — the caller does not supply them
-- A `designing → designing` transition MUST NOT trigger approval invalidation or artifact downgrade — it is a state-preserving transition that only re-enters the same step
-- Input MAY include `allowOutOfScope` for `impl.linksInScope` skippable semantics on transition
-- When the schema cannot be resolved, `TransitionChange` MUST throw (schema miss is not a silent skip of all checks)
-- When no workflow step exists for the target, `workflow.requires` / `workflow.taskCompletion` skip; matching protocol and other predicates still run
-- Constructor / `resolveTransitionChangeDeps` MUST inject application `create*` `transitionBindings`. It MUST NOT default to domain stub `TRANSITION_BINDINGS`
-- `RunStepHooks` SHALL be composed into hook checks (`createHookPre` / `createHookPost`), not as a use-case constructor port
-- When enter-ready runners fail, `TransitionChange` MUST propagate `ReadOnlyWorkspaceError` (`workspace.readOnly`) and `ArchiveDependencyMismatchError` (`deps.consistent`) — the same typed errors as `ArchiveChange`
-- When forward exit-implementing runners fail, `TransitionChange` MUST propagate `ArchiveImplementationStateError` (`impl.filesResolved` / `impl.linksInScope`)
-- When `to` is `'next'` and no happy-path hop exists, `TransitionChange` MUST throw `HappyPathNextUnavailableError` (a typed `SpecdError`)
+- `TransitionChange` MUST enforce the legal entity/protocol edge; it only resolves the effective target and delegates the state mutation.
+- Task completion checks are controlled by schema-declared `requiresTaskCompletion`; only listed artifacts are content-checked. `safeRegex` compilation failures or nested quantifiers are treated as non-matching without throwing.
+- `InvalidStateTransitionError` retains structured reasons for incomplete artifacts/tasks, missing task capability, invalid edges, approval required, and gate not required. Registered predicate failures MUST map to canonical reasons rather than a parallel requires/task/dependency/readOnly/implementation algorithm.
+- Enter-ready predicates and forward exit-implementing predicates MUST use the same runners as `ArchiveChange`. Redesign MUST NOT run implementation-readiness checks merely because it moves backward.
+- Pre-hook and before-persist post-hook aborts prevent the requested transition. Post effects run only on forward movement; source-post effects do not run for backward, redesign, or recovery.
+- `verifying → implementing` MUST NOT clear unchanged artifact validation. Schema `implementing.requires` still governs later forward readiness, not retry-side clearing.
+- A `designing → designing` request is a neutral application no-op: it MUST NOT append a transition event or invalidate approval/artifacts. The entity continues to reject real self-transitions. `verifying → verifying` remains invalid, not a renewal protocol.
+- `allowOutOfScope` MAY skip `impl.linksInScope` where the registered check permits it, but cannot skip `impl.filesResolved`.
+- Schema resolution failure MUST throw; absence of a target workflow row only skips workflow-specific requires/task checks, not protocol or other predicates.
+- Composition MUST inject application `create*` transition bindings, not domain stubs; `RunStepHooks` belongs in hook checks rather than the use-case constructor.
+- Enter-ready and forward exit-implementing failures MUST preserve their existing typed errors. A missing happy-path next hop MUST throw `HappyPathNextUnavailableError`.
 
 ## Spec Dependencies
 

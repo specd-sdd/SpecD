@@ -128,20 +128,36 @@
 - **AND** does not deadlock
 - **AND** the final internal manifest write persists the correct accumulated changes
 
-#### Scenario: mutate returns result and post-reconcile change
+#### Scenario: mutate returns result and post-save hydrated change
 
-- **GIVEN** `fn` returns the value `"ok"`
+- **GIVEN** `fn` returns `"ok"`
 - **WHEN** `mutate(name, fn)` completes successfully
-- **THEN** the return value is `{ result: "ok", change }`
-- **AND** `change` is the post-reconcile aggregate, not necessarily the same object identity as the callback `fresh`
+- **THEN** the result is `{ result: "ok", change }`
+- **AND** `change` is the post-save hydrated aggregate, not necessarily the callback object
+- **AND** its fresh physical classification does not imply persisted validity recovery
 
-#### Scenario: Post-save reconcile detects disk drift from saveArtifact inside callback
+#### Scenario: Post-save hydration exposes disk drift without an automatic validity commit
 
 - **GIVEN** a validated complete artifact file with a stored `validatedHash`
-- **AND** `mutate` callback calls `saveArtifact` with different content then returns
+- **AND** the `mutate` callback calls `saveArtifact` with different content without materializing validity
 - **WHEN** `mutate` completes
-- **THEN** `.change` reflects drift classification from the reconcile load path
-- **AND** the persisted manifest matches that reconciled state
+- **THEN** returned `.change` exposes the fresh drift classification
+- **AND** the persisted manifest contains no new approval invalidation, recovery, or drift event from repository hydration alone
+- **AND** an explicit application reconciliation can subsequently materialize the drift exactly once
+
+### Requirement: Version-aware atomic reconciliation persistence
+
+#### Scenario: Reconciliation commits one coherent v2 mutation
+
+- **GIVEN** a supported legacy change whose fresh inputs invalidate approval evidence
+- **WHEN** an application operation reconciles it through `mutate`
+- **THEN** projection changes, audit events, policy, and required recovery are persisted atomically as v2
+- **AND** a later failed operation does not undo that recovery
+
+#### Scenario: Future manifest is rejected before hydration
+
+- **WHEN** the repository reads a manifest with a newer unsupported version
+- **THEN** it raises the typed manifest-version error without adapting or rewriting it
 
 ### Requirement: mutateDraft serializes drafted change updates
 
@@ -168,59 +184,27 @@
 - **WHEN** the callback runs
 - **THEN** it receives a freshly loaded `Change` with `isDrafted === true`
 
-#### Scenario: mutateDraft returns result and post-reconcile change
+#### Scenario: mutateDraft returns result and post-save hydrated change
 
 - **GIVEN** `fn` returns `undefined`
-- **WHEN** `mutateDraft(name, fn)` completes successfully after a restore transition
-- **THEN** the return value is `{ result: undefined, change }`
-- **AND** `change` is loaded from the post-persist bucket after any directory move
+- **WHEN** `mutateDraft(name, fn)` completes after a restore transition
+- **THEN** the result is `{ result: undefined, change }` loaded from the destination bucket
+- **AND** the reload appends no new validity or lifecycle event
 
-### Requirement: Auto-invalidation on get when artifact files drift
+### Requirement: Hydration reports fresh file facts without deciding validity
 
-#### Scenario: Repository collects all drifted files before invalidating
+Scenarios:
 
-- **GIVEN** a change with two validated spec files under the same artifact
-- **AND** both files have changed on disk
-- **WHEN** `FsChangeRepository.get()` is called
-- **THEN** the invalidation captures both file keys in a single grouped invalidation
+#### Scenario: Plain hydration has no validity side effects
 
-#### Scenario: Drift invalidates even while already designing
+- **GIVEN** external artifact or implementation content differs from persisted evidence
+- **WHEN** the repository loads the change without reconciliation
+- **THEN** it exposes fresh file facts without invalidating projections or changing lifecycle state
 
-- **GIVEN** a change already in `designing`
-- **AND** a previously validated artifact file drifts on disk
-- **WHEN** `FsChangeRepository.get()` is called
-- **THEN** the change remains in `designing`
-- **AND** the drifted file becomes `drifted-pending-review`
+#### Scenario: Missing implementation input is reported as a fact
 
-#### Scenario: Drift preserves drifted files and downgrades others to pending review
-
-- **GIVEN** a change with validated artifacts
-- **AND** one file drifts on disk
-- **WHEN** `FsChangeRepository.get()` auto-invalidates the change
-- **THEN** the drifted file is `drifted-pending-review`
-- **AND** other previously validated files become `pending-review`
-
-#### Scenario: No drift — no invalidation
-
-- **GIVEN** a change whose validated files still match their stored hashes
-- **WHEN** `FsChangeRepository.get()` is called
-- **THEN** no invalidation occurs
-
-#### Scenario: Auto-invalidation is bypassed when repository is uninitialized
-
-- **GIVEN** a change with drifted files
-- **AND** a repository initialized with no artifact types
-- **WHEN** `get()` is called
-- **THEN** no invalidation is performed
-- **AND** the manifest on disk is not updated
-
-#### Scenario: Invalidation is written to disk under change lock
-
-- **GIVEN** a change with drifted files and a fully initialized repository
-- **WHEN** `get()` is called
-- **THEN** the repository acquires the change lock
-- **AND** it reloads the manifest inside the lock
-- **AND** it invalidates and persists the updated manifest to disk under the lock boundary
+- **WHEN** a confirmed implementation path cannot be read during hydration
+- **THEN** the missing input is exposed explicitly and never omitted from later validity evaluation
 
 ### Requirement: list returns active changes in creation order
 

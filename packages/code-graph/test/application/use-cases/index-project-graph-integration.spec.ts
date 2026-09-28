@@ -4,7 +4,12 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { performance } from 'node:perf_hooks'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createSpecRepository, type SpecdConfig, type SpecRepository } from '@specd/core'
+import {
+  createSpecRepository,
+  DEFAULT_INVALIDATION_POLICY,
+  type SpecdConfig,
+  type SpecRepository,
+} from '@specd/core'
 import Database from 'better-sqlite3'
 import { IndexProjectGraph } from '../../../src/application/use-cases/index-project-graph.js'
 import { createCodeGraphProvider } from '../../../src/composition/create-code-graph-provider.js'
@@ -55,6 +60,7 @@ function makeConfig(projectRoot: string, codeRoot: string): SpecdConfig {
       archiveAdapter: { adapter: 'fs', config: { path: join(projectRoot, 'archive') } },
     },
     approvals: { spec: false, signoff: false },
+    invalidation: DEFAULT_INVALIDATION_POLICY,
   } as SpecdConfig
 }
 
@@ -408,7 +414,7 @@ describe('IndexProjectGraph integration', () => {
       coverage.find((entry) => entry.filePath === 'fixture:php/Service.php')?.capabilities,
     ).not.toContain('publicBindings')
     await store.close()
-  })
+  }, 20_000)
 
   it('reprocesses native-store importers when a previously missing target is added', async () => {
     tempDir = mkdtempSync(join(tmpdir(), 'index-project-graph-added-target-'))

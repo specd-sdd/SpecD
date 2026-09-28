@@ -549,34 +549,38 @@ Both approval records capture the approver's git identity, a reason, and a hash 
 
 ---
 
-## Invalidation policy
+## Invalidation
 
-When a change's validated artifacts drift from their baseline (files edited on disk after validation) or when you manually invalidate a change, SpecD reopens artifacts for review. The `invalidationPolicy` field controls how far that reopening propagates:
+When validated artifacts drift, or when you invalidate a change by hand, SpecD decides two separate things: which artifacts reopen, and whether the lifecycle should return to `designing`. Gate recovery is a third rule and is not configuration.
 
 ```yaml
-invalidationPolicy: downstream # default
+invalidation:
+  artifacts: downstream # default
+  workflow: preserve # default
 ```
 
-| Policy       | What gets reopened                                                                           |
-| ------------ | -------------------------------------------------------------------------------------------- |
-| `none`       | Nothing. Drift is tracked but artifacts stay `complete`. Status shows `complete-with-drift`. |
-| `surgical`   | Only the specific files that changed.                                                        |
-| `downstream` | Changed files plus all artifacts that depend on them in the DAG. This is the default.        |
-| `global`     | Every artifact in the change, regardless of which file triggered the invalidation.           |
+| Dimension   | Values                                     | What it controls                                                                                         |
+| ----------- | ------------------------------------------ | -------------------------------------------------------------------------------------------------------- |
+| `artifacts` | `none`, `surgical`, `downstream`, `global` | Which non-task artifacts reopen. `none` skips reopening and still leaves drift as a freshness blocker.   |
+| `workflow`  | `preserve`, `redesign`                     | `preserve` keeps the current phase for ordinary drift. `redesign` returns to `designing` for that drift. |
 
-The project-level default is persisted on each change at creation time. You can change it per-change with:
+`downstream` reopens the drifted files and their DAG descendants, and does not propagate review into a task artifact. `global` reopens every non-task artifact. `surgical` reopens only the drifted or targeted files.
+
+Omitting both this object and the deprecated scalar stores `{ artifacts: downstream, workflow: preserve }` on new changes. The deprecated scalar `invalidationPolicy` maps to `{ artifacts: <scalar>, workflow: redesign }`. Setting both keys is a config error. A version 1 manifest that has no scalar is read as `{ artifacts: downstream, workflow: redesign }`.
+
+Create and edit store the structured policy:
 
 ```bash
-specd changes edit my-change --invalidation-policy surgical
+specd changes edit my-change --artifact-policy surgical --workflow-policy preserve
 ```
 
-Or override it for a single manual invalidation:
+A manual invalidation can override one invocation without changing the stored policy:
 
 ```bash
-specd changes invalidate my-change --reason "API changed" --target specs --policy surgical
+specd changes invalidate my-change --reason "API changed" --target specs --artifact-policy surgical
 ```
 
-Under `none`, drift is still visible — `changes status` and `changes artifacts` show `complete-with-drift` and a `[drift]` tag — but the lifecycle is not blocked and artifacts are not reopened. Use `none` when you want informational drift tracking without automatic reopening.
+Required stale spec approval still returns the change to `designing` when the state is later than `designing`. Required stale sign-off returns it to `done` only when the state is later than `done`. Those returns outrank `workflow`. Verification staleness never moves the lifecycle. See [Validity and verification](workflow.md#validity-and-verification).
 
 ---
 

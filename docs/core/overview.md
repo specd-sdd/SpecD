@@ -271,36 +271,40 @@ These functions expose the canonical standalone composition contract:
 
 Use them when you need only one or two use cases without constructing a full `Kernel`.
 
-| Export                         | Description                                                              |
-| ------------------------------ | ------------------------------------------------------------------------ |
-| `createCreateChange`           | Wires `CreateChange` from explicit deps or from `SpecdConfig`.           |
-| `createGetStatus`              | Wires `GetStatus` from explicit deps or from `SpecdConfig`.              |
-| `createTransitionChange`       | Wires `TransitionChange` from explicit deps or from `SpecdConfig`.       |
-| `createDraftChange`            | Wires `DraftChange` from explicit deps or from `SpecdConfig`.            |
-| `createRestoreChange`          | Wires `RestoreChange` from explicit deps or from `SpecdConfig`.          |
-| `createDiscardChange`          | Wires `DiscardChange` from explicit deps or from `SpecdConfig`.          |
-| `createApproveSpec`            | Wires `ApproveSpec` from explicit deps or from `SpecdConfig`.            |
-| `createApproveSignoff`         | Wires `ApproveSignoff` from explicit deps or from `SpecdConfig`.         |
-| `createArchiveChange`          | Wires `ArchiveChange` from explicit deps or from `SpecdConfig`.          |
-| `createValidateArtifacts`      | Wires `ValidateArtifacts` from explicit deps or from `SpecdConfig`.      |
-| `createCompileContext`         | Wires `CompileContext` from explicit deps or from `SpecdConfig`.         |
-| `createListChanges`            | Wires `ListChanges` from explicit deps or from `SpecdConfig`.            |
-| `createListDrafts`             | Wires `ListDrafts` from explicit deps or from `SpecdConfig`.             |
-| `createListDiscarded`          | Wires `ListDiscarded` from explicit deps or from `SpecdConfig`.          |
-| `createListArchived`           | Wires `ListArchived` from explicit deps or from `SpecdConfig`.           |
-| `createGetArchivedChange`      | Wires `GetArchivedChange` from explicit deps or from `SpecdConfig`.      |
-| `createEditChange`             | Wires `EditChange` from explicit deps or from `SpecdConfig`.             |
-| `createSkipArtifact`           | Wires `SkipArtifact` from explicit deps or from `SpecdConfig`.           |
-| `createListSpecs`              | Wires `ListSpecs` from explicit deps or from `SpecdConfig`.              |
-| `createGetSpec`                | Wires `GetSpec` from explicit deps or from `SpecdConfig`.                |
-| `createSaveSpecMetadata`       | Wires `SaveSpecMetadata` from explicit deps or from `SpecdConfig`.       |
-| `createInvalidateSpecMetadata` | Wires `InvalidateSpecMetadata` from explicit deps or from `SpecdConfig`. |
-| `createGetActiveSchema`        | Wires `GetActiveSchema` from explicit deps or from `SpecdConfig`.        |
-| `createValidateSpecs`          | Wires `ValidateSpecs` to the fs.                                         |
-| `createGetSpecContext`         | Wires `GetSpecContext` to the fs.                                        |
-| `createConfigWriter`           | Filesystem-backed `ConfigWriter` for yaml mutations.                     |
-| `createGetProjectContext`      | Wires `GetProjectContext` to the fs.                                     |
-| `createGetProjectSummary`      | Wires `GetProjectSummary` to the fs.                                     |
+| Export                          | Description                                                               |
+| ------------------------------- | ------------------------------------------------------------------------- |
+| `createCreateChange`            | Wires `CreateChange` from explicit deps or from `SpecdConfig`.            |
+| `createGetStatus`               | Wires `GetStatus` from explicit deps or from `SpecdConfig`.               |
+| `createTransitionChange`        | Wires `TransitionChange` from explicit deps or from `SpecdConfig`.        |
+| `createDraftChange`             | Wires `DraftChange` from explicit deps or from `SpecdConfig`.             |
+| `createRestoreChange`           | Wires `RestoreChange` from explicit deps or from `SpecdConfig`.           |
+| `createDiscardChange`           | Wires `DiscardChange` from explicit deps or from `SpecdConfig`.           |
+| `createApproveSpec`             | Wires `ApproveSpec` from explicit deps or from `SpecdConfig`.             |
+| `createApproveSignoff`          | Wires `ApproveSignoff` from explicit deps or from `SpecdConfig`.          |
+| `createArchiveChange`           | Wires `ArchiveChange` from explicit deps or from `SpecdConfig`.           |
+| `createValidateArtifacts`       | Wires `ValidateArtifacts` from explicit deps or from `SpecdConfig`.       |
+| `createCompileContext`          | Wires `CompileContext` from explicit deps or from `SpecdConfig`.          |
+| `createListChanges`             | Wires `ListChanges` from explicit deps or from `SpecdConfig`.             |
+| `createListDrafts`              | Wires `ListDrafts` from explicit deps or from `SpecdConfig`.              |
+| `createListDiscarded`           | Wires `ListDiscarded` from explicit deps or from `SpecdConfig`.           |
+| `createListArchived`            | Wires `ListArchived` from explicit deps or from `SpecdConfig`.            |
+| `createGetArchivedChange`       | Wires `GetArchivedChange` from explicit deps or from `SpecdConfig`.       |
+| `createEditChange`              | Wires `EditChange` from explicit deps or from `SpecdConfig`.              |
+| `createReconcileChangeValidity` | Wires `ReconcileChangeValidity` from explicit deps or from `SpecdConfig`. |
+| `createStartVerification`       | Wires `StartVerification` from explicit deps or from `SpecdConfig`.       |
+| `createCompleteVerification`    | Wires `CompleteVerification` from explicit deps or from `SpecdConfig`.    |
+| `createInvalidateVerification`  | Wires `InvalidateVerification` from explicit deps or from `SpecdConfig`.  |
+| `createSkipArtifact`            | Wires `SkipArtifact` from explicit deps or from `SpecdConfig`.            |
+| `createListSpecs`               | Wires `ListSpecs` from explicit deps or from `SpecdConfig`.               |
+| `createGetSpec`                 | Wires `GetSpec` from explicit deps or from `SpecdConfig`.                 |
+| `createSaveSpecMetadata`        | Wires `SaveSpecMetadata` from explicit deps or from `SpecdConfig`.        |
+| `createInvalidateSpecMetadata`  | Wires `InvalidateSpecMetadata` from explicit deps or from `SpecdConfig`.  |
+| `createGetActiveSchema`         | Wires `GetActiveSchema` from explicit deps or from `SpecdConfig`.         |
+| `createValidateSpecs`           | Wires `ValidateSpecs` to the fs.                                          |
+| `createGetSpecContext`          | Wires `GetSpecContext` to the fs.                                         |
+| `createConfigWriter`            | Filesystem-backed `ConfigWriter` for yaml mutations.                      |
+| `createGetProjectContext`       | Wires `GetProjectContext` to the fs.                                      |
+| `createGetProjectSummary`       | Wires `GetProjectSummary` to the fs.                                      |
 
 ## Where to go next
 

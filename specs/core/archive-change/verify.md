@@ -97,6 +97,35 @@
 - **WHEN** `ArchiveChange.execute` aborts
 - **THEN** the change remains in `archivable` state
 
+### Requirement: Canonical validity archive preflight
+
+#### Scenario: Archive rechecks all live blockers after hooks
+
+- **GIVEN** pre-archive hooks modify fingerprinted inputs or add an incomplete task
+- **WHEN** archive preflight runs
+- **THEN** implementation tracking is refreshed and canonical reconciliation plus fresh evidence or task checks block publication
+- **AND** stale verification recommends renewal in the current state
+
+#### Scenario: Archive reports committed recovery separately from eligibility
+
+- **GIVEN** fresh preflight commits gate recovery that makes archive inapplicable
+- **WHEN** archive stops
+- **THEN** the recovery remains persisted and the failure includes canonical blockers and next action
+- **AND** it is not reduced to a generic invalid-state error
+
+#### Scenario: Every archive construction path requires reconciliation
+
+- **WHEN** direct dependencies or either factory form omit the reconciler
+- **THEN** construction fails with the standard composition error
+- **AND** archive never falls back to `Change.invalidate`
+
+#### Scenario: Publication plan uses the accepted post-hook snapshot
+
+- **GIVEN** a pre-archive hook adds and accepts an in-scope implementation link
+- **WHEN** archive refreshes, reconciles, and passes live predicates
+- **THEN** it constructs the plan and snapshots only afterward
+- **AND** the new link is included in the publication plan and spec-lock sidecar
+
 ### Requirement: ReadOnly workspace guard
 
 #### Scenario: Archive rejected when change contains readOnly specs
@@ -145,26 +174,29 @@
 - **AND** the error message includes `core:config` and `beta`
 - **AND** no files are modified and no hooks are executed
 
-#### Scenario: Archive with allowOverlap invalidates overlapping changes
+#### Scenario: Archive overlap applies each peer policy and records exact affected scope
 
-- **GIVEN** a change `alpha` in `archivable` state targeting `core:config` and `core:kernel`
-- **AND** another active change `beta` targeting `core:config` in `implementing` state
-- **AND** another active change `gamma` targeting `core:kernel` in `ready` state
-- **WHEN** `ArchiveChange.execute({ name: 'alpha', allowOverlap: true })` is called
-- **THEN** the archive proceeds normally
-- **AND** `beta` is invalidated to `designing` with cause `'spec-overlap-conflict'`
-- **AND** `gamma` is invalidated to `designing` with cause `'spec-overlap-conflict'`
-- **AND** `beta`'s invalidation message includes `'alpha'` and `'core:config'`
-- **AND** `gamma`'s invalidation message includes `'alpha'` and `'core:kernel'`
-- **AND** `result.invalidatedChanges` has two entries: `{ name: 'beta', specIds: ['core:config'] }` and `{ name: 'gamma', specIds: ['core:kernel'] }`
+- **GIVEN** `alpha` in `archivable` targets `core:config` and `core:kernel`
+- **AND** active peers `beta` and `gamma` overlap those specs and each has workflow `redesign`
+- **WHEN** `ArchiveChange.execute({ name: 'alpha', allowOverlap: true })` succeeds
+- **THEN** each peer receives a `spec-overlap-conflict` invalidation through canonical reconciliation and returns to `designing` once
+- **AND** each audit message names `alpha` and its overlapping spec ID
+- **AND** `invalidatedChanges` contains `{ name: 'beta', specIds: ['core:config'] }` and `{ name: 'gamma', specIds: ['core:kernel'] }`
 
-#### Scenario: Archive with allowOverlap invalidation happens via ChangeRepository.mutate
+#### Scenario: Archive overlap peer recovery is reconciler-owned and serialized
 
-- **GIVEN** a change `alpha` in `archivable` state targeting `core:config`
-- **AND** another active change `beta` also targets `core:config`
-- **WHEN** `ArchiveChange.execute({ name: 'alpha', allowOverlap: true })` invalidates `beta`
-- **THEN** the invalidation is performed inside `ChangeRepository.mutate('beta', fn)`
-- **AND** the callback calls `change.invalidate('spec-overlap-conflict', message, affectedArtifacts)`
+- **GIVEN** `alpha` and active `beta` both target `core:config`
+- **WHEN** archive of `alpha` permits overlap
+- **THEN** the `spec-overlap-conflict` intent for `beta` is processed inside one serialized `ChangeRepository.mutate('beta', fn)` reconciliation
+- **AND** artifact review, projection changes, audit event, and any gate-required return are committed atomically
+- **AND** `ArchiveChange` never calls `beta.invalidate` directly
+
+#### Scenario: Ungated preserve peer remains in its current phase
+
+- **GIVEN** an overlapping active peer in `implementing` with workflow `preserve` and no required stale spec consent
+- **WHEN** another change archives with `allowOverlap: true`
+- **THEN** the peer remains in `implementing` with explicit overlap review and a forward-progress blocker
+- **AND** no unconditional return to `designing` is appended
 
 #### Scenario: No overlap with allowOverlap produces empty invalidatedChanges
 
@@ -273,6 +305,14 @@
 - **GIVEN** a base markdown spec that mixes unordered list markers (`-` and `*`) or emphasis markers (`*` and `_`) for the same construct
 - **WHEN** `ArchiveChange.execute` merges and serializes the markdown artifact
 - **THEN** output style is deterministic and follows project markdown conventions
+
+### Requirement: Versioned validity evidence preservation
+
+#### Scenario: Archived v2 retains audit evidence
+
+- **WHEN** a valid change is archived
+- **THEN** its structured policy, projections, fingerprints, algorithms, and complete history remain readable
+- **AND** inspecting an archived v1 record does not migrate or repair it
 
 ### Requirement: Archive repository call
 
@@ -837,11 +877,11 @@
 - **AND** it does not resolve `runStepHooks` onto the use case
 - **AND** the factory delegates to canonical `createArchiveChange(deps)`
 
-#### Scenario: resolveArchiveChangeDeps does not resolve GenerateSpecMetadata or SaveSpecMetadata directly
+#### Scenario: resolveArchiveChangeDeps resolves materialization, not direct metadata writers
 
 - **WHEN** `resolveArchiveChangeDeps(resolver)` runs
-- **THEN** it resolves `regenerateMetadata: RegenerateSpecMetadata`
-- **AND** it does not resolve `generateMetadata: GenerateSpecMetadata` or `saveMetadata: SaveSpecMetadata` directly
+- **THEN** it resolves `materializeMetadata: MaterializeSpecMetadata`
+- **AND** it does not resolve `regenerateMetadata`, `GenerateSpecMetadata`, or `SaveSpecMetadata` directly
 
 ### Requirement: Shared fallback batch snapshot lifetime
 

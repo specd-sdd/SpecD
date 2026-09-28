@@ -8,6 +8,7 @@ import {
   isValidTransition,
 } from '../value-objects/change-state.js'
 import { type Schema } from '../value-objects/schema.js'
+import { type ChangeValidityVerdict, type ValidityBlocker } from './change-validity.js'
 import { type CheckResult } from './transition-checks.js'
 import { boundFromStates } from './check-bindings.js'
 import { Logger } from '../../observability/logger.js'
@@ -53,6 +54,12 @@ export interface LifecycleVerdictInput {
   readonly approvals?: { readonly spec: boolean; readonly signoff: boolean }
   /** Bypass tokens such as `allow-overlap` that skip matching review blockers. */
   readonly bypassFlags?: readonly string[]
+  /**
+   * Already reconciled validity verdict.
+   *
+   * Guidance reads this snapshot. It does not recompute recovery or read files.
+   */
+  readonly validity?: ChangeValidityVerdict
 }
 
 export interface LifecycleAffectedFile {
@@ -254,9 +261,21 @@ export function evaluateLifecycleVerdict(
           bypassFlags,
         )
 
-  const blockers = dedupeBlockers([...reviewBlockers, ...hopBlockers])
+  const blockers = dedupeBlockers([
+    ...reviewBlockers,
+    ...hopBlockers,
+    ...(options.validity !== undefined ? validityBlockers(options.validity) : []),
+  ])
   const nextArtifactId = nextArtifact(schema, verdictByArtifact)
-  const nextHop = resolveLifecycleNextHop(change, review, availableTransitions, approvals)
+  const guidedTransitions =
+    options.validity?.artifactReviewRequired === true
+      ? availableTransitions.filter((target) => !isForward(change.state, target))
+      : availableTransitions
+  const nextHop = projectValidityNextHop(
+    change,
+    options.validity,
+    resolveLifecycleNextHop(change, review, guidedTransitions, approvals),
+  )
   const checks =
     options.requestedTarget !== undefined
       ? (checksByTarget[options.requestedTarget] ?? [])
@@ -271,8 +290,8 @@ export function evaluateLifecycleVerdict(
   ]
   const requestedAllowed =
     options.requestedTarget !== undefined
-      ? availableTransitions.includes(options.requestedTarget)
-      : availableTransitions.includes(nextHop.targetStep)
+      ? guidedTransitions.includes(options.requestedTarget)
+      : guidedTransitions.includes(nextHop.targetStep)
 
   Logger.debug('evaluateLifecycleVerdict evaluated change lifecycle', {
     change: change.name,
@@ -294,7 +313,7 @@ export function evaluateLifecycleVerdict(
     review,
     nextHop,
     validTransitions,
-    availableTransitions,
+    availableTransitions: guidedTransitions,
     transitionBlockers,
     nextArtifact: nextArtifactId,
     checksByTarget,
@@ -821,6 +840,100 @@ function blockersFromFailedChecks(
       }
       return [blocker]
     })
+}
+
+const DELIVERY_AXIS: readonly ChangeState[] = [
+  'drafting',
+  'designing',
+  'ready',
+  'pending-spec-approval',
+  'spec-approved',
+  'implementing',
+  'verifying',
+  'done',
+  'pending-signoff',
+  'signed-off',
+  'archivable',
+  'archiving',
+]
+
+function isForward(from: ChangeState, to: ChangeState): boolean {
+  return DELIVERY_AXIS.indexOf(to) > DELIVERY_AXIS.indexOf(from)
+}
+
+function validityBlockers(validity: ChangeValidityVerdict): LifecycleBlocker[] {
+  return validity.blockers.map((blocker) => validityBlocker(blocker))
+}
+
+function validityBlocker(blocker: ValidityBlocker): LifecycleBlocker {
+  return {
+    code: blocker.code,
+    message: blocker.message,
+    isSkippable: false,
+  }
+}
+
+function projectValidityNextHop(
+  change: Change,
+  validity: ChangeValidityVerdict | undefined,
+  nextHop: LifecycleNextHop,
+): LifecycleNextHop {
+  if (validity === undefined) return nextHop
+  if (validity.specApproval === 'stale' || validity.specApproval === 'revoked') {
+    return {
+      targetStep: 'designing',
+      actionType: 'cognitive',
+      reason: 'Spec approval must be renewed',
+    }
+  }
+  if (
+    (validity.signoff === 'stale' || validity.signoff === 'revoked') &&
+    isForward('done', change.state)
+  ) {
+    return {
+      targetStep: 'done',
+      actionType: 'mechanical',
+      reason: 'Sign-off must be renewed from done',
+    }
+  }
+  if (verificationBoundary(change.state) && verificationNeedsRenewal(validity)) {
+    return {
+      targetStep: change.state,
+      actionType: 'cognitive',
+      reason: 'Renew verification in place',
+    }
+  }
+  if (
+    validity.artifactReviewRequired &&
+    validity.recovery === null &&
+    isForward(change.state, nextHop.targetStep)
+  ) {
+    return {
+      targetStep: change.state,
+      actionType: 'cognitive',
+      reason: 'Artifact review is required before forward progress',
+    }
+  }
+  return nextHop
+}
+
+function verificationBoundary(state: ChangeState): boolean {
+  return (
+    state === 'verifying' ||
+    state === 'done' ||
+    state === 'pending-signoff' ||
+    state === 'signed-off' ||
+    state === 'archivable' ||
+    state === 'archiving'
+  )
+}
+
+function verificationNeedsRenewal(validity: ChangeValidityVerdict): boolean {
+  return (
+    validity.verification === 'stale' ||
+    validity.verification === 'absent' ||
+    validity.verification === 'attempt-active'
+  )
 }
 
 export function resolveLifecycleNextHop(

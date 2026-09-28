@@ -74,11 +74,15 @@ describe('change edit', () => {
     expect(stdout()).toContain('auth/register')
   })
 
-  it('warns to stderr when approvals invalidated', async () => {
+  it('does not warn merely because spec scope changed', async () => {
     const { kernel, stderr } = setup()
     kernel.changes.edit.execute.mockResolvedValue({
       change: makeMockChange({ name: 'feat', specIds: ['auth/register'] }),
       invalidated: true,
+      scopeChanged: true,
+      validityChanged: false,
+      projectionChanges: [],
+      automaticReturn: null,
     })
     captureStdout()
 
@@ -94,9 +98,99 @@ describe('change edit', () => {
       'auth/register',
     ])
 
-    expect(stderr()).toContain('warning:')
-    expect(stderr()).toContain('invalidated')
+    expect(stderr()).not.toContain('warning:')
   })
+
+  it('renders blockers and Core-owned next action for a preserved text state', async () => {
+    const { kernel, stdout, stderr } = setup()
+    kernel.changes.edit.execute.mockResolvedValue({
+      change: makeMockChange({ name: 'feat', state: 'implementing' }),
+      invalidated: false,
+      scopeChanged: true,
+      validityChanged: false,
+      blockers: [{ code: 'ARTIFACT_REVIEW_REQUIRED', message: 'Review changed design artifacts' }],
+      nextAction: {
+        targetStep: 'implementing',
+        actionType: 'mechanical',
+        command: null,
+        reason: 'Resolve validity blockers before advancing',
+      },
+      projectionChanges: [],
+      automaticReturn: null,
+    })
+
+    const program = makeProgram()
+    registerChangeEdit(program.command('change'))
+    await program.parseAsync([
+      'node',
+      'specd',
+      'change',
+      'edit',
+      'feat',
+      '--add-spec',
+      'auth/register',
+    ])
+
+    expect(stderr()).not.toContain('validity changed')
+    expect(stdout()).toContain('blockers:')
+    expect(stdout()).toContain('ARTIFACT_REVIEW_REQUIRED: Review changed design artifacts')
+    expect(stdout()).toContain('target:  implementing')
+    expect(stdout()).toContain('command: (none)')
+    expect(stdout()).toContain('reason:  Resolve validity blockers before advancing')
+  })
+
+  it.each(['json', 'toon'] as const)(
+    'keeps scope and validity separate with guidance in %s',
+    async (format) => {
+      const { kernel, stdout, stderr } = setup()
+      kernel.changes.edit.execute.mockResolvedValue({
+        change: makeMockChange({ name: 'feat', state: 'implementing' }),
+        invalidated: false,
+        scopeChanged: true,
+        validityChanged: false,
+        blockers: [{ code: 'ARTIFACT_REVIEW_REQUIRED', message: 'Review artifacts' }],
+        nextAction: {
+          targetStep: 'implementing',
+          actionType: 'mechanical',
+          command: null,
+          reason: 'Resolve blockers',
+        },
+        projectionChanges: [],
+        automaticReturn: null,
+      })
+
+      const program = makeProgram()
+      registerChangeEdit(program.command('change'))
+      await program.parseAsync([
+        'node',
+        'specd',
+        'change',
+        'edit',
+        'feat',
+        '--add-spec',
+        'auth/register',
+        '--format',
+        format,
+      ])
+
+      expect(stderr()).not.toContain('validity changed')
+      const rendered = stdout()
+      expect(rendered).toContain('scopeChanged')
+      expect(rendered).toContain('validityChanged')
+      expect(rendered).toContain('ARTIFACT_REVIEW_REQUIRED')
+      expect(rendered).toContain('implementing')
+      if (format === 'json') {
+        const parsed = JSON.parse(rendered)
+        expect(parsed).toMatchObject({
+          invalidated: false,
+          scopeChanged: true,
+          validityChanged: false,
+          blockers: [{ code: 'ARTIFACT_REVIEW_REQUIRED', message: 'Review artifacts' }],
+          nextAction: { targetStep: 'implementing', reason: 'Resolve blockers' },
+        })
+      }
+    },
+  )
 
   it('outputs JSON with invalidated flag', async () => {
     const { kernel, stdout } = setup()
@@ -259,5 +353,108 @@ describe('change edit', () => {
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toContain('workspace "platform" is readOnly')
     expect(kernel.changes.edit.execute).not.toHaveBeenCalled()
+  })
+
+  it('names the structured policy flags when no edit option is provided', async () => {
+    const { stderr } = setup()
+
+    const program = makeProgram()
+    registerChangeEdit(program.command('change'))
+    await program.parseAsync(['node', 'specd', 'change', 'edit', 'feat']).catch(() => {})
+
+    expect(stderr()).toContain('--artifact-policy')
+    expect(stderr()).toContain('--workflow-policy')
+    expect(stderr()).not.toContain('--invalidation-policy')
+  })
+
+  it('passes only the supplied workflow dimension', async () => {
+    const { kernel, stdout } = setup()
+    kernel.changes.edit.execute.mockResolvedValue({
+      change: makeMockChange({ name: 'feat', specIds: ['auth/login'], state: 'implementing' }),
+      invalidated: false,
+      effectivePolicy: { artifacts: 'downstream', workflow: 'redesign' },
+      projectionChanges: [],
+      automaticReturn: null,
+    })
+
+    const program = makeProgram()
+    registerChangeEdit(program.command('change'))
+    await program.parseAsync([
+      'node',
+      'specd',
+      'change',
+      'edit',
+      'feat',
+      '--workflow-policy',
+      'redesign',
+    ])
+
+    expect(kernel.changes.edit.execute).toHaveBeenCalledWith({
+      name: 'feat',
+      invalidation: { workflow: 'redesign' },
+    })
+    expect(stdout()).toContain('workflow:   redesign')
+    expect(stdout()).toContain('automatic return: (none)')
+  })
+
+  it('renders projection changes and automatic return from core', async () => {
+    const { kernel, stdout, stderr } = setup()
+    kernel.changes.edit.execute.mockResolvedValue({
+      change: makeMockChange({ name: 'feat', specIds: ['auth/login'], state: 'designing' }),
+      invalidated: true,
+      effectivePolicy: { artifacts: 'surgical', workflow: 'preserve' },
+      projectionChanges: [
+        {
+          projection: 'specApproval',
+          from: 'valid',
+          to: 'stale',
+          cause: 'scope-change',
+          differences: [
+            {
+              scope: 'artifact',
+              key: 'spec:login',
+              kind: 'changed',
+              expected: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+              actual: 'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+            },
+          ],
+        },
+      ],
+      automaticReturn: { cause: 'spec-approval', from: 'implementing', to: 'designing' },
+    })
+
+    const program = makeProgram()
+    registerChangeEdit(program.command('change'))
+    await program.parseAsync([
+      'node',
+      'specd',
+      'change',
+      'edit',
+      'feat',
+      '--artifact-policy',
+      'surgical',
+      '--format',
+      'json',
+    ])
+
+    expect(kernel.changes.edit.execute).toHaveBeenCalledWith({
+      name: 'feat',
+      invalidation: { artifacts: 'surgical' },
+    })
+    const parsed = JSON.parse(stdout()) as {
+      projectionChanges: Array<{ differences: Array<Record<string, string>> }>
+      automaticReturn: { to: string }
+      state: string
+    }
+    expect(parsed.state).toBe('designing')
+    expect(parsed.automaticReturn.to).toBe('designing')
+    expect(parsed.projectionChanges[0]?.differences[0]).toEqual({
+      scope: 'artifact',
+      key: 'spec:login',
+      kind: 'changed',
+    })
+    expect(stdout()).not.toContain('sha256:')
+    expect(stderr()).toContain('validity changed (specApproval)')
+    expect(stderr()).toContain('implementing → designing')
   })
 })

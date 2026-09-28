@@ -4,19 +4,31 @@
 
 ### Requirement: Input contract
 
-#### Scenario: Targets accept artifact and artifact-at-spec forms
+Scenarios:
 
-- **WHEN** `InvalidateChange.execute` is called with `targets: ['design', 'specs@core:change']`
-- **THEN** the use case accepts both target forms in one request
-- **AND** it preserves them for later normalization and validation
+#### Scenario: Override dimensions remain independent
+
+- **WHEN** a request overrides only workflow policy
+- **THEN** persisted artifact policy supplies the other dimension and target rules remain artifact-policy-driven
+
+#### Scenario: Invalid policy value is rejected before mutation
+
+- **WHEN** either override dimension contains an unsupported value
+- **THEN** input validation fails and the change remains untouched
 
 ### Requirement: Effective policy resolution
 
-#### Scenario: Explicit override wins over persisted policy
+Scenarios:
 
-- **GIVEN** a change persisted with `invalidationPolicy: 'downstream'`
-- **WHEN** `InvalidateChange.execute` is called with `policyOverride: 'surgical'`
-- **THEN** the effective invalidation policy is `surgical`
+#### Scenario: Execution override is not persisted
+
+- **WHEN** invalidation applies a valid structured override
+- **THEN** that execution uses the overlaid policy and the change default remains unchanged
+
+#### Scenario: Workflow override does not alter target normalization
+
+- **WHEN** workflow policy changes but artifact policy does not
+- **THEN** target requirements and expansion remain those of the artifact policy
 
 ### Requirement: Policy-dependent target rules
 
@@ -41,20 +53,36 @@
 
 ### Requirement: Approval guard
 
-#### Scenario: Active approval blocks execution until forced
+Scenarios:
 
-- **GIVEN** a change with an active spec approval
-- **WHEN** `InvalidateChange.execute` is called without `force: true`
-- **THEN** execution fails without mutating the change
+#### Scenario: Force is required only for current consent
 
-### Requirement: Change-level invalidation is unconditional
+- **GIVEN** a request affects valid approval
+- **WHEN** force is absent
+- **THEN** no mutation occurs and affected gates and recovery targets are reported
+- **AND** already-stale historical evidence does not trigger that guard
 
-#### Scenario: Policy none still returns the change to designing
+#### Scenario: Forced revocation commits evidence and recovery together
 
-- **GIVEN** a change outside `designing`
-- **WHEN** `InvalidateChange.execute` succeeds with effective policy `none`
-- **THEN** the change is invalidated
-- **AND** it returns to `designing`
+- **WHEN** force authorizes revoking valid consent
+- **THEN** projection, audit event, artifact effects, and recovery are atomic
+
+### Requirement: Canonical gate-safe invalidation and recovery
+
+Scenarios:
+
+#### Scenario: Gate priority wins over preserve
+
+- **GIVEN** forced invalidation affects valid spec approval and signoff under workflow `preserve`
+- **WHEN** reconciliation applies it
+- **THEN** both projections retain audit evidence and spec recovery returns to `designing`
+- **AND** repeating the request does not duplicate effects
+
+#### Scenario: Ungated preserve retains lifecycle state
+
+- **GIVEN** invalidation affects no required consent under workflow `preserve`
+- **WHEN** it is applied
+- **THEN** lifecycle state remains and artifact reopening follows only artifact policy
 
 ### Requirement: Manual invalidation cause
 
@@ -92,12 +120,17 @@
 
 ### Requirement: Output contract
 
-#### Scenario: Success returns the deduplicated final affected set
+Scenarios:
 
-- **GIVEN** two requested targets converge on one downstream file
-- **WHEN** `InvalidateChange.execute` succeeds
-- **THEN** the returned affected set includes that file only once
-- **AND** it also returns the effective invalidation policy and updated change
+#### Scenario: Result reports committed canonical effects
+
+- **WHEN** invalidation succeeds
+- **THEN** its result includes reason, effective policy, normalized targets, projection changes, blockers, next action, and any committed return
+
+#### Scenario: Output reflects idempotent repetition
+
+- **WHEN** unchanged invalidity is applied again
+- **THEN** result reports no new projection or recovery effects
 
 ### Requirement: Affected-set traversal order
 

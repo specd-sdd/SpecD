@@ -1,4 +1,5 @@
 export { ContentHasher } from './content-hasher.js'
+export { BinaryContentHasher } from './binary-content-hasher.js'
 export { Repository, type RepositoryConfig } from './repository.js'
 export {
   SpecRepository,

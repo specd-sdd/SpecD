@@ -27,7 +27,13 @@ import {
 } from '../services/execute-matching-predicates.js'
 import { throwHookFailed } from '../checks/hook-failed.js'
 import { type RefreshImplementationTracking } from './refresh-implementation-tracking.js'
+import { type ReconcileChangeValidity } from './reconcile-change-validity.js'
+import { type ChangeValidityVerdict } from '../../domain/services/change-validity.js'
 import { Logger } from '../logger.js'
+import { InvalidCompositionFactoryArgumentsError } from '../../domain/errors/invalid-composition-factory-arguments-error.js'
+import { ReconciledOperationBlockedError } from '../errors/reconciled-operation-blocked-error.js'
+import { type AutomaticRecovery } from '../../domain/services/change-validity.js'
+import { type NextAction } from './get-status.js'
 
 /** Selectors for granular hook phase skipping during transitions. */
 export type HookPhaseSelector = 'source.pre' | 'source.post' | 'target.pre' | 'target.post' | 'all'
@@ -112,6 +118,7 @@ export class TransitionChange {
   private readonly _refresh: RefreshImplementationTracking
   private readonly _approvals: ApprovalGates
   private readonly _transitionBindings: readonly CheckBinding[]
+  private readonly _reconcile: ReconcileChangeValidity
 
   /**
    * Creates a new `TransitionChange` use case instance.
@@ -122,6 +129,7 @@ export class TransitionChange {
    * @param refreshImplementationTracking - Primitive for optional pre-transition refresh
    * @param approvals - Whether approval gates are active in the project configuration
    * @param transitionBindings - Composed transition check bindings
+   * @param reconcile - Canonical reconciler. When supplied, recovery is committed before checks and the designing hop does not broadly invalidate artifacts.
    */
   constructor(
     changes: ChangeRepository,
@@ -130,6 +138,7 @@ export class TransitionChange {
     refreshImplementationTracking: RefreshImplementationTracking,
     approvals: ApprovalGates,
     transitionBindings: readonly CheckBinding[],
+    reconcile?: ReconcileChangeValidity,
   ) {
     this._changes = changes
     this._actor = actor
@@ -137,6 +146,10 @@ export class TransitionChange {
     this._refresh = refreshImplementationTracking
     this._approvals = approvals
     this._transitionBindings = transitionBindings
+    if (reconcile === undefined) {
+      throw new InvalidCompositionFactoryArgumentsError('TransitionChange', 'reconcile is required')
+    }
+    this._reconcile = reconcile
   }
 
   /**
@@ -154,6 +167,7 @@ export class TransitionChange {
    * @throws {ArchiveDependencyMismatchError} If enter-ready fails `deps.consistent`
    * @throws {ArchiveImplementationStateError} If exit-implementing fails `impl.*`
    * @throws {HookFailedError} If a source.post or target.pre hook exits with a non-zero code
+   * @throws {ReconciledOperationBlockedError} If validity reconciliation already committed a recovery
    */
   async execute(
     input: TransitionChangeInput,
@@ -164,16 +178,29 @@ export class TransitionChange {
       throw new ChangeNotFoundError(input.name)
     }
 
-    if (input.refreshImplementationTrackingBefore !== false) {
-      await this._refresh.execute({ name: input.name })
-      const reloaded = await this._changes.get(input.name)
-      if (reloaded === null) {
-        throw new ChangeNotFoundError(input.name)
+    const beforeState = change.state
+    let validity: ChangeValidityVerdict | undefined
+    const reconciled = await this._reconcile.execute({
+      name: input.name,
+      refreshImplementationTracking: input.refreshImplementationTrackingBefore !== false,
+    })
+    change = reconciled.change
+    validity = reconciled.verdict
+    if (change.state !== beforeState) {
+      if (reconciled.automaticReturn !== null) {
+        throw committedRecoveryError(
+          input.name,
+          change.state,
+          reconciled.automaticReturn,
+          reconciled.verdict,
+        )
       }
-      change = reloaded
+      throw new InvalidStateTransitionError(
+        change.state,
+        input.to === 'next' ? beforeState : input.to,
+      )
     }
 
-    const actor = await this._actor.identity()
     const fromState = change.state
     let requestedTarget: ChangeState
     if (input.to === 'next') {
@@ -185,6 +212,12 @@ export class TransitionChange {
     } else {
       requestedTarget = input.to
     }
+
+    if (fromState === 'designing' && requestedTarget === 'designing') {
+      return { change }
+    }
+
+    const actor = await this._actor.identity()
     const allowOutOfScope = input.allowOutOfScope === true
 
     this._assertDrainAndGateTargets(fromState, requestedTarget)
@@ -209,6 +242,7 @@ export class TransitionChange {
         skipHookPhases,
         effectiveStatusByArtifact,
         passMemo,
+        ...(validity !== undefined ? { validity } : {}),
         ...(onCheckProgress !== undefined ? { onCheckProgress } : {}),
       }),
       { failFastOn: 'protocol.edge' },
@@ -219,6 +253,7 @@ export class TransitionChange {
       requestedTarget,
       approvals: this._approvals,
       checksByTarget: { [requestedTarget]: evaluation.checks },
+      ...(validity !== undefined ? { validity } : {}),
     })
 
     Logger.debug('TransitionChange projected evaluateLifecycle routing', {
@@ -252,37 +287,66 @@ export class TransitionChange {
       'before-persist',
       along,
     )) {
-      await this._executeEffect(binding, change, schema, attempt, skipHookPhases, onProgress)
+      await this._executeEffect(
+        binding,
+        change,
+        schema,
+        attempt,
+        skipHookPhases,
+        onProgress,
+        validity,
+      )
+    }
+
+    {
+      const afterHooks = await this._reconcile.execute({
+        name: input.name,
+        refreshImplementationTracking: true,
+      })
+      change = afterHooks.change
+      validity = afterHooks.verdict
+      if (change.state !== fromState) {
+        if (afterHooks.automaticReturn !== null) {
+          throw committedRecoveryError(
+            input.name,
+            change.state,
+            afterHooks.automaticReturn,
+            afterHooks.verdict,
+          )
+        }
+        throw new InvalidStateTransitionError(change.state, effectiveTarget)
+      }
+      const rerun = await executeMatchingPredicates(
+        this._transitionBindings,
+        buildCheckExecutionContext({
+          change,
+          schema,
+          attempt,
+          approvals: this._approvals,
+          allowOutOfScope,
+          skipHookPhases,
+          effectiveStatusByArtifact,
+          passMemo: new Map(),
+          validity,
+          ...(onCheckProgress !== undefined ? { onCheckProgress } : {}),
+        }),
+        { failFastOn: 'protocol.edge' },
+      )
+      if (!rerun.allowed) {
+        const failed = rerun.checks.find((check) => check.outcome === 'fail')
+        if (failed !== undefined) {
+          this._emitFailureProgress(failed, onProgress)
+          this._mapFailedPredicate(failed, fromState, effectiveTarget, change, schema)
+        }
+      }
     }
 
     const { change: persistedChange } = await this._changes.mutate(input.name, (freshChange) => {
-      let invalidated = false
-
-      if (
-        effectiveTarget === 'designing' &&
-        freshChange.state !== 'drafting' &&
-        freshChange.state !== 'designing'
-      ) {
-        freshChange.invalidate(
-          'artifact-review-required',
-          actor,
-          'Invalidated because the change returned to designing and all artifacts require review.',
-          [...freshChange.artifacts.values()].map((artifact) => ({
-            type: artifact.type,
-            files: [...artifact.files.keys()],
-          })),
-          schema.artifactDag(),
-        )
-        invalidated = true
-      }
-
       if (SKILL_HOP_SOURCES.has(fromState) && SKILL_HOP_TARGETS.has(effectiveTarget)) {
         freshChange.invalidateSignoff(actor)
       }
 
-      if (!invalidated) {
-        freshChange.transition(effectiveTarget, actor)
-      }
+      freshChange.transition(effectiveTarget, actor)
 
       if (effectiveTarget === 'implementing' && !freshChange.isImplementationTrackingActive) {
         freshChange.startImplementationTracking()
@@ -303,6 +367,7 @@ export class TransitionChange {
    * @param attempt - Classified attempt
    * @param skipHookPhases - Skip selectors
    * @param onProgress - Optional progress callback
+   * @param validity - Reconciled validity verdict for this transition
    */
   private async _executeEffect(
     binding: CheckBinding,
@@ -311,6 +376,7 @@ export class TransitionChange {
     attempt: ReturnType<typeof transitionAttemptFor>['attempt'],
     skipHookPhases: readonly string[],
     onProgress?: OnTransitionProgress,
+    validity?: ChangeValidityVerdict,
   ): Promise<void> {
     const onCheckProgress: OnCheckProgress | undefined =
       onProgress === undefined ? undefined : (event) => onProgress(event)
@@ -320,6 +386,7 @@ export class TransitionChange {
       attempt,
       approvals: this._approvals,
       skipHookPhases,
+      ...(validity !== undefined ? { validity } : {}),
       ...(onCheckProgress !== undefined ? { onCheckProgress } : {}),
     })
     const result = await executeCheckWithProgress(binding.check, ctx)
@@ -539,6 +606,37 @@ export class TransitionChange {
       }
     }
   }
+}
+
+/**
+ * Builds the typed diagnostic for an already-committed validity recovery.
+ *
+ * @param changeName - Reconciled change name
+ * @param state - Persisted state after recovery
+ * @param recovery - Recovery committed by the reconciler
+ * @param verdict - Canonical post-recovery validity verdict
+ * @returns Typed error carrying repair guidance
+ */
+function committedRecoveryError(
+  changeName: string,
+  state: ChangeState,
+  recovery: AutomaticRecovery,
+  verdict: ChangeValidityVerdict,
+): ReconciledOperationBlockedError {
+  const nextAction: NextAction = {
+    targetStep: recovery.to,
+    actionType: 'cognitive',
+    reason: `Validity reconciliation returned the change to ${recovery.to}`,
+    command: recovery.to === 'designing' ? '/specd-design' : '/specd-verify',
+  }
+  return new ReconciledOperationBlockedError({
+    operation: 'transition',
+    changeName,
+    state,
+    automaticReturn: recovery,
+    blockers: verdict.blockers,
+    nextAction,
+  })
 }
 
 /**

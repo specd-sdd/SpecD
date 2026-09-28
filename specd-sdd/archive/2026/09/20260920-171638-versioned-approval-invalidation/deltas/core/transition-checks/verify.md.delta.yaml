@@ -1,0 +1,96 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Evaluation of a transition attempt$'
+  content: |
+    ### Requirement: Shared validity verdict and recovery priority
+
+    #### Scenario: Identical facts produce identical recovery
+
+    - **GIVEN** the same fresh change, schema, gates, policy, artifacts, and implementation files
+    - **WHEN** status, validation, transition, and archive evaluate validity
+    - **THEN** each receives the same blockers, affected inputs, recovery priority, and next action
+
+    #### Scenario: Verification staleness blocks without moving lifecycle
+
+    - **GIVEN** stale verification at a boundary that requires current evidence
+    - **WHEN** validity is evaluated
+    - **THEN** progress is blocked with in-place verification guidance
+    - **AND** no verification-driven lifecycle return is selected
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Shared validity verdict and recovery priority$'
+  content: |
+    ### Requirement: Single validity reconciliation owner
+
+    #### Scenario: Repeated observation is idempotent
+
+    - **GIVEN** reconciliation already persisted projection changes and required recovery
+    - **WHEN** another entry point reconciles unchanged facts
+    - **THEN** it appends no duplicate invalidation or transition events
+    - **AND** returns the same canonical verdict
+
+    #### Scenario: Missing reconciler never selects a legacy path
+
+    - **WHEN** a mutating use case is constructed without the required reconciler
+    - **THEN** construction or execution fails with the typed configuration error
+    - **AND** `Change.invalidate` is not invoked as a fallback
+
+- op: modified
+  selector:
+    type: section
+    matches: '^Requirement: Registry bindings for this capability$'
+  content: |
+    Scenarios:
+
+    #### Scenario: Verification exit uses a non-mutating registered check
+
+    - **GIVEN** `verifying → done` is evaluated with only an active attempt
+    - **WHEN** `verification.current` executes
+    - **THEN** it fails with actionable structured detail
+    - **AND** it neither completes the attempt nor changes projections
+
+    #### Scenario: Fresh completed evidence passes through shared evaluation
+
+    - **GIVEN** completed evidence matches fresh resolved inputs
+    - **WHEN** both `CompleteVerification` freshness evaluation and `verification.current` evaluate that snapshot
+    - **THEN** both produce the same freshness verdict
+    - **AND** only explicit completion is allowed to persist success
+
+    #### Scenario: Missing verification verdict fails closed
+
+    - **GIVEN** a verification-requiring boundary has no canonical verification verdict
+    - **WHEN** `verification.current` executes
+    - **THEN** it fails with unavailable-validity guidance rather than skipping
+
+    #### Scenario: Explicit not-required verdict skips
+
+    - **WHEN** the canonical verdict explicitly marks verification `not-required`
+    - **THEN** `verification.current` skips without fabricating completed evidence
+
+    #### Scenario: Overlapping implementation bindings are deduplicated
+
+    - **GIVEN** `implementing → verifying` matches forward-exit and verifying-entry applicability
+    - **WHEN** registered checks are evaluated
+    - **THEN** `impl.filesResolved` and `impl.linksInScope` each execute exactly once
+
+    #### Scenario: Each implementation boundary remains independently guarded
+
+    - **WHEN** a permitted transition enters `verifying` from another state or exits `implementing` forward to another state
+    - **THEN** both implementation readiness checks execute for the applicable boundary
+
+    #### Scenario: Verification start uses operation context
+
+    - **WHEN** explicit start runs outside `verifying`
+    - **THEN** it executes the registered implementation checks through operation context
+    - **AND** does not fabricate a lifecycle edge or self-transition

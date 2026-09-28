@@ -2,6 +2,7 @@ import { type ActorResolver } from '../../application/ports/actor-resolver.js'
 import { type ChangeRepository } from '../../application/ports/change-repository.js'
 import { type SchemaProvider } from '../../application/ports/schema-provider.js'
 import { EditChange } from '../../application/use-cases/edit-change.js'
+import { type ReconcileChangeValidity } from '../../application/use-cases/reconcile-change-validity.js'
 import { type ListWorkspaces } from '../../application/use-cases/list-workspaces.js'
 import { type RefreshImplementationTracking } from '../../application/use-cases/refresh-implementation-tracking.js'
 import { type SpecdConfig } from '../../application/specd-config.js'
@@ -21,6 +22,7 @@ export interface EditChangeDeps {
   readonly actor: ActorResolver
   readonly schemaProvider: SchemaProvider
   readonly refreshImplementationTracking?: RefreshImplementationTracking
+  readonly reconcile: ReconcileChangeValidity
 }
 
 /**
@@ -36,6 +38,7 @@ export function resolveEditChangeDeps(resolver: CompositionResolver): EditChange
     actor: resolver.getActorResolver(),
     schemaProvider: resolver.getSchemaProvider(),
     refreshImplementationTracking: resolver.getRefreshImplementationTracking(),
+    reconcile: resolver.getReconcileChangeValidity(),
   }
 }
 
@@ -87,14 +90,21 @@ function createEditChangeFromNormalized(
   input: FactoryInput<EditChangeDeps, CompositionResolutionOptions>,
 ): EditChange {
   if (input.kind === 'deps') {
-    const { changes, listWorkspaces, actor, schemaProvider, refreshImplementationTracking } =
-      input.deps
+    const {
+      changes,
+      listWorkspaces,
+      actor,
+      schemaProvider,
+      refreshImplementationTracking,
+      reconcile,
+    } = input.deps
     return new EditChange(
       changes,
       listWorkspaces,
       actor,
       schemaProvider,
       refreshImplementationTracking,
+      reconcile,
     )
   }
 
@@ -110,6 +120,10 @@ function createEditChangeFromNormalized(
  */
 function isEditChangeDeps(value: EditChangeDeps | SpecdConfig): value is EditChangeDeps {
   return (
-    'changes' in value && 'listWorkspaces' in value && 'actor' in value && 'schemaProvider' in value
+    'changes' in value &&
+    'listWorkspaces' in value &&
+    'actor' in value &&
+    'schemaProvider' in value &&
+    'reconcile' in value
   )
 }

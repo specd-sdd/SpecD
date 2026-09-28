@@ -137,6 +137,37 @@ resolved or ignored.
 - Links targeting specs outside the change scope block archive unless explicitly
   overridden with `--allow-out-of-scope`
 
+### 4b. Live preflight after hooks
+
+Hooks can change files and links. Reload canonical status before archiving.
+Core reconciles again, including overlap peers. Do not hand-invalidate those
+peers or edit their manifests.
+
+```bash
+specd changes status <name> --format text
+```
+
+Do not archive until that post-hook status passes live facts:
+
+- required live tasks are complete (`hasTasks` artifacts stay outside
+  fingerprints, and incomplete tasks still block)
+- required artifacts are current
+- implementation tracking is resolved
+- required verification is current, not missing, stale, or unknown
+- enabled spec and sign-off gates are satisfied
+
+Do not bypass tasks, artifacts, implementation, verification, or gates. If
+verification is missing or stale, stay on the explicit in-place cycle:
+`/specd-verify` or `specd changes verification start <name>`, then complete
+only after the repeated work succeeds. There is no restart-verification flag.
+Verification staleness does not move lifecycle state by itself. A stale
+sign-off after `done` returns to `done`; stale spec consent returns to
+`designing` via `/specd-design`.
+
+`workflow: preserve` keeps artifact review in phase. `workflow: redesign` with
+unresolved non-task drift returns to `designing`. `artifacts: none` waives
+reopening, not freshness.
+
 ### 5. Archive
 
 `--skip-hooks pre` only. Pre `run:` / `instruction:` already ran in step 4.

@@ -1,6 +1,10 @@
 import { describe, it, expect, vi } from 'vitest'
 import { makeSpec } from '../../helpers/make-spec.js'
 import { EditChange } from '../../../src/application/use-cases/edit-change.js'
+import { ReconcileChangeValidity } from '../../../src/application/use-cases/reconcile-change-validity.js'
+import { ValidityFingerprintService } from '../../../src/application/services/validity-fingerprint-service.js'
+import { NodeBinaryContentHasher } from '../../../src/infrastructure/node/binary-content-hasher.js'
+import { NodeContentHasher } from '../../../src/infrastructure/node/content-hasher.js'
 import { ChangeNotFoundError } from '../../../src/application/errors/change-not-found-error.js'
 import { SpecNotInChangeError } from '../../../src/application/errors/spec-not-in-change-error.js'
 import {
@@ -12,6 +16,8 @@ import {
   makeSchema,
   testActor,
   makeListWorkspaces,
+  makeObservingReconcile,
+  makeSpecApprovalFingerprint,
 } from './helpers.js'
 import { type SpecRepository } from '../../../src/application/ports/spec-repository.js'
 import { Spec } from '../../../src/domain/entities/spec.js'
@@ -26,6 +32,8 @@ function createEditChange(
     makeListWorkspaces(specs),
     makeActorResolver(),
     makeSchemaProvider(makeSchema()),
+    undefined,
+    makeObservingReconcile(repo),
   )
 }
 
@@ -67,7 +75,9 @@ describe('EditChange', () => {
       })
 
       expect(result.change.specIds).toEqual(['auth/login', 'auth/logout'])
-      expect(result.invalidated).toBe(true)
+      expect(result.scopeChanged).toBe(true)
+      expect(result.validityChanged).toBe(false)
+      expect(result.invalidated).toBe(false)
     })
 
     it('does not duplicate existing specIds', async () => {
@@ -161,7 +171,9 @@ describe('EditChange', () => {
       })
 
       expect(result.change.specIds).toEqual(['auth/login'])
-      expect(result.invalidated).toBe(true)
+      expect(result.scopeChanged).toBe(true)
+      expect(result.validityChanged).toBe(false)
+      expect(result.invalidated).toBe(false)
     })
 
     it('throws SpecNotInChangeError when removing a spec that is not in the change', async () => {
@@ -202,10 +214,15 @@ describe('EditChange', () => {
 
       const result = await uc.execute({
         name: 'c',
-        invalidationPolicy: 'surgical',
+        invalidation: { artifacts: 'surgical' },
       })
 
-      expect(result.change.invalidationPolicy).toBe('surgical')
+      expect(result.change.invalidationPolicy).toEqual({
+        artifacts: 'surgical',
+        workflow: 'preserve',
+      })
+      expect(result.validityChanged).toBe(false)
+      expect(result.automaticReturn).toBeNull()
       expect(result.invalidated).toBe(false)
     })
   })
@@ -220,13 +237,18 @@ describe('EditChange', () => {
         name: 'c',
         addSpecIds: ['auth/logout'],
         description: 'Updated',
-        invalidationPolicy: 'global',
+        invalidation: { artifacts: 'global' },
       })
 
       expect(result.change.specIds).toEqual(['auth/login', 'auth/logout'])
       expect(result.change.description).toBe('Updated')
-      expect(result.change.invalidationPolicy).toBe('global')
-      expect(result.invalidated).toBe(true)
+      expect(result.change.invalidationPolicy).toEqual({
+        artifacts: 'global',
+        workflow: 'preserve',
+      })
+      expect(result.scopeChanged).toBe(true)
+      expect(result.validityChanged).toBe(false)
+      expect(result.invalidated).toBe(false)
     })
   })
 
@@ -235,7 +257,7 @@ describe('EditChange', () => {
       const change = makeChange('c', { specIds: ['auth/login'] })
       change.transition('designing', testActor)
       change.transition('ready', testActor)
-      change.recordSpecApproval('Testing', {}, testActor)
+      change.recordSpecApproval('Testing', makeSpecApprovalFingerprint(change.specIds), testActor)
       const repo = makeChangeRepository([change])
       const uc = createEditChange(repo)
 
@@ -244,8 +266,9 @@ describe('EditChange', () => {
         addSpecIds: ['auth/logout'],
       })
 
-      expect(result.change.activeSpecApproval).toBeUndefined()
-      expect(result.invalidated).toBe(true)
+      expect(result.change.activeSpecApproval).toBeDefined()
+      expect(result.validityChanged).toBe(false)
+      expect(result.invalidated).toBe(false)
     })
 
     it('triggers refresh implementation tracking when specIds change', async () => {
@@ -269,13 +292,16 @@ describe('EditChange', () => {
           return { implementationTracking: {} as never }
         }),
       }
+      const listWorkspaces = makeListWorkspaces()
+      const listWorkspacesSpy = vi.spyOn(listWorkspaces, 'execute')
 
       const uc = new EditChange(
         repo,
-        makeListWorkspaces(),
+        listWorkspaces,
         makeActorResolver(),
         makeSchemaProvider(makeSchema()),
         refresh as never,
+        makeObservingReconcile(repo),
       )
 
       const result = await uc.execute({
@@ -283,8 +309,122 @@ describe('EditChange', () => {
         removeSpecIds: ['auth/logout'],
       })
 
+      expect(listWorkspacesSpy).toHaveBeenCalledOnce()
       expect(refresh.execute).toHaveBeenCalledWith({ name: 'c' })
       expect(result.change.implementationLinks).toEqual([])
+      expect(result.scopeChanged).toBe(true)
+      expect(result.validityChanged).toBe(false)
+      expect(result.invalidated).toBe(false)
+    })
+  })
+
+  describe('reconciled scope edit', () => {
+    function buildReconciledEdit(change: ReturnType<typeof makeChange>) {
+      const repo = makeChangeRepository([change])
+      const schemaProvider = makeSchemaProvider(makeSchema())
+      const reconcile = new ReconcileChangeValidity({
+        changes: repo,
+        schemaProvider,
+        actor: makeActorResolver(),
+        refreshImplementationTracking: {
+          execute: async () => ({ implementationTracking: null as never }),
+        } as never,
+        fingerprint: new ValidityFingerprintService({
+          changes: repo,
+          hasher: new NodeContentHasher(),
+          binaryHasher: new NodeBinaryContentHasher(),
+          schemaProvider,
+        }),
+        approvals: { spec: true, signoff: false },
+      })
+      const uc = new EditChange(
+        repo,
+        makeListWorkspaces(),
+        makeActorResolver(),
+        schemaProvider,
+        undefined,
+        reconcile,
+      )
+      return { repo, uc }
+    }
+
+    it('returns required spec approval to designing and keeps the approval event', async () => {
+      const change = makeChange('c', { specIds: ['auth/login'] })
+      change.transition('designing', testActor)
+      change.transition('ready', testActor)
+      change.transition('implementing', testActor)
+      change.recordSpecApproval(
+        'LGTM',
+        {
+          version: 1,
+          specIds: ['auth/login'],
+          artifacts: { version: 1, algorithm: 'artifact-pre-hash-v1', files: {} },
+        },
+        testActor,
+      )
+      const { uc } = buildReconciledEdit(change)
+      const result = await uc.execute({ name: 'c', addSpecIds: ['auth/logout'] })
+      expect(result.scopeChanged).toBe(true)
+      expect(result.validityChanged).toBe(true)
+      expect(result.projectionChanges).toEqual([
+        expect.objectContaining({
+          projection: 'specApproval',
+          cause: 'scope-change',
+          differences: [
+            expect.objectContaining({
+              scope: 'spec',
+              key: 'auth/logout',
+              kind: 'spec-added',
+            }),
+          ],
+        }),
+      ])
+      expect(result.automaticReturn).toEqual({
+        cause: 'spec-approval',
+        from: 'implementing',
+        to: 'designing',
+      })
+      expect(result.change.state).toBe('designing')
+      expect(result.change.history.some((event) => event.type === 'spec-approved')).toBe(true)
+      expect(result.change.invalidationPolicy).toEqual({
+        artifacts: 'downstream',
+        workflow: 'preserve',
+      })
+    })
+
+    it('treats scope reordering as a scope edit without invalidating consent', async () => {
+      const change = makeChange('reorder', { specIds: ['auth/a', 'auth/b'] })
+      change.transition('designing', testActor)
+      change.transition('ready', testActor)
+      change.transition('implementing', testActor)
+      change.recordSpecApproval(
+        'LGTM',
+        {
+          version: 1,
+          specIds: ['auth/a', 'auth/b'],
+          artifacts: { version: 1, algorithm: 'artifact-pre-hash-v1', files: {} },
+        },
+        testActor,
+      )
+      const beforeEvents = change.history.filter(
+        (event) => event.type === 'approval-invalidated',
+      ).length
+      const { uc } = buildReconciledEdit(change)
+
+      const result = await uc.execute({
+        name: 'reorder',
+        removeSpecIds: ['auth/a'],
+        addSpecIds: ['auth/a'],
+      })
+
+      expect(result.scopeChanged).toBe(true)
+      expect(result.projectionChanges).toEqual([])
+      expect(result.validityChanged).toBe(false)
+      expect(result.invalidated).toBe(false)
+      expect(result.change.specApproval?.status).toBe('valid')
+      expect(
+        result.change.history.filter((event) => event.type === 'approval-invalidated'),
+      ).toHaveLength(beforeEvents)
     })
   })
 })

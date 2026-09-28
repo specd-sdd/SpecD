@@ -14,7 +14,29 @@
     "core:implementation-detector-port",
     "core:transition-checks"
   ],
-  "implementation": [],
+  "implementation": [
+    {
+      "file": "core:src/domain/value-objects/validity-fingerprint.ts",
+      "symbols": [
+        "ValidityFingerprint",
+        "normalizeTextV1",
+        "compareValidityFingerprints",
+        "SpecApprovalFingerprint",
+        "compareSpecApprovalFingerprints"
+      ]
+    },
+    {
+      "file": "core:src/domain/entities/change.ts",
+      "symbols": ["Change", "SpecApprovalProjection", "SignoffProjection", "VerificationProjection"]
+    },
+    {
+      "file": "core:src/domain/value-objects/change-state.ts",
+      "symbols": ["RecoveryTransitionTable", "RECOVERY_ONLY_TRANSITIONS"]
+    },
+    {
+      "file": "core:test/domain/entities/change.spec.ts"
+    }
+  ],
   "optimizations": {
     "optimizedDescription": {
       "value": "Central change entity governs lifecycle, approval gates, artifact and implementation state, history, drafts, and archival.",

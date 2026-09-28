@@ -9,11 +9,7 @@ import { DeltaApplicationError } from '../../domain/errors/delta-application-err
 import { type Spec } from '../../domain/entities/spec.js'
 import { type ActorResolver } from '../ports/actor-resolver.js'
 import { type ExtractorTransformRegistry } from '../../domain/services/content-extraction.js'
-import {
-  type ActorIdentity,
-  type SpecApprovedEvent,
-  type SignedOffEvent,
-} from '../../domain/entities/change.js'
+import { type SpecApprovedEvent, type SignedOffEvent } from '../../domain/entities/change.js'
 import { type PreHashCleanup } from '../../domain/value-objects/validation-rule.js'
 import { type ArtifactStatus } from '../../domain/value-objects/artifact-status.js'
 import { type MetadataExtractorEntry } from '../../domain/value-objects/metadata-extraction.js'
@@ -40,6 +36,8 @@ import {
 } from './_shared/cross-artifact-participant-state.js'
 import { extractMetadataFromSpecArtifacts } from './_shared/extract-metadata-from-spec-artifacts.js'
 import { type ListWorkspaces } from './list-workspaces.js'
+import { type ReconcileChangeValidity } from './reconcile-change-validity.js'
+import { InvalidCompositionFactoryArgumentsError } from '../../domain/errors/invalid-composition-factory-arguments-error.js'
 
 /** Input for the {@link ValidateArtifacts} use case. */
 export interface ValidateArtifactsInput {
@@ -119,10 +117,10 @@ export class ValidateArtifacts {
   private readonly _listWorkspaces: ListWorkspaces
   private readonly _schemaProvider: SchemaProvider
   private readonly _parsers: ArtifactParserRegistry
-  private readonly _actor: ActorResolver
   private readonly _hasher: ContentHasher
   private readonly _extractorTransforms: ExtractorTransformRegistry
   private readonly _workspaceRoutes: readonly SpecWorkspaceRoute[]
+  private readonly _reconcile: ReconcileChangeValidity
 
   /**
    * Creates a new `ValidateArtifacts` use case instance.
@@ -131,29 +129,37 @@ export class ValidateArtifacts {
    * @param listWorkspaces - The project orchestrator
    * @param schemaProvider - Provider for the fully-resolved schema
    * @param parsers - Registry of artifact format parsers
-   * @param actor - Resolver for the actor identity
+   * @param _actor - Resolver retained in the public construction contract
    * @param hasher - Content hasher for computing artifact hashes
    * @param extractorTransforms - Shared extractor transform registry
    * @param workspaceRoutes - Workspace routing metadata for cross-workspace resolution
+   * @param reconcile - Canonical reconciler. When supplied, drift and recovery are applied inside the validation mutation and stale evidence is not renewed.
    */
   constructor(
     changes: ChangeRepository,
     listWorkspaces: ListWorkspaces,
     schemaProvider: SchemaProvider,
     parsers: ArtifactParserRegistry,
-    actor: ActorResolver,
+    _actor: ActorResolver,
     hasher: ContentHasher,
     extractorTransforms: ExtractorTransformRegistry = new Map(),
     workspaceRoutes: readonly SpecWorkspaceRoute[] = [],
+    reconcile?: ReconcileChangeValidity,
   ) {
     this._changes = changes
     this._listWorkspaces = listWorkspaces
     this._schemaProvider = schemaProvider
     this._parsers = parsers
-    this._actor = actor
     this._hasher = hasher
     this._extractorTransforms = extractorTransforms
     this._workspaceRoutes = workspaceRoutes
+    if (reconcile === undefined) {
+      throw new InvalidCompositionFactoryArgumentsError(
+        'ValidateArtifacts',
+        'reconcile is required',
+      )
+    }
+    this._reconcile = reconcile
   }
 
   /**
@@ -209,7 +215,6 @@ export class ValidateArtifacts {
       }
     }
 
-    const actor: ActorIdentity = await this._actor.identity()
     const failures: ValidationFailure[] = []
     const warnings: ValidationWarning[] = []
     const files: ValidationFileResult[] = []
@@ -302,6 +307,7 @@ export class ValidateArtifacts {
     const driftedFilesByArtifact = new Map<string, Set<string>>()
     if (approval !== undefined || signoff !== undefined) {
       for (const artifactType of schema.artifacts()) {
+        if (artifactType.hasTasks) continue
         const changeArtifact = change.getArtifact(artifactType.id)
         if (
           changeArtifact === null ||
@@ -723,30 +729,13 @@ export class ValidateArtifacts {
       completedValidations.length > 0 ||
       specDependsOnUpdates.size > 0
     ) {
-      await this._changes.mutate(input.name, (freshChange) => {
-        if (driftedFilesByArtifact.size > 0) {
-          const affectedArtifacts = [...driftedFilesByArtifact.entries()].map(([type, files]) => ({
-            type,
-            files: [...files].sort(),
-          }))
-          freshChange.invalidate(
-            'artifact-drift',
-            actor,
-            `Invalidated because validated artifacts drifted: ${affectedArtifacts
-              .map((artifact) => `${artifact.type} [${artifact.files.join(', ')}]`)
-              .join('; ')}`,
-            affectedArtifacts,
-            schema.artifactDag(),
-          )
-        }
-
+      await this._reconcile.mutate({ name: input.name }, (ctx) => {
         for (const completed of completedValidations) {
-          const artifact = freshChange.getArtifact(completed.artifactId)
+          const artifact = ctx.change.getArtifact(completed.artifactId)
           artifact?.markComplete(completed.fileKey, completed.validatedHash)
         }
-
         for (const [specId, deps] of specDependsOnUpdates) {
-          freshChange.setSpecDependsOn(specId, deps)
+          ctx.change.setSpecDependsOn(specId, deps)
         }
       })
     }

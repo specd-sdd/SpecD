@@ -63,6 +63,7 @@ export type {
   SpecRepository,
   SchemaRegistry,
   ArchiveRepository,
+  BinaryContentHasher,
 } from './application/ports/index.js'
 export { InvalidCompositionFactoryArgumentsError } from './domain/errors/index.js'
 
@@ -154,6 +155,21 @@ export {
   type ApproveSpecInput,
   type ApproveSignoff,
   type ApproveSignoffInput,
+  type StartVerification,
+  type StartVerificationInput,
+  type StartVerificationResult,
+  type CompleteVerification,
+  type CompleteVerificationInput,
+  type CompleteVerificationResult,
+  type InvalidateVerification,
+  type InvalidateVerificationInput,
+  type InvalidateVerificationResult,
+  type ReconcileChangeValidity,
+  type ReconcileChangeValidityInput,
+  type ReconcileChangeValidityResult,
+  type ReconciliationIntent,
+  type ReconciledMutationContext,
+  type ReconciledMutationResult,
   type ArchiveHookPhaseSelector,
   type ArchiveChange,
   type ArchiveChangeInput,
@@ -328,6 +344,14 @@ export {
   type ApproveSpecDeps,
   createApproveSignoff,
   type ApproveSignoffDeps,
+  createStartVerification,
+  type StartVerificationDeps,
+  createCompleteVerification,
+  type CompleteVerificationDeps,
+  createInvalidateVerification,
+  type InvalidateVerificationDeps,
+  createReconcileChangeValidity,
+  type ReconcileChangeValidityDeps,
   createArchiveChange,
   type ArchiveChangeDeps,
   createValidateArtifacts,
@@ -414,10 +438,20 @@ export {
   WorkspaceNotFoundError,
   InvalidInvalidateTargetError,
   InvalidateRequiresForceError,
+  type ForceInvalidationRecovery,
   ImplementationLinksExistError,
   ImplementationFileNotFoundError,
   ConfigNotFoundError,
   ProjectMetadataNotFoundError,
+  FingerprintInputError,
+  VerificationAttemptNotFoundError,
+  VerificationNotFoundError,
+  VerificationFingerprintMismatchError,
+  VerificationInProgressError,
+  VerificationStaleError,
+  ReconciledOperationBlockedError,
+  type ReconciledOperation,
+  type ReconciledOperationBlockedInput,
 } from './application/errors/index.js'
 
 // Domain entities
@@ -538,6 +572,7 @@ export {
   type GuardedChangeOperation,
   InvalidInputError,
   DraftedChangeReadOnlyError,
+  UnsupportedManifestVersionError,
 } from './domain/errors/index.js'
 
 export {

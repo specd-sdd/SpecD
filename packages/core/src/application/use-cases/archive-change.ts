@@ -3,6 +3,7 @@ import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 import { SchemaMismatchError } from '../errors/schema-mismatch-error.js'
 import { ParserNotRegisteredError } from '../errors/parser-not-registered-error.js'
 import { ReadOnlyWorkspaceError } from '../../domain/errors/read-only-workspace-error.js'
+import { InvalidStateTransitionError } from '../../domain/errors/invalid-state-transition-error.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
 import { type SpecRepository } from '../ports/spec-repository.js'
 import { type ArchiveRepository } from '../ports/archive-repository.js'
@@ -10,10 +11,17 @@ import { type ActorResolver } from '../ports/actor-resolver.js'
 import { type ArtifactParserRegistry } from '../ports/artifact-parser.js'
 import { type SchemaProvider } from '../ports/schema-provider.js'
 import { type ContentHasher } from '../ports/content-hasher.js'
+import { type ReconcileChangeValidity } from './reconcile-change-validity.js'
+import {
+  type ArtifactReviewTarget,
+  type AutomaticRecovery,
+  type ChangeValidityVerdict,
+} from '../../domain/services/change-validity.js'
+import { ReconciledOperationBlockedError } from '../errors/reconciled-operation-blocked-error.js'
+import { type NextAction } from './get-status.js'
 import { type ExtractorTransformRegistry } from '../../domain/services/extract-metadata.js'
 import { type ArchivedChange } from '../../domain/entities/archived-change.js'
 import { type ActorIdentity, type Change } from '../../domain/entities/change.js'
-import { SYSTEM_ACTOR } from '../../domain/entities/change.js'
 import { type Schema } from '../../domain/value-objects/schema.js'
 import { Spec, ABSENT_SPEC_SIDECAR } from '../../domain/entities/spec.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
@@ -55,6 +63,7 @@ import { type SpecWorkspaceRoute } from './_shared/spec-reference-resolver.js'
 import { isExcludedByPrefix } from '../services/is-excluded-by-prefix.js'
 import { type ListWorkspaces, type ProjectWorkspace } from './list-workspaces.js'
 import { hookFailureMode, matchingEffects } from '../services/execute-hook-effect.js'
+import { InvalidCompositionFactoryArgumentsError } from '../../domain/errors/invalid-composition-factory-arguments-error.js'
 
 /** Selectors for granular hook-phase skipping during archiving. */
 export type ArchiveHookPhaseSelector = 'pre' | 'post' | 'all'
@@ -196,6 +205,7 @@ export class ArchiveChange {
   private readonly _batchSnapshot: ArchiveBatchSnapshotPort
   private readonly _archiveBindings: readonly CheckBinding[]
   private readonly _hasher: ContentHasher | undefined
+  private readonly _reconcile: ReconcileChangeValidity
 
   /**
    * Creates a new `ArchiveChange` use case instance.
@@ -213,6 +223,7 @@ export class ArchiveChange {
    * @param projectRoot - Project root used to canonicalize raw implementation paths
    * @param batchSnapshot - Batch canonical snapshot adapter for commit rollback
    * @param hasher - Content hasher for lock-less disk `dependsOn` extraction
+   * @param reconcile - Required canonical validity reconciler used before and after hooks
    */
   constructor(
     changes: ChangeRepository,
@@ -227,7 +238,8 @@ export class ArchiveChange {
     workspaceRoutes: readonly SpecWorkspaceRoute[] = [],
     projectRoot = process.cwd(),
     batchSnapshot: ArchiveBatchSnapshotPort = createNoopArchiveBatchSnapshot(),
-    hasher?: ContentHasher,
+    hasher: ContentHasher | undefined,
+    reconcile: ReconcileChangeValidity,
   ) {
     this._changes = changes
     this._listWorkspaces = listWorkspaces
@@ -242,6 +254,10 @@ export class ArchiveChange {
     this._batchSnapshot = batchSnapshot
     this._archiveBindings = archiveBindings
     this._hasher = hasher
+    if (reconcile === undefined) {
+      throw new InvalidCompositionFactoryArgumentsError('ArchiveChange', 'reconcile is required')
+    }
+    this._reconcile = reconcile
   }
 
   /**
@@ -266,6 +282,21 @@ export class ArchiveChange {
     const schema = await this._schemaProvider.get()
 
     let change = loadedChange
+    let validity: ChangeValidityVerdict | undefined
+    const reconciled = await this._reconcile.execute({ name: input.name })
+    change = reconciled.change
+    validity = reconciled.verdict
+    if (change.state !== 'archivable' && change.state !== 'archiving') {
+      if (reconciled.automaticReturn !== null) {
+        throw archiveRecoveryError(
+          input.name,
+          change.state,
+          reconciled.automaticReturn,
+          reconciled.verdict,
+        )
+      }
+      throw new InvalidStateTransitionError(change.state, 'archiving')
+    }
     const workspaces = await this._listWorkspaces.execute()
     const workspaceMap = new Map(workspaces.map((ws) => [ws.name, ws]))
 
@@ -281,6 +312,7 @@ export class ArchiveChange {
         approvals: { spec: false, signoff: false },
         allowOverlap: input.allowOverlap === true,
         allowOutOfScope: input.allowOutOfScope === true,
+        ...(validity !== undefined ? { validity } : {}),
         ...(onCheckProgress !== undefined ? { onCheckProgress } : {}),
       }),
       { failFastOn: 'schema.nameMatch' },
@@ -302,7 +334,7 @@ export class ArchiveChange {
     }
     if (input.allowOverlap === true && relevantOverlap.length > 0) {
       invalidatedChanges.push(
-        ...(await this._invalidateOverlappingChanges(change, schema, others, relevantOverlap)),
+        ...(await this._invalidateOverlappingChanges(change, others, relevantOverlap)),
       )
     }
     Logger.debug('ArchiveChange named archive predicates complete', {
@@ -345,6 +377,51 @@ export class ArchiveChange {
       })
     }
 
+    const afterHooks = await this._reconcile.execute({
+      name: input.name,
+      refreshImplementationTracking: true,
+    })
+    change = afterHooks.change
+    validity = afterHooks.verdict
+    if (change.state !== 'archivable' && change.state !== 'archiving') {
+      if (afterHooks.automaticReturn !== null) {
+        throw archiveRecoveryError(
+          input.name,
+          change.state,
+          afterHooks.automaticReturn,
+          afterHooks.verdict,
+        )
+      }
+      throw new InvalidStateTransitionError(change.state, 'archiving')
+    }
+    if (postHookValidityBlocksArchive(validity)) {
+      throw new InvalidStateTransitionError(change.state, 'archiving')
+    }
+    const rerun = await executeMatchingPredicates(
+      this._archiveBindings,
+      buildCheckExecutionContext({
+        change,
+        schema,
+        attempt: archiveAttempt,
+        approvals: { spec: false, signoff: false },
+        allowOverlap: input.allowOverlap === true,
+        allowOutOfScope: input.allowOutOfScope === true,
+        validity,
+        ...(onCheckProgress !== undefined ? { onCheckProgress } : {}),
+      }),
+      { failFastOn: 'schema.nameMatch' },
+    )
+    const rerunFailed = rerun.checks.filter((check) => check.outcome === 'fail')
+    if (rerunFailed.length > 0) {
+      let rerunOverlap: readonly OverlapEntry[] = []
+      if (rerunFailed.some((check) => check.id === 'spec.overlap')) {
+        rerunOverlap = (await this._loadArchiveOverlap(change)).relevantOverlap
+      }
+      for (const check of rerunFailed) {
+        throwMappedArchiveFailure(check, change, schema, rerunOverlap, workspaceMap)
+      }
+    }
+
     let preparedPlan: PreparedArchivePlan
     try {
       preparedPlan = await this._prepareArchivePlan(change, schema, workspaceMap)
@@ -364,7 +441,6 @@ export class ArchiveChange {
       throw _error
     }
     let preparedPreflight: readonly PreparedArchivePreflightSpec[]
-
     try {
       preparedPreflight = await this._prepareArchivePreflight(
         change,
@@ -392,7 +468,6 @@ export class ArchiveChange {
       ]),
     ]
     const publishOrder: string[] = preparedPreflight.map((publication) => publication.specId)
-
     try {
       await this._batchSnapshot.detectOrphans(batchSpecIds, change.name)
       for (const specId of publishOrder) {
@@ -402,6 +477,7 @@ export class ArchiveChange {
       await this._recordArchiveFailure(input.name, 'prepare', _error, archivingActor, false)
       throw _error
     }
+
     const { change: transitionedChange } = await this._changes.mutate(input.name, (freshChange) => {
       freshChange.assertArchivable()
       if (freshChange.state !== 'archiving') {
@@ -1092,14 +1168,12 @@ export class ArchiveChange {
    * Invalidates peer changes that overlap the archive target after a skippable overlap check.
    *
    * @param change - Change being archived
-   * @param schema - Active schema (for artifact DAG invalidation)
    * @param others - Other loaded active changes
    * @param relevant - Overlap entries that include the archive target
    * @returns Invalidated change names and spec ids
    */
   private async _invalidateOverlappingChanges(
     change: Change,
-    schema: Schema,
     others: readonly Change[],
     relevant: readonly OverlapEntry[],
   ): Promise<readonly InvalidatedChangesEntry[]> {
@@ -1119,30 +1193,16 @@ export class ArchiveChange {
             .map((entry) => entry.specId),
         ),
       ]
-      const affectedArtifacts = others.find((c) => c.name === overlappingName)!.artifacts.values()
-      const artifactEntries = [...affectedArtifacts]
-        .filter((artifact) =>
-          [...artifact.files.keys()].some((key) => specsForChange.includes(key)),
-        )
-        .map((artifact) => ({
-          type: artifact.type,
-          files: [...artifact.files.keys()].filter((key) => specsForChange.includes(key)),
-        }))
       const message = `Invalidated because change '${change.name}' was archived with overlapping specs: ${specsForChange.join(', ')}`
-      await this._changes.mutate(overlappingName, (freshOverlapping) => {
-        freshOverlapping.invalidate(
-          'spec-overlap-conflict',
-          SYSTEM_ACTOR,
-          message,
-          artifactEntries.length > 0
-            ? artifactEntries
-            : [...freshOverlapping.artifacts.values()].map((a) => ({
-                type: a.type,
-                files: [...a.files.keys()],
-              })),
-          schema.artifactDag(),
-        )
-        return freshOverlapping
+      const peer = others.find((candidate) => candidate.name === overlappingName)
+      const targets = peer === undefined ? [] : overlapReviewTargets(peer, specsForChange)
+      await this._reconcile.execute({
+        name: overlappingName,
+        intent: {
+          type: 'spec-overlap-conflict',
+          reason: message,
+          targets,
+        },
       })
       invalidatedChanges.push({ name: overlappingName, specIds: specsForChange })
     }
@@ -1240,6 +1300,37 @@ export class ArchiveChange {
 }
 
 /**
+ * Builds the archive diagnostic for an already-committed automatic return.
+ *
+ * @param changeName - Reconciled change name
+ * @param state - Persisted recovery target
+ * @param recovery - Recovery committed by the reconciler
+ * @param verdict - Canonical post-recovery verdict
+ * @returns Typed recovery diagnostic
+ */
+function archiveRecoveryError(
+  changeName: string,
+  state: Change['state'],
+  recovery: AutomaticRecovery,
+  verdict: ChangeValidityVerdict,
+): ReconciledOperationBlockedError {
+  const nextAction: NextAction = {
+    targetStep: recovery.to,
+    actionType: 'cognitive',
+    reason: `Validity reconciliation returned the change to ${recovery.to}`,
+    command: recovery.to === 'designing' ? '/specd-design' : '/specd-verify',
+  }
+  return new ReconciledOperationBlockedError({
+    operation: 'archive',
+    changeName,
+    state,
+    automaticReturn: recovery,
+    blockers: verdict.blockers,
+    nextAction,
+  })
+}
+
+/**
  * Returns whether a tracked archive input filename is delta-backed.
  *
  * @param filename - Change-directory filename
@@ -1302,6 +1393,62 @@ function toPortableRelativePath(rootDir: string, absolutePath: string): string |
  * @param overlapEntries - Overlap entries involving this change
  * @param workspaceMap - Workspace ownership map for readOnly errors
  * @throws Typed archive errors matching prior ArchiveChange behavior
+ */
+/**
+ * Whether a post-hook verdict still blocks archive.
+ *
+ * Artifact review, non-current verification, and required approval or sign-off
+ * that is absent, stale, or revoked all stop the archiving transition.
+ *
+ * @param verdict - Canonical verdict from the post-hook reconciliation
+ * @returns `true` when archive must not transition or publish
+ */
+function postHookValidityBlocksArchive(verdict: ChangeValidityVerdict): boolean {
+  if (verdict.artifactReviewRequired) return true
+  if (verdict.verification !== 'not-required' && verdict.verification !== 'valid') return true
+  if (verdict.specApproval !== 'not-required' && verdict.specApproval !== 'valid') return true
+  if (verdict.signoff !== 'not-required' && verdict.signoff !== 'valid') return true
+  return false
+}
+
+/**
+ * Maps overlapping spec files to reconciler review targets.
+ *
+ * Matching spec keys are preferred. When none match, every file on the peer
+ * is targeted, matching the legacy invalidate fallback.
+ *
+ * @param change - Peer change sharing specs with the archive target
+ * @param specIds - Spec ids that overlap the archived change
+ * @returns Direct review targets for a `spec-overlap-conflict` intent
+ */
+function overlapReviewTargets(change: Change, specIds: readonly string[]): ArtifactReviewTarget[] {
+  const matching: ArtifactReviewTarget[] = []
+  const all: ArtifactReviewTarget[] = []
+  for (const artifact of change.artifacts.values()) {
+    for (const file of artifact.files.values()) {
+      const target: ArtifactReviewTarget = {
+        artifactId: artifact.type,
+        fileKey: file.key,
+        filename: file.filename,
+        origin: 'direct',
+      }
+      all.push(target)
+      if (specIds.includes(file.key)) matching.push(target)
+    }
+  }
+  return matching.length > 0 ? matching : all
+}
+
+/**
+ * Throw mapped archive failure.
+ *
+ * @param check - check
+ * @param change - change
+ * @param schema - schema
+ * @param overlapEntries - overlap entries
+ * @param workspaceMap - workspace map
+ * @throws {InvalidStateTransitionError} When archive checks reject the change
+ * @throws {ArchiveImplementationStateError} When verification evidence is not current
  */
 function throwMappedArchiveFailure(
   check: CheckResult,
@@ -1368,6 +1515,32 @@ function throwMappedArchiveFailure(
         [],
         check.message ??
           `Implementation sidecar updates would touch specs outside the change "${change.name}" scope.`,
+      )
+    case 'workflow.taskCompletion': {
+      const artifactId =
+        typeof check.details?.artifactId === 'string' ? check.details.artifactId : 'unknown'
+      if (check.details?.reason === 'missing-task-capability') {
+        throw new InvalidStateTransitionError(change.state, 'archiving', {
+          type: 'missing-task-capability',
+          artifactId,
+        })
+      }
+      const count = (key: string): number => {
+        const value = check.details?.[key]
+        return typeof value === 'number' ? value : 0
+      }
+      throw new InvalidStateTransitionError(change.state, 'archiving', {
+        type: 'incomplete-tasks',
+        artifactId,
+        incomplete: count('incomplete'),
+        complete: count('complete'),
+        total: count('total'),
+      })
+    }
+    case 'verification.current':
+      throw new ArchiveImplementationStateError(
+        [],
+        check.message ?? 'Verification evidence is not current',
       )
     default:
       throw new ArchiveImplementationStateError(

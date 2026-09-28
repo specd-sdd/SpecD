@@ -3,6 +3,21 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": ["cli:entrypoint", "core:change", "cli:change-create", "core:spec-id-format"],
-  "implementation": []
+  "dependsOn": [
+    "cli:entrypoint",
+    "core:change",
+    "core:edit-change",
+    "core:config",
+    "cli:change-create",
+    "core:spec-id-format"
+  ],
+  "implementation": [
+    {
+      "file": "cli:src/commands/change/edit.ts",
+      "symbols": ["registerChangeEdit"]
+    },
+    {
+      "file": "cli:test/commands/change-edit.spec.ts"
+    }
+  ]
 }

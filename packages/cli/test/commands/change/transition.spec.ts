@@ -1304,3 +1304,48 @@ describe('Typed transition failures render Repair Guide', () => {
     expect(stderr()).toContain('! IMPL_UNRESOLVED')
   })
 })
+
+describe('validity-aware transition guidance', () => {
+  it('prints core recovery and the in-place verification command without a restart flag', async () => {
+    const { kernel, stderr } = setup()
+    kernel.changes.status.execute.mockResolvedValue({
+      change: makeMockChange({ name: 'my-change', state: 'designing' }),
+      artifactStatuses: [],
+      blockers: [{ code: 'APPROVAL_STALE', message: 'Spec approval is stale' }],
+      nextAction: {
+        targetStep: 'designing',
+        actionType: 'cognitive',
+        reason: 'Spec consent must be renewed',
+        command: '/specd-design',
+      },
+      validity: {
+        specApproval: 'stale',
+        signoff: 'not-required',
+        verification: 'stale',
+        recovery: { cause: 'spec-approval', from: 'verifying', to: 'designing' },
+        blockers: [{ code: 'APPROVAL_STALE', message: 'Spec approval is stale' }],
+      },
+    })
+    kernel.changes.transition.execute.mockRejectedValue(
+      new InvalidStateTransitionError('verifying', 'done'),
+    )
+
+    const program = makeProgram()
+    const change = program.command('change')
+    registerChangeTransition(change)
+    const transition = change.commands.find((command) => command.name() === 'transition')
+    expect(transition?.options.map((option) => option.long)).not.toContain('--restart-verification')
+
+    await program
+      .parseAsync(['node', 'specd', 'change', 'transition', 'my-change', 'done'])
+      .catch(() => {})
+
+    const err = stderr()
+    expect(process.exit).toHaveBeenCalledWith(1)
+    expect(err).toContain('repair guide:')
+    expect(err).toContain('state:   designing')
+    expect(err).toContain('recovery:      verifying → designing (spec-approval)')
+    expect(err).toContain('command: /specd-design')
+    expect(err).not.toContain('restart')
+  })
+})

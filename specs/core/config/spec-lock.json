@@ -4,7 +4,23 @@
     "version": 1
   },
   "dependsOn": ["core:vcs-adapter-port", "default:_global/architecture", "core:transition-checks"],
-  "implementation": [],
+  "implementation": [
+    {
+      "file": "core:src/domain/value-objects/invalidation-policy.ts",
+      "symbols": ["InvalidationPolicy", "DEFAULT_INVALIDATION_POLICY", "resolveInvalidationPolicy"]
+    },
+    {
+      "file": "core:src/application/specd-config.ts",
+      "symbols": ["SpecdConfig"]
+    },
+    {
+      "file": "core:src/infrastructure/fs/config-loader.ts",
+      "symbols": ["FsConfigLoader"]
+    },
+    {
+      "file": "core:src/application/ports/config-schema.ts"
+    }
+  ],
   "optimizations": {
     "optimizedDescription": {
       "value": "specd.yaml authoritatively configures schema, workspaces, storage, plugins, context, approvals, and layered overrides.",

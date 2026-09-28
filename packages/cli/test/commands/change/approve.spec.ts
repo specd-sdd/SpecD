@@ -196,6 +196,35 @@ describe('change approve spec', () => {
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toMatch(/error:/)
   })
+
+  it('reloads and renders canonical state after an approval failure', async () => {
+    const { kernel, stderr } = setup()
+    kernel.changes.approveSpec.execute.mockRejectedValue(new ApprovalGateDisabledError('spec'))
+    kernel.changes.status.execute.mockResolvedValue({
+      change: makeMockChange({ name: 'my-change', state: 'designing' }),
+      artifactStatuses: [],
+      specDependsOn: {},
+      implementationTracking: { trackedFiles: [], links: [] },
+      blockers: [{ code: 'APPROVAL_STALE', message: 'Spec approval is stale' }],
+      nextAction: {
+        targetStep: 'designing',
+        actionType: 'cognitive',
+        reason: 'Renew design consent',
+        command: '/specd-design',
+      },
+    })
+    const program = makeProgram()
+    registerChangeApprove(program.command('change'))
+
+    await program
+      .parseAsync(['node', 'specd', 'change', 'approve', 'spec', 'my-change', '--reason', 'ok'])
+      .catch(() => {})
+
+    expect(kernel.changes.status.execute).toHaveBeenCalledWith({ name: 'my-change' })
+    expect(stderr()).toContain('state: designing')
+    expect(stderr()).toContain('blocker: APPROVAL_STALE')
+    expect(stderr()).toContain('next action: /specd-design')
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -341,5 +370,146 @@ describe('change approve signoff', () => {
     expect(parsed.result).toBe('ok')
     expect(parsed.gate).toBe('signoff')
     expect(parsed.name).toBe('my-change')
+  })
+
+  it('renders empty observed implementation separately from legacy unknown evidence', async () => {
+    const hash = 'sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc'
+    const { kernel, stdout } = setup()
+    kernel.changes.approveSignoff.execute.mockResolvedValue({
+      name: 'my-change',
+      state: 'done',
+      signoff: {
+        status: 'valid',
+        decision: {
+          at: new Date('2026-09-22T12:00:00.000Z'),
+          by: { name: 'Ada', email: 'ada@example.com' },
+          reason: 'done',
+        },
+        verificationId: 'verification-3',
+        fingerprint: {
+          version: 1,
+          artifacts: {
+            algorithm: 'artifact-pre-hash-v1',
+            files: { 'spec:login': hash },
+          },
+          implementation: {
+            version: 1,
+            hashAlgorithm: 'sha256',
+            textNormalization: 'text-v1',
+            binaryNormalization: 'bytes-v1',
+            files: {},
+          },
+        },
+      },
+    })
+
+    const program = makeProgram()
+    registerChangeApprove(program.command('change'))
+    await program.parseAsync([
+      'node',
+      'specd',
+      'change',
+      'approve',
+      'signoff',
+      'my-change',
+      '--reason',
+      'done',
+    ])
+
+    const out = stdout()
+    expect(out).toContain('status:      valid')
+    expect(out).toContain('verification: verification-3')
+    expect(out).toContain('observed empty')
+    expect(out).toContain('text-v1')
+    expect(out).not.toContain(hash)
+    expect(out).not.toContain('legacy unknown')
+  })
+
+  it('labels a null implementation fingerprint as legacy unknown', async () => {
+    const { kernel, stdout } = setup()
+    kernel.changes.approveSignoff.execute.mockResolvedValue({
+      name: 'my-change',
+      state: 'done',
+      signoff: {
+        status: 'valid',
+        decision: {
+          at: '2026-09-22T12:00:00.000Z',
+          by: { name: 'Ada', email: 'ada@example.com' },
+          reason: 'done',
+        },
+        verificationId: null,
+        fingerprint: {
+          version: 1,
+          artifacts: { algorithm: 'artifact-pre-hash-v1', files: {} },
+          implementation: null,
+        },
+      },
+    })
+
+    const program = makeProgram()
+    registerChangeApprove(program.command('change'))
+    await program.parseAsync([
+      'node',
+      'specd',
+      'change',
+      'approve',
+      'signoff',
+      'my-change',
+      '--reason',
+      'done',
+    ])
+
+    expect(stdout()).toContain('implementation: legacy unknown')
+    expect(stdout()).toContain('verification: legacy unknown')
+  })
+})
+
+describe('change approve spec evidence', () => {
+  it('renders materialized spec approval without file hashes', async () => {
+    const hash = 'sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd'
+    const { kernel, stdout } = setup()
+    kernel.changes.approveSpec.execute.mockResolvedValue({
+      name: 'my-change',
+      state: 'ready',
+      specApproval: {
+        status: 'valid',
+        decision: {
+          at: '2026-09-22T12:00:00.000Z',
+          by: { name: 'Ada', email: 'ada@example.com' },
+          reason: 'looks good',
+        },
+        fingerprint: {
+          version: 1,
+          algorithm: 'artifact-pre-hash-v1',
+          files: { 'spec:login': hash },
+        },
+      },
+    })
+
+    const program = makeProgram()
+    registerChangeApprove(program.command('change'))
+    await program.parseAsync([
+      'node',
+      'specd',
+      'change',
+      'approve',
+      'spec',
+      'my-change',
+      '--reason',
+      'looks good',
+      '--format',
+      'json',
+    ])
+
+    const parsed = JSON.parse(stdout()) as {
+      approval: {
+        status: string
+        fingerprint: { artifacts: { fileCount: number }; implementation?: unknown }
+      }
+    }
+    expect(parsed.approval.status).toBe('valid')
+    expect(parsed.approval.fingerprint.artifacts.fileCount).toBe(1)
+    expect(parsed.approval.fingerprint.implementation).toBeUndefined()
+    expect(stdout()).not.toContain(hash)
   })
 })

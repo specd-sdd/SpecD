@@ -291,6 +291,25 @@
 - **THEN** it requires `archivable` or `archiving` and points signoff wait at `/specd-verify` in `done`
 - **AND** it does not mention `pending-signoff` or a `change transition` into it
 
+### Requirement: Reconciled invalidation protocol in lifecycle templates
+
+#### Scenario: Generated skills teach the same verification ownership
+
+- **WHEN** source templates are built and synchronized
+- **THEN** shared, verify, compliance, and lifecycle copies describe standalone and delegated attempt ownership consistently
+- **AND** none instruct transitions or status to create successful evidence
+
+#### Scenario: Compliance without active change remains report-only
+
+- **WHEN** compliance runs in all, diff, PR, or single-spec mode without a concrete active change
+- **THEN** the generated instructions produce reports without verification start or complete commands
+
+#### Scenario: Template tests execute every delegated decision branch
+
+- **WHEN** template contract tests simulate delegated compliance
+- **THEN** status, project context, scope discovery, dependency expansion, spec-preview reads, report directory, and filename all select change-scoped behavior
+- **AND** the test verifies attempt ownership behavior rather than only matching command phrases
+
 ### Requirement: Overlap invalidation vs live archive overlap in templates
 
 #### Scenario: Design implement verify and new do not list OVERLAP_CONFLICT as a typical blocker

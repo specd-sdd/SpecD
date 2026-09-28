@@ -21,7 +21,7 @@
     "default:_global/logging",
     "core:spec-lock",
     "default:_global/error-handling-conventions",
-    "core:regenerate-spec-metadata",
+    "core:materialize-spec-metadata",
     "core:spec-optimization",
     "core:initialize-persisted-spec-state",
     "core:composition-resolver",
@@ -29,11 +29,18 @@
   ],
   "implementation": [
     {
-      "file": "core:src/composition/use-cases/archive-change.ts",
-      "symbols": ["resolveArchiveBatchSnapshotPort"]
+      "file": "core:src/application/use-cases/archive-change.ts",
+      "symbols": ["ArchiveChange"]
     },
     {
-      "file": "core:test/composition/archive-batch-snapshot-port.spec.ts"
+      "file": "core:src/composition/use-cases/archive-change.ts",
+      "symbols": ["ArchiveChangeDeps", "createArchiveChange", "resolveArchiveChangeDeps"]
+    },
+    {
+      "file": "core:test/application/use-cases/archive-change.spec.ts"
+    },
+    {
+      "file": "core:test/composition/use-cases/archive-change.spec.ts"
     }
   ],
   "optimizations": {

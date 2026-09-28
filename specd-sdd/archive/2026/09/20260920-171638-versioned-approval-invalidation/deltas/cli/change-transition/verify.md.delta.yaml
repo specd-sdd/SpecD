@@ -1,0 +1,29 @@
+- op: added
+  position:
+    {
+      parent: { type: section, matches: '^Requirements$' },
+      after: { type: section, matches: '^Requirement: Next-transition resolution$' },
+    }
+  content: |
+    ### Requirement: Validity-aware transition guidance
+
+    #### Scenario: Exit check failure recommends verification in place
+
+    - **GIVEN** `verifying → done` lacks current completed evidence
+    - **WHEN** transition output renders `verification.current`
+    - **THEN** it reports the failed check and actual unchanged or reconciled state
+    - **AND** does not start, complete, retry, or select another transition
+
+    #### Scenario: Repair command uses the real change name
+
+    - **GIVEN** change `checkout-retry` needs in-place verification
+    - **WHEN** transition renders its repair guide
+    - **THEN** the command contains `checkout-retry`
+    - **AND** no literal `<name>` placeholder is emitted
+
+    #### Scenario: Committed recovery is not rendered as an edge error
+
+    - **GIVEN** pre-transition reconciliation commits a mandatory return
+    - **WHEN** the originally requested edge becomes inapplicable
+    - **THEN** output shows the committed blockers and next action
+    - **AND** does not describe the failure solely as an invalid protocol edge

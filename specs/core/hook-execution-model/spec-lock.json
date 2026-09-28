@@ -19,36 +19,36 @@
   "implementation": [],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Defines workflow instruction, shell, and external hooks; effect binding dispatch, ordering, failure policy, skip controls, and escaping.",
+      "value": "Defines passive, shell, and external workflow hooks plus binding-driven timing, failure, ordering, skipping, and progress.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:499fa212bbf53b1ae873b01aa2b917fab989e70dde7a702c64011e26a0a5bc85",
-          "lastModified": "2026-08-29T22:56:10.318Z"
+          "hash": "sha256:0bf018a02c9a37ded09f605ffa1ad6071fc83f7c2af7e50478586ab6485e6c11",
+          "lastModified": "2026-09-19T19:11:11.479Z"
         },
         "verify.md": {
-          "hash": "sha256:cedcf819df72973a13f6570c141961fd11e4b303c513cc2dd9ab71c96848b104",
-          "lastModified": "2026-08-29T22:53:45.973Z"
+          "hash": "sha256:33b807c144f6541ef66d2247cbd1ce750e93f98fc732108869ce976e0d2e22a9",
+          "lastModified": "2026-09-19T19:11:11.484Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# Hook Execution Model\n\n## Rules\n- Entry: `id` + exactly one `instruction:`, `run:`, or `external: { type, config }`; invalid shape → `SchemaValidationError`. Every step/phase may use all forms.\n- `instruction:` passive text only: `GetHookInstructions(step, phase, hookId?)`; never process, predicate/effect, or `CompileContext`. `run:` shell-only `HookRunner`, never agent context. External dispatches runner supporting `external.type`; absent runner fails clearly.\n- Effects selected by binding matchers (`from`/`to`/`along`), phase, `onFailure`; never check ID/private source-post path. `TransitionChange`: matching `hook.pre` and `hook.post` both `before-persist`, `abort`. `ArchiveChange`: pre `before-persist`/abort, post `after-persist`/collect. `Change` executes nothing.\n- `RunStepHooks` standalone: pre fail-fast; post continue/collect; CLI exits 2 on failures. Effects with `abort` throw `HookFailedError`; pre-persist failure leaves no state/files mutation. Collect failure records and continues after persisted archive.\n- Order per pre/post: schema declaration order, then matching project `schemaOverrides` order.\n- `skipHookPhases`: transition `source.pre|source.post|target.pre|target.post|all`; archive `pre|post|all`; skips effects, never predicates. Transition pre/post share binding phase, so selector determines skip. Manual sequence: `specd change hook-instruction`, `specd change run-hooks`, lifecycle `--skip-hooks`, post `run-hooks`, post instruction; preserve `along` filter.\n- `HookRunner` expands/shell-escapes `{{change.name}}`, `{{change.path}}`, `{{project.root}}`; unknown token unchanged. No `{{change.workspace}}`; derive plural workspaces from `specIds`.\n\n## Constraints\n- `RunStepHooks` sole execution engine for hook checks/CLI.\n- Transition source.post: forward-only, before-persist, abort; archive post: after-persist, collect.\n- Binding phase/`onFailure` controls timing/policy; callers never expand variables.",
+      "value": "# Hook Execution Model\n\n## Rules\n- Hook entry has id + exactly one `instruction:`, `run:`, or `external:{type,config}`; invalid combination → `SchemaValidationError`. Every workflow step supports all forms.\n- `instruction:` is passive text returned only by `GetHookInstructions(step, phase, hookId?)`; never process/check/effect/`CompileContext`. `run:` executes only through `HookRunner`; never agent context. External dispatches only to runner supporting `external.type`; missing runner fails clearly.\n- `TransitionChange` / `ArchiveChange` execute matching run/external effects after predicates pass. Matcher, slot, failure come from binding, never check ID/private hook path. Hook check owns `RunStepHooks` dependency.\n- Transition defaults: `hook.pre` any except recovery, `hook.post` forward only; both `before-persist`, `abort`. Archive: pre `before-persist`/abort; post `after-persist`/collect. Before-persist abort throws `HookFailedError` and preserves prior state/files; collect records and continues.\n- Standalone `RunStepHooks`: pre fail-fast; post continues/collects; CLI exits 2 on failure. It is sole hook execution engine for checks and CLI. `Change` executes nothing.\n- Ordering per phase: schema hooks declaration order, then matching project `schemaOverrides` declaration order.\n- Transition `skipHookPhases`: source.pre/source.post/target.pre/target.post/all; archive: pre/post/all. Skip only effects, never predicates. Since transition pre/post share before-persist, selection uses binding phase plus pre/post selector identity. Manual callers preserve `along` filtering.\n- Manual sequence: hook instruction pre → run-hooks pre → lifecycle command with skip selector → run-hooks post → hook instruction post.\n- `HookRunner` expands and shell-escapes `{{change.name}}`, `{{change.path}}`, `{{project.root}}`; unknown token preserved. No `{{change.workspace}}`; derive touched workspaces from specIds.\n\n## Constraints\n- Pre hooks always fail-fast. Transition source.post is forward-only and aborts before persist. Archive post is collect after persist.\n- Use cases select effects by binding phase/onFailure and never launch `RunStepHooks` by ID.\n- `--skip-hooks` skips effects only.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:499fa212bbf53b1ae873b01aa2b917fab989e70dde7a702c64011e26a0a5bc85",
-          "lastModified": "2026-08-29T22:56:10.318Z"
+          "hash": "sha256:0bf018a02c9a37ded09f605ffa1ad6071fc83f7c2af7e50478586ab6485e6c11",
+          "lastModified": "2026-09-19T19:11:11.479Z"
         },
         "verify.md": {
-          "hash": "sha256:cedcf819df72973a13f6570c141961fd11e4b303c513cc2dd9ab71c96848b104",
-          "lastModified": "2026-08-29T22:53:45.973Z"
+          "hash": "sha256:33b807c144f6541ef66d2247cbd1ce750e93f98fc732108869ce976e0d2e22a9",
+          "lastModified": "2026-09-19T19:11:11.484Z"
         }
       }
     }

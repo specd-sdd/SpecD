@@ -87,25 +87,17 @@
 
 ### Requirement: Input contract
 
-#### Scenario: execute accepts CreateChangeInput without schema fields
+Scenarios:
 
-- **WHEN** `CreateChange.execute` is called with `name` and `specIds` only
-- **THEN** it accepts the input without `schemaName` or `schemaVersion`
+#### Scenario: Creation accepts a complete structured override
 
-#### Scenario: execute accepts explicit schema override
+- **WHEN** valid artifact and workflow policy values are supplied
+- **THEN** they are passed as one structured input without parsing legacy aliases in the use case
 
-- **WHEN** `CreateChange.execute` is called with `schemaName` and `schemaVersion` provided
-- **THEN** it uses the provided values without calling `GetActiveSchema`
+#### Scenario: Partial schema override remains invalid
 
-#### Scenario: Partial schema override is rejected
-
-- **WHEN** `CreateChange.execute` is called with only `schemaName` or only `schemaVersion`
-- **THEN** it throws before persisting the change
-
-#### Scenario: specIds are recorded in the created event
-
-- **WHEN** `CreateChange.execute` is called with `specIds: ['auth/login', 'auth/register']`
-- **THEN** the created event contains `specIds: ['auth/login', 'auth/register']`
+- **WHEN** creation supplies only one member of the schema override pair
+- **THEN** input validation rejects the request independently of policy input
 
 ### Requirement: Active schema resolution
 
@@ -152,11 +144,18 @@
 
 ### Requirement: Initial invalidation policy
 
-#### Scenario: New change persists the project default invalidationPolicy
+Scenarios:
 
-- **GIVEN** the project default invalidation policy is `downstream`
-- **WHEN** `CreateChange.execute` creates a new change
-- **THEN** the returned and persisted change uses `invalidationPolicy: 'downstream'`
+#### Scenario: Explicit policy wins over preserve default
+
+- **WHEN** a new change is created with explicit structured policy
+- **THEN** its v2 manifest persists that policy and no legacy scalar
+- **AND** omission resolves configured values or `{ downstream, preserve }`
+
+#### Scenario: Later policy edits do not rewrite creation history
+
+- **WHEN** the persisted policy changes after creation
+- **THEN** no retroactive drift or recovery is fabricated
 
 ### Requirement: Persistence and scaffolding
 
@@ -213,15 +212,26 @@
 
 ### Requirement: Config-based factory delegates through resolveCreateChangeDeps
 
-#### Scenario: createCreateChange config form derives CreateChangeDeps through resolveCreateChangeDeps
+#### Scenario: Config factory injects nondefault project policy
 
-- **WHEN** `createCreateChange(config, options?)` is invoked
-- **THEN** it creates a composition resolver for that composition session
-- **AND** it derives `CreateChangeDeps` through `resolveCreateChangeDeps(resolver)`
-- **AND** `resolveCreateChangeDeps(resolver)` resolves:
-- `changes: ChangeRepository`
-- `listWorkspaces: ListWorkspaces`
-- `actor: ActorResolver`
-- `getActiveSchema: GetActiveSchema`
-- `detectOverlap: DetectOverlap`
-- **AND** the factory delegates to canonical `createCreateChange(deps)`
+- **GIVEN** resolved project configuration sets `{ artifacts: surgical, workflow: redesign }`
+- **WHEN** `createCreateChange(config).execute` creates a change without an input policy
+- **THEN** `resolveCreateChangeDeps` supplies that structured default
+- **AND** the persisted v2 manifest uses `{ artifacts: surgical, workflow: redesign }`, not the native default
+
+#### Scenario: Kernel creation shares the config factory default
+
+- **GIVEN** the same nondefault project policy
+- **WHEN** `kernel.changes.create.execute` receives no input policy
+- **THEN** it persists the same project default without a CLI-supplied overlay
+
+#### Scenario: Explicit policy overrides injected project default
+
+- **GIVEN** a config-based factory or kernel with a nondefault project policy
+- **WHEN** creation supplies an explicit structured input policy
+- **THEN** the explicit policy is persisted and only one creation event is recorded
+
+#### Scenario: Direct dependencies without project default use native default
+
+- **WHEN** `createCreateChange(deps)` receives no injected default and execute supplies no policy
+- **THEN** it persists `{ artifacts: downstream, workflow: preserve }`

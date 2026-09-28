@@ -1,7 +1,7 @@
 import { createHash } from 'crypto'
 import { describe, it, expect, vi } from 'vitest'
 import { makeSpec } from '../../helpers/make-spec.js'
-import { ValidateArtifacts } from '../../../src/application/use-cases/validate-artifacts.js'
+import { ValidateArtifacts as CoreValidateArtifacts } from '../../../src/application/use-cases/validate-artifacts.js'
 import { ChangeNotFoundError } from '../../../src/application/errors/change-not-found-error.js'
 import { SchemaNotFoundError } from '../../../src/application/errors/schema-not-found-error.js'
 import { SchemaMismatchError } from '../../../src/application/errors/schema-mismatch-error.js'
@@ -31,7 +31,13 @@ import {
   testActor,
   makeContentHasher,
   makeListWorkspaces,
+  makeObservingReconcile,
+  makeSpecApprovalFingerprint,
 } from './helpers.js'
+import { ValidityFingerprintService } from '../../../src/application/services/validity-fingerprint-service.js'
+import { ReconcileChangeValidity } from '../../../src/application/use-cases/reconcile-change-validity.js'
+import { type RefreshImplementationTracking } from '../../../src/application/use-cases/refresh-implementation-tracking.js'
+import { NodeBinaryContentHasher } from '../../../src/infrastructure/node/binary-content-hasher.js'
 
 // ---------------------------------------------------------------------------
 // Test helpers
@@ -39,6 +45,16 @@ import {
 
 function sha256(content: string): string {
   return `sha256:${createHash('sha256').update(content, 'utf8').digest('hex')}`
+}
+
+/** Builds the real canonical reconciler for validation fixtures that omit one. */
+function makeValidateArtifacts(
+  ...args: ConstructorParameters<typeof CoreValidateArtifacts>
+): CoreValidateArtifacts {
+  if (args[8] === undefined) {
+    args[8] = makeObservingReconcile(args[0])
+  }
+  return new CoreValidateArtifacts(...args)
 }
 
 function makeChangeWithArtifacts(
@@ -78,7 +94,7 @@ function makeChangeWithArtifacts(
 describe('ValidateArtifacts', () => {
   describe('change not found', () => {
     it('throws ChangeNotFoundError when change does not exist', async () => {
-      const uc = new ValidateArtifacts(
+      const uc = makeValidateArtifacts(
         makeChangeRepository(),
         makeListWorkspaces(new Map()),
         makeSchemaProvider(makeSchema([])),
@@ -98,7 +114,7 @@ describe('ValidateArtifacts', () => {
   describe('specPath not in change', () => {
     it('throws SpecNotInChangeError when specPath is not in change.specIds', async () => {
       const change = makeChangeWithArtifacts('c', [], { specIds: ['default:auth/login'] })
-      const uc = new ValidateArtifacts(
+      const uc = makeValidateArtifacts(
         makeChangeRepository([change]),
         makeListWorkspaces(new Map()),
         makeSchemaProvider(makeSchema([])),
@@ -118,7 +134,7 @@ describe('ValidateArtifacts', () => {
   describe('schema not found', () => {
     it('throws SchemaNotFoundError when schema cannot be resolved', async () => {
       const change = makeChangeWithArtifacts('c', [])
-      const uc = new ValidateArtifacts(
+      const uc = makeValidateArtifacts(
         makeChangeRepository([change]),
         makeListWorkspaces(new Map()),
         makeSchemaProvider(null),
@@ -138,7 +154,7 @@ describe('ValidateArtifacts', () => {
   describe('schema name mismatch', () => {
     it('throws SchemaMismatchError when active schema name differs from change schema name', async () => {
       const change = makeChangeWithArtifacts('c', [], { schemaName: 'schema-a' })
-      const uc = new ValidateArtifacts(
+      const uc = makeValidateArtifacts(
         makeChangeRepository([change]),
         makeListWorkspaces(new Map()),
         makeSchemaProvider(makeSchema({ name: 'schema-b' })),
@@ -161,7 +177,7 @@ describe('ValidateArtifacts', () => {
       const schema = makeSchema([specsType])
       const change = makeChangeWithArtifacts('c', [])
       const repo = makeChangeRepository([change])
-      const uc = new ValidateArtifacts(
+      const uc = makeValidateArtifacts(
         repo,
         makeListWorkspaces(new Map()),
         makeSchemaProvider(schema),
@@ -199,7 +215,7 @@ describe('ValidateArtifacts', () => {
       })
       const change = makeChangeWithArtifacts('c', [designArtifact])
       const repo = makeChangeRepository([change])
-      const uc = new ValidateArtifacts(
+      const uc = makeValidateArtifacts(
         repo,
         makeListWorkspaces(new Map()),
         makeSchemaProvider(schema),
@@ -221,7 +237,7 @@ describe('ValidateArtifacts', () => {
       const schema = makeSchema([designType])
       const change = makeChangeWithArtifacts('c', [])
       const repo = makeChangeRepository([change])
-      const uc = new ValidateArtifacts(
+      const uc = makeValidateArtifacts(
         repo,
         makeListWorkspaces(new Map()),
         makeSchemaProvider(schema),
@@ -244,7 +260,7 @@ describe('ValidateArtifacts', () => {
       const change = makeChangeWithArtifacts('c', [])
       const repo = makeChangeRepository([change])
       const evaluateSpy = vi.spyOn(lifecycleVerdict, 'evaluateLifecycleVerdict')
-      const uc = new ValidateArtifacts(
+      const uc = makeValidateArtifacts(
         repo,
         makeListWorkspaces(new Map()),
         makeSchemaProvider(schema),
@@ -309,7 +325,7 @@ describe('ValidateArtifacts', () => {
         },
       })
 
-      const uc = new ValidateArtifacts(
+      const uc = makeValidateArtifacts(
         repo,
         makeListWorkspaces(new Map()),
         makeSchemaProvider(schema),
@@ -369,7 +385,7 @@ describe('ValidateArtifacts', () => {
       })
       const change = makeChangeWithArtifacts('c', [proposalArtifact, specsArtifact])
       const repo = makeChangeRepository([change])
-      const uc = new ValidateArtifacts(
+      const uc = makeValidateArtifacts(
         repo,
         makeListWorkspaces(new Map()),
         makeSchemaProvider(schema),
@@ -437,7 +453,7 @@ describe('ValidateArtifacts', () => {
       })
 
       const evaluateSpy = vi.spyOn(lifecycleVerdict, 'evaluateLifecycleVerdict')
-      const uc = new ValidateArtifacts(
+      const uc = makeValidateArtifacts(
         repo,
         makeListWorkspaces(new Map()),
         makeSchemaProvider(schema),
@@ -506,7 +522,7 @@ describe('ValidateArtifacts', () => {
         },
       })
 
-      const uc = new ValidateArtifacts(
+      const uc = makeValidateArtifacts(
         repo,
         makeListWorkspaces(new Map()),
         makeSchemaProvider(schema),
@@ -566,7 +582,7 @@ describe('ValidateArtifacts', () => {
         },
       })
 
-      const uc = new ValidateArtifacts(
+      const uc = makeValidateArtifacts(
         repo,
         makeListWorkspaces(new Map()),
         makeSchemaProvider(schema),
@@ -612,7 +628,7 @@ describe('ValidateArtifacts', () => {
         },
       })
       const mutateSpy = vi.spyOn(repo, 'mutate')
-      const uc = new ValidateArtifacts(
+      const uc = makeValidateArtifacts(
         repo,
         makeListWorkspaces(new Map()),
         makeSchemaProvider(schema),
@@ -655,7 +671,7 @@ describe('ValidateArtifacts', () => {
         },
       })
       const mutateSpy = vi.spyOn(repo, 'mutate')
-      const uc = new ValidateArtifacts(
+      const uc = makeValidateArtifacts(
         repo,
         makeListWorkspaces(new Map()),
         makeSchemaProvider(schema),
@@ -671,7 +687,7 @@ describe('ValidateArtifacts', () => {
       expect(file?.displayStatus()).not.toBe('complete-with-drift')
     })
 
-    it('calls change.invalidate when cleaned hash differs from approval', async () => {
+    it('does not call legacy aggregate invalidation when cleaned hash differs', async () => {
       const specsType = makeArtifactType('specs')
       const schema = makeSchema([specsType])
 
@@ -709,7 +725,7 @@ describe('ValidateArtifacts', () => {
         },
       })
 
-      const uc = new ValidateArtifacts(
+      const uc = makeValidateArtifacts(
         repo,
         makeListWorkspaces(new Map()),
         makeSchemaProvider(schema),
@@ -723,9 +739,8 @@ describe('ValidateArtifacts', () => {
         specPath: 'default:auth',
       })
 
-      // After invalidation, change should be back in designing state
       const saved = repo.store.get('c')
-      expect(saved?.history.some((e) => e.type === 'invalidated')).toBe(true)
+      expect(saved?.history.some((e) => e.type === 'invalidated')).toBe(false)
     })
 
     it('scans consent hashes across all artifacts even when artifactId is set', async () => {
@@ -785,7 +800,7 @@ describe('ValidateArtifacts', () => {
           return c !== undefined ? new SpecArtifact(filename, c) : null
         },
       })
-      const uc = new ValidateArtifacts(
+      const uc = makeValidateArtifacts(
         repo,
         makeListWorkspaces(new Map()),
         makeSchemaProvider(schema),
@@ -801,7 +816,7 @@ describe('ValidateArtifacts', () => {
       })
 
       const saved = repo.store.get('c')
-      expect(saved?.history.some((e) => e.type === 'invalidated')).toBe(true)
+      expect(saved?.history.some((e) => e.type === 'invalidated')).toBe(false)
     })
 
     it('calls invalidate at most once even when multiple artifacts changed', async () => {
@@ -847,7 +862,7 @@ describe('ValidateArtifacts', () => {
         },
       })
 
-      const uc = new ValidateArtifacts(
+      const uc = makeValidateArtifacts(
         repo,
         makeListWorkspaces(new Map()),
         makeSchemaProvider(schema),
@@ -863,7 +878,7 @@ describe('ValidateArtifacts', () => {
 
       const saved = repo.store.get('c')
       const invalidatedCount = saved?.history.filter((e) => e.type === 'invalidated').length ?? 0
-      expect(invalidatedCount).toBe(1)
+      expect(invalidatedCount).toBe(0)
     })
 
     it('Consent-hash drift still invalidates once with a focused payload', async () => {
@@ -953,7 +968,7 @@ describe('ValidateArtifacts', () => {
         },
       })
 
-      const uc = new ValidateArtifacts(
+      const uc = makeValidateArtifacts(
         repo,
         makeListWorkspaces(new Map()),
         makeSchemaProvider(schema),
@@ -967,15 +982,7 @@ describe('ValidateArtifacts', () => {
         specPath: 'default:auth',
       })
 
-      expect(invalidateCall).toBeDefined()
-      const [cause, , invalidation] = invalidateCall! as [
-        string,
-        unknown,
-        { message: string; affectedArtifacts: Array<{ type: string; files: string[] }> },
-      ]
-      expect(cause).toBe('artifact-drift')
-      expect(invalidation.message).toContain('validated artifacts drifted')
-      expect(invalidation.affectedArtifacts).toEqual([{ type: 'design', files: ['design'] }])
+      expect(invalidateCall).toBeUndefined()
     })
 
     it('does not call invalidate when hashes match', async () => {
@@ -1017,7 +1024,7 @@ describe('ValidateArtifacts', () => {
         },
       })
 
-      const uc = new ValidateArtifacts(
+      const uc = makeValidateArtifacts(
         repo,
         makeListWorkspaces(new Map()),
         makeSchemaProvider(schema),
@@ -1082,7 +1089,7 @@ describe('ValidateArtifacts', () => {
         },
       })
 
-      const uc = new ValidateArtifacts(
+      const uc = makeValidateArtifacts(
         repo,
         makeListWorkspaces(new Map()),
         makeSchemaProvider(schema),
@@ -1137,7 +1144,7 @@ describe('ValidateArtifacts', () => {
         },
       })
 
-      const uc = new ValidateArtifacts(
+      const uc = makeValidateArtifacts(
         repo,
         makeListWorkspaces(new Map()),
         makeSchemaProvider(schema),
@@ -1182,7 +1189,7 @@ describe('ValidateArtifacts', () => {
         },
       })
 
-      const uc = new ValidateArtifacts(
+      const uc = makeValidateArtifacts(
         repo,
         makeListWorkspaces(new Map()),
         makeSchemaProvider(schema),
@@ -1226,7 +1233,7 @@ describe('ValidateArtifacts', () => {
         },
       })
 
-      const uc = new ValidateArtifacts(
+      const uc = makeValidateArtifacts(
         repo,
         makeListWorkspaces(new Map()),
         makeSchemaProvider(schema),
@@ -1276,7 +1283,7 @@ describe('ValidateArtifacts', () => {
         },
       })
 
-      const uc = new ValidateArtifacts(
+      const uc = makeValidateArtifacts(
         repo,
         makeListWorkspaces(new Map()),
         makeSchemaProvider(schema),
@@ -1329,7 +1336,7 @@ describe('ValidateArtifacts', () => {
         },
       })
 
-      const uc = new ValidateArtifacts(
+      const uc = makeValidateArtifacts(
         repo,
         makeListWorkspaces(new Map()),
         makeSchemaProvider(schema),
@@ -1375,7 +1382,7 @@ describe('ValidateArtifacts', () => {
         },
       })
 
-      const uc = new ValidateArtifacts(
+      const uc = makeValidateArtifacts(
         repo,
         makeListWorkspaces(new Map()),
         makeSchemaProvider(schema),
@@ -1434,7 +1441,7 @@ describe('ValidateArtifacts', () => {
         artifacts: { 'auth/spec.md': 'base content' },
       })
 
-      const uc = new ValidateArtifacts(
+      const uc = makeValidateArtifacts(
         repo,
         makeListWorkspaces(new Map([['default', specsRepo]])),
         makeSchemaProvider(schema),
@@ -1513,7 +1520,7 @@ describe('ValidateArtifacts', () => {
         artifacts: { 'auth/spec.md': 'base content' },
       })
 
-      const uc = new ValidateArtifacts(
+      const uc = makeValidateArtifacts(
         repo,
         makeListWorkspaces(new Map([['default', specsRepo]])),
         makeSchemaProvider(schema),
@@ -1575,7 +1582,7 @@ describe('ValidateArtifacts', () => {
         },
       })
 
-      const uc = new ValidateArtifacts(
+      const uc = makeValidateArtifacts(
         repo,
         makeListWorkspaces(new Map()),
         makeSchemaProvider(schema),
@@ -1658,7 +1665,7 @@ describe('ValidateArtifacts', () => {
         },
       })
 
-      const uc = new ValidateArtifacts(
+      const uc = makeValidateArtifacts(
         repo,
         makeListWorkspaces(
           new Map([
@@ -1724,7 +1731,7 @@ describe('ValidateArtifacts', () => {
       })
       const specRepoSpy = vi.spyOn(specRepo, 'get')
 
-      const uc = new ValidateArtifacts(
+      const uc = makeValidateArtifacts(
         repo,
         makeListWorkspaces(new Map([['default', specRepo]])),
         makeSchemaProvider(schema),
@@ -1779,7 +1786,7 @@ describe('ValidateArtifacts', () => {
         },
       })
 
-      const uc = new ValidateArtifacts(
+      const uc = makeValidateArtifacts(
         repo,
         makeListWorkspaces(
           new Map([
@@ -1839,7 +1846,7 @@ describe('ValidateArtifacts', () => {
         },
       })
 
-      const uc = new ValidateArtifacts(
+      const uc = makeValidateArtifacts(
         repo,
         makeListWorkspaces(
           new Map([
@@ -1907,7 +1914,7 @@ describe('ValidateArtifacts', () => {
         },
       })
 
-      const uc = new ValidateArtifacts(
+      const uc = makeValidateArtifacts(
         repo,
         makeListWorkspaces(new Map()),
         makeSchemaProvider(schema),
@@ -1948,7 +1955,7 @@ describe('ValidateArtifacts', () => {
         },
       })
 
-      const uc = new ValidateArtifacts(
+      const uc = makeValidateArtifacts(
         repo,
         makeListWorkspaces(new Map()),
         makeSchemaProvider(schema),
@@ -1970,7 +1977,7 @@ describe('ValidateArtifacts', () => {
       const specsType = makeArtifactType('specs')
       const schema = makeSchema([specsType])
       const change = makeChangeWithArtifacts('c', [])
-      const uc = new ValidateArtifacts(
+      const uc = makeValidateArtifacts(
         makeChangeRepository([change]),
         makeListWorkspaces(new Map()),
         makeSchemaProvider(schema),
@@ -1993,7 +2000,7 @@ describe('ValidateArtifacts', () => {
       const proposalType = makeArtifactType('proposal')
       const schema = makeSchema([proposalType])
       const change = makeChangeWithArtifacts('c', [])
-      const uc = new ValidateArtifacts(
+      const uc = makeValidateArtifacts(
         makeChangeRepository([change]),
         makeListWorkspaces(new Map()),
         makeSchemaProvider(schema),
@@ -2041,7 +2048,7 @@ describe('ValidateArtifacts', () => {
         },
       })
 
-      const uc = new ValidateArtifacts(
+      const uc = makeValidateArtifacts(
         repo,
         makeListWorkspaces(new Map()),
         makeSchemaProvider(schema),
@@ -2085,7 +2092,7 @@ describe('ValidateArtifacts', () => {
         },
       })
 
-      const uc = new ValidateArtifacts(
+      const uc = makeValidateArtifacts(
         repo,
         makeListWorkspaces(new Map()),
         makeSchemaProvider(schema),
@@ -2141,7 +2148,7 @@ describe('ValidateArtifacts', () => {
       const change = makeChangeWithArtifacts('c', [proposalArtifact, verifyArtifact])
       const repo = makeChangeRepository([change])
 
-      const uc = new ValidateArtifacts(
+      const uc = makeValidateArtifacts(
         repo,
         makeListWorkspaces(new Map()),
         makeSchemaProvider(schema),
@@ -2197,7 +2204,7 @@ describe('ValidateArtifacts', () => {
       const change = makeChangeWithArtifacts('c', [proposalArtifact, verifyArtifact])
       const repo = makeChangeRepository([change])
 
-      const uc = new ValidateArtifacts(
+      const uc = makeValidateArtifacts(
         repo,
         makeListWorkspaces(new Map()),
         makeSchemaProvider(schema),
@@ -2264,7 +2271,7 @@ describe('ValidateArtifacts', () => {
         },
       })
 
-      const uc = new ValidateArtifacts(
+      const uc = makeValidateArtifacts(
         repo,
         makeListWorkspaces(new Map()),
         makeSchemaProvider(schema),
@@ -2312,7 +2319,7 @@ describe('ValidateArtifacts', () => {
         },
       })
 
-      const uc = new ValidateArtifacts(
+      const uc = makeValidateArtifacts(
         repo,
         makeListWorkspaces(new Map()),
         makeSchemaProvider(schema),
@@ -2348,7 +2355,7 @@ describe('ValidateArtifacts', () => {
       const change = makeChangeWithArtifacts('c', [specsArtifact])
 
       const repo = makeChangeRepository([change])
-      const uc = new ValidateArtifacts(
+      const uc = makeValidateArtifacts(
         repo,
         makeListWorkspaces(new Map()),
         makeSchemaProvider(schema),
@@ -2383,7 +2390,7 @@ describe('ValidateArtifacts', () => {
       const change = makeChangeWithArtifacts('c', [designArtifact])
 
       const repo = makeChangeRepository([change])
-      const uc = new ValidateArtifacts(
+      const uc = makeValidateArtifacts(
         repo,
         makeListWorkspaces(new Map()),
         makeSchemaProvider(schema),
@@ -2479,7 +2486,7 @@ describe('ValidateArtifacts', () => {
         renderSubtree: (node) => (node.value as string | undefined) ?? '',
       })
 
-      const uc = new ValidateArtifacts(
+      const uc = makeValidateArtifacts(
         repo,
         makeListWorkspaces(new Map()),
         makeSchemaProvider(schema),
@@ -2601,7 +2608,7 @@ describe('ValidateArtifacts', () => {
             .join('\n'),
       })
 
-      const uc = new ValidateArtifacts(
+      const uc = makeValidateArtifacts(
         repo,
         makeListWorkspaces(new Map()),
         makeSchemaProvider(schema),
@@ -2718,7 +2725,7 @@ describe('ValidateArtifacts', () => {
             .join('\n'),
       })
 
-      const uc = new ValidateArtifacts(
+      const uc = makeValidateArtifacts(
         repo,
         makeListWorkspaces(
           new Map([
@@ -2838,7 +2845,7 @@ describe('ValidateArtifacts', () => {
             .join('\n'),
       })
 
-      const uc = new ValidateArtifacts(
+      const uc = makeValidateArtifacts(
         repo,
         makeListWorkspaces(new Map([['default', specRepo]])),
         makeSchemaProvider(schema),
@@ -2949,7 +2956,7 @@ describe('ValidateArtifacts', () => {
             .join('\n'),
       })
 
-      const uc = new ValidateArtifacts(
+      const uc = makeValidateArtifacts(
         repo,
         makeListWorkspaces(new Map()),
         makeSchemaProvider(schema),
@@ -3051,7 +3058,7 @@ describe('ValidateArtifacts', () => {
         },
       })
 
-      const uc = new ValidateArtifacts(
+      const uc = makeValidateArtifacts(
         repo,
         makeListWorkspaces(new Map([['default', makeSpecRepository()]])),
         makeSchemaProvider(schema),
@@ -3120,7 +3127,7 @@ describe('ValidateArtifacts', () => {
         },
       })
 
-      const uc = new ValidateArtifacts(
+      const uc = makeValidateArtifacts(
         repo,
         makeListWorkspaces(new Map([['default', makeSpecRepository()]])),
         makeSchemaProvider(schema),
@@ -3227,7 +3234,7 @@ describe('ValidateArtifacts', () => {
         },
       })
 
-      const uc = new ValidateArtifacts(
+      const uc = makeValidateArtifacts(
         repo,
         makeListWorkspaces(new Map([['default', makeSpecRepository()]])),
         makeSchemaProvider(schema),
@@ -3348,7 +3355,7 @@ describe('ValidateArtifacts', () => {
         })
 
         const parser = makeRequirementParser()
-        const uc = new ValidateArtifacts(
+        const uc = makeValidateArtifacts(
           repo,
           makeListWorkspaces(new Map([['default', makeSpecRepository()]])),
           makeSchemaProvider(schema),
@@ -3393,7 +3400,7 @@ describe('ValidateArtifacts', () => {
           },
         })
 
-        const uc = new ValidateArtifacts(
+        const uc = makeValidateArtifacts(
           repo,
           makeListWorkspaces(new Map([['default', makeSpecRepository()]])),
           makeSchemaProvider(schema),
@@ -3448,7 +3455,7 @@ describe('ValidateArtifacts', () => {
           },
         })
 
-        const uc = new ValidateArtifacts(
+        const uc = makeValidateArtifacts(
           repo,
           makeListWorkspaces(new Map([['default', makeSpecRepository()]])),
           makeSchemaProvider(schema),
@@ -3506,7 +3513,7 @@ describe('ValidateArtifacts', () => {
           },
         })
 
-        const uc = new ValidateArtifacts(
+        const uc = makeValidateArtifacts(
           repo,
           makeListWorkspaces(new Map([['default', makeSpecRepository()]])),
           makeSchemaProvider(schema),
@@ -3625,7 +3632,7 @@ describe('ValidateArtifacts', () => {
         })
 
         const parser = makeRequirementParser()
-        const uc = new ValidateArtifacts(
+        const uc = makeValidateArtifacts(
           repo,
           makeListWorkspaces(new Map([['default', makeSpecRepository()]])),
           makeSchemaProvider(schema),
@@ -3705,7 +3712,7 @@ describe('ValidateArtifacts', () => {
           parseDelta: () => [{ op: 'modified' }],
         })
 
-        const uc = new ValidateArtifacts(
+        const uc = makeValidateArtifacts(
           repo,
           makeListWorkspaces(new Map([['default', specRepo]])),
           makeSchemaProvider(schema),
@@ -3770,7 +3777,7 @@ describe('ValidateArtifacts', () => {
         })
 
         const parser = makeRequirementParser()
-        const uc = new ValidateArtifacts(
+        const uc = makeValidateArtifacts(
           repo,
           makeListWorkspaces(new Map([['default', makeSpecRepository()]])),
           makeSchemaProvider(schema),
@@ -3833,7 +3840,7 @@ describe('ValidateArtifacts', () => {
         })
 
         const parser = makeRequirementParser()
-        const uc = new ValidateArtifacts(
+        const uc = makeValidateArtifacts(
           repo,
           makeListWorkspaces(new Map([['default', makeSpecRepository()]])),
           makeSchemaProvider(schema),
@@ -3950,7 +3957,7 @@ describe('ValidateArtifacts', () => {
         })
 
         const parser = makeRequirementParser()
-        const uc = new ValidateArtifacts(
+        const uc = makeValidateArtifacts(
           repo,
           makeListWorkspaces(new Map([['default', makeSpecRepository()]])),
           makeSchemaProvider(schema),
@@ -4003,7 +4010,7 @@ describe('ValidateArtifacts', () => {
       const repo = makeChangeRepository([change])
       repo.artifact = async () => new SpecArtifact('proposal.md', '# Proposal')
 
-      const uc = new ValidateArtifacts(
+      const uc = makeValidateArtifacts(
         repo,
         makeListWorkspaces(new Map()),
         makeSchemaProvider(schema),
@@ -4022,7 +4029,7 @@ describe('ValidateArtifacts', () => {
         makeArtifactType('specs', { scope: 'spec', output: 'spec.md', requires: [] }),
       ])
       const change = makeChangeWithArtifacts('c', [], { specIds: ['default:auth'] })
-      const uc = new ValidateArtifacts(
+      const uc = makeValidateArtifacts(
         makeChangeRepository([change]),
         makeListWorkspaces(new Map()),
         makeSchemaProvider(schema),
@@ -4084,7 +4091,7 @@ describe('ValidateArtifacts', () => {
         return new SpecArtifact(filename, `# ${id}`)
       }
 
-      const uc = new ValidateArtifacts(
+      const uc = makeValidateArtifacts(
         repo,
         makeListWorkspaces(new Map()),
         makeSchemaProvider(schema),
@@ -4097,5 +4104,213 @@ describe('ValidateArtifacts', () => {
 
       expect(validationOrder).toEqual(['proposal', 'design', 'tasks'])
     })
+  })
+})
+
+describe('ValidateArtifacts reconciliation', () => {
+  it('rejects construction without the canonical reconciler', () => {
+    const repo = makeChangeRepository()
+    expect(
+      () =>
+        new CoreValidateArtifacts(
+          repo,
+          makeListWorkspaces(new Map()),
+          makeSchemaProvider(makeSchema()),
+          makeParsers(makeParser()),
+          makeActorResolver(),
+          makeContentHasher(),
+        ),
+    ).toThrow('reconcile is required')
+  })
+
+  function reconciled(
+    repo: ReturnType<typeof makeChangeRepository>,
+    schema: ReturnType<typeof makeSchema>,
+  ) {
+    const schemaProvider = makeSchemaProvider(schema)
+    const hasher = makeContentHasher()
+    const fingerprint = new ValidityFingerprintService({
+      changes: repo,
+      hasher,
+      binaryHasher: new NodeBinaryContentHasher(),
+      schemaProvider,
+    })
+    const reconcile = new ReconcileChangeValidity({
+      changes: repo,
+      schemaProvider,
+      actor: makeActorResolver(),
+      refreshImplementationTracking: {
+        execute: async () => undefined,
+      } as unknown as RefreshImplementationTracking,
+      fingerprint,
+      approvals: { spec: false, signoff: false },
+    })
+    return makeValidateArtifacts(
+      repo,
+      makeListWorkspaces(new Map()),
+      schemaProvider,
+      makeParsers(makeParser()),
+      makeActorResolver(),
+      hasher,
+      new Map(),
+      [],
+      reconcile,
+    )
+  }
+
+  it('stales approval before committing the new validated hash and does not renew it', async () => {
+    const content = 'current content'
+    const specsType = makeArtifactType('specs')
+    const schema = makeSchema([specsType])
+    const change = makeChangeWithArtifacts('c', [
+      new ChangeArtifact({
+        type: 'specs',
+        files: new Map([
+          [
+            'specs',
+            new ArtifactFile({
+              key: 'specs',
+              filename: 'specs.md',
+              status: 'in-progress',
+            }),
+          ],
+        ]),
+      }),
+    ])
+    change.recordSpecApproval(
+      'earlier',
+      makeSpecApprovalFingerprint(change.specIds, {
+        version: 1,
+        algorithm: 'artifact-pre-hash-v1',
+        files: { 'specs:specs': 'sha256:old' },
+      }),
+      testActor,
+    )
+    const repo = makeChangeRepository([change])
+    const mutateSpy = vi.spyOn(repo, 'mutate')
+    const invalidateSpy = vi.spyOn(change, 'invalidate')
+    repo.artifact = async () => new SpecArtifact('specs.md', content)
+    const result = await reconciled(repo, schema).execute({ name: 'c' })
+    const saved = repo.store.get('c')
+    expect(result.passed).toBe(true)
+    expect(saved?.specApproval?.status).toBe('stale')
+    expect(saved?.getArtifact('specs')?.getFile('specs')?.status).toBe('complete')
+    expect(saved?.getArtifact('specs')?.getFile('specs')?.validatedHash).not.toBe('sha256:old')
+    expect(saved?.history.filter((event) => event.type === 'spec-approved')).toHaveLength(1)
+    expect(mutateSpy).toHaveBeenCalledTimes(1)
+    expect(invalidateSpy).not.toHaveBeenCalled()
+  })
+
+  it('does not stale approval when only a task artifact changes', async () => {
+    const proposal = 'proposal body'
+    const proposalHash = sha256(proposal)
+    const schema = makeSchema([
+      makeArtifactType('proposal'),
+      makeArtifactType('tasks', { hasTasks: true }),
+    ])
+    const change = makeChangeWithArtifacts('c', [
+      new ChangeArtifact({
+        type: 'proposal',
+        files: new Map([
+          [
+            'proposal',
+            new ArtifactFile({
+              key: 'proposal',
+              filename: 'proposal.md',
+              status: 'complete',
+              validatedHash: proposalHash,
+            }),
+          ],
+        ]),
+      }),
+      new ChangeArtifact({
+        type: 'tasks',
+        files: new Map([
+          [
+            'tasks',
+            new ArtifactFile({
+              key: 'tasks',
+              filename: 'tasks.md',
+              status: 'complete',
+              validatedHash: 'sha256:old-tasks',
+            }),
+          ],
+        ]),
+      }),
+    ])
+    change.recordSpecApproval(
+      'earlier',
+      makeSpecApprovalFingerprint(change.specIds, {
+        version: 1,
+        algorithm: 'artifact-pre-hash-v1',
+        files: { 'proposal:proposal': proposalHash as `sha256:${string}` },
+      }),
+      testActor,
+    )
+    const repo = makeChangeRepository([change])
+    repo.artifact = async (_change, filename) =>
+      new SpecArtifact(filename, filename === 'tasks.md' ? '- [ ] still open' : proposal)
+    const result = await reconciled(repo, schema).execute({ name: 'c' })
+    const saved = repo.store.get('c')
+    expect(result.passed).toBe(true)
+    expect(saved?.specApproval?.status).toBe('valid')
+    expect(saved?.history.some((event) => event.type === 'approval-invalidated')).toBe(false)
+    expect(saved?.getArtifact('tasks')?.getFile('tasks')?.status).toBe('complete')
+  })
+
+  it('does not stale approval when only a hasTasks artifact named checklist.md changes', async () => {
+    const proposal = 'proposal body'
+    const proposalHash = sha256(proposal)
+    const schema = makeSchema([
+      makeArtifactType('proposal'),
+      makeArtifactType('checklist', { hasTasks: true, output: 'checklist.md' }),
+    ])
+    const change = makeChangeWithArtifacts('c', [
+      new ChangeArtifact({
+        type: 'proposal',
+        files: new Map([
+          [
+            'proposal',
+            new ArtifactFile({
+              key: 'proposal',
+              filename: 'proposal.md',
+              status: 'complete',
+              validatedHash: proposalHash,
+            }),
+          ],
+        ]),
+      }),
+      new ChangeArtifact({
+        type: 'checklist',
+        files: new Map([
+          [
+            'checklist',
+            new ArtifactFile({
+              key: 'checklist',
+              filename: 'checklist.md',
+              status: 'complete',
+              validatedHash: 'sha256:old-checklist',
+            }),
+          ],
+        ]),
+      }),
+    ])
+    change.recordSpecApproval(
+      'earlier',
+      makeSpecApprovalFingerprint(change.specIds, {
+        version: 1,
+        algorithm: 'artifact-pre-hash-v1',
+        files: { 'proposal:proposal': proposalHash as `sha256:${string}` },
+      }),
+      testActor,
+    )
+    const repo = makeChangeRepository([change])
+    repo.artifact = async (_change, filename) =>
+      new SpecArtifact(filename, filename === 'checklist.md' ? '- [ ] still open' : proposal)
+    const result = await reconciled(repo, schema).execute({ name: 'c' })
+    const saved = repo.store.get('c')
+    expect(result.passed).toBe(true)
+    expect(saved?.specApproval?.status).toBe('valid')
+    expect(saved?.history.some((event) => event.type === 'approval-invalidated')).toBe(false)
   })
 })

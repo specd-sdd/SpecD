@@ -55,6 +55,14 @@ JSON/toon output SHALL include both canonical state and display-state fields whe
 
 Displayed `validTransitions`, `availableTransitions`, `nextAction`, and repair-oriented blockers MUST be the check-derived projections from `GetStatus`. The CLI MUST NOT filter the protocol graph locally in a way that reintroduces a list execute would reject (for example advertising `verifying` while tasks are incomplete, or recommending `/specd-implement` when `verifying` is allowed).
 
+### Requirement: Reconciled validity and next-action output
+
+The command SHALL treat `GetStatus` as the sole source of current validity and routing. It MUST render the lifecycle state returned after reconciliation, not a state captured before the call, and MUST make any automatic return visible with its cause.
+
+Text and structured output SHALL distinguish absent, valid, stale, revoked, and legacy-unknown approval or verification evidence; show active verification attempts separately from completed evidence, including identity and freshness; show changed fingerprint inputs without dumping sensitive content; show structured artifact/workflow policy; and present the canonical blocker and next action. At verification-requiring boundaries, stale evidence recommends in-place start/checks/complete through the skill rather than mandatory phase movement. Status MUST NOT complete an attempt or imply that starting one means verification passed.
+
+Required stale spec consent SHALL display the committed return to `designing` and the path through review, `ready`, approval, and implementation. Stale sign-off alone SHALL show return to `done`, with verification first when stale. At earlier phases stale verification remains contextual and MUST NOT replace the normal next step. Under ungated `preserve`, in-place artifact review and revalidation SHALL be suggested without implying that validation renews approval.
+
 ### Requirement: Text status omits duplicated review file lists
 
 When rendering `format=text` and `review.required` is true, the CLI MUST print a `review:` header with `required`, `route`, `reason`, and human `message` when Core supplies it. It MUST NOT print `review.affectedArtifacts` file paths. Those files already appear under `artifacts (details):` with `pending-review` and `[drift]`. Invalidation overlap MUST NOT appear as a `OVERLAP_CONFLICT` blocker line.

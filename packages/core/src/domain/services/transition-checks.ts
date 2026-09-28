@@ -1,6 +1,7 @@
 import { InvalidInputError } from '../errors/invalid-input-error.js'
 import { VALID_TRANSITIONS, type ChangeState } from '../value-objects/change-state.js'
 import { type Change } from '../entities/change.js'
+import { type ChangeValidityVerdict } from './change-validity.js'
 import { type ArtifactStatus } from '../value-objects/artifact-status.js'
 import { type Schema } from '../value-objects/schema.js'
 
@@ -32,6 +33,7 @@ export type CheckId =
   | 'spec.overlap'
   | 'hook.pre'
   | 'hook.post'
+  | 'verification.current'
 
 /** Outcome of a single check. */
 export type CheckOutcome = 'pass' | 'fail' | 'skip'
@@ -54,6 +56,7 @@ export const CHECK_LABELS: Readonly<Record<CheckId, string>> = {
   'spec.overlap': 'Checking spec overlap',
   'hook.pre': 'Running pre hooks',
   'hook.post': 'Running post hooks',
+  'verification.current': 'Checking verification freshness',
 }
 
 /**
@@ -93,6 +96,7 @@ export type CheckApplicability =
       readonly along: TransitionAlong | '*'
     }
   | { readonly scope: 'archive' }
+  | { readonly scope: 'operation'; readonly operation: 'verification-start' }
 
 /** Per-artifact checkbox counts gathered by `workflow.taskCompletion`. */
 export interface TaskCompletionCounts {
@@ -212,6 +216,7 @@ export type CheckAttempt =
       readonly along: TransitionAlong
     }
   | { readonly scope: 'archive' }
+  | { readonly scope: 'operation'; readonly operation: 'verification-start' }
 
 /**
  * Whether a check applies to this attempt.
@@ -223,6 +228,9 @@ export type CheckAttempt =
 export function checkMatches(applicability: CheckApplicability, attempt: CheckAttempt): boolean {
   if (applicability.scope === 'archive') {
     return attempt.scope === 'archive'
+  }
+  if (applicability.scope === 'operation') {
+    return attempt.scope === 'operation' && applicability.operation === attempt.operation
   }
   if (attempt.scope !== 'transition') {
     return false
@@ -349,6 +357,12 @@ export interface CheckExecutionContext {
   readonly allowOutOfScope: boolean
   /** Config approval gates. */
   readonly approvals: { readonly spec: boolean; readonly signoff: boolean }
+  /**
+   * Reconciled validity snapshot for this evaluation.
+   *
+   * Checks read it and must not mutate projections or read files to recompute it.
+   */
+  readonly validity?: ChangeValidityVerdict
   /** Effective artifact statuses for `workflow.requires`. */
   readonly effectiveStatusByArtifact: ReadonlyMap<string, ArtifactStatus>
   /** Optional sink for `check-progress` while a check’s `execute` runs. */

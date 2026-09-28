@@ -2,14 +2,16 @@ import { type Change } from '../../domain/entities/change.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
 import { type ActorResolver } from '../ports/actor-resolver.js'
 import { type SchemaProvider } from '../ports/schema-provider.js'
-import { type ContentHasher } from '../ports/content-hasher.js'
 import { ApprovalGateDisabledError } from '../errors/approval-gate-disabled-error.js'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
+import { FingerprintInputError } from '../errors/fingerprint-input-error.js'
 import { SchemaMismatchError } from '../errors/schema-mismatch-error.js'
 import { InvalidStateTransitionError } from '../../domain/errors/invalid-state-transition-error.js'
-import { computeArtifactHash, buildCleanupMap } from './_shared/compute-artifact-hash.js'
-import { boundFromStates } from '../../domain/services/check-bindings.js'
+import { type ChangeValidityVerdict } from '../../domain/services/change-validity.js'
+import { type Schema } from '../../domain/value-objects/schema.js'
+import { type ValidityFingerprintService } from '../services/validity-fingerprint-service.js'
 import { type ApprovalGates } from './transition-change.js'
+import { type ReconcileChangeValidity } from './reconcile-change-validity.js'
 
 /** Input for the {@link ApproveSpec} use case. */
 export interface ApproveSpecInput {
@@ -20,52 +22,55 @@ export interface ApproveSpecInput {
 }
 
 /**
- * Records spec-gate consent in every state the binding table lists as `from` for
- * `approval.spec` (today: `ready`). Drain: `pending-spec-approval` → `spec-approved`.
+ * Records spec-gate consent only while the reconciled change is `ready`.
  *
- * Requires the spec approval gate (`approvals.spec: true`) to be active.
- * Artifact hashes are computed internally from the change's artifacts on disk,
- * using schema-defined pre-hash cleanup rules.
+ * Historic `pending-spec-approval` manifests still drain to `spec-approved`.
+ * New work does not enter that state, and this use case does not invent it.
  */
 export class ApproveSpec {
   private readonly _changes: ChangeRepository
   private readonly _actor: ActorResolver
   private readonly _schemaProvider: SchemaProvider
-  private readonly _hasher: ContentHasher
   private readonly _approvals: ApprovalGates
+  private readonly _reconcile: ReconcileChangeValidity
+  private readonly _fingerprint: ValidityFingerprintService
 
   /**
    * Creates a new `ApproveSpec` use case instance.
    *
    * @param changes - Repository for loading and persisting the change
-   * @param actor - Resolver for the actor identity
+   * @param actor - Resolver for the privacy-decorated actor identity
    * @param schemaProvider - Provider for the fully-resolved schema
-   * @param hasher - Content hasher for computing artifact hashes
    * @param approvals - Whether approval gates are active in the project configuration
+   * @param reconcile - Canonical validity reconciler
+   * @param fingerprint - Shared artifact fingerprint collector
    */
   constructor(
     changes: ChangeRepository,
     actor: ActorResolver,
     schemaProvider: SchemaProvider,
-    hasher: ContentHasher,
     approvals: ApprovalGates,
+    reconcile: ReconcileChangeValidity,
+    fingerprint: ValidityFingerprintService,
   ) {
     this._changes = changes
     this._actor = actor
     this._schemaProvider = schemaProvider
-    this._hasher = hasher
     this._approvals = approvals
+    this._reconcile = reconcile
+    this._fingerprint = fingerprint
   }
 
   /**
-   * Executes the use case.
+   * Reconciles validity and records spec consent when the change remains eligible.
    *
    * @param input - Approval parameters
    * @returns The updated change
    * @throws {ApprovalGateDisabledError} If the spec approval gate is not enabled
    * @throws {ChangeNotFoundError} If no change with the given name exists
-   * @throws {InvalidStateTransitionError} If the change is not in an `approval.spec` `from` state or `pending-spec-approval`
+   * @throws {InvalidStateTransitionError} If the reconciled change cannot accept spec consent
    * @throws {SchemaMismatchError} If the change schema differs from the active schema
+   * @throws {FingerprintInputError} If a required artifact fingerprint cannot be collected
    */
   async execute(input: ApproveSpecInput): Promise<Change> {
     if (!this._approvals.spec) {
@@ -77,52 +82,80 @@ export class ApproveSpec {
       throw new ChangeNotFoundError(input.name)
     }
 
-    const actor = await this._actor.identity()
     const schema = await this._schemaProvider.get()
     if (schema.name() !== change.schemaName) {
       throw new SchemaMismatchError(change.name, change.schemaName, schema.name())
     }
 
-    const consentFrom = boundFromStates('approval.spec')
-    if (!consentFrom.includes(change.state) && change.state !== 'pending-spec-approval') {
-      throw new InvalidStateTransitionError(change.state, consentFrom[0] ?? 'ready')
+    const actor = await this._actor.identity()
+    const mutation = await this._reconcile.mutate({ name: input.name, actor }, async (ctx) => {
+      const state = ctx.change.state
+      if (state !== 'ready' && state !== 'pending-spec-approval') {
+        return { outcome: 'state' as const, state }
+      }
+      const collected = await this._fingerprint.specApprovalFingerprint(ctx.change)
+      if (collected.fingerprint === null) {
+        return { outcome: 'fingerprint' as const, failures: collected.failures }
+      }
+      const artifactId = blockingArtifact(ctx.change, schema, ctx.before)
+      if (artifactId !== null) {
+        return { outcome: 'ineligible' as const, state, artifactId }
+      }
+      ctx.change.recordSpecApproval(input.reason, collected.fingerprint, actor)
+      if (ctx.change.state === 'pending-spec-approval') {
+        ctx.change.transition('spec-approved', actor)
+      }
+      return { outcome: 'ok' as const }
+    })
+
+    if (mutation.result.outcome === 'state') {
+      throw new InvalidStateTransitionError(mutation.result.state, 'ready')
     }
-
-    const { change: updatedChange } = await this._changes.mutate(
-      input.name,
-      async (freshChange) => {
-        const artifactHashes = await this._computeArtifactHashes(freshChange)
-        freshChange.recordSpecApproval(input.reason, artifactHashes, actor)
-        if (freshChange.state === 'pending-spec-approval') {
-          freshChange.transition('spec-approved', actor)
-        }
-      },
-    )
-    return updatedChange
+    if (mutation.result.outcome === 'fingerprint') {
+      throw new FingerprintInputError(mutation.result.failures)
+    }
+    if (mutation.result.outcome === 'ineligible') {
+      throw new InvalidStateTransitionError(mutation.result.state, 'ready', {
+        type: 'incomplete-artifact',
+        artifactId: mutation.result.artifactId,
+      })
+    }
+    return mutation.change
   }
+}
 
-  /**
-   * Computes artifact hashes for all artifacts in the change, applying
-   * schema-defined pre-hash cleanup rules.
-   *
-   * @param change - The change whose artifacts to hash
-   * @returns Map of artifact filename to hash string
-   */
-  private async _computeArtifactHashes(change: Change): Promise<Record<string, string>> {
-    const schema = await this._schemaProvider.get()
-    const cleanupMap = buildCleanupMap(schema)
-
-    const result: Record<string, string> = {}
-    for (const [type, artifact] of change.artifacts) {
-      const cleanups = cleanupMap.get(type) ?? []
-      for (const [fileKey, file] of artifact.files) {
-        if (file.status === 'missing' || file.status === 'skipped') continue
-        const loaded = await this._changes.artifact(change, file.filename)
-        if (loaded === null) continue
-        const hashKey = `${type}:${fileKey}`
-        result[hashKey] = computeArtifactHash(loaded.content, (c) => this._hasher.hash(c), cleanups)
+/**
+ * Blocking artifact.
+ *
+ * @param change - change
+ * @param schema - schema
+ * @param verdict - verdict
+ * @returns blocking artifact result
+ */
+function blockingArtifact(
+  change: Change,
+  schema: Schema,
+  verdict: ChangeValidityVerdict,
+): string | null {
+  if (verdict.artifactReviewRequired) {
+    return verdict.affectedArtifacts[0]?.artifactId ?? 'unknown'
+  }
+  const requires = schema.workflowStep(change.state)?.requires ?? []
+  for (const artifactId of requires) {
+    const type = schema.artifact(artifactId)
+    if (type?.hasTasks === true) continue
+    const artifact = change.getArtifact(artifactId)
+    if (artifact === null) return artifactId
+    for (const file of artifact.files.values()) {
+      if (
+        file.status === 'missing' ||
+        file.status === 'pending-review' ||
+        file.status === 'drifted-pending-review' ||
+        file.status === 'in-progress'
+      ) {
+        return artifactId
       }
     }
-    return result
   }
+  return null
 }

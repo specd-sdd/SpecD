@@ -124,16 +124,19 @@ There is no implicit multi-level fallback — the prefix determines exactly wher
 
 ### Requirement: Invalidation policy configuration
 
-`specd.yaml` MAY declare a root-level `invalidationPolicy` field controlling how artifact/file invalidation propagates when a change is invalidated.
+Project configuration SHALL accept the structured invalidation policy:
 
-Allowed values are:
+```yaml
+invalidation:
+  artifacts: downstream
+  workflow: preserve
+```
 
-- `none`
-- `surgical`
-- `downstream`
-- `global`
+`artifacts` MUST be one of `none`, `surgical`, `downstream`, or `global`. `workflow` MUST be `preserve` or `redesign`. Missing values for a newly created change resolve to `{ artifacts: downstream, workflow: preserve }` before the policy is persisted on that change.
 
-The configured value is the project default used to seed new changes and to resolve effective invalidation policy when a change has not been overridden later.
+The legacy top-level `invalidationPolicy` key SHALL remain readable temporarily as a deprecated alias. It maps to `{ artifacts: <legacy value>, workflow: redesign }`, preserving legacy rollback behaviour. Supplying both `invalidationPolicy` and `invalidation` in the same effective configuration SHALL fail validation as ambiguous; merge precedence MUST NOT silently select one.
+
+The workflow policy controls drift-driven lifecycle recovery only. It MUST NOT configure transition topology, waive unresolved artifact freshness, or override mandatory approval-gate recovery.
 
 ### Requirement: Workspaces
 
@@ -470,19 +473,19 @@ File paths remain resolved relative to the directory containing the active confi
 
 ### Requirement: Approvals
 
-`specd.yaml` may include an `approvals` section to configure which lifecycle gates require explicit human approval. Both gates are disabled by default — teams opt in to the level of governance they need.
+`specd.yaml` MAY configure two independent human-approval gates. Both are disabled by default:
 
 ```yaml
 approvals:
-  spec: false # require approval of the spec before implementation (default: false)
-  signoff: false # require sign-off of the completed work before archiving (default: false)
+  spec: false
+  signoff: false
 ```
 
-**`spec`** — when `true`, a change in `ready` cannot take any **forward** leave of `ready` (`approval.spec` is `from=ready`, `to=*`, `along=forward`) until `ApproveSpec` records consent. The change stays in `ready`. That includes `ready → implementing` and `ready → verifying` when `implementing` is omitted from `workflow[]`. Redesign (`ready → designing`) MUST NOT require the spec gate. The `approval.spec` check fails with `APPROVAL_REQUIRED` until that record exists. When `false` (default), forward leave of `ready` is free (`approval.spec` skips). New work MUST NOT enter `pending-spec-approval` as a happy-path hop. When a change is already in `pending-spec-approval`, drain (leave that state) remains legal. `change transition` targeting `pending-spec-approval` is never the next-action path.
+When `spec` is `true`, a change in `ready` MUST NOT take a legal forward leave of `ready` until `ApproveSpec` records current consent. The `approval.spec` check applies to that forward boundary and fails with `APPROVAL_REQUIRED` while consent is missing or stale. Redesign (`ready → designing`) MUST NOT require consent. When the gate is off, the check skips. Omitting a workflow row does not by itself create a direct transition to a later lifecycle state; phase skipping is outside this contract.
 
-**`signoff`** — when `true`, a change in `done` cannot transition to `archivable` until `ApproveSignoff` records consent. The change stays in `done`. When `false` (default), `done → archivable` is a free transition. New work MUST NOT enter `pending-signoff` as a happy-path hop. When a change is already in `pending-signoff`, drain remains legal. `change transition` targeting `pending-signoff` is never the next-action path.
+When `signoff` is `true`, a change in `done` MUST NOT enter `archivable` until `ApproveSignoff` records current consent. When the gate is off, that approval check skips.
 
-Both flags are independent — any combination is valid.
+New work MUST stay in `ready` or `done` while awaiting the respective approval; it MUST NOT enter `pending-spec-approval` or `pending-signoff` as a happy-path hop. Existing changes already in those pending states retain their compatibility drain. Both gate flags are independent and every combination is valid.
 
 ### Requirement: Logging configuration
 

@@ -4,9 +4,11 @@ import {
   type CheckExecutionContext,
   type CheckId,
   type CheckKind,
+  pass,
   skip,
   type TaskCompletionCounts,
 } from '../../domain/services/transition-checks.js'
+import { type ChangeState } from '../../domain/value-objects/change-state.js'
 import { type CountTasks } from '../use-cases/count-tasks.js'
 import { WorkflowCheck } from './workflow-check.js'
 
@@ -52,25 +54,61 @@ class WorkflowTaskCompletionCheck extends WorkflowCheck {
    * @returns Check result
    */
   override async execute(ctx: CheckExecutionContext) {
-    if (ctx.attempt.scope !== 'transition') {
+    if (ctx.attempt.scope !== 'transition' && ctx.attempt.scope !== 'archive') {
       return skip('workflow.taskCompletion')
     }
+    const taskCounts = await this._loadCounts(ctx)
+    if (ctx.attempt.scope === 'transition') {
+      return runTaskCompletion({
+        schema: ctx.schema,
+        target: ctx.attempt.to,
+        taskCounts,
+      })
+    }
+    let sawRequiredStep = false
+    for (const step of ctx.schema.workflow()) {
+      if (step.requiresTaskCompletion.length === 0) continue
+      sawRequiredStep = true
+      const result = runTaskCompletion({
+        schema: ctx.schema,
+        target: step.step as ChangeState,
+        taskCounts,
+      })
+      if (result.outcome === 'fail') return result
+    }
+    if (!sawRequiredStep) {
+      return {
+        ...skip('workflow.taskCompletion'),
+        details: { byArtifact: taskCounts.byArtifact },
+      }
+    }
+    return {
+      ...pass('workflow.taskCompletion'),
+      details: { byArtifact: taskCounts.byArtifact },
+    }
+  }
+
+  /**
+   * Loads checkbox counts once per predicate pass.
+   *
+   * @param ctx - Host attempt context
+   * @returns Per-artifact and total counts
+   */
+  private async _loadCounts(ctx: CheckExecutionContext): Promise<{
+    readonly byArtifact: Readonly<Record<string, TaskCompletionCounts>>
+    readonly total: TaskCompletionCounts
+  }> {
     const memoKey = 'workflow.taskCompletion:countTasks'
-    let taskCounts = ctx.passMemo?.get(memoKey) as
+    const cached = ctx.passMemo?.get(memoKey) as
       | {
           readonly byArtifact: Readonly<Record<string, TaskCompletionCounts>>
           readonly total: TaskCompletionCounts
         }
       | undefined
-    if (taskCounts === undefined) {
-      taskCounts = await this._countTasks.execute({ change: ctx.change })
-      ctx.passMemo?.set(memoKey, taskCounts)
-    }
-    return runTaskCompletion({
-      schema: ctx.schema,
-      target: ctx.attempt.to,
-      taskCounts,
-    })
+    if (cached !== undefined) return cached
+    const taskCounts = await this._countTasks.execute({ change: ctx.change })
+    ctx.passMemo?.set(memoKey, taskCounts)
+    return taskCounts
   }
 }
 

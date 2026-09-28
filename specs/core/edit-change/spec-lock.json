@@ -3,15 +3,19 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": ["core:change", "core:composition", "core:composition-resolver"],
+  "dependsOn": [
+    "core:change",
+    "core:composition",
+    "core:composition-resolver",
+    "core:list-workspaces"
+  ],
   "implementation": [
     {
       "file": "core:src/application/use-cases/edit-change.ts",
-      "symbols": ["EditChange.execute"]
+      "symbols": ["EditChange"]
     },
     {
-      "file": "core:src/composition/use-cases/edit-change.ts",
-      "symbols": ["resolveEditChangeDeps"]
+      "file": "core:test/application/use-cases/edit-change.spec.ts"
     }
   ],
   "optimizations": {

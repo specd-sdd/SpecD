@@ -9,6 +9,7 @@ import { type ActorResolver } from '../application/ports/actor-resolver.js'
 import { type ArchiveRepository } from '../application/ports/archive-repository.js'
 import { type ArtifactParserRegistry } from '../application/ports/artifact-parser.js'
 import { type ChangeRepository } from '../application/ports/change-repository.js'
+import { type BinaryContentHasher } from '../application/ports/binary-content-hasher.js'
 import { type ContentHasher } from '../application/ports/content-hasher.js'
 import { type DiffGenerator } from '../application/ports/diff-generator.js'
 import { type FileReader } from '../application/ports/file-reader.js'
@@ -30,6 +31,9 @@ import { parseSpecId } from '../domain/services/parse-spec-id.js'
 import { SpecPath } from '../domain/value-objects/spec-path.js'
 import { FsFileReader } from '../infrastructure/fs/file-reader.js'
 import { FsFileWriter } from '../infrastructure/fs/file-writer.js'
+import { ValidityFingerprintService } from '../application/services/validity-fingerprint-service.js'
+import { ReconcileChangeValidity } from '../application/use-cases/reconcile-change-validity.js'
+import { NodeBinaryContentHasher } from '../infrastructure/node/binary-content-hasher.js'
 import { NodeContentHasher } from '../infrastructure/node/content-hasher.js'
 import { NodeHookRunner } from '../infrastructure/node/hook-runner.js'
 import { NodeYamlSerializer } from '../infrastructure/node/yaml-serializer.js'
@@ -207,6 +211,27 @@ export interface CompositionResolver {
   getContentHasher(): ContentHasher
 
   /**
+   * Returns the shared raw-byte hasher.
+   *
+   * @returns The binary content hasher
+   */
+  getBinaryContentHasher(): BinaryContentHasher
+
+  /**
+   * Returns the shared validity fingerprint service.
+   *
+   * @returns The fingerprint service
+   */
+  getValidityFingerprintService(): ValidityFingerprintService
+
+  /**
+   * Returns the shared validity reconciler.
+   *
+   * @returns The reconciler
+   */
+  getReconcileChangeValidity(): ReconcileChangeValidity
+
+  /**
    * Returns the shared file reader.
    *
    * @returns The file reader
@@ -349,6 +374,7 @@ export function createCompositionResolver(
     ownership: defaultWorkspace.ownership,
     isExternal: defaultWorkspace.isExternal,
     configPath: config.configPath,
+    projectRoot: config.projectRoot,
   }
 
   let specRepositories: ReadonlyMap<string, SpecRepository> | undefined =
@@ -365,6 +391,9 @@ export function createCompositionResolver(
   let diffGenerator: DiffGenerator | undefined
   let extractorTransforms: ExtractorTransformRegistry | undefined
   let contentHasher: ContentHasher | undefined
+  let binaryContentHasher: BinaryContentHasher | undefined
+  let validityFingerprintService: ValidityFingerprintService | undefined
+  let reconcileChangeValidity: ReconcileChangeValidity | undefined
   let fileReader: FileReader | undefined
   let fileWriter: FileWriter | undefined
   let yamlSerializer: YamlSerializer | undefined
@@ -629,6 +658,36 @@ export function createCompositionResolver(
       if (contentHasher !== undefined) return contentHasher
       contentHasher = new NodeContentHasher()
       return contentHasher
+    },
+
+    getBinaryContentHasher(): BinaryContentHasher {
+      if (binaryContentHasher !== undefined) return binaryContentHasher
+      binaryContentHasher = new NodeBinaryContentHasher()
+      return binaryContentHasher
+    },
+
+    getValidityFingerprintService(): ValidityFingerprintService {
+      if (validityFingerprintService !== undefined) return validityFingerprintService
+      validityFingerprintService = new ValidityFingerprintService({
+        changes: resolver.getChangeRepository(),
+        hasher: resolver.getContentHasher(),
+        binaryHasher: resolver.getBinaryContentHasher(),
+        schemaProvider: resolver.getSchemaProvider(),
+      })
+      return validityFingerprintService
+    },
+
+    getReconcileChangeValidity(): ReconcileChangeValidity {
+      if (reconcileChangeValidity !== undefined) return reconcileChangeValidity
+      reconcileChangeValidity = new ReconcileChangeValidity({
+        changes: resolver.getChangeRepository(),
+        schemaProvider: resolver.getSchemaProvider(),
+        actor: resolver.getActorResolver(),
+        refreshImplementationTracking: resolver.getRefreshImplementationTracking(),
+        fingerprint: resolver.getValidityFingerprintService(),
+        approvals: config.approvals,
+      })
+      return reconcileChangeValidity
     },
 
     getFileReader(): FileReader {

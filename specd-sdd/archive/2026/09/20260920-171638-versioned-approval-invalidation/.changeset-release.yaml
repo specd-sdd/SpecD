@@ -1,0 +1,26 @@
+releases:
+  core:change: minor
+  core:change-repository-port: minor
+  core:config: minor
+  core:approve-spec: minor
+  core:approve-signoff: minor
+  core:validate-artifacts: minor
+  core:invalidate-change: minor
+  core:edit-change: minor
+  core:transition-change: minor
+  core:get-status: minor
+  core:archive-change: minor
+  cli:change-status: minor
+  cli:change-invalidate: minor
+  cli:change-approve: minor
+  cli:change-transition: minor
+  core:change-manifest: minor
+  core:schema-format: minor
+  core:transition-checks: minor
+  skills:workflow-automation: minor
+  skills:skill-templates-source: minor
+  core:create-change: minor
+  cli:change-create: minor
+  cli:change-edit: minor
+  cli:change-verification: minor
+  core:invalidate-verification: minor

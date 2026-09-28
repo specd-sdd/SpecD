@@ -1,5 +1,12 @@
 import * as path from 'node:path'
-import { type Change } from '../../domain/entities/change.js'
+import {
+  type ApprovalDecision,
+  type Change,
+  type CompletedVerification,
+  type ProjectionInvalidation,
+  type ProjectionStatus,
+  type VerificationAttempt,
+} from '../../domain/entities/change.js'
 import { type DraftedChangeView } from '../../domain/read-only-change-view.js'
 import { type ArtifactStatus } from '../../domain/value-objects/artifact-status.js'
 import { type ArtifactDisplayStatus } from '../../domain/value-objects/artifact-display-status.js'
@@ -32,6 +39,15 @@ import {
   projectImplementationTracking,
 } from './_shared/implementation-tracking.js'
 import { RefreshImplementationTracking } from './refresh-implementation-tracking.js'
+import { type ReconcileChangeValidity } from './reconcile-change-validity.js'
+import { InvalidCompositionFactoryArgumentsError } from '../../domain/errors/invalid-composition-factory-arguments-error.js'
+import {
+  type ArtifactReviewTarget,
+  type AutomaticRecovery,
+  type ChangeValidityVerdict,
+  type ProjectionChange,
+  type ValidityBlocker,
+} from '../../domain/services/change-validity.js'
 import { type TaskCompletionStatus } from './count-tasks.js'
 
 /** Input for the {@link GetStatus} use case. */
@@ -49,6 +65,51 @@ export interface GetStatusInput {
    * case returns early without re-evaluating full status.
    */
   readonly ifModifiedSince?: string
+}
+
+/**
+ * Combines the committed aggregate evidence with its canonical verdict.
+ *
+ * @param change - Committed aggregate
+ * @param verdict - Canonical validity verdict
+ * @param nextAction - Lifecycle guidance derived by Core
+ * @returns Rich status projection
+ */
+function projectValidityStatus(
+  change: Change,
+  verdict: ChangeValidityVerdict,
+  nextAction: NextAction,
+): ValidityStatusProjection {
+  const spec = change.specApproval
+  const signoff = change.signoff
+  const verification = change.verification
+  return {
+    specApproval: {
+      required: verdict.specApproval !== 'not-required',
+      status: verdict.specApproval,
+      ...(spec?.decision !== undefined ? { decision: spec.decision } : {}),
+      ...(spec?.invalidation !== undefined ? { invalidation: spec.invalidation } : {}),
+    },
+    signoff: {
+      required: verdict.signoff !== 'not-required',
+      status: verdict.signoff,
+      ...(signoff?.decision !== undefined ? { decision: signoff.decision } : {}),
+      ...(signoff?.invalidation !== undefined ? { invalidation: signoff.invalidation } : {}),
+    },
+    verification: {
+      requiredAtCurrentBoundary: verdict.verification !== 'not-required',
+      freshness: verdict.verification === 'attempt-active' ? 'in-progress' : verdict.verification,
+      ...(verification.activeAttempt !== undefined
+        ? { activeAttempt: verification.activeAttempt }
+        : {}),
+      ...(verification.completed !== undefined ? { completed: verification.completed } : {}),
+    },
+    automaticReturn: verdict.recovery,
+    projectionChanges: verdict.projectionChanges,
+    affectedArtifacts: verdict.affectedArtifacts,
+    blockers: verdict.blockers,
+    nextAction,
+  }
 }
 
 /** Per-file status detail within an artifact. */
@@ -213,6 +274,34 @@ export interface NextAction {
   readonly command: string | null
 }
 
+/** Materialized approval status exposed by GetStatus. */
+export interface ApprovalStatusProjection {
+  readonly required: boolean
+  readonly status: 'not-required' | 'absent' | ProjectionStatus
+  readonly decision?: ApprovalDecision
+  readonly invalidation?: ProjectionInvalidation
+}
+
+/** Materialized verification status retaining attempt and completed evidence together. */
+export interface VerificationStatusProjection {
+  readonly requiredAtCurrentBoundary: boolean
+  readonly activeAttempt?: VerificationAttempt
+  readonly completed?: CompletedVerification
+  readonly freshness: 'not-required' | 'absent' | 'in-progress' | 'valid' | 'stale'
+}
+
+/** Canonical validity projection returned to delivery adapters. */
+export interface ValidityStatusProjection {
+  readonly specApproval: ApprovalStatusProjection
+  readonly signoff: ApprovalStatusProjection
+  readonly verification: VerificationStatusProjection
+  readonly automaticReturn: AutomaticRecovery | null
+  readonly projectionChanges: readonly ProjectionChange[]
+  readonly affectedArtifacts: readonly ArtifactReviewTarget[]
+  readonly blockers: readonly ValidityBlocker[]
+  readonly nextAction: NextAction
+}
+
 /** Describes why a structurally valid transition is not currently available. */
 export interface TransitionBlocker {
   /** The blocked target state. */
@@ -276,6 +365,8 @@ export interface GetStatusResult {
   readonly blockers: readonly Blocker[]
   /** Recommended next action. */
   readonly nextAction: NextAction
+  /** Canonical validity verdict when status reconciled before projecting. */
+  readonly validity?: ValidityStatusProjection
 }
 
 /**
@@ -291,6 +382,7 @@ export class GetStatus {
   private readonly _refresh: RefreshImplementationTracking
   private readonly _transitionBindings: readonly CheckBinding[]
   private readonly _archiveBindings: readonly CheckBinding[]
+  private readonly _reconcile: ReconcileChangeValidity
 
   /**
    * Creates a new `GetStatus` use case instance.
@@ -303,6 +395,7 @@ export class GetStatus {
    * @param refreshImplementationTracking - Primitive for optional pre-read refresh
    * @param transitionBindings - Composed transition check bindings
    * @param archiveBindings - Composed archive check bindings (status in `archivable`)
+   * @param reconcile - Optional validity reconciler applied before projection
    */
   constructor(
     changes: ChangeRepository,
@@ -311,6 +404,7 @@ export class GetStatus {
     refreshImplementationTracking: RefreshImplementationTracking,
     transitionBindings: readonly CheckBinding[],
     archiveBindings: readonly CheckBinding[],
+    reconcile?: ReconcileChangeValidity,
   ) {
     this._changes = changes
     this._schemaProvider = schemaProvider
@@ -318,6 +412,10 @@ export class GetStatus {
     this._refresh = refreshImplementationTracking
     this._transitionBindings = transitionBindings
     this._archiveBindings = archiveBindings
+    if (reconcile === undefined) {
+      throw new InvalidCompositionFactoryArgumentsError('GetStatus', 'reconcile is required')
+    }
+    this._reconcile = reconcile
   }
 
   /**
@@ -340,32 +438,33 @@ export class GetStatus {
       return await this._buildDraftedResult(draftView)
     }
 
-    if (input.ifModifiedSince !== undefined) {
-      const clientRevision = Date.parse(input.ifModifiedSince)
-      if (!Number.isNaN(clientRevision) && clientRevision >= change.updatedAt.getTime()) {
-        return this._buildUnchangedResult(change)
-      }
+    let schema: Awaited<ReturnType<SchemaProvider['get']>>
+    try {
+      schema = await this._schemaProvider.get()
+    } catch {
+      return this._buildActiveResult(change, undefined, null)
     }
 
-    if (input.refreshImplementationTracking !== false) {
-      await this._refresh.execute({ name: input.name })
-    }
-
-    const refreshedChange = await this._changes.get(input.name)
-    if (refreshedChange === null) {
-      throw new ChangeNotFoundError(input.name)
-    }
-
-    return this._buildActiveResult(refreshedChange)
+    const reconciled = await this._reconcile.execute({
+      name: input.name,
+      refreshImplementationTracking: input.refreshImplementationTracking !== false,
+    })
+    return this._buildActiveResult(reconciled.change, reconciled.verdict, schema)
   }
 
   /**
    * Builds the full status projection for an active change.
    *
    * @param change - Active change loaded from the repository
+   * @param validity - Reconciled validity verdict when a reconciler ran
+   * @param schema - Schema resolved before any active-status mutation, or null on degradation
    * @returns Full status result
    */
-  private async _buildActiveResult(change: Change): Promise<GetStatusResult> {
+  private async _buildActiveResult(
+    change: Change,
+    validity?: ChangeValidityVerdict,
+    schema: Awaited<ReturnType<SchemaProvider['get']>> | null = null,
+  ): Promise<GetStatusResult> {
     const changePath = this._changes.changePath(change)
     const artifactStatuses: ArtifactStatusEntry[] = []
     let schemaInfo: LifecycleContext['schemaInfo'] = null
@@ -391,13 +490,7 @@ export class GetStatus {
     let checksByTarget: Readonly<Partial<Record<ChangeState, readonly CheckResult[]>>> = {}
     let checks: readonly CheckResult[] = []
 
-    let schema
-    try {
-      schema = await this._schemaProvider.get()
-    } catch (err) {
-      if (!(err instanceof SchemaNotFoundError)) {
-        throw err
-      }
+    if (schema === null) {
       blockers = [
         {
           code: 'SCHEMA_RESOLUTION_FAILED',
@@ -467,6 +560,7 @@ export class GetStatus {
       approvals: this._approvals,
       effectiveStatusByArtifact,
       passMemo,
+      ...(validity !== undefined ? { validity } : {}),
     })
     let archiveChecks: readonly CheckResult[] = []
     if (change.state === 'archivable') {
@@ -481,6 +575,7 @@ export class GetStatus {
           allowOutOfScope: false,
           effectiveStatusByArtifact,
           passMemo,
+          ...(validity !== undefined ? { validity } : {}),
         }),
       )
       archiveChecks = archiveEvaluation.checks
@@ -488,6 +583,7 @@ export class GetStatus {
     const verdict = evaluateLifecycle(change, schema, {
       approvals: this._approvals,
       checksByTarget: checksByTargetMap,
+      ...(validity !== undefined ? { validity } : {}),
     })
     const artifactStatusByType = new Map(
       verdict.artifacts.map((artifact) => [artifact.type, artifact]),
@@ -568,6 +664,9 @@ export class GetStatus {
       review,
       blockers,
       nextAction,
+      ...(validity !== undefined
+        ? { validity: projectValidityStatus(change, validity, nextAction) }
+        : {}),
     }
   }
 

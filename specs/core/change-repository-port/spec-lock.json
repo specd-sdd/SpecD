@@ -5,6 +5,7 @@
   },
   "dependsOn": [
     "core:repository-port",
+    "core:change-list-entry",
     "default:_global/architecture",
     "core:change",
     "core:read-only-change-view",
@@ -13,17 +14,24 @@
     "core:drafted-change-read-only-error",
     "core:storage",
     "core:change-manifest",
-    "default:_global/logging",
-    "core:change-list-entry"
+    "core:schema-format",
+    "core:transition-checks",
+    "default:_global/logging"
   ],
   "implementation": [
     {
       "file": "core:src/application/ports/change-repository.ts",
-      "symbols": ["MutateResult", "ChangeRepository"]
+      "symbols": ["ChangeRepository", "ImplementationFileReadResult"]
     },
     {
-      "file": "core:src/domain/errors/change-mutation-required-error.ts",
-      "symbols": ["ChangeMutationRequiredError"]
+      "file": "core:src/infrastructure/fs/change-repository.ts",
+      "symbols": ["FsChangeRepository"]
+    },
+    {
+      "file": "core:test/infrastructure/fs/change-repository.spec.ts"
+    },
+    {
+      "file": "core:test/infrastructure/fs/manifest-change-loader.spec.ts"
     }
   ],
   "optimizations": {

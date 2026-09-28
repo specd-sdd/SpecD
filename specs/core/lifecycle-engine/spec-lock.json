@@ -22,36 +22,36 @@
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "LifecycleEngine: sole DAG-aware authority for effective status, blockers, transitions, nextAction.",
+      "value": "Plain lifecycle verdict functions project DAG status, check-derived transitions, blockers, review, and next-hop guidance.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:55f5980387125a4f5647c5d3f534404d8068c2ff4dce35ac5605cbdd7e3071c9",
-          "lastModified": "2026-05-25T06:02:58.467Z"
+          "hash": "sha256:90032a8e77b836c14f93bf8500d049d2f0ef3d6a3d7f098517a7c37778d81928",
+          "lastModified": "2026-09-19T19:11:11.117Z"
         },
         "verify.md": {
-          "hash": "sha256:5cd035c7607622ac483c5cf53c50f70eb37369d2c4a3681ab486ef6b4f3c9658",
-          "lastModified": "2026-05-25T06:02:58.467Z"
+          "hash": "sha256:310705375fe5807461371597123c6f955c309f4af7ffd8dfd06795cddf72f357",
+          "lastModified": "2026-09-19T19:13:17.602Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# LifecycleEngine\n\n## Rules\n- Sole authority unifying protocol, artifact, and content validation. Public: `evaluate(...)` — no separate public `computeEffectiveStatus`.\n- Effective status: drifted-pending-review/pending-review sticky; complete + unsatisfied upstream → `pending-parent-artifact-review`; else match aggregate. Recursive parent blocks.\n- Canonical states only — ignore display `complete-with-drift` / diagnostic `hasDrift` as lifecycle states.\n- Blocker: `code`, `message`, `isSkippable`, optional `bypassFlag`, optional `affectedArtifacts`. Skippable+active bypass → warning.\n- Codes: MISSING_ARTIFACT, INCOMPLETE_ARTIFACT, ARTIFACT_DRIFT, REVIEW_REQUIRED, PENDING_PARENT_REVIEW, INCOMPLETE_TASKS, OVERLAP_CONFLICT, INVALID_TRANSITION, APPROVAL_REQUIRED.\n- AvailableStep: `isReady`, `isPermitted` (VALID_TRANSITIONS + approvals + blockers). Approval gates route to pending-*; disabled gate → INVALID_TRANSITION to pending/approved.\n- Archiving: validTransitions include `archivable`+`designing`. `archiving→archivable` no workflow requires. archive-failed+`commitStarted` → prefer designing review over blind retry.\n- Next artifact: scan `schema.artifactDag().topologicalOrder()`, first not complete/skipped with deps satisfied; else null. Not declaration order.\n- Consumers MUST use engine — no local schema reimplementation.\n\n## Constraints\n- Persisted aggregates on Change; DAG-aware effective status derived here.",
+      "value": "# Lifecycle Verdict\n\n## Rules\n- Domain API: plain exports in `domain/services/lifecycle-verdict.ts`: `evaluateLifecycleVerdict(change, schema, options)`, `projectArtifacts(source, schema)`, `findBlockingParent(...)`, `resolveLifecycleNextHop`; `domain/lifecycle-engine.ts` re-exports. No `LifecycleEngine` class/constructor/options alias. Diagnostics may call `Logger.debug`.\n- `LifecycleDomainVerdict` contains predicate projections, effective artifacts, blockers, review, transitions, `nextHop`; never CLI commands. Application `evaluateLifecycle` + `resolveLifecycleCommand` attach public `nextAction.command`.\n- One-attempt authority: caller executes matching checks from core:transition-checks; verdict projects supplied `CheckResult` rows. No I/O, effects, snapshot bag, `check.run` fallback, or second availability algorithm. `TransitionChange` fail-fasts `protocol.edge`; `GetStatus` collects all matching predicates.\n- `projectArtifacts`: preserve `pending-review` / `drifted-pending-review`; complete + recursive review-blocked parent → `pending-parent-artifact-review`; complete + other unsatisfied parent → `in-progress`; review block wins. Otherwise preserve aggregate. Only canonical states; ignore display `complete-with-drift` / `hasDrift`.\n- Blocker fields: `code`, `message`, `isSkippable`, optional `bypassFlag`, `affectedArtifacts`. Active bypass removes blocker; verdict has no warnings. Codes: `INCOMPLETE_ARTIFACT`, `ARTIFACT_DRIFT`, `REVIEW_REQUIRED`, `PENDING_PARENT_REVIEW`, `INCOMPLETE_TASKS`, `OVERLAP_CONFLICT`, `INVALID_TRANSITION`, `APPROVAL_REQUIRED`. File blockers group exact files by artifact. No `MISSING_ARTIFACT`.\n- `validTransitions` = `VALID_TRANSITIONS` legal targets. `availableTransitions` = targets whose predicates pass/skip. Includes target requires/tasks, enter-ready deps/readOnly, forward exit-implementing impl checks, approvals. Redesign never runs impl-exit checks.\n- `availableSteps` = extras-bearing `schema.workflow()` rows in declaration order, not participating states. Omitted workflow row never removes protocol state.\n- `isReady` derives from supplied `workflow.requires`; `blockingArtifacts` uses failed result `details.artifactId`. If target lacks supplied checks, DAG-only requires walk allowed. `isPermitted` means protocol legality only. Only `impl.linksInScope` is skippable by `--allow-out-of-scope`.\n- `nextHop`: `targetStep`, `actionType: cognitive|mechanical`, `reason`; no command. Happy path: design incomplete→designing, ready available→ready; implementing→verifying when available; verifying→done; ready missing approval→ready, else implementing; done missing signoff→done, else archivable; signed-off→archivable; archivable→archiving. Review reason `spec-overlap-conflict`→designing. Backward retry hops remain available but never default.\n- Application guidance owns command matrix: `/specd-design`, `/specd-implement`, `/specd-verify`, `/specd-archive`, approval commands. done/signed-off with archivable route → `/specd-archive`. Victim overlap review → `/specd-design`; live archivable `OVERLAP_CONFLICT` retains archivable + `/specd-archive`.\n- Archiving exposes `archivable` and `designing`. `archiving→archivable` recovery skips workflow requires/tasks. Latest `archive-failed.commitStarted:true` without completed restore recommends manual review/designing; otherwise retry archive or redesign.\n- Consumers needing full public answer use application `evaluateLifecycle`; transition projection uses verdict; `ValidateArtifacts` / `GetArtifactInstruction` may use empty `checksByTarget` for DAG/next artifact only. No hop predicate execution or global snapshot gathering there. `CompileContext` independent.\n- Next artifact: scan `schema.artifactDag().topologicalOrder()`; first non-complete/non-skipped artifact whose parents are complete/skipped; else null.\n- Failed `workflow.requires` projection preserves predicate artifact ID in blocker `blocking`.\n\n## Constraints\n- Predicate results supplied by caller are sole transition availability source.\n- Effects never run in domain verdict.\n- Persisted aggregate/history stay on `Change`; DAG-effective state remains derived.\n- Approval gates do not rewrite requested targets to pending states.\n- Overlap blocker represents live conflicts from archive predicate, not victim review reason.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:55f5980387125a4f5647c5d3f534404d8068c2ff4dce35ac5605cbdd7e3071c9",
-          "lastModified": "2026-05-25T06:02:58.467Z"
+          "hash": "sha256:90032a8e77b836c14f93bf8500d049d2f0ef3d6a3d7f098517a7c37778d81928",
+          "lastModified": "2026-09-19T19:11:11.117Z"
         },
         "verify.md": {
-          "hash": "sha256:5cd035c7607622ac483c5cf53c50f70eb37369d2c4a3681ab486ef6b4f3c9658",
-          "lastModified": "2026-05-25T06:02:58.467Z"
+          "hash": "sha256:310705375fe5807461371597123c6f955c309f4af7ffd8dfd06795cddf72f357",
+          "lastModified": "2026-09-19T19:13:17.602Z"
         }
       }
     }

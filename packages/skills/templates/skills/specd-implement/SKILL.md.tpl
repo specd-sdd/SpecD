@@ -28,12 +28,26 @@ Extract the `path:` field from the "lifecycle:" section.
 From the `artifacts (DAG):` section, note which artifact IDs are marked with
 `[hasTasks]`; those are the task-bearing artifacts to read and update later.
 
-If the status output shows `review: required: yes`, this change has artifacts that
-require review before implementation can continue. Tell the user:
+Trust reconciled status. Do not calculate fingerprints, edit projections, or
+roll the lifecycle back yourself.
 
-> Artifacts need review before implementation can continue. Run `/specd-design <name>`.
-
-**Stop — do not continue.**
+- Required stale or revoked spec approval returns to `designing`. Stop and
+  route to `/specd-design` through `designing` → `ready` → human `approve spec`.
+- Required stale or revoked sign-off after `done` returns to `done`. Do not
+  move this earlier state forward to `done`.
+- Verification staleness does **not** move lifecycle state. Before `verifying`
+  it is contextual, so keep implementing. At `verifying` or later it blocks and
+  recommends in-place verification (`/specd-verify` or
+  `specd changes verification start <name>`). Do not start that attempt here.
+- `workflow: preserve` plus artifact review stays in phase. Semantically review
+  drifted artifacts you can correct without a new design decision, then
+  `specd changes validate`. Do not force `/specd-design` for every drift.
+  Structural validation is not semantic review or approval renewal.
+- `workflow: redesign` plus unresolved non-task drift returns to `designing`.
+  Stop and route to `/specd-design`.
+- `artifacts: none` waives reopening, not freshness. Existing drift still blocks
+  forward progress.
+- New design decisions and artifact authoring still go to `/specd-design`.
 
 If not in `ready` or `implementing` or `spec-approved`, this is the wrong skill.
 Redirect based on the **next action:** `target` recommendation.
@@ -315,5 +329,7 @@ specd changes transition <name> designing --skip-hooks all
 - If you touch code outside the change's spec scope, surface it to the user
 - Never skip the pre-hook — it tells you what to read
 - Never recommend `/specd-verify` while `implementation list` still shows `open` files
-- Any time a fresh `changes status` shows `review: required: yes`, stop
-  implementation and redirect to `/specd-design <name>`
+- On `review: required: yes`, follow canonical recovery. Spec consent or
+  `workflow: redesign` goes to `/specd-design`. `workflow: preserve` stays in
+  phase for in-place review and validation. `artifacts: none` does not clear
+  a freshness blocker

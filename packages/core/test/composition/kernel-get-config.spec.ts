@@ -65,6 +65,7 @@ async function makeConfig(): Promise<SpecdConfig> {
       archiveAdapter: { adapter: 'fs', config: { path: archivePath } },
     },
     approvals: { spec: false, signoff: false },
+    invalidation: { artifacts: 'downstream', workflow: 'preserve' },
   }
 }
 

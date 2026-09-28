@@ -19,6 +19,9 @@ export function hookStep(phase: 'pre' | 'post', ctx: CheckExecutionContext): Cha
   if (ctx.attempt.scope === 'archive') {
     return 'archiving'
   }
+  if (ctx.attempt.scope === 'operation') {
+    return ctx.change.state
+  }
   return phase === 'post' ? ctx.attempt.from : ctx.attempt.to
 }
 

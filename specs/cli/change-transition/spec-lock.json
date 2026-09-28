@@ -11,16 +11,7 @@
     "core:get-status",
     "core:transition-checks"
   ],
-  "implementation": [
-    {
-      "file": "cli:src/commands/change/transition.ts",
-      "symbols": ["registerChangeTransition", "makeProgressRenderer", "writeTextRepairGuide"]
-    },
-    {
-      "file": "cli:src/commands/change/_check-progress-presenter.ts",
-      "symbols": ["createCheckProgressPresenter"]
-    }
-  ],
+  "implementation": [],
   "optimizations": {
     "optimizedDescription": {
       "value": "Governed specd changes transition lifecycle moves: Core-resolved next, checks, hooks, progress, repair diagnostics.",

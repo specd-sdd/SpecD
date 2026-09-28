@@ -1,4 +1,9 @@
-import { type ChangeState, isValidTransition } from '../value-objects/change-state.js'
+import {
+  type ChangeState,
+  RECOVERY_ONLY_TRANSITIONS,
+  isValidTransition,
+} from '../value-objects/change-state.js'
+import { type AutomaticRecovery } from '../services/change-validity.js'
 import { InvalidStateTransitionError } from '../errors/invalid-state-transition-error.js'
 import { InvalidChangeError } from '../errors/invalid-change-error.js'
 import { CorruptedManifestError } from '../errors/corrupted-manifest-error.js'
@@ -9,8 +14,22 @@ import { type ArtifactDag } from '../value-objects/artifact-dag.js'
 import { type ArtifactType } from '../value-objects/artifact-type.js'
 import {
   type InvalidationPolicy,
+  type ArtifactInvalidationPolicy,
   DEFAULT_INVALIDATION_POLICY,
+  isInvalidationPolicy,
+  fromLegacyInvalidationPolicy,
 } from '../value-objects/invalidation-policy.js'
+import {
+  type ArtifactFingerprint,
+  type SpecApprovalFingerprint,
+  type ImplementationFingerprint,
+  type ValidityFingerprint,
+  type FingerprintDifference,
+  type ArtifactFingerprintAlgorithm,
+  type Sha256Digest,
+  type TextNormalizationAlgorithm,
+  type BinaryNormalizationAlgorithm,
+} from '../value-objects/validity-fingerprint.js'
 import { parseSpecId } from '../services/parse-spec-id.js'
 import { expectedArtifactFilename } from '../services/artifact-filename.js'
 
@@ -55,6 +74,7 @@ export interface SpecApprovedEvent {
   readonly by: ActorIdentity
   readonly reason: string
   readonly artifactHashes: Record<string, string>
+  readonly fingerprint?: SpecApprovalFingerprint
 }
 
 /** Appended when the signoff gate is passed. */
@@ -173,6 +193,129 @@ export interface DescriptionUpdatedEvent {
   readonly description: string
 }
 
+/** Status of a materialized validity projection. */
+export type ProjectionStatus = 'valid' | 'stale' | 'revoked'
+
+/** Specific cause for projection invalidation. */
+export type ValidityInvalidationCause =
+  | 'artifact-drift'
+  | 'implementation-drift'
+  | 'scope-change'
+  | 'manual-invalidation'
+  | 'verification-invalidated'
+  | 'spec-overlap-conflict'
+  | 'legacy-unknown'
+
+/** Recorded invalidation facts attached to a stale or revoked projection. */
+export interface ProjectionInvalidation {
+  readonly at: Date
+  readonly by: ActorIdentity
+  readonly cause: ValidityInvalidationCause
+  readonly reason: string
+  readonly differences: readonly FingerprintDifference[]
+}
+
+/** Recorded human approval decision. */
+export interface ApprovalDecision {
+  readonly at: Date
+  readonly by: ActorIdentity
+  readonly reason: string
+}
+
+/** Materialized projection of current spec approval validity. */
+export interface SpecApprovalProjection {
+  readonly status: ProjectionStatus
+  readonly decision: ApprovalDecision
+  readonly fingerprint: SpecApprovalFingerprint
+  readonly invalidation?: ProjectionInvalidation
+}
+
+/** Materialized projection of current sign-off validity. */
+export interface SignoffProjection {
+  readonly status: ProjectionStatus
+  readonly decision: ApprovalDecision
+  readonly fingerprint: {
+    readonly version: 1
+    readonly artifacts: ArtifactFingerprint
+    readonly implementation: ImplementationFingerprint | null
+  }
+  readonly verificationId: string | null
+  readonly invalidation?: ProjectionInvalidation
+}
+
+/** An active or historical verification attempt baseline. */
+export interface VerificationAttempt {
+  readonly id: string
+  readonly startedAt: Date
+  readonly startedBy: ActorIdentity
+  readonly startedIn: ChangeState
+  readonly baseline: ValidityFingerprint
+}
+
+/** Materialized projection of completed verification evidence. */
+export interface CompletedVerification {
+  readonly id: string
+  readonly attemptId: string
+  readonly status: 'valid' | 'stale'
+  readonly completedAt: Date
+  readonly completedBy: ActorIdentity
+  readonly fingerprint: {
+    readonly version: 1
+    readonly artifacts: ArtifactFingerprint
+    readonly implementation: ImplementationFingerprint | null
+  }
+  readonly invalidation?: ProjectionInvalidation
+}
+
+/** Combined verification projection covering active attempt and completed evidence. */
+export interface VerificationProjection {
+  readonly activeAttempt?: VerificationAttempt
+  readonly completed?: CompletedVerification
+}
+
+/** Appended when a gate projection (spec or signoff) is invalidated. */
+export interface ApprovalInvalidatedEvent {
+  readonly type: 'approval-invalidated'
+  readonly at: Date
+  readonly by: ActorIdentity
+  readonly gate: 'spec' | 'signoff'
+  readonly status: 'stale' | 'revoked'
+  readonly cause: ValidityInvalidationCause
+  readonly reason: string
+  readonly differences: readonly FingerprintDifference[]
+}
+
+/** Appended when a new verification attempt is started. */
+export interface VerificationAttemptStartedEvent {
+  readonly type: 'verification-attempt-started'
+  readonly at: Date
+  readonly by: ActorIdentity
+  readonly attemptId: string
+  readonly state: ChangeState
+  readonly fingerprintVersion: 1
+  readonly artifactAlgorithm: ArtifactFingerprintAlgorithm
+  readonly textNormalization: TextNormalizationAlgorithm
+  readonly binaryNormalization: BinaryNormalizationAlgorithm
+}
+
+/** Appended when an active verification attempt completes successfully. */
+export interface VerificationCompletedEvent {
+  readonly type: 'verification-completed'
+  readonly at: Date
+  readonly by: ActorIdentity
+  readonly attemptId: string
+  readonly verificationId: string
+}
+
+/** Appended when completed verification evidence is explicitly marked stale. */
+export interface VerificationInvalidatedEvent {
+  readonly type: 'verification-invalidated'
+  readonly at: Date
+  readonly by: ActorIdentity
+  readonly verificationId: string
+  readonly reason: string
+}
+
 /** Discriminated union of all change history event types. */
 export type ChangeEvent =
   | CreatedEvent
@@ -188,6 +331,10 @@ export type ChangeEvent =
   | ArtifactSkippedEvent
   | ArtifactsSyncedEvent
   | DescriptionUpdatedEvent
+  | ApprovalInvalidatedEvent
+  | VerificationAttemptStartedEvent
+  | VerificationCompletedEvent
+  | VerificationInvalidatedEvent
 
 /**
  * Construction properties for a `Change`.
@@ -217,14 +364,24 @@ export interface ChangeProps {
   readonly artifacts?: Map<string, ChangeArtifact>
   /** Per-spec declared dependencies, keyed by spec ID. */
   readonly specDependsOn?: ReadonlyMap<string, readonly string[]>
-  /** Invalidation policy for this change. Defaults to `'downstream'`. */
-  readonly invalidationPolicy?: InvalidationPolicy
+  /**
+   * Invalidation policy for this change.
+   * A legacy artifact scalar is mapped to `{ artifacts, workflow: 'redesign' }`.
+   * Omission uses the native default.
+   */
+  readonly invalidationPolicy?: InvalidationPolicy | ArtifactInvalidationPolicy
   /** Tracked implementation files under review for the active change. */
   readonly trackedImplementationFiles?: readonly TrackedImplementationFile[]
   /** Confirmed implementation links for the active change. */
   readonly implementationLinks?: readonly ImplementationLink[]
   /** Timestamp when implementation tracking commenced, or null/undefined if inactive. */
   readonly implementationTrackingStartedAt?: Date | null
+  /** Materialized spec approval projection. */
+  readonly specApproval?: SpecApprovalProjection
+  /** Materialized signoff projection. */
+  readonly signoff?: SignoffProjection
+  /** Materialized verification projection. */
+  readonly verification?: VerificationProjection
 }
 
 /** Explicit review states for tracked implementation files. */
@@ -277,6 +434,9 @@ export class Change {
   private _trackedImplementationFiles: Map<string, TrackedImplementationFileState>
   private _implementationLinks: Map<string, ImplementationLink>
   private _implementationTrackingStartedAt: Date | null
+  private _specApproval: SpecApprovalProjection | undefined
+  private _signoff: SignoffProjection | undefined
+  private _verification: VerificationProjection
 
   /**
    * Creates a new `Change` from the given properties.
@@ -307,7 +467,12 @@ export class Change {
         this._specDependsOn.set(key, [...deps])
       }
     }
-    this._invalidationPolicy = props.invalidationPolicy ?? DEFAULT_INVALIDATION_POLICY
+    this._invalidationPolicy =
+      props.invalidationPolicy !== undefined
+        ? isInvalidationPolicy(props.invalidationPolicy)
+          ? props.invalidationPolicy
+          : fromLegacyInvalidationPolicy(props.invalidationPolicy)
+        : DEFAULT_INVALIDATION_POLICY
     this._trackedImplementationFiles = new Map<string, TrackedImplementationFileState>()
     if (props.trackedImplementationFiles !== undefined) {
       for (const entry of props.trackedImplementationFiles) {
@@ -328,6 +493,9 @@ export class Change {
     } else {
       this._implementationTrackingStartedAt = this.getHistoricalImplementationAt()
     }
+    this._specApproval = props.specApproval ? { ...props.specApproval } : undefined
+    this._signoff = props.signoff ? { ...props.signoff } : undefined
+    this._verification = props.verification ? { ...props.verification } : {}
   }
 
   /** Unique slug name identifying this change. */
@@ -458,11 +626,34 @@ export class Change {
     }))
   }
 
+  /** Materialized spec approval projection, or undefined if never approved. */
+  get specApproval(): SpecApprovalProjection | undefined {
+    return this._specApproval ? { ...this._specApproval } : undefined
+  }
+
+  /** Materialized signoff projection, or undefined if never signed off. */
+  get signoff(): SignoffProjection | undefined {
+    return this._signoff ? { ...this._signoff } : undefined
+  }
+
+  /** Materialized verification projection covering active attempt and completed evidence. */
+  get verification(): VerificationProjection {
+    return {
+      ...(this._verification.activeAttempt
+        ? { activeAttempt: { ...this._verification.activeAttempt } }
+        : {}),
+      ...(this._verification.completed ? { completed: { ...this._verification.completed } } : {}),
+    }
+  }
+
   /**
-   * The active spec approval — the most recent `spec-approved` event that has
-   * not been superseded by a subsequent `invalidated` event, or `undefined`.
+   * The active spec approval — the most recent `spec-approved` event when the
+   * current spec approval projection is `valid`, or `undefined`.
    */
   get activeSpecApproval(): SpecApprovedEvent | undefined {
+    if (this._specApproval !== undefined && this._specApproval.status !== 'valid') {
+      return undefined
+    }
     let last: SpecApprovedEvent | undefined
     for (const evt of this._history) {
       if (evt.type === 'spec-approved') last = evt
@@ -472,10 +663,13 @@ export class Change {
   }
 
   /**
-   * The active signoff — the most recent `signed-off` event that has not been
-   * superseded by a subsequent `invalidated` event, or `undefined`.
+   * The active signoff — the most recent `signed-off` event when the
+   * current signoff projection is `valid`, or `undefined`.
    */
   get activeSignoff(): SignedOffEvent | undefined {
+    if (this._signoff !== undefined && this._signoff.status !== 'valid') {
+      return undefined
+    }
     let last: SignedOffEvent | undefined
     for (const evt of this._history) {
       if (evt.type === 'signed-off') last = evt
@@ -520,8 +714,10 @@ export class Change {
   }
 
   /** Updates the persisted invalidation policy. Does NOT trigger invalidation. */
-  set invalidationPolicy(policy: InvalidationPolicy) {
-    this._invalidationPolicy = policy
+  set invalidationPolicy(policy: InvalidationPolicy | ArtifactInvalidationPolicy) {
+    this._invalidationPolicy = isInvalidationPolicy(policy)
+      ? policy
+      : fromLegacyInvalidationPolicy(policy)
   }
 
   /**
@@ -713,10 +909,13 @@ export class Change {
    *
    * @param to - The target state
    * @param actor - Identity of the actor performing the transition
-   * @throws {InvalidStateTransitionError} If the transition is not permitted
+   * @throws {InvalidStateTransitionError} If the transition is not permitted or is a self-transition
    */
   transition(to: ChangeState, actor: ActorIdentity): void {
     const from = this.state
+    if (from === to) {
+      throw new InvalidStateTransitionError(from, to)
+    }
     if (!isValidTransition(from, to)) {
       throw new InvalidStateTransitionError(from, to)
     }
@@ -725,11 +924,29 @@ export class Change {
     if (to === 'implementing' && this._implementationTrackingStartedAt === null) {
       this._implementationTrackingStartedAt = new Date(now.getTime())
     }
+    this.touchUpdatedAt(now)
   }
 
   /**
-   * Records an invalidation, appending an `invalidated` event followed by a
-   * `transitioned` event rolling back to `designing`.
+   * Applies a lifecycle edge reserved for canonical validity recovery.
+   *
+   * @param recovery - Evaluator-selected cause and exact source/target states
+   * @param actor - Identity attributed to the recovery transition
+   * @throws {InvalidStateTransitionError} When the aggregate state or recovery topology does not match
+   */
+  recover(recovery: AutomaticRecovery, actor: ActorIdentity): void {
+    const from = this.state
+    const allowedTarget = RECOVERY_ONLY_TRANSITIONS[recovery.cause][from]
+    if (from !== recovery.from || allowedTarget !== recovery.to) {
+      throw new InvalidStateTransitionError(from, recovery.to)
+    }
+    const now = new Date()
+    this._history.push({ type: 'transitioned', from, to: recovery.to, at: now, by: actor })
+    this.touchUpdatedAt(now)
+  }
+
+  /**
+   * Records an invalidation of change artifacts.
    *
    * Policy semantics:
    * - `none`: no artifact states are reopened; drift is informational only
@@ -737,16 +954,16 @@ export class Change {
    * - `downstream`: targets + all DAG descendants are reopened
    * - `global`: every artifact/file in the change is reopened
    *
-   * For `artifact-drift`, `hasDrift` is materialized on focused files before
-   * policy-driven reopening. Manual invalidation (`artifact-review-required`)
-   * never touches drift flags.
+   * Note: Does NOT automatically transition to `designing` or clear approval projections.
+   * Lifecycle recovery and gate invalidation are owned by canonical reconciliation.
    *
    * @param cause - The reason for invalidation
    * @param actor - Identity of the actor triggering the change
    * @param message - Human-readable invalidation summary
    * @param affectedArtifacts - Artifact/file payload that triggered the invalidation
    * @param artifactDag - Schema-derived DAG used for `downstream` expansion
-   * @param invalidationPolicyOverride - Override the persisted policy for this execution
+   * @param policy - Invalidation policy override
+   * @param taskArtifactIds - Set of artifact type IDs that have tasks (excluded from propagation)
    * @returns The final deduplicated affected set after policy expansion
    */
   invalidate(
@@ -760,12 +977,17 @@ export class Change {
       }),
     ),
     artifactDag: ArtifactDag,
-    invalidationPolicyOverride?: InvalidationPolicy,
+    policy?: InvalidationPolicy | ArtifactInvalidationPolicy,
+    taskArtifactIds?: ReadonlySet<string>,
   ): readonly InvalidatedArtifactEntry[] {
-    const effectivePolicy = this._resolveInvalidationPolicy(invalidationPolicyOverride)
-    const expanded = this._expandAffectedArtifacts(affectedArtifacts, effectivePolicy, artifactDag)
+    const effectivePolicy = this._resolveInvalidationPolicy(policy)
+    const expanded = this._expandAffectedArtifacts(
+      affectedArtifacts,
+      effectivePolicy,
+      artifactDag,
+      taskArtifactIds,
+    )
 
-    const from = this.state
     const now = new Date()
     this._history.push({
       type: 'invalidated',
@@ -775,9 +997,6 @@ export class Change {
       at: now,
       by: actor,
     })
-    if (from !== 'designing') {
-      this._history.push({ type: 'transitioned', from, to: 'designing', at: now, by: actor })
-    }
 
     if (cause === 'artifact-drift') {
       for (const entry of affectedArtifacts) {
@@ -794,9 +1013,11 @@ export class Change {
       expanded.map((e) => [e.type, [...e.files]]),
     )
 
-    if (effectivePolicy === 'none') return expanded
+    const artifactPolicy = effectivePolicy.artifacts
 
-    if (effectivePolicy === 'surgical') {
+    if (artifactPolicy === 'none') return expanded
+
+    if (artifactPolicy === 'surgical') {
       for (const [typeId, keys] of expandedMap) {
         const artifact = this._artifacts.get(typeId)
         if (artifact === undefined) continue
@@ -847,8 +1068,13 @@ export class Change {
    * @param override - Caller-supplied policy override
    * @returns The effective policy
    */
-  private _resolveInvalidationPolicy(override?: InvalidationPolicy): InvalidationPolicy {
-    return override ?? this._invalidationPolicy
+  private _resolveInvalidationPolicy(
+    override?: InvalidationPolicy | ArtifactInvalidationPolicy,
+  ): InvalidationPolicy {
+    if (!override) {
+      return this._invalidationPolicy
+    }
+    return isInvalidationPolicy(override) ? override : fromLegacyInvalidationPolicy(override)
   }
 
   /**
@@ -857,14 +1083,18 @@ export class Change {
    * @param base - The initially targeted artifact/file entries
    * @param policy - The effective invalidation policy
    * @param artifactDag - Schema-derived DAG for `downstream` expansion
+   * @param taskArtifactIds - Artifact type IDs containing tasks (excluded from propagation)
    * @returns The expanded affected set
    */
   private _expandAffectedArtifacts(
     base: readonly InvalidatedArtifactEntry[],
     policy: InvalidationPolicy,
     artifactDag: ArtifactDag,
+    taskArtifactIds?: ReadonlySet<string>,
   ): readonly InvalidatedArtifactEntry[] {
-    if (policy === 'none' || policy === 'surgical') {
+    const artifactPolicy = policy.artifacts
+
+    if (artifactPolicy === 'none' || artifactPolicy === 'surgical') {
       const seen = new Map<string, Set<string>>()
       for (const entry of base) {
         let set = seen.get(entry.type)
@@ -877,11 +1107,17 @@ export class Change {
       return [...seen.entries()].map(([type, files]) => ({ type, files: [...files] }))
     }
 
-    if (policy === 'global') {
-      return [...this._artifacts.values()].map((artifact) => ({
-        type: artifact.type,
-        files: [...artifact.files.keys()],
-      }))
+    if (artifactPolicy === 'global') {
+      const baseTypes = new Set(base.map((e) => e.type))
+      return [...this._artifacts.values()]
+        .filter((artifact) => {
+          if (baseTypes.has(artifact.type)) return true
+          return taskArtifactIds ? !taskArtifactIds.has(artifact.type) : true
+        })
+        .map((artifact) => ({
+          type: artifact.type,
+          files: [...artifact.files.keys()],
+        }))
     }
 
     // downstream: targets + DAG descendants
@@ -898,6 +1134,9 @@ export class Change {
       for (const f of entry.files) set.add(f)
     }
     for (const typeId of descendants) {
+      if (taskArtifactIds && taskArtifactIds.has(typeId) && !baseTypes.has(typeId)) {
+        continue
+      }
       if (!seen.has(typeId)) {
         const artifact = this._artifacts.get(typeId)
         if (artifact !== undefined) {
@@ -910,33 +1149,296 @@ export class Change {
   }
 
   /**
-   * Records that the spec approval gate has been passed.
+   * Records that the spec approval gate has been passed, renewing the spec approval projection.
    *
    * @param reason - Free-text rationale for the approval
-   * @param artifactHashes - Hashes of the artifacts reviewed during approval
+   * @param fingerprint - Complete scope-aware approval fingerprint
    * @param actor - Identity of the approver
+   * @param at - Timestamp (defaults to now)
    */
   recordSpecApproval(
     reason: string,
-    artifactHashes: Record<string, string>,
+    fingerprint: SpecApprovalFingerprint,
     actor: ActorIdentity,
+    at: Date = new Date(),
   ): void {
-    this._history.push({ type: 'spec-approved', reason, artifactHashes, at: new Date(), by: actor })
+    this._specApproval = {
+      status: 'valid',
+      decision: { at, by: actor, reason },
+      fingerprint,
+    }
+
+    this._history.push({
+      type: 'spec-approved',
+      reason,
+      artifactHashes: { ...fingerprint.artifacts.files },
+      fingerprint,
+      at,
+      by: actor,
+    })
+    this.touchUpdatedAt(at)
   }
 
   /**
-   * Records that the signoff gate has been passed.
+   * Records that the signoff gate has been passed, renewing the signoff projection.
    *
    * @param reason - Free-text rationale for the sign-off
-   * @param artifactHashes - Hashes of the artifacts reviewed during sign-off
-   * @param actor - Identity of the approver
+   * @param fingerprint - Materialized signoff fingerprint or legacy artifact hashes record
+   * @param actorOrVerificationId - Actor identity (if 3-arg legacy call) or verification ID string
+   * @param actor - Identity of the approver (when verificationId is passed)
+   * @param at - Timestamp (defaults to now)
+   * @throws {Error} When a verification id is passed without an actor
    */
   recordSignoff(
     reason: string,
-    artifactHashes: Record<string, string>,
-    actor: ActorIdentity,
+    fingerprint: SignoffProjection['fingerprint'] | Record<string, string>,
+    actorOrVerificationId: ActorIdentity | string,
+    actor?: ActorIdentity,
+    at: Date = new Date(),
   ): void {
-    this._history.push({ type: 'signed-off', reason, artifactHashes, at: new Date(), by: actor })
+    let verificationId: string | null = null
+    let actualActor: ActorIdentity
+
+    if (typeof actorOrVerificationId === 'string') {
+      verificationId = actorOrVerificationId
+      if (!actor) {
+        throw new Error('Actor must be supplied when verificationId is provided')
+      }
+      actualActor = actor
+    } else {
+      actualActor = actorOrVerificationId
+    }
+
+    const signoffFp: SignoffProjection['fingerprint'] = isSignoffFingerprint(fingerprint)
+      ? fingerprint
+      : {
+          version: 1,
+          artifacts: coerceArtifactFingerprint(fingerprint),
+          implementation: null,
+        }
+
+    this._signoff = {
+      status: 'valid',
+      decision: { at, by: actualActor, reason },
+      fingerprint: signoffFp,
+      verificationId,
+    }
+
+    this._history.push({
+      type: 'signed-off',
+      reason,
+      artifactHashes: { ...signoffFp.artifacts.files },
+      at,
+      by: actualActor,
+    })
+    this.touchUpdatedAt(at)
+  }
+
+  /**
+   * Marks a projection (spec or signoff) stale or revoked.
+   *
+   * @param gate - Which gate to invalidate (`'spec'` or `'signoff'`)
+   * @param status - The target status (`'stale'` or `'revoked'`)
+   * @param invalidation - Details of the invalidation
+   * @returns `true` if the status changed; `false` if already in the same or stronger status
+   */
+  markApprovalInvalid(
+    gate: 'spec' | 'signoff',
+    status: 'stale' | 'revoked',
+    invalidation: ProjectionInvalidation,
+  ): boolean {
+    if (gate === 'spec') {
+      if (this._specApproval === undefined) {
+        return false
+      }
+      if (this._specApproval.status === 'revoked') {
+        return false
+      }
+      if (this._specApproval.status === 'stale' && status === 'stale') {
+        return false
+      }
+      this._specApproval = {
+        ...this._specApproval,
+        status,
+        invalidation,
+      }
+      this._history.push({
+        type: 'approval-invalidated',
+        gate: 'spec',
+        status,
+        cause: invalidation.cause,
+        reason: invalidation.reason,
+        differences: invalidation.differences,
+        at: invalidation.at,
+        by: invalidation.by,
+      })
+      this.touchUpdatedAt(invalidation.at)
+      return true
+    }
+
+    if (gate === 'signoff') {
+      if (this._signoff === undefined) {
+        return false
+      }
+      if (this._signoff.status === 'revoked') {
+        return false
+      }
+      if (this._signoff.status === 'stale' && status === 'stale') {
+        return false
+      }
+      this._signoff = {
+        ...this._signoff,
+        status,
+        invalidation,
+      }
+      this._history.push({
+        type: 'approval-invalidated',
+        gate: 'signoff',
+        status,
+        cause: invalidation.cause,
+        reason: invalidation.reason,
+        differences: invalidation.differences,
+        at: invalidation.at,
+        by: invalidation.by,
+      })
+      this.touchUpdatedAt(invalidation.at)
+      return true
+    }
+
+    return false
+  }
+
+  /**
+   * Starts a verification attempt with the given baseline.
+   *
+   * @param baseline - Combined validity fingerprint baseline
+   * @param actor - Identity of the actor starting verification
+   * @param at - Optional start timestamp
+   * @returns Object containing the created attempt and superseded attempt ID if any
+   */
+  startVerification(
+    baseline: ValidityFingerprint,
+    actor: ActorIdentity,
+    at: Date = new Date(),
+  ): { readonly attempt: VerificationAttempt; readonly supersededAttemptId: string | null } {
+    let attemptCount = 0
+    for (const evt of this._history) {
+      if (evt.type === 'verification-attempt-started') {
+        attemptCount++
+      }
+    }
+    const attemptId = `verification-attempt-${attemptCount + 1}`
+    const supersededAttemptId = this._verification.activeAttempt?.id ?? null
+
+    const attempt: VerificationAttempt = {
+      id: attemptId,
+      startedAt: at,
+      startedBy: actor,
+      startedIn: this.state,
+      baseline,
+    }
+
+    this._verification = {
+      ...this._verification,
+      activeAttempt: attempt,
+    }
+
+    this._history.push({
+      type: 'verification-attempt-started',
+      at,
+      by: actor,
+      attemptId,
+      state: this.state,
+      fingerprintVersion: 1,
+      artifactAlgorithm: baseline.artifacts.algorithm,
+      textNormalization: baseline.implementation.textNormalization,
+      binaryNormalization: baseline.implementation.binaryNormalization,
+    })
+    this.touchUpdatedAt(at)
+
+    return { attempt, supersededAttemptId }
+  }
+
+  /**
+   * Completes the currently active verification attempt, recording successful completed evidence.
+   *
+   * @param actor - Identity of the actor completing verification
+   * @param at - Optional completion timestamp
+   * @returns Completed verification evidence
+   * @throws {Error} If no active verification attempt exists
+   */
+  completeVerification(actor: ActorIdentity, at: Date = new Date()): CompletedVerification {
+    const active = this._verification.activeAttempt
+    if (!active) {
+      throw new Error('No active verification attempt to complete')
+    }
+
+    const ordinal = active.id.replace('verification-attempt-', '')
+    const verificationId = `verification-${ordinal}`
+
+    const completed: CompletedVerification = {
+      id: verificationId,
+      attemptId: active.id,
+      status: 'valid',
+      completedAt: at,
+      completedBy: actor,
+      fingerprint: {
+        version: 1,
+        artifacts: active.baseline.artifacts,
+        implementation: active.baseline.implementation,
+      },
+    }
+
+    this._verification = {
+      completed,
+    }
+
+    this._history.push({
+      type: 'verification-completed',
+      at,
+      by: actor,
+      attemptId: active.id,
+      verificationId,
+    })
+    this.touchUpdatedAt(at)
+
+    return completed
+  }
+
+  /**
+   * Explicitly marks completed verification evidence as stale.
+   *
+   * @param invalidation - Invalidation metadata
+   * @returns `true` if evidence changed from valid to stale; `false` if already stale or absent
+   */
+  invalidateVerification(invalidation: ProjectionInvalidation): boolean {
+    const completed = this._verification.completed
+    if (!completed) {
+      return false
+    }
+    if (completed.status === 'stale') {
+      return false
+    }
+
+    this._verification = {
+      ...this._verification,
+      completed: {
+        ...completed,
+        status: 'stale',
+        invalidation,
+      },
+    }
+
+    this._history.push({
+      type: 'verification-invalidated',
+      at: invalidation.at,
+      by: invalidation.by,
+      verificationId: completed.id,
+      reason: invalidation.reason,
+    })
+    this.touchUpdatedAt(invalidation.at)
+
+    return true
   }
 
   /**
@@ -947,12 +1449,27 @@ export class Change {
    * requires signoff again when that gate is enabled.
    *
    * @param actor - Identity of the actor clearing signoff
+   * @param reason - Optional explanation for clearing signoff
    */
-  invalidateSignoff(actor: ActorIdentity): void {
-    if (this.activeSignoff === undefined) {
-      return
+  invalidateSignoff(actor: ActorIdentity, reason = 'Signoff cleared'): void {
+    if (this._signoff?.status === 'valid') {
+      this._signoff = {
+        ...this._signoff,
+        status: 'revoked',
+        invalidation: {
+          at: new Date(),
+          by: actor,
+          cause: 'manual-invalidation',
+          reason,
+          differences: [],
+        },
+      }
+      this._history.push({ type: 'signoff-invalidated', at: new Date(), by: actor })
+      this.touchUpdatedAt()
+    } else if (this.activeSignoff !== undefined) {
+      this._history.push({ type: 'signoff-invalidated', at: new Date(), by: actor })
+      this.touchUpdatedAt()
     }
-    this._history.push({ type: 'signoff-invalidated', at: new Date(), by: actor })
   }
 
   /**
@@ -1069,12 +1586,31 @@ export class Change {
    * @param actor - Identity of the actor making the change
    * @param artifactDag - Schema-derived DAG for invalidation expansion
    */
-  updateSpecIds(specIds: readonly string[], actor: ActorIdentity, artifactDag: ArtifactDag): void {
+  /**
+   * Replaces spec ids without opening artifact review.
+   *
+   * Validity consequences belong to reconciliation. This method only updates
+   * the scope set and drops dependency entries for removed specs.
+   *
+   * @param specIds - Replacement spec identifiers
+   */
+  replaceSpecIds(specIds: readonly string[]): void {
     this._specIds = [...new Set(specIds)]
     const newIds = new Set(this._specIds)
     for (const key of this._specDependsOn.keys()) {
       if (!newIds.has(key)) this._specDependsOn.delete(key)
     }
+  }
+
+  /**
+   * Update spec ids.
+   *
+   * @param specIds - spec ids
+   * @param actor - actor
+   * @param artifactDag - artifact dag
+   */
+  updateSpecIds(specIds: readonly string[], actor: ActorIdentity, artifactDag: ArtifactDag): void {
+    this.replaceSpecIds(specIds)
     this.invalidate(
       'spec-change',
       actor,
@@ -1319,4 +1855,58 @@ function implementationLinkKey(specId: string, file: string): string {
  */
 function artifactRepresentationClass(filename: string): 'delta' | 'direct' {
   return filename.startsWith('deltas/') ? 'delta' : 'direct'
+}
+
+/**
+ * Accepts a materialized artifact fingerprint or a legacy hash map.
+ *
+ * @param fingerprint - Structured fingerprint or pre-hash file map
+ * @returns Artifact fingerprint version 1
+ */
+function coerceArtifactFingerprint(
+  fingerprint: ArtifactFingerprint | Record<string, string>,
+): ArtifactFingerprint {
+  if (isArtifactFingerprint(fingerprint)) return fingerprint
+  const files: Record<string, Sha256Digest> = {}
+  for (const [key, digest] of Object.entries(fingerprint)) {
+    files[key] = digest as Sha256Digest
+  }
+  return { version: 1, algorithm: 'artifact-pre-hash-v1', files }
+}
+
+/**
+ * Distinguishes a structured artifact fingerprint from a legacy hash map.
+ *
+ * @param value - Caller-supplied fingerprint
+ * @returns `true` when the value already carries version, algorithm, and files
+ */
+function isArtifactFingerprint(
+  value: ArtifactFingerprint | Record<string, string>,
+): value is ArtifactFingerprint {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'version' in value &&
+    'algorithm' in value &&
+    'files' in value &&
+    typeof value.files === 'object'
+  )
+}
+
+/**
+ * Distinguishes a sign-off fingerprint from a legacy artifact hash map.
+ *
+ * @param value - Caller-supplied sign-off fingerprint
+ * @returns `true` when artifacts and implementation slots are present
+ */
+function isSignoffFingerprint(
+  value: SignoffProjection['fingerprint'] | Record<string, string>,
+): value is SignoffProjection['fingerprint'] {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'artifacts' in value &&
+    'implementation' in value &&
+    typeof value.artifacts === 'object'
+  )
 }

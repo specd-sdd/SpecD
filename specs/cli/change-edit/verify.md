@@ -4,10 +4,17 @@
 
 ### Requirement: Command signature
 
-#### Scenario: No edit flags provided
+Scenarios:
 
-- **WHEN** `specd change edit my-change` is run with no edit flags
-- **THEN** the command exits with code 1 and prints a usage error to stderr
+#### Scenario: Partial policy edit preserves unspecified dimension
+
+- **WHEN** only one policy flag is supplied
+- **THEN** only that dimension is sent to `EditChange`
+
+#### Scenario: At least one edit remains required
+
+- **WHEN** no scope, description, or policy edit flag is supplied
+- **THEN** the command fails before calling core
 
 ### Requirement: Workspace derivation
 
@@ -69,20 +76,39 @@
 
 ### Requirement: Approval invalidation
 
-#### Scenario: Spec change triggers invalidation
+Scenarios:
 
-- **GIVEN** a change with an active spec approval in `spec-approved` state
-- **WHEN** `specd change edit my-change --add-spec auth/register` is run
-- **THEN** an `invalidated` event is appended to history
-- **AND** the change is rolled back to `designing`
-- **AND** stderr contains a `warning:` about invalidation
+#### Scenario: Output reflects canonical gate recovery
 
-#### Scenario: No active approval — no invalidation event
+- **GIVEN** a scope edit makes required spec consent stale under preserve
+- **WHEN** the command succeeds
+- **THEN** it reports the committed `designing` state, affected evidence, and artifact review
+- **AND** policy-only edits do not claim invalidation without a reported drift
 
-- **GIVEN** a change with no active approval in `designing` state
-- **WHEN** `specd change edit my-change --add-spec auth/register` is run
-- **THEN** no `invalidated` event is appended
-- **AND** the state remains `designing`
+#### Scenario: Ungated preserve reports blocker without invented return
+
+- **GIVEN** scope editing creates review without required spec consent
+- **WHEN** workflow policy is preserve
+- **THEN** output shows the retained state and forward-progress blocker
+
+#### Scenario: Scope change does not imply validity warning
+
+- **GIVEN** an edit normalizes to the approved canonical scope and causes no projection change
+- **WHEN** output is rendered
+- **THEN** `scopeChanged` and actual validity change remain distinct
+- **AND** no approval-invalidated warning is printed
+
+#### Scenario: Structured output includes recovery guidance
+
+- **WHEN** reconciliation returns blockers and next action
+- **THEN** text, JSON, and TOON render that Core-owned guidance
+
+#### Scenario: Text output renders blocker codes and next command
+
+- **GIVEN** an ungated preserve scope edit returns a nonempty blocker list and `/specd-design` or in-place review next action from Core
+- **WHEN** the default text presenter renders the successful result
+- **THEN** stdout names every returned blocker code and the exact Core-owned next-action command
+- **AND** it does not infer a different recovery from lifecycle state
 
 ### Requirement: Output on success
 
@@ -92,11 +118,13 @@
 - **THEN** stdout contains `updated change my-change` followed by the new `specs:` and `workspaces:` lines
 - **AND** the process exits with code 0
 
-#### Scenario: JSON output with invalidation
+#### Scenario: JSON output reflects required-gate scope recovery
 
-- **GIVEN** a change in `spec-approved` state
-- **WHEN** `specd change edit my-change --add-spec auth/register --format json` is run
-- **THEN** stdout is valid JSON with `result` equal to `"ok"`, `specIds`, `workspaces`, `invalidated` equal to `true`, and `state` equal to `"designing"`
+- **GIVEN** a change with valid required spec consent and workflow `preserve`
+- **WHEN** `changes edit` adds a canonical spec with `--format json`
+- **THEN** output has `result: "ok"`, updated `specIds` and `workspaces`, `scopeChanged: true`, and `validityChanged: true`
+- **AND** the compatibility `invalidated` field is true and committed state is `designing`
+- **AND** blockers, next action, projection changes, and automatic return match the Core result
 
 ### Requirement: Error cases
 

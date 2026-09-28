@@ -1,0 +1,38 @@
+- op: modified
+  selector: { type: section, matches: '^Requirement: Artifact hash computation$' }
+  content: |
+    Scenarios:
+
+    #### Scenario: CLI never computes approval fingerprints
+
+    - **WHEN** either approval command runs
+    - **THEN** it delegates fingerprinting and reconciliation to the corresponding core use case
+
+    #### Scenario: Ineligible approval reports canonical blocker
+
+    - **WHEN** core returns recovery or unresolved review
+    - **THEN** CLI reports it without presenting approval success
+
+    #### Scenario: Approval failure reloads canonical recovery context
+
+    - **GIVEN** an approval use case fails after committing reconciliation
+    - **WHEN** the command formats the failure
+    - **THEN** it obtains canonical status or consumes the equivalent structured core result
+    - **AND** text, JSON, and TOON include actual state, blockers, and next action
+    - **AND** no stale pre-operation state is rendered
+
+- op: modified
+  selector: { type: section, matches: '^Requirement: Output on success$' }
+  content: |
+    Scenarios:
+
+    #### Scenario: Signoff output distinguishes empty from unknown
+
+    - **WHEN** signoff succeeds with an observed empty implementation map
+    - **THEN** output presents valid empty evidence and its algorithm
+    - **AND** does not describe it as legacy missing evidence or print file contents
+
+    #### Scenario: Success reports materialized evidence metadata
+
+    - **WHEN** approval succeeds
+    - **THEN** output includes gate, valid status, actor, time, and summarized fingerprint scope

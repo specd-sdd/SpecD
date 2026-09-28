@@ -175,15 +175,19 @@
 
 ### Requirement: Invalidation policy configuration
 
-#### Scenario: Root invalidationPolicy accepts the four canonical values
+Scenarios:
 
-- **WHEN** `specd.yaml` declares `invalidationPolicy` as `none`, `surgical`, `downstream`, or `global`
-- **THEN** config loading accepts the value
+#### Scenario: New defaults preserve lifecycle position
 
-#### Scenario: Unknown invalidationPolicy is rejected
+- **WHEN** configuration omits both invalidation shapes
+- **THEN** a new change resolves `{ artifacts: downstream, workflow: preserve }`
 
-- **WHEN** `specd.yaml` declares an unknown `invalidationPolicy`
-- **THEN** config loading fails with a validation error
+#### Scenario: Legacy and structured shapes cannot be combined
+
+- **GIVEN** effective configuration contains `invalidationPolicy` and `invalidation`
+- **WHEN** configuration is loaded
+- **THEN** validation fails as ambiguous
+- **AND** the legacy key alone maps its artifact value with `workflow: redesign`
 
 ### Requirement: Workspaces
 
@@ -832,6 +836,13 @@
 - **THEN** the wait is the `approval.spec` check
 - **AND** config MUST NOT be documented as requiring a pending hop
 - **AND** enforcement is verified in `core:transition-change` and `cli:change-transition` tests (in-place stay in `ready`)
+
+#### Scenario: Omitted implementing row does not create ready to verifying
+
+- **GIVEN** the spec approval gate is enabled and the schema omits an `implementing` workflow row
+- **WHEN** a caller requests `ready → verifying`
+- **THEN** the fixed protocol still rejects that edge
+- **AND** the spec gate remains bound to every legal forward leave of `ready`
 
 ### Requirement: Config writer port
 

@@ -2,6 +2,7 @@ import { type ActorResolver } from '../../application/ports/actor-resolver.js'
 import { type ChangeRepository } from '../../application/ports/change-repository.js'
 import { type SchemaProvider } from '../../application/ports/schema-provider.js'
 import { InvalidateChange } from '../../application/use-cases/invalidate-change.js'
+import { type ReconcileChangeValidity } from '../../application/use-cases/reconcile-change-validity.js'
 import { type SpecdConfig } from '../../application/specd-config.js'
 import {
   createCompositionResolver,
@@ -20,6 +21,8 @@ export interface InvalidateChangeDeps {
   readonly actor: ActorResolver
   /** Schema provider used by the use case. */
   readonly schemaProvider: SchemaProvider
+  /** Canonical reconciler for this invalidation. */
+  readonly reconcile: ReconcileChangeValidity
 }
 
 /**
@@ -33,6 +36,7 @@ export function resolveInvalidateChangeDeps(resolver: CompositionResolver): Inva
     changes: resolver.getChangeRepository(),
     actor: resolver.getActorResolver(),
     schemaProvider: resolver.getSchemaProvider(),
+    reconcile: resolver.getReconcileChangeValidity(),
   }
 }
 
@@ -84,8 +88,8 @@ function createInvalidateChangeFromNormalized(
   input: FactoryInput<InvalidateChangeDeps, CompositionResolutionOptions>,
 ): InvalidateChange {
   if (input.kind === 'deps') {
-    const { changes, actor, schemaProvider } = input.deps
-    return new InvalidateChange(changes, actor, schemaProvider)
+    const { changes, actor, schemaProvider, reconcile } = input.deps
+    return new InvalidateChange(changes, actor, schemaProvider, reconcile)
   }
 
   const resolver = createCompositionResolver(input.config, input.options)
@@ -101,5 +105,5 @@ function createInvalidateChangeFromNormalized(
 function isInvalidateChangeDeps(
   value: InvalidateChangeDeps | SpecdConfig,
 ): value is InvalidateChangeDeps {
-  return 'changes' in value && 'actor' in value && 'schemaProvider' in value
+  return 'changes' in value && 'actor' in value && 'schemaProvider' in value && 'reconcile' in value
 }

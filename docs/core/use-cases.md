@@ -35,6 +35,40 @@ const result = await createChange.execute({
 
 Use cases are stateless between calls. Constructing one instance and reusing it is safe. Dependencies are resolved at construction time and do not change per call.
 
+Validity and verification use cases also expose the canonical factories. Supplying `options` together with the deps object throws `InvalidCompositionFactoryArgumentsError`. Config factories do not bootstrap a full kernel. For every factory whose deps include `actor`, `resolveXDeps` loads it with `CompositionResolver.getActorResolver()`, so the config overload receives the privacy-decorated identity. The deps overload uses the resolver you pass and does not decorate it again.
+
+```typescript
+export function createReconcileChangeValidity(
+  deps: ReconcileChangeValidityDeps,
+): ReconcileChangeValidity
+export function createReconcileChangeValidity(
+  config: SpecdConfig,
+  options?: CompositionResolutionOptions,
+): ReconcileChangeValidity
+
+export function createStartVerification(deps: StartVerificationDeps): StartVerification
+export function createStartVerification(
+  config: SpecdConfig,
+  options?: CompositionResolutionOptions,
+): StartVerification
+
+export function createCompleteVerification(deps: CompleteVerificationDeps): CompleteVerification
+export function createCompleteVerification(
+  config: SpecdConfig,
+  options?: CompositionResolutionOptions,
+): CompleteVerification
+
+export function createInvalidateVerification(
+  deps: InvalidateVerificationDeps,
+): InvalidateVerification
+export function createInvalidateVerification(
+  config: SpecdConfig,
+  options?: CompositionResolutionOptions,
+): InvalidateVerification
+```
+
+`ReconcileChangeValidity` is the only application path that applies artifact review, projection invalidation, audit events, and automatic lifecycle recovery. Other use cases call it. They do not choose recovery themselves. Delivery hosts should import these factories from `@specd/sdk`.
+
 ---
 
 ## Change management
@@ -45,18 +79,19 @@ Creates a new change and persists it to the repository. Scaffolds the change dir
 
 When `schemaName` and `schemaVersion` are omitted, the use case resolves the project's active schema internally via `GetActiveSchema`. Hosts such as the CLI do not need to resolve schema identity before calling `execute`.
 
-**Constructor:** `new CreateChange(changes: ChangeRepository, listWorkspaces: ListWorkspaces, actor: ActorResolver, getActiveSchema: GetActiveSchema, detectOverlap: DetectOverlap)`
+**Constructor:** `new CreateChange(changes: ChangeRepository, listWorkspaces: ListWorkspaces, actor: ActorResolver, getActiveSchema: GetActiveSchema, detectOverlap: DetectOverlap, defaultInvalidation?: InvalidationPolicy)`. Composition injects the resolved project policy from `specd.yaml`.
 
 **Input:**
 
-| Field                 | Type                | Required | Description                                                                  |
-| --------------------- | ------------------- | -------- | ---------------------------------------------------------------------------- |
-| `name`                | `string`            | yes      | Unique slug name (e.g. `'add-oauth-login'`).                                 |
-| `description`         | `string`            | no       | Optional free-text description of the change.                                |
-| `specIds`             | `readonly string[]` | yes      | Spec paths being created or modified.                                        |
-| `schemaName`          | `string`            | no       | Explicit schema name override. When omitted, resolved from active schema.    |
-| `schemaVersion`       | `number`            | no       | Explicit schema version override. When omitted, resolved from active schema. |
-| `includeOverlapCheck` | `boolean`           | no       | When `true` and `specIds` is non-empty, include overlap report on result.    |
+| Field                 | Type                 | Required | Description                                                                                                                                                                                                        |
+| --------------------- | -------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `name`                | `string`             | yes      | Unique slug name (e.g. `'add-oauth-login'`).                                                                                                                                                                       |
+| `description`         | `string`             | no       | Optional free-text description of the change.                                                                                                                                                                      |
+| `specIds`             | `readonly string[]`  | yes      | Spec paths being created or modified.                                                                                                                                                                              |
+| `schemaName`          | `string`             | no       | Explicit schema name override. When omitted, resolved from active schema.                                                                                                                                          |
+| `schemaVersion`       | `number`             | no       | Explicit schema version override. When omitted, resolved from active schema.                                                                                                                                       |
+| `invalidation`        | `InvalidationPolicy` | no       | Stored `{ artifacts, workflow }`. Explicit input wins; otherwise the injected project default is used. `{ artifacts: 'downstream', workflow: 'preserve' }` is only the direct-construction compatibility fallback. |
+| `includeOverlapCheck` | `boolean`            | no       | When `true` and `specIds` is non-empty, include overlap report on result.                                                                                                                                          |
 
 **Returns:** `Promise<CreateChangeResult>`
 
@@ -82,6 +117,8 @@ interface CreateChangeResult {
 Loads a change and reports its current lifecycle state, artifact statuses, and pre-computed lifecycle context including available transitions and blockers. For active changes, refreshes implementation tracking by default via `RefreshImplementationTracking` before loading status.
 
 `validTransitions` is the protocol list (`VALID_TRANSITIONS` for the current state). `availableTransitions` is **check-derived**: `GetStatus` gathers the same snapshots `TransitionChange` uses and evaluates every protocol candidate. Targets whose blocking predicates fail (incomplete artifacts or tasks, enter-`ready` deps/read-only, exit-`implementing` impl integrity, missing spec/signoff consent on the delivery edge) are omitted.
+
+Active status always runs `ReconcileChangeValidity` first, even when `ifModifiedSince` matches. That reconciliation may persist recovery. Draft status stays read-only. `refreshImplementationTracking: false` skips the refresh and still evaluates the links and files already known. The returned state, blockers, and next action describe the committed aggregate. `GetStatusResult` adds a `validity` projection (`specApproval`, `signoff`, `verification`, `automaticReturn`) without removing existing fields. Verification freshness separates an active attempt from completed evidence. Stale verification is context before `verifying` and a blocker at the verification, sign-off, and archive boundaries.
 
 **Constructor:** `new GetStatus(changes: ChangeRepository, schemaProvider: SchemaProvider, approvals: { spec: boolean; signoff: boolean }, refreshImplementationTracking: RefreshImplementationTracking)`
 
@@ -140,9 +177,11 @@ interface TransitionBlocker {
 
 ### TransitionChange
 
-Performs a lifecycle state transition on a change. Enforces the shared transition-check evaluation (protocol edge, workflow `requires`, task completion on the target step, enter-`ready` and exit-`implementing` guards, approval predicates on the requested delivery edge) and executes `run:` hooks at step boundaries. Source `post` `run:` hooks run only when the attempt is classified as `along = forward`. For active changes, refreshes implementation tracking by default via `RefreshImplementationTracking` before lifecycle evaluation.
+Performs a lifecycle state transition on a change. Enforces the shared transition-check evaluation (protocol edge, workflow `requires`, task completion on the target step, enter-`ready`, exit-`implementing`, and enter-`verifying` guards, approval predicates on the requested delivery edge) and executes `run:` hooks at step boundaries. `impl.filesResolved` and `impl.linksInScope` are deduplicated by stable check ID when a route matches both exit-`implementing` and enter-`verifying`. Source `post` `run:` hooks run only when the attempt is classified as `along = forward`. For active changes, refreshes implementation tracking by default via `RefreshImplementationTracking` before lifecycle evaluation.
 
 The final persisted lifecycle update is applied through `ChangeRepository.mutate(...)` so hook execution stays outside the lock while the manifest mutation runs against fresh state.
+
+`TransitionChange` reconciles before checks and, after mutation-capable hooks, refreshes implementation tracking, reconciles again, and reruns applicable checks. It does not start or complete verification, and it has no restart input. A transition alone does not stale verification whose fingerprint still matches. If reconciliation commits a different state, the requested transition is not applied. That recovery stays committed, and a later attempt reconciles again under the lock. The caller reports the committed state.
 
 There is **no** approval-gate rewrite of the requested target:
 
@@ -207,7 +246,7 @@ type TransitionProgressEvent =
 
 ### EditChange
 
-Edits the spec scope of an existing change by adding or removing spec IDs. Any modification to `specIds` triggers approval invalidation.
+Edits the spec scope, description, or stored invalidation policy of an existing change. Scope changes run inside `ReconcileChangeValidity.mutate` so pre-edit drift is not lost. Policy edits pass a partial `InvalidationPolicyOverride`. Omitted dimensions stay as stored. The result reports `effectivePolicy`, whether validity changed, projection changes, affected artifacts, and any `automaticReturn`.
 
 The effective `specIds` update is persisted through `ChangeRepository.mutate(...)`; scaffold cleanup and creation remain outside that serialized manifest mutation.
 
@@ -215,18 +254,26 @@ The effective `specIds` update is persisted through `ChangeRepository.mutate(...
 
 **Input:**
 
-| Field           | Type       | Required | Description                          |
-| --------------- | ---------- | -------- | ------------------------------------ |
-| `name`          | `string`   | yes      | The change to edit.                  |
-| `addSpecIds`    | `string[]` | no       | Spec paths to add to `specIds`.      |
-| `removeSpecIds` | `string[]` | no       | Spec paths to remove from `specIds`. |
+| Field           | Type                         | Required | Description                          |
+| --------------- | ---------------------------- | -------- | ------------------------------------ |
+| `name`          | `string`                     | yes      | The change to edit.                  |
+| `addSpecIds`    | `string[]`                   | no       | Spec paths to add to `specIds`.      |
+| `removeSpecIds` | `string[]`                   | no       | Spec paths to remove from `specIds`. |
+| `description`   | `string`                     | no       | Replacement description.             |
+| `invalidation`  | `InvalidationPolicyOverride` | no       | Stored policy dimensions to overlay. |
 
 **Returns:** `Promise<EditChangeResult>`
 
 ```typescript
 interface EditChangeResult {
   change: Change
-  invalidated: boolean // true when approvals were invalidated by the edit
+  invalidated: boolean
+  scopeChanged: boolean
+  validityChanged: boolean
+  effectivePolicy: InvalidationPolicy
+  projectionChanges: readonly ProjectionChange[]
+  affectedArtifacts: readonly ArtifactReviewTarget[]
+  automaticReturn: AutomaticRecovery | null
 }
 ```
 
@@ -414,69 +461,159 @@ Retrieves a single archived change by name.
 
 ---
 
+## Validity
+
+`ReconcileChangeValidity` is the only use case that mutates validity projections, artifact review, matching audit events, and automatic lifecycle recovery. `StartVerification`, `CompleteVerification`, and `InvalidateVerification` call it. They do not apply those effects themselves.
+
+Recovery priority is fixed and is not configuration: required stale or revoked spec approval returns to `designing` when the state is after `designing`; otherwise required stale or revoked sign-off returns to `done` only when the state is later than `done`; otherwise `workflow: redesign` with unresolved non-task drift returns to `designing`; otherwise the state is preserved. Recovery never advances an earlier state. Verification staleness never moves the lifecycle. `artifacts: none` skips reopening and does not waive freshness.
+
+### ReconcileChangeValidity
+
+Observes current fingerprints and applies only new consequences inside one `ChangeRepository.mutate` boundary. `mutate` runs a caller operation between the pre-check and the post-check so scope edits, validation, approvals, and verification cannot replace a baseline while dropping earlier drift. Callers must not call `Change.invalidate`, projection invalidators, or recovery transitions outside this use case.
+
+Mutation-owning callers resolve their privacy-decorated actor once and pass it
+through `input.actor`; the reconciler reuses that exact object for all projection
+and event writes. Direct reconciliation without an actor keeps the established
+convention: observation uses the system actor, while human mutation intent uses
+the configured actor resolver.
+
+The same persisted projection status, artifact review state, and lifecycle state append no second invalidation or transition. Reads of the repository stay side-effect free. Status is the application path that may write when reconciliation discovers invalidity.
+
+**Factories:** `createReconcileChangeValidity(deps)` and `createReconcileChangeValidity(config, options?)`.
+
+**Input:**
+
+| Field                           | Type                   | Required | Description                                                                                        |
+| ------------------------------- | ---------------------- | -------- | -------------------------------------------------------------------------------------------------- |
+| `name`                          | `string`               | yes      | Active change name.                                                                                |
+| `intent`                        | `ReconciliationIntent` | no       | `observe`, `manual-invalidation`, `verification-invalidation`, or `spec-overlap-conflict`.         |
+| `refreshImplementationTracking` | `boolean`              | no       | Refresh links before fact collection when set.                                                     |
+| `actor`                         | `ActorIdentity`        | no       | Already-resolved decorated identity to reuse for every projection/event written by this operation. |
+
+**Returns:** `Promise<ReconcileChangeValidityResult>` — `change`, `verdict`, `projectionChanges`, `affectedArtifacts`, `automaticReturn`, and `changed`. `mutate` adds the caller `result`.
+
+**Throws:** `ChangeNotFoundError` when the change is missing. Fingerprint collection failures are verdict blockers (`FINGERPRINT_INPUT_ERROR`) rather than a partial fingerprint. A partial fingerprint is `null`.
+
+### StartVerification
+
+Valid in every active lifecycle state. Refreshes implementation tracking, reconciles, then runs the registered `impl.filesResolved` and `impl.linksInScope` checks in `verification-start` operation context. It fails before creating a baseline when either check fails. A complete fingerprint is required. Repeated start supersedes only the active attempt. Identical inputs still start a new attempt. Completed evidence is left unchanged unless reconciliation has already marked it stale.
+
+**Factories:** `createStartVerification(deps)` and `createStartVerification(config, options?)`.
+
+**Input:** `{ name: string }`.
+
+**Returns:** `Promise<StartVerificationResult>` — `change`, `attempt`, `supersededAttemptId`, and `reconciliation`.
+
+**Throws:**
+
+| Error                   | Condition                                                                                                        |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `ChangeNotFoundError`   | No change with the given name exists.                                                                            |
+| `FingerprintInputError` | A required input is missing, unreadable, outside the project, or an invalid path. No partial baseline is stored. |
+
+### CompleteVerification
+
+Requires an active attempt. Inside the reconciled mutation it compares the attempt baseline with a fresh fingerprint. Equality records completion. Mismatch, unreadable input, or a missing attempt writes no success and does not replace the baseline. The use case does not run tests.
+
+**Factories:** `createCompleteVerification(deps)` and `createCompleteVerification(config, options?)`.
+
+**Input:** `{ name: string }`.
+
+**Returns:** `Promise<CompleteVerificationResult>` — `change`, `verification`, and `reconciliation`.
+
+**Throws:**
+
+| Error                                  | Condition                                                                                                      |
+| -------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `VerificationAttemptNotFoundError`     | No active attempt. Code `VERIFICATION_ATTEMPT_NOT_FOUND`. No mutation.                                         |
+| `VerificationFingerprintMismatchError` | Fresh fingerprint differs. Code `VERIFICATION_FINGERPRINT_MISMATCH`. Differences are attached. Baseline stays. |
+| `FingerprintInputError`                | A required input cannot be read. No completion is recorded.                                                    |
+
+After a mismatch, start again, repeat the verification work, and only then complete.
+
+### InvalidateVerification
+
+Requires completed evidence. Marks valid or legacy-unknown evidence stale once, appends one event, and stales a current valid sign-off that depends on that verification id. Evidence that is already stale returns `invalidated: false` and writes no second event. The use case does not start an attempt, calculate a new baseline, or transition to the same state.
+
+**Factories:** `createInvalidateVerification(deps)` and `createInvalidateVerification(config, options?)`.
+
+**Input:** `{ name: string; reason: string }`.
+
+**Returns:** `Promise<InvalidateVerificationResult>` — `change`, `verification`, persisted `reason`, `invalidated`, `signoffChanged`, `automaticReturn`, `blockers`, and `nextAction`. Repeated invalidation returns the first stored reason even when the new request supplies a different one.
+
+**Throws:**
+
+| Error                       | Condition                                                                                     |
+| --------------------------- | --------------------------------------------------------------------------------------------- |
+| `VerificationNotFoundError` | No completed evidence. An unfinished attempt does not qualify. Code `VERIFICATION_NOT_FOUND`. |
+
+---
+
 ## Approvals
 
 ### ApproveSpec
 
-Records a spec approval. Requires the spec approval gate to be enabled. Artifact hashes are computed internally from the change's artifacts on disk, applying schema-defined pre-hash cleanup rules.
+Records a spec approval. Requires the spec approval gate to be enabled. The use case reconciles first, requires the committed state to be exactly `ready`, and records one `SpecApprovalFingerprint`: canonical sorted/deduplicated `specIds` plus the artifact fingerprint of the required non-task artifacts. Scope additions/removals stale consent; reordering does not. Task artifacts (`hasTasks`) are excluded. It does not move the lifecycle state.
 
-When the change is in `ready`, the use case records the approval and **does not** transition to `pending-spec-approval` or `spec-approved`. The change stays in `ready` so `approval.spec` can pass on the next `ready → implementing` attempt.
+Renewal replaces only the current materialized projection and appends a new `spec-approved` event. Prior approvals, invalidations, and legacy pending-state transitions remain unchanged in history.
 
-Drain: when the change is already in `pending-spec-approval`, the use case may still transition to `spec-approved`.
-
-Once prerequisites are ready, the approval event is persisted through `ChangeRepository.mutate(...)` on fresh change state. A `ready` change is not transitioned; drain from `pending-spec-approval` still may transition to `spec-approved`.
+The actor is resolved once through the injected `ActorResolver` and reused for the projection and the audit event. Config composition supplies the privacy-decorated resolver from `getActorResolver()`. The same decorated identity is what gets persisted.
 
 **Constructor:** `new ApproveSpec(changes: ChangeRepository, actor: ActorResolver, schemaProvider: SchemaProvider, hasher: ContentHasher)`
 
 **Input:**
 
-| Field           | Type      | Required | Description                                         |
-| --------------- | --------- | -------- | --------------------------------------------------- |
-| `name`          | `string`  | yes      | The change to approve the spec for.                 |
-| `reason`        | `string`  | yes      | Free-text rationale recorded in the approval event. |
-| `approvalsSpec` | `boolean` | yes      | Whether the spec approval gate is enabled.          |
+| Field    | Type     | Required | Description                                         |
+| -------- | -------- | -------- | --------------------------------------------------- |
+| `name`   | `string` | yes      | The change to approve the spec for.                 |
+| `reason` | `string` | yes      | Free-text rationale recorded in the approval event. |
 
 **Returns:** `Promise<Change>` — the updated change.
 
 **Throws:**
 
-| Error                         | Condition                                                          |
-| ----------------------------- | ------------------------------------------------------------------ |
-| `ApprovalGateDisabledError`   | `approvalsSpec` is `false`.                                        |
-| `ChangeNotFoundError`         | No change with the given name exists.                              |
-| `InvalidStateTransitionError` | Change is neither `ready` nor drain-state `pending-spec-approval`. |
+| Error                         | Condition                                             |
+| ----------------------------- | ----------------------------------------------------- |
+| `ApprovalGateDisabledError`   | The spec approval gate is disabled.                   |
+| `ChangeNotFoundError`         | No change with the given name exists.                 |
+| `InvalidStateTransitionError` | The committed state is not `ready`.                   |
+| `FingerprintInputError`       | A required non-task artifact cannot be fingerprinted. |
 
 ---
 
 ### ApproveSignoff
 
-Records a sign-off. Requires the signoff gate to be enabled. Artifact hashes are computed internally.
+Records a sign-off. Requires the signoff gate to be enabled. The use case refreshes implementation links, reconciles, requires the committed state to be exactly `done`, and requires current completed verification. It stores a complete fingerprint and that verification id, then stays in `done`. An empty implementation `files` map is valid. A `null` implementation fingerprint is legacy unknown evidence and cannot be renewed as current until a concrete fingerprint is recorded.
 
-When the change is in `done`, the use case records the sign-off and **does not** transition to `pending-signoff` or `signed-off`. The change stays in `done` so `approval.signoff` can pass on the next `done → archivable` attempt.
+Renewal replaces only the current sign-off projection and appends a new `signed-off` event. It never filters earlier sign-offs, invalidations, or legacy pending-state transitions from history.
 
-Drain: when the change is already in `pending-signoff`, the use case may still transition to `signed-off`.
+The actor is resolved once through the injected `ActorResolver` and reused for the projection and the audit event. Config composition supplies the privacy-decorated resolver from `getActorResolver()`.
 
-Once prerequisites are ready, the sign-off event is persisted through `ChangeRepository.mutate(...)` on fresh change state. A `done` change is not transitioned; drain from `pending-signoff` still may transition to `signed-off`.
+Missing completed evidence throws `VerificationNotFoundError`; active-only evidence throws `VerificationInProgressError`; stale or legacy-unknown evidence throws `VerificationStaleError`; only an explicit fresh comparison mismatch throws `VerificationFingerprintMismatchError`.
 
 **Constructor:** `new ApproveSignoff(changes: ChangeRepository, actor: ActorResolver, schemaProvider: SchemaProvider, hasher: ContentHasher)`
 
 **Input:**
 
-| Field              | Type      | Required | Description                                         |
-| ------------------ | --------- | -------- | --------------------------------------------------- |
-| `name`             | `string`  | yes      | The change to sign off.                             |
-| `reason`           | `string`  | yes      | Free-text rationale recorded in the sign-off event. |
-| `approvalsSignoff` | `boolean` | yes      | Whether the signoff gate is enabled.                |
+| Field    | Type     | Required | Description                                         |
+| -------- | -------- | -------- | --------------------------------------------------- |
+| `name`   | `string` | yes      | The change to sign off.                             |
+| `reason` | `string` | yes      | Free-text rationale recorded in the sign-off event. |
 
 **Returns:** `Promise<Change>` — the updated change.
 
 **Throws:**
 
-| Error                         | Condition                                                   |
-| ----------------------------- | ----------------------------------------------------------- |
-| `ApprovalGateDisabledError`   | `approvalsSignoff` is `false`.                              |
-| `ChangeNotFoundError`         | No change with the given name exists.                       |
-| `InvalidStateTransitionError` | Change is neither `done` nor drain-state `pending-signoff`. |
+| Error                                  | Condition                                                                       |
+| -------------------------------------- | ------------------------------------------------------------------------------- |
+| `ApprovalGateDisabledError`            | The sign-off gate is disabled.                                                  |
+| `ChangeNotFoundError`                  | No change with the given name exists.                                           |
+| `InvalidStateTransitionError`          | The committed state is not `done`, or another artifact/gate blocker remains.    |
+| `VerificationNotFoundError`            | No completed verification exists.                                               |
+| `VerificationInProgressError`          | Only an active attempt exists.                                                  |
+| `VerificationStaleError`               | Completed evidence is stale or has a legacy-unknown implementation fingerprint. |
+| `VerificationFingerprintMismatchError` | Current inputs differ from explicitly comparable completed evidence.            |
+| `FingerprintInputError`                | A linked implementation file or required artifact cannot be fingerprinted.      |
 
 ---
 
@@ -484,9 +621,22 @@ Once prerequisites are ready, the sign-off event is persisted through `ChangeRep
 
 ### ArchiveChange
 
-Finalises a completed change: runs pre-archive hooks, merges delta artifacts into the project specs, moves the change to the archive, runs post-archive hooks, and regenerates spec metadata. The change must be in `archivable` state.
+Finalises a completed change: runs pre-archive hooks, merges delta artifacts into the project specs, moves the change to the archive, runs post-archive hooks, and materializes spec metadata. The change must be in `archivable` state.
 
-Only the initial persisted move into `archiving` is serialized through `ChangeRepository.mutate(...)`; overlap checks, hooks, spec sync, archive storage, and metadata generation remain outside that critical section.
+The validity reconciler is mandatory. Archive first reconciles and runs its
+initial predicates, then executes pre-archive hooks. Because hooks may change
+artifacts or implementation links, it refreshes tracking, reconciles again, and
+reruns the archive predicates. Only after that second accepted snapshot does it
+build the publication plan and full-batch preflight, detect orphan backups, and
+take snapshots. No publication plan or snapshot is produced from pre-hook state.
+
+Only the final persisted move into `archiving` is serialized through
+`ChangeRepository.mutate(...)`; overlap checks, hooks, planning, preflight, spec
+sync, archive storage, and metadata generation remain outside that critical
+section. A reconciliation that already returned the change elsewhere throws
+`ReconciledOperationBlockedError` with the committed state and next action.
+
+Allowed overlaps are delegated to that reconciler for each active peer. Every peer is evaluated with its persisted invalidation policy and the project's enabled gates; Archive does not call `Change.invalidate` or force all peers to `designing`.
 
 This use case is the most port-intensive — it composes `RunStepHooks`, `MaterializeSpecMetadata` (force policy post-commit), and persisted-state publication via `applyPersistedSpecStatePatch` alongside direct ports.
 
@@ -512,13 +662,14 @@ interface ArchiveChangeResult {
 
 **Throws:**
 
-| Error                         | Condition                                                            |
-| ----------------------------- | -------------------------------------------------------------------- |
-| `ChangeNotFoundError`         | No change with the given name exists.                                |
-| `SchemaNotFoundError`         | The schema reference cannot be resolved.                             |
-| `SchemaMismatchError`         | The active schema name differs from the one on record in the change. |
-| `InvalidStateTransitionError` | Change is not in `archivable` state.                                 |
-| `HookFailedError`             | A pre-archive `run:` hook exited with a non-zero code.               |
+| Error                             | Condition                                                            |
+| --------------------------------- | -------------------------------------------------------------------- |
+| `ChangeNotFoundError`             | No change with the given name exists.                                |
+| `SchemaNotFoundError`             | The schema reference cannot be resolved.                             |
+| `SchemaMismatchError`             | The active schema name differs from the one on record in the change. |
+| `InvalidStateTransitionError`     | Change is not in `archivable` state.                                 |
+| `HookFailedError`                 | A pre-archive `run:` hook exited with a non-zero code.               |
+| `ReconciledOperationBlockedError` | Reconciliation committed recovery before archive could continue.     |
 
 ---
 
@@ -528,7 +679,7 @@ interface ArchiveChangeResult {
 
 Validates a change's artifact files against the active schema and marks them complete. This is the only path through which an artifact can reach `'complete'` status.
 
-Also enforces approval invalidation: if any artifact's content has changed since an approval was recorded, an `invalidated` event is appended.
+Validation captures drift inside `ReconcileChangeValidity` before it establishes a new structural baseline. Task-artifact content is ignored for automatic drift and is still structurally validated. A new baseline does not heal stale or revoked evidence.
 
 Dependency-blocked validation failures are status-aware: `ValidationFailure.description` includes the blocking dependency ID plus its effective status. Review states (`pending-review`, `drifted-pending-review`) are reported as review blockers, and recursive review propagation (`pending-parent-artifact-review`) includes upstream parent blocker context when available.
 

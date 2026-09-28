@@ -24,6 +24,7 @@ import { createImplLinksInScope } from './impl-links-in-scope.js'
 import { createProtocolEdge } from './protocol-edge.js'
 import { createSchemaNameMatch } from './schema-name-match.js'
 import { createSpecOverlap, type SpecOverlapDetection } from './spec-overlap.js'
+import { createVerificationCurrent } from './verification-current.js'
 import { createWorkspaceReadOnly } from './workspace-read-only.js'
 import { createWorkflowRequires } from './workflow-requires.js'
 import { createWorkflowTaskCompletion } from './workflow-task-completion.js'
@@ -84,6 +85,7 @@ export function createWorkflowCheckRegistry(
   const approvalSignoff = createApprovalSignoff()
   const schemaNameMatch = createSchemaNameMatch()
   const archiveArchivable = createArchiveArchivable()
+  const verificationCurrent = createVerificationCurrent()
   const specOverlap = createSpecOverlap({
     detectSpecOverlap: deps.detectSpecOverlap ?? (() => ({ blocked: false })),
   })
@@ -103,6 +105,7 @@ export function createWorkflowCheckRegistry(
     'spec.overlap': specOverlap,
     'hook.pre': hookPre,
     'hook.post': hookPost,
+    'verification.current': verificationCurrent,
   }
 
   return {

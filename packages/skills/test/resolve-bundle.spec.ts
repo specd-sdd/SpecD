@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { SpecdConfig } from '@specd/core'
+import { DEFAULT_INVALIDATION_POLICY, type SpecdConfig } from '@specd/core'
 import { ResolveBundle } from '../src/application/use-cases/resolve-bundle.js'
 import type { SkillRepository } from '../src/application/ports/skill-repository.js'
 import type { SkillBundle } from '../src/domain/skill-bundle.js'
@@ -44,6 +44,7 @@ function makeMockConfig(projectRoot: string = '/tmp/project'): SpecdConfig {
       archiveAdapter: { adapter: 'fs', config: {} },
     },
     approvals: { spec: false, signoff: false },
+    invalidation: DEFAULT_INVALIDATION_POLICY,
     plugins: { agents: [] },
   }
 }

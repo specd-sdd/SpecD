@@ -34,57 +34,35 @@
 
 ### Requirement: Spec approval is a check not a pending hop
 
-#### Scenario: Ready to implementing stays in ready when spec approval is missing
+Scenarios:
 
-- **GIVEN** a change in `ready` state
-- **GIVEN** `TransitionChange` is constructed with `approvals.spec: true`
-- **AND** no spec approval is recorded
-- **WHEN** `execute` is called with `to: 'implementing'`
-- **THEN** it throws `InvalidStateTransitionError` with reason `{ type: 'approval-required', gate: 'spec' }`
-- **AND** the change remains in `ready`
-- **AND** it does not persist `pending-spec-approval`
+#### Scenario: Stale approval returns to design instead of parking
 
-#### Scenario: Ready to implementing is direct when spec approval is inactive
+- **GIVEN** required spec approval is stale at `ready`
+- **WHEN** a forward transition is requested
+- **THEN** reconciliation commits `designing` recovery and the request fails
+- **AND** no pending approval state is entered
 
-- **GIVEN** a change in `ready` state
-- **GIVEN** `TransitionChange` is constructed with `approvals.spec: false`
-- **WHEN** `execute` is called with `to: 'implementing'`
-- **THEN** the change transitions to `implementing`
+#### Scenario: Valid current consent permits normal edge evaluation
 
-#### Scenario: Ready to implementing succeeds after spec approval is recorded
-
-- **GIVEN** a change in `ready` with `approvals.spec: true`
-- **AND** spec approval is recorded
-- **WHEN** `execute` is called with `to: 'implementing'`
-- **THEN** the change transitions to `implementing`
-- **AND** it does not persist `pending-spec-approval`
+- **WHEN** spec approval is valid for current canonical scope and artifacts
+- **THEN** approval check passes without rewriting the requested target
 
 ### Requirement: Signoff is a check not a pending hop
 
-#### Scenario: Done to archivable stays in done when signoff is missing
+Scenarios:
 
-- **GIVEN** a change in `done` state
-- **GIVEN** `TransitionChange` is constructed with `approvals.signoff: true`
-- **AND** no signoff is recorded
-- **WHEN** `execute` is called with `to: 'archivable'`
-- **THEN** it throws `InvalidStateTransitionError` with reason `{ type: 'approval-required', gate: 'signoff' }`
-- **AND** the change remains in `done`
-- **AND** it does not persist `pending-signoff`
+#### Scenario: Signoff requires current verification and fingerprints
 
-#### Scenario: Done to archivable is direct when signoff is inactive
+- **GIVEN** signoff exists but verification or signed inputs are stale
+- **WHEN** `done → archivable` is requested
+- **THEN** the request fails with verification or signoff recovery guidance
+- **AND** no pending signoff state is entered
 
-- **GIVEN** a change in `done` state
-- **GIVEN** `TransitionChange` is constructed with `approvals.signoff: false`
-- **WHEN** `execute` is called with `to: 'archivable'`
-- **THEN** the change transitions to `archivable`
+#### Scenario: Disabled signoff predicate skips
 
-#### Scenario: Done to archivable succeeds after signoff is recorded
-
-- **GIVEN** a change in `done` with `approvals.signoff: true`
-- **AND** signoff is recorded
-- **WHEN** `execute` is called with `to: 'archivable'`
-- **THEN** the change transitions to `archivable`
-- **AND** it does not persist `pending-signoff`
+- **WHEN** the signoff gate is disabled for `done → archivable`
+- **THEN** signoff check skips while other transition checks remain applicable
 
 ### Requirement: Human-approval pending states produce explicit transition failures
 
@@ -157,6 +135,22 @@
 - **THEN** it throws `incomplete-tasks`
 - **AND** the use case does not invoke `CountTasks` after a green predicate `execute`
 
+### Requirement: Canonical pre-transition validity reconciliation
+
+#### Scenario: Committed recovery survives failed requested transition
+
+- **GIVEN** fresh reconciliation invalidates required consent and returns the change to `designing`
+- **WHEN** the original forward transition becomes inapplicable
+- **THEN** it fails with the committed state, blockers, and next action
+- **AND** does not undo recovery
+
+#### Scenario: Recovery failure uses the canonical diagnostic contract
+
+- **GIVEN** reconciliation changes the lifecycle state before the requested edge is evaluated
+- **WHEN** the requested transition is no longer applicable
+- **THEN** the typed failure exposes committed state, automatic return, canonical blockers, and next action
+- **AND** it is not reduced to an invalid-state message without recovery context
+
 ### Requirement: Workflow requires enforcement
 
 #### Scenario: Unsatisfied requirement throws with structured reason
@@ -182,79 +176,84 @@
 - **WHEN** `TransitionChange.execute()` runs
 - **THEN** the thrown `incomplete-artifact` reason identifies the same artifact
 
-### Requirement: Artifact validation clearing on verifying to implementing
+### Requirement: Implementation-only retry from verifying
 
 #### Scenario: Implementation-only retry preserves validated artifacts
 
-- **GIVEN** a change in `verifying` state with validated artifacts
-- **AND** verification fails for implementation-only reasons
-- **WHEN** `execute` is called with `to: 'implementing'`
-- **THEN** unchanged validated artifacts are not cleared
+- **GIVEN** a change in `verifying` with validated artifacts and an implementation-only verification failure
+- **WHEN** `verifying → implementing` executes
+- **THEN** unchanged artifact and file states remain complete
+- **AND** `implementing.requires` is not used to clear their validation
 
-#### Scenario: Artifact review required does not route through implementing
+#### Scenario: Artifact or task revision routes to designing
 
-- **GIVEN** a change in `verifying` state
-- **AND** the required fix needs new tasks or revised artifacts
-- **WHEN** lifecycle routing is resolved
-- **THEN** the caller must transition to `designing`, not `implementing`
+- **GIVEN** verification discovers that the intended artifacts or task plan must change
+- **WHEN** the failure is classified
+- **THEN** the caller routes to `designing`, not through an implementation-only retry
+
+### Requirement: Verification attempt lifecycle
+
+#### Scenario: Entering verifying checks readiness only
+
+- **GIVEN** all implementation files and links are resolved
+- **WHEN** a real transition enters `verifying`
+- **THEN** readiness checks pass and the state changes
+- **AND** no verification attempt or completion is created
+
+#### Scenario: Exit rejects evidence changed by hooks
+
+- **GIVEN** completed evidence initially matches
+- **WHEN** a pre-persist hook changes a fingerprinted input before `verifying → done`
+- **THEN** fresh `verification.current` evaluation blocks persistence
+- **AND** recommends renewing verification in the current reconciled state
+
+#### Scenario: Implementing to verifying deduplicates readiness checks
+
+- **GIVEN** the hop matches forward-exit and verifying-entry bindings
+- **WHEN** transition checks execute
+- **THEN** each implementation readiness check runs once
+
+#### Scenario: Other implementation boundaries remain guarded
+
+- **WHEN** a permitted forward hop exits `implementing` without targeting `verifying`, or another state enters `verifying`
+- **THEN** the applicable implementation readiness checks still execute
+
+#### Scenario: Missing verification verdict blocks exit
+
+- **WHEN** `verifying → done` has no canonical verification verdict
+- **THEN** exit fails closed with typed unavailable-validity guidance
+- **AND** only an explicit `not-required` verdict may skip the predicate
 
 ### Requirement: Skill-aligned backward hop invalidation
 
-#### Scenario: done to implementing invalidates signoff only
+Scenarios:
 
-- **GIVEN** a change in `done` with validated artifacts and an active signoff
-- **WHEN** `execute` is called with `to: 'implementing'`
-- **THEN** signoff is invalidated
-- **AND** artifacts are not mass-downgraded
-- **AND** `implementing.post` is not executed
+#### Scenario: Backward movement preserves matching verification
+
+- **GIVEN** completed verification still matches current inputs
+- **WHEN** the change moves backward below verification
+- **THEN** verification remains valid
+- **AND** independently affected signoff follows its recovery rules
+
+#### Scenario: Changed inputs stale evidence independently
+
+- **WHEN** a backward transition accompanies actual artifact or implementation drift
+- **THEN** reconciliation stales only evidence whose fingerprint changed
 
 ### Requirement: Transition to designing from any state
 
-#### Scenario: Transition from archivable to designing
+Scenarios:
 
-- **GIVEN** a change in `archivable` state
-- **WHEN** `execute` is called with `to: 'designing'`
-- **THEN** the change transitions to `designing`
+#### Scenario: Explicit redesign applies focused policy
 
-#### Scenario: Transition to designing downgrades files to pending-review
+- **WHEN** a non-drafting change explicitly transitions to `designing`
+- **THEN** artifact reopening follows the configured artifact policy and required consent is revoked
+- **AND** unchanged verification is preserved unless its inputs changed
 
-- **GIVEN** a change with validated artifacts
-- **AND** one file is already `drifted-pending-review`
-- **WHEN** `execute` is called with `to: 'designing'`
-- **THEN** every other tracked file becomes `pending-review`
-- **AND** the drifted file remains `drifted-pending-review`
+#### Scenario: Designing self-entry remains validity neutral
 
-#### Scenario: Transition to designing invalidates active approvals
-
-- **GIVEN** a change in `implementing` state with an active spec approval
-- **WHEN** `execute` is called with `to: 'designing'`
-- **THEN** the approval is invalidated before the transition
-
-#### Scenario: Transition from designing to designing does not invalidate
-
-- **GIVEN** a change already in `designing` state
-- **WHEN** `execute` is called with `to: 'designing'`
-- **THEN** `change.invalidate()` is not called
-- **AND** `change.transition('designing', actor)` is called directly
-- **AND** no artifact files are downgraded
-- **AND** no approvals are cleared
-
-#### Scenario: Transition from drafting to designing does not invalidate
-
-- **GIVEN** a change in `drafting` state
-- **WHEN** `execute` is called with `to: 'designing'`
-- **THEN** `change.invalidate()` is not called
-- **AND** `change.transition('designing', actor)` is called directly
-
-#### Scenario: Transition from implementing to designing invalidates
-
-- **GIVEN** a change in `implementing` state with validated artifacts
-- **WHEN** `execute` is called with `to: 'designing'`
-- **THEN** `change.invalidate()` is called with cause `'artifact-review-required'`
-- **AND** all artifact files are downgraded to `pending-review`
-- **AND** any active spec approval is cleared
-- **AND** `change.transition('designing', actor)` is not called
-- **AND** the change is in `designing` from the invalidate `transitioned` event
+- **WHEN** `designing → designing` is requested
+- **THEN** no approval revocation, artifact reopening, or `transitioned` event is invented
 
 ### Requirement: Transition from archiving to archivable
 

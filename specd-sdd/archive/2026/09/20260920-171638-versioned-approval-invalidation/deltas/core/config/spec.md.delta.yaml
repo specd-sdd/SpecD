@@ -1,0 +1,39 @@
+- op: modified
+  description: 'Split artifact and workflow invalidation policy with compatibility rules'
+  selector:
+    type: section
+    matches: '^Requirement: Invalidation policy configuration$'
+  content: |
+    Project configuration SHALL accept the structured invalidation policy:
+
+    ```yaml
+    invalidation:
+      artifacts: downstream
+      workflow: preserve
+    ```
+
+    `artifacts` MUST be one of `none`, `surgical`, `downstream`, or `global`. `workflow` MUST be `preserve` or `redesign`. Missing values for a newly created change resolve to `{ artifacts: downstream, workflow: preserve }` before the policy is persisted on that change.
+
+    The legacy top-level `invalidationPolicy` key SHALL remain readable temporarily as a deprecated alias. It maps to `{ artifacts: <legacy value>, workflow: redesign }`, preserving legacy rollback behaviour. Supplying both `invalidationPolicy` and `invalidation` in the same effective configuration SHALL fail validation as ambiguous; merge precedence MUST NOT silently select one.
+
+    The workflow policy controls drift-driven lifecycle recovery only. It MUST NOT configure transition topology, waive unresolved artifact freshness, or override mandatory approval-gate recovery.
+
+- op: modified
+  description: 'Keep approval checks on legal ready and done boundaries without promising deferred phase skipping'
+  selector:
+    type: section
+    matches: '^Requirement: Approvals$'
+  content: |
+    `specd.yaml` MAY configure two independent human-approval gates. Both are disabled by default:
+
+    ```yaml
+    approvals:
+      spec: false
+      signoff: false
+    ```
+
+    When `spec` is `true`, a change in `ready` MUST NOT take a legal forward leave of `ready` until `ApproveSpec` records current consent. The `approval.spec` check applies to that forward boundary and fails with `APPROVAL_REQUIRED` while consent is missing or stale. Redesign (`ready → designing`) MUST NOT require consent. When the gate is off, the check skips. Omitting a workflow row does not by itself create a direct transition to a later lifecycle state; phase skipping is outside this contract.
+
+    When `signoff` is `true`, a change in `done` MUST NOT enter `archivable` until `ApproveSignoff` records current consent. When the gate is off, that approval check skips.
+
+    New work MUST stay in `ready` or `done` while awaiting the respective approval; it MUST NOT enter `pending-spec-approval` or `pending-signoff` as a happy-path hop. Existing changes already in those pending states retain their compatibility drain. Both gate flags are independent and every combination is valid.

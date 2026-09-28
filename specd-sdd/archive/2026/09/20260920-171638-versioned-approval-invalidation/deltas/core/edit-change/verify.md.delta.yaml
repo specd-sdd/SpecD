@@ -1,0 +1,129 @@
+- op: modified
+  description: 'Separate effective scope edits from actual validity changes'
+  selector: { type: section, matches: '^Requirement: No-op when no spec changes requested$' }
+  content: |
+    #### Scenario: Description provided with no spec changes
+
+    - **GIVEN** a change with description "Original description" and no separate input drift
+    - **WHEN** `EditChange.execute` receives only a new description
+    - **THEN** the description is updated and `scopeChanged`, `validityChanged`, and `invalidated` are false
+
+    #### Scenario: Both add and remove are absent
+
+    - **GIVEN** a current change with no separate drift or pending recovery
+    - **WHEN** `execute` receives no addSpecIds, removeSpecIds, description, or policy changes
+    - **THEN** it returns the unchanged change without a persistence-worthy mutation
+
+    #### Scenario: Both add and remove are empty arrays
+
+    - **GIVEN** a current change with no separate drift or pending recovery
+    - **WHEN** `execute` receives empty addSpecIds and removeSpecIds and no other edit
+    - **THEN** it returns the unchanged change without a persistence-worthy mutation
+
+    #### Scenario: Description and addSpecIds together without existing evidence
+
+    - **GIVEN** a change with no approval or completed verification evidence and no separate drift
+    - **WHEN** `execute` receives a new spec ID and description together
+    - **THEN** both edits are applied and `scopeChanged` is true
+    - **AND** `validityChanged` and its compatibility alias `invalidated` are false
+
+    #### Scenario: addSpecIds with no effective change
+
+    - **GIVEN** a current change already containing the spec with no separate input drift
+    - **WHEN** `execute` adds that same spec again
+    - **THEN** scope remains unchanged and `scopeChanged`, `validityChanged`, and `invalidated` are false
+
+- op: modified
+  description: 'Assert removal ordering independently of consent invalidation'
+  selector: { type: section, matches: '^Requirement: Removal precedes addition$' }
+  content: |
+    Scenarios:
+
+    #### Scenario: Remove and add in same call
+
+    - **GIVEN** a change with `specIds: ['auth/login', 'billing/invoices']`, no approval or completed verification evidence, and no separate drift
+    - **WHEN** `execute` receives `removeSpecIds: ['auth/login']` and `addSpecIds: ['auth/signup']`
+    - **THEN** the resulting specIds are `['billing/invoices', 'auth/signup']` and `scopeChanged` is true
+    - **AND** `validityChanged` and `invalidated` are false because no existing evidence became invalid
+
+- op: modified
+  selector: { type: section, matches: '^Requirement: Invalidation policy edits$' }
+  content: |
+    Scenarios:
+
+    #### Scenario: Policy-only edit changes no current validity
+
+    - **WHEN** one structured policy dimension is edited without other input changes
+    - **THEN** the v2 policy is persisted without invented drift, review, or lifecycle movement
+
+    #### Scenario: Repeating the same policy is a no-op
+
+    - **WHEN** an edit supplies the already persisted structured policy
+    - **THEN** no persistence-worthy policy change or invalidation is reported
+
+- op: modified
+  selector: { type: section, matches: '^Requirement: Approval invalidation on effective change$' }
+  content: |
+    Scenarios:
+
+    #### Scenario: Scope change reconciles fingerprints atomically
+
+    - **WHEN** effective spec scope changes
+    - **THEN** affected artifact review and evidence are updated in the same mutation
+    - **AND** required stale spec consent returns to design while ungated preserve retains state
+
+    #### Scenario: Scope change always affects spec consent but not unrelated evidence
+
+    - **WHEN** the canonical spec set changes but verification or sign-off inputs remain equal
+    - **THEN** spec approval becomes stale with explicit added or removed spec differences
+    - **AND** unaffected verification or sign-off remains unchanged with history retained
+
+    #### Scenario: Scope reordering is not a semantic change
+
+    - **WHEN** an edit only reorders or duplicates inputs that normalize to the approved canonical spec set
+    - **THEN** spec approval remains valid and no scope-change invalidation event is appended
+
+- op: modified
+  selector: { type: section, matches: '^Requirement: Output contract$' }
+  content: |
+    Scenarios:
+
+    #### Scenario: Result distinguishes edits from invalidation
+
+    - **WHEN** description or policy alone changes
+    - **THEN** output reports the edit without claiming projection invalidation unless fresh reconciliation found separate drift
+
+    #### Scenario: Scope edit reports committed recovery
+
+    - **WHEN** a scope edit changes evidence and triggers a return
+    - **THEN** result includes `scopeChanged`, actual validity change, affected files, projection changes, effective policy, blockers, next action, and automatic return
+
+- op: modified
+  description: 'Exercise scope-driven tracking refresh even when validity stays unchanged'
+  selector:
+    type: section
+    matches: '^Requirement: Implementation tracking refresh on spec change$'
+  content: |
+    #### Scenario: Spec removal triggers implementation tracking refresh
+
+    - **GIVEN** a change with confirmed implementation links and configured `refreshImplementationTracking`
+    - **WHEN** `EditChange.execute` removes a spec from canonical `specIds`
+    - **THEN** `refreshImplementationTracking.execute({ name })` sweeps dangling links
+
+    #### Scenario: Ungated preserve scope edit refreshes without validity change
+
+    - **GIVEN** a change with no existing approval or verification evidence and workflow `preserve`
+    - **WHEN** an edit adds a canonical spec ID
+    - **THEN** `scopeChanged` is true and tracking refresh runs
+    - **AND** `validityChanged` and the compatibility `invalidated` field may remain false
+
+- op: modified
+  description: 'Use ListWorkspaces rather than a competing repository map'
+  selector:
+    type: section
+    matches: '^Scenario: Uses spec repositories map for existence checks and dependency seeding$'
+  rename: 'Scenario: Uses ListWorkspaces for repository views and dependency seeding'
+  content: |
+    - **WHEN** `EditChange` is instantiated through direct dependencies or the config factory
+    - **THEN** it receives `ListWorkspaces` and obtains the relevant `SpecRepository` views from it
+    - **AND** it does not require a separate `ReadonlyMap<string, SpecRepository>` constructor argument

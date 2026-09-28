@@ -5,6 +5,7 @@ import { SchemaNotFoundError } from '../../../src/application/errors/schema-not-
 import { SchemaMismatchError } from '../../../src/application/errors/schema-mismatch-error.js'
 import { HookFailedError } from '../../../src/domain/errors/hook-failed-error.js'
 import { InvalidStateTransitionError } from '../../../src/domain/errors/invalid-state-transition-error.js'
+import { ReconciledOperationBlockedError } from '../../../src/application/errors/reconciled-operation-blocked-error.js'
 import { DeltaApplicationError } from '../../../src/domain/errors/delta-application-error.js'
 import { SpecOverlapError } from '../../../src/domain/errors/spec-overlap-error.js'
 import { ArchiveDependencyMismatchError } from '../../../src/domain/errors/archive-dependency-mismatch-error.js'
@@ -31,14 +32,25 @@ import { type ListResult } from '../../../src/application/ports/repository.js'
 import { type ArchiveListEntry } from '../../../src/domain/archived-change-index-entry.js'
 import { SpecPublicationError } from '../../../src/domain/errors/spec-publication-error.js'
 import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
+import { type ChangeValidityVerdict } from '../../../src/domain/services/change-validity.js'
+import {
+  ReconcileChangeValidity,
+  type ReconcileChangeValidityInput,
+} from '../../../src/application/use-cases/reconcile-change-validity.js'
+import { ValidityFingerprintService } from '../../../src/application/services/validity-fingerprint-service.js'
+import { NodeBinaryContentHasher } from '../../../src/infrastructure/node/binary-content-hasher.js'
+import { type ValidityFingerprint } from '../../../src/domain/value-objects/validity-fingerprint.js'
 import { ArtifactFile } from '../../../src/domain/value-objects/artifact-file.js'
 import { type MaterializeSpecMetadata } from '../../../src/application/use-cases/materialize-spec-metadata.js'
+import { ArchiveChange } from '../../../src/application/use-cases/archive-change.js'
+import { type ArchiveBatchSnapshotPort } from '../../../src/application/ports/archive-batch-snapshot.js'
 import { MarkdownParser } from '../../../src/infrastructure/artifact-parser/markdown-parser.js'
 import {
   type RunStepHooksInput,
   type RunStepHooksResult,
 } from '../../../src/application/use-cases/run-step-hooks.js'
 import {
+  makeChange,
   makeChangeRepository,
   makeListWorkspaces,
   makeActorResolver,
@@ -50,6 +62,7 @@ import {
   makeParser,
   makeParsers,
   makeMaterializeMetadata,
+  makeContentHasher,
   newArchiveChange,
   testActor,
 } from './helpers.js'
@@ -165,6 +178,28 @@ function makeArchivableChange(
 
 describe('ArchiveChange', () => {
   describe('constructor', () => {
+    it('rejects construction without the canonical reconciler', () => {
+      expect(
+        () =>
+          new ArchiveChange(
+            makeChangeRepository([]),
+            makeListWorkspaces(new Map()),
+            makeArchiveRepository(),
+            [],
+            makeActorResolver(),
+            makeParsers(),
+            makeSchemaProvider(makeSchema()),
+            makeMaterializeMetadata(),
+            new Map(),
+            [],
+            '/project',
+            undefined,
+            undefined,
+            undefined as never,
+          ),
+      ).toThrow('reconcile is required')
+    })
+
     it('does not store RunStepHooks on the instance', () => {
       const uc = newArchiveChange(
         makeChangeRepository([]),
@@ -3163,7 +3198,7 @@ describe('ArchiveChange', () => {
       expect(result.invalidatedChanges[0]!.specIds).toContain('default:auth/oauth')
 
       const invalidated = await repo.get('other-change')
-      expect(invalidated?.state).toBe('designing')
+      expect(invalidated?.state).toBe('drafting')
       const invEvent = invalidated?.history.find((e) => e.type === 'invalidated')
       expect(invEvent?.type === 'invalidated' && invEvent.cause).toBe('spec-overlap-conflict')
     })
@@ -3546,6 +3581,581 @@ describe('ArchiveChange', () => {
 
       await uc.execute({ name: 'my-change' })
       expect(specRepo.saved.has('auth/brand-new-spec/spec-lock.json')).toBe(false)
+    })
+  })
+
+  describe('reconciled archive preflight', () => {
+    const baseline: ValidityFingerprint = {
+      version: 1,
+      artifacts: { version: 1, algorithm: 'artifact-pre-hash-v1', files: {} },
+      implementation: {
+        version: 1,
+        hashAlgorithm: 'sha256',
+        textNormalization: 'text-v1',
+        binaryNormalization: 'bytes-v1',
+        files: {},
+      },
+    }
+    const openVerdict: ChangeValidityVerdict = {
+      artifactReviewRequired: false,
+      affectedArtifacts: [],
+      projectionChanges: [],
+      specApproval: 'valid',
+      signoff: 'valid',
+      verification: 'valid',
+      blockers: [],
+      recovery: null,
+    }
+
+    function resultFor(change: Change, verdict: ChangeValidityVerdict = openVerdict) {
+      return {
+        change,
+        verdict,
+        projectionChanges: [],
+        affectedArtifacts: [],
+        automaticReturn: verdict.recovery,
+        changed: false,
+      }
+    }
+
+    it('does not archive when preflight recovery leaves a non-archivable state', async () => {
+      const current = makeArchivableChange('my-change')
+      const recovered = makeChange('my-change', { specIds: ['default:auth/oauth'] })
+      recovered.transition('designing', testActor)
+      const repo = makeChangeRepository([current])
+      const archive = makeArchiveRepository()
+      const archiveSpy = vi.spyOn(archive, 'archive')
+      let calls = 0
+      const reconcile = {
+        execute: async () => {
+          calls += 1
+          repo.store.set('my-change', recovered)
+          return resultFor(recovered, {
+            ...openVerdict,
+            recovery: { cause: 'spec-approval', from: 'archivable', to: 'designing' },
+          })
+        },
+      } as unknown as ReconcileChangeValidity
+      const uc = newArchiveChange(
+        repo,
+        makeListWorkspaces(new Map()),
+        archive,
+        makeRunStepHooks(),
+        makeActorResolver(),
+        makeParsers(),
+        makeSchemaProvider(makeSchema()),
+        makeMaterializeMetadata(),
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        reconcile,
+      )
+
+      await expect(uc.execute({ name: 'my-change' })).rejects.toMatchObject({
+        name: ReconciledOperationBlockedError.name,
+        code: 'RECONCILED_OPERATION_BLOCKED',
+        operation: 'archive',
+        state: 'designing',
+        automaticReturn: { cause: 'spec-approval', from: 'archivable', to: 'designing' },
+        nextAction: { targetStep: 'designing', command: '/specd-design' },
+      })
+      expect(calls).toBe(1)
+      expect(archiveSpy).not.toHaveBeenCalled()
+      expect(repo.store.get('my-change')?.state).toBe('designing')
+    })
+
+    it('does not transition to archiving when post-hook verification blocks', async () => {
+      const change = makeArchivableChange('my-change')
+      const repo = makeChangeRepository([change])
+      const archive = makeArchiveRepository()
+      const archiveSpy = vi.spyOn(archive, 'archive')
+      const mutateSpy = vi.spyOn(repo, 'mutate')
+      const batchSnapshot = {
+        detectOrphans: vi.fn(),
+        snapshot: vi.fn(),
+        recordCreatedFile: vi.fn(),
+        restoreBatch: vi.fn(),
+        cleanup: vi.fn(),
+      } as unknown as ArchiveBatchSnapshotPort
+      let calls = 0
+      const reconcile = {
+        execute: async () => {
+          calls += 1
+          if (calls === 1) return resultFor(change)
+          return resultFor(change, {
+            ...openVerdict,
+            verification: 'stale',
+            blockers: [{ code: 'VERIFICATION_STALE', message: 'Verification evidence is stale' }],
+          })
+        },
+      } as unknown as ReconcileChangeValidity
+      const uc = newArchiveChange(
+        repo,
+        makeListWorkspaces(new Map()),
+        archive,
+        makeRunStepHooks(),
+        makeActorResolver(),
+        makeParsers(),
+        makeSchemaProvider(makeSchema()),
+        makeMaterializeMetadata(),
+        undefined,
+        undefined,
+        undefined,
+        batchSnapshot,
+        undefined,
+        reconcile,
+      )
+
+      await expect(uc.execute({ name: 'my-change' })).rejects.toBeInstanceOf(
+        InvalidStateTransitionError,
+      )
+      expect(calls).toBe(2)
+      expect(archiveSpy).not.toHaveBeenCalled()
+      expect(mutateSpy).not.toHaveBeenCalled()
+      expect(batchSnapshot.detectOrphans).not.toHaveBeenCalled()
+      expect(batchSnapshot.snapshot).not.toHaveBeenCalled()
+      expect(repo.store.get('my-change')?.state).toBe('archivable')
+    })
+
+    it('builds the archive plan from implementation links accepted after hooks', async () => {
+      const change = makeArchivableChange('my-change', {
+        specIds: ['default:auth/oauth'],
+      })
+      const repo = makeChangeRepository([change])
+      const specRepo = makeSpecRepository({
+        specs: [makeSpec({ workspace: 'default', name: 'auth/oauth', filenames: ['spec.md'] })],
+      })
+      let calls = 0
+      const reconcile = {
+        execute: async () => {
+          calls += 1
+          if (calls === 2) {
+            change.trackImplementationFile('src/accepted.ts', 'resolved')
+            change.addImplementationLink({
+              specId: 'default:auth/oauth',
+              file: 'src/accepted.ts',
+              fileLinkExplicit: true,
+            })
+          }
+          return resultFor(change)
+        },
+      } as unknown as ReconcileChangeValidity
+      const uc = newArchiveChange(
+        repo,
+        makeListWorkspaces(
+          new Map([['default', specRepo]]),
+          new Map(),
+          new Map([['default', '/project']]),
+        ),
+        makeArchiveRepository(),
+        makeRunStepHooks(),
+        makeActorResolver(),
+        makeParsers(),
+        makeSchemaProvider(makeSchema()),
+        makeMaterializeMetadata(),
+        new Map(),
+        [],
+        '/project',
+        undefined,
+        undefined,
+        reconcile,
+      )
+
+      await uc.execute({ name: 'my-change' })
+
+      expect(calls).toBeGreaterThanOrEqual(2)
+      expect(JSON.parse(specRepo.saved.get('auth/oauth/spec-lock.json') ?? '{}')).toMatchObject({
+        implementation: [{ file: 'default:src/accepted.ts' }],
+      })
+    })
+
+    it('does not archive when post-hook spec approval is absent', async () => {
+      const change = makeArchivableChange('my-change')
+      const repo = makeChangeRepository([change])
+      const archive = makeArchiveRepository()
+      const archiveSpy = vi.spyOn(archive, 'archive')
+      let calls = 0
+      const reconcile = {
+        execute: async () => {
+          calls += 1
+          if (calls === 1) return resultFor(change)
+          return resultFor(change, {
+            ...openVerdict,
+            specApproval: 'absent',
+            blockers: [{ code: 'APPROVAL_REQUIRED', message: 'Spec approval is required' }],
+          })
+        },
+      } as unknown as ReconcileChangeValidity
+      const uc = newArchiveChange(
+        repo,
+        makeListWorkspaces(new Map()),
+        archive,
+        makeRunStepHooks(),
+        makeActorResolver(),
+        makeParsers(),
+        makeSchemaProvider(makeSchema()),
+        makeMaterializeMetadata(),
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        reconcile,
+      )
+
+      await expect(uc.execute({ name: 'my-change' })).rejects.toBeInstanceOf(
+        InvalidStateTransitionError,
+      )
+      expect(archiveSpy).not.toHaveBeenCalled()
+      expect(repo.store.get('my-change')?.state).toBe('archivable')
+    })
+
+    it('does not archive when post-hook links fall outside scope', async () => {
+      const current = makeArchivableChange('my-change')
+      const drifted = makeArchivableChange('my-change')
+      drifted.addImplementationLink({
+        specId: 'default:other/spec',
+        file: 'src/outside.ts',
+        fileLinkExplicit: true,
+      })
+      const repo = makeChangeRepository([current])
+      const archive = makeArchiveRepository()
+      const archiveSpy = vi.spyOn(archive, 'archive')
+      let calls = 0
+      const reconcile = {
+        execute: async () => {
+          calls += 1
+          if (calls === 1) return resultFor(current)
+          repo.store.set('my-change', drifted)
+          return resultFor(drifted)
+        },
+      } as unknown as ReconcileChangeValidity
+      const uc = newArchiveChange(
+        repo,
+        makeListWorkspaces(new Map()),
+        archive,
+        makeRunStepHooks(),
+        makeActorResolver(),
+        makeParsers(),
+        makeSchemaProvider(makeSchema()),
+        makeMaterializeMetadata(),
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        reconcile,
+      )
+
+      await expect(uc.execute({ name: 'my-change' })).rejects.toBeInstanceOf(
+        ArchiveImplementationStateError,
+      )
+      expect(archiveSpy).not.toHaveBeenCalled()
+      expect(repo.store.get('my-change')?.state).toBe('archivable')
+    })
+
+    it('reconciles overlapping peers with a spec-overlap-conflict intent', async () => {
+      const archivable = makeArchivableChange('my-change', {
+        specIds: ['default:auth/oauth'],
+      })
+      const other = new Change({
+        name: 'other-change',
+        createdAt: new Date(),
+        specIds: ['default:auth/oauth'],
+        history: [
+          {
+            type: 'created',
+            at: new Date(),
+            by: testActor,
+            specIds: ['default:auth/oauth'],
+            schemaName: 'test-schema',
+            schemaVersion: 1,
+          },
+        ],
+      })
+      const specs = new ChangeArtifact({ type: 'specs' })
+      specs.setFile(
+        new ArtifactFile({
+          key: 'default:auth/oauth',
+          filename: 'spec.md',
+          status: 'complete',
+        }),
+      )
+      other.setArtifact(specs)
+      const repo = makeChangeRepository([archivable, other])
+      const intents: ReconcileChangeValidityInput[] = []
+      const reconcile = {
+        execute: async (input: ReconcileChangeValidityInput) => {
+          intents.push(input)
+          const loaded = repo.store.get(input.name)
+          if (loaded === undefined) throw new Error(`missing ${input.name}`)
+          return resultFor(loaded)
+        },
+      } as unknown as ReconcileChangeValidity
+      const mutateSpy = vi.spyOn(repo, 'mutate')
+      const uc = newArchiveChange(
+        repo,
+        makeListWorkspaces(new Map([['default', makeSpecRepository()]])),
+        makeArchiveRepository(),
+        makeRunStepHooks(),
+        makeActorResolver(),
+        makeParsers(),
+        makeSchemaProvider(makeSchema()),
+        makeMaterializeMetadata(),
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        reconcile,
+      )
+
+      const result = await uc.execute({ name: 'my-change', allowOverlap: true })
+
+      expect(result.invalidatedChanges).toEqual([
+        { name: 'other-change', specIds: ['default:auth/oauth'] },
+      ])
+      const overlap = intents.find((input) => input.name === 'other-change')
+      expect(overlap?.intent).toEqual({
+        type: 'spec-overlap-conflict',
+        reason:
+          "Invalidated because change 'my-change' was archived with overlapping specs: default:auth/oauth",
+        targets: [
+          {
+            artifactId: 'specs',
+            fileKey: 'default:auth/oauth',
+            filename: 'spec.md',
+            origin: 'direct',
+          },
+        ],
+      })
+      expect(mutateSpy.mock.calls.some((call) => call[0] === 'other-change')).toBe(false)
+      expect(
+        repo.store.get('other-change')?.history.some((event) => event.type === 'invalidated'),
+      ).toBe(false)
+    })
+
+    it('applies each overlapping peer policy and enabled gate through reconciliation', async () => {
+      const specId = 'default:auth/oauth'
+      const archivable = makeArchivableChange('my-change', { specIds: [specId] })
+      const makePeer = (name: string, workflow: 'preserve' | 'redesign') => {
+        const peer = makeChange(name, { specIds: [specId] })
+        peer.transition('designing', testActor)
+        peer.transition('ready', testActor)
+        peer.transition('implementing', testActor)
+        peer.invalidationPolicy = { artifacts: 'surgical', workflow }
+        const specs = new ChangeArtifact({ type: 'specs' })
+        specs.setFile(
+          new ArtifactFile({
+            key: specId,
+            filename: 'spec.md',
+            status: 'complete',
+          }),
+        )
+        peer.setArtifact(specs)
+        return peer
+      }
+      const preserved = makePeer('preserve-peer', 'preserve')
+      const redesigned = makePeer('redesign-peer', 'redesign')
+      const gated = makePeer('gated-peer', 'preserve')
+      gated.recordSpecApproval(
+        'approved scope',
+        {
+          version: 1,
+          specIds: [specId],
+          artifacts: { version: 1, algorithm: 'artifact-pre-hash-v1', files: {} },
+        },
+        testActor,
+      )
+      const repo = makeChangeRepository([archivable, preserved, redesigned, gated])
+      repo.artifact = async (_change, filename) => new SpecArtifact(filename, '# Peer spec')
+      const schemaProvider = makeSchemaProvider(
+        makeSchema([makeArtifactType('specs', { scope: 'spec' })]),
+      )
+      const makeReconciler = (specGate: boolean) =>
+        new ReconcileChangeValidity({
+          changes: repo,
+          schemaProvider,
+          actor: makeActorResolver(),
+          refreshImplementationTracking: {
+            execute: async () => ({ implementationTracking: null as never }),
+          } as never,
+          fingerprint: new ValidityFingerprintService({
+            changes: repo,
+            hasher: makeContentHasher(),
+            binaryHasher: new NodeBinaryContentHasher(),
+            schemaProvider,
+          }),
+          approvals: { spec: specGate, signoff: false },
+        })
+      const ungated = makeReconciler(false)
+      const specGated = makeReconciler(true)
+      const peerResults = new Map<string, Awaited<ReturnType<ReconcileChangeValidity['execute']>>>()
+      const reconcile = {
+        execute: async (input: ReconcileChangeValidityInput) => {
+          if (input.name === archivable.name) return resultFor(archivable)
+          const result = await (input.name === gated.name ? specGated : ungated).execute(input)
+          peerResults.set(input.name, result)
+          return result
+        },
+      } as unknown as ReconcileChangeValidity
+      const specRepo = makeSpecRepository({
+        specs: [makeSpec({ workspace: 'default', name: 'auth/oauth', filenames: ['spec.md'] })],
+      })
+      const uc = newArchiveChange(
+        repo,
+        makeListWorkspaces(new Map([['default', specRepo]])),
+        makeArchiveRepository(),
+        makeRunStepHooks(),
+        makeActorResolver(),
+        makeParsers(),
+        schemaProvider,
+        makeMaterializeMetadata(),
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        reconcile,
+      )
+
+      const result = await uc.execute({ name: archivable.name, allowOverlap: true })
+
+      expect(result.invalidatedChanges.map((entry) => entry.name).sort()).toEqual([
+        'gated-peer',
+        'preserve-peer',
+        'redesign-peer',
+      ])
+      expect(repo.store.get(preserved.name)?.state).toBe('implementing')
+      expect(peerResults.get(preserved.name)?.automaticReturn).toBeNull()
+      expect(peerResults.get(preserved.name)?.verdict.blockers).toEqual(
+        expect.arrayContaining([expect.objectContaining({ code: 'ARTIFACT_DRIFT' })]),
+      )
+      expect(repo.store.get(redesigned.name)?.state).toBe('designing')
+      expect(peerResults.get(redesigned.name)?.automaticReturn).toEqual({
+        cause: 'workflow-redesign',
+        from: 'implementing',
+        to: 'designing',
+      })
+      expect(repo.store.get(gated.name)?.state).toBe('designing')
+      expect(peerResults.get(gated.name)?.automaticReturn).toEqual({
+        cause: 'spec-approval',
+        from: 'implementing',
+        to: 'designing',
+      })
+      expect(repo.store.get(gated.name)?.specApproval?.status).toBe('stale')
+    })
+
+    it('archives the loaded change without a repository migrate or rewrite', async () => {
+      const change = makeArchivableChange('my-change')
+      change.startVerification(baseline, testActor)
+      const completed = change.completeVerification(testActor)
+      const historyBefore = change.history.length
+      const repo = makeChangeRepository([change])
+      const archive = makeArchiveRepository()
+      const archiveSpy = vi.spyOn(archive, 'archive')
+      const saveArtifact = vi.spyOn(repo, 'saveArtifact')
+      const create = vi.spyOn(repo, 'create')
+      const reconcile = {
+        execute: async () => resultFor(change),
+      } as unknown as ReconcileChangeValidity
+      const uc = newArchiveChange(
+        repo,
+        makeListWorkspaces(new Map()),
+        archive,
+        makeRunStepHooks(),
+        makeActorResolver(),
+        makeParsers(),
+        makeSchemaProvider(makeSchema()),
+        makeMaterializeMetadata(),
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        reconcile,
+      )
+
+      await uc.execute({ name: 'my-change' })
+
+      expect(saveArtifact).not.toHaveBeenCalled()
+      expect(create).not.toHaveBeenCalled()
+      expect(archiveSpy).toHaveBeenCalledTimes(1)
+      const archived = archiveSpy.mock.calls[0]?.[0]
+      expect(archived?.state).toBe('archiving')
+      expect(archived?.verification.completed?.id).toBe(completed.id)
+      expect(archived?.verification.completed?.status).toBe('valid')
+      expect(
+        archived?.history.filter((event) => event.type === 'verification-completed'),
+      ).toHaveLength(1)
+      expect(archived?.history.length).toBe(historyBefore + 1)
+      expect(archived?.history[archived.history.length - 1]).toMatchObject({
+        type: 'transitioned',
+        to: 'archiving',
+      })
+    })
+
+    it('blocks archive when a task artifact that is not named tasks.md still has open items', async () => {
+      const change = makeArchivableChange('my-change')
+      change.setArtifact(
+        new ChangeArtifact({
+          type: 'checklist',
+          files: new Map([
+            [
+              'checklist',
+              new ArtifactFile({
+                key: 'checklist',
+                filename: 'checklist.md',
+                status: 'complete',
+              }),
+            ],
+          ]),
+        }),
+      )
+      const schema = makeSchema({
+        artifacts: [
+          makeArtifactType('checklist', {
+            hasTasks: true,
+            taskCompletionCheck: {
+              incompletePattern: '^\\s*-\\s+\\[ \\]',
+              completePattern: '^\\s*-\\s+\\[x\\]',
+            },
+          }),
+        ],
+        workflow: [
+          {
+            step: 'archiving',
+            requires: ['checklist'],
+            requiresTaskCompletion: ['checklist'],
+            hooks: { pre: [], post: [] },
+          },
+        ],
+      })
+      const repo = makeChangeRepository([change])
+      vi.spyOn(repo, 'artifact').mockResolvedValue(
+        new SpecArtifact('checklist.md', '- [ ] still open\n'),
+      )
+      const archive = makeArchiveRepository()
+      const archiveSpy = vi.spyOn(archive, 'archive')
+      const uc = newArchiveChange(
+        repo,
+        makeListWorkspaces(new Map()),
+        archive,
+        makeRunStepHooks(),
+        makeActorResolver(),
+        makeParsers(),
+        makeSchemaProvider(schema),
+        makeMaterializeMetadata(),
+      )
+
+      await expect(uc.execute({ name: 'my-change' })).rejects.toMatchObject({
+        code: 'INVALID_STATE_TRANSITION',
+        reason: { type: 'incomplete-tasks', artifactId: 'checklist', incomplete: 1 },
+      })
+      expect(archiveSpy).not.toHaveBeenCalled()
+      expect(repo.store.get('my-change')?.state).toBe('archivable')
     })
   })
 })

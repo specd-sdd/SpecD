@@ -3,6 +3,9 @@ import { type ChangeRepository } from '../../application/ports/change-repository
 import { type ContentHasher } from '../../application/ports/content-hasher.js'
 import { type SchemaProvider } from '../../application/ports/schema-provider.js'
 import { type ApprovalGates } from '../../application/use-cases/transition-change.js'
+import { type ReconcileChangeValidity } from '../../application/use-cases/reconcile-change-validity.js'
+import { type RefreshImplementationTracking } from '../../application/use-cases/refresh-implementation-tracking.js'
+import { type ValidityFingerprintService } from '../../application/services/validity-fingerprint-service.js'
 import { ApproveSignoff } from '../../application/use-cases/approve-signoff.js'
 import { type SpecdConfig } from '../../application/specd-config.js'
 import {
@@ -26,6 +29,12 @@ export interface ApproveSignoffDeps {
   readonly contentHasher: ContentHasher
   /** Approval gate configuration used by the use case. */
   readonly approvals: ApprovalGates
+  /** Canonical validity reconciler. */
+  readonly reconcile: ReconcileChangeValidity
+  /** Shared complete fingerprint collector. */
+  readonly fingerprint: ValidityFingerprintService
+  /** Implementation tracking refresh. */
+  readonly refreshImplementationTracking: RefreshImplementationTracking
 }
 
 /**
@@ -41,6 +50,9 @@ export function resolveApproveSignoffDeps(resolver: CompositionResolver): Approv
     schemaProvider: resolver.getSchemaProvider(),
     contentHasher: resolver.getContentHasher(),
     approvals: resolver.config.approvals,
+    reconcile: resolver.getReconcileChangeValidity(),
+    fingerprint: resolver.getValidityFingerprintService(),
+    refreshImplementationTracking: resolver.getRefreshImplementationTracking(),
   }
 }
 
@@ -92,8 +104,24 @@ function createApproveSignoffFromNormalized(
   input: FactoryInput<ApproveSignoffDeps, CompositionResolutionOptions>,
 ): ApproveSignoff {
   if (input.kind === 'deps') {
-    const { changes, actor, schemaProvider, contentHasher, approvals } = input.deps
-    return new ApproveSignoff(changes, actor, schemaProvider, contentHasher, approvals)
+    const {
+      changes,
+      actor,
+      schemaProvider,
+      approvals,
+      reconcile,
+      fingerprint,
+      refreshImplementationTracking,
+    } = input.deps
+    return new ApproveSignoff(
+      changes,
+      actor,
+      schemaProvider,
+      approvals,
+      reconcile,
+      fingerprint,
+      refreshImplementationTracking,
+    )
   }
 
   const resolver = createCompositionResolver(input.config, input.options)
@@ -114,6 +142,9 @@ function isApproveSignoffDeps(
     'actor' in value &&
     'schemaProvider' in value &&
     'contentHasher' in value &&
-    'approvals' in value
+    'approvals' in value &&
+    'reconcile' in value &&
+    'fingerprint' in value &&
+    'refreshImplementationTracking' in value
   )
 }

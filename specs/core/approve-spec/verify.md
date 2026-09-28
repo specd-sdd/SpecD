@@ -21,56 +21,69 @@
 
 ### Requirement: Artifact hash computation
 
-#### Scenario: Artifacts are hashed with schema cleanup rules
+Scenarios:
 
-- **GIVEN** the change has two artifacts of type `spec` and `verify`
-- **AND** the schema defines a pre-hash cleanup rule for `spec` but not `verify`
-- **WHEN** the use case computes artifact hashes
-- **THEN** the `spec` artifact content has the cleanup rule applied before hashing
-- **AND** the `verify` artifact content is hashed without cleanup
+#### Scenario: Task artifacts are excluded from consent fingerprint
 
-#### Scenario: Artifact cannot be loaded
+- **GIVEN** all required artifacts are valid and one declares `hasTasks: true`
+- **WHEN** spec approval computes its fingerprint
+- **THEN** non-task artifacts use configured cleanup and the task artifact is excluded
 
-- **GIVEN** the change has an artifact entry but `ChangeRepository.artifact()` returns `null` for it
-- **WHEN** the use case computes artifact hashes
-- **THEN** that artifact is skipped and does not appear in the hash map
+#### Scenario: Missing required artifact blocks approval
 
-#### Scenario: Schema resolution failure propagates
+- **WHEN** a required non-task artifact is missing or pending review
+- **THEN** fingerprint approval fails without recording consent
 
-- **GIVEN** `SchemaProvider.get()` throws for the configured schema
-- **WHEN** the use case executes
-- **THEN** the error propagates from the gate guard before hash computation is reached
+#### Scenario: Approval snapshots canonical scope
+
+- **GIVEN** repeated and differently ordered spec IDs resolve to one canonical set
+- **WHEN** spec approval computes its fingerprint
+- **THEN** the sorted deduplicated spec IDs and artifact fingerprint are captured together
 
 ### Requirement: Approval recording and state transition
 
-#### Scenario: Change is in ready records approval without pending
+Scenarios:
 
-- **GIVEN** the change is in `ready` and the spec gate is on
-- **WHEN** `execute()` completes successfully
-- **THEN** the change history contains a `spec-approved` event with the provided reason, computed artifact hashes, and the resolved actor
-- **AND** the change state remains `ready`
+#### Scenario: Approval is renewed only in ready
 
-#### Scenario: Drain from pending-spec-approval still reaches spec-approved
+- **GIVEN** stale required consent while the change is implementing
+- **WHEN** approval is requested
+- **THEN** reconciliation routes through designing and ready before approval can succeed
+- **AND** no pending state or deleted history is produced
 
-- **GIVEN** the change is in `pending-spec-approval` state
-- **WHEN** `execute()` completes successfully
-- **THEN** the change state is `spec-approved`
+#### Scenario: Successful renewal retains prior audit history
 
-#### Scenario: Change is not in ready or pending-spec-approval
+- **WHEN** consent is renewed in reconciled `ready`
+- **THEN** the current projection and new event contain the same complete scope-aware fingerprint
+- **AND** prior approval events retain their earlier scopes unchanged
 
-- **GIVEN** the change is in `drafting` state
-- **WHEN** `execute()` is called
-- **THEN** an `InvalidStateTransitionError` is thrown
+#### Scenario: Approval actor decorator remains authoritative
+
+- **WHEN** approval resolves actor name and email
+- **THEN** it uses the existing decorated actor resolver with the same privacy and fallback behavior
+- **AND** it resolves exactly one decorated identity for the logical operation
+- **AND** reconciliation, the projection, and all appended events receive that same value
+
+### Requirement: Canonical pre-approval reconciliation
+
+#### Scenario: Newly detected drift prevents approval
+
+- **WHEN** reconciliation detects non-task drift before approval
+- **THEN** it persists canonical review and recovery and approval is not recorded
 
 ### Requirement: Persistence and return value
 
-#### Scenario: Change is saved and returned through serialized mutation
+Scenarios:
 
-- **GIVEN** a successful approval from `ready`
-- **WHEN** `execute()` returns
-- **THEN** `ChangeRepository.mutate(input.name, fn)` has been called
-- **AND** the callback records the approval on the fresh persisted change
-- **AND** the returned `Change` has state `ready`
+#### Scenario: Approval and reconciliation share one snapshot
+
+- **WHEN** eligible approval succeeds
+- **THEN** the valid projection and event refer to the same fresh fingerprint committed in one mutation
+
+#### Scenario: Ineligible approval commits only reconciliation
+
+- **WHEN** canonical reconciliation makes approval inapplicable
+- **THEN** its recovery persists without adding an approval event
 
 ### Requirement: Input contract
 
@@ -103,10 +116,15 @@
 
 ### Requirement: Config-based factory delegates through resolveApproveSpecDeps
 
-#### Scenario: createApproveSpec config form derives ApproveSpecDeps through resolveApproveSpecDeps
+Scenarios:
 
-- **WHEN** `createApproveSpec(config, options?)` is invoked
-- **THEN** it creates a composition resolver for that composition session
-- **AND** it derives `ApproveSpecDeps` through `resolveApproveSpecDeps(resolver)`
-- **AND** `resolveApproveSpecDeps(resolver)` resolves `contentHasher: ContentHasher`
-- **AND** the factory delegates to canonical `createApproveSpec(deps)`
+#### Scenario: Both factories are behaviorally equivalent
+
+- **WHEN** approval is constructed through deps and through config/options
+- **THEN** both delegate to the same canonical dependencies and result
+- **AND** options with deps raise the established invalid-arguments error
+
+#### Scenario: Factory does not bootstrap a kernel
+
+- **WHEN** dependencies are resolved
+- **THEN** only approval-specific ports are constructed and shared composition is reused

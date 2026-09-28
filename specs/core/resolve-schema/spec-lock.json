@@ -20,36 +20,36 @@
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "ResolveSchema pipeline: base→extends→plugins→overrides→merge→buildSchema; construction-time config.",
+      "value": "ResolveSchema deterministically composes base, extends, plugins, overrides, templates, and validation into one resolved Schema.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:0b57840d11314533eced2b59fc70824768e6108d306beaa4638bc2e1760f86b5",
-          "lastModified": "2026-07-06T14:22:55.215Z"
+          "hash": "sha256:69a626c2c2cf1877b3094b4ee1062656168a021b9d16890b65f9797a59cd4f0f",
+          "lastModified": "2026-08-30T09:18:36.436Z"
         },
         "verify.md": {
-          "hash": "sha256:e0bc39911eb456cd9ae7cec500115e9cc5f02e506d833825ddab5a6548ffeb70",
-          "lastModified": "2026-07-06T14:22:55.216Z"
+          "hash": "sha256:cafdffb5cf24dc96bc0bf3b0b4552eb99b06e2d03c3812f4c63a8377ac6ae3be",
+          "lastModified": "2026-08-30T09:18:36.437Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# ResolveSchema\n\n## Rules\n- Deps: SchemaRegistry, schemaRef, workspaceSchemasPaths, schemaPlugins[], schemaOverrides?. `execute()` no args.\n- Pipeline: (1) resolve base — null→SchemaNotFoundError; (2) recursive extends + cycle detect→SchemaValidationError; (3) extends layers root→parent `source:'extends'`; (4) plugins must `kind:schema-plugin` else SchemaValidationError; (5) normalize override hooks YAML→domain recursively, layer `source:'override'`; (6) mergeSchemaLayers; (7) if layers: pre-merge buildSchema on inherited for base-error attribution; (8) buildSchema — with layers ref `\"<schemaRef> (resolved)\"` else schemaRef. Child templates override parent same path.\n- Returns `Promise<Schema>`. Idempotent, deterministic. Config factory via `resolveResolveSchemaDeps`.\n\n## Constraints\n- application/use-cases/; domain services + SchemaRegistry only — no infra imports. Plugin miss = hard error. Extends unlimited depth, cycles detected.",
+      "value": "# ResolveSchema\n\n## Rules\n- Construct with SchemaRegistry, schemaRef, workspaceSchemasPaths, schemaPlugins[], optional schemaOverrides; `execute()` takes no arguments, returns `Promise<Schema>`.\n- Pipeline: resolve base or `SchemaNotFoundError`; recursively resolve extends with path-cycle detection; build root→parent extends layers; inherit parent compat unless child overrides; resolve plugins in declaration order, require kind schema-plugin; recursively normalize override hooks from YAML to domain across append/prepend/create/set; merge layers; pre-build inherited base when plugins/overrides exist for error attribution; final `buildSchema`.\n- Layers order: extends → plugins → override; sources preserved. Plugin miss hard error; kind mismatch/cycle → `SchemaValidationError`.\n- Final ref is original schemaRef without layers, otherwise `<schemaRef> (resolved)`. Templates accumulate across extends; child same-path template wins.\n- Registry result exposes parsed YAML, templates, resolved path. Execution idempotent/deterministic.\n- Config factory uses `resolveResolveSchemaDeps(resolver)` then canonical `createResolveSchema(deps)`; helper resolves schemas/schemaRef/plugins/overrides and owns config-based composition.\n\n## Constraints\n- Application use case only; imports domain merge/build services and SchemaRegistry port, never infrastructure.\n- Extends depth unlimited; cycles detected by resolved path.\n- Factory never reconstructs fs wiring inline.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:0b57840d11314533eced2b59fc70824768e6108d306beaa4638bc2e1760f86b5",
-          "lastModified": "2026-07-06T14:22:55.215Z"
+          "hash": "sha256:69a626c2c2cf1877b3094b4ee1062656168a021b9d16890b65f9797a59cd4f0f",
+          "lastModified": "2026-08-30T09:18:36.436Z"
         },
         "verify.md": {
-          "hash": "sha256:e0bc39911eb456cd9ae7cec500115e9cc5f02e506d833825ddab5a6548ffeb70",
-          "lastModified": "2026-07-06T14:22:55.216Z"
+          "hash": "sha256:cafdffb5cf24dc96bc0bf3b0b4552eb99b06e2d03c3812f4c63a8377ac6ae3be",
+          "lastModified": "2026-08-30T09:18:36.437Z"
         }
       }
     }

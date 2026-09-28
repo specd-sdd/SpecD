@@ -12,15 +12,11 @@ Without an abstraction over change storage, use cases would couple directly to f
 
 ### Requirement: get returns a Change or null
 
-`get(name)` MUST resolve the change name **only** under active storage (`changes/`). It MUST NOT search `drafts/` or `discarded/`.
+`get(name)` MUST resolve only active storage (`changes/`); a name found only under `drafts/` or `discarded/` returns `null`.
 
-When a change with the given name exists only as drafted, `get(name)` MUST return `null`.
+For an active change, `get` MUST hydrate its versioned manifest and return a `Change` with persisted artifact/file states. A missing serialized `state` defaults to `missing` during legacy adaptation. `validatedHash` remains available, and hydration MAY classify fresh physical file facts against it, but `get` MUST NOT persist validity changes, invalidate approvals, append events, or move lifecycle state. Fresh physical classification is not itself a completed application reconciliation.
 
-When a change exists in active storage, `get(name)` MUST return the `Change` with artifact and file states loaded from the persisted manifest. If an artifact or file entry omits `state`, the repository defaults that missing value to `missing` while loading.
-
-`validatedHash` is still loaded with the artifact data, but hash comparison is not the sole source of truth for steady-state status. The repository MAY detect drift and persist updated file and artifact states before returning (see Requirement: Auto-invalidation on get when artifact files drift).
-
-`get()` is a snapshot read for **active** changes. It MAY auto-invalidate and persist drifted artifacts under the repository's change lock (`_withChangeLock`) before returning, but it MUST NOT be the repository's serialized mutation primitive. Callers that need a coordinated read-modify-write section for an existing active change MUST use `mutate(name, fn)` instead of relying on a later `save()` against a stale snapshot.
+`get` is a snapshot read, not a serialized read-modify-write primitive. Callers needing an atomic update MUST use `mutate(name, fn)`; callers needing operational validity MUST invoke the application reconciler.
 
 ### Requirement: getDraft returns a DraftedChangeView or null
 
@@ -44,80 +40,31 @@ When no discarded change exists with the given name, `getDiscarded(name)` MUST r
 
 ### Requirement: mutate serializes persisted change updates
 
-`mutate(name, fn)` MUST provide serialized read-modify-write semantics for one existing **active** persisted change.
+`mutate(name, fn)` MUST provide serialized read-modify-write semantics for one existing active change. It resolves only `changes/` and throws `ChangeNotFoundError` for a missing or drafted-only name.
 
-Resolution MUST use the same rules as `get(name)` — only `changes/`. If the name exists only under `drafts/`, `mutate()` MUST throw `ChangeNotFoundError`.
+For a given name the repository MUST acquire exclusive per-change access, reload the freshest persisted `Change` inside that lock without nested writes, invoke `fn(change)` with `isDrafted === false`, and persist the changed manifest after a successful callback. It MUST then reload fresh file facts without independently applying or persisting validity decisions, release the lock, and return `{ result, change }`: `result` is the callback result and `change` is the post-save hydrated aggregate. The returned file classification MAY differ from the callback snapshot; it does not imply that approval or lifecycle recovery has been materialized.
 
-For a given active change name, the repository MUST:
+An application reconciliation callback MAY evaluate fresh file facts and mutate artifact review, approval/verification projections, history, and recovery inside this same serialized operation. Only that callback owns such decisions, and its changes MUST be committed atomically. If `fn` throws, no partial callback mutation is persisted and the lock is released. Locks are per change name; unrelated names MAY mutate concurrently.
 
-1. Acquire exclusive mutation access scoped to that persisted change
-2. Reload the freshest persisted `Change` state from active storage after the exclusive access is acquired, ensuring that this load operation does not trigger nested write locks or deadlocks. In filesystem-backed implementations, this reload operation MUST be performed using the internal read helper (e.g. `_getInternal(..., { skipWrite: true })`) to bypass nested locks and auto-invalidation writes, deferring all writes to the final save step.
-3. Invoke `fn(change)` with that fresh `Change` where `change.isDrafted === false`
-4. Persist the updated change manifest if `fn` resolves successfully (via the repository's internal manifest-write primitive)
-5. Reconcile by re-reading the change through the same load path used by `get` (including artifact-file drift detection and disk re-derive when artifact types are resolved). If that reconcile requires further manifest persistence, persist again before releasing the lock
-6. Release the exclusive access before returning or throwing
+### Requirement: Version-aware atomic reconciliation persistence
 
-`mutate` MUST return `{ result, change }` where:
+Repository load SHALL discriminate manifest format versions before version-specific validation, adapt supported v1 manifests to the v2 domain projection in memory, and reject unsupported future versions with the typed manifest-version error.
 
-- `result` is the value returned by `fn` (including `void` / `undefined`)
-- `change` is the post-reconcile `Change` from step 5 — not the pre-reconcile callback snapshot
-
-Callers that need the durable aggregate MUST use `.change`. The callback `fresh` object is not guaranteed equivalent to a subsequent `get()` after artifact bytes or disk state diverge during the callback.
-
-If no active change with the given name exists, `mutate()` MUST throw `ChangeNotFoundError`.
-
-If `fn` throws, `mutate()` MUST release the exclusive access and MUST NOT persist a partial manifest update produced by the failed callback.
-
-The serialized section MUST cover the full persisted mutation window — fresh load, callback execution, manifest persistence, and post-save reconcile. Locking only the final manifest write is insufficient.
-
-Exclusive access is per change name, not global. Mutations targeting different change names MAY proceed concurrently.
+`mutate` SHALL support an application reconciliation callback that evaluates fresh external file facts before writing. If reconciliation detects a change, the v2 structured invalidation policy, materialized approval and verification projections, fingerprints, artifact review state, append-only events, and required lifecycle return MUST be committed atomically. A failed subsequent transition or archive operation MUST NOT undo an already committed recovery.
 
 ### Requirement: mutateDraft serializes drafted change updates
 
-`mutateDraft(name, fn)` MUST provide serialized read-modify-write semantics for one existing **drafted** persisted change.
+`mutateDraft(name, fn)` MUST provide serialized read-modify-write semantics for one existing drafted change. It resolves only `drafts/` and throws `ChangeNotFoundError` for an active-only or missing name. The callback receives a fresh mutable `Change` with `isDrafted === true`; only `RestoreChange`, `DiscardChange`, and repository internals MAY call it in production.
 
-Resolution MUST use the same rules as `getDraft(name)` — only `drafts/`. If the name exists only under active storage, `mutateDraft()` MUST throw `ChangeNotFoundError`.
+On success the repository MUST persist the manifest and any required directory move, then reload through the destination bucket's non-writing hydration path and return `{ result, change }`. That reload MAY expose current physical file facts but MUST NOT independently invalidate approvals or select lifecycle recovery. On callback failure, no partial update is persisted and the lock is released.
 
-The callback MUST receive a fresh mutable `Change` with `isDrafted === true` before any transforming operation in the callback. Only `RestoreChange` and `DiscardChange` (and repository internals) MAY call `mutateDraft` in production code.
+### Requirement: Hydration reports fresh file facts without deciding validity
 
-On success, the repository MUST:
+`get(name)` SHALL hydrate the manifest and expose the fresh artifact and implementation file facts required by validity evaluation, but repository hydration MUST NOT independently invalidate approvals, choose a recovery target, or append lifecycle transitions.
 
-1. Persist the manifest and perform any required directory move (`drafts/` ↔ `changes/` or `drafts/` → `discarded/`)
-2. Reconcile by re-reading through the load path appropriate to the change's post-persist bucket (including drift detection when applicable)
-3. Return `{ result, change }` with the same semantics as `mutate` — `result` from `fn`, `change` post-reconcile
+Active validity reconciliation is owned by the application reconciler. A plain repository read, including a legacy v1 read or archived inspection, MUST NOT rewrite the manifest merely to migrate it. When a caller invokes reconciliation, all resulting artifact review states, approval and verification projection changes, audit events, and any automatic return SHALL be persisted as one serialized mutation before the reconciled change is returned.
 
-If `fn` throws, `mutateDraft()` MUST NOT persist partial updates, matching `mutate` failure semantics.
-
-### Requirement: Auto-invalidation on get when artifact files drift
-
-The `FsChangeRepository` implementation of `get()` MUST detect artifact file drift and auto-invalidate the change when appropriate, provided that the repository is fully initialized with resolved artifact types. After loading a change, the repository compares the current cleaned file hash against each file's stored `validatedHash` for files that were previously validated. If the repository is not initialized with artifact types, drift detection is bypassed.
-
-To support clean delegation and avoid deadlocks, the core loading, status mapping, and lock-based drift invalidation/sync checks MUST be encapsulated in a single internal read path (e.g., a private helper like `_getInternal`) shared by `get()` and `mutate()`.
-
-A file is drifted when:
-
-- `validatedHash` is a SHA-256 value recorded by prior validation, and
-- the current cleaned content hash no longer matches that `validatedHash`
-
-When drift is detected, the repository MUST:
-
-1. Acquire the repository's change lock (`_withChangeLock`) for the change name.
-2. Inside the lock, reload the manifest from disk to ensure consistency.
-3. If drift is still present on the reloaded state, scan the full affected artifact set first, collecting every drifted file key grouped by artifact type. It MUST NOT stop at the first mismatch.
-4. Mark each drifted file as `drifted-pending-review`.
-5. Recompute every affected artifact's aggregate `state`.
-6. Invalidate the change back to `designing` using the domain invalidation mechanism, preserving `drifted-pending-review` on the drifted files and downgrading the remaining files to `pending-review`.
-7. Persist the updated manifest inside the lock boundary before returning.
-
-This invalidation is lifecycle-independent: if a validated file drifts, the change is invalidated back to `designing` regardless of whether the current lifecycle state is `designing`, `ready`, `implementing`, `verifying`, `done`, or `archivable`.
-
-The invalidation history entry MUST record:
-
-- `cause: "artifact-drift"`
-- a clear `message`
-- `affectedArtifacts`, including each affected artifact type and the full list of drifted file keys captured in step 3
-
-The `SYSTEM_ACTOR` constant (`{ name: 'specd', email: 'system@getspecd.dev' }`) is used as the actor for these automated invalidations.
+The repository SHALL expose file reads for confirmed project-relative implementation paths without coupling application use cases to filesystem primitives. Missing, unreadable, or escaping paths SHALL be reported explicitly and MUST NOT be silently excluded from a fingerprint.
 
 ### Requirement: list returns active changes in creation order
 
@@ -310,29 +257,28 @@ These logs MUST follow the project's global logging conventions.
 
 ## Constraints
 
-- Changes are stored globally, not per-workspace — the inherited workspace context is unused
-- `get()` in `FsChangeRepository` may auto-invalidate and persist the change under the mutation lock before returning, if artifact drift is detected and the change is beyond `designing` or has active approvals
-- `list`, `listDrafts`, and `listDiscarded` return lightweight list entries with no artifact content, history, or derived artifact state maps
-- `get`, `getDraft`, and `getDiscarded` remain the detail surfaces for full manifest-backed inspection
-- List pagination has no default `limit`; when omitted, `list()` returns the full bucket and `meta.limit` equals `meta.total` per `core:repository-port`
-- Application use cases persist new changes via `create` and existing changes via `mutate` / `mutateDraft` only
-- `saveArtifact()` writes file content only and MUST NOT mutate the in-memory `Change`; manifest status updates come from mutate/reconcile/`get`
-- `ArtifactConflictError` is the sole error type for concurrent modification detection on artifact bytes
-- The `force` option on `saveArtifact()` bypasses conflict detection entirely
-- `originalHash` on loaded artifacts MUST use `sha256` of the file content as read from disk
-- Manifest writes MUST be atomic to prevent corruption from partial reads
-- `mutate` / `mutateDraft` return `{ result, change }` where `change` is post-reconcile
+- Changes are stored globally, not per workspace; the inherited workspace context is unused.
+- Repository `get`, post-save reload, drafted inspection, and archived inspection MUST NOT persist validity changes merely from hydration or legacy adaptation.
+- `list`, `listDrafts`, and `listDiscarded` return lightweight entries without artifact content, history, or derived artifact-state maps; `get`, `getDraft`, and `getDiscarded` are the detail surfaces.
+- List pagination has no default `limit`; when omitted, `list()` returns the full bucket and `meta.limit` equals `meta.total` per `core:repository-port`.
+- Application use cases persist new changes through `create` and existing changes through `mutate` / `mutateDraft` only.
+- `saveArtifact()` writes file content only and MUST NOT mutate the in-memory `Change`; manifest validity updates belong to application reconciliation.
+- `ArtifactConflictError` is the sole error type for concurrent artifact-byte modification; `force` on `saveArtifact()` bypasses conflict detection.
+- `originalHash` on loaded artifacts MUST be SHA-256 of file bytes read from disk.
+- Manifest writes MUST be atomic. `mutate` / `mutateDraft` return `{ result, change }` with post-save hydration; this is not an automatic validity commit.
 
 ## Spec Dependencies
 
 - [`core:repository-port`](../repository-port/spec.md) — shared repository base contract and list pagination types
-- [`core:change-list-entry`](../change-list-entry/spec.md) — `ActiveChangeListEntry`, `DraftedChangeListEntry`, and `DiscardedChangeListEntry`
+- [`core:change-list-entry`](../change-list-entry/spec.md) — active, drafted, and discarded list entries
 - [`default:_global/architecture`](../../_global/architecture/spec.md) — application ports and ownership boundaries
-- [`core:change`](../change/spec.md) — change entity state, invalidation, and artifact semantics
+- [`core:change`](../change/spec.md) — change state, validity projections, invalidation, and artifact semantics
 - [`core:read-only-change-view`](../read-only-change-view/spec.md) — shared read-only facade
 - [`core:drafted-change-view`](../drafted-change-view/spec.md) — read model returned by `getDraft`
 - [`core:discarded-change-view`](../discarded-change-view/spec.md) — read model returned by `getDiscarded`
 - [`core:drafted-change-read-only-error`](../drafted-change-read-only-error/spec.md) — secondary persistence guard
 - [`core:storage`](../storage/spec.md) — filesystem persistence and change directory layout
-- [`core:change-manifest`](../change-manifest/spec.md) — manifest fields persisted by the repository
-- [`default:_global/logging`](../../_global/logging/spec.md) — debug logging requirements for tracked artifact resolution and path-confinement diagnostics
+- [`core:change-manifest`](../change-manifest/spec.md) — versioned manifest fields persisted by the repository
+- [`core:schema-format`](../schema-format/spec.md) — artifact task markers and cleanup rules used by reconciliation
+- [`core:transition-checks`](../transition-checks/spec.md) — canonical validity verdict consumed during reconciliation
+- [`default:_global/logging`](../../_global/logging/spec.md) — diagnostics for tracked artifact and implementation resolution

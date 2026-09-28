@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { parseSpecId } from '../../src/helpers/spec-path.js'
-import { type SpecdConfig } from '@specd/sdk'
+import { DEFAULT_INVALIDATION_POLICY, type SpecdConfig } from '@specd/sdk'
 
 function makeConfig(workspaceNames: string[]): SpecdConfig {
   return {
@@ -28,6 +28,7 @@ function makeConfig(workspaceNames: string[]): SpecdConfig {
       archiveAdapter: { adapter: 'fs', config: { path: '/project/.specd/archive' } },
     },
     approvals: { spec: false, signoff: false },
+    invalidation: DEFAULT_INVALIDATION_POLICY,
   }
 }
 

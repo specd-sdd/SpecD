@@ -1,0 +1,45 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "core:change",
+    "core:change-repository-port",
+    "core:transition-checks",
+    "core:composition-resolver"
+  ],
+  "implementation": [
+    {
+      "file": "core:src/application/errors/fingerprint-input-error.ts",
+      "symbols": ["FingerprintInputError"]
+    },
+    {
+      "file": "core:src/application/errors/verification-attempt-not-found-error.ts",
+      "symbols": ["VerificationAttemptNotFoundError"]
+    },
+    {
+      "file": "core:src/application/errors/verification-not-found-error.ts",
+      "symbols": ["VerificationNotFoundError"]
+    },
+    {
+      "file": "core:src/application/errors/verification-fingerprint-mismatch-error.ts",
+      "symbols": ["VerificationFingerprintMismatchError"]
+    },
+    {
+      "file": "core:src/application/use-cases/start-verification.ts",
+      "symbols": ["StartVerification"]
+    },
+    {
+      "file": "core:src/application/use-cases/complete-verification.ts",
+      "symbols": ["CompleteVerification"]
+    },
+    {
+      "file": "core:src/application/use-cases/invalidate-verification.ts",
+      "symbols": ["InvalidateVerification"]
+    },
+    {
+      "file": "core:test/application/use-cases/invalidate-verification.spec.ts"
+    }
+  ]
+}

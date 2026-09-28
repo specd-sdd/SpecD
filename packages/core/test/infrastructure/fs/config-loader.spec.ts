@@ -2275,12 +2275,38 @@ context:
 
   describe('Requirement: Invalidation policy configuration', () => {
     it('accepts valid invalidationPolicy values', async () => {
-      for (const policy of ['none', 'surgical', 'downstream', 'global']) {
+      for (const policy of ['none', 'surgical', 'downstream', 'global'] as const) {
         const configPath = await writeConfig(minimalYaml(`invalidationPolicy: ${policy}`))
         const loader = createLoader({ configPath })
         const config = await loader.load()
-        expect(config.invalidationPolicy).toBe(policy)
+        expect(config.invalidation).toEqual({ artifacts: policy, workflow: 'redesign' })
       }
+    })
+
+    it('uses the native preserve default when both shapes are omitted', async () => {
+      const configPath = await writeConfig(minimalYaml(''))
+      const loader = createLoader({ configPath })
+      const config = await loader.load()
+      expect(config.invalidation).toEqual({ artifacts: 'downstream', workflow: 'preserve' })
+    })
+
+    it('accepts a structured invalidation policy', async () => {
+      const configPath = await writeConfig(
+        minimalYaml('invalidation:\n  artifacts: surgical\n  workflow: preserve'),
+      )
+      const loader = createLoader({ configPath })
+      const config = await loader.load()
+      expect(config.invalidation).toEqual({ artifacts: 'surgical', workflow: 'preserve' })
+    })
+
+    it('rejects ambiguous invalidation shapes', async () => {
+      const configPath = await writeConfig(
+        minimalYaml(
+          'invalidationPolicy: global\ninvalidation:\n  artifacts: none\n  workflow: preserve',
+        ),
+      )
+      const loader = createLoader({ configPath })
+      await expect(loader.load()).rejects.toThrow(ConfigValidationError)
     })
 
     it('rejects unknown invalidationPolicy value', async () => {

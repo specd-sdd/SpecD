@@ -75,6 +75,24 @@ When overlap or drift risk exists for broader spec-delta review outside that nar
 
 When review only needs one spec-scoped artifact, agents SHOULD prefer `specd changes spec-preview <change-name> <specId> --artifact <artifactId>` to reduce unnecessary output volume.
 
+### Requirement: Cross-skill artifact review and recovery
+
+Every lifecycle skill SHALL begin from fresh `change status` guidance and SHALL treat the returned reconciled state, validity projections, blockers, and next action as canonical.
+
+Under `workflow: preserve` without required spec-gate recovery, the active skill MAY review drifted artifacts in place: inspect semantic consistency and dependent artifacts, correct content when within that skill's authorized scope, and run structural validation to establish a new baseline. Structural success MUST NOT be presented as semantic review, approval renewal, or verification renewal.
+
+The skill SHALL redirect to `specd-design` when artifact authoring, design correction, a new design decision, or required spec-approval recovery is necessary. Implement, verify, and change-scoped compliance SHALL respect mandatory spec-consent recovery. `changes verification invalidate <name> --reason <text>` withdraws completed evidence; explicit `start` begins a new attempt. Archive refuses stale or unknown required verification and incomplete live tasks.
+
+Both `specd-verify` and `specd-compliance --change <name>`, when invoked independently, SHALL support any active lifecycle state and execute `changes verification start <name>` before verification work, then perform checks and produce findings/report, then execute `changes verification complete <name>` only after success. Applicable hooks and report generation precede completion. CLI completion records the skill's declaration, not execution of tests. Neither skill requires entering `verifying` merely to produce evidence; lifecycle advancement remains a separate authorized action.
+
+When verify optionally invokes compliance in full mode, verify SHALL start before scenario checks and explicitly pass both `--delegated` and `--attempt <attemptId>`. Delegated compliance participates in that attempt and returns its audit result without start or complete. It remains a complete change-scoped audit mode: it resolves status and project context, discovers the change specs and direct dependencies, reads merged specs through `changes spec-preview`, writes under the change's reports directory, and emits the change-scoped compliance filename. Every downstream mode branch that applies to standalone `--change` also applies to delegated mode except verification-attempt ownership.
+
+Verify alone completes after both scenario verification and audit succeed. Simple verify runs start/checks/complete without compliance. An existing active attempt alone MUST NOT imply delegation; independent invocations start their own attempt. Compliance modes without a concrete active change produce reports without change-verification commands.
+
+If fingerprints change, the owning skill SHALL inspect differences, resolve their cause, explicitly start again, and repeat verification work before completion. It MUST NOT start after testing and immediately complete using earlier results. Failed checks, interrupted work, or failed delegated audits MUST NOT record successful completion. Renewing evidence requires neither a self-transition nor leaving and re-entering a phase.
+
+Skills MUST NOT independently calculate fingerprints, invalidate projections, select recovery targets, or assume that `preserve` permits forward progress with unresolved non-task review.
+
 ### Requirement: Implementation traceability policy
 
 AI agents SHALL maintain implementation traceability as part of normal change workflow.
@@ -97,7 +115,10 @@ If subagent flows are not supported, the orchestrator agent SHALL perform optimi
 
 ## Spec Dependencies
 
-- [`cli:command-resource-naming`](../cli/command-resource-naming/spec.md) — canonical plural naming policy used by agent-facing command examples
-- [`skills:agents`](../agents/spec.md) — defines specialized optimizer agents and their prompts
-- [`cli:spec-context`](../../cli/spec-context/spec.md) — agent-ready semantic spec context, filtering, and dependency traversal
-- [`cli:spec-metadata`](../../cli/spec-metadata/spec.md) — normalized metadata projection and materialization diagnostics
+- [`cli:command-resource-naming`](../cli/command-resource-naming/spec.md) — canonical plural naming in agent-facing commands
+- [`skills:agents`](../agents/spec.md) — optimizer agents and prompts
+- [`cli:spec-context`](../../cli/spec-context/spec.md) — semantic spec context and dependency traversal
+- [`cli:spec-metadata`](../../cli/spec-metadata/spec.md) — metadata projection and diagnostics
+- [`core:get-status`](../../core/get-status/spec.md) — reconciled lifecycle, validity, blockers, and next action
+- [`core:validate-artifacts`](../../core/validate-artifacts/spec.md) — structural validation and baseline establishment
+- [`core:transition-checks`](../../core/transition-checks/spec.md) — canonical validity verdict and recovery priority

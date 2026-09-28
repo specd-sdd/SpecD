@@ -12,3 +12,4 @@ export { archiveArchivable, runArchiveArchivable } from './archive-archivable.js
 export { specOverlap, runSpecOverlap } from './spec-overlap.js'
 export { hookPre } from './hook-pre.js'
 export { hookPost } from './hook-post.js'
+export { verificationCurrent } from './verification-current.js'

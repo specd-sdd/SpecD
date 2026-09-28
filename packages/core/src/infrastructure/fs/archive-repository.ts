@@ -23,7 +23,7 @@ import { isEnoent } from './is-enoent.js'
 import { moveDir } from './move-dir.js'
 import { normalizeRelativePath, resolveConfinedPath } from './path-confinement.js'
 import { writeFileAtomic } from './write-atomic.js'
-import { type ChangeManifest, changeManifestSchema } from './manifest.js'
+import { type ChangeManifest, parseChangeManifest } from './manifest.js'
 import { loadChangeFromManifest } from './manifest-change-loader.js'
 import { FsArchiveIndexCache, type ArchiveIndexEntry } from './fs-archive-index-cache.js'
 import { ensureTmpGitignore } from './ensure-tmp-gitignore.js'
@@ -436,11 +436,14 @@ export class FsArchiveRepository extends ArchiveRepository {
   private async _loadManifest(dir: string): Promise<ChangeManifest> {
     const content = await fs.readFile(path.join(dir, 'manifest.json'), 'utf8')
     const json: unknown = JSON.parse(content)
-    const result = changeManifestSchema.safeParse(json)
-    if (!result.success) {
-      throw new CorruptedManifestError(dir)
+    try {
+      return parseChangeManifest(json)
+    } catch (err) {
+      if (err instanceof CorruptedManifestError) {
+        throw new CorruptedManifestError(dir)
+      }
+      throw err
     }
-    return result.data as ChangeManifest
   }
 
   /**

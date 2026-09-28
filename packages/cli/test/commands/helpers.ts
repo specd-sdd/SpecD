@@ -8,12 +8,13 @@
 import type { Stats } from 'node:fs'
 import { vi } from 'vitest'
 import { Command } from 'commander'
-import type {
-  SpecdConfig,
-  Kernel,
-  SpecRepository,
-  ChangeRepository,
-  ArchiveRepository,
+import {
+  DEFAULT_INVALIDATION_POLICY,
+  type SpecdConfig,
+  type Kernel,
+  type SpecRepository,
+  type ChangeRepository,
+  type ArchiveRepository,
 } from '@specd/sdk'
 
 /**
@@ -88,6 +89,7 @@ export function makeMockConfig(overrides: Partial<SpecdConfig> = {}): SpecdConfi
       archiveAdapter: { adapter: 'fs', config: { path: '/project/.specd/archive' } },
     },
     approvals: { spec: false, signoff: false },
+    invalidation: DEFAULT_INVALIDATION_POLICY,
     ...overrides,
   }
 }
@@ -255,7 +257,17 @@ export function makeMockDiscardedView(
 // Mock kernel factory
 // ---------------------------------------------------------------------------
 
-export function makeMockKernel(overrides: Record<string, unknown> = {}): Kernel & MockKernel {
+/** Verification use cases added to the mock kernel before they exist on every Kernel build. */
+export type VerificationKernelMethods = {
+  startVerification: { execute: ReturnType<typeof vi.fn> }
+  completeVerification: { execute: ReturnType<typeof vi.fn> }
+  invalidateVerification: { execute: ReturnType<typeof vi.fn> }
+}
+
+/** Kernel mock including verification methods. */
+export type TestKernel = Kernel & MockKernel & { changes: VerificationKernelMethods }
+
+export function makeMockKernel(overrides: Record<string, unknown> = {}): TestKernel {
   const emptyList = makeListResult([])
 
   const changes = {
@@ -304,6 +316,9 @@ export function makeMockKernel(overrides: Record<string, unknown> = {}): Kernel 
     preview: { execute: vi.fn() },
     approveSpec: { execute: vi.fn() },
     approveSignoff: { execute: vi.fn() },
+    startVerification: { execute: vi.fn() },
+    completeVerification: { execute: vi.fn() },
+    invalidateVerification: { execute: vi.fn() },
   }
 
   const specs = {
@@ -390,7 +405,7 @@ export function makeMockKernel(overrides: Record<string, unknown> = {}): Kernel 
   // The mock satisfies Kernel structurally at runtime (every group has every
   // key with an { execute } stub). A single cast is enough — MockKernel
   // mirrors Kernel's shape with mock execute functions.
-  return { schemas, changes, specs, project, ...overrides } as unknown as Kernel & MockKernel
+  return { schemas, changes, specs, project, ...overrides } as unknown as TestKernel
 }
 
 // ---------------------------------------------------------------------------

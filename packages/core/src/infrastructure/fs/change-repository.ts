@@ -3,14 +3,19 @@ import { existsSync } from 'node:fs'
 import * as path from 'node:path'
 import { z } from 'zod'
 import { StorageDirectoryNotFoundError } from '../../domain/errors/index.js'
-import { Change, SYSTEM_ACTOR } from '../../domain/entities/change.js'
-import { type ChangeEvent } from '../../domain/entities/change.js'
+import {
+  Change,
+  type ChangeEvent,
+  type ProjectionInvalidation,
+  type SignoffProjection,
+  type SpecApprovalProjection,
+  type VerificationProjection,
+} from '../../domain/entities/change.js'
 import { ChangeArtifact } from '../../domain/entities/change-artifact.js'
 import { ArtifactFile, SKIPPED_SENTINEL } from '../../domain/value-objects/artifact-file.js'
-import { ArtifactDag } from '../../domain/value-objects/artifact-dag.js'
 import { type ArtifactType } from '../../domain/value-objects/artifact-type.js'
 import { type ArtifactStatus } from '../../domain/value-objects/artifact-status.js'
-import { type ChangeState, VALID_TRANSITIONS } from '../../domain/value-objects/change-state.js'
+import { normalizeImplementationPath } from '../../domain/value-objects/validity-fingerprint.js'
 import { SpecArtifact } from '../../domain/value-objects/spec-artifact.js'
 import { ArtifactConflictError } from '../../domain/errors/artifact-conflict-error.js'
 import { DraftedChangeReadOnlyError } from '../../domain/errors/drafted-change-read-only-error.js'
@@ -63,13 +68,20 @@ import { normalizeRelativePath, resolveConfinedPath } from './path-confinement.j
 import { writeFileAtomic } from './write-atomic.js'
 import {
   type ChangeManifest,
+  type ChangeManifestV2,
   type ManifestArtifact,
   type ManifestArtifactFile,
   type ManifestImplementationLink,
   type ManifestTrackedImplementationFile,
   type RawChangeEvent,
-  changeManifestSchema,
+  type RawProjectionInvalidation,
+  type RawSpecApprovalProjection,
+  type RawSignoffProjection,
+  type RawVerificationProjection,
+  parseChangeManifest,
 } from './manifest.js'
+import { loadChangeFromManifest } from './manifest-change-loader.js'
+import { type ImplementationFileReadResult } from '../../application/ports/change-repository.js'
 
 /**
  * Extended configuration for `FsChangeRepository`.
@@ -77,6 +89,8 @@ import {
 export interface ChangeRepositoryConfig extends BaseChangeRepositoryConfig {
   readonly draftsPath: string
   readonly discardedPath: string
+  /** Absolute project root used to confine implementation-file reads. */
+  readonly projectRoot?: string
   readonly activeSchema?: { name: string; version: number }
   readonly resolveArtifactTypes?: () => Promise<readonly ArtifactType[]>
   readonly resolveSpecExists?: (specId: string) => Promise<boolean>
@@ -124,6 +138,7 @@ export class FsChangeRepository extends ChangeRepository {
   private readonly _draftsPath: string
   private readonly _discardedPath: string
   private readonly _locksPath: string
+  private readonly _projectRoot: string
   private readonly _activeSchema: { name: string; version: number } | undefined
   private _artifactTypes: readonly ArtifactType[]
   private readonly _resolveArtifactTypes: (() => Promise<readonly ArtifactType[]>) | undefined
@@ -193,6 +208,11 @@ export class FsChangeRepository extends ChangeRepository {
     this._draftsPath = context.draftsPath
     this._discardedPath = context.discardedPath
     this._locksPath = path.join(context.configPath, 'tmp', 'change-locks')
+    this._projectRoot =
+      context.projectRoot ??
+      (path.basename(context.configPath) === '.specd'
+        ? path.dirname(context.configPath)
+        : context.configPath)
     this._activeSchema = context.activeSchema
     this._resolveArtifactTypes = context.resolveArtifactTypes
     this._resolveSpecExists = context.resolveSpecExists
@@ -345,15 +365,18 @@ export class FsChangeRepository extends ChangeRepository {
     fn: (change: Change) => Promise<T> | T,
   ): Promise<MutateResult<T>> {
     return this._withChangeLock(name, async () => {
-      const change = await this._getInternal(name, { skipWrite: true })
+      const change = await this._getInternal(name)
       if (change === null) {
         throw new ChangeNotFoundError(name)
       }
 
       this._activeMutationInProgress.add(name)
       try {
+        const before = changeMutationStamp(change)
         const result = await fn(change)
-        await this._persistManifest(change)
+        if (changeMutationStamp(change) !== before) {
+          await this._persistManifest(change)
+        }
         const reconciled = await this._reconcileChangeUnderLock(name)
         return { result, change: reconciled }
       } finally {
@@ -400,59 +423,30 @@ export class FsChangeRepository extends ChangeRepository {
    * @returns The change with current artifact state, or `null` if not found in active storage
    */
   override async get(name: string): Promise<Change | null> {
-    return this._getInternal(name, { skipWrite: false })
+    return this._getInternal(name)
   }
 
   /**
    * Internal read path shared by {@link get} and {@link mutate}.
    *
-   * Loads the change and reconstructs the domain entity (including any
-   * in-memory sync/drift handling) without persisting. If sync or drift
-   * detection flagged the in-memory manifest as needing persistence, and the
-   * caller has not requested `skipWrite`, this method acquires the change's
-   * `_withChangeLock`, reloads the manifest from disk, re-applies the
-   * detection, and writes the updated manifest under the lock before
-   * returning.
-   *
-   * `skipWrite` is used by `mutate()` so that the load it performs does not
-   * try to acquire a nested lock or write a manifest that is about to be
-   * written again by the subsequent `save()`.
+   * Loads the change and reconstructs the domain entity, including fresh file
+   * status, without writing. Validity decisions and v1-to-v2 upgrades happen
+   * only inside a successful {@link mutate}.
    *
    * @param name - The change slug name to look up
-   * @param options - Internal read options
-   * @param options.skipWrite - When `true`, skip lock acquisition and disk
-   *   writes — return the in-memory change directly. Used by `mutate()`.
    * @returns The change with current artifact state, or `null` if not found
    */
-  private async _getInternal(
-    name: string,
-    options: { skipWrite: boolean },
-  ): Promise<Change | null> {
+  private async _getInternal(name: string): Promise<Change | null> {
     const dir = await this._resolveActiveDir(name)
     if (dir === null) return null
 
     const manifest = await this._loadManifest(dir)
-    const { change, hasChangesToPersist } = await this._manifestToChange(manifest, dir)
-
-    if (hasChangesToPersist && this._artifactTypesResolved && !options.skipWrite) {
-      return this._withChangeLock(name, async () => {
-        const freshManifest = await this._loadManifest(dir)
-        const { change: freshChange, hasChangesToPersist: stillNeedsPersist } =
-          await this._manifestToChange(freshManifest, dir)
-
-        if (stillNeedsPersist) {
-          await this._writeManifestAtomic(dir, changeToManifest(freshChange))
-        }
-        return freshChange
-      })
-    }
-
+    const { change } = await this._manifestToChange(manifest, dir)
     return change
   }
 
   /**
-   * Reloads a change from disk under an existing lock and persists drift detected
-   * during manifest hydration.
+   * Reloads a change from disk under an existing lock without writing.
    *
    * @param name - Change slug name
    * @returns Post-reconcile domain entity
@@ -465,15 +459,7 @@ export class FsChangeRepository extends ChangeRepository {
     }
 
     const manifest = await this._loadManifest(dir)
-    const { change, hasChangesToPersist } = await this._manifestToChange(manifest, dir)
-
-    if (hasChangesToPersist && this._artifactTypesResolved) {
-      await this._writeManifestAtomic(dir, changeToManifest(change))
-      const freshManifest = await this._loadManifest(dir)
-      const { change: reconciled } = await this._manifestToChange(freshManifest, dir)
-      return reconciled
-    }
-
+    const { change } = await this._manifestToChange(manifest, dir)
     return change
   }
 
@@ -1302,13 +1288,14 @@ export class FsChangeRepository extends ChangeRepository {
     } catch {
       throw new CorruptedManifestError(`invalid JSON in manifest.json in ${dir}`)
     }
-    const result = changeManifestSchema.safeParse(raw)
-    if (!result.success) {
-      throw new CorruptedManifestError(
-        `invalid manifest.json in ${dir}: ${result.error.issues.map((i) => i.message).join(', ')}`,
-      )
+    try {
+      return parseChangeManifest(raw)
+    } catch (err) {
+      if (err instanceof CorruptedManifestError) {
+        throw new CorruptedManifestError(`invalid manifest.json in ${dir}: ${err.message}`)
+      }
+      throw err
     }
-    return result.data as ChangeManifest
   }
 
   /**
@@ -1423,6 +1410,14 @@ export class FsChangeRepository extends ChangeRepository {
         if (status === 'pending-parent-artifact-review') {
           status = 'in-progress'
         }
+        if (
+          rawFile.validatedHash !== null &&
+          rawFile.validatedHash !== SKIPPED_SENTINEL &&
+          status === 'complete'
+        ) {
+          const derived = await this._deriveFileStatus(resolvedRawFile, dir, raw.optional, cleanup)
+          if (derived !== 'complete') status = derived
+        }
 
         filesMap.set(
           rawFile.key,
@@ -1446,34 +1441,24 @@ export class FsChangeRepository extends ChangeRepository {
       artifactMap.set(artifact.type, artifact)
     }
 
-    const history = manifest.history.map(deserializeEvent)
-
-    let specDependsOn: Map<string, readonly string[]> | undefined
-    if (manifest.specDependsOn !== undefined) {
-      specDependsOn = new Map<string, readonly string[]>()
-      for (const [key, deps] of Object.entries(manifest.specDependsOn)) {
-        specDependsOn.set(key, deps)
-      }
-    }
+    const hydrated = loadChangeFromManifest(manifest)
 
     const change = new Change({
-      name: manifest.name,
-      createdAt: new Date(manifest.createdAt),
+      name: hydrated.name,
+      createdAt: hydrated.createdAt,
       updatedAt: deriveManifestUpdatedAt(manifest),
-      ...(manifest.description !== undefined ? { description: manifest.description } : {}),
-      specIds: manifest.specIds,
-      ...(manifest.trackedImplementationFiles !== undefined
-        ? { trackedImplementationFiles: manifest.trackedImplementationFiles }
+      ...(hydrated.description !== undefined ? { description: hydrated.description } : {}),
+      specIds: [...hydrated.specIds],
+      ...(hydrated.trackedImplementationFiles.length > 0
+        ? { trackedImplementationFiles: hydrated.trackedImplementationFiles }
         : {}),
-      ...(manifest.implementationLinks !== undefined
-        ? { implementationLinks: manifest.implementationLinks }
+      ...(hydrated.implementationLinks.length > 0
+        ? { implementationLinks: hydrated.implementationLinks }
         : {}),
-      history,
+      history: hydrated.history,
       artifacts: artifactMap,
-      ...(specDependsOn !== undefined ? { specDependsOn } : {}),
-      ...(manifest.invalidationPolicy !== undefined
-        ? { invalidationPolicy: manifest.invalidationPolicy }
-        : {}),
+      specDependsOn: hydrated.specDependsOn,
+      invalidationPolicy: hydrated.invalidationPolicy,
       ...(manifest.implementationTrackingStartedAt !== undefined
         ? {
             implementationTrackingStartedAt:
@@ -1482,6 +1467,9 @@ export class FsChangeRepository extends ChangeRepository {
                 : null,
           }
         : {}),
+      ...(hydrated.specApproval !== undefined ? { specApproval: hydrated.specApproval } : {}),
+      ...(hydrated.signoff !== undefined ? { signoff: hydrated.signoff } : {}),
+      verification: hydrated.verification,
     })
 
     // Sync artifacts against schema to reconcile with current artifact types and specIds.
@@ -1526,59 +1514,6 @@ export class FsChangeRepository extends ChangeRepository {
       // changes or legacy filenames were normalized. The actual write is
       // deferred to the caller (under `_withChangeLock`).
       if (changed || manifestNormalized) {
-        hasChangesToPersist = true
-      }
-
-      // Auto-invalidate if any previously validated file drifted from its stored hash.
-      const driftedFilesByArtifact = new Map<string, Set<string>>()
-      for (const [, artifact] of change.artifacts) {
-        for (const [, file] of artifact.files) {
-          if (file.validatedHash === undefined || file.validatedHash === SKIPPED_SENTINEL) continue
-          if (
-            file.status === 'pending-review' ||
-            file.status === 'drifted-pending-review' ||
-            file.status === 'skipped'
-          ) {
-            continue
-          }
-          let drifted = false
-          if (file.status === 'complete') {
-            const derivedStatus = await this._deriveFileStatus(
-              {
-                key: file.key,
-                filename: file.filename,
-                state: file.status,
-                validatedHash: file.validatedHash,
-              },
-              dir,
-              artifact.optional,
-              artifactTypeMap.get(artifact.type)?.preHashCleanup ?? [],
-            )
-            drifted = derivedStatus !== 'complete'
-          } else {
-            drifted = true
-          }
-          if (drifted) {
-            const keys = driftedFilesByArtifact.get(artifact.type) ?? new Set<string>()
-            keys.add(file.key)
-            driftedFilesByArtifact.set(artifact.type, keys)
-          }
-        }
-      }
-      if (driftedFilesByArtifact.size > 0) {
-        const affectedArtifacts = [...driftedFilesByArtifact.entries()].map(([type, files]) => ({
-          type,
-          files: [...files].sort(),
-        }))
-        change.invalidate(
-          'artifact-drift',
-          SYSTEM_ACTOR,
-          `Invalidated because validated artifacts drifted: ${affectedArtifacts
-            .map((artifact) => `${artifact.type} [${artifact.files.join(', ')}]`)
-            .join('; ')}`,
-          affectedArtifacts,
-          ArtifactDag.from(artifactTypes),
-        )
         hasChangesToPersist = true
       }
     }
@@ -1627,6 +1562,45 @@ export class FsChangeRepository extends ChangeRepository {
    *
    * @returns Absolute paths in stable order: changes, drafts, discarded
    */
+  /**
+   * Reads whole implementation-file bytes confined to the project root.
+   *
+   * @param _change - Change context; path confinement uses the repository project root
+   * @param projectRelativePath - Project-relative path to read
+   * @returns Found bytes or a typed failure fact
+   */
+  override async implementationFile(
+    _change: Change,
+    projectRelativePath: string,
+  ): Promise<ImplementationFileReadResult> {
+    let normalized: string
+    try {
+      normalized = normalizeImplementationPath(projectRelativePath)
+    } catch {
+      return { status: 'outside-project', path: projectRelativePath }
+    }
+
+    const root = path.resolve(this._projectRoot)
+    const absolute = path.resolve(root, ...normalized.split('/'))
+    if (absolute !== root && !absolute.startsWith(root + path.sep)) {
+      return { status: 'outside-project', path: projectRelativePath }
+    }
+
+    try {
+      const bytes = await fs.readFile(absolute)
+      return { status: 'found', path: normalized, bytes: new Uint8Array(bytes) }
+    } catch (err) {
+      if (isEnoent(err)) return { status: 'missing', path: normalized }
+      const reason = err instanceof Error ? err.message : String(err)
+      return { status: 'unreadable', path: normalized, reason }
+    }
+  }
+
+  /**
+   * Internal paths.
+   *
+   * @returns internal paths result
+   */
   override internalPaths(): readonly string[] {
     return [this._changesPath, this._draftsPath, this._discardedPath]
   }
@@ -1659,7 +1633,7 @@ function deriveManifestUpdatedAt(manifest: ChangeManifest): Date {
  * @param change - The change to serialize
  * @returns The manifest JSON structure
  */
-function changeToManifest(change: Change): ChangeManifest {
+function changeToManifest(change: Change): ChangeManifestV2 {
   const createdEvent = change.history.find((e) => e.type === 'created')
   const schema =
     createdEvent?.type === 'created'
@@ -1684,7 +1658,14 @@ function changeToManifest(change: Change): ChangeManifest {
     }),
   )
 
+  const specApproval = change.specApproval
+  const signoff = change.signoff
+  const verification = change.verification
+  const hasVerification =
+    verification.activeAttempt !== undefined || verification.completed !== undefined
+
   return {
+    manifestVersion: 2,
     name: change.name,
     createdAt: change.createdAt.toISOString(),
     updatedAt: change.updatedAt.toISOString(),
@@ -1692,12 +1673,15 @@ function changeToManifest(change: Change): ChangeManifest {
     schema,
     specIds: [...change.specIds],
     ...(Object.keys(specDependsOn).length > 0 ? { specDependsOn } : {}),
-    invalidationPolicy: change.invalidationPolicy,
+    invalidation: change.invalidationPolicy,
     ...(change.implementationTrackingStartedAt !== null
       ? { implementationTrackingStartedAt: change.implementationTrackingStartedAt.toISOString() }
       : {}),
     ...(trackedImplementationFiles.length > 0 ? { trackedImplementationFiles } : {}),
     ...(implementationLinks.length > 0 ? { implementationLinks } : {}),
+    ...(specApproval !== undefined ? { specApproval: serializeSpecApproval(specApproval) } : {}),
+    ...(signoff !== undefined ? { signoff: serializeSignoff(signoff) } : {}),
+    ...(hasVerification ? { verification: serializeVerification(verification) } : {}),
     artifacts: [...change.artifacts.values()].map(serializeArtifact),
     history: change.history.map(serializeEvent),
   }
@@ -1773,6 +1757,7 @@ function serializeEvent(event: ChangeEvent): RawChangeEvent {
         by: event.by,
         reason: event.reason,
         artifactHashes: event.artifactHashes,
+        ...(event.fingerprint !== undefined ? { fingerprint: event.fingerprint } : {}),
       }
     case 'signed-off':
       return {
@@ -1857,162 +1842,141 @@ function serializeEvent(event: ChangeEvent): RawChangeEvent {
         by: event.by,
         description: event.description,
       }
+    case 'approval-invalidated':
+      return {
+        type: 'approval-invalidated',
+        at: event.at.toISOString(),
+        by: event.by,
+        gate: event.gate,
+        status: event.status,
+        cause: event.cause,
+        reason: event.reason,
+        differences: event.differences.map((difference) => ({ ...difference })),
+      }
+    case 'verification-attempt-started':
+      return {
+        type: 'verification-attempt-started',
+        at: event.at.toISOString(),
+        by: event.by,
+        attemptId: event.attemptId,
+        state: event.state,
+        fingerprintVersion: event.fingerprintVersion,
+        artifactAlgorithm: event.artifactAlgorithm,
+        textNormalization: event.textNormalization,
+        binaryNormalization: event.binaryNormalization,
+      }
+    case 'verification-completed':
+      return {
+        type: 'verification-completed',
+        at: event.at.toISOString(),
+        by: event.by,
+        attemptId: event.attemptId,
+        verificationId: event.verificationId,
+      }
+    case 'verification-invalidated':
+      return {
+        type: 'verification-invalidated',
+        at: event.at.toISOString(),
+        by: event.by,
+        verificationId: event.verificationId,
+        reason: event.reason,
+      }
   }
 }
 
-/** All valid `ChangeState` values, derived from the transition map keys. */
-const CHANGE_STATES = Object.keys(VALID_TRANSITIONS) as ChangeState[]
-
-/** All valid `InvalidatedEvent` cause values. */
-const INVALIDATED_CAUSES = [
-  'spec-change',
-  'artifact-drift',
-  'artifact-review-required',
-  'spec-overlap-conflict',
-] as const
-/** Historical persisted cause kept readable for archived/discarded manifests. */
-const LEGACY_INVALIDATED_CAUSE = 'artifact-change' as const
-/** Union of valid `InvalidatedEvent` cause strings. */
-type InvalidatedCause = (typeof INVALIDATED_CAUSES)[number]
-
 /**
- * Asserts that a string value is a valid `ChangeState`.
+ * Serialize invalidation.
  *
- * @param value - The raw string to validate
- * @param field - Field name used in the error message
- * @returns The validated `ChangeState`
- * @throws {Error} If the value is not a valid state
+ * @param invalidation - invalidation
+ * @returns serialize invalidation result
  */
-function assertChangeState(value: string, field: string): ChangeState {
-  if ((CHANGE_STATES as string[]).includes(value)) return value as ChangeState
-  throw new CorruptedManifestError(`invalid ChangeState in manifest field '${field}': '${value}'`)
+function serializeInvalidation(invalidation: ProjectionInvalidation): RawProjectionInvalidation {
+  return {
+    at: invalidation.at.toISOString(),
+    by: invalidation.by,
+    cause: invalidation.cause,
+    reason: invalidation.reason,
+    differences: invalidation.differences.map((difference) => ({ ...difference })),
+  }
 }
 
 /**
- * Normalizes a raw manifest invalidation cause into the canonical domain cause.
+ * Serialize spec approval.
  *
- * @param value - The raw string to validate
- * @returns The validated canonical cause
- * @throws {Error} If the value is not a valid cause
+ * @param projection - projection
+ * @returns serialize spec approval result
  */
-function normalizeInvalidatedCause(value: string): InvalidatedCause {
-  if ((INVALIDATED_CAUSES as readonly string[]).includes(value)) return value as InvalidatedCause
-  // Historical manifests persisted `artifact-change`; keep reads compatible.
-  if (value === LEGACY_INVALIDATED_CAUSE) return 'artifact-drift'
-  throw new CorruptedManifestError(`invalid invalidated cause in manifest: '${value}'`)
+function serializeSpecApproval(projection: SpecApprovalProjection): RawSpecApprovalProjection {
+  return {
+    status: projection.status,
+    decision: {
+      at: projection.decision.at.toISOString(),
+      by: projection.decision.by,
+      reason: projection.decision.reason,
+    },
+    fingerprint: projection.fingerprint,
+    ...(projection.invalidation !== undefined
+      ? { invalidation: serializeInvalidation(projection.invalidation) }
+      : {}),
+  }
 }
 
 /**
- * Deserializes a raw JSON event object into a `ChangeEvent` domain type.
+ * Serialize signoff.
  *
- * @param raw - The raw JSON event as stored in `manifest.json`
- * @returns The deserialized domain event
+ * @param projection - projection
+ * @returns serialize signoff result
  */
-function deserializeEvent(raw: RawChangeEvent): ChangeEvent {
-  switch (raw.type) {
-    case 'created':
-      return {
-        type: 'created',
-        at: new Date(raw.at),
-        by: raw.by,
-        specIds: raw.specIds,
-        schemaName: raw.schemaName,
-        schemaVersion: raw.schemaVersion,
-      }
-    case 'transitioned':
-      return {
-        type: 'transitioned',
-        at: new Date(raw.at),
-        by: raw.by,
-        from: assertChangeState(raw.from, 'from'),
-        to: assertChangeState(raw.to, 'to'),
-      }
-    case 'spec-approved':
-      return {
-        type: 'spec-approved',
-        at: new Date(raw.at),
-        by: raw.by,
-        reason: raw.reason,
-        artifactHashes: raw.artifactHashes,
-      }
-    case 'signed-off':
-      return {
-        type: 'signed-off',
-        at: new Date(raw.at),
-        by: raw.by,
-        reason: raw.reason,
-        artifactHashes: raw.artifactHashes,
-      }
-    case 'signoff-invalidated':
-      return {
-        type: 'signoff-invalidated',
-        at: new Date(raw.at),
-        by: raw.by,
-      }
-    case 'invalidated':
-      return {
-        type: 'invalidated',
-        at: new Date(raw.at),
-        by: raw.by,
-        cause: normalizeInvalidatedCause(raw.cause),
-        message: raw.message,
-        affectedArtifacts: (raw.affectedArtifacts ?? []).map((artifact) => ({
-          type: artifact.type,
-          files: artifact.files,
-        })),
-      }
-    case 'archive-failed':
-      return {
-        type: 'archive-failed',
-        at: new Date(raw.at),
-        by: raw.by,
-        step: raw.step,
-        message: raw.message,
-        commitStarted: raw.commitStarted,
-      }
-    case 'drafted':
-      return raw.reason !== undefined
-        ? { type: 'drafted', at: new Date(raw.at), by: raw.by, reason: raw.reason }
-        : { type: 'drafted', at: new Date(raw.at), by: raw.by }
-    case 'restored':
-      return { type: 'restored', at: new Date(raw.at), by: raw.by }
-    case 'discarded':
-      return raw.supersededBy !== undefined
-        ? {
-            type: 'discarded',
-            at: new Date(raw.at),
-            by: raw.by,
-            reason: raw.reason,
-            supersededBy: raw.supersededBy,
-          }
-        : { type: 'discarded', at: new Date(raw.at), by: raw.by, reason: raw.reason }
-    case 'artifact-skipped':
-      return raw.reason !== undefined
-        ? {
-            type: 'artifact-skipped',
-            at: new Date(raw.at),
-            by: raw.by,
-            artifactId: raw.artifactId,
-            reason: raw.reason,
-          }
-        : { type: 'artifact-skipped', at: new Date(raw.at), by: raw.by, artifactId: raw.artifactId }
-    case 'artifacts-synced':
-      return {
-        type: 'artifacts-synced',
-        at: new Date(raw.at),
-        by: raw.by ?? { name: 'specd', email: 'system@getspecd.dev' },
-        typesAdded: raw.typesAdded ?? [],
-        typesRemoved: raw.typesRemoved ?? [],
-        filesAdded: raw.filesAdded ?? [],
-        filesRemoved: raw.filesRemoved ?? [],
-      }
-    case 'description-updated':
-      return {
-        type: 'description-updated',
-        at: new Date(raw.at),
-        by: raw.by,
-        description: raw.description,
-      }
+function serializeSignoff(projection: SignoffProjection): RawSignoffProjection {
+  return {
+    status: projection.status,
+    decision: {
+      at: projection.decision.at.toISOString(),
+      by: projection.decision.by,
+      reason: projection.decision.reason,
+    },
+    fingerprint: projection.fingerprint,
+    verificationId: projection.verificationId,
+    ...(projection.invalidation !== undefined
+      ? { invalidation: serializeInvalidation(projection.invalidation) }
+      : {}),
+  }
+}
+
+/**
+ * Serialize verification.
+ *
+ * @param projection - projection
+ * @returns serialize verification result
+ */
+function serializeVerification(projection: VerificationProjection): RawVerificationProjection {
+  return {
+    ...(projection.activeAttempt !== undefined
+      ? {
+          activeAttempt: {
+            id: projection.activeAttempt.id,
+            startedAt: projection.activeAttempt.startedAt.toISOString(),
+            startedBy: projection.activeAttempt.startedBy,
+            startedIn: projection.activeAttempt.startedIn,
+            baseline: projection.activeAttempt.baseline,
+          },
+        }
+      : {}),
+    ...(projection.completed !== undefined
+      ? {
+          completed: {
+            id: projection.completed.id,
+            attemptId: projection.completed.attemptId,
+            status: projection.completed.status,
+            completedAt: projection.completed.completedAt.toISOString(),
+            completedBy: projection.completed.completedBy,
+            fingerprint: projection.completed.fingerprint,
+            ...(projection.completed.invalidation !== undefined
+              ? { invalidation: serializeInvalidation(projection.completed.invalidation) }
+              : {}),
+          },
+        }
+      : {}),
   }
 }
 
@@ -2042,8 +2006,6 @@ function artifactRepresentationClass(filename: string): 'delta' | 'direct' {
   return normalizeRelativePath(filename).startsWith('deltas/') ? 'delta' : 'direct'
 }
 
-// changeManifestSchema imported from ./manifest.js
-
 // ---- Discard detection ----
 
 /**
@@ -2056,6 +2018,18 @@ function isDiscardedChange(change: Change): boolean {
   const history = change.history
   if (history.length === 0) return false
   return history[history.length - 1]?.type === 'discarded'
+}
+
+/**
+ * Fingerprint of fields a no-op reconciliation must not rewrite.
+ *
+ * A v1 manifest stays on disk until a real mutation changes one of these facts.
+ *
+ * @param change - Aggregate after load or after a mutation callback
+ * @returns Stable stamp for write suppression
+ */
+function changeMutationStamp(change: Change): string {
+  return JSON.stringify(changeToManifest(change))
 }
 
 // ---- Error helpers ----

@@ -22,30 +22,29 @@ The use case MUST load the change by name from the `ChangeRepository`. If no cha
 
 ### Requirement: Artifact hash computation
 
-Before recording the approval, the use case MUST compute a content hash for every file across all artifacts in the change. Obtain the schema once from `SchemaProvider.get()`. Build a cleanup map from that schema. For each artifact, iterate the artifact's `files` map. For each file:
+Before approval, `ApproveSpec` SHALL delegate to the central validity reconciler and use its fresh scope and artifact projection. It SHALL compute a scope-aware fingerprint containing the exact sorted, deduplicated canonical `specIds` and a deterministic artifact fingerprint for every schema-relevant artifact file except artifacts whose type declares `hasTasks: true`, applying each artifact's configured `preHashCleanup` before hashing.
 
-1. Skip files with status `missing` or `skipped`.
-2. Load the file content from the repository via `ChangeRepository.artifact(change, file.filename)`.
-3. If the file cannot be loaded (returns `null`), skip it silently.
-4. Apply the matching cleanup rules (by artifact type) to the content, then hash the cleaned content via the `ContentHasher`.
-
-The result is a `Record<string, string>` mapping `type:key` hash keys to hash strings (e.g. `"proposal:proposal"`, `"specs:default:auth/login"`), where `type` is the artifact type ID and `key` is the file key within the artifact.
+The approval MUST fail if a required artifact is missing or structurally invalid, or if any non-task artifact has drift or pending review. Validation establishes a structural baseline but does not itself constitute semantic or human approval.
 
 ### Requirement: Approval recording and state transition
 
-The use case MUST resolve the current actor identity via the `ActorResolver`, then call `change.recordSpecApproval(reason, artifactHashes, actor)` to append a `spec-approved` history event.
+Spec approval MAY be granted or renewed only while the reconciled change is in `ready`. `ApproveSpec` MUST NOT transition the change to an approval state.
 
-When the change is in a state bound as `from` for `approval.spec` (check registry bindings; currently `ready`), it MUST NOT call `change.transition('spec-approved', actor)` or `change.transition('pending-spec-approval', actor)`. The change remains in that state so `approval.spec` can pass on the next bound delivery edge.
+On success it SHALL append the `spec-approved` audit event and persist a current spec-approval projection with status `valid`, actor, reason, timestamp, and the exact scope-aware fingerprint reviewed. The current projection and event SHALL contain the same canonical scope and artifact fingerprint. It replaces the current projection but never removes prior approval or invalidation events.
 
-Drain: when the change is already in `pending-spec-approval`, the use case MAY still `change.transition('spec-approved', actor)` so in-flight changes can leave that state. Drain states are not `approval.spec` bindings.
+Actor name and email SHALL continue to be resolved through the existing approval actor decorator and its privacy/fallback rules. One logical approval operation MUST resolve exactly one decorated `ActorIdentity` value and reuse it for reconciliation consequences, the materialized projection, and every appended event. Scope-aware fingerprinting and direct-dependency factory forms MUST NOT introduce a second identity-resolution path or permit inconsistent actor resolvers.
+
+A stale or revoked required spec approval cannot be renewed in `implementing`; reconciliation first returns the change to `designing`, after which artifacts are reviewed, the change reaches `ready`, and approval is granted there.
+
+### Requirement: Canonical pre-approval reconciliation
+
+`ApproveSpec` MUST use the single application reconciler for validity detection, invalidation, and automatic recovery. It MUST NOT independently mark a gate stale, infer recovery, or append a return transition. If reconciliation changes the state so approval is inapplicable, the use case SHALL persist that result and stop with the reconciled blocker.
 
 ### Requirement: Persistence and return value
 
-After computing artifact hashes, the use case MUST record the approval through `ChangeRepository.mutate(name, fn)`.
+After the disabled-gate fast failure, `ApproveSpec` SHALL run reconciliation and approval through one serialized repository mutation using fresh persisted state and file facts. If the canonical verdict is not eligible for approval, it persists any detected invalidity or recovery and returns the typed blocker without adding approval.
 
-Inside the mutation callback, the repository supplies the fresh persisted `Change`. The use case records the spec approval on that instance. It MUST NOT transition a change whose state is bound as `from` for `approval.spec` into `pending-spec-approval` or `spec-approved`. Drain transitions from `pending-spec-approval` remain allowed.
-
-`ApproveSpec.execute` returns the updated `Change` entity produced by that serialized mutation.
+If eligible, the mutation records the valid materialized spec approval and its audit event while the change remains in `ready`. Historic drain from `pending-spec-approval` remains supported for in-flight manifests, but new work MUST NOT enter that state. The result is the post-mutation reconciled `Change`.
 
 ### Requirement: Input contract
 
@@ -70,17 +69,9 @@ The constructor MUST receive `approvals: ApprovalGates`. `createApproveSpec(conf
 
 ### Requirement: Config-based factory delegates through resolveApproveSpecDeps
 
-The config-based `createApproveSpec(config, options?)` form MUST derive `ApproveSpecDeps` through `resolveApproveSpecDeps(resolver)` and then delegate to canonical `createApproveSpec(deps)`.
+The public factory SHALL retain both established forms: canonical `createApproveSpec(deps: ApproveSpecDeps)` and convenience `createApproveSpec(config, options?)`. The config form uses `normalizeCompositionFactoryArgs`, obtains deps through `resolveApproveSpecDeps(resolver)`, and delegates to the canonical form; options with the deps overload use the standard invalid-factory-arguments error.
 
-`resolveApproveSpecDeps(resolver)` MUST resolve:
-
-- `changes: ChangeRepository`
-- `actor: ActorResolver`
-- `schemaProvider: SchemaProvider`
-- `contentHasher: ContentHasher`
-- `approvals: ApprovalGates`
-
-The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+`ApproveSpecDeps` and `resolveApproveSpecDeps` SHALL provide the change repository, actor resolver, schema provider, content hasher or shared fingerprint service, approval gates, and the central validity reconciler. They MUST NOT duplicate filesystem bootstrap or construct an entire kernel to obtain reconciliation.
 
 ## Constraints
 

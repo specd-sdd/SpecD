@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
-import type { SpecdConfig } from '@specd/core'
+import { DEFAULT_INVALIDATION_POLICY, type SpecdConfig } from '@specd/core'
 import type { Skill, SkillBundle } from '@specd/skills'
 
 const repositoryMock = {
@@ -94,6 +94,7 @@ function makeMockConfig(projectRoot: string): SpecdConfig {
       archiveAdapter: { adapter: 'fs', config: {} },
     },
     approvals: { spec: false, signoff: false },
+    invalidation: DEFAULT_INVALIDATION_POLICY,
     plugins: { agents: [] },
   }
 }

@@ -5,8 +5,22 @@ import { type SchemaProvider } from '../ports/schema-provider.js'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 import { InvalidInvalidateTargetError } from '../errors/invalid-invalidate-target-error.js'
 import { InvalidateRequiresForceError } from '../errors/invalidate-requires-force-error.js'
-import { type ArtifactDag } from '../../domain/value-objects/artifact-dag.js'
-import { type InvalidationPolicy } from '../../domain/value-objects/invalidation-policy.js'
+import { type Schema } from '../../domain/value-objects/schema.js'
+import {
+  resolveInvalidationPolicy,
+  type InvalidationPolicy,
+  type InvalidationPolicyOverride,
+} from '../../domain/value-objects/invalidation-policy.js'
+import {
+  type AutomaticRecovery,
+  type ProjectionChange,
+  type ArtifactReviewTarget,
+  type ValidityBlocker,
+  selectAutomaticRecovery,
+} from '../../domain/services/change-validity.js'
+import { type ForceInvalidationRecovery } from '../errors/invalidate-requires-force-error.js'
+import { type ReconcileChangeValidity } from './reconcile-change-validity.js'
+import { type NextAction } from './get-status.js'
 
 /** A single target identifying an artifact (and optionally a specific file within it). */
 export interface InvalidateTargetInput {
@@ -18,7 +32,7 @@ export interface InvalidateTargetInput {
 export interface InvalidateChangeInput {
   readonly name: string
   readonly reason: string
-  readonly policyOverride?: InvalidationPolicy
+  readonly policyOverride?: InvalidationPolicyOverride
   readonly targets?: readonly InvalidateTargetInput[]
   readonly force?: boolean
 }
@@ -34,8 +48,16 @@ export interface AffectedArtifactFile {
 /** Result of a manual invalidation execution. */
 export interface InvalidateChangeResult {
   readonly change: Change
+  /** Exact human-readable reason persisted for this invalidation. */
+  readonly reason: string
   readonly effectivePolicy: InvalidationPolicy
   readonly affected: readonly AffectedArtifactFile[]
+  /** Projection status transitions committed by reconciliation. */
+  readonly projectionChanges: readonly ProjectionChange[]
+  /** Lifecycle return committed by reconciliation, when one was required. */
+  readonly automaticReturn: AutomaticRecovery | null
+  readonly blockers: readonly ValidityBlocker[]
+  readonly nextAction: NextAction
 }
 
 /**
@@ -48,6 +70,7 @@ export class InvalidateChange {
   private readonly _changes: ChangeRepository
   private readonly _actor: ActorResolver
   private readonly _schemaProvider: SchemaProvider
+  private readonly _reconcile: ReconcileChangeValidity
 
   /**
    * Creates a new `InvalidateChange` use case.
@@ -55,11 +78,18 @@ export class InvalidateChange {
    * @param changes - Change repository for loading and mutating changes
    * @param actor - Actor resolver for identity
    * @param schemaProvider - Schema provider for artifact type resolution
+   * @param reconcile - Canonical reconciler that applies review, revocation, and recovery
    */
-  constructor(changes: ChangeRepository, actor: ActorResolver, schemaProvider: SchemaProvider) {
+  constructor(
+    changes: ChangeRepository,
+    actor: ActorResolver,
+    schemaProvider: SchemaProvider,
+    reconcile: ReconcileChangeValidity,
+  ) {
     this._changes = changes
     this._actor = actor
     this._schemaProvider = schemaProvider
+    this._reconcile = reconcile
   }
 
   /**
@@ -74,61 +104,88 @@ export class InvalidateChange {
       throw new ChangeNotFoundError(input.name)
     }
 
-    const effectivePolicy = input.policyOverride ?? change.invalidationPolicy
+    const effectivePolicy = resolveInvalidationPolicy(
+      change.invalidationPolicy,
+      input.policyOverride,
+    )
     const targetErrors = validateCommandShape(effectivePolicy, input.targets)
     if (targetErrors.length > 0) {
       throw new InvalidInvalidateTargetError(targetErrors)
     }
 
-    if (
-      (change.activeSpecApproval !== undefined || change.activeSignoff !== undefined) &&
-      input.force !== true
-    ) {
-      throw new InvalidateRequiresForceError()
+    const schema = await this._schemaProvider.get()
+    const resolvedTargets =
+      effectivePolicy.artifacts === 'none' || effectivePolicy.artifacts === 'global'
+        ? []
+        : resolveTargets(change, input.targets ?? [], schema.artifacts())
+    const revoke = consentToRevoke(change)
+    if (revoke.length > 0 && input.force !== true) {
+      throw new InvalidateRequiresForceError(forceRecoveries(change, revoke))
     }
+
+    const targets: ArtifactReviewTarget[] =
+      effectivePolicy.artifacts === 'global'
+        ? globalTargets(change, schema)
+        : resolvedTargets.map((target) => ({
+            artifactId: target.artifactId,
+            fileKey: target.key,
+            filename: target.filename,
+            origin: 'direct' as const,
+          }))
 
     const actor = await this._actor.identity()
-    const schema = await this._schemaProvider.get()
-
-    if (effectivePolicy === 'none') {
-      const { change: persisted } = await this._changes.mutate(input.name, (freshChange) => {
-        freshChange.invalidate(
-          'artifact-review-required',
-          actor,
-          input.reason,
-          [],
-          schema.artifactDag(),
-        )
-      })
-
-      return { change: persisted, effectivePolicy, affected: [] }
-    }
-
-    const resolvedTargets = resolveTargets(change, input.targets ?? [], schema.artifacts())
-    const affectedArtifacts = resolvedTargets.map((t) => ({
-      type: t.artifactId,
-      files: [t.key],
-    }))
-
-    const { change: persisted } = await this._changes.mutate(input.name, (freshChange) => {
-      freshChange.invalidate(
-        'artifact-review-required',
-        actor,
-        input.reason,
-        affectedArtifacts,
-        schema.artifactDag(),
-        effectivePolicy,
-      )
+    const reconciled = await this._reconcile.execute({
+      name: input.name,
+      actor,
+      intent: {
+        type: 'manual-invalidation',
+        reason: input.reason,
+        policy: effectivePolicy,
+        targets,
+        revoke: input.force === true ? revoke : [],
+      },
     })
 
-    const expanded = expandAffectedSet(
-      resolvedTargets,
-      change,
+    return {
+      change: reconciled.change,
+      reason: input.reason,
       effectivePolicy,
-      schema.artifactDag(),
-    )
+      affected: reconciled.affectedArtifacts.map((target) => ({
+        artifactId: target.artifactId,
+        key: target.fileKey,
+        filename: target.filename,
+        expansion:
+          target.origin === 'downstream' || target.origin === 'global' ? target.origin : 'direct',
+      })),
+      projectionChanges: reconciled.projectionChanges,
+      automaticReturn: reconciled.automaticReturn,
+      blockers: reconciled.verdict.blockers,
+      nextAction: invalidationNextAction(reconciled.change, reconciled.automaticReturn),
+    }
+  }
+}
 
-    return { change: persisted, effectivePolicy, affected: expanded }
+/**
+ * Projects canonical recovery without reconstructing invalidation policy in adapters.
+ *
+ * @param change - Reconciled change
+ * @param recovery - Automatic lifecycle return, when one was committed
+ * @returns Core-owned next action
+ */
+function invalidationNextAction(change: Change, recovery: AutomaticRecovery | null): NextAction {
+  if (recovery !== null) {
+    return {
+      targetStep: recovery.to,
+      actionType: 'cognitive',
+      reason: `Invalidation returned the change to ${recovery.to}`,
+      command: recovery.to === 'designing' ? '/specd-design' : '/specd-verify',
+    }
+  }
+  return {
+    targetStep: change.state,
+    actionType: 'cognitive',
+    reason: 'Review the reported blockers before advancing',
+    command: null,
   }
 }
 
@@ -145,15 +202,15 @@ function validateCommandShape(
 ): string[] {
   const errors: string[] = []
 
-  if (effectivePolicy === 'none' || effectivePolicy === 'global') {
+  if (effectivePolicy.artifacts === 'none' || effectivePolicy.artifacts === 'global') {
     if (targets !== undefined && targets.length > 0) {
       errors.push(
-        `--target is not allowed with policy '${effectivePolicy}' — targeting is semantically irrelevant`,
+        `--target is not allowed with policy '${effectivePolicy.artifacts}' — targeting is semantically irrelevant`,
       )
     }
   } else {
     if (targets === undefined || targets.length === 0) {
-      errors.push(`At least one --target is required with policy '${effectivePolicy}'`)
+      errors.push(`At least one --target is required with policy '${effectivePolicy.artifacts}'`)
     }
   }
 
@@ -229,90 +286,64 @@ function resolveTargets(
 }
 
 /**
- * Expands direct targets into the full affected set according to the policy.
+ * Consent to revoke.
  *
- * @param directTargets - The resolved direct targets
- * @param change - The change for DAG traversal
- * @param policy - The effective policy controlling expansion
- * @param artifactDag - Schema-derived DAG for `downstream` expansion
- * @returns Affected files labelled with their expansion origin
+ * @param change - change
+ * @returns consent to revoke result
  */
-function expandAffectedSet(
-  directTargets: Array<{ artifactId: string; key: string; filename: string }>,
-  change: Change,
-  policy: InvalidationPolicy,
-  artifactDag: ArtifactDag,
-): AffectedArtifactFile[] {
-  const results: AffectedArtifactFile[] = []
-  const directArtifactOrder = uniqueArtifactIds(directTargets.map((target) => target.artifactId))
-
-  for (const target of directTargets) {
-    results.push({
-      artifactId: target.artifactId,
-      key: target.key,
-      filename: target.filename,
-      expansion: 'direct',
-    })
-  }
-
-  if (policy === 'surgical') return results
-
-  const directTypeIds = new Set(directArtifactOrder)
-
-  if (policy === 'global') {
-    const artifactTraversalOrder = artifactDag.topologicalOrder()
-    for (const typeId of artifactTraversalOrder) {
-      if (directTypeIds.has(typeId)) continue
-      const artifact = change.getArtifact(typeId)
-      if (artifact === null) continue
-      for (const [, file] of artifact.files) {
-        results.push({
-          artifactId: typeId,
-          key: file.key,
-          filename: file.filename,
-          expansion: 'global',
-        })
-      }
-    }
-    return results
-  }
-  const expandedTypeIds = new Set([
-    ...directArtifactOrder,
-    ...artifactDag.descendantsOf(directArtifactOrder),
-  ])
-  const artifactTraversalOrder = artifactDag
-    .topologicalOrder()
-    .filter((typeId) => expandedTypeIds.has(typeId))
-  for (const typeId of artifactTraversalOrder) {
-    if (directTypeIds.has(typeId)) continue
-    const artifact = change.getArtifact(typeId)
-    if (artifact === null) continue
-    for (const [, file] of artifact.files) {
-      results.push({
-        artifactId: typeId,
-        key: file.key,
-        filename: file.filename,
-        expansion: 'downstream',
-      })
-    }
-  }
-
-  return results
+function consentToRevoke(change: Change): ('spec' | 'signoff')[] {
+  const gates: ('spec' | 'signoff')[] = []
+  if (change.specApproval?.status === 'valid') gates.push('spec')
+  if (change.signoff?.status === 'valid') gates.push('signoff')
+  return gates
 }
 
 /**
- * Returns artifact ids in first-seen order without duplicates.
+ * Selects the recovery target independently for every valid gate requiring confirmation.
  *
- * @param artifactIds - Artifact ids gathered from direct target resolution
- * @returns Stable artifact ids preserving the first occurrence
+ * @param change - Current change snapshot
+ * @param gates - Valid consent gates that would be revoked
+ * @returns Exact gate/target pairs for adapter reporting
  */
-function uniqueArtifactIds(artifactIds: readonly string[]): string[] {
-  const seen = new Set<string>()
-  const ordered: string[] = []
-  for (const artifactId of artifactIds) {
-    if (seen.has(artifactId)) continue
-    seen.add(artifactId)
-    ordered.push(artifactId)
+function forceRecoveries(
+  change: Change,
+  gates: readonly ('spec' | 'signoff')[],
+): ForceInvalidationRecovery[] {
+  return gates.map((gate) => {
+    const recovery = selectAutomaticRecovery(
+      change.state,
+      { artifacts: 'none', workflow: 'preserve' },
+      gate === 'spec' ? 'revoked' : 'not-required',
+      gate === 'signoff' ? 'revoked' : 'not-required',
+      false,
+    )
+    return { gate, target: recovery?.to ?? change.state }
+  })
+}
+
+/**
+ * Global targets.
+ *
+ * @param change - change
+ * @param schema - schema
+ * @returns global targets result
+ */
+function globalTargets(change: Change, schema: Schema): ArtifactReviewTarget[] {
+  const taskArtifacts = new Set(
+    schema.artifacts().flatMap((artifact) => (artifact.hasTasks ? [artifact.id] : [])),
+  )
+  const targets: ArtifactReviewTarget[] = []
+  for (const [typeId, artifact] of change.artifacts) {
+    if (taskArtifacts.has(typeId)) continue
+    for (const file of artifact.files.values()) {
+      if (file.status === 'skipped') continue
+      targets.push({
+        artifactId: typeId,
+        fileKey: file.key,
+        filename: file.filename,
+        origin: 'global',
+      })
+    }
   }
-  return ordered
+  return targets
 }

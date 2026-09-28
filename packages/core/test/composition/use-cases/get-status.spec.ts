@@ -63,6 +63,7 @@ async function makeConfig(): Promise<SpecdConfig> {
       archiveAdapter: { adapter: 'fs', config: { path: archivePath } },
     },
     approvals: { spec: false, signoff: false },
+    invalidation: { artifacts: 'downstream', workflow: 'preserve' },
   }
 }
 
@@ -82,6 +83,7 @@ describe('createGetStatus', () => {
       refreshImplementationTracking: {} as never,
       transitionBindings: [],
       archiveBindings: [],
+      reconcile: {} as never,
     }
     const useCase = createGetStatus(deps)
 
@@ -96,11 +98,26 @@ describe('createGetStatus', () => {
       refreshImplementationTracking: {} as never,
       transitionBindings: [],
       archiveBindings: [],
+      reconcile: {} as never,
     }
 
     expect(() =>
       createGetStatus(deps as unknown as SpecdConfig, { extraNodeModulesPaths: [] }),
     ).toThrow(InvalidCompositionFactoryArgumentsError)
+  })
+
+  it('rejects explicit deps without the canonical reconciler', () => {
+    const incomplete = {
+      changes: {},
+      schemaProvider: {},
+      approvals: { spec: false, signoff: false },
+      refreshImplementationTracking: {},
+      transitionBindings: [],
+      archiveBindings: [],
+    }
+    expect(() => createGetStatus(incomplete as never)).toThrow(
+      InvalidCompositionFactoryArgumentsError,
+    )
   })
 
   it('wires includeOverlapDetection for archive predicates', () => {

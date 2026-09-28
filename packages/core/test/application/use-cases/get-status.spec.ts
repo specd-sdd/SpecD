@@ -18,9 +18,13 @@ import {
 } from '../../../src/domain/services/transition-checks.js'
 import { detectImplLinksInScope } from '../../../src/application/services/detect-impl-links-in-scope.js'
 import { createWorkflowCheckRegistry } from '../../../src/application/checks/workflow-check-registry.js'
+import { ReconcileChangeValidity } from '../../../src/application/use-cases/reconcile-change-validity.js'
+import { type ChangeValidityVerdict } from '../../../src/domain/services/change-validity.js'
+import { type ValidityFingerprint } from '../../../src/domain/value-objects/validity-fingerprint.js'
 import {
   makeChangeRepository,
   makeChange,
+  makeActorResolver,
   makeSchemaProvider,
   makeSchema,
   makeArtifactType,
@@ -28,6 +32,7 @@ import {
   makeListWorkspaces,
   makeNoopParsers,
   makeRunStepHooks,
+  makeObservingReconcile,
   testActor,
 } from './helpers.js'
 
@@ -65,6 +70,7 @@ function makeGetStatus(
     detectSpecOverlap?: (
       change: Change,
     ) => { blocked: boolean; message?: string } | Promise<{ blocked: boolean; message?: string }>
+    reconcile?: ReconcileChangeValidity
   } = {},
 ) {
   const schema = opts.schema === undefined ? makeStdSchema() : opts.schema
@@ -95,6 +101,7 @@ function makeGetStatus(
     refresh,
     opts.transitionBindings ?? registry.transitionBindings,
     opts.archiveBindings ?? registry.archiveBindings,
+    opts.reconcile ?? makeObservingReconcile(changes, undefined, refresh),
   )
 }
 
@@ -308,25 +315,49 @@ describe('GetStatus', () => {
       ])
     })
 
-    it('rethrows unexpected schema provider errors', async () => {
+    it('degrades before refresh or real reconciliation for any schema resolution failure', async () => {
       const change = makeChange('my-change')
       change.transition('designing', testActor)
       const changes = makeChangeRepository([change])
+      const historyBefore = [...change.history]
       const schemaProvider = {
         get: async () => {
           throw new Error('disk exploded')
         },
       }
+      const refreshExecute = vi.fn()
+      const refresh = makeRefreshImplementationTracking(refreshExecute)
+      const reconcile = new ReconcileChangeValidity({
+        changes,
+        schemaProvider: schemaProvider as never,
+        actor: makeActorResolver(),
+        refreshImplementationTracking: refresh,
+        fingerprint: {} as never,
+        approvals: defaultApprovals,
+      })
+      const reconcileExecute = vi.spyOn(reconcile, 'execute')
+      const mutate = vi.spyOn(changes, 'mutate')
       const uc = new GetStatus(
         changes,
         schemaProvider as never,
         defaultApprovals,
-        makeRefreshImplementationTracking(),
+        refresh,
         [],
         [],
+        reconcile,
       )
 
-      await expect(uc.execute({ name: 'my-change' })).rejects.toThrow('disk exploded')
+      const result = await uc.execute({ name: 'my-change' })
+
+      expect(result.blockers).toEqual([
+        expect.objectContaining({ code: 'SCHEMA_RESOLUTION_FAILED' }),
+      ])
+      expect(result.lifecycle.schemaInfo).toBeNull()
+      expect(result.lifecycle.availableTransitions).toEqual([])
+      expect(refreshExecute).not.toHaveBeenCalled()
+      expect(reconcileExecute).not.toHaveBeenCalled()
+      expect(mutate).not.toHaveBeenCalled()
+      expect(change.history).toEqual(historyBefore)
     })
   })
 
@@ -430,13 +461,15 @@ describe('GetStatus', () => {
       },
       detectImplLinksInScope,
     })
+    const statusRepo = makeChangeRepository([change])
     const uc = new GetStatus(
-      makeChangeRepository([change]),
+      statusRepo,
       makeSchemaProvider(schema),
       defaultApprovals,
       makeRefreshImplementationTracking(),
       registry.transitionBindings,
       registry.archiveBindings,
+      makeObservingReconcile(statusRepo),
     )
 
     await uc.execute({ name: 'order-tasks' })
@@ -907,7 +940,7 @@ describe('GetStatus', () => {
   })
 
   describe('ifModifiedSince revision checks', () => {
-    it('returns unchanged early when client revision matches updatedAt', async () => {
+    it('reconciles even when client revision matches updatedAt', async () => {
       const createdAt = new Date('2024-01-01T00:00:00Z')
       const updatedAt = new Date('2024-06-01T12:00:00Z')
       const change = makeChange('my-change', { createdAt, updatedAt })
@@ -917,19 +950,19 @@ describe('GetStatus', () => {
 
       const result = await uc.execute({
         name: 'my-change',
-        ifModifiedSince: updatedAt.toISOString(),
+        ifModifiedSince: change.updatedAt.toISOString(),
       })
 
-      expect(result.unchanged).toBe(true)
-      expect(result.artifactStatuses).toEqual([])
-      expect(refreshExecute).not.toHaveBeenCalled()
+      expect(result.unchanged).toBeUndefined()
+      expect(result.artifactStatuses.length).toBeGreaterThan(0)
+      expect(refreshExecute).toHaveBeenCalledWith({ name: 'my-change' })
       expect(result.change).toBe(change)
       expect(result.specDependsOn).toEqual({})
       expect(result.blockers).toEqual([])
       expect(result.review.required).toBe(false)
     })
 
-    it('returns unchanged early when client revision exceeds updatedAt', async () => {
+    it('reconciles even when client revision exceeds updatedAt', async () => {
       const createdAt = new Date('2024-01-01T00:00:00Z')
       const updatedAt = new Date('2024-06-01T12:00:00Z')
       const change = makeChange('my-change', { createdAt, updatedAt })
@@ -939,12 +972,12 @@ describe('GetStatus', () => {
 
       const result = await uc.execute({
         name: 'my-change',
-        ifModifiedSince: new Date('2024-06-01T13:00:00Z').toISOString(),
+        ifModifiedSince: new Date(change.updatedAt.getTime() + 1000).toISOString(),
       })
 
-      expect(result.unchanged).toBe(true)
-      expect(result.artifactStatuses).toEqual([])
-      expect(refreshExecute).not.toHaveBeenCalled()
+      expect(result.unchanged).toBeUndefined()
+      expect(result.artifactStatuses.length).toBeGreaterThan(0)
+      expect(refreshExecute).toHaveBeenCalledWith({ name: 'my-change' })
       expect(result.change).toBe(change)
       expect(result.specDependsOn).toEqual({})
       expect(result.blockers).toEqual([])
@@ -1122,5 +1155,161 @@ describe('GetStatus', () => {
     const overlap = result.blockers.find((blocker) => blocker.code === 'OVERLAP_CONFLICT')
     expect(overlap).toBeDefined()
     expect(overlap?.bypassFlag).toBe('--allow-overlap')
+  })
+
+  describe('reconciled validity projection', () => {
+    const baseline: ValidityFingerprint = {
+      version: 1,
+      artifacts: { version: 1, algorithm: 'artifact-pre-hash-v1', files: {} },
+      implementation: {
+        version: 1,
+        hashAlgorithm: 'sha256',
+        textNormalization: 'text-v1',
+        binaryNormalization: 'bytes-v1',
+        files: {},
+      },
+    }
+
+    function reconcileAs(
+      change: Change,
+      verdict: ChangeValidityVerdict,
+    ): { readonly reconcile: ReconcileChangeValidity; readonly calls: number[] } {
+      const calls: number[] = []
+      return {
+        calls,
+        reconcile: {
+          execute: async () => {
+            calls.push(1)
+            return {
+              change,
+              verdict,
+              projectionChanges: [],
+              affectedArtifacts: [],
+              automaticReturn: verdict.recovery,
+              changed: false,
+            }
+          },
+        } as unknown as ReconcileChangeValidity,
+      }
+    }
+
+    it('sets validity and keeps an active attempt distinct from completed evidence', async () => {
+      const change = makeChange('my-change')
+      change.transition('designing', testActor)
+      change.transition('ready', testActor)
+      change.transition('implementing', testActor)
+      change.transition('verifying', testActor)
+      change.startVerification(baseline, testActor)
+      const completed = change.completeVerification(testActor)
+      const { attempt } = change.startVerification(baseline, testActor)
+      const verdict: ChangeValidityVerdict = {
+        artifactReviewRequired: false,
+        affectedArtifacts: [],
+        projectionChanges: [],
+        specApproval: 'not-required',
+        signoff: 'not-required',
+        verification: 'attempt-active',
+        blockers: [
+          {
+            code: 'VERIFICATION_IN_PROGRESS',
+            message: 'Verification is still in progress',
+          },
+        ],
+        recovery: null,
+      }
+      const { reconcile } = reconcileAs(change, verdict)
+      const uc = makeGetStatus(makeChangeRepository([change]), { reconcile })
+
+      const result = await uc.execute({ name: 'my-change' })
+
+      expect(result.validity?.verification.freshness).toBe('in-progress')
+      expect(result.validity?.verification.activeAttempt?.id).toBe(attempt.id)
+      expect(result.validity?.verification.completed?.id).toBe(completed.id)
+      expect(result.validity?.blockers).toEqual(verdict.blockers)
+      expect(result.change?.verification.activeAttempt?.id).toBe(attempt.id)
+      expect(result.change?.verification.completed?.id).toBe(completed.id)
+      expect(result.change?.verification.completed?.status).toBe('valid')
+      expect(result.nextAction.reason).toBe('Renew verification in place')
+      expect(result.nextAction.command).toBe('/specd-verify')
+      expect(result.nextAction.targetStep).toBe('verifying')
+    })
+
+    it('keeps earlier-phase guidance when verification is stale', async () => {
+      const change = makeChange('my-change')
+      change.transition('designing', testActor)
+      change.transition('ready', testActor)
+      change.transition('implementing', testActor)
+      const verdict: ChangeValidityVerdict = {
+        artifactReviewRequired: false,
+        affectedArtifacts: [],
+        projectionChanges: [],
+        specApproval: 'not-required',
+        signoff: 'not-required',
+        verification: 'stale',
+        blockers: [{ code: 'VERIFICATION_STALE', message: 'Verification evidence is stale' }],
+        recovery: null,
+      }
+      const uc = makeGetStatus(makeChangeRepository([change]), {
+        reconcile: reconcileAs(change, verdict).reconcile,
+      })
+
+      const result = await uc.execute({ name: 'my-change' })
+
+      expect(result.validity?.verification.freshness).toBe('stale')
+      expect(result.nextAction.reason).toBe('Tasks complete, ready to verify')
+      expect(result.nextAction.targetStep).toBe('verifying')
+      expect(result.nextAction.command).toBe('/specd-verify')
+    })
+
+    it('projects committed spec-approval recovery', async () => {
+      const change = makeChange('my-change')
+      change.transition('designing', testActor)
+      const verdict: ChangeValidityVerdict = {
+        artifactReviewRequired: false,
+        affectedArtifacts: [],
+        projectionChanges: [],
+        specApproval: 'stale',
+        signoff: 'not-required',
+        verification: 'not-required',
+        blockers: [{ code: 'APPROVAL_STALE', message: 'Spec approval is stale' }],
+        recovery: { cause: 'spec-approval', from: 'implementing', to: 'designing' },
+      }
+      const uc = makeGetStatus(makeChangeRepository([change]), {
+        reconcile: reconcileAs(change, verdict).reconcile,
+      })
+
+      const result = await uc.execute({ name: 'my-change' })
+
+      expect(result.change?.state).toBe('designing')
+      expect(result.validity?.automaticReturn).toEqual({
+        cause: 'spec-approval',
+        from: 'implementing',
+        to: 'designing',
+      })
+      expect(result.nextAction.command).toBe('/specd-design')
+      expect(result.blockers.some((blocker) => blocker.code === 'APPROVAL_STALE')).toBe(true)
+    })
+
+    it('does not reconcile drafted changes', async () => {
+      const change = makeChange('my-change')
+      change.transition('designing', testActor)
+      change.draft(testActor)
+      const repo = makeChangeRepository()
+      repo.store.set(change.name, change)
+      const calls: string[] = []
+      const reconcile = {
+        execute: async (input: { name: string }) => {
+          calls.push(input.name)
+          throw new Error('draft status must not reconcile')
+        },
+      } as unknown as ReconcileChangeValidity
+      const uc = makeGetStatus(repo, { reconcile })
+
+      const result = await uc.execute({ name: 'my-change' })
+
+      expect(calls).toEqual([])
+      expect(result.draftView?.name).toBe('my-change')
+      expect(result.validity).toBeUndefined()
+    })
   })
 })

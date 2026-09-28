@@ -13,10 +13,25 @@
   ],
   "implementation": [
     {
-      "file": "core:src/infrastructure/fs/manifest.ts"
+      "file": "core:src/infrastructure/fs/manifest.ts",
+      "symbols": [
+        "parseChangeManifest",
+        "ChangeManifest",
+        "fingerprintDifferenceSchema",
+        "rawChangeEventV2Schema"
+      ]
     },
     {
-      "file": "core:src/infrastructure/fs/change-repository.ts"
+      "file": "core:src/infrastructure/fs/manifest-change-loader.ts",
+      "symbols": ["loadChangeFromManifest"]
+    },
+    {
+      "file": "core:src/domain/errors/unsupported-manifest-version-error.ts",
+      "symbols": ["UnsupportedManifestVersionError"]
+    },
+    {
+      "file": "core:src/infrastructure/fs/archive-repository.ts",
+      "symbols": ["FsArchiveRepository"]
     }
   ],
   "optimizations": {

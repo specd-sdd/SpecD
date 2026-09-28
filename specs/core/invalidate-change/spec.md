@@ -10,27 +10,13 @@ This spec defines the `InvalidateChange` use case for explicit invalidation requ
 
 ### Requirement: Input contract
 
-`InvalidateChange.execute` MUST accept an input object with:
+`InvalidateChange.execute` MUST accept `name`, mandatory human-readable `reason`, optional structured `policyOverride`, optional repeated `targets`, and optional `force` confirmation.
 
-- `name` — the target change name
-- `reason` — mandatory human-readable explanation recorded on the invalidated event
-- `policyOverride` — optional one-off invalidation policy override
-- `targets` — optional repeated normalized targets
-- `force` — optional confirmation flag for destructive approval/signoff rollback
-
-Targets use one canonical shape:
-
-- `<artifactId>` — the whole artifact
-- `<artifactId>@<specId>` — one spec-scoped artifact file
+`policyOverride` MAY set `artifacts: none | surgical | downstream | global` and `workflow: preserve | redesign` independently. Targets use `<artifactId>` or `<artifactId>@<specId>`. The override applies only to this execution and MUST NOT mutate the change's persisted default policy.
 
 ### Requirement: Effective policy resolution
 
-The use case MUST resolve one effective invalidation policy for the execution:
-
-- `policyOverride`, when provided
-- otherwise the change's persisted `invalidationPolicy`
-
-The use case MUST NOT maintain a separate manual-default policy dimension.
+The use case SHALL resolve one effective structured policy by overlaying the supplied override on the change's persisted `invalidation` policy. Target requirements are determined solely by the effective `artifacts` dimension. The `workflow` dimension does not alter target syntax or artifact expansion.
 
 ### Requirement: Policy-dependent target rules
 
@@ -60,15 +46,15 @@ For scope compatibility:
 
 ### Requirement: Approval guard
 
-If the loaded change currently has an active spec approval or signoff, the use case MUST stop by default and require explicit confirmation via `force=true` before executing the invalidation.
+Before mutation, the use case SHALL determine from the canonical verdict whether the requested invalidation would revoke a currently `valid` spec approval or sign-off. If so, it requires `force=true` and reports each affected gate and recovery target. Historical events and already stale or revoked projections do not by themselves trigger the guard.
 
-Without `force=true`, the use case MUST fail without mutating the change.
+Without force, no mutation occurs. With force, revocation, audit evidence, artifact effects, and recovery are applied atomically by the reconciler.
 
-### Requirement: Change-level invalidation is unconditional
+### Requirement: Canonical gate-safe invalidation and recovery
 
-When execution proceeds past validation and approval guards, the use case MUST invalidate the change and return it to `designing` regardless of the effective invalidation policy.
+When execution passes validation and approval guards, `InvalidateChange` SHALL delegate the complete mutation to the central reconciler. Manual invalidation appends audit evidence and applies the artifact policy. Lifecycle state is preserved or returned to `designing` according to the workflow policy unless mandatory gate recovery is stricter.
 
-The invalidation policy governs only artifact/file-state consequences, not whether the change-level invalidation occurs.
+Explicit invalidation of a valid approval requires `force=true`. A forced spec-approval revocation returns the change to `designing`; a forced sign-off revocation returns a later change to `done`; when both are affected, spec recovery wins. The operation MUST commit projection changes and recovery together and MUST be idempotent.
 
 ### Requirement: Manual invalidation cause
 
@@ -111,13 +97,7 @@ Already reopened targets are not command errors.
 
 ### Requirement: Output contract
 
-On success, the use case MUST return:
-
-- the updated `Change`
-- the effective invalidation policy
-- the final deduplicated affected artifact/file set after policy expansion
-
-This affected set is the authoritative result for human-facing reporting.
+On success the use case SHALL return the reconciled `Change`, the recorded human-readable `reason`, the effective structured invalidation policy, the deduplicated affected artifact/file set, all approval or verification projection changes, canonical blockers and next action, and any automatic lifecycle return committed by reconciliation. This result is authoritative for CLI reporting.
 
 ### Requirement: Config-based factory delegates through resolveInvalidateChangeDeps
 
@@ -133,9 +113,10 @@ The helper is the only use-case-specific composition entry for config-based boot
 
 ## Constraints
 
-- `InvalidateChange` MUST NOT perform filesystem drift detection itself.
-- The use case MUST delegate lifecycle rollback and policy-aware invalidation to the `Change` entity rather than re-implementing entity rules externally.
-- Target validation failures happen before approval/signoff confirmation handling.
+- `InvalidateChange` does not perform filesystem drift detection.
+- Target validation completes before approval/sign-off confirmation handling.
+- The use case delegates complete invalidation and recovery orchestration to the central reconciler. Aggregate methods may apply domain state changes but are not an independent application path.
+- Manual invalidation never invents or clears physical `hasDrift` evidence.
 
 ## Spec Dependencies
 

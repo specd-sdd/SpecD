@@ -115,6 +115,7 @@ export interface ArchiveChangeDeps {
   readonly batchSnapshot: ArchiveBatchSnapshotPort
   readonly archiveBindings: readonly import('../../domain/services/transition-checks.js').CheckBinding[]
   readonly contentHasher: ContentHasher
+  readonly reconcile: import('../../application/use-cases/reconcile-change-validity.js').ReconcileChangeValidity
 }
 
 export function resolveArchiveChangeDeps(resolver: CompositionResolver): ArchiveChangeDeps {
@@ -146,6 +147,7 @@ export function resolveArchiveChangeDeps(resolver: CompositionResolver): Archive
     batchSnapshot: resolveArchiveBatchSnapshotPort(listWorkspaces, workspaceLayouts),
     archiveBindings: registry.archiveBindings,
     contentHasher: resolver.getContentHasher(),
+    reconcile: resolver.getReconcileChangeValidity(),
   }
 }
 
@@ -185,6 +187,7 @@ function createArchiveChangeFromNormalized(
       batchSnapshot,
       archiveBindings,
       contentHasher,
+      reconcile,
     } = input.deps
 
     return new ArchiveChange(
@@ -201,6 +204,7 @@ function createArchiveChangeFromNormalized(
       projectRoot,
       batchSnapshot,
       contentHasher,
+      reconcile,
     )
   }
 
@@ -222,6 +226,7 @@ function isArchiveChangeDeps(value: ArchiveChangeDeps | SpecdConfig): value is A
     'workspaceRoutes' in value &&
     'projectRoot' in value &&
     'batchSnapshot' in value &&
-    'contentHasher' in value
+    'contentHasher' in value &&
+    'reconcile' in value
   )
 }

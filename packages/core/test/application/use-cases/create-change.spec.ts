@@ -120,10 +120,13 @@ describe('CreateChange', () => {
         specIds: ['auth/login'],
         schemaName: 'specd-std',
         schemaVersion: 1,
-        invalidationPolicy: 'surgical',
+        invalidation: { artifacts: 'surgical', workflow: 'preserve' },
       })
 
-      expect(result.change.invalidationPolicy).toBe('surgical')
+      expect(result.change.invalidationPolicy).toEqual({
+        artifacts: 'surgical',
+        workflow: 'preserve',
+      })
     })
 
     it('defaults invalidation policy to downstream', async () => {
@@ -137,7 +140,50 @@ describe('CreateChange', () => {
         schemaVersion: 1,
       })
 
-      expect(result.change.invalidationPolicy).toBe('downstream')
+      expect(result.change.invalidationPolicy).toEqual({
+        artifacts: 'downstream',
+        workflow: 'preserve',
+      })
+    })
+
+    it('uses the injected project invalidation policy when input omits an override', async () => {
+      const repo = makeChangeRepository()
+      const uc = makeCreateChange(repo, makeListWorkspaces(new Map()), {
+        defaultInvalidation: { artifacts: 'surgical', workflow: 'redesign' },
+      })
+
+      const result = await uc.execute({
+        name: 'configured-policy',
+        specIds: [],
+        schemaName: 'specd-std',
+        schemaVersion: 1,
+      })
+
+      expect(result.change.invalidationPolicy).toEqual({
+        artifacts: 'surgical',
+        workflow: 'redesign',
+      })
+    })
+
+    it('prefers an explicit invalidation policy over the injected project default', async () => {
+      const repo = makeChangeRepository()
+      const uc = makeCreateChange(repo, makeListWorkspaces(new Map()), {
+        defaultInvalidation: { artifacts: 'global', workflow: 'redesign' },
+      })
+
+      const result = await uc.execute({
+        name: 'explicit-policy',
+        specIds: [],
+        schemaName: 'specd-std',
+        schemaVersion: 1,
+        invalidation: { artifacts: 'none', workflow: 'preserve' },
+      })
+
+      expect(result.change.invalidationPolicy).toEqual({
+        artifacts: 'none',
+        workflow: 'preserve',
+      })
+      expect(result.change.history).toHaveLength(1)
     })
 
     it('loads and seeds persisted dependencies for existing specs', async () => {

@@ -22,6 +22,7 @@ import { resolveCliContext } from '../../../src/helpers/cli-context.js'
 import { enrichImplementationTracking } from '../../../src/commands/change/_implementation-tracking.js'
 import { registerChangeStatus } from '../../../src/commands/change/status.js'
 import { ChangeNotFoundError } from '@specd/sdk'
+import { decode as decodeToon } from '@toon-format/toon'
 
 const defaultLifecycle = {
   validTransitions: ['ready', 'designing'],
@@ -1290,5 +1291,148 @@ describe('artifact-drift review rendering', () => {
       filename: 'tasks.md',
       path: '/project/.specd/changes/add-login/tasks.md',
     })
+  })
+})
+
+describe('reconciled validity and next action', () => {
+  it.each(['json', 'toon'] as const)(
+    'preserves reconciled state, blockers, validity, and next action in %s',
+    async (format) => {
+      const { kernel, stdout } = setup()
+      kernel.changes.status.execute.mockResolvedValue({
+        change: makeMockChange({ name: 'my-change', state: 'designing' }),
+        specDependsOn: {},
+        implementationTracking: { trackedFiles: [], links: [] },
+        artifactStatuses: [],
+        lifecycle: defaultLifecycle,
+        blockers: [{ code: 'APPROVAL_STALE', message: 'Spec approval is stale' }],
+        nextAction: {
+          targetStep: 'designing',
+          actionType: 'cognitive',
+          reason: 'Renew design consent',
+          command: '/specd-design',
+        },
+        validity: {
+          specApproval: 'stale',
+          signoff: 'not-required',
+          verification: 'not-required',
+          recovery: { cause: 'spec-approval', from: 'implementing', to: 'designing' },
+          blockers: [{ code: 'APPROVAL_STALE', message: 'Spec approval is stale' }],
+          projectionChanges: [],
+        },
+      })
+      const program = makeProgram()
+      registerChangeStatus(program.command('change'))
+
+      await program.parseAsync([
+        'node',
+        'specd',
+        'change',
+        'status',
+        'my-change',
+        '--format',
+        format,
+      ])
+
+      const parsed = format === 'json' ? JSON.parse(stdout()) : decodeToon(stdout())
+      expect(parsed).toMatchObject({
+        state: 'designing',
+        blockers: [{ code: 'APPROVAL_STALE' }],
+        validity: {
+          specApproval: 'stale',
+          recovery: { cause: 'spec-approval', to: 'designing' },
+        },
+        nextAction: { targetStep: 'designing', command: '/specd-design' },
+      })
+    },
+  )
+
+  it('prints validity, attempt, completed evidence, and the core next command', async () => {
+    const hash = 'sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee'
+    const { kernel, stdout } = setup()
+    kernel.changes.status.execute.mockResolvedValue({
+      change: makeMockChange({
+        name: 'my-change',
+        state: 'verifying',
+        invalidationPolicy: { artifacts: 'downstream', workflow: 'preserve' },
+        verification: {
+          activeAttempt: {
+            id: 'verification-attempt-2',
+            startedIn: 'verifying',
+            baseline: {
+              artifacts: { algorithm: 'artifact-pre-hash-v1', files: { 'spec:login': hash } },
+              implementation: {
+                hashAlgorithm: 'sha256',
+                textNormalization: 'text-v1',
+                binaryNormalization: 'bytes-v1',
+                files: { 'src/login.ts': { hash, content: 'text', normalization: 'text-v1' } },
+              },
+            },
+          },
+          completed: {
+            id: 'verification-1',
+            attemptId: 'verification-attempt-1',
+            status: 'stale',
+            fingerprint: {
+              artifacts: { algorithm: 'artifact-pre-hash-v1', files: {} },
+              implementation: null,
+            },
+          },
+        },
+      }),
+      specDependsOn: {},
+      implementationTracking: { trackedFiles: [], links: [] },
+      artifactStatuses: [],
+      lifecycle: defaultLifecycle,
+      blockers: [{ code: 'VERIFICATION_STALE', message: 'Completed verification is stale' }],
+      nextAction: {
+        targetStep: 'verifying',
+        actionType: 'cognitive',
+        reason: 'Renew verification in place',
+        command: 'specd changes verification start my-change',
+      },
+      validity: {
+        specApproval: 'valid',
+        signoff: 'absent',
+        verification: 'stale',
+        recovery: null,
+        blockers: [{ code: 'VERIFICATION_STALE', message: 'Completed verification is stale' }],
+        projectionChanges: [
+          {
+            projection: 'verification',
+            from: 'valid',
+            to: 'stale',
+            cause: 'implementation-drift',
+            differences: [
+              {
+                scope: 'implementation',
+                key: 'src/login.ts',
+                kind: 'changed',
+                expected: hash,
+                actual: hash,
+              },
+            ],
+          },
+        ],
+      },
+    })
+
+    const program = makeProgram()
+    registerChangeStatus(program.command('change'))
+    await program.parseAsync(['node', 'specd', 'change', 'status', 'my-change', '--format', 'json'])
+
+    const parsed = JSON.parse(stdout()) as {
+      state: string
+      validity: { verification: string; recovery: null }
+      verification: { activeAttempt: { id: string }; completed: { id: string; status: string } }
+      nextAction: { command: string }
+    }
+    expect(parsed.state).toBe('verifying')
+    expect(parsed.validity.verification).toBe('stale')
+    expect(parsed.validity.recovery).toBeNull()
+    expect(parsed.verification.activeAttempt.id).toBe('verification-attempt-2')
+    expect(parsed.verification.completed.status).toBe('stale')
+    expect(parsed.nextAction.command).toBe('specd changes verification start my-change')
+    expect(stdout()).not.toContain(hash)
   })
 })

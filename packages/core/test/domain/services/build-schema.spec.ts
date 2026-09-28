@@ -492,6 +492,28 @@ describe('buildSchema', () => {
     expect(() => buildSchema('#test', data, new Map())).not.toThrow()
   })
 
+  it('treats hasTasks as metadata even when the output file is not tasks.md', () => {
+    const data = {
+      kind: 'schema' as const,
+      name: 'test',
+      version: 1,
+      artifacts: [
+        { id: 'checklist', scope: 'change' as const, output: 'checklist.md', hasTasks: true },
+      ],
+      workflow: [
+        {
+          step: 'archiving',
+          requires: ['checklist'],
+          requiresTaskCompletion: ['checklist'],
+          hooks: { pre: [], post: [] },
+        },
+      ],
+    }
+    const schema = buildSchema('#test', data, new Map())
+    expect(schema.artifact('checklist')?.hasTasks).toBe(true)
+    expect(schema.workflowStep('archiving')?.requiresTaskCompletion).toEqual(['checklist'])
+  })
+
   it('injects default patterns when hasTasks is true and patterns are missing', () => {
     const data = {
       kind: 'schema' as const,

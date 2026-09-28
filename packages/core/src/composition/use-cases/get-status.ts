@@ -28,6 +28,8 @@ export interface GetStatusDeps {
   readonly transitionBindings: readonly CheckBinding[]
   /** Composed archive check bindings. */
   readonly archiveBindings: readonly CheckBinding[]
+  /** Canonical reconciler. Config resolution always supplies the shared instance. */
+  readonly reconcile: import('../../application/use-cases/reconcile-change-validity.js').ReconcileChangeValidity
 }
 
 /**
@@ -47,6 +49,7 @@ export function resolveGetStatusDeps(resolver: CompositionResolver): GetStatusDe
     refreshImplementationTracking: resolver.getRefreshImplementationTracking(),
     transitionBindings: registry.transitionBindings,
     archiveBindings: registry.archiveBindings,
+    reconcile: resolver.getReconcileChangeValidity(),
   }
 }
 
@@ -105,6 +108,7 @@ function createGetStatusFromNormalized(
       refreshImplementationTracking,
       transitionBindings,
       archiveBindings,
+      reconcile,
     } = input.deps
     return new GetStatus(
       changes,
@@ -113,6 +117,7 @@ function createGetStatusFromNormalized(
       refreshImplementationTracking,
       transitionBindings,
       archiveBindings,
+      reconcile,
     )
   }
 
@@ -133,6 +138,7 @@ function isGetStatusDeps(value: GetStatusDeps | SpecdConfig): value is GetStatus
     'approvals' in value &&
     'refreshImplementationTracking' in value &&
     'transitionBindings' in value &&
-    'archiveBindings' in value
+    'archiveBindings' in value &&
+    'reconcile' in value
   )
 }

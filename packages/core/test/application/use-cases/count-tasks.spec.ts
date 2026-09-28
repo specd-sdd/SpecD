@@ -39,6 +39,29 @@ describe('CountTasks', () => {
     expect(result.total).toEqual({ complete: 2, incomplete: 1, total: 3 })
   })
 
+  it('counts a hasTasks artifact whose output is checklist.md', async () => {
+    const change = makeChange('count')
+    const checklist = new ChangeArtifact({ type: 'checklist' })
+    checklist.setFile(new ArtifactFile({ key: 'checklist', filename: 'checklist.md' }))
+    change.setArtifact(checklist)
+    const repo = makeChangeRepository([change])
+    repo.artifact = async () => new SpecArtifact('checklist.md', '- [x] done\n- [ ] open\n')
+    const schema = buildSchema(
+      '#test',
+      {
+        kind: 'schema',
+        name: 'test',
+        version: 1,
+        artifacts: [{ id: 'checklist', scope: 'change', output: 'checklist.md', hasTasks: true }],
+      },
+      new Map(),
+    )
+
+    const result = await new CountTasks(repo, makeSchemaProvider(schema)).execute({ change })
+
+    expect(result.byArtifact.checklist).toEqual({ complete: 1, incomplete: 1, total: 2 })
+  })
+
   it('aggregates counts across distinct task artifact types', async () => {
     const change = makeChange('multiple-artifacts')
     const tasks = new ChangeArtifact({ type: 'tasks' })

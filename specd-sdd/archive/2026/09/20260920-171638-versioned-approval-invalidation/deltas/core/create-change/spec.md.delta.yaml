@@ -1,0 +1,39 @@
+- op: modified
+  description: 'Accept structured invalidation input'
+  selector:
+    type: section
+    matches: '^Requirement: Input contract$'
+  content: |
+    `CreateChange.execute` SHALL accept the existing name, description, spec IDs, optional paired schema override, and overlap-check fields, plus optional structured `invalidation` with `artifacts: none | surgical | downstream | global` and `workflow: preserve | redesign`.
+
+    When the schema override pair is absent, the active schema is resolved through `GetActiveSchema`; supplying only one schema field is invalid. The use case receives already resolved project policy defaults from its composition boundary and MUST NOT parse legacy config aliases itself.
+
+- op: modified
+  description: 'Persist v2 structured policy defaults'
+  selector:
+    type: section
+    matches: '^Requirement: Initial invalidation policy$'
+  content: |
+    `CreateChange` SHALL persist the effective structured invalidation policy in a new v2 manifest. Explicit input wins; otherwise the resolved project default is used. When neither supplies a value, the new-change default is `{ artifacts: downstream, workflow: preserve }`.
+
+    The created change MUST NOT persist the legacy scalar `invalidationPolicy`. The policy becomes the change-local default for later reconciliation and may be changed through `EditChange` without retroactively inventing drift or recovery.
+
+- op: modified
+  description: 'Make project policy defaults a Core composition dependency, not a CLI-only overlay'
+  selector:
+    type: section
+    matches: '^Requirement: Dependencies$'
+  content: |
+    `CreateChange` SHALL receive `ChangeRepository`, `ListWorkspaces`, `ActorResolver`, `GetActiveSchema`, optional `DetectOverlap`, and a resolved structured `defaultInvalidation` policy through its constructor/dependency object. The workspace orchestrator supplies spec existence and persisted dependency views; schema resolution and optional overlap detection retain their existing use-case ownership.
+
+    Explicit `execute` input policy takes precedence over the injected default. If neither exists, the native `{ artifacts: downstream, workflow: preserve }` default applies. No application or CLI caller may silently substitute the native default when config-based composition supplied a different project default.
+
+- op: modified
+  description: 'Require the config factory and kernel to inject resolved project defaults'
+  selector:
+    type: section
+    matches: '^Requirement: Config-based factory delegates through resolveCreateChangeDeps$'
+  content: |
+    The config-based `createCreateChange(config, options?)` form MUST obtain `CreateChangeDeps` through `resolveCreateChangeDeps(resolver)` and delegate to canonical `createCreateChange(deps)`. The resolver MUST supply `changes`, `listWorkspaces`, `actor`, `getActiveSchema`, optional `detectOverlap`, and the effective project `defaultInvalidation` derived from the resolved configuration, including legacy alias adaptation.
+
+    `Kernel.changes.create` MUST use the same resolver path. With omitted input policy, config-based factory and kernel creation MUST persist the project default rather than falling back to the native default. Explicit input policy still wins. The factory MUST NOT rebuild filesystem wiring or depend on CLI preprocessing to satisfy this behavior.

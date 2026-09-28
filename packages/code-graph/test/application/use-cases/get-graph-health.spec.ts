@@ -8,7 +8,7 @@ import {
 import { type GraphStatistics } from '../../../src/domain/value-objects/graph-statistics.js'
 import { type CodeGraphHostPort } from '../../../src/application/ports/code-graph-host-port.js'
 import { type WorkspaceIndexTarget } from '../../../src/domain/value-objects/index-options.js'
-import { type SpecdConfig, type VcsAdapter } from '@specd/core'
+import { DEFAULT_INVALIDATION_POLICY, type SpecdConfig, type VcsAdapter } from '@specd/core'
 import { buildProjectGraphConfig } from '../../../src/application/services/build-project-graph-config.js'
 import { GraphBusyError } from '../../../src/domain/errors/graph-busy-error.js'
 import { GraphProviderStaleError } from '../../../src/domain/errors/graph-provider-stale-error.js'
@@ -76,6 +76,7 @@ const config = {
     archiveAdapter: { adapter: 'fs', config: { path: '/project/.specd/archive' } },
   },
   approvals: { spec: false, signoff: false },
+  invalidation: DEFAULT_INVALIDATION_POLICY,
 } as SpecdConfig
 
 const codeGraphVersion = '1.0.0'

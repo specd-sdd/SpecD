@@ -4,39 +4,58 @@
 
 ### Requirement: Command signature
 
-#### Scenario: Missing reason is rejected
+Scenarios:
 
-- **WHEN** `specd changes invalidate <name>` is run without `--reason`
-- **THEN** the command exits with code `1`
-- **AND** it prints a usage or validation error
+#### Scenario: Independent overrides map to core input
+
+- **WHEN** artifact and workflow flags are supplied independently
+- **THEN** the CLI delegates their structured values and validates target compatibility
+
+#### Scenario: Missing reason remains an input error
+
+- **WHEN** structured policy flags are supplied without `--reason`
+- **THEN** the command exits with no mutation
 
 ### Requirement: Effective policy resolution
 
-#### Scenario: CLI override becomes the effective policy
+Scenarios:
 
-- **GIVEN** a change persisted with `invalidationPolicy: downstream`
-- **WHEN** `specd changes invalidate <name> --reason "review" --policy surgical --target specs`
-- **THEN** execution uses effective policy `surgical`
+#### Scenario: Legacy adaptation remains in core
+
+- **WHEN** persisted configuration originated from the legacy key
+- **THEN** CLI displays the effective structured policy returned by core without reinterpreting it
+
+#### Scenario: Invocation overrides are shown as effective only for the request
+
+- **WHEN** core returns an overlaid policy
+- **THEN** output shows it without claiming the persisted default changed
 
 ### Requirement: Target syntax
 
+Scenarios:
+
 #### Scenario: Scope-incompatible artifact-at-spec target is rejected
 
-- **WHEN** `specd changes invalidate <name> --reason "review" --policy surgical --target design@core:change`
+- **WHEN** `specd changes invalidate <name> --reason "review" --artifact-policy surgical --target design@core:change` is run
 - **THEN** the command exits with code `1`
 - **AND** the error explains that the target form is invalid for a `scope: change` artifact
+- **AND** no mutation occurs
 
 ### Requirement: Policy-dependent target requirements
 
+Scenarios:
+
 #### Scenario: Downstream requires at least one target
 
-- **WHEN** `specd changes invalidate <name> --reason "review" --policy downstream`
+- **WHEN** `specd changes invalidate <name> --reason "review" --artifact-policy downstream` is run
 - **THEN** the command exits with code `1`
+- **AND** no mutation occurs
 
 #### Scenario: Global rejects explicit targets
 
-- **WHEN** `specd changes invalidate <name> --reason "review" --policy global --target specs`
+- **WHEN** `specd changes invalidate <name> --reason "review" --artifact-policy global --target specs` is run
 - **THEN** the command exits with code `1`
+- **AND** no mutation occurs
 
 ### Requirement: Target normalization and validation
 
@@ -48,38 +67,67 @@
 
 ### Requirement: Approval guard
 
-#### Scenario: Active approval requires force even under policy none
+Scenarios:
 
-- **GIVEN** the change currently has an active approval
-- **WHEN** `specd changes invalidate <name> --reason "review" --policy none` is run without `--force`
-- **THEN** the command exits with code `1`
-- **AND** the warning says the change would return to `designing` and invalidate the approval
+#### Scenario: Refusal names exact gates and targets
+
+- **GIVEN** the request would revoke current consent and force is absent
+- **WHEN** the command evaluates its guard
+- **THEN** it performs no mutation and names each affected gate and canonical recovery
+- **AND** CLI does not hard-code `designing` for sign-off-only or no-return cases
+
+#### Scenario: Stale historical evidence needs no force
+
+- **WHEN** only already-stale evidence is affected
+- **THEN** the approval guard does not request confirmation solely for history
 
 ### Requirement: Change-level invalidation
 
-#### Scenario: Successful command always returns the change to designing
+Scenarios:
 
-- **WHEN** `specd changes invalidate <name> --reason "review"` succeeds
-- **THEN** the change is invalidated
-- **AND** it returns to `designing`
+#### Scenario: CLI does not choose recovery
 
-### Requirement: `none` semantics
+- **WHEN** guarded invalidation succeeds
+- **THEN** lifecycle and projection consequences exactly match the core result
 
-#### Scenario: Policy none reports no artifact invalidation
+#### Scenario: Artifact and workflow effects are reported independently
 
-- **WHEN** `specd changes invalidate <name> --reason "review" --policy none` succeeds
-- **THEN** output says the change returned to `designing`
-- **AND** it says no artifacts were invalidated because the effective policy is `none`
+- **WHEN** core preserves state while reopening focused artifacts
+- **THEN** CLI reports both facts without synthesizing a design return
+
+### Requirement: none semantics
+
+Scenarios:
+
+#### Scenario: None reopens nothing and forgives nothing
+
+- **WHEN** artifact policy `none` is effective
+- **THEN** no additional files reopen while existing drift, stale evidence, and workflow recovery remain visible
+
+#### Scenario: None with redesign still moves lifecycle
+
+- **WHEN** artifact policy is `none` and workflow policy is `redesign`
+- **THEN** output reports no reopened files and the independently committed design recovery
 
 ### Requirement: Reporting
 
-#### Scenario: Downstream output reports only the final affected set
+Scenarios:
 
-- **GIVEN** repeated targets normalize to one set and downstream expansion reaches additional files
-- **WHEN** the command succeeds
-- **THEN** output reports the effective policy
-- **AND** it lists each affected artifact/file at most once
-- **AND** downstream-expanded entries are clearly labeled
+#### Scenario: Preserve output still reports blockers
+
+- **WHEN** invalidation preserves lifecycle state with unresolved drift
+- **THEN** output shows both policy dimensions, affected evidence, and the forward blocker
+
+#### Scenario: Recovery output names committed state
+
+- **WHEN** core commits gate-driven recovery
+- **THEN** text, JSON, and TOON render that state, cause, blockers, and next action
+
+#### Scenario: Structured success preserves the operator reason
+
+- **WHEN** invalidation succeeds with a human-readable reason
+- **THEN** JSON and TOON expose that exact value in a named `reason` field
+- **AND** text output includes it without replacing canonical recovery guidance
 
 ### Requirement: Error handling
 

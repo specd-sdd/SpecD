@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { join } from 'node:path'
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { type SpecdConfig } from '@specd/core'
+import { DEFAULT_INVALIDATION_POLICY, type SpecdConfig } from '@specd/core'
 import {
   acquireGraphIndexLock,
   acquireGraphIndexLockLeaseByStoragePath,
@@ -36,6 +36,7 @@ describe('index-lock infrastructure', () => {
         archiveAdapter: { adapter: 'fs', config: {} },
       },
       approvals: { spec: false, signoff: false },
+      invalidation: DEFAULT_INVALIDATION_POLICY,
     }
   })
 

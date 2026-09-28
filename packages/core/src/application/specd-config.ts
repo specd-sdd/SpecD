@@ -254,8 +254,13 @@ export interface SpecdConfig {
   readonly schemaPlugins?: readonly string[] | undefined
   /** Inline schema override operations from `specd.yaml`. */
   readonly schemaOverrides?: SchemaOperations | undefined
-  /** Default invalidation policy for new changes. Defaults to `'downstream'`. */
-  readonly invalidationPolicy?: InvalidationPolicy | undefined
+  /**
+   * Resolved default invalidation policy for new changes.
+   *
+   * Always present after load. Native omission is `{ artifacts: 'downstream', workflow: 'preserve' }`.
+   * A legacy `invalidationPolicy` scalar is adapted to `{ artifacts: <scalar>, workflow: 'redesign' }`.
+   */
+  readonly invalidation: InvalidationPolicy
   /** Declared plugins grouped by type (currently `agents`). */
   readonly plugins?:
     | {

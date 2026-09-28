@@ -314,6 +314,15 @@
 - **THEN** its default `completePattern` is `^\s*-\s+\[[xX]\]`
 - **AND** that pattern matches both `[x]` and `[X]` markdown task markers
 
+### Requirement: Task artifact validity semantics
+
+#### Scenario: Marker controls operational semantics
+
+- **GIVEN** an artifact has an arbitrary ID and declares `hasTasks: true`
+- **WHEN** validity and archive are evaluated
+- **THEN** its content is excluded from fingerprints and automatic drift propagation
+- **AND** missing structure or incomplete live tasks still block applicable operations
+
 ### Requirement: Delta validation rules
 
 #### Scenario: where rule matches correlated entry in delta AST
@@ -477,28 +486,6 @@
 - **AND** one `Requirement:` section whose serialized markdown body contains no `SHALL` or `MUST`
 - **WHEN** `ValidateArtifacts` evaluates the rule
 - **THEN** `ValidateArtifacts` records a warning for that section
-
-### Requirement: Per-spec approval
-
-#### Scenario: New spec requires approval
-
-- **WHEN** a delta creates a new spec via an `added` operation
-- **THEN** that spec ID must be approved before archiving
-
-#### Scenario: Modified spec requires approval
-
-- **WHEN** a delta modifies or removes nodes in an existing spec
-- **THEN** that spec ID must be approved before archiving
-
-#### Scenario: All specs approved
-
-- **WHEN** every spec ID touched by the change has been approved
-- **THEN** `specd archive` proceeds without an approval error
-
-#### Scenario: Partially approved
-
-- **WHEN** at least one touched spec ID has not been approved
-- **THEN** `specd archive` must refuse and report which spec IDs are pending approval
 
 ### Requirement: preHashCleanup
 

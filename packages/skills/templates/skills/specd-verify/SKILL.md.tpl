@@ -33,16 +33,33 @@ For other blockers, follow the **next action:** command recommendation.
 
 Extract the `path:` field from the "lifecycle:" section.
 
-If the status output shows `review: required: yes`, tell the user:
+Trust the reconciled status. Do not calculate fingerprints or roll the lifecycle
+back yourself. See `shared.md` — "Canonical validity reconciliation".
 
-> Artifacts need review before verification can continue. Run `/specd-design <name>`.
+If required spec consent is stale or revoked, status returns the change to
+`designing`. Stop verification and route to `/specd-design` through
+`designing` → `ready` → human `approve spec`.
 
-**Stop — do not continue.**
+If the status output shows `review: required: yes`:
 
-If not in `implementing`, `verifying`, or `done`, this is the wrong skill.
-Redirect based on the **next action:** `target` recommendation.
+- `workflow: redesign` with unresolved non-task drift routes to `/specd-design`.
+  **Stop.**
+- `workflow: preserve` without mandatory spec recovery stays in the current
+  phase. Review drifted artifacts in place when that review is in this skill's
+  scope, then `specd changes validate`. Do not force `/specd-design` for every
+  drift. Structural validation is not semantic review or verification renewal.
+- `artifacts: none` waives reopening, not freshness.
 
-**Stop — do not continue.**
+Verification evidence is state-independent. Record it from any active lifecycle
+state. Entering `verifying` does **not** capture a baseline and is not required
+merely to produce evidence. Lifecycle advancement
+(`implementing` → `verifying` → `done` → `archivable`) remains a separate
+authorized action and still follows the hop rules below.
+
+Verification staleness never moves lifecycle state. Before `verifying` it is
+contextual. At `verifying` or later it blocks until this skill renews evidence
+in place. A stale sign-off after `done` returns to `done`; it does not move an
+earlier state forward.
 
 ### 2. Enter verification (or resume)
 
@@ -76,9 +93,11 @@ specd changes run-hooks <name> verifying --phase pre
 specd changes hook-instruction <name> verifying --phase pre --format text
 ```
 
-**If in `done`**: skip directly to step 6a (transition to archivable path).
+**If in `done`**: skip the `verifying` entry transition. Continue with attempt
+ownership below when evidence must be renewed; otherwise continue at step 6b
+for the signoff gate. Entering `done` does not complete verification.
 
-Continue to step 2b.
+`verifying` → `verifying` is not a protocol hop. There is no restart-verification flag. Continue to step 2b whenever this invocation will check scenarios.
 
 ### 2b. Select verification mode
 
@@ -152,6 +171,33 @@ specd changes spec-preview <name> <specId> --artifact <artifactId> --format toon
 This merged view is what you should verify against. Raw delta inspection alone is not
 equivalent to merged preview review.
 
+### 3c. Start the verification attempt
+
+This skill owns the attempt, including full mode. Before any scenario check,
+compliance audit, verification report, or completion, run:
+
+```bash
+specd changes verification start <name> --format text
+```
+
+Store the returned attempt id. The command is explicit and works from any active
+state. It refreshes tracking and runs the registered implementation readiness
+checks before storing a baseline; entering `verifying` applies the same guards but
+never creates an attempt. Transitions and status never complete an unfinished attempt.
+
+If fingerprinted inputs changed, this start replaces the baseline. Repeat every
+scenario check and, in full mode, the delegated audit against that new baseline.
+Earlier results cannot complete the new attempt.
+
+```bash
+specd changes verification invalidate <name> --reason "<text>"
+```
+
+`verification invalidate` is a separate command. It only withdraws completed
+verification evidence. It does not start or restart an attempt. Do not use it
+instead of `verification start`. If evidence was already stale, trust the persisted
+reason returned by the command; a new request reason does not replace audit history.
+
 ### 4. Verify each scenario
 
 For each spec in the change, read the merged spec content from step 3b. Then verify
@@ -180,15 +226,22 @@ Follow guidance. If hooks fail, fix and re-run.
 
 ### 5b. Compliance audit (full mode only)
 
-**Only if `verificationMode` is `full`:** run the compliance audit now, before any
-state transition or results display.
+**Only if `verificationMode` is `full`:** run the compliance audit now, before
+completion or any lifecycle transition.
 
-Execute the `specd-compliance` skill for the current change: `/specd-compliance --change <name>`
+Pass the attempt id from step 3c and a delegated marker. Delegated compliance
+participates in this attempt and must not run `verification start` or
+`verification complete`:
 
-Obtain the audit results and store them. They will be presented together with the
-verification results in step 6.
+`/specd-compliance --change <name> --delegated --attempt <attemptId>`
 
-**If `verificationMode` is `simple`:** skip this step entirely.
+An existing active attempt alone does not imply delegation. This skill already
+started the outer attempt. Obtain the audit results and store them. They are
+presented with the verification findings in step 6. Full mode completes only
+after scenario checks and this audit both succeed.
+
+**If `verificationMode` is `simple`:** skip compliance. This skill still owns
+start, scenario checks, and complete.
 
 Continue to step 6.
 
@@ -225,8 +278,10 @@ Before choosing a transition, reload status:
 specd changes status <name> --format text
 ```
 
-If the fresh status shows `review: required: yes`, do NOT route back to
-`implementing`. Tell the user to run `/specd-design <name>` and **stop**.
+If fresh status shows required spec recovery, or `workflow: redesign` with
+unresolved non-task drift, do NOT route back to `implementing`. Tell the user
+to run `/specd-design <name>` and **stop**. Under `workflow: preserve`, stay in
+phase for in-place review instead of forcing design.
 
 If this is an implementation-only failure:
 
@@ -244,7 +299,26 @@ specd changes transition <name> designing --skip-hooks all
 
 Tell the user to run `/specd-design <name>` to update them. **Stop.**
 
-**If all pass:** transition through `done` and the signoff gate to reach `archivable`.
+Do not run `verification complete` after a failed scenario, an interrupted
+session, or a failed delegated audit. Leave the active attempt. There is no restart-verification flag.
+
+**If all scenario checks pass, applicable hooks pass, and (full mode) the
+delegated audit succeeds:** complete the attempt this skill started. Do this
+before any lifecycle transition. CLI completion records the declaration; it does
+not run the tests.
+
+```bash
+specd changes verification complete <name> --format text
+```
+
+If complete reports a fingerprint mismatch, do not complete with the previous
+results. Inspect the differences, run `specd changes verification start <name>`
+again, repeat all required verification work against the new baseline, then
+complete.
+
+Lifecycle advancement is separate. When the user authorizes it and current
+evidence exists, transition through `done` and the signoff gate to reach
+`archivable`.
 
 #### 6a. Transition to done
 
@@ -339,6 +413,12 @@ specd changes transition <name> designing --skip-hooks all
 
 - Verify against scenarios from the compiled context
 - Run actual tests where applicable
-- Any time a fresh `changes status` shows `review: required: yes`, stop
-  verification and redirect to `/specd-design <name>`
+- On `review: required: yes`, follow canonical recovery: spec consent or
+  `workflow: redesign` goes to `/specd-design`; `workflow: preserve` stays in
+  phase for in-place review. Do not treat structural validation as approval
 - ALWAYS ask the user for the next action when full-mode audit finds issues
+- Own `verification start` and `verification complete` for both simple and full
+  mode. Pass `--delegated --attempt <attemptId>` in full mode. Do not let
+  compliance complete the outer attempt
+- Do not complete after a failed check, a failed delegated audit, or a
+  fingerprint mismatch until the repeated work succeeds

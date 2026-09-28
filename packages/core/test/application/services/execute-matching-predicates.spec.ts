@@ -40,6 +40,42 @@ function makeFailingCheck(id: 'protocol.edge' | 'workflow.requires'): Check {
 }
 
 describe('executeMatchingPredicates', () => {
+  it('executes one stable check ID once when exit and entry bindings overlap', async () => {
+    const execute = vi.fn(async () => ({
+      id: 'impl.filesResolved' as const,
+      label: CHECK_LABELS['impl.filesResolved'],
+      kind: 'predicate' as const,
+      outcome: 'pass' as const,
+    }))
+    const check: Check = {
+      id: 'impl.filesResolved',
+      label: CHECK_LABELS['impl.filesResolved'],
+      kind: 'predicate',
+      execute,
+    }
+    const bindings: CheckBinding[] = [
+      {
+        check,
+        applicability: [{ scope: 'transition', from: 'implementing', to: '*', along: 'forward' }],
+      },
+      {
+        check,
+        applicability: [{ scope: 'transition', from: '*', to: 'verifying', along: '*' }],
+      },
+    ]
+    const ctx = buildCheckExecutionContext({
+      change: makeChange(),
+      schema: makeSchema(),
+      attempt: { scope: 'transition', from: 'implementing', to: 'verifying', along: 'forward' },
+      approvals: { spec: false, signoff: false },
+    })
+
+    const result = await executeMatchingPredicates(bindings, ctx)
+
+    expect(execute).toHaveBeenCalledOnce()
+    expect(result.checks.map((entry) => entry.id)).toEqual(['impl.filesResolved'])
+  })
+
   it('collects every matching fail when failFastOn is omitted (GetStatus path)', async () => {
     const later = vi.fn(async () =>
       fail('workflow.requires', 'CHECK_FAILED', 'workflow.requires failed'),
@@ -144,5 +180,42 @@ describe('executeMatchingPredicates', () => {
     expect(later).not.toHaveBeenCalled()
     expect(result.allowed).toBe(false)
     expect(result.checks.map((check) => check.id)).toEqual(['schema.nameMatch'])
+  })
+
+  it('passes the reconciled validity snapshot to checks', async () => {
+    const seen: unknown[] = []
+    const validity = {
+      artifactReviewRequired: false,
+      affectedArtifacts: [],
+      projectionChanges: [],
+      specApproval: 'valid' as const,
+      signoff: 'not-required' as const,
+      verification: 'not-required' as const,
+      blockers: [],
+      recovery: null,
+    }
+    const bindings: CheckBinding[] = [
+      {
+        check: {
+          id: 'protocol.edge',
+          label: CHECK_LABELS['protocol.edge'],
+          kind: 'predicate',
+          execute: async (ctx) => {
+            seen.push(ctx.validity)
+            return fail('protocol.edge', 'CHECK_FAILED', 'seen')
+          },
+        },
+        applicability: [{ scope: 'transition', from: '*', to: '*', along: '*' }],
+      },
+    ]
+    const ctx = buildCheckExecutionContext({
+      change: makeChange(),
+      schema: makeSchema(),
+      attempt: { scope: 'transition', from: 'designing', to: 'ready', along: 'forward' },
+      approvals: { spec: false, signoff: false },
+      validity,
+    })
+    await executeMatchingPredicates(bindings, ctx)
+    expect(seen).toEqual([validity])
   })
 })

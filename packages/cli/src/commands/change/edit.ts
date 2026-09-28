@@ -4,6 +4,17 @@ import { output, parseFormat } from '../../formatter.js'
 import { handleError, cliError } from '../../handle-error.js'
 import { parseSpecId } from '../../helpers/spec-path.js'
 import { collect } from '../../helpers/collect.js'
+import {
+  parseArtifactPolicyFlag,
+  parseWorkflowPolicyFlag,
+  resolveInvalidationOverride,
+} from './_invalidation-flags.js'
+import {
+  publicProjectionChanges,
+  readAutomaticReturn,
+  type PublicAutomaticReturn,
+  type PublicProjectionChange,
+} from './_validity-present.js'
 
 /**
  * Registers the `change edit` subcommand on the given parent command.
@@ -21,8 +32,12 @@ export function registerChangeEdit(parent: Command): void {
     .option('--remove-spec <id>', 'remove a spec path (repeatable)', collect, [] as string[])
     .option('--description <text>', 'set or replace the change description (informational)')
     .option(
-      '--invalidation-policy <policy>',
-      'set the invalidation policy (none|surgical|downstream|global)',
+      '--artifact-policy <policy>',
+      'replace only the artifact invalidation dimension (none|surgical|downstream|global)',
+    )
+    .option(
+      '--workflow-policy <policy>',
+      'replace only the workflow invalidation dimension (preserve|redesign)',
     )
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
@@ -47,11 +62,14 @@ JSON/TOON output schema:
           addSpec: string[]
           removeSpec: string[]
           description?: string
-          invalidationPolicy?: string
+          artifactPolicy?: string
+          workflowPolicy?: string
           format: string
           config?: string
         },
       ) => {
+        const artifactPolicy = parseArtifactPolicyFlag(opts.artifactPolicy, opts.format)
+        const workflowPolicy = parseWorkflowPolicyFlag(opts.workflowPolicy, opts.format)
         try {
           const { config, kernel } = await resolveCliContext({ configPath: opts.config })
 
@@ -59,11 +77,12 @@ JSON/TOON output schema:
             opts.addSpec.length > 0 ||
             opts.removeSpec.length > 0 ||
             opts.description !== undefined ||
-            opts.invalidationPolicy !== undefined
+            artifactPolicy !== undefined ||
+            workflowPolicy !== undefined
 
           if (!hasChanges) {
             cliError(
-              'at least one of --add-spec, --remove-spec, --description, or --invalidation-policy must be provided',
+              'at least one of --add-spec, --remove-spec, --description, --artifact-policy, or --workflow-policy must be provided',
               opts.format,
             )
           }
@@ -92,26 +111,38 @@ JSON/TOON output schema:
               ? opts.removeSpec.map((s) => parseSpecId(s, config).specId)
               : undefined
 
-          const { change, invalidated } = await kernel.changes.edit.execute({
+          const invalidation = resolveInvalidationOverride(artifactPolicy, workflowPolicy)
+          const result = await kernel.changes.edit.execute({
             name,
             ...(addSpecIds !== undefined ? { addSpecIds } : {}),
             ...(removeSpecIds !== undefined ? { removeSpecIds } : {}),
             ...(opts.description !== undefined ? { description: opts.description } : {}),
-            ...(opts.invalidationPolicy !== undefined
-              ? {
-                  invalidationPolicy: opts.invalidationPolicy as
-                    | 'none'
-                    | 'surgical'
-                    | 'downstream'
-                    | 'global',
-                }
-              : {}),
+            ...(invalidation !== undefined ? { invalidation } : {}),
           })
+          const { change, invalidated } = result
+          const scopeChanged = 'scopeChanged' in result ? result.scopeChanged : false
+          const validityChanged = 'validityChanged' in result ? result.validityChanged : invalidated
+          const blockers = 'blockers' in result ? result.blockers : []
+          const nextAction = 'nextAction' in result ? result.nextAction : undefined
+          const projectionChanges = publicProjectionChanges(
+            'projectionChanges' in result ? result.projectionChanges : undefined,
+          )
+          const automaticReturn = readAutomaticReturn(
+            'automaticReturn' in result ? result.automaticReturn : undefined,
+          )
+          const effectivePolicy = 'effectivePolicy' in result ? result.effectivePolicy : undefined
 
-          if (invalidated) {
-            process.stderr.write(
-              'warning: approvals invalidated — change rolled back to designing\n',
-            )
+          if (
+            projectionChanges.length > 0 ||
+            (automaticReturn !== null && automaticReturn !== undefined)
+          ) {
+            const recovery =
+              automaticReturn !== undefined && automaticReturn !== null
+                ? ` — automatic return ${automaticReturn.from} → ${automaticReturn.to} (${automaticReturn.cause})`
+                : ''
+            const projections = projectionChanges.map((entry) => entry.projection).join(', ')
+            const changed = projections === '' ? 'lifecycle validity' : projections
+            process.stderr.write(`warning: validity changed (${changed})${recovery}\n`)
           }
 
           // Check for spec overlap and warn (only when specs changed)
@@ -141,7 +172,10 @@ JSON/TOON output schema:
               `updated change ${name}`,
               `specs:      ${[...change.specIds].join(', ')}`,
               `workspaces: ${[...change.workspaces].join(', ')}`,
+              `state:      ${change.state}`,
             ]
+            appendEditConsequences(lines, effectivePolicy, projectionChanges, automaticReturn)
+            appendEditGuidance(lines, blockers, nextAction)
             output(lines.join('\n'), 'text')
           } else {
             output(
@@ -151,7 +185,14 @@ JSON/TOON output schema:
                 specIds: [...change.specIds],
                 workspaces: [...change.workspaces],
                 invalidated,
+                scopeChanged,
+                validityChanged,
                 state: change.state,
+                ...(blockers.length > 0 ? { blockers } : {}),
+                ...(nextAction !== undefined ? { nextAction } : {}),
+                ...(effectivePolicy !== undefined ? { effectivePolicy } : {}),
+                ...(projectionChanges.length > 0 ? { projectionChanges } : {}),
+                ...(automaticReturn !== undefined ? { automaticReturn } : {}),
               },
               fmt,
             )
@@ -161,4 +202,67 @@ JSON/TOON output schema:
         }
       },
     )
+}
+
+/**
+ * Appends Core-owned blockers and advancement guidance to text output.
+ *
+ * @param lines - Text output lines
+ * @param blockers - Canonical validity blockers returned by Core
+ * @param nextAction - Canonical next action returned by Core, when available
+ */
+function appendEditGuidance(
+  lines: string[],
+  blockers: readonly { readonly code: string; readonly message: string }[],
+  nextAction:
+    | {
+        readonly targetStep: string
+        readonly command: string | null
+        readonly reason: string
+      }
+    | undefined,
+): void {
+  if (blockers.length > 0) {
+    lines.push('blockers:')
+    for (const blocker of blockers) {
+      lines.push(`  ! ${blocker.code}: ${blocker.message}`)
+    }
+  }
+  if (nextAction !== undefined) {
+    lines.push('next action:')
+    lines.push(`  target:  ${nextAction.targetStep}`)
+    lines.push(`  command: ${nextAction.command ?? '(none)'}`)
+    lines.push(`  reason:  ${nextAction.reason}`)
+  }
+}
+
+/**
+ * Appends policy, projection, and recovery lines returned by `EditChange`.
+ *
+ * @param lines - Text output lines
+ * @param effectivePolicy - Policy Core persisted after the partial overlay
+ * @param projectionChanges - Projection transitions Core committed
+ * @param automaticReturn - Lifecycle return Core committed, when the field was present
+ */
+function appendEditConsequences(
+  lines: string[],
+  effectivePolicy: unknown,
+  projectionChanges: readonly PublicProjectionChange[],
+  automaticReturn: PublicAutomaticReturn | null | undefined,
+): void {
+  if (typeof effectivePolicy === 'object' && effectivePolicy !== null) {
+    const policy = effectivePolicy as { artifacts?: unknown; workflow?: unknown }
+    if (typeof policy.artifacts === 'string') lines.push(`artifacts:  ${policy.artifacts}`)
+    if (typeof policy.workflow === 'string') lines.push(`workflow:   ${policy.workflow}`)
+  }
+  for (const change of projectionChanges) {
+    lines.push(`projection: ${change.projection} ${change.from} → ${change.to} (${change.cause})`)
+  }
+  if (automaticReturn === null) {
+    lines.push('automatic return: (none)')
+  } else if (automaticReturn !== undefined) {
+    lines.push(
+      `automatic return: ${automaticReturn.from} → ${automaticReturn.to} (${automaticReturn.cause})`,
+    )
+  }
 }

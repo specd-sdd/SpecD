@@ -46,12 +46,25 @@
 
 ### Requirement: Artifact hash computation
 
-#### Scenario: Hashes computed by use case from disk
+Scenarios:
 
-- **GIVEN** artifact files exist on disk for the change
-- **WHEN** `specd change approve spec my-change --reason "ok"` is run
-- **THEN** the approval event in history contains `artifactHashes` computed by `ApproveSpec` from current file content on disk
-- **AND** the CLI did not compute or pass hash values
+#### Scenario: CLI never computes approval fingerprints
+
+- **WHEN** either approval command runs
+- **THEN** it delegates fingerprinting and reconciliation to the corresponding core use case
+
+#### Scenario: Ineligible approval reports canonical blocker
+
+- **WHEN** core returns recovery or unresolved review
+- **THEN** CLI reports it without presenting approval success
+
+#### Scenario: Approval failure reloads canonical recovery context
+
+- **GIVEN** an approval use case fails after committing reconciliation
+- **WHEN** the command formats the failure
+- **THEN** it obtains canonical status or consumes the equivalent structured core result
+- **AND** text, JSON, and TOON include actual state, blockers, and next action
+- **AND** no stale pre-operation state is rendered
 
 ### Requirement: Approve spec behaviour
 
@@ -92,9 +105,15 @@
 
 ### Requirement: Output on success
 
-#### Scenario: JSON output on successful approval
+Scenarios:
 
-- **GIVEN** the change is in `ready` state
-- **WHEN** `specd change approve spec my-change --reason "looks good" --format json` is run
-- **THEN** stdout is valid JSON with `result` equal to `"ok"`, `gate` equal to `"spec"`, and `name` equal to `"my-change"`
-- **AND** the process exits with code 0
+#### Scenario: Signoff output distinguishes empty from unknown
+
+- **WHEN** signoff succeeds with an observed empty implementation map
+- **THEN** output presents valid empty evidence and its algorithm
+- **AND** does not describe it as legacy missing evidence or print file contents
+
+#### Scenario: Success reports materialized evidence metadata
+
+- **WHEN** approval succeeds
+- **THEN** output includes gate, valid status, actor, time, and summarized fingerprint scope

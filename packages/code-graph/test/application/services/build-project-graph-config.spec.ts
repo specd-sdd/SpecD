@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { type SpecdConfig } from '@specd/core'
+import { DEFAULT_INVALIDATION_POLICY, type SpecdConfig } from '@specd/core'
 import { DEFAULT_EXCLUDE_PATHS } from '../../../src/application/use-cases/discover-files.js'
 import { buildProjectGraphConfig } from '../../../src/application/services/build-project-graph-config.js'
 
@@ -32,6 +32,7 @@ function makeMockConfig(overrides: Partial<SpecdConfig> = {}): SpecdConfig {
     },
     approvals: { spec: false, signoff: false },
     ...overrides,
+    invalidation: overrides.invalidation ?? DEFAULT_INVALIDATION_POLICY,
   }
 }
 

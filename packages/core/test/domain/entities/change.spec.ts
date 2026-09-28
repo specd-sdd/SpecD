@@ -12,6 +12,10 @@ import {
   ArtifactDag,
   artifactDagFromChangeArtifacts,
 } from '../../../src/domain/value-objects/artifact-dag.js'
+import type {
+  ArtifactFingerprint,
+  SpecApprovalFingerprint,
+} from '../../../src/domain/value-objects/validity-fingerprint.js'
 
 const actor: ActorIdentity = { name: 'Alice', email: 'alice@example.com' }
 const otherActor: ActorIdentity = { name: 'Bob', email: 'bob@example.com' }
@@ -24,6 +28,24 @@ function makeChange(history: ChangeEvent[] = []) {
     specIds: ['auth/login'],
     history,
   })
+}
+
+function approvalFingerprint(
+  change: Change,
+  artifacts: ArtifactFingerprint | Record<string, string> = {},
+): SpecApprovalFingerprint {
+  return {
+    version: 1,
+    specIds: [...change.specIds].sort(),
+    artifacts:
+      'algorithm' in artifacts
+        ? (artifacts as ArtifactFingerprint)
+        : {
+            version: 1,
+            algorithm: 'artifact-pre-hash-v1',
+            files: artifacts as Record<string, `sha256:${string}`>,
+          },
+  }
 }
 
 function makeArtifact(type: string, status: ArtifactStatus, requires: string[] = []) {
@@ -292,10 +314,41 @@ describe('Change', () => {
       expect(() => c.transition('archivable', actor)).toThrow()
       expect(c.history).toHaveLength(0)
     })
+
+    it.each(['signed-off', 'archivable', 'archiving'] as const)(
+      'applies sign-off recovery from %s to done with one attributed event',
+      (from) => {
+        const c = makeChange([
+          { type: 'transitioned', from: 'drafting', to: from, at: new Date(), by: actor },
+        ])
+        const before = c.history.length
+
+        c.recover({ cause: 'signoff', from, to: 'done' }, otherActor)
+
+        expect(c.state).toBe('done')
+        expect(c.history).toHaveLength(before + 1)
+        expect(c.history.at(-1)).toMatchObject({
+          type: 'transitioned',
+          from,
+          to: 'done',
+          by: otherActor,
+        })
+      },
+    )
+
+    it.each(['signed-off', 'archivable', 'archiving'] as const)(
+      'rejects the manual %s to done recovery edge',
+      (from) => {
+        const c = makeChange([
+          { type: 'transitioned', from: 'drafting', to: from, at: new Date(), by: actor },
+        ])
+        expect(() => c.transition('done', actor)).toThrow(InvalidStateTransitionError)
+      },
+    )
   })
 
   describe('invalidate', () => {
-    it('appends invalidated and transitioned events', () => {
+    it('appends invalidated event and preserves lifecycle state', () => {
       const c = makeChange()
       c.transition('designing', actor)
       c.transition('ready', actor)
@@ -303,23 +356,11 @@ describe('Change', () => {
 
       const history = c.history
       const last = history[history.length - 1]
-      const secondLast = history[history.length - 2]
-      expect(secondLast?.type).toBe('invalidated')
-      expect(last?.type).toBe('transitioned')
-      if (last?.type === 'transitioned') {
-        expect(last.to).toBe('designing')
-      }
+      expect(last?.type).toBe('invalidated')
+      expect(c.state).toBe('ready')
     })
 
-    it('rolls state back to designing', () => {
-      const c = makeChange()
-      c.transition('designing', actor)
-      c.transition('ready', actor)
-      c.invalidate('spec-change', actor, allArtifactsMessage, allArtifacts(c), dagFor(c))
-      expect(c.state).toBe('designing')
-    })
-
-    it('records the cause on the invalidated event', () => {
+    it('records the cause on the invalidated event without transitioning state', () => {
       const c = makeChange()
       c.transition('designing', actor)
       c.invalidate(
@@ -332,16 +373,7 @@ describe('Change', () => {
 
       const evt = c.history.find((e) => e.type === 'invalidated')
       expect(evt?.type === 'invalidated' && evt.cause).toBe('artifact-drift')
-    })
-
-    it('records the pre-invalidation state as from on the transitioned event', () => {
-      const c = makeChange()
-      c.transition('designing', actor)
-      c.transition('ready', actor)
-      c.invalidate('spec-change', actor, allArtifactsMessage, allArtifacts(c), dagFor(c))
-
-      const transitioned = [...c.history].reverse().find((e) => e.type === 'transitioned')
-      expect(transitioned?.type === 'transitioned' && transitioned.from).toBe('ready')
+      expect(c.state).toBe('designing')
     })
 
     it('marks complete artifacts pending-review while preserving hashes', () => {
@@ -423,7 +455,7 @@ describe('Change', () => {
         allArtifacts(c),
         dagFor(c),
       )
-      expect(c.state).toBe('designing')
+      expect(c.state).toBe('archivable')
     })
 
     it('with drift payload marks only specified and downstream artifacts for review', () => {
@@ -564,18 +596,14 @@ describe('Change', () => {
       const evt = c.history.find((e) => e.type === 'invalidated')
       expect(evt?.type === 'invalidated' && evt.cause).toBe('spec-overlap-conflict')
       expect(evt?.type === 'invalidated' && evt.message).toBe(message)
-      expect(c.state).toBe('designing')
-
-      const transitioned = [...c.history].reverse().find((e) => e.type === 'transitioned')
-      expect(transitioned?.type === 'transitioned' && transitioned.from).toBe('implementing')
-      expect(transitioned?.type === 'transitioned' && transitioned.to).toBe('designing')
+      expect(c.state).toBe('implementing')
     })
   })
 
   describe('invalidationPolicy', () => {
     it('defaults to downstream', () => {
       const c = makeChange()
-      expect(c.invalidationPolicy).toBe('downstream')
+      expect(c.invalidationPolicy).toEqual({ artifacts: 'downstream', workflow: 'preserve' })
     })
 
     it('accepts an explicit policy via constructor', () => {
@@ -596,7 +624,7 @@ describe('Change', () => {
         artifacts: new Map(),
         invalidationPolicy: 'surgical',
       })
-      expect(c.invalidationPolicy).toBe('surgical')
+      expect(c.invalidationPolicy).toEqual({ artifacts: 'surgical', workflow: 'redesign' })
     })
 
     function makeChangeWithChain(): Change {
@@ -640,7 +668,7 @@ describe('Change', () => {
         dagFor(c),
         'none',
       )
-      expect(c.state).toBe('designing')
+      expect(c.state).toBe('implementing')
       expect(c.getArtifact('proposal')?.status).toBe('complete')
       expect(c.getArtifact('design')?.status).toBe('complete')
       expect(c.getArtifact('tasks')?.status).toBe('complete')
@@ -659,7 +687,7 @@ describe('Change', () => {
         dagFor(c),
         'surgical',
       )
-      expect(c.state).toBe('designing')
+      expect(c.state).toBe('implementing')
       expect(c.getArtifact('proposal')?.status).toBe('complete')
       expect(c.getArtifact('design')?.status).toBe('drifted-pending-review')
       expect(c.getArtifact('design')?.getFile('design')?.hasDrift).toBe(true)
@@ -678,7 +706,7 @@ describe('Change', () => {
         dagFor(c),
         'global',
       )
-      expect(c.state).toBe('designing')
+      expect(c.state).toBe('implementing')
       expect(c.getArtifact('proposal')?.status).toBe('pending-review')
       expect(c.getArtifact('design')?.status).toBe('drifted-pending-review')
       expect(c.getArtifact('design')?.getFile('design')?.hasDrift).toBe(true)
@@ -698,7 +726,7 @@ describe('Change', () => {
         dagFor(c),
         'downstream',
       )
-      expect(c.state).toBe('designing')
+      expect(c.state).toBe('implementing')
       expect(c.getArtifact('proposal')?.status).toBe('complete')
       expect(c.getArtifact('design')?.status).toBe('drifted-pending-review')
       expect(c.getArtifact('design')?.getFile('design')?.hasDrift).toBe(true)
@@ -740,7 +768,7 @@ describe('Change', () => {
   describe('recordSpecApproval', () => {
     it('appends spec-approved event', () => {
       const c = makeChange()
-      c.recordSpecApproval('LGTM', { proposal: 'sha256:abc' }, actor)
+      c.recordSpecApproval('LGTM', approvalFingerprint(c, { proposal: 'sha256:abc' }), actor)
       const evt = c.history[0]
       expect(evt?.type).toBe('spec-approved')
       if (evt?.type === 'spec-approved') {
@@ -770,7 +798,7 @@ describe('Change', () => {
 
     it('returns the spec-approved event when present', () => {
       const c = makeChange()
-      c.recordSpecApproval('LGTM', {}, actor)
+      c.recordSpecApproval('LGTM', approvalFingerprint(c), actor)
       expect(c.activeSpecApproval).toBeDefined()
       expect(c.activeSpecApproval?.reason).toBe('LGTM')
     })
@@ -778,7 +806,7 @@ describe('Change', () => {
     it('returns undefined after invalidation supersedes approval', () => {
       const c = makeChange()
       c.transition('designing', actor)
-      c.recordSpecApproval('LGTM', {}, actor)
+      c.recordSpecApproval('LGTM', approvalFingerprint(c), actor)
       c.invalidate('spec-change', actor, allArtifactsMessage, allArtifacts(c), dagFor(c))
       expect(c.activeSpecApproval).toBeUndefined()
     })
@@ -786,9 +814,9 @@ describe('Change', () => {
     it('returns new approval after re-approval following invalidation', () => {
       const c = makeChange()
       c.transition('designing', actor)
-      c.recordSpecApproval('First approval', {}, actor)
+      c.recordSpecApproval('First approval', approvalFingerprint(c), actor)
       c.invalidate('spec-change', actor, allArtifactsMessage, allArtifacts(c), dagFor(c))
-      c.recordSpecApproval('Second approval', {}, otherActor)
+      c.recordSpecApproval('Second approval', approvalFingerprint(c), otherActor)
       expect(c.activeSpecApproval?.reason).toBe('Second approval')
     })
   })
@@ -819,7 +847,7 @@ describe('Change', () => {
 
     it('returns undefined after invalidateSignoff without clearing spec approval', () => {
       const c = makeChange()
-      c.recordSpecApproval('LGTM', {}, actor)
+      c.recordSpecApproval('LGTM', approvalFingerprint(c), actor)
       c.recordSignoff('Ship it', {}, actor)
       c.invalidateSignoff(actor)
       expect(c.activeSignoff).toBeUndefined()
@@ -879,7 +907,7 @@ describe('Change', () => {
       const c = makeChange()
       c.draft(actor)
       c.restore(otherActor)
-      const evt = c.history[c.history.length - 1]
+      const evt = c.history[c.history.length - 1]!
       expect(evt?.type).toBe('restored')
       if (evt?.type === 'restored') expect(evt.by).toBe(otherActor)
     })
@@ -1478,6 +1506,235 @@ describe('Change', () => {
       })
       expect(c.isImplementationTrackingActive).toBe(false)
       expect(c.implementationTrackingStartedAt).toBeNull()
+    })
+  })
+
+  describe('projections and verification lifecycle', () => {
+    const artFp = {
+      version: 1 as const,
+      algorithm: 'artifact-pre-hash-v1' as const,
+      files: {
+        'proposal:proposal': 'sha256:p1' as `sha256:${string}`,
+      },
+    }
+
+    const implFp = {
+      version: 1 as const,
+      hashAlgorithm: 'sha256' as const,
+      textNormalization: 'text-v1' as const,
+      binaryNormalization: 'bytes-v1' as const,
+      files: {
+        'src/index.ts': {
+          hash: 'sha256:i1' as `sha256:${string}`,
+          content: 'text' as const,
+          normalization: 'text-v1' as const,
+        },
+      },
+    }
+
+    const testBaseline = {
+      version: 1 as const,
+      artifacts: artFp,
+      implementation: implFp,
+    }
+
+    it('rejects self-transitions', () => {
+      const c = makeChange()
+      c.transition('designing', actor)
+      expect(() => c.transition('designing', actor)).toThrow(InvalidStateTransitionError)
+    })
+
+    it('records spec approval and updates activeSpecApproval projection', () => {
+      const c = makeChange()
+      const at = new Date('2024-01-02T10:00:00Z')
+      c.recordSpecApproval('Approval reason', approvalFingerprint(c, artFp), actor, at)
+
+      expect(c.specApproval).toEqual({
+        status: 'valid',
+        decision: {
+          at,
+          by: actor,
+          reason: 'Approval reason',
+        },
+        fingerprint: {
+          version: 1,
+          specIds: ['auth/login'],
+          artifacts: artFp,
+        },
+      })
+      expect(c.activeSpecApproval).toBeDefined()
+      const lastEvent = c.history[c.history.length - 1]!
+      expect(lastEvent.type).toBe('spec-approved')
+      if (lastEvent.type === 'spec-approved') {
+        expect(lastEvent.by).toEqual(actor)
+        expect(lastEvent.reason).toBe('Approval reason')
+      }
+    })
+
+    it('records signoff and updates activeSignoff projection', () => {
+      const c = makeChange()
+      const at = new Date('2024-01-02T11:00:00Z')
+      const signoffFp = {
+        version: 1 as const,
+        artifacts: artFp,
+        implementation: implFp,
+      }
+      c.recordSignoff('Signoff reason', signoffFp, 'verification-1', actor, at)
+
+      expect(c.signoff).toEqual({
+        status: 'valid',
+        decision: {
+          at,
+          by: actor,
+          reason: 'Signoff reason',
+        },
+        fingerprint: signoffFp,
+        verificationId: 'verification-1',
+      })
+      expect(c.activeSignoff).toBeDefined()
+      const lastEvent = c.history[c.history.length - 1]!
+      expect(lastEvent.type).toBe('signed-off')
+      if (lastEvent.type === 'signed-off') {
+        expect(lastEvent.by).toEqual(actor)
+        expect(lastEvent.reason).toBe('Signoff reason')
+      }
+    })
+
+    it('marks spec approval invalid as stale and appends approval-invalidated event', () => {
+      const c = makeChange()
+      const at = new Date('2024-01-02T10:00:00Z')
+      c.recordSpecApproval('Initial approval', approvalFingerprint(c, artFp), actor, at)
+
+      const invalAt = new Date('2024-01-02T12:00:00Z')
+      const inval = {
+        at: invalAt,
+        by: actor,
+        cause: 'artifact-drift' as const,
+        reason: 'Specs drifted',
+        differences: [],
+      }
+      const changed = c.markApprovalInvalid('spec', 'stale', inval)
+      expect(changed).toBe(true)
+
+      expect(c.specApproval?.status).toBe('stale')
+      expect(c.specApproval?.invalidation).toEqual(inval)
+      const lastEvent = c.history[c.history.length - 1]!
+      expect(lastEvent.type).toBe('approval-invalidated')
+      if (lastEvent.type === 'approval-invalidated') {
+        expect(lastEvent.gate).toBe('spec')
+        expect(lastEvent.status).toBe('stale')
+        expect(lastEvent.cause).toBe('artifact-drift')
+      }
+
+      // Idempotent call should not add another event or change status
+      const historyCount = c.history.length
+      const changedAgain = c.markApprovalInvalid('spec', 'stale', inval)
+      expect(changedAgain).toBe(false)
+      expect(c.history.length).toBe(historyCount)
+    })
+
+    it('marks signoff invalid as revoked and does not overwrite with stale', () => {
+      const c = makeChange()
+      c.recordSignoff('Signoff ok', artFp.files, actor, undefined, new Date('2024-01-02T10:00:00Z'))
+
+      c.invalidateSignoff(actor, 'User revoked signoff')
+      expect(c.signoff?.status).toBe('revoked')
+      expect(c.signoff?.invalidation?.cause).toBe('manual-invalidation')
+
+      const historyCount = c.history.length
+      // Once revoked, markApprovalInvalid should not downgrade to stale
+      const changed = c.markApprovalInvalid('signoff', 'stale', {
+        at: new Date('2024-01-02T12:00:00Z'),
+        by: actor,
+        cause: 'artifact-drift',
+        reason: 'Drift occurred',
+        differences: [],
+      })
+      expect(changed).toBe(false)
+      expect(c.signoff?.status).toBe('revoked')
+      expect(c.history.length).toBe(historyCount)
+    })
+
+    it('manages verification attempts and completion lifecycle', () => {
+      const c = makeChange()
+      expect(c.verification.completed).toBeUndefined()
+      expect(c.verification.activeAttempt).toBeUndefined()
+
+      // 1. Start attempt 1
+      const at1 = new Date('2024-01-02T10:00:00Z')
+      const { attempt: attempt1, supersededAttemptId: s1 } = c.startVerification(
+        testBaseline,
+        actor,
+        at1,
+      )
+      expect(attempt1.id).toBe('verification-attempt-1')
+      expect(s1).toBeNull()
+      expect(c.verification.activeAttempt).toEqual(attempt1)
+      let lastEvent = c.history[c.history.length - 1]!
+      expect(lastEvent.type).toBe('verification-attempt-started')
+      if (lastEvent.type === 'verification-attempt-started') {
+        expect(lastEvent.attemptId).toBe('verification-attempt-1')
+      }
+
+      // 2. Start attempt 2 supersedes attempt 1
+      const at2 = new Date('2024-01-02T11:00:00Z')
+      const { attempt: attempt2, supersededAttemptId: s2 } = c.startVerification(
+        testBaseline,
+        actor,
+        at2,
+      )
+      expect(attempt2.id).toBe('verification-attempt-2')
+      expect(s2).toBe('verification-attempt-1')
+      expect(c.verification.activeAttempt).toEqual(attempt2)
+      lastEvent = c.history[c.history.length - 1]!
+      expect(lastEvent.type).toBe('verification-attempt-started')
+      if (lastEvent.type === 'verification-attempt-started') {
+        expect(lastEvent.attemptId).toBe('verification-attempt-2')
+      }
+
+      // 3. Complete verification with active attempt
+      const compAt = new Date('2024-01-02T12:00:00Z')
+      const completed = c.completeVerification(actor, compAt)
+      expect(completed.id).toBe('verification-2')
+      expect(completed.attemptId).toBe('verification-attempt-2')
+      expect(completed.status).toBe('valid')
+      expect(c.verification.activeAttempt).toBeUndefined()
+      expect(c.verification.completed).toBeDefined()
+      expect(c.verification.completed?.id).toBe('verification-2')
+
+      lastEvent = c.history[c.history.length - 1]!
+      expect(lastEvent.type).toBe('verification-completed')
+      if (lastEvent.type === 'verification-completed') {
+        expect(lastEvent.verificationId).toBe('verification-2')
+        expect(lastEvent.attemptId).toBe('verification-attempt-2')
+      }
+
+      // 4. Invalidate verification
+      const invalAt = new Date('2024-01-02T13:00:00Z')
+      const inval = {
+        at: invalAt,
+        by: actor,
+        cause: 'implementation-drift' as const,
+        reason: 'Code modified',
+        differences: [],
+      }
+      const invalChanged = c.invalidateVerification(inval)
+      expect(invalChanged).toBe(true)
+      expect(c.verification.completed?.status).toBe('stale')
+      expect(c.verification.completed?.invalidation).toEqual(inval)
+
+      lastEvent = c.history[c.history.length - 1]!
+      expect(lastEvent.type).toBe('verification-invalidated')
+      if (lastEvent.type === 'verification-invalidated') {
+        expect(lastEvent.verificationId).toBe('verification-2')
+        expect(lastEvent.reason).toBe('Code modified')
+      }
+
+      // 5. Idempotent invalidation
+      const count = c.history.length
+      const invalChangedAgain = c.invalidateVerification(inval)
+      expect(invalChangedAgain).toBe(false)
+      expect(c.history.length).toBe(count)
     })
   })
 })

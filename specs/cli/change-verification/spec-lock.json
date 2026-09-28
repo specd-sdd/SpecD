@@ -1,0 +1,22 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "cli:entrypoint",
+    "core:invalidate-verification",
+    "core:get-status",
+    "core:change",
+    "core:transition-checks"
+  ],
+  "implementation": [
+    {
+      "file": "cli:src/commands/change/verification.ts",
+      "symbols": ["registerChangeVerification"]
+    },
+    {
+      "file": "cli:test/commands/change/verification.spec.ts"
+    }
+  ]
+}

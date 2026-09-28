@@ -179,6 +179,29 @@ Workflow skill templates that own a hop (`specd-new`, `specd-design`, `specd-imp
 
 Template contract tests MUST assert the absence of happy-path parking copy (for example “routes to `pending-signoff`”, “reaches `pending-spec-approval`” as the normal wait).
 
+### Requirement: Reconciled invalidation protocol in lifecycle templates
+
+Shared, design, implement, verify, compliance, and archive templates SHALL instruct agents to obtain fresh status and follow its committed state and next action before change-scoped substantive work or progression.
+
+The shared protocol SHALL explain that:
+
+- artifact and workflow invalidation policies are independent
+- unresolved non-task drift or pending review blocks forward progress even under `artifacts: none`
+- `preserve` permits in-place semantic review and revalidation only when no mandatory gate recovery overrides it
+- validation establishes structure and a baseline but does not approve content
+- required stale spec consent returns to design and must be renewed in `ready`
+- stale sign-off returns a later change to `done`, with verification repeated first when stale
+- entering `verifying` checks implementation readiness but does not capture a baseline; explicit verification start does so after resolving files and links from any active state
+- independent verify and change-scoped compliance use start/checks/report/complete; delegated compliance shares verify's explicitly supplied attempt and never starts or completes it
+- verify completes the outer attempt only after scenario checks and optional audit succeed; changed inputs require a new start and repeated verification work in place
+- transitions and status only check already-completed current evidence, never complete an unfinished attempt
+- `changes verification invalidate` only withdraws completed verification evidence and never starts or restarts an attempt
+- `hasTasks` artifacts are live operational state excluded from fingerprints but still structurally validated and completion-checked at transition and archive
+
+Templates MUST NOT teach skills to calculate fingerprints, edit manifest projections, append invalidation events, or choose recovery separately from core. Generated and installed skill copies SHALL be refreshed from these templates through the normal build/sync path.
+
+The compliance template SHALL implement delegated mode as change-scoped for report placement, scope discovery, project context, dependency expansion, merged `changes spec-preview` reads, and filename generation. Its only behavioural difference from standalone change mode is attempt ownership: delegated mode requires the caller-supplied attempt ID and runs neither verification start nor completion. Template contract tests MUST exercise every detected mode through those downstream decisions; phrase-presence assertions alone are insufficient.
+
 ### Requirement: Implementation tracking in verify and implement templates
 
 `impl.filesResolved` gates `implementing → verifying` (and archive). Command syntax for listing, adding, resolving, and ignoring tracked files MUST live in `templates/shared/shared.md.tpl` so every skill that already loads shared context can drain tracking without duplicating the CLI cookbook.

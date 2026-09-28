@@ -108,6 +108,13 @@
 - **THEN** structural validation for that file is skipped
 - **AND** `markComplete` is not invoked again for that file
 
+#### Scenario: Complete file can still be fingerprinted for freshness
+
+- **GIVEN** a complete non-task file is selected for validation and its bytes changed externally
+- **WHEN** structural validation skips that file
+- **THEN** the shared validity evaluator may still read it and detect drift
+- **AND** the structural bypass does not renew stale approval or verification evidence
+
 #### Scenario: Skipped file is not re-validated
 
 - **GIVEN** a tracked optional artifact file marked `skipped`
@@ -120,54 +127,38 @@
 - **WHEN** `ValidateArtifacts` includes that file in the current invocation
 - **THEN** structural validation still runs for that file
 
-### Requirement: Approval invalidation on content change
+### Requirement: Validity reconciliation around artifact validation
 
-#### Scenario: Drift collection records all file keys in one invalidation
+Scenarios:
 
-- **GIVEN** a change with an active spec approval
-- **AND** two validated files under `specs` have changed since approval
-- **WHEN** `ValidateArtifacts.execute` detects the mismatches
-- **THEN** a single invalidation is performed
-- **AND** both file keys are included in the grouped affected artifact detail
+#### Scenario: Validation cannot erase detected drift
 
-#### Scenario: Drifted files become drifted-pending-review
+- **GIVEN** current non-task content differs from approval and verification baselines
+- **WHEN** the artifact is structurally revalidated
+- **THEN** affected projections become stale before the new validated hash is committed
+- **AND** validation alone does not renew them
 
-- **GIVEN** a change with an active approval
-- **AND** one validated file has changed since approval
-- **WHEN** `ValidateArtifacts.execute` invalidates the change
-- **THEN** that file becomes `drifted-pending-review`
-- **AND** unaffected validated files become `pending-review`
+#### Scenario: Preserve permits in-place validation but not progress with review
 
-#### Scenario: Drift invalidation is shared across spec approval and signoff
-
-- **GIVEN** a change with an active signoff
-- **AND** a validated artifact file has changed
-- **WHEN** `ValidateArtifacts.execute` detects the mismatch
-- **THEN** the same grouped invalidation behavior is applied
+- **GIVEN** no gate recovery and workflow `preserve`
+- **WHEN** validation succeeds while semantic review remains pending
+- **THEN** lifecycle state is retained and forward progress remains blocked
 
 ### Requirement: Policy-aware drift materialization
 
-#### Scenario: ValidateArtifacts does not own baseline validatedHash drift
+Scenarios:
 
-- **GIVEN** a complete file whose content no longer matches `validatedHash`
-- **AND** the change has no active spec approval and no active signoff
-- **WHEN** `ValidateArtifacts.execute` runs
-- **THEN** it does not call `Change.invalidate` for that baseline mismatch
+#### Scenario: Task content stays operational
 
-#### Scenario: Consent-hash drift still invalidates once with a focused payload
+- **GIVEN** only a `hasTasks` artifact changes
+- **WHEN** drift materialization runs
+- **THEN** it neither invalidates approvals nor propagates review
+- **AND** structural validation and task counting still observe the artifact
 
-- **GIVEN** a change with an active spec approval
-- **AND** one file's current hash differs from `activeSpecApproval.artifactHashes`
-- **WHEN** `ValidateArtifacts.execute` runs
-- **THEN** it calls `Change.invalidate()` with cause `artifact-drift`
-- **AND** the grouped payload identifies only that file
+#### Scenario: Non-task drift follows both policy dimensions
 
-#### Scenario: Consent-hash scan is not scoped to artifactId
-
-- **GIVEN** an active spec approval whose hashes include more than one artifact type
-- **AND** `ValidateArtifacts.execute` is called with `artifactId` set to one of those types
-- **WHEN** a different artifact type's consent hash mismatches
-- **THEN** `Change.invalidate` still runs for that mismatch
+- **WHEN** a non-task validated hash differs from current cleaned content
+- **THEN** artifact reopening follows artifact policy and movement follows workflow and gate priority
 
 ### Requirement: Per-file validation
 
@@ -188,13 +179,12 @@
 - **THEN** validation still reports the expected delta file as missing
 - **AND** the direct file is ignored for that artifact
 
-#### Scenario: Missing file can still carry hasDrift without rendering complete-with-drift
+#### Scenario: Missing previously validated file remains a blocker without false completion
 
-- **GIVEN** a file was previously validated and is now absent on disk
-- **AND** the change has no active spec approval and no active signoff
-- **WHEN** `ValidateArtifacts.execute` runs
-- **THEN** it does not call `Change.invalidate` for that absence
-- **AND** it does not treat the file as `complete-with-drift`
+- **GIVEN** a required non-task file was previously validated and is now absent on disk
+- **WHEN** `ValidateArtifacts.execute` runs with no current approval or sign-off
+- **THEN** it reports missing input and does not render the file as `complete-with-drift`
+- **AND** canonical reconciliation, not a local `Change.invalidate` call, determines any persisted review and lifecycle effects
 
 ### Requirement: Expected file path validation
 

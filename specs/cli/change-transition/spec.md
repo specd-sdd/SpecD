@@ -37,6 +37,14 @@ After Core resolves `next` to a concrete state, the command MUST execute the nor
 
 When Core rejects `to: 'next'` (no happy-path hop: at least `pending-spec-approval`, `pending-signoff`, `archivable`, `archiving`), the command MUST exit with code 1 and print an explanatory `error:` message to stderr.
 
+### Requirement: Validity-aware transition guidance
+
+Before resolving `next`, and when a requested transition fails after fresh reconciliation, the command SHALL consume the canonical `GetStatus` or `TransitionChange` result rather than reconstructing gate or verification rules.
+
+If reconciliation committed an automatic return, output SHALL show the new state, invalidated evidence, reason, and current next action. Required stale spec approval routes through `designing` and `ready`; stale sign-off alone routes to `done`; stale verification at required boundaries recommends the verification skill in place. Earlier-phase stale verification remains context and MUST NOT cause the CLI to suggest verification prematurely.
+
+The CLI MUST NOT retry the original transition automatically after recovery, choose an alternate transition, expose verification-attempt restart flags, or accept `verifying → verifying`. Entry to `verifying` reports readiness checks without claiming baseline capture. Exit to `done` reports `verification.current` through the generic check output. A failure does not claim verification completion or transition success; it reports the actual reconciled state and in-place verification guidance. Transitions never start or complete an attempt.
+
 ### Requirement: Delegates refresh policy to TransitionChange
 
 The command MUST NOT call `RefreshImplementationTracking` or `ImplementationDetector` directly.

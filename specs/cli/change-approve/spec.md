@@ -28,9 +28,9 @@ The CLI MUST invoke `kernel.changes.approveSpec` and `kernel.changes.approveSign
 
 ### Requirement: Artifact hash computation
 
-The CLI MUST NOT compute artifact hashes. Hash computation is owned by `ApproveSpec` and `ApproveSignoff` internally from on-disk artifact content using schema-defined pre-hash cleanup rules.
+The command MUST NOT compute fingerprints itself. It SHALL delegate spec approval to `ApproveSpec` and sign-off to `ApproveSignoff`, which reconcile fresh inputs and create the canonical artifact and implementation fingerprints.
 
-The user never supplies artifact hashes.
+Spec approval is available only in reconciled `ready` after required artifact validation with no non-task drift or pending review. Sign-off is available only in reconciled `done` with valid verification evidence.
 
 ### Requirement: Approve spec behaviour
 
@@ -42,10 +42,9 @@ The user never supplies artifact hashes.
 
 ### Requirement: Output on success
 
-On success, output depends on `--format`:
+Success output SHALL identify the approved gate, resulting materialized status `valid`, approver, decision time, and summarized fingerprint scope. Sign-off output SHALL distinguish an observed empty implementation map from legacy missing evidence and show the normalization algorithm without printing file contents.
 
-- `text` (default): prints to stdout `approved <gate> for <name>` where `<gate>` is `spec` or `signoff`
-- `json` or `toon`: outputs `{ "result": "ok", "gate": "<gate>", "name": "<name>" }` to stdout
+If pre-approval reconciliation commits recovery or reveals a blocker, the command SHALL render the returned state, reasons, and next action and MUST NOT report approval success.
 
 ### Requirement: Error cases
 

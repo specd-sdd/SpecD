@@ -13,13 +13,21 @@
 - **AND** it includes `effectiveStatus`
 - **AND** each file entry includes its own persisted `state`
 
-#### Scenario: review.required becomes true when any file is pending review
+#### Scenario: Non-task pending review routes by policy and gate priority
 
-- **GIVEN** a change with one file in `pending-review`
-- **WHEN** `execute()` is called
-- **THEN** `review.required` is `true`
-- **AND** `review.route` is `'designing'`
-- **AND** `review.reason` is `'artifact-review-required'`
+- **GIVEN** a non-task file is in `pending-review` with no required stale spec consent
+- **WHEN** active status reconciles the change
+- **THEN** `review.required` is `true` with reason `artifact-review-required`
+- **AND** workflow `preserve` retains the current-phase review route and blocks forward progress
+- **AND** workflow `redesign` routes to committed `designing`
+- **AND** required stale spec consent routes to `designing` regardless of preserve
+
+#### Scenario: Task-only content change does not open artifact review
+
+- **GIVEN** only an artifact marked `hasTasks: true` changed after validation
+- **WHEN** active status reconciles artifact validity
+- **THEN** it does not mark non-task artifact review required solely from that change
+- **AND** live task completion remains a separate blocker where applicable
 
 #### Scenario: review.reason prefers artifact-drift when any file drifted
 
@@ -51,41 +59,18 @@
 
 ### Requirement: Revision evaluation for conditional status queries
 
-#### Scenario: Revision matches updatedAt
+Scenarios:
 
-- **GIVEN** a change with `updatedAt`
-- **WHEN** `GetStatus` is called with `ifModifiedSince` equal to `updatedAt.toISOString()`
-- **THEN** the result has `unchanged: true`
-- **AND** `artifactStatuses` is an empty array
-- **AND** `RefreshImplementationTracking` is not invoked
-- **AND** the result still includes the loaded `change` and `specDependsOn`
-- **AND** `blockers` is an empty array
-- **AND** `review.required` is `false`
+#### Scenario: Matching manifest timestamp does not hide external drift
 
-#### Scenario: Revision exceeds updatedAt
+- **GIVEN** `ifModifiedSince` matches the manifest but a linked file changed externally
+- **WHEN** active status is requested
+- **THEN** refresh and reconciliation run before any unchanged response decision
 
-- **GIVEN** a change with `updatedAt`
-- **WHEN** `GetStatus` is called with `ifModifiedSince` strictly later than `updatedAt`
-- **THEN** the result has `unchanged: true`
-- **AND** `artifactStatuses` is an empty array
-- **AND** `RefreshImplementationTracking` is not invoked
-- **AND** the result still includes the loaded `change` and `specDependsOn`
-- **AND** `blockers` is an empty array
-- **AND** `review.required` is `false`
+#### Scenario: Draft status may retain read-only timestamp shortcut
 
-#### Scenario: Revision older than updatedAt evaluates full status
-
-- **GIVEN** a change with `updatedAt`
-- **WHEN** `GetStatus` is called with `ifModifiedSince` strictly earlier than `updatedAt`
-- **THEN** `unchanged` is absent or not `true`
-- **AND** full status evaluation runs (non-empty `artifactStatuses` for a change that has artifacts)
-
-#### Scenario: Unparseable ifModifiedSince evaluates full status
-
-- **GIVEN** a change with `updatedAt`
-- **WHEN** `GetStatus` is called with `ifModifiedSince` that `Date.parse` cannot parse
-- **THEN** `unchanged` is absent or not `true`
-- **AND** full status evaluation runs
+- **WHEN** conditional status targets a draft with an unchanged revision
+- **THEN** it may return the existing read-only unchanged projection without reconciliation
 
 ### Requirement: Drafted change read-only status
 
@@ -142,30 +127,35 @@
 
 ### Requirement: Optional pre-read implementation tracking refresh
 
-#### Scenario: GetStatus does not invoke detector directly
+Scenarios:
 
-- **GIVEN** a change has entered `implementing` at least once
-- **WHEN** `GetStatus.execute()` is called
-- **THEN** it does not invoke `ImplementationDetector` directly
-- **AND** it does not duplicate refresh merge logic
+#### Scenario: Refresh is configurable only for active status
 
-#### Scenario: Active change refreshes by default
+- **WHEN** active status runs with refresh enabled
+- **THEN** it delegates to `RefreshImplementationTracking` before reconciliation
+- **AND** drafted status never refreshes or mutates
 
-- **GIVEN** an active change exists in `changes/` storage
-- **WHEN** `GetStatus.execute({ name })` is called without `refreshImplementationTracking`
-- **THEN** it invokes `RefreshImplementationTracking.execute({ name })` before loading status
+#### Scenario: Explicit refresh false is honored
 
-#### Scenario: Draft-only read skips refresh
+- **WHEN** active status disables implementation refresh
+- **THEN** it skips `RefreshImplementationTracking` but still performs configured validity reconciliation
 
-- **GIVEN** a change exists only under `drafts/` storage
-- **WHEN** `GetStatus.execute({ name })` is called
-- **THEN** it does not invoke `RefreshImplementationTracking`
+### Requirement: Operational status reconciliation
 
-#### Scenario: Explicit opt-out skips refresh
+#### Scenario: Active status persists detected recovery once
 
-- **GIVEN** an active change exists in `changes/` storage
-- **WHEN** `GetStatus.execute({ name, refreshImplementationTracking: false })` is called
-- **THEN** it does not invoke `RefreshImplementationTracking`
+- **GIVEN** external drift invalidates required spec consent
+- **WHEN** active status is requested twice
+- **THEN** the first request atomically persists staleness and design recovery
+- **AND** the second reports the committed state without duplicate events
+
+#### Scenario: Schema resolution failure is reachable and read only
+
+- **GIVEN** the real schema provider fails before active refresh
+- **WHEN** status is requested
+- **THEN** it returns `SCHEMA_RESOLUTION_FAILED` with non-mutating guidance
+- **AND** neither implementation refresh nor reconciliation is invoked
+- **AND** the manifest and history remain byte-for-byte unchanged
 
 ### Requirement: Drift-aware display status
 
@@ -259,83 +249,20 @@
 
 ### Requirement: Returns lifecycle context
 
-#### Scenario: Available transitions require persisted complete or skipped state
+Scenarios:
 
-- **GIVEN** a change in `designing` state
-- **AND** an artifact required by `ready` is `pending-review`
-- **WHEN** `execute()` is called
-- **THEN** `lifecycle.availableTransitions` does not include `ready`
+#### Scenario: Preserve routes artifact review through the active skill
 
-#### Scenario: Next artifact resolves from persisted state
+- **GIVEN** ungated artifact drift with workflow `preserve`
+- **WHEN** status projects review and lifecycle context
+- **THEN** review is required in the current skill and forward progress is blocked
+- **AND** required stale spec consent instead routes to `designing`
 
-- **GIVEN** a change with `proposal` in `complete`, `specs` in `complete`, and `verify` in `missing`
-- **WHEN** `execute()` is called
-- **THEN** `lifecycle.nextArtifact` is `'verify'`
+#### Scenario: Redesign policy routes review to design
 
-#### Scenario: Skipped artifacts still satisfy lifecycle gating
-
-- **GIVEN** a change whose required optional artifact is `skipped`
-- **WHEN** `execute()` is called
-- **THEN** that artifact does not block `availableTransitions`
-
-#### Scenario: Review reason is spec-overlap-conflict with single unhandled invalidation
-
-- **GIVEN** a change in `designing` state with files in `pending-review`
-- **AND** history contains one `invalidated` event with `cause: 'spec-overlap-conflict'`
-- **AND** no `transitioned` event with `to` not equal to `'designing'` appears after it
-- **WHEN** `execute()` is called
-- **THEN** `review.required` is `true`
-- **AND** `review.reason` is `'spec-overlap-conflict'`
-- **AND** `review.overlapDetail` has one entry with the archived change name and overlapping spec IDs
-
-#### Scenario: Overlap detail merges multiple unhandled invalidations
-
-- **GIVEN** a change in `designing` state with files in `pending-review`
-- **AND** history contains two `invalidated` events with `cause: 'spec-overlap-conflict'`
-- **AND** event A was caused by archiving change `alpha` overlapping `core:config`
-- **AND** event B was caused by archiving change `beta` overlapping `core:kernel`
-- **AND** no `transitioned` event with `to` not equal to `'designing'` appears after either
-- **WHEN** `execute()` is called
-- **THEN** `review.overlapDetail` has two entries
-- **AND** the entries are ordered newest-first
-- **AND** one entry references `beta` with `core:kernel`
-- **AND** the other references `alpha` with `core:config`
-
-#### Scenario: Overlap scan stops at forward transition boundary
-
-- **GIVEN** a change with history: `invalidated(spec-overlap-conflict, alpha)`, `transitioned(designing)`, `transitioned(ready)`, `invalidated(spec-overlap-conflict, beta)`, `transitioned(designing)`
-- **AND** files are in `pending-review`
-- **WHEN** `execute()` is called
-- **THEN** `review.overlapDetail` has only one entry referencing `beta`
-- **AND** the `alpha` invalidation is excluded because `transitioned(ready)` appears before it in reverse scan order
-
-#### Scenario: Review reason is artifact-drift when drift exists even with overlap invalidation
-
-- **GIVEN** a change with at least one file in `drifted-pending-review`
-- **AND** unhandled `spec-overlap-conflict` invalidations exist
-- **WHEN** `execute()` is called
-- **THEN** `review.reason` is `'artifact-drift'` (drift takes priority)
-- **AND** `review.overlapDetail` is an empty array
-
-#### Scenario: Review overlapDetail is empty for non-overlap reasons
-
-- **GIVEN** a change in `designing` state with files in `pending-review`
-- **AND** the latest `invalidated` event has `cause: 'artifact-review-required'`
-- **WHEN** `execute()` is called
-- **THEN** `review.overlapDetail` is an empty array
-
-#### Scenario: No invalidation event produces empty overlapDetail
-
-- **GIVEN** a change with no `invalidated` events in history
-- **WHEN** `execute()` is called
-- **THEN** `review.overlapDetail` is an empty array
-
-#### Scenario: availableTransitions is not protocol-only
-
-- **GIVEN** protocol allows `verifying` but tasks are incomplete
-- **WHEN** `GetStatus.execute()` returns lifecycle context
-- **THEN** `validTransitions` includes `verifying`
-- **AND** `availableTransitions` does not
+- **GIVEN** non-task drift under workflow `redesign`
+- **WHEN** lifecycle context is projected
+- **THEN** review route and committed state point to `designing`
 
 ### Requirement: Graceful degradation when schema resolution fails
 
@@ -366,25 +293,24 @@
 
 ### Requirement: Constructor dependencies
 
-#### Scenario: GetStatus is constructed without LifecycleEngine
+Scenarios:
 
-- **WHEN** `GetStatus` is constructed
-- **THEN** it does not receive `LifecycleEngine` or `evaluateLifecycle` as constructor arguments
-- **AND** it receives `transitionBindings` and `archiveBindings`
+#### Scenario: Composition resolves one reconciliation path
 
-#### Scenario: Constructor composes create-star checks
+- **WHEN** either supported `GetStatus` factory signature is used
+- **THEN** it resolves refresh, reconciliation, repository, schema, gates, and checks through standard composition
+- **AND** does not construct adapters or a second invalidation path
 
-- **WHEN** `GetStatus` is constructed
-- **THEN** it receives composed `Check` instances from `create*`
-- **AND** `CountTasks` is a dep of `createWorkflowTaskCompletion`, not a global snapshot gatherer
-- **AND** `transitionBindings` is injected from the workflow check registry
+#### Scenario: Draft composition remains read only
 
-#### Scenario: Drafted status DAG-projects effective status
+- **WHEN** status resolves a drafted change
+- **THEN** it uses the draft view without reconciliation or active mutation ports
 
-- **GIVEN** a drafted change whose `proposal` is complete and `specs` is blocked only by that parent being `pending-review`
-- **WHEN** `GetStatus.execute()` runs for that draft-only name
-- **THEN** `effectiveStatus` for the dependent artifact is `pending-parent-artifact-review`
-- **AND** `availableTransitions` is empty
+#### Scenario: Missing reconciler fails instead of falling back
+
+- **WHEN** direct dependencies omit the mandatory reconciler
+- **THEN** status construction or execution fails explicitly
+- **AND** no legacy `Change.invalidate` mutation occurs
 
 ### Requirement: Config-based factory preserves complete repository bootstrap
 
@@ -452,6 +378,29 @@
 - **WHEN** `GetStatus.execute()` runs twice with different task file contents
 - **THEN** each execute counts tasks afresh
 - **AND** the check instance does not reuse a previous CountTasks result
+
+### Requirement: Approval, verification, and fingerprint status projection
+
+#### Scenario: Attempt and completed evidence are distinct
+
+- **GIVEN** a stale completed verification and a newer unfinished attempt
+- **WHEN** status is rendered
+- **THEN** both records and their freshness are shown separately
+- **AND** the attempt is not presented as successful evidence
+
+#### Scenario: Required boundary recommends in-place verification
+
+- **GIVEN** current verification is missing at `verifying`
+- **WHEN** status determines the next action
+- **THEN** it recommends the verification skill in the current state
+- **AND** does not require a lifecycle self-transition or rollback
+
+#### Scenario: Status exposes the rich projection contract
+
+- **GIVEN** a completed record and a newer active attempt coexist
+- **WHEN** `GetStatus` returns validity
+- **THEN** the public value is `ValidityStatusProjection` assembled from verdict and committed aggregate
+- **AND** neither record is lost by returning the raw evaluator verdict
 
 ### Requirement: Config-based factory delegates through resolveGetStatusDeps
 

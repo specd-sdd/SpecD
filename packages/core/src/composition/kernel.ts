@@ -2,6 +2,9 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { type ArchiveChange } from '../application/use-cases/archive-change.js'
 import { type ApproveSignoff } from '../application/use-cases/approve-signoff.js'
+import { type StartVerification } from '../application/use-cases/start-verification.js'
+import { type CompleteVerification } from '../application/use-cases/complete-verification.js'
+import { type InvalidateVerification } from '../application/use-cases/invalidate-verification.js'
 import { type ApproveSpec } from '../application/use-cases/approve-spec.js'
 import { type CompileContext } from '../application/use-cases/compile-context.js'
 import { type CreateChange } from '../application/use-cases/create-change.js'
@@ -73,6 +76,14 @@ import {
   type CompositionResolutionOptions,
 } from './composition-resolver.js'
 import { createApproveSignoff, resolveApproveSignoffDeps } from './use-cases/approve-signoff.js'
+import {
+  createCompleteVerification,
+  createInvalidateVerification,
+  createStartVerification,
+  resolveCompleteVerificationDeps,
+  resolveInvalidateVerificationDeps,
+  resolveStartVerificationDeps,
+} from './use-cases/verification-factories.js'
 import { createApproveSpec, resolveApproveSpecDeps } from './use-cases/approve-spec.js'
 import { createArchiveChange, resolveArchiveChangeDeps } from './use-cases/archive-change.js'
 import { createCompileContext, resolveCompileContextDeps } from './use-cases/compile-context.js'
@@ -215,6 +226,9 @@ export interface Kernel {
     preview: PreviewSpec
     approveSpec: ApproveSpec
     approveSignoff: ApproveSignoff
+    startVerification: StartVerification
+    completeVerification: CompleteVerification
+    invalidateVerification: InvalidateVerification
   }
   specs: {
     repos: ReadonlyMap<string, SpecRepository>
@@ -377,6 +391,11 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
   )
   const approveSpec = createApproveSpec(resolveApproveSpecDeps(resolver))
   const approveSignoff = createApproveSignoff(resolveApproveSignoffDeps(resolver))
+  const startVerification = createStartVerification(resolveStartVerificationDeps(resolver))
+  const completeVerification = createCompleteVerification(resolveCompleteVerificationDeps(resolver))
+  const invalidateVerification = createInvalidateVerification(
+    resolveInvalidateVerificationDeps(resolver),
+  )
 
   const listSpecs = createListSpecs(resolveListSpecsDeps(resolver))
   const searchSpecs = createSearchSpecs(resolveSearchSpecsDeps(resolver))
@@ -436,6 +455,9 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
       preview,
       approveSpec,
       approveSignoff,
+      startVerification,
+      completeVerification,
+      invalidateVerification,
     },
     specs: {
       repos: specsRepos,

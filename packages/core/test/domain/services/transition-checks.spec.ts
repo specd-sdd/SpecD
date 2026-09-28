@@ -393,6 +393,18 @@ describe('snapshot bag absence', () => {
     )
   })
 
+  it('binds live task completion and verification freshness on archive without widening the transition edge', () => {
+    expect(ARCHIVE_BINDINGS.some((row) => row.check.id === 'workflow.taskCompletion')).toBe(true)
+    expect(ARCHIVE_BINDINGS.some((row) => row.check.id === 'verification.current')).toBe(true)
+    const transitionRows = TRANSITION_BINDINGS.filter(
+      (row) => row.check.id === 'verification.current',
+    )
+    expect(transitionRows).toHaveLength(1)
+    expect(transitionRows[0]?.applicability).toEqual([
+      { scope: 'transition', from: 'verifying', to: 'done', along: 'forward' },
+    ])
+  })
+
   it('given missing check instance, when applyBindingSpecs runs, then throws InvalidInputError', () => {
     expect(() =>
       applyBindingSpecs(

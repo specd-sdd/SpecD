@@ -3,6 +3,7 @@ import {
   isValidTransition,
   VALID_TRANSITIONS,
   HAPPY_PATH_NEXT,
+  RECOVERY_ONLY_TRANSITIONS,
   type ChangeState,
 } from '../../../src/domain/value-objects/change-state.js'
 
@@ -65,8 +66,10 @@ describe('ChangeState', () => {
       }
     })
 
-    it('archivable cannot hop to done', () => {
+    it('keeps sign-off recovery edges out of manual transitions', () => {
+      expect(isValidTransition('signed-off', 'done')).toBe(false)
       expect(isValidTransition('archivable', 'done')).toBe(false)
+      expect(isValidTransition('archiving', 'done')).toBe(false)
     })
 
     it('HAPPY_PATH_NEXT maps delivery hops and omits pending/archivable', () => {
@@ -79,7 +82,7 @@ describe('ChangeState', () => {
       expect(HAPPY_PATH_NEXT.archiving).toBeUndefined()
     })
 
-    it('archiving allows transition to archivable and designing only', () => {
+    it('archiving allows transition to archivable and designing', () => {
       for (const to of ALL_STATES) {
         if (to === 'archivable' || to === 'designing') {
           expect(isValidTransition('archiving', to)).toBe(true)
@@ -121,7 +124,7 @@ describe('ChangeState', () => {
       }
     })
 
-    it('archivable allows archiving, designing, implementing, and verifying', () => {
+    it('archivable allows archiving, redesign, and skill hops', () => {
       expect(VALID_TRANSITIONS['archivable']).toEqual([
         'archiving',
         'designing',
@@ -130,7 +133,7 @@ describe('ChangeState', () => {
       ])
     })
 
-    it('archiving allows archivable and designing escape transitions', () => {
+    it('archiving allows archivable and designing', () => {
       expect(VALID_TRANSITIONS['archiving']).toEqual(['archivable', 'designing'])
     })
 
@@ -145,6 +148,16 @@ describe('ChangeState', () => {
         'implementing',
         'verifying',
       ])
+    })
+  })
+
+  describe('RECOVERY_ONLY_TRANSITIONS', () => {
+    it('contains sign-off returns without advertising them as manual edges', () => {
+      expect(RECOVERY_ONLY_TRANSITIONS.signoff).toEqual({
+        'signed-off': 'done',
+        archivable: 'done',
+        archiving: 'done',
+      })
     })
   })
 })

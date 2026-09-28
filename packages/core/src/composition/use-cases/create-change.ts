@@ -5,6 +5,7 @@ import { DetectOverlap } from '../../application/use-cases/detect-overlap.js'
 import { type GetActiveSchema } from '../../application/use-cases/get-active-schema.js'
 import { type ListWorkspaces } from '../../application/use-cases/list-workspaces.js'
 import { type SpecdConfig } from '../../application/specd-config.js'
+import { type InvalidationPolicy } from '../../domain/value-objects/invalidation-policy.js'
 import {
   createCompositionResolver,
   type CompositionResolver,
@@ -26,6 +27,8 @@ export interface CreateChangeDeps {
   readonly getActiveSchema: GetActiveSchema
   /** Overlap detection used by the use case. */
   readonly detectOverlap: DetectOverlap
+  /** Resolved project invalidation policy for newly created changes. */
+  readonly defaultInvalidation?: InvalidationPolicy
 }
 
 /**
@@ -41,6 +44,7 @@ export function resolveCreateChangeDeps(resolver: CompositionResolver): CreateCh
     actor: resolver.getActorResolver(),
     getActiveSchema: resolver.getGetActiveSchema(),
     detectOverlap: createDetectOverlapFromResolver(resolver),
+    defaultInvalidation: resolver.config.invalidation,
   }
 }
 
@@ -92,8 +96,16 @@ function createCreateChangeFromNormalized(
   input: FactoryInput<CreateChangeDeps, CompositionResolutionOptions>,
 ): CreateChange {
   if (input.kind === 'deps') {
-    const { changes, listWorkspaces, actor, getActiveSchema, detectOverlap } = input.deps
-    return new CreateChange(changes, listWorkspaces, actor, getActiveSchema, detectOverlap)
+    const { changes, listWorkspaces, actor, getActiveSchema, detectOverlap, defaultInvalidation } =
+      input.deps
+    return new CreateChange(
+      changes,
+      listWorkspaces,
+      actor,
+      getActiveSchema,
+      detectOverlap,
+      defaultInvalidation,
+    )
   }
 
   const resolver = createCompositionResolver(input.config, input.options)

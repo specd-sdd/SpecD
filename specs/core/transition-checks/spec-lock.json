@@ -9,5 +9,74 @@
     "core:schema-format",
     "default:_global/architecture"
   ],
-  "implementation": []
+  "implementation": [
+    {
+      "file": "core:src/domain/services/change-validity.ts",
+      "symbols": ["evaluateChangeValidity", "selectAutomaticRecovery"]
+    },
+    {
+      "file": "core:src/application/use-cases/reconcile-change-validity.ts",
+      "symbols": ["ReconcileChangeValidity"]
+    },
+    {
+      "file": "core:src/application/services/validity-fingerprint-service.ts",
+      "symbols": ["ValidityFingerprintService"]
+    },
+    {
+      "file": "core:src/application/ports/binary-content-hasher.ts",
+      "symbols": ["BinaryContentHasher"]
+    },
+    {
+      "file": "core:src/domain/services/lifecycle-verdict.ts",
+      "symbols": ["evaluateLifecycleVerdict"]
+    },
+    {
+      "file": "core:src/application/services/execute-matching-predicates.ts",
+      "symbols": ["buildCheckExecutionContext"]
+    },
+    {
+      "file": "core:src/application/checks/verification-current.ts",
+      "symbols": ["createVerificationCurrent"]
+    },
+    {
+      "file": "core:src/domain/services/check-bindings.ts",
+      "symbols": ["TRANSITION_BINDING_SPECS"]
+    }
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Shared check registry evaluates transition/archive predicates and effects with one ABI, matcher, progress bus, and projection source.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:352fd38c82c4eb27369042f33aad2929f775c1900e9d315e09fc418e969dd2c5",
+          "lastModified": "2026-09-19T19:11:11.285Z"
+        },
+        "verify.md": {
+          "hash": "sha256:e202732c3e3f33223dcf4073b59b4658afd5a975ae15b29ef7f9029431cf7f02",
+          "lastModified": "2026-09-19T19:13:17.826Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Transition Checks\n\n## Rules\n- Stable check IDs include `protocol.edge`, `workflow.requires`, `workflow.taskCompletion`, `deps.consistent`, `workspace.readOnly`, `impl.filesResolved`, `impl.linksInScope`, `approval.spec`, `approval.signoff`, `schema.nameMatch`, `archive.archivable`, `spec.overlap`, `hook.pre`, `hook.post`; never `archive.publication`. Every check declares short gerund `label`, `kind: predicate|effect`, `execute(ctx)`. Result: id/label/kind/outcome pass|fail|skip, failure code/message, optional details. `instruction:` hooks are not checks.\n- ABI: `Check`; abstract application `WorkflowCheck` with pass/fail/skip; `create<Name>(deps)` receives only ports used by that check. Domain pure `run(facts)` optional, never production I/O path. No `PredicateSnapshots`, `needs`, `emptyPredicateSnapshots`, or `gatherPredicateSnapshots`. One module pair/check; class declares id/kind.\n- `CheckExecutionContext`: change, schema, transition attempt or archive operation, baked spec/signoff approvals, `skipHookPhases`, `allowOverlap`, `allowOutOfScope`, optional pure DAG status, `onCheckProgress`, per-evaluation `passMemo`. `workflow.taskCompletion` memoizes `CountTasks` there. No durable check-specific facts.\n- Registry alone owns applicability bindings: `from`, `to`, `along`; effects also `phase: before-persist|after-persist`, `onFailure: abort|collect`, skip selector identity. No applicability on check object or duplicate domain table. Runtime IDs remain plugin-safe strings despite built-in TS union.\n- `along`: forward, backward, redesign (`to=designing`), recovery (`archiving→archivable`), any. Axis uses known `schema.workflow[]` order, splicing omitted `ready`, `implementing`, `verifying`, `done`, `archivable`, `archiving` by `AXIS_FALLBACK` relative order. Unknown states occupy no slot; omission never removes protocol state.\n- Transition evaluation: classify; execute `protocol.edge` (`TransitionChange` fail-fast, `GetStatus` collect-all); execute every matching predicate; allowed iff none fail; execute matching effects by slot only after predicates; persist between before/after slots. Never rewrite requested target for approvals.\n- Archive is operation binding, not fake edge; `approval.signoff` never binds archive. Publication preflight remains inside `ArchiveChange`.\n- Predicate bindings: requires/tasks target requested step; deps/readOnly enter-ready + archive; impl checks forward exit-implementing + archive, never redesign; spec approval forward exit-ready; signoff exact `done→archivable`; archive includes schema-name, archivable-state, overlap and shared deps/readOnly/impl. Approval off→skip, valid→pass, missing→`APPROVAL_REQUIRED`.\n- Effect defaults: transition `hook.pre` any except recovery and `hook.post` forward, both before-persist/abort; archive pre before-persist/abort, post after-persist/collect. Hook checks call `RunStepHooks`; use cases never branch by hook ID. `skipHookPhases` skips effects only and matches phase plus target/source/pre/post identity.\n- Before-persist abort throws `HookFailedError` without persistence. After-persist collect records failure and continues. Same matcher selects predicates/effects.\n- Failed `impl.filesResolved` / `impl.linksInScope` text: count + ≤3 labeled examples; full inventory only structured/dedicated listing. deps failures show extracted vs persisted per spec; overlap names changes/specs; readOnly names spec IDs/workspace. Only `impl.linksInScope` gets `isSkippable` + `--allow-out-of-scope`.\n- Generic progress envelope for every executed check: `check-start {id,label}`, optional `check-progress`, `check-done {id,label,outcome,reason?}`. Hook runner progress maps into same bus. Status never streams; structured rows/blockers retain label/checkId. Canonical labels remain defined per built-in ID.\n- Projections derive only from check results: protocol-legal `validTransitions`; predicate-allowed `availableTransitions`; `nextAction` plus review blockers. Implementing + tasks complete + verifying allowed→`/specd-verify`; missing approvals→approval command; backward retries visible but not default.\n- Historic parked approval states preserve approval-required repair before protocol rejection of non-drain target. Production status/archive registry injects overlap detector; dependency-free default registry only isolated/non-production.\n\n## Constraints\n- No schema/task/platform result-array split; origin is check metadata.\n- recovery is not backward. Dry-run predicates only. Schema YAML cannot list check IDs.\n- Timing/failure/skip/applicability come from bindings, never check-ID switches.\n- Approval commands record consent separately; `TransitionChange` never routes into pending approval states.\n- New check/plugin must not require lifecycle use-case gather logic changes.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:352fd38c82c4eb27369042f33aad2929f775c1900e9d315e09fc418e969dd2c5",
+          "lastModified": "2026-09-19T19:11:11.285Z"
+        },
+        "verify.md": {
+          "hash": "sha256:e202732c3e3f33223dcf4073b59b4658afd5a975ae15b29ef7f9029431cf7f02",
+          "lastModified": "2026-09-19T19:13:17.826Z"
+        }
+      }
+    }
+  }
 }

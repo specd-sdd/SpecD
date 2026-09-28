@@ -71,33 +71,25 @@ When `artifactId` is provided but the invocation still validates all tracked fil
 
 ### Requirement: Complete and skipped file bypass
 
-For each tracked artifact file considered by structural validation, if the file's canonical persisted status is `complete` or `skipped`, `ValidateArtifacts` MUST NOT re-read the file for structure/delta, MUST NOT re-run structural validation or delta preview for that file, and MUST NOT invoke `markComplete` again for that file.
+For each tracked file selected for structural validation, if its canonical persisted state is `complete` or `skipped`, `ValidateArtifacts` MUST NOT re-read it for structural/delta validation, re-run its delta preview, or call `markComplete` again. A fresh validity fingerprint or drift check MAY still read those bytes through the shared evaluator; structural bypass is not a freshness waiver.
 
-Files in review or drift states (`pending-review`, `drifted-pending-review`, and any other non-terminal canonical state except `missing` when no file exists) MUST still be validated when selected by the invocation.
+Files in review or drift states, including `pending-review` and `drifted-pending-review`, MUST be structurally validated when selected. A `missing` file with no bytes remains missing and follows the normal required-file failure path. Materialized drift and approval/verification changes belong to application reconciliation, not repository hydration or the bypass branch.
 
-Baseline `validatedHash` vs disk is not this use case (see [`core:storage`](../storage/spec.md)). Approval/signoff hash comparison (Requirement: Approval invalidation on content change) still scans non-`missing` / non-`skipped` files, including `complete`, when those gates are active.
+### Requirement: Validity reconciliation around artifact validation
 
-### Requirement: Approval invalidation on content change
+`ValidateArtifacts.execute` SHALL integrate the single application reconciler into the same serialized mutation used to validate files. Reconciliation MUST compare fresh non-task artifact and implementation inputs independently with the materialized spec approval, verification, and sign-off baselines, mark only affected projections stale, append audit evidence, and commit any mandatory gate recovery atomically.
 
-`ValidateArtifacts.execute` MUST load the change through `ChangeRepository.get` first. Load-time baseline drift (if any) has already been applied by the repository.
+The use case MUST NOT infer active approvals by replaying event order, call broad `Change.invalidate` on its own, or let a newly written `validatedHash` erase evidence of the drift detected immediately before validation. Revalidation establishes a new artifact baseline only; it MUST NOT restore stale approval, verification, or sign-off projections.
 
-If the change has an active spec approval (`change.activeSpecApproval` is defined) or an active signoff (`change.activeSignoff` is defined), `ValidateArtifacts` MUST compare each non-`missing` / non-`skipped` file's current content hash (after `preHashCleanup`) to the hash recorded in that record's `artifactHashes`.
-
-That consent-hash scan MUST iterate every artifact in `schema.artifacts()`, not only the `artifactId` being structurally validated. `artifactId` limits structural validation and `markComplete`; it MUST NOT skip consent comparison for other artifact types. Complete files are included in this scan even though structural validation bypasses them.
-
-Approval hash keys use the `type:key` format (e.g. `"proposal:proposal"`, `"specs:default:auth/login"`), where `type` is the artifact type ID and `key` is the file key within that artifact.
-
-When no active approval and no active signoff exist, this scan MUST NOT run and MUST NOT call `Change.invalidate`.
-
-A single invalidation call is made per `execute` invocation even if multiple consent hashes mismatch. That call uses cause `artifact-drift`, the `ActorResolver` identity (not `SYSTEM_ACTOR`), and a focused grouped payload of mismatching artifact/file keys. `Change.invalidate` applies the change's invalidation policy.
+A successful structural validation is not semantic approval. Under `workflow: preserve` and without required spec-gate recovery, validation may occur in the current state. Forward progress remains blocked while any non-task artifact has drift or pending review.
 
 ### Requirement: Policy-aware drift materialization
 
-`ValidateArtifacts` MUST NOT compare current disk content to `validatedHash` in order to detect baseline artifact drift, MUST NOT mark `hasDrift` for that reason, and MUST NOT call `Change.invalidate` for content/absence mismatch against the validated baseline.
+Baseline artifact drift SHALL be evaluated by the shared validity evaluator and applied by the central reconciler, not by a repository side effect or a second detector local to `ValidateArtifacts`.
 
-That comparison and invalidation belong to `ChangeRepository` load when artifact types are resolved ([`core:storage`](../storage/spec.md)). By the time `ValidateArtifacts.execute` runs, `get()` has already performed that step for the fs adapter.
+The evaluator compares current content to each `validatedHash` after schema cleanup. Artifacts whose type declares `hasTasks: true` are excluded from automatic drift invalidation, approval/verification fingerprint comparison, and downstream propagation. They remain part of structural validation, required-presence checks, and live task counting.
 
-Policy `none` vs reopen is the `Change` entity's invalidation policy on whatever caller invoked `invalidate`. It is not a second drift detector inside this use case.
+The structured artifact policy controls reopening breadth; the workflow policy controls drift-driven lifecycle movement. Neither policy waives the rule that unresolved non-task drift or review blocks forward transitions.
 
 ### Requirement: Per-file validation
 
@@ -323,17 +315,14 @@ When `ChangeRepository.get(name)` returns `null`, `ValidateArtifacts.execute` MU
 
 ## Constraints
 
-- ValidateArtifacts is the only code path that may call Artifact.markComplete(hash) — enforced by convention and test coverage
-- The merged spec is never written to SpecRepository during validate — only during ArchiveChange
-- Baseline `validatedHash` vs disk drift is owned by `ChangeRepository` load ([`core:storage`](../storage/spec.md)), not by this use case
-- When active approval or signoff hashes mismatch, ValidateArtifacts calls `change.invalidate('artifact-drift', actor, ...)` at most once per execute, with a focused artifact/file payload
-- deltaValidations evaluate rules against the normalized YAML AST of the delta file; validations evaluate rules against the normalized artifact AST; both use the same rule evaluation algorithm
-- validations run against the merged artifact content (or direct content for non-delta artifacts)
-- preHashCleanup substitutions are applied only for hash computation, never to the actual file content on disk
-- A missing deltaValidations\[] is not an error — the step is skipped
-- A missing validations\[] is not an error — the step is skipped
-- A missing expected delta file for an existing spec with a delta: true artifact is a validation failure; direct files under specs/... are valid only for new specs or non-delta artifacts
-- When `ChangeRepository.get(name)` returns null, `ValidateArtifacts.execute` MUST throw `ChangeNotFoundError` before validation (distinct from returning `passed: false` for validation failures)
+- `ValidateArtifacts` is the only code path that MAY call `Artifact.markComplete(hash)`; this invariant is enforced by convention and tests.
+- Validation MUST NOT write a merged spec to `SpecRepository`; that happens only during `ArchiveChange`.
+- Repository hydration MAY expose fresh physical file facts against `validatedHash`, but MUST NOT persist approval invalidation or lifecycle recovery. The shared evaluator determines validity from those facts and the application reconciler materializes it within the serialized mutation.
+- `ValidateArtifacts` MUST NOT call broad `Change.invalidate('artifact-drift', ...)` independently. One semantic drift episode MUST produce only the affected projection changes and audit events selected by reconciliation, without duplicate materialization on repeat validation.
+- `deltaValidations` evaluate the normalized YAML AST of the delta; `validations` evaluate the normalized artifact AST. Both use the same rule algorithm. Artifact validations run against merged content, or direct content for non-delta artifacts.
+- `preHashCleanup` affects hash computation only, never bytes written to disk.
+- Missing `deltaValidations[]` or `validations[]` means that step is skipped. A missing expected delta for an existing spec with `delta: true` fails validation; direct files under `specs/...` are valid only for new specs or non-delta artifacts.
+- If `ChangeRepository.get(name)` returns null, `execute` MUST throw `ChangeNotFoundError` before validation rather than return `passed: false`.
 
 ## Spec Dependencies
 

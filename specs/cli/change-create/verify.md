@@ -4,17 +4,31 @@
 
 ### Requirement: Command signature
 
-#### Scenario: Missing name argument
+Scenarios:
 
-- **WHEN** `specd change create` is run without a positional name
-- **THEN** the command exits with code 1 and prints a usage error to stderr
+#### Scenario: Invalid policy flag fails before creation
 
-#### Scenario: No --spec flag creates change with empty specIds
+- **WHEN** an unsupported artifact or workflow policy value is passed
+- **THEN** the command exits with input guidance and creates no change
 
-- **WHEN** `specd change create my-change` is run with no `--spec` flag
-- **THEN** the change is created with an empty specIds list
-- **AND** stdout contains `created change my-change`
-- **AND** the process exits with code 0
+#### Scenario: Canonical signature accepts independent policy flags
+
+- **WHEN** valid artifact and workflow flags accompany normal creation options
+- **THEN** the command delegates creation with the resolved structured policy
+
+### Requirement: Structured invalidation policy input
+
+#### Scenario: CLI delegates resolved dimensions
+
+- **WHEN** only `--workflow-policy redesign` is supplied
+- **THEN** the CLI combines it with the configured or default artifact policy
+- **AND** delegates `{ artifacts: downstream, workflow: redesign }` when neither project dimension is configured
+
+#### Scenario: Both explicit dimensions are preserved
+
+- **WHEN** `--artifact-policy surgical` and `--workflow-policy preserve` are supplied together
+- **THEN** the CLI delegates exactly `{ artifacts: surgical, workflow: preserve }`
+- **AND** it does not expose the deprecated scalar for new writes
 
 ### Requirement: Workspace resolution
 

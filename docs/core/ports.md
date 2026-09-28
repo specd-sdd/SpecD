@@ -684,6 +684,28 @@ Computes a deterministic hash of the given string content. Returns a string in `
 
 ---
 
+## BinaryContentHasher
+
+Port for hashing raw bytes. Validity fingerprints use it for implementation files so the text-only `ContentHasher` contract stays unchanged. Artifact text still goes through `ContentHasher` after schema `preHashCleanup`.
+
+Plugin authors and `@specd/core` consumers import the port from `@specd/core`. Delivery hosts import the same contract from `@specd/sdk`. `NodeBinaryContentHasher` is infrastructure-internal and is not a public export. `CompositionResolver.getBinaryContentHasher()` returns one memoized instance for the composition session.
+
+```typescript
+import { BinaryContentHasher, type Sha256Digest } from '@specd/core'
+
+abstract class BinaryContentHasher {
+  abstract hash(content: Uint8Array): Sha256Digest
+}
+```
+
+### Methods
+
+#### `hash(content: Uint8Array): Sha256Digest`
+
+SHA-256 of the given bytes, returned as `` `sha256:${hex}` ``. Callers pass raw bytes for binary files (`bytes-v1`) and UTF-8 bytes after `text-v1` normalization for text. An empty binary file hashes zero bytes. A partial collection — any missing, unreadable, outside-project, or invalid path — yields a `null` fingerprint and must not authorize approval or verification.
+
+---
+
 ## ConfigLoader
 
 Port for loading and resolving the active `specd.yaml` configuration. Delivery mechanisms call `load()` once at startup and pass the resulting `SpecdConfig` to factory functions or use cases.

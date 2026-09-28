@@ -2,7 +2,11 @@ import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { z } from 'zod'
 import { ConfigLoader } from '../../application/ports/config-loader.js'
-import { isInvalidationPolicy } from '../../domain/value-objects/invalidation-policy.js'
+import {
+  DEFAULT_INVALIDATION_POLICY,
+  fromLegacyInvalidationPolicy,
+  type InvalidationPolicy,
+} from '../../domain/value-objects/invalidation-policy.js'
 import {
   type SpecdConfig,
   type SpecdAdapterBinding,
@@ -644,9 +648,7 @@ export class FsConfigLoader extends ConfigLoader {
       ...(data.schemaOverrides !== undefined
         ? { schemaOverrides: data.schemaOverrides as SchemaOperations }
         : {}),
-      ...(data.invalidationPolicy !== undefined && isInvalidationPolicy(data.invalidationPolicy)
-        ? { invalidationPolicy: data.invalidationPolicy }
-        : {}),
+      invalidation: resolveConfiguredInvalidation(data),
       ...(data.plugins !== undefined
         ? {
             plugins: {
@@ -663,4 +665,32 @@ export class FsConfigLoader extends ConfigLoader {
         : {}),
     }
   }
+}
+
+/**
+ * Resolves the single effective invalidation policy from raw configuration.
+ *
+ * Native `invalidation` is stored as given. A legacy scalar maps to
+ * `{ artifacts: scalar, workflow: 'redesign' }`. Absence uses the native default.
+ * Documents that contain both shapes are rejected before this runs.
+ *
+ * @param data - Parsed raw project configuration
+ * @param data.invalidation - Native structured invalidation policy, when present
+ * @param data.invalidationPolicy - Legacy scalar invalidation policy, when present
+ * @returns Frozen structured policy
+ */
+function resolveConfiguredInvalidation(data: {
+  readonly invalidation?: InvalidationPolicy | undefined
+  readonly invalidationPolicy?: string | undefined
+}): InvalidationPolicy {
+  if (data.invalidation !== undefined) {
+    return Object.freeze({
+      artifacts: data.invalidation.artifacts,
+      workflow: data.invalidation.workflow,
+    })
+  }
+  if (data.invalidationPolicy !== undefined) {
+    return fromLegacyInvalidationPolicy(data.invalidationPolicy)
+  }
+  return DEFAULT_INVALIDATION_POLICY
 }

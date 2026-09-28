@@ -123,6 +123,13 @@ export class StubChangeRepository extends ChangeRepository {
 
   async unscaffold(_change: Change, _specIds: readonly string[]): Promise<void> {}
 
+  async implementationFile(
+    _change: Change,
+    projectRelativePath: string,
+  ): Promise<{ readonly status: 'missing'; readonly path: string }> {
+    return { status: 'missing', path: projectRelativePath }
+  }
+
   internalPaths(): readonly string[] | undefined {
     return undefined
   }

@@ -51,7 +51,7 @@ Each lifecycle phase has its own skill that knows how to guide the coding assist
 | `/specd-new`       | Creation     | Explores what you want to do, creates a change when ready            |
 | `/specd-design`    | Designing    | Drives the agent through proposal → specs → verify → design → tasks  |
 | `/specd-implement` | Implementing | Works through tasks one by one, runs hooks, transitions to verifying |
-| `/specd-verify`    | Verifying    | Checks the implementation against verification scenarios             |
+| `/specd-verify`    | Verifying    | Starts a verification attempt, checks scenarios, then completes it   |
 | `/specd-archive`   | Archiving    | Handles signoff gates, archives the change, applies deltas           |
 
 You rarely need to invoke phase skills directly — `/specd` suggests the right one based on the current state. But you can jump to any phase if you know where you are.
@@ -67,8 +67,10 @@ A real session looks like this:
 5. `/specd-design` reads the exploration context, verifies it's still current, and guides the agent through writing the artifacts defined by the schema — in `@specd/schema-std` that means proposal, specs, verification scenarios, design, and tasks. Other schemas may define a different set of artifacts.
 6. You review the artifacts. If approval gates are enabled, you approve the spec.
 7. `/specd-implement` works through the task list, writing code that satisfies the specs
-8. `/specd-verify` runs through each verification scenario to confirm correctness
+8. `/specd-verify` starts a verification attempt, checks each scenario, and completes the attempt only after that work succeeds. Entering `verifying` does not start the attempt, and leaving it does not complete it. If the reviewed files change, the skill starts again and repeats the checks.
 9. `/specd-archive` archives the completed change, applying spec deltas to the permanent spec repository
+
+If status reports stale spec approval, implementation and verification stop and the work returns through `/specd-design`. When the workflow policy is `preserve` and spec consent is still valid, drifted artifacts can be reviewed in the current phase. Stale verification is repaired in the current state. It does not by itself move the lifecycle.
 
 At every step, the coding assistant has access to the compiled context — the right specs, the right instructions, the right constraints — assembled automatically by specd.
 

@@ -32,7 +32,7 @@ Manage active development changes. A change is the unit of work in SpecD — it 
 specd changes create <name> [options]
 ```
 
-Create a new change and place it in the active changes directory.
+Create a new change and place it in the active changes directory. The stored policy is the structured object `{ artifacts, workflow }`. Omitting both flags uses the project default, which is `{ artifacts: downstream, workflow: preserve }` when the config omits both `invalidation` and the deprecated scalar. There is no `--invalidation-policy` flag. An invalid policy value fails before the change is written and exits 1.
 
 `<name>` is a short slug identifying the change. It must be unique among active changes and match the slug conventions of your project (lowercase, hyphens). It becomes part of the change directory name and is used in all subsequent commands that reference this change.
 
@@ -40,7 +40,8 @@ Create a new change and place it in the active changes directory.
 | --------------------------- | ------------------------------------------------------------------------------------------------ |
 | `--spec <id>`               | Associate a spec with this change. Repeatable — pass multiple `--spec` flags for multiple specs. |
 | `--description <text>`      | Short description of the change's intent.                                                        |
-| `--invalidation-policy <p>` | Set the invalidation policy (`none\|surgical\|downstream\|global`). Defaults to `downstream`.    |
+| `--artifact-policy <p>`     | Stored artifact policy (`none\|surgical\|downstream\|global`). Default `downstream`.             |
+| `--workflow-policy <p>`     | Stored workflow policy (`preserve\|redesign`). Default `preserve`.                               |
 | `--format text\|json\|toon` | Output format.                                                                                   |
 | `--config <path>`           | Config file path.                                                                                |
 
@@ -91,6 +92,10 @@ Available transitions are **check-derived**: the same predicate evaluation used 
 
 It also exposes both the aggregate state of each artifact and the state of each tracked file inside that artifact. Structured output includes an `artifactDag` array for structural analysis and a `review` block for identifying artifacts that require attention.
 
+Active status reconciles validity before it renders, including when `ifModifiedSince` matches, because the manifest timestamp cannot prove external files. That reconciliation may persist a recovery. Draft status stays read-only and may still use the timestamp shortcut. Text and structured output include a `validity` projection: spec approval, sign-off, verification freshness, the active attempt separately from completed evidence, committed `automaticReturn`, blockers, and a phase-aware next action. An empty implementation `files` map is observed empty evidence. `implementation: null` is legacy unknown evidence and does not authorize a required gate. Stale verification before `verifying` is context. At a verification, sign-off, or archive boundary it is a blocker whose repair stays in the current state. Text output does not print source bytes or full hashes.
+
+Expected Core errors exit 1 and keep their `code`. Repeating status after the same facts produces no second invalidation or transition.
+
 Drafted changes are read-only. Text mode marks the state as `(drafted)` and prints `transitions: (none — change is drafted)`. JSON/TOON include `isDrafted: true`, empty `availableTransitions`, and `nextAction.command: null`.
 
 In JSON mode, the output includes a `nextAction` object and a `blockers` array. A top-level `approvalGates` object reports whether spec approval and signoff approval are enabled in the project config. Extra-bearing workflow rows appear as `availableSteps` (not protocol membership). Blockers from failed predicates include optional `label` and `checkId`.
@@ -124,7 +129,9 @@ Transition the change to a new lifecycle state. You can either provide an explic
 Core resolves the happy-path next state (`HAPPY_PATH_NEXT`). This is not
 `GetStatus.nextAction`.
 
-When a transition fails (e.g. due to missing artifacts or drifted content), the command renders a **Repair Guide** to **stderr**, providing the blocker codes and a recommended next command to resolve the issue.
+The command reconciles validity before checks and again after hooks. If that commits a different lifecycle state, the requested transition stops and the repair guide describes the state that was committed. Recovery is not rolled back when the requested transition then fails. There is no flag that restarts verification. Entry to `verifying` does not start an attempt, and `verifying → done` only checks current completed evidence. The repair for stale or missing verification is [verification start](change-verification.md) in the current state, then the verification work, then `complete`.
+
+When a transition fails (e.g. due to missing artifacts or drifted content), the command renders a **Repair Guide** to **stderr**, providing the blocker codes and a recommended next command to resolve the issue. Expected Core errors exit 1.
 
 `--next` happy-path map in Core:
 
@@ -200,16 +207,17 @@ When a change has previously reached the `implementing` state, drafting is block
 specd changes edit <name> [options]
 ```
 
-Edit the spec scope or description of an existing change. At least one of the options below is required.
+Edit the spec scope, description, or stored invalidation policy of an existing change. At least one option below is required. `--artifact-policy` and `--workflow-policy` update only the dimensions you pass and persist them on the change. Unspecified dimensions stay as stored. There is no `--invalidation-policy` flag. Output includes whether validity changed and any committed recovery. An invalid policy value exits 1 before mutation.
 
-| Option                      | Description                                                            |
-| --------------------------- | ---------------------------------------------------------------------- |
-| `--add-spec <id>`           | Add a spec to the change.                                              |
-| `--remove-spec <id>`        | Remove a spec from the change.                                         |
-| `--description <text>`      | Update the change description.                                         |
-| `--invalidation-policy <p>` | Change the invalidation policy (`none\|surgical\|downstream\|global`). |
-| `--format text\|json\|toon` | Output format.                                                         |
-| `--config <path>`           | Config file path.                                                      |
+| Option                      | Description                                                        |
+| --------------------------- | ------------------------------------------------------------------ |
+| `--add-spec <id>`           | Add a spec to the change.                                          |
+| `--remove-spec <id>`        | Remove a spec from the change.                                     |
+| `--description <text>`      | Update the change description.                                     |
+| `--artifact-policy <p>`     | Store this artifact policy (`none\|surgical\|downstream\|global`). |
+| `--workflow-policy <p>`     | Store this workflow policy (`preserve\|redesign`).                 |
+| `--format text\|json\|toon` | Output format.                                                     |
+| `--config <path>`           | Config file path.                                                  |
 
 ### change validate
 
@@ -304,7 +312,7 @@ Dependency-blocked failures are status-aware. When validation is blocked by an u
 specd changes approve spec <name> [options]
 ```
 
-Record a spec approval for the change. This command is only meaningful when `approvals.spec: true` in `specd.yaml`. From `ready`, it records consent and **leaves the change in `ready`**, unblocking the same `ready → implementing` transition. It does not move the change to `pending-spec-approval`. For in-flight changes already in `pending-spec-approval`, the command still drains to `spec-approved`.
+Record a spec approval for the change. This command is only meaningful when `approvals.spec: true` in `specd.yaml`. It reconciles first, requires the committed state to be exactly `ready`, and **leaves the change in `ready`**. Text output reports the materialized status, fingerprint algorithm, and file count. It does not print source bytes or full hashes. Task artifacts are excluded from the fingerprint. An empty observed artifact set is distinct from missing evidence. Expected failures, including a gate that is off or a state other than `ready`, exit 1.
 
 | Option                      | Description                    |
 | --------------------------- | ------------------------------ |
@@ -318,7 +326,7 @@ Record a spec approval for the change. This command is only meaningful when `app
 specd changes approve signoff <name> [options]
 ```
 
-Record a sign-off for the change. This command is only meaningful when `approvals.signoff: true` in `specd.yaml`. From `done`, it records consent and **leaves the change in `done`**, unblocking the same `done → archivable` transition. It does not move the change to `pending-signoff`. For in-flight changes already in `pending-signoff`, the command still drains to `signed-off`.
+Record a sign-off for the change. This command is only meaningful when `approvals.signoff: true` in `specd.yaml`. It reconciles first, requires the committed state to be exactly `done`, requires current completed verification, and **leaves the change in `done`**. Text output reports the materialized status, fingerprint algorithms, file counts, and verification id. An empty implementation `files` map means no linked files were observed. `implementation: null` is legacy unknown evidence and cannot be signed off until it is renewed. Text does not print source bytes or full hashes. Expected failures exit 1.
 
 | Option                      | Description                    |
 | --------------------------- | ------------------------------ |
@@ -468,31 +476,30 @@ Mark an optional artifact as intentionally skipped. A skipped artifact is treate
 specd changes invalidate <name> --reason <text> [options]
 ```
 
-Invalidate a change and return it to `designing`, optionally targeting specific artifacts for review. This is the manual invalidation entry point — it records an `invalidated` history event, transitions the change back to `designing` (if not already there), and reopens targeted artifacts for review.
+Invalidate a change by hand. This records review and, when valid consent is affected and `--force` is set, revokes that consent. Lifecycle recovery is chosen by Core, not by this command: a required spec approval returns to `designing` when the state is later than `designing`; a required sign-off returns to `done` only when the state is later than `done`; otherwise `workflow: redesign` with unresolved non-task review returns to `designing`; otherwise the phase stays. The command does not persist `--artifact-policy` or `--workflow-policy`. They override this invocation only. There is no `--invalidation-policy` or `--policy` flag.
 
-The **invalidation policy** controls how artifact reopening propagates:
+Artifact reopening uses the effective artifact policy:
 
-| Policy       | Behaviour                                                               |
-| ------------ | ----------------------------------------------------------------------- |
-| `none`       | No artifacts are reopened. The change transitions to `designing` only.  |
-| `surgical`   | Only the explicitly targeted files are reopened.                        |
-| `downstream` | Targets plus all DAG descendants are reopened. This is the **default**. |
-| `global`     | Every artifact in the change is reopened.                               |
+| Policy       | Behaviour                                                                                            |
+| ------------ | ---------------------------------------------------------------------------------------------------- |
+| `none`       | No artifacts are reopened. Drift remains a freshness blocker. `--target` is disallowed.              |
+| `surgical`   | Only the explicitly targeted files are reopened. Requires `--target`.                                |
+| `downstream` | Targets plus non-task DAG descendants are reopened. This is the stored default. Requires `--target`. |
+| `global`     | Every non-task artifact is reopened. `--target` is disallowed.                                       |
 
-Targets are specified with `--target <artifactId>` or `--target <artifactId>@<specId>` for spec-scoped artifacts. The `@specId` syntax is only valid for artifacts with `scope: spec`.
+Targets use `--target <artifactId>` or `--target <artifactId>@<specId>` for spec-scoped artifacts. Explicitly targeted task review is allowed. Review does not propagate from a parent into a task artifact.
 
-When a change has an active spec approval or signoff, invalidation is blocked unless `--force` is passed. This prevents accidentally invalidating an approved change.
+When the request would revoke a currently valid spec approval or sign-off, the command fails unless `--force` is passed. The refusal lists each exact Core-provided `gate → target` pair; the CLI does not assume that every gate returns to `designing`. Successful text output shows the change name, state, request `reason`, effective policy, affected gates, committed recovery, blockers, next action, and an `affected:` section. JSON and TOON expose `reason`, `blockers`, and `nextAction` as named fields. It does not print source bytes or full hashes. Repeating the same facts does not append a second event. Expected Core errors exit 1.
 
-Text output shows the change name, state, effective policy, and an `affected:` section listing each reopened file grouped by artifact with its expansion label (`downstream`, `global`).
-
-| Option                      | Description                                                                                                    |
-| --------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `--reason <text>`           | Mandatory explanation for the invalidation.                                                                    |
-| `--target <target>`         | Target an artifact or artifact file (repeatable). Use `artifactId` or `artifactId@specId`.                     |
-| `--policy <policy>`         | Override the change's persisted invalidation policy for this execution (`none\|surgical\|downstream\|global`). |
-| `--force`                   | Bypass the approval/signoff guard.                                                                             |
-| `--format text\|json\|toon` | Output format.                                                                                                 |
-| `--config <path>`           | Config file path.                                                                                              |
+| Option                      | Description                                                                                |
+| --------------------------- | ------------------------------------------------------------------------------------------ |
+| `--reason <text>`           | Mandatory explanation for the invalidation.                                                |
+| `--target <target>`         | Target an artifact or artifact file (repeatable). Use `artifactId` or `artifactId@specId`. |
+| `--artifact-policy <p>`     | One-shot artifact override (`none\|surgical\|downstream\|global`). Not stored.             |
+| `--workflow-policy <p>`     | One-shot workflow override (`preserve\|redesign`). Not stored.                             |
+| `--force`                   | Required when this request revokes currently valid spec or sign-off consent.               |
+| `--format text\|json\|toon` | Output format.                                                                             |
+| `--config <path>`           | Config file path.                                                                          |
 
 ```bash
 # Invalidate specific artifacts with downstream propagation
@@ -501,9 +508,19 @@ specd changes invalidate my-change --reason "Revisit design after API change" --
 # Invalidate a spec-scoped artifact file
 specd changes invalidate my-change --reason "Update specs" --target specs@auth/login
 
-# Override policy to surgical (only targeted files)
-specd changes invalidate my-change --reason "Minor fix" --target tasks --policy surgical
+# Override artifact policy for this invocation only (not stored)
+specd changes invalidate my-change --reason "Minor fix" --target tasks --artifact-policy surgical
 ```
+
+### change verification
+
+```
+specd changes verification start <name> [--format text|json|toon]
+specd changes verification complete <name> [--format text|json|toon]
+specd changes verification invalidate <name> --reason <text> [--format text|json|toon]
+```
+
+Start, complete, or withdraw verification evidence without moving the lifecycle by themselves. Command details, idempotence, and retry guidance are in [change verification](change-verification.md). Expected Core errors exit 1. Text output never prints source bytes or full hashes.
 
 ### change deps
 
@@ -572,7 +589,7 @@ specd changes archive <name> [options]
 
 Archive a completed change. Scope-`spec` artifacts are synced into the spec repository, and the change is moved to the archive directory. The change must be in the `archivable` state.
 
-While archive runs, the change remains `archivable` through guards, pre-archive hooks, orphan detection, and preflight. It transitions to `archiving` immediately before canonical publication. On commit-phase failure, batch restore may return the change to `archivable` (retry) or leave it in `archiving` (use `specd changes transition` to `archivable` or `designing`). See [Change Lifecycle Guide](../guide/workflow.md#archiving).
+While archive runs, the change remains `archivable` through initial guards and pre-archive hooks. After hooks it refreshes tracking, reconciles validity, reruns guards, and only then builds the publication plan and full-batch preflight, detects orphan backups, and snapshots canonical inputs. It transitions to `archiving` immediately before canonical publication. On commit-phase failure, batch restore may return the change to `archivable` (retry) or leave it in `archiving` (use `specd changes transition` to `archivable` or `designing`). See [Change Lifecycle Guide](../guide/workflow.md#archiving).
 
 If other active changes target the same specs, the archive is blocked by default. Use `--allow-overlap` to proceed despite the overlap.
 
@@ -1869,5 +1886,6 @@ specd project init --schema @specd/schema-std --agent claude --agent copilot
 
 ## Related documentation
 
+- [Change verification](change-verification.md) — `verification start`, `complete`, and `invalidate`
 - [Configuration reference](../config/config-reference.md) — `specd.yaml` fields, file discovery, workspace configuration, hooks
 - [Schema format reference](../schemas/schema-format.md) — artifact definitions, lifecycle steps, validation rules, delta files

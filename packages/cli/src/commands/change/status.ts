@@ -3,6 +3,12 @@ import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
 import { ArtifactDag, type ArtifactStatusEntry, type ArtifactType } from '@specd/sdk'
+import {
+  publicValidity,
+  publicVerificationEvidence,
+  readStructuredPolicy,
+  validityTextLines,
+} from './_validity-present.js'
 import { enrichImplementationTracking } from './_implementation-tracking.js'
 import { resolveSdkHostContext } from '../../helpers/sdk-host.js'
 
@@ -204,11 +210,25 @@ JSON/TOON output schema:
           }
 
           const fmt = parseFormat(opts.format)
+          const validity = publicValidity((statusResult as { validity?: unknown }).validity)
+          const evidence = publicVerificationEvidence(change)
+          const invalidation = readStructuredPolicy(change)
 
           if (fmt === 'text') {
             const lines = [`change:      ${change.name}`, `state:       ${change.state}`]
             if (change.description !== undefined) {
               lines.push(`description: ${change.description}`)
+            }
+            if (invalidation !== undefined) {
+              lines.push(
+                `policy:      artifacts=${invalidation.artifacts} workflow=${invalidation.workflow}`,
+              )
+            }
+            const validityLines = validityTextLines(validity, evidence)
+            if (validityLines.length > 0) {
+              lines.push('')
+              lines.push('validity:')
+              for (const line of validityLines) lines.push(`  ${line}`)
             }
             lines.push('')
 
@@ -407,6 +427,9 @@ JSON/TOON output schema:
                 specIds: [...change.specIds],
                 schema: { name: change.schemaName, version: change.schemaVersion },
                 ...(change.description !== undefined ? { description: change.description } : {}),
+                ...(invalidation !== undefined ? { invalidation } : {}),
+                ...(validity !== undefined ? { validity } : {}),
+                ...(evidence !== undefined ? { verification: evidence } : {}),
                 blockers: blockers.map((b) => ({
                   code: b.code,
                   message: b.message,

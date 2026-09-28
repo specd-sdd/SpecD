@@ -16,9 +16,35 @@ export { type ArtifactStatus } from './artifact-status.js'
 export { type ArtifactDisplayStatus } from './artifact-display-status.js'
 export {
   type InvalidationPolicy,
+  type InvalidationPolicyOverride,
+  type ArtifactInvalidationPolicy,
+  type WorkflowInvalidationPolicy,
   DEFAULT_INVALIDATION_POLICY,
+  LEGACY_DEFAULT_INVALIDATION_POLICY,
   isInvalidationPolicy,
+  isArtifactInvalidationPolicy,
+  isWorkflowInvalidationPolicy,
+  resolveInvalidationPolicy,
+  fromLegacyInvalidationPolicy,
 } from './invalidation-policy.js'
+export {
+  type Sha256Digest,
+  type ArtifactFingerprintAlgorithm,
+  type TextNormalizationAlgorithm,
+  type BinaryNormalizationAlgorithm,
+  type ArtifactFingerprint,
+  type ImplementationFingerprintEntry,
+  type ImplementationFingerprint,
+  type ValidityFingerprint,
+  type FingerprintDifference,
+  type FingerprintComparison,
+  normalizeTextV1,
+  classifyContent,
+  normalizeImplementationPath,
+  compareArtifactFingerprints,
+  compareImplementationFingerprints,
+  compareValidityFingerprints,
+} from './validity-fingerprint.js'
 export { type Selector, type DeltaPosition } from './selector.js'
 export {
   type ValidationCount,

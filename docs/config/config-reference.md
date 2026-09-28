@@ -51,7 +51,8 @@ Bootstrap mode is intended for initial indexing and exploratory graph queries. I
 | `plugins`             | object  | no       | —               | Installed plugins grouped by type.                                                                                   |
 | `schemaPlugins`       | array   | no       | `[]`            | Schema plugin references loaded and merged into the active schema.                                                   |
 | `schemaOverrides`     | object  | no       | —               | Inline schema override operations applied after plugins. See [`schemaOverrides`](#schemaoverrides).                  |
-| `invalidationPolicy`  | string  | no       | `'downstream'`  | Default policy for automatic and manual artifact invalidation. See [`invalidationPolicy`](#invalidationpolicy).      |
+| `invalidation`        | object  | no       | see below       | Structured default for artifact reopening and workflow recovery. See [`invalidation`](#invalidation).                |
+| `invalidationPolicy`  | string  | no       | —               | Deprecated scalar. Read-only compatibility. Do not set it together with `invalidation`.                              |
 
 ## Environment overrides
 
@@ -495,24 +496,50 @@ schemaOverrides:
 
 Hook entries in `schemaOverrides` require an `id` field — this is how append/prepend/remove identify individual hooks within a step's array. The `id` must be unique within the `pre` or `post` array it belongs to.
 
-## invalidationPolicy
+## invalidation
 
-`invalidationPolicy` controls how artifact invalidation propagates when a change's files drift from their validated baseline or when manual invalidation is triggered. The policy is persisted on each change at creation time (inheriting this project default) and can be overridden per-change with `specd changes edit --invalidation-policy` or per-execution with `specd changes invalidate --policy`.
+`invalidation` is the project default copied onto a new change. It has two independent dimensions. Artifact policy chooses which non-task artifacts reopen for review. Workflow policy chooses whether unresolved non-task drift asks the lifecycle to return to `designing`. Neither dimension configures approval-gate recovery, and artifact policy does not waive freshness.
 
 ```yaml
-invalidationPolicy: downstream # default
+invalidation:
+  artifacts: downstream # none | surgical | downstream | global
+  workflow: preserve # preserve | redesign
 ```
 
-| Policy       | Automatic drift invalidation                                                              | Manual `change invalidate`                                                                 |
-| ------------ | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| `none`       | No artifacts are reopened. Drift is recorded (`hasDrift: true`) but states are preserved. | Change transitions to `designing` but no artifacts are reopened. `--target` is disallowed. |
-| `surgical`   | Only the specific files that drifted are reopened.                                        | Only explicitly targeted files are reopened. Requires `--target`.                          |
-| `downstream` | Drifted files plus their DAG descendants are reopened. This is the default.               | Targets plus all DAG descendants are reopened. Requires `--target`.                        |
-| `global`     | All artifacts in the change are reopened.                                                 | All artifacts are reopened. `--target` is disallowed.                                      |
+Omitting both `invalidation` and `invalidationPolicy` yields `{ artifacts: downstream, workflow: preserve }` for new changes.
 
-When `invalidationPolicy` is omitted from `specd.yaml`, new changes default to `downstream` — the same behaviour as before this field was introduced.
+| `artifacts`  | What reopens                                                                                               |
+| ------------ | ---------------------------------------------------------------------------------------------------------- |
+| `none`       | Nothing. Drift stays a freshness blocker. `none` waives reopening, not freshness.                          |
+| `surgical`   | Only the files that drifted, or the files named by a manual invalidate.                                    |
+| `downstream` | Those files plus their DAG descendants. This is the default. Review never propagates into a task artifact. |
+| `global`     | Every non-task artifact in the change.                                                                     |
 
-Display status reflects drift even under `none`: files show `complete-with-drift` in `changes status` and `changes artifacts` output while remaining canonically `complete`.
+| `workflow` | When it applies                                                                                              |
+| ---------- | ------------------------------------------------------------------------------------------------------------ |
+| `preserve` | Keep the current phase when no stricter gate recovery applies. Review drifted artifacts in place.            |
+| `redesign` | If non-task drift or review is still unresolved, and no gate recovery takes priority, return to `designing`. |
+
+Required spec-approval and sign-off recovery is fixed and is not a config field. See [Validity and verification](../guide/workflow.md#validity-and-verification).
+
+`specd changes create` and `specd changes edit` can store a structured policy with `--artifact-policy` and `--workflow-policy`. `specd changes invalidate` can override either dimension for that invocation only. Those one-shot flags are not written back as the change's stored policy. There is no `--invalidation-policy` flag.
+
+### Deprecated `invalidationPolicy`
+
+`invalidationPolicy` is a legacy scalar: `none`, `surgical`, `downstream`, or `global`. It is accepted on read and maps to `{ artifacts: <scalar>, workflow: redesign }`. A version 1 manifest that omits the scalar maps to `{ artifacts: downstream, workflow: redesign }`.
+
+Setting `invalidation` and `invalidationPolicy` in the same effective config is a `ConfigValidationError` (`CONFIG_VALIDATION_ERROR`). Keep only `invalidation`.
+
+### Manifest compatibility
+
+Active change manifests are versioned. Reads do not migrate a file and do not roll the lifecycle backward.
+
+| Manifest | Recognition              | Policy field                                              |
+| -------- | ------------------------ | --------------------------------------------------------- |
+| v1       | `manifestVersion` absent | optional scalar `invalidationPolicy`                      |
+| v2       | `manifestVersion: 2`     | required `invalidation` object; the scalar is not written |
+
+Any other explicit `manifestVersion` throws `UnsupportedManifestVersionError` and writes nothing. A successful mutation of an active change writes v2. Archive copies the manifest and adds `archivedAt` and `archivedBy` without changing `manifestVersion` or validity evidence.
 
 ## Validation
 
@@ -534,6 +561,7 @@ SpecD validates `specd.yaml` before executing any command that requires a config
 | Invalid `contextIncludeSpecs` or `contextExcludeSpecs` pattern syntax            | e.g. `*` in a disallowed position.                               |
 | `llmOptimizedContext` is not a boolean                                           | Any other type is a startup validation error.                    |
 | Legacy `artifactRules` field is present                                          | Use `schemaOverrides` instead.                                   |
+| Both `invalidation` and `invalidationPolicy` are set                             | Keep only `invalidation`. The scalar is deprecated.              |
 
 Commands that skip validation entirely: `--help`, `--version`, `specd project init`, `specd config validate`, and `specd plugin` subcommands.
 

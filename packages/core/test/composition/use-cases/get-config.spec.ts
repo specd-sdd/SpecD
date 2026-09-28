@@ -44,6 +44,7 @@ describe('createGetConfig', () => {
           archiveAdapter: { adapter: 'fs', config: { path: '/tmp/project/.specd/archive' } },
         },
         approvals: { spec: false, signoff: false },
+        invalidation: { artifacts: 'downstream', workflow: 'preserve' },
       },
     }
 
@@ -68,6 +69,7 @@ describe('createGetConfig', () => {
           archiveAdapter: { adapter: 'fs', config: { path: '/tmp/project/.specd/archive' } },
         },
         approvals: { spec: false, signoff: false },
+        invalidation: { artifacts: 'downstream', workflow: 'preserve' },
       },
     }
 

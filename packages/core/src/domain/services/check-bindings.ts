@@ -12,6 +12,7 @@ import { archiveArchivable } from '../checks/archive-archivable.js'
 import { specOverlap } from '../checks/spec-overlap.js'
 import { hookPre } from '../checks/hook-pre.js'
 import { hookPost } from '../checks/hook-post.js'
+import { verificationCurrent } from '../checks/verification-current.js'
 import { type ChangeState } from '../value-objects/change-state.js'
 import {
   applyBindingSpecs,
@@ -53,11 +54,19 @@ export const TRANSITION_BINDING_SPECS: readonly CheckBindingSpec[] = [
   },
   {
     id: 'impl.filesResolved',
-    applicability: [{ scope: 'transition', from: 'implementing', to: '*', along: 'forward' }],
+    applicability: [
+      { scope: 'transition', from: 'implementing', to: '*', along: 'forward' },
+      { scope: 'transition', from: '*', to: 'verifying', along: '*' },
+      { scope: 'operation', operation: 'verification-start' },
+    ],
   },
   {
     id: 'impl.linksInScope',
-    applicability: [{ scope: 'transition', from: 'implementing', to: '*', along: 'forward' }],
+    applicability: [
+      { scope: 'transition', from: 'implementing', to: '*', along: 'forward' },
+      { scope: 'transition', from: '*', to: 'verifying', along: '*' },
+      { scope: 'operation', operation: 'verification-start' },
+    ],
   },
   {
     id: 'approval.spec',
@@ -67,6 +76,11 @@ export const TRANSITION_BINDING_SPECS: readonly CheckBindingSpec[] = [
   {
     id: 'approval.signoff',
     applicability: [{ scope: 'transition', from: 'done', to: 'archivable', along: 'forward' }],
+    reportSkipWhenUnmatched: true,
+  },
+  {
+    id: 'verification.current',
+    applicability: [{ scope: 'transition', from: 'verifying', to: 'done', along: 'forward' }],
     reportSkipWhenUnmatched: true,
   },
   {
@@ -95,6 +109,8 @@ export const ARCHIVE_BINDING_SPECS: readonly CheckBindingSpec[] = [
   { id: 'deps.consistent', applicability: [{ scope: 'archive' }] },
   { id: 'impl.filesResolved', applicability: [{ scope: 'archive' }] },
   { id: 'impl.linksInScope', applicability: [{ scope: 'archive' }] },
+  { id: 'workflow.taskCompletion', applicability: [{ scope: 'archive' }] },
+  { id: 'verification.current', applicability: [{ scope: 'archive' }] },
   {
     id: 'hook.pre',
     applicability: [{ scope: 'archive' }],
@@ -125,6 +141,7 @@ const DOMAIN_CHECKS: Readonly<Partial<Record<CheckId, Check>>> = {
   'spec.overlap': specOverlap,
   'hook.pre': hookPre,
   'hook.post': hookPost,
+  'verification.current': verificationCurrent,
 }
 
 /**

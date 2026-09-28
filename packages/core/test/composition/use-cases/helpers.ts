@@ -69,6 +69,7 @@ export async function setupCompositionFactoryConfig(prefix: string): Promise<{
         archiveAdapter: { adapter: 'fs', config: { path: archivePath } },
       },
       approvals: { spec: false, signoff: false },
+      invalidation: { artifacts: 'downstream', workflow: 'preserve' },
     },
   }
 }

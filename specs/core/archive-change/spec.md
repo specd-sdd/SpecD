@@ -85,6 +85,18 @@ This guard MAY run outside `ChangeRepository.mutate` when no lifecycle mutation 
 
 Archive is **not** a lifecycle `from → to` evaluation. `approval.signoff` MUST NOT be bound to this operation.
 
+### Requirement: Canonical validity archive preflight
+
+After pre-archive hooks and before permanent writes, `ArchiveChange` SHALL refresh implementation tracking, run the single application reconciler against fresh artifact and implementation files, rerun live predicates and task counting, and only then construct the publication plan, preflight snapshot, spec-lock sidecars, and canonical write batch. The accepted verdict and the publication plan MUST describe the same post-hook snapshot.
+
+The reconciler is a mandatory dependency in every constructor and factory form. Missing explicit dependencies MUST fail through the standard composition-configuration error. `ArchiveChange` MUST NOT call `Change.invalidate` or another legacy mutation path as a fallback.
+
+Archive SHALL fail when required approval is absent, stale, or revoked; verification is absent, legacy-unknown, or stale; any non-task artifact has unresolved drift or pending review; or a required task artifact is missing, unreadable, structurally invalid, or contains incomplete tasks.
+
+If reconciliation commits a mandatory return to `designing` or `done`, archive SHALL stop and return a typed application diagnostic containing the committed state, automatic return, canonical blockers, and next action. It MUST NOT reduce recovery to a generic invalid-state error. Missing or stale verification recommends renewing evidence in the current state; it does not force a transition to `verifying`. A failed archive MUST NOT undo committed gate recovery.
+
+Task artifacts remain excluded from approval fingerprints, but archive MUST live-count them again so tasks added after approval or verification cannot bypass completion.
+
 ### Requirement: Deferred transition to archiving
 
 After full-batch preflight succeeds and batch canonical snapshots are written, `ArchiveChange` MUST transition the change to `archiving` inside a serialized `ChangeRepository.mutate(name, fn)` immediately before the first canonical `SpecRepository.publish()` call.
@@ -116,20 +128,11 @@ This check MUST occur before any hooks execute or any spec files are written. Th
 
 ### Requirement: Overlap guard
 
-After the archivable guard passes and before pre-archive hooks execute, `ArchiveChange` MUST evaluate `spec.overlap` (skippable with `allowOverlap` / `--allow-overlap`). Overlap stays archive-only in this capability — it MUST NOT run as an enter-`ready` predicate. The change MUST still be in `archivable` during this check.
+After the archivable guard passes and before pre-archive hooks execute, `ArchiveChange` MUST evaluate `spec.overlap` while the subject change remains `archivable`. Overlap is archive-only and MUST NOT become an enter-`ready` predicate.
 
-The check MUST:
+The check MUST list active changes, exclude the change being archived by name, call `detectSpecOverlap` with the remaining changes and subject, and retain only report entries involving the subject. When overlap exists and `allowOverlap` is false, it MUST throw `SpecOverlapError` naming each overlapping spec and peer change before any publication. Without overlap, archive proceeds regardless of the flag.
 
-1. Call `ChangeRepository.list()` to retrieve all active changes
-2. Exclude the change being archived from the list
-3. Call the `detectSpecOverlap` domain service with the remaining changes plus the change being archived
-4. Filter the result to entries where the change being archived participates
-
-**When `allowOverlap` is `false`:** If the filtered report has overlap, `ArchiveChange` MUST throw `SpecOverlapError` with the overlap entries. The error message MUST list the overlapping spec IDs and the names of the other changes targeting them.
-
-**When `allowOverlap` is `true`:** If the filtered report has overlap, `ArchiveChange` MUST invalidate each overlapping change as defined in the existing overlap invalidation rules.
-
-If the filtered report has no overlap, the archive proceeds normally regardless of the `allowOverlap` flag.
+When overlap exists and `allowOverlap` is true, each affected peer MUST receive a `spec-overlap-conflict` reconciliation intent through the single application reconciler. The peer's configured artifact and workflow policies and any mandatory gate recovery determine its persisted review state and lifecycle target; overlap alone MUST NOT unconditionally move every peer to `designing`. Peer invalidation and the resulting audit evidence MUST be committed atomically per peer. `ArchiveChange` MUST NOT call broad `Change.invalidate` directly.
 
 ### Requirement: Pre-archive hooks
 
@@ -285,6 +288,12 @@ For each spec ID in `change.specIds`:
 For markdown artifacts, the merge output must preserve inline formatting and list/style conventions from the base artifact wherever possible. Implementations must avoid destructive normalization of untouched sections during archive-time serialization.
 
 When the base markdown uses mixed style markers for the same construct (for example both `-` and `*` bullets, or both `*` and `_` for emphasis/strong), archive-time serialization must be deterministic and follow project markdown conventions configured for lint consistency.
+
+### Requirement: Versioned validity evidence preservation
+
+The archived manifest SHALL retain `manifestVersion`, structured invalidation policy, materialized approval and verification projections, artifact and implementation fingerprints with algorithm identifiers, and the complete append-only history. Archive inspection of a legacy manifest is read-only; it MUST NOT rewrite solely to migrate format.
+
+An active legacy change whose verification or required sign-off freshness cannot be proven MUST repeat the relevant operation before archive. Existing archived legacy records remain readable historical evidence and are not retroactively repaired from current files.
 
 ### Requirement: Archive repository call
 
@@ -493,8 +502,8 @@ When archive composition cannot derive explicit workspace layouts, `resolveArchi
 - [`default:_global/logging`](../../_global/logging/spec.md)
 - [`core:spec-lock`](../spec-lock/spec.md)
 - [`default:_global/error-handling-conventions`](../../_global/error-handling-conventions/spec.md)
-- [`core:regenerate-spec-metadata`](../regenerate-spec-metadata/spec.md) — forced post-commit metadata materialization
-- [`core:spec-optimization`](../spec-optimization/spec.md) — optimization records preserved unchanged during publication
-- [`core:initialize-persisted-spec-state`](../initialize-persisted-spec-state/spec.md) — shared `resolveInitialPersistedDependsOn()` service reused for lock-less specs
+- [`core:materialize-spec-metadata`](../materialize-spec-metadata/spec.md) — forced post-commit metadata materialization
+- [`core:spec-optimization`](../spec-optimization/spec.md)
+- [`core:initialize-persisted-spec-state`](../initialize-persisted-spec-state/spec.md)
 - [`core:composition-resolver`](../composition-resolver/spec.md)
-- [`core:transition-checks`](../transition-checks/spec.md) — named archive checks and shared runners.
+- [`core:transition-checks`](../transition-checks/spec.md) — canonical archive predicates and reconciliation

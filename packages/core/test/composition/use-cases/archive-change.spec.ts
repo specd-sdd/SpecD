@@ -41,6 +41,7 @@ describe('createArchiveChange', () => {
       projectRoot: '/tmp/project',
       batchSnapshot: {} as never,
       contentHasher: {} as never,
+      reconcile: {} as never,
     }
 
     expect(createArchiveChange(deps)).toBeInstanceOf(ArchiveChange)
@@ -61,6 +62,7 @@ describe('createArchiveChange', () => {
       projectRoot: '/tmp/project',
       batchSnapshot: {} as never,
       contentHasher: {} as never,
+      reconcile: {} as never,
     }
 
     expect(() =>

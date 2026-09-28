@@ -8,7 +8,27 @@
 
 import { z } from 'zod'
 import { type ArtifactStatus } from '../../domain/value-objects/artifact-status.js'
-import { type InvalidationPolicy } from '../../domain/value-objects/invalidation-policy.js'
+import {
+  type InvalidationPolicy,
+  type ArtifactInvalidationPolicy,
+} from '../../domain/value-objects/invalidation-policy.js'
+import {
+  type ArtifactFingerprint,
+  type SpecApprovalFingerprint,
+  type ImplementationFingerprint,
+  type ValidityFingerprint,
+  type FingerprintDifference,
+  type ArtifactFingerprintAlgorithm,
+  type TextNormalizationAlgorithm,
+  type BinaryNormalizationAlgorithm,
+} from '../../domain/value-objects/validity-fingerprint.js'
+import { type ChangeState } from '../../domain/value-objects/change-state.js'
+import {
+  type ProjectionStatus,
+  type ValidityInvalidationCause,
+} from '../../domain/entities/change.js'
+import { UnsupportedManifestVersionError } from '../../domain/errors/unsupported-manifest-version-error.js'
+import { CorruptedManifestError } from '../../domain/errors/corrupted-manifest-error.js'
 
 /** Actor identity as stored in the manifest JSON. */
 export interface ManifestActorIdentity {
@@ -58,6 +78,9 @@ export interface ManifestArtifact {
   readonly files: ManifestArtifactFile[]
 }
 
+/** Raw change artifact alias used in specs. */
+export type RawChangeArtifact = ManifestArtifact
+
 /** Allowed review states for tracked implementation files. */
 export type ManifestTrackedImplementationFileState = 'open' | 'resolved' | 'ignored' | 'removed'
 
@@ -101,169 +124,111 @@ export type RawInvalidatedCause =
 
 /** Raw JSON shape of a `created` event. */
 export interface RawCreatedEvent {
-  /** Event discriminant. */
   readonly type: 'created'
-  /** ISO 8601 timestamp. */
   readonly at: string
-  /** Actor who created the change. */
   readonly by: ManifestActorIdentity
-  /** Spec paths at creation time. */
   readonly specIds: string[]
-  /** Schema name at creation time. */
   readonly schemaName: string
-  /** Schema version at creation time. */
   readonly schemaVersion: number
 }
 
 /** Raw JSON shape of a `transitioned` event. */
 export interface RawTransitionedEvent {
-  /** Event discriminant. */
   readonly type: 'transitioned'
-  /** ISO 8601 timestamp. */
   readonly at: string
-  /** Actor who triggered the transition. */
   readonly by: ManifestActorIdentity
-  /** The state transitioned from. */
   readonly from: string
-  /** The state transitioned to. */
   readonly to: string
 }
 
 /** Raw JSON shape of a `spec-approved` event. */
 export interface RawSpecApprovedEvent {
-  /** Event discriminant. */
   readonly type: 'spec-approved'
-  /** ISO 8601 timestamp. */
   readonly at: string
-  /** Actor who approved the spec. */
   readonly by: ManifestActorIdentity
-  /** Free-text rationale for the approval. */
   readonly reason: string
-  /** Hashes of the artifacts reviewed during approval, keyed by artifact type. */
   readonly artifactHashes: Record<string, string>
+  /** Present on native v2 writes; absent on legacy/transitional history. */
+  readonly fingerprint?: SpecApprovalFingerprint
 }
 
 /** Raw JSON shape of a `signed-off` event. */
 export interface RawSignedOffEvent {
-  /** Event discriminant. */
   readonly type: 'signed-off'
-  /** ISO 8601 timestamp. */
   readonly at: string
-  /** Actor who signed off. */
   readonly by: ManifestActorIdentity
-  /** Free-text rationale for the sign-off. */
   readonly reason: string
-  /** Hashes of the artifacts reviewed during sign-off, keyed by artifact type. */
   readonly artifactHashes: Record<string, string>
 }
 
 /** Raw JSON shape of a `signoff-invalidated` event. */
 export interface RawSignoffInvalidatedEvent {
-  /** Event discriminant. */
   readonly type: 'signoff-invalidated'
-  /** ISO 8601 timestamp. */
   readonly at: string
-  /** Actor who cleared the signoff. */
   readonly by: ManifestActorIdentity
 }
 
 /** Raw JSON shape of an `invalidated` event. */
 export interface RawInvalidatedEvent {
-  /** Event discriminant. */
   readonly type: 'invalidated'
-  /** ISO 8601 timestamp. */
   readonly at: string
-  /** Actor who triggered the invalidation. */
   readonly by: ManifestActorIdentity
-  /** The reason the approval was invalidated. */
   readonly cause: RawInvalidatedCause
-  /** Human-readable invalidation summary. */
   readonly message: string
-  /** Artifact/file payload that triggered the invalidation. */
   readonly affectedArtifacts: RawInvalidatedArtifactEntry[]
 }
 
 /** Raw JSON shape of an `archive-failed` event. */
 export interface RawArchiveFailedEvent {
-  /** Event discriminant. */
   readonly type: 'archive-failed'
-  /** ISO 8601 timestamp. */
   readonly at: string
-  /** Actor who triggered the archive attempt. */
   readonly by: ManifestActorIdentity
-  /** Archive phase that failed. */
   readonly step: 'prepare' | 'commit' | 'archive' | 'metadata'
-  /** Human-readable failure summary. */
   readonly message: string
-  /** Whether permanent archive commit had already begun. */
   readonly commitStarted: boolean
 }
 
 /** Raw JSON shape of a `drafted` event. */
 export interface RawDraftedEvent {
-  /** Event discriminant. */
   readonly type: 'drafted'
-  /** ISO 8601 timestamp. */
   readonly at: string
-  /** Actor who shelved the change. */
   readonly by: ManifestActorIdentity
-  /** Optional explanation for shelving. */
   readonly reason?: string
 }
 
 /** Raw JSON shape of a `restored` event. */
 export interface RawRestoredEvent {
-  /** Event discriminant. */
   readonly type: 'restored'
-  /** ISO 8601 timestamp. */
   readonly at: string
-  /** Actor who restored the change. */
   readonly by: ManifestActorIdentity
 }
 
 /** Raw JSON shape of a `discarded` event. */
 export interface RawDiscardedEvent {
-  /** Event discriminant. */
   readonly type: 'discarded'
-  /** ISO 8601 timestamp. */
   readonly at: string
-  /** Actor who discarded the change. */
   readonly by: ManifestActorIdentity
-  /** Mandatory reason for discarding. */
   readonly reason: string
-  /** Optional list of change names that replace this one. */
   readonly supersededBy?: string[]
 }
 
 /** Raw JSON shape of an `artifacts-synced` event. */
 export interface RawArtifactsSyncedEvent {
-  /** Event discriminant. */
   readonly type: 'artifacts-synced'
-  /** ISO 8601 timestamp. */
   readonly at: string
-  /** System actor that performed the sync. */
   readonly by: ManifestActorIdentity
-  /** Artifact type IDs added by the sync. */
   readonly typesAdded: string[]
-  /** Artifact type IDs removed by the sync. */
   readonly typesRemoved: string[]
-  /** Files added within existing or new artifacts. */
   readonly filesAdded: Array<{ type: string; key: string }>
-  /** Files removed from existing artifacts. */
   readonly filesRemoved: Array<{ type: string; key: string }>
 }
 
 /** Raw JSON shape of an `artifact-skipped` event. */
 export interface RawArtifactSkippedEvent {
-  /** Event discriminant. */
   readonly type: 'artifact-skipped'
-  /** ISO 8601 timestamp. */
   readonly at: string
-  /** Actor who skipped the artifact. */
   readonly by: ManifestActorIdentity
-  /** The artifact type ID that was skipped. */
   readonly artifactId: string
-  /** Optional explanation for skipping. */
   readonly reason?: string
 }
 
@@ -275,8 +240,51 @@ export interface RawDescriptionUpdatedEvent {
   readonly description: string
 }
 
-/** Discriminated union of all raw event JSON shapes. */
-export type RawChangeEvent =
+/** Raw JSON shape of an `approval-invalidated` event. */
+export interface RawApprovalInvalidatedEvent {
+  readonly type: 'approval-invalidated'
+  readonly at: string
+  readonly by: ManifestActorIdentity
+  readonly gate: 'spec' | 'signoff'
+  readonly status: 'stale' | 'revoked'
+  readonly cause: ValidityInvalidationCause
+  readonly reason: string
+  readonly differences: readonly FingerprintDifference[]
+}
+
+/** Raw JSON shape of a `verification-attempt-started` event. */
+export interface RawVerificationAttemptStartedEvent {
+  readonly type: 'verification-attempt-started'
+  readonly at: string
+  readonly by: ManifestActorIdentity
+  readonly attemptId: string
+  readonly state: ChangeState
+  readonly fingerprintVersion: 1
+  readonly artifactAlgorithm: ArtifactFingerprintAlgorithm
+  readonly textNormalization: TextNormalizationAlgorithm
+  readonly binaryNormalization: BinaryNormalizationAlgorithm
+}
+
+/** Raw JSON shape of a `verification-completed` event. */
+export interface RawVerificationCompletedEvent {
+  readonly type: 'verification-completed'
+  readonly at: string
+  readonly by: ManifestActorIdentity
+  readonly attemptId: string
+  readonly verificationId: string
+}
+
+/** Raw JSON shape of a `verification-invalidated` event. */
+export interface RawVerificationInvalidatedEvent {
+  readonly type: 'verification-invalidated'
+  readonly at: string
+  readonly by: ManifestActorIdentity
+  readonly verificationId: string
+  readonly reason: string
+}
+
+/** Discriminated union of raw event JSON shapes for v1 manifests. */
+export type RawChangeEventV1 =
   | RawCreatedEvent
   | RawTransitionedEvent
   | RawSpecApprovedEvent
@@ -290,6 +298,137 @@ export type RawChangeEvent =
   | RawArtifactSkippedEvent
   | RawArtifactsSyncedEvent
   | RawDescriptionUpdatedEvent
+
+/** Discriminated union of raw event JSON shapes for v2 manifests. */
+export type RawChangeEventV2 =
+  | RawChangeEventV1
+  | RawApprovalInvalidatedEvent
+  | RawVerificationAttemptStartedEvent
+  | RawVerificationCompletedEvent
+  | RawVerificationInvalidatedEvent
+
+/** Alias for backward compatibility with v1 raw events. */
+export type RawChangeEvent = RawChangeEventV2
+
+// ---- Raw projection definitions ----
+
+/** Raw projection invalidation. */
+export interface RawProjectionInvalidation {
+  readonly at: string
+  readonly by: ManifestActorIdentity
+  readonly cause: ValidityInvalidationCause
+  readonly reason: string
+  readonly differences: readonly FingerprintDifference[]
+}
+
+/** Raw approval decision. */
+export interface RawApprovalDecision {
+  readonly at: string
+  readonly by: ManifestActorIdentity
+  readonly reason: string
+}
+
+/** Raw spec approval projection. */
+export interface RawSpecApprovalProjection {
+  readonly status: ProjectionStatus
+  readonly decision: RawApprovalDecision
+  readonly fingerprint: SpecApprovalFingerprint | ArtifactFingerprint
+  readonly invalidation?: RawProjectionInvalidation
+}
+
+/** Raw signoff projection. */
+export interface RawSignoffProjection {
+  readonly status: ProjectionStatus
+  readonly decision: RawApprovalDecision
+  readonly fingerprint: {
+    readonly version: 1
+    readonly artifacts: ArtifactFingerprint
+    readonly implementation: ImplementationFingerprint | null
+  }
+  readonly verificationId: string | null
+  readonly invalidation?: RawProjectionInvalidation
+}
+
+/** Raw verification attempt. */
+export interface RawVerificationAttempt {
+  readonly id: string
+  readonly startedAt: string
+  readonly startedBy: ManifestActorIdentity
+  readonly startedIn: ChangeState
+  readonly baseline: ValidityFingerprint
+}
+
+/** Raw completed verification. */
+export interface RawCompletedVerification {
+  readonly id: string
+  readonly attemptId: string
+  readonly status: 'valid' | 'stale'
+  readonly completedAt: string
+  readonly completedBy: ManifestActorIdentity
+  readonly fingerprint: {
+    readonly version: 1
+    readonly artifacts: ArtifactFingerprint
+    readonly implementation: ImplementationFingerprint | null
+  }
+  readonly invalidation?: RawProjectionInvalidation
+}
+
+/** Raw verification projection. */
+export interface RawVerificationProjection {
+  readonly activeAttempt?: RawVerificationAttempt
+  readonly completed?: RawCompletedVerification
+}
+
+// ---- Legacy v1 and Native v2 ChangeManifest shapes ----
+
+/** Legacy change manifest v1. */
+export interface LegacyChangeManifestV1 {
+  readonly manifestVersion?: undefined
+  readonly name: string
+  readonly createdAt: string
+  readonly updatedAt?: string
+  readonly description?: string
+  readonly archivedAt?: string
+  readonly archivedBy?: ManifestActorIdentity
+  readonly schema: { readonly name: string; readonly version: number }
+  readonly workspaces?: readonly string[]
+  readonly specIds: readonly string[]
+  readonly specDependsOn?: Readonly<Record<string, readonly string[]>>
+  readonly invalidationPolicy?: ArtifactInvalidationPolicy
+  readonly implementationTrackingStartedAt?: string | null
+  readonly trackedImplementationFiles?: readonly ManifestTrackedImplementationFile[]
+  readonly implementationLinks?: readonly ManifestImplementationLink[]
+  readonly artifacts: readonly ManifestArtifact[]
+  readonly history: readonly RawChangeEventV1[]
+}
+
+/** Change manifest v2. */
+export interface ChangeManifestV2 {
+  readonly manifestVersion: 2
+  readonly name: string
+  readonly createdAt: string
+  readonly updatedAt: string
+  readonly description?: string
+  readonly archivedAt?: string
+  readonly archivedBy?: ManifestActorIdentity
+  readonly schema: { readonly name: string; readonly version: number }
+  readonly specIds: readonly string[]
+  readonly specDependsOn?: Readonly<Record<string, readonly string[]>>
+  readonly invalidation: InvalidationPolicy
+  readonly artifacts: readonly ManifestArtifact[]
+  readonly trackedImplementationFiles?: readonly ManifestTrackedImplementationFile[]
+  readonly implementationLinks?: readonly ManifestImplementationLink[]
+  readonly implementationTrackingStartedAt?: string | null
+  readonly specApproval?: RawSpecApprovalProjection
+  readonly signoff?: RawSignoffProjection
+  readonly verification?: RawVerificationProjection
+  readonly history: readonly RawChangeEventV2[]
+}
+
+/** Discriminated union of all supported manifest versions. */
+export type ChangeManifest = LegacyChangeManifestV1 | ChangeManifestV2
+
+export const MAX_SUPPORTED_MANIFEST_VERSION = 2
 
 // ---- Zod validation schemas ----
 
@@ -357,7 +496,283 @@ export const rawChangeEventSchema = z
   })
   .passthrough()
 
-export const changeManifestSchema = z.object({
+const validityCauseSchema = z.enum([
+  'artifact-drift',
+  'implementation-drift',
+  'scope-change',
+  'manual-invalidation',
+  'verification-invalidated',
+  'spec-overlap-conflict',
+  'legacy-unknown',
+])
+
+/**
+ * Legacy event.
+ *
+ * @param type - type
+ * @param shape - shape
+ * @returns passthrough Zod schema for one legacy history event
+ */
+function legacyEvent<T extends string>(type: T, shape: z.ZodRawShape) {
+  return z
+    .object({
+      type: z.literal(type),
+      at: z.string(),
+      by: actorIdentitySchema,
+      ...shape,
+    })
+    .passthrough()
+}
+
+/** Strict serialized representation of one validity fingerprint difference. */
+export const fingerprintDifferenceSchema = z
+  .object({
+    scope: z.enum(['artifact', 'implementation', 'spec']),
+    key: z.string(),
+    kind: z.enum([
+      'added',
+      'removed',
+      'changed',
+      'algorithm-changed',
+      'unreadable',
+      'spec-added',
+      'spec-removed',
+    ]),
+    expected: z.string().optional(),
+    actual: z.string().optional(),
+  })
+  .strict()
+
+/**
+ * Explicit v2 history variants. Legacy event types stay passthrough so additive
+ * historical fields survive; the four validity events are strict.
+ */
+export const rawChangeEventV2Schema = z.discriminatedUnion('type', [
+  z
+    .object({
+      type: z.literal('approval-invalidated'),
+      at: z.string(),
+      by: actorIdentitySchema,
+      gate: z.enum(['spec', 'signoff']),
+      status: z.enum(['stale', 'revoked']),
+      cause: validityCauseSchema,
+      reason: z.string(),
+      differences: z.array(fingerprintDifferenceSchema),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('verification-attempt-started'),
+      at: z.string(),
+      by: actorIdentitySchema,
+      attemptId: z.string(),
+      state: z.string(),
+      fingerprintVersion: z.literal(1),
+      artifactAlgorithm: z.literal('artifact-pre-hash-v1'),
+      textNormalization: z.literal('text-v1'),
+      binaryNormalization: z.literal('bytes-v1'),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('verification-completed'),
+      at: z.string(),
+      by: actorIdentitySchema,
+      attemptId: z.string(),
+      verificationId: z.string(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('verification-invalidated'),
+      at: z.string(),
+      by: actorIdentitySchema,
+      verificationId: z.string(),
+      reason: z.string(),
+    })
+    .strict(),
+  legacyEvent('created', {
+    specIds: z.array(z.string()),
+    schemaName: z.string(),
+    schemaVersion: z.number(),
+  }),
+  legacyEvent('transitioned', { from: z.string(), to: z.string() }),
+  legacyEvent('spec-approved', {
+    reason: z.string(),
+    artifactHashes: z.record(z.string(), z.string()),
+    fingerprint: z
+      .object({
+        version: z.literal(1),
+        specIds: z.array(z.string()),
+        artifacts: z.lazy(() => artifactFingerprintSchema),
+      })
+      .strict()
+      .optional(),
+  }),
+  legacyEvent('signed-off', {
+    reason: z.string(),
+    artifactHashes: z.record(z.string(), z.string()),
+  }),
+  legacyEvent('signoff-invalidated', {}),
+  legacyEvent('invalidated', {
+    cause: z.string(),
+    message: z.string(),
+    affectedArtifacts: z.array(z.object({ type: z.string(), files: z.array(z.string()) })),
+  }),
+  legacyEvent('archive-failed', {
+    step: z.enum(['prepare', 'commit', 'archive', 'metadata']),
+    message: z.string(),
+    commitStarted: z.boolean(),
+  }),
+  legacyEvent('drafted', { reason: z.string().optional() }),
+  legacyEvent('restored', {}),
+  legacyEvent('discarded', { reason: z.string(), supersededBy: z.array(z.string()).optional() }),
+  legacyEvent('artifact-skipped', { artifactId: z.string(), reason: z.string().optional() }),
+  legacyEvent('artifacts-synced', {
+    typesAdded: z.array(z.string()),
+    typesRemoved: z.array(z.string()),
+    filesAdded: z.array(z.object({ type: z.string(), key: z.string() })),
+    filesRemoved: z.array(z.object({ type: z.string(), key: z.string() })),
+  }),
+  legacyEvent('description-updated', { description: z.string() }),
+])
+
+const sha256Pattern = /^sha256:[0-9a-f]{64}$/
+
+export const artifactFingerprintSchema = z
+  .object({
+    version: z.literal(1),
+    algorithm: z.literal('artifact-pre-hash-v1'),
+    files: z.record(z.string(), z.string().regex(sha256Pattern)),
+  })
+  .strict()
+
+export const implementationFingerprintEntrySchema = z.object({
+  hash: z.string().regex(sha256Pattern),
+  content: z.enum(['text', 'binary']),
+  normalization: z.enum(['text-v1', 'bytes-v1']),
+})
+
+export const implementationFingerprintSchema = z
+  .object({
+    version: z.literal(1),
+    hashAlgorithm: z.literal('sha256'),
+    textNormalization: z.literal('text-v1'),
+    binaryNormalization: z.literal('bytes-v1'),
+    files: z.record(z.string(), implementationFingerprintEntrySchema),
+  })
+  .strict()
+
+export const validityFingerprintSchema = z.object({
+  version: z.literal(1),
+  artifacts: artifactFingerprintSchema,
+  implementation: implementationFingerprintSchema,
+})
+
+export const rawProjectionInvalidationSchema = z.object({
+  at: z.string(),
+  by: actorIdentitySchema,
+  cause: z.enum([
+    'artifact-drift',
+    'implementation-drift',
+    'scope-change',
+    'manual-invalidation',
+    'verification-invalidated',
+    'spec-overlap-conflict',
+    'legacy-unknown',
+  ]),
+  reason: z.string(),
+  differences: z.array(fingerprintDifferenceSchema),
+})
+
+export const rawApprovalDecisionSchema = z.object({
+  at: z.string(),
+  by: actorIdentitySchema,
+  reason: z.string(),
+})
+
+export const rawSpecApprovalProjectionSchema = z
+  .object({
+    status: z.enum(['valid', 'stale', 'revoked']),
+    decision: rawApprovalDecisionSchema,
+    fingerprint: z.union([
+      z
+        .object({
+          version: z.literal(1),
+          specIds: z.array(z.string()),
+          artifacts: artifactFingerprintSchema,
+        })
+        .strict(),
+      artifactFingerprintSchema,
+    ]),
+    invalidation: rawProjectionInvalidationSchema.optional(),
+  })
+  .strict()
+
+export const rawSignoffProjectionSchema = z.object({
+  status: z.enum(['valid', 'stale', 'revoked']),
+  decision: rawApprovalDecisionSchema,
+  fingerprint: z.object({
+    version: z.literal(1),
+    artifacts: artifactFingerprintSchema,
+    implementation: implementationFingerprintSchema.nullable(),
+  }),
+  verificationId: z.string().nullable(),
+  invalidation: rawProjectionInvalidationSchema.optional(),
+})
+
+export const rawVerificationAttemptSchema = z.object({
+  id: z.string(),
+  startedAt: z.string(),
+  startedBy: actorIdentitySchema,
+  startedIn: z.enum([
+    'drafting',
+    'proposing',
+    'specifying',
+    'designing',
+    'ready',
+    'pending-spec-approval',
+    'spec-approved',
+    'implementing',
+    'verifying',
+    'done',
+    'pending-signoff',
+    'signed-off',
+    'archivable',
+    'archiving',
+    'archived',
+    'drafted',
+    'discarded',
+  ]),
+  baseline: validityFingerprintSchema,
+})
+
+export const rawCompletedVerificationSchema = z.object({
+  id: z.string(),
+  attemptId: z.string(),
+  status: z.enum(['valid', 'stale']),
+  completedAt: z.string(),
+  completedBy: actorIdentitySchema,
+  fingerprint: z.object({
+    version: z.literal(1),
+    artifacts: artifactFingerprintSchema,
+    implementation: implementationFingerprintSchema.nullable(),
+  }),
+  invalidation: rawProjectionInvalidationSchema.optional(),
+})
+
+export const rawVerificationProjectionSchema = z.object({
+  activeAttempt: rawVerificationAttemptSchema.optional(),
+  completed: rawCompletedVerificationSchema.optional(),
+})
+
+export const invalidationPolicySchema = z.object({
+  artifacts: z.enum(['none', 'surgical', 'downstream', 'global']),
+  workflow: z.enum(['preserve', 'redesign']),
+})
+
+export const legacyChangeManifestV1Schema = z.object({
+  manifestVersion: z.undefined().optional(),
   name: z.string(),
   createdAt: z.string(),
   updatedAt: z.string().optional(),
@@ -379,66 +794,71 @@ export const changeManifestSchema = z.object({
   history: z.array(rawChangeEventSchema),
 })
 
-/** The top-level structure of a `manifest.json` file. */
-export interface ChangeManifest {
-  /** The change slug; immutable after creation. */
-  readonly name: string
-  /** ISO 8601 creation timestamp; immutable after creation. */
-  readonly createdAt: string
-  /**
-   * ISO 8601 timestamp of the last manifest mutation.
-   *
-   * Absent in legacy manifests; derived on load from `createdAt` and `history`.
-   */
-  readonly updatedAt?: string
-  /** Optional free-text description of the change's purpose. */
-  readonly description?: string
-  /**
-   * ISO 8601 timestamp when the change was archived.
-   *
-   * Present only in manifests that have been moved to the archive directory.
-   * Absent from active, drafted, and discarded change manifests.
-   */
-  readonly archivedAt?: string
-  /**
-   * Git identity of the actor who archived the change.
-   *
-   * Present only in manifests that have been moved to the archive directory.
-   */
-  readonly archivedBy?: ManifestActorIdentity
-  /** Schema name and version recorded at creation; never updated. */
-  readonly schema: {
-    /** Schema name (e.g. `"@specd/schema-std"`). */
-    readonly name: string
-    /** Schema version integer. */
-    readonly version: number
+export const changeManifestV2Schema = z.object({
+  manifestVersion: z.literal(2),
+  name: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  description: z.string().optional(),
+  archivedAt: z.string().optional(),
+  archivedBy: actorIdentitySchema.optional(),
+  schema: z.object({
+    name: z.string(),
+    version: z.number(),
+  }),
+  specIds: z.array(z.string()),
+  specDependsOn: z.record(z.string(), z.array(z.string())).optional(),
+  invalidation: invalidationPolicySchema,
+  artifacts: z.array(manifestArtifactSchema),
+  trackedImplementationFiles: z.array(manifestTrackedImplementationFileSchema).optional(),
+  implementationLinks: z.array(manifestImplementationLinkSchema).optional(),
+  implementationTrackingStartedAt: z.string().datetime().optional().nullable(),
+  specApproval: rawSpecApprovalProjectionSchema.optional(),
+  signoff: rawSignoffProjectionSchema.optional(),
+  verification: rawVerificationProjectionSchema.optional(),
+  history: z.array(rawChangeEventV2Schema),
+})
+
+/**
+ * Top-level union schema that accepts either a v1 or v2 manifest.
+ */
+export const changeManifestSchema = z.union([changeManifestV2Schema, legacyChangeManifestV1Schema])
+
+/**
+ * Parses and validates raw manifest content according to manifestVersion.
+ *
+ * Missing or undefined `manifestVersion` uses the legacy v1 schema.
+ * Version 2 uses the strict v2 schema.
+ * Greater versions or invalid non-number versions throw `UnsupportedManifestVersionError`.
+ * Malformed valid-version shapes throw `CorruptedManifestError`.
+ *
+ * @param raw - Unknown deserialized JSON object
+ * @returns Validated `ChangeManifest` (v1 or v2)
+ * @throws {UnsupportedManifestVersionError} When `manifestVersion` is unsupported or invalid
+ * @throws {CorruptedManifestError} When manifest structure is invalid
+ */
+export function parseChangeManifest(raw: unknown): ChangeManifest {
+  if (typeof raw !== 'object' || raw === null) {
+    throw new CorruptedManifestError('manifest root must be an object')
   }
-  /**
-   * Legacy workspace IDs field.
-   *
-   * No longer written on save. Accepted on load for backward compatibility
-   * with manifests created before workspaces became a computed property.
-   */
-  readonly workspaces?: string[]
-  /** Current snapshot of spec paths being modified. */
-  readonly specIds: string[]
-  /**
-   * Per-spec declared dependencies, keyed by spec ID.
-   *
-   * Captured during change authoring to track dependencies even before
-   * `metadata.json` is generated. Omitted from the manifest when empty.
-   */
-  readonly specDependsOn?: Record<string, string[]>
-  /** Invalidation policy for this change. Defaults to `'downstream'` when absent. */
-  readonly invalidationPolicy?: InvalidationPolicy
-  /** ISO 8601 timestamp when implementation tracking started. */
-  readonly implementationTrackingStartedAt?: string | null
-  /** Optional tracked implementation files under review for the active change. */
-  readonly trackedImplementationFiles?: ManifestTrackedImplementationFile[]
-  /** Optional confirmed implementation links for the active change. */
-  readonly implementationLinks?: ManifestImplementationLink[]
-  /** Artifact descriptors including their validation hashes. */
-  readonly artifacts: ManifestArtifact[]
-  /** Append-only event history. */
-  readonly history: RawChangeEvent[]
+
+  const obj = raw as Record<string, unknown>
+  if ('manifestVersion' in obj && obj.manifestVersion !== undefined) {
+    const version = obj.manifestVersion
+    if (version !== 2) {
+      throw new UnsupportedManifestVersionError(version)
+    }
+    const parsed = changeManifestV2Schema.safeParse(raw)
+    if (!parsed.success) {
+      throw new CorruptedManifestError(parsed.error.issues.map((i) => i.message).join(', '))
+    }
+    return parsed.data as ChangeManifestV2
+  }
+
+  // Absent version -> v1
+  const parsed = legacyChangeManifestV1Schema.safeParse(raw)
+  if (!parsed.success) {
+    throw new CorruptedManifestError(parsed.error.issues.map((i) => i.message).join(', '))
+  }
+  return parsed.data as LegacyChangeManifestV1
 }

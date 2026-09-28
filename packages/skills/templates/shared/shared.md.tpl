@@ -144,6 +144,92 @@ The `changes status` response also includes a `nextAction` object:
 **Always prefer the `nextAction` recommendation** over manual state derivation.
 It accounts for both structural blockers and the logical workflow progression.
 
+## Canonical validity reconciliation
+
+Start every change-scoped lifecycle decision from a fresh `specd changes status`.
+The reconciled state, materialized validity projections, blockers, and next action
+are canonical. Status may write when it discovers invalidity: that committed
+recovery is already applied. Trust it.
+
+Do not calculate fingerprints, edit manifest projections, append invalidation
+events, choose a recovery target, or roll the lifecycle back by hand. Do not
+invent a restart-verification flag on `changes transition`. Transitions and
+status only check already-completed current evidence. They never complete an
+unfinished verification attempt.
+
+Artifact policy and workflow policy are independent:
+
+- `artifacts: none` waives reopening artifacts for review. It does not waive
+  freshness. Unresolved non-task drift or pending review still blocks forward
+  progress.
+- `workflow: preserve` permits in-place semantic review and revalidation in the
+  current phase when no mandatory gate recovery overrides it. It does not force
+  `/specd-design`, and it does not authorize forward progress while non-task
+  review is unresolved.
+- `workflow: redesign` plus unresolved non-task drift or pending review returns
+  the change to `designing`.
+
+`specd changes validate` establishes structure and a baseline. Structural success
+is not semantic review, approval renewal, or verification renewal.
+
+Recovery is already chosen by core. Follow the committed state and next action:
+
+- Required stale or revoked spec consent returns to `designing` and must be
+  renewed in `ready` with human `approve spec` (`designing` → `ready` →
+  approval). Spec recovery wins when both gates are stale. A stale spec
+  approval that is already in `designing` does not transition again.
+- Required stale or revoked sign-off returns a change that is later than `done`
+  to `done`. It does not move an earlier state forward to `done`. When
+  verification is also stale, repeat verification in place before renewing
+  sign-off.
+- Verification staleness alone never moves lifecycle state. Before `verifying`
+  it is contextual: do the phase's normal work. At `verifying` or later,
+  including `verifying` → `done`, sign-off, and archive, it blocks and
+  recommends in-place verification (`/specd-verify` or
+  `specd changes verification start <name>`). Renewing evidence does not require
+  a self-transition or leaving and re-entering a phase.
+- Entering `verifying` checks implementation readiness. It does not capture a
+  verification baseline. Explicit `specd changes verification start <name>`
+  captures the baseline after files and links are resolved, from any active
+  state.
+
+Verification attempt ownership:
+
+- Independent `/specd-verify` and independent
+  `specd-compliance --change <name>` each run
+  `specd changes verification start <name>` before verification work, then
+  checks, report, and applicable hooks, then
+  `specd changes verification complete <name>` only after success. Neither
+  requires the change to be in `verifying` merely to produce evidence. Lifecycle
+  advancement stays a separate authorized action.
+- Full verify starts once, passes the returned attempt id and a `--delegated`
+  marker to compliance, and runs `verification complete` only after scenario
+  checks and the delegated audit both succeed. Delegated compliance must not
+  start or complete that attempt.
+- An existing active attempt does not mean the invocation is delegated.
+  Independent compliance starts its own attempt.
+- Project-wide, diff, pull-request, single-spec, and selection modes without a
+  concrete active change are report-only. They do not run verification start
+  or complete.
+- If fingerprinted inputs change, inspect the differences, run
+  `specd changes verification start <name>` again, and repeat all required
+  verification work against the new baseline before complete. Do not complete a
+  new attempt with results from the previous baseline. Failed checks,
+  interrupted work, or a failed delegated audit leave the attempt active and
+  must not record successful completion.
+- `specd changes verification invalidate <name> --reason "<text>"` only
+  withdraws completed verification evidence. It never starts or restarts an
+  attempt.
+
+`hasTasks` artifacts are live operational state. They are excluded from
+fingerprints, and they are still structurally validated. Incomplete live tasks
+still block transition and archive.
+
+Archive uses the same live preflight. Do not archive until post-hook status
+shows tasks, artifacts, implementation, required verification, and enabled gates
+passing. Overlap with peer changes is reconciled by core. Do not hand-invalidate
+peer manifests.
+
 ## Repair Guide for failed transitions
 
 When `changes transition` fails in `text` mode, it renders a **Repair Guide**,
@@ -237,9 +323,10 @@ If the output is not what you want, edit the delta again (make sure the delta do
 ## Structural validation vs content review
 
 `specd changes validate` is a structural and lifecycle-state gate. It verifies schema
-shape, required files, artifact dependencies, and validation status. It does **not**
-approve semantic content quality, requirement intent, implementation correctness, or
-whether a delta preserves important existing text.
+shape, required files, artifact dependencies, and validation status, and it can
+establish a new baseline. It does **not** approve semantic content quality,
+requirement intent, implementation correctness, whether a delta preserves
+important existing text, or renew spec approval, sign-off, or verification.
 
 After validation succeeds, review the content that matters for the current phase:
 

@@ -270,10 +270,28 @@ export const SpecdYamlZodSchema = z
     llmOptimizedContext: z.boolean().optional(),
     schemaPlugins: z.array(z.string()).optional(),
     schemaOverrides: SchemaOverridesZodSchema.optional(),
+    invalidation: z
+      .object({
+        artifacts: z.enum(['none', 'surgical', 'downstream', 'global']),
+        workflow: z.enum(['preserve', 'redesign']),
+      })
+      .strict()
+      .optional(),
+    /** @deprecated Input compatibility alias. Effective config exposes `invalidation` only. */
     invalidationPolicy: z.enum(['none', 'surgical', 'downstream', 'global']).optional(),
     plugins: PluginsZodSchema.optional(),
   })
   .strict()
+  .superRefine((data, ctx) => {
+    if (data.invalidation !== undefined && data.invalidationPolicy !== undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['invalidation'],
+        message:
+          'invalidation and invalidationPolicy are ambiguous; supply only one invalidation shape',
+      })
+    }
+  })
 
 // ---------------------------------------------------------------------------
 // Utility functions needed by cascade code

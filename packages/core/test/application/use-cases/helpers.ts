@@ -12,6 +12,8 @@ import { type Spec } from '../../../src/domain/entities/spec.js'
 import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
 import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
 import { ArtifactFile } from '../../../src/domain/value-objects/artifact-file.js'
+import { ArtifactDag } from '../../../src/domain/value-objects/artifact-dag.js'
+import { type InvalidationPolicy } from '../../../src/domain/value-objects/invalidation-policy.js'
 import {
   ArtifactType,
   type ArtifactTypeProps,
@@ -78,6 +80,8 @@ import {
 } from '../../../src/application/use-cases/run-step-hooks.js'
 import { type ActorResolver } from '../../../src/application/ports/actor-resolver.js'
 import { SpecArtifact } from '../../../src/domain/value-objects/spec-artifact.js'
+import { type ReconcileChangeValidity } from '../../../src/application/use-cases/reconcile-change-validity.js'
+import { type ChangeValidityVerdict } from '../../../src/domain/services/change-validity.js'
 import {
   toDiscardedChangeView,
   toDraftedChangeView,
@@ -110,9 +114,32 @@ import { type WorkflowStep } from '../../../src/domain/value-objects/workflow-st
 import { ChangeNotFoundError } from '../../../src/application/errors/change-not-found-error.js'
 import { type HookRunner } from '../../../src/application/ports/hook-runner.js'
 import { HookResult } from '../../../src/domain/value-objects/hook-result.js'
+import {
+  type ArtifactFingerprint,
+  type SpecApprovalFingerprint,
+} from '../../../src/domain/value-objects/validity-fingerprint.js'
 
 /** Default identity for test actors. */
 export const testActor: ActorIdentity = { name: 'Test User', email: 'test@example.com' }
+
+/** Builds complete native spec-approval evidence for tests. */
+export function makeSpecApprovalFingerprint(
+  specIds: readonly string[],
+  artifacts: ArtifactFingerprint | Record<string, string> = {},
+): SpecApprovalFingerprint {
+  return {
+    version: 1,
+    specIds: [...new Set(specIds)].sort(),
+    artifacts:
+      'algorithm' in artifacts
+        ? (artifacts as ArtifactFingerprint)
+        : {
+            version: 1,
+            algorithm: 'artifact-pre-hash-v1',
+            files: artifacts as Record<string, `sha256:${string}`>,
+          },
+  }
+}
 
 /**
  * Creates a mock `Change` entity.
@@ -284,6 +311,14 @@ export class StubChangeRepository extends ChangeRepository {
   }
   async deltaExists(_change: Change, _specId: string, _filename: string): Promise<boolean> {
     return false
+  }
+  async implementationFile(
+    _change: Change,
+    projectRelativePath: string,
+  ): Promise<
+    import('../../../src/application/ports/change-repository.js').ImplementationFileReadResult
+  > {
+    return { status: 'missing', path: projectRelativePath }
   }
 }
 
@@ -963,6 +998,7 @@ export function newArchiveChange(
   projectRoot = process.cwd(),
   batchSnapshot: ArchiveBatchSnapshotPort = createNoopArchiveBatchSnapshot(),
   archiveBindings?: readonly CheckBinding[],
+  reconcile?: ReconcileChangeValidity,
 ): ArchiveChange {
   return new ArchiveChange(
     changes,
@@ -987,6 +1023,7 @@ export function newArchiveChange(
     projectRoot,
     batchSnapshot,
     makeContentHasher(),
+    reconcile ?? makeObservingReconcile(changes),
   )
 }
 
@@ -1163,6 +1200,7 @@ export function makeCreateChange(
     actor?: ActorResolver
     getActiveSchema?: GetActiveSchema
     detectOverlap?: DetectOverlap
+    defaultInvalidation?: InvalidationPolicy
   } = {},
 ): CreateChange {
   return new CreateChange(
@@ -1171,6 +1209,7 @@ export function makeCreateChange(
     opts.actor ?? makeActorResolver(),
     opts.getActiveSchema ?? makeGetActiveSchema(),
     opts.detectOverlap ?? makeDetectOverlap(),
+    opts.defaultInvalidation,
   )
 }
 
@@ -1224,4 +1263,104 @@ export function makeGetSpecMetadata(
   hasher: ContentHasher = makeContentHasher(),
 ): GetSpecMetadata {
   return makeSnapshotGetSpecMetadata(repos, hasher)
+}
+
+/** Open canonical verdict used by legacy-focused unit fixtures. */
+export const openValidityVerdict: ChangeValidityVerdict = {
+  artifactReviewRequired: false,
+  affectedArtifacts: [],
+  projectionChanges: [],
+  specApproval: 'not-required',
+  signoff: 'not-required',
+  verification: 'not-required',
+  blockers: [],
+  recovery: null,
+}
+
+/**
+ * Creates a persistence-aware reconciler double for tests whose subject is not
+ * validity calculation. Validity-specific suites inject the real reconciler.
+ */
+export function makeObservingReconcile(
+  changes: ChangeRepository,
+  verdict?: ChangeValidityVerdict,
+  refresh?: { execute(input: { readonly name: string }): Promise<unknown> },
+): ReconcileChangeValidity {
+  const verdictFor = (change: Change): ChangeValidityVerdict =>
+    verdict ?? {
+      ...openValidityVerdict,
+      specApproval: change.specApproval?.status ?? 'not-required',
+      signoff: change.signoff?.status ?? 'not-required',
+      verification:
+        change.verification.completed?.status === 'valid'
+          ? 'valid'
+          : change.verification.completed?.status === 'stale'
+            ? 'stale'
+            : change.verification.activeAttempt !== undefined
+              ? 'attempt-active'
+              : 'not-required',
+    }
+  const projection = (change: Change) => {
+    const currentVerdict = verdictFor(change)
+    return {
+      change,
+      verdict: currentVerdict,
+      projectionChanges: currentVerdict.projectionChanges,
+      affectedArtifacts: currentVerdict.affectedArtifacts,
+      automaticReturn: currentVerdict.recovery,
+      changed: false,
+    }
+  }
+  return {
+    execute: async ({
+      name,
+      refreshImplementationTracking,
+      intent,
+    }: {
+      readonly name: string
+      readonly refreshImplementationTracking?: boolean
+      readonly intent?: {
+        readonly type: string
+        readonly reason?: string
+        readonly targets?: readonly { readonly type: string; readonly files: readonly string[] }[]
+      }
+    }) => {
+      if (refreshImplementationTracking === true) await refresh?.execute({ name })
+      if (intent?.type === 'spec-overlap-conflict') {
+        await changes.mutate(name, (change) => {
+          change.invalidate(
+            'spec-overlap-conflict',
+            testActor,
+            intent.reason ?? 'Overlapping spec scope',
+            intent.targets ?? [],
+            ArtifactDag.from([]),
+          )
+        })
+      }
+      const change = await changes.get(name)
+      if (change === null) throw new Error(`Missing test change '${name}'`)
+      return projection(change)
+    },
+    mutate: async <T>(
+      { name }: { readonly name: string },
+      operation: (ctx: {
+        readonly change: Change
+        readonly before: ChangeValidityVerdict
+        readonly fingerprint: null
+        reconcileAfter(): Promise<ChangeValidityVerdict>
+      }) => Promise<T> | T,
+    ) => {
+      const mutation = await changes.mutate(name, async (change) => {
+        const currentVerdict = verdictFor(change)
+        const result = await operation({
+          change,
+          before: currentVerdict,
+          fingerprint: null,
+          reconcileAfter: async () => verdictFor(change),
+        })
+        return result
+      })
+      return { ...projection(mutation.change), result: mutation.result }
+    },
+  } as unknown as ReconcileChangeValidity
 }

@@ -59,33 +59,48 @@
 #### Scenario: Multi-workspace derived from specIds
 
 - **WHEN** a Change has `specIds: ['default:auth/login', 'billing:invoices']`
-- **THEN** both `default` and `billing` are active and both workspace-level context patterns are applied
+- **THEN** both workspace-level context patterns are applied
 
-#### Scenario: Spec added after creation
+#### Scenario: Scope addition without required gates preserves the working phase
 
-- **WHEN** a new spec ID is added to the Change's `specIds`
-- **THEN** an `invalidated` event with `cause: 'spec-change'` is appended and a `transitioned` event rolling back to `designing` is appended
+- **GIVEN** a change in `implementing` with workflow `preserve` and both approval gates disabled
+- **WHEN** `EditChange` adds a spec and canonical reconciliation evaluates the new scope
+- **THEN** the change remains in `implementing`
+- **AND** any existing spec consent covering a different scope becomes stale with a `spec-added` difference
+- **AND** missing or unvalidated required artifacts for the added spec still block forward progress
+- **AND** the edit does not invent approval evidence when none exists
+
+#### Scenario: Scope addition or removal requires renewed mandatory spec consent
+
+- **GIVEN** a change in `implementing` with valid spec consent and the spec gate enabled
+- **WHEN** canonical reconciliation detects an added or removed spec even with identical artifact bytes
+- **THEN** consent becomes stale with the corresponding `spec-added` or `spec-removed` difference
+- **AND** the change returns to `designing` exactly once, even with workflow `preserve`
+- **AND** the original approval and approved scope remain in audit history
+
+#### Scenario: Scope reordering and duplicates do not invalidate consent
+
+- **GIVEN** a valid approval for a canonical spec set and unchanged artifacts
+- **WHEN** an edit only reorders or repeats members of that same set
+- **THEN** consent remains valid and no scope-driven recovery or approval-invalidated event occurs
 
 #### Scenario: Orphaned specDependsOn removed when spec removed from specIds
 
-- **GIVEN** a Change with `specIds: ['auth/login', 'auth/session']`
-- **AND** `specDependsOn` has entries for both `'auth/login'` and `'auth/session'`
-- **WHEN** `updateSpecIds(['auth/login'], actor)` is called
-- **THEN** `specDependsOn` no longer has an entry for `'auth/session'`
-- **AND** `specDependsOn` still has the entry for `'auth/login'`
+- **GIVEN** scope contains `auth/login` and `auth/session` with dependencies for both
+- **WHEN** scope replacement retains only `auth/login`
+- **THEN** the `auth/session` dependency entry is removed and the `auth/login` entry is preserved
 
 #### Scenario: workspaces is not usable as a singular primary workspace
 
-- **GIVEN** a Change with `specIds: ['default:auth/login', 'billing:invoices']` so `workspaces` is `['default', 'billing']`
-- **WHEN** a consumer building template variables (see `core:template-variables`) or an archive path pattern (see `core:storage`) needs "the change's workspace"
-- **THEN** there is no such singular value — `workspaces[0]` MUST NOT be read or treated as a primary/home workspace for the change
-- **AND** the two touched workspaces remain equally valid members of the derived set
+- **GIVEN** a Change touches both `default` and `billing`
+- **WHEN** a consumer builds template variables or archive paths
+- **THEN** neither `workspaces[0]` nor another member is treated as a primary or home workspace
 
 #### Scenario: Single-workspace change still has no primary-workspace semantics
 
-- **GIVEN** a Change with `specIds: ['default:auth/login']` so `workspaces` is `['default']`
+- **GIVEN** a Change touches only `default`
 - **WHEN** a consumer inspects `workspaces`
-- **THEN** `workspaces[0]` being the only element does not make `default` a "primary" workspace identity — it remains the derived touched-set of size one
+- **THEN** the single-member touched set does not establish a primary workspace identity
 
 ### Requirement: Lifecycle
 
@@ -117,15 +132,6 @@
 - **WHEN** it is transitioned to `designing`
 - **THEN** the transition succeeds
 
-#### Scenario: Designing to designing does not downgrade artifacts or approvals
-
-- **GIVEN** a Change already in `designing` state with validated artifacts and an active spec approval
-- **WHEN** the change is transitioned to `designing` again
-- **THEN** no `invalidated` event is appended
-- **AND** no artifact files are downgraded to `pending-review`
-- **AND** the active spec approval remains valid
-- **AND** a `transitioned` event with `from: 'designing'` and `to: 'designing'` is appended
-
 #### Scenario: done can hop to implementing
 
 - **GIVEN** a Change in `done`
@@ -139,6 +145,22 @@
 - **WHEN** a transition to `done` is attempted
 - **THEN** the entity rejects the pair as invalid
 
+### Requirement: Neutral designing self-entry
+
+#### Scenario: Designing self-entry preserves history and validated evidence
+
+- **GIVEN** an application request for `designing` while a Change is already in `designing` with validated artifacts and a current spec approval
+- **WHEN** `TransitionChange` handles the request
+- **THEN** the state, artifact/file states, and approval projection remain unchanged
+- **AND** no `transitioned`, `invalidated`, or `approval-invalidated` event is appended
+
+#### Scenario: Direct entity self-transition remains invalid
+
+- **GIVEN** a Change already in `designing`
+- **WHEN** a caller invokes the entity's real `transition('designing')`
+- **THEN** it rejects the self-transition without changing history
+- **AND** the neutral application behavior does not make `verifying → verifying` legal
+
 ### Requirement: Skill-aligned backward hops
 
 #### Scenario: Hop from done invalidates signoff only
@@ -151,154 +173,184 @@
 
 ### Requirement: Archiving escape transitions
 
-#### Scenario: Archiving allows transition to archivable
+Scenarios:
 
-- **GIVEN** a change in `archiving` state
-- **WHEN** `TransitionChange` is invoked with target `archivable`
-- **THEN** the transition succeeds
+#### Scenario: Canonical signoff recovery may return archiving to done
 
-#### Scenario: Archiving allows transition to designing
+- **GIVEN** a change in `archiving` whose required sign-off becomes stale or revoked
+- **WHEN** the central reconciler applies mandatory gate recovery
+- **THEN** `archiving → done` succeeds exactly once
+- **AND** the recovery event identifies sign-off invalidity as its cause
 
-- **GIVEN** a change in `archiving` state
-- **WHEN** `TransitionChange` is invoked with target `designing`
-- **THEN** the transition succeeds and artifact files are downgraded for review
+#### Scenario: Manual archiving to done remains forbidden
 
-#### Scenario: Archiving rejects transition to implementing
-
-- **GIVEN** a change in `archiving` state
-- **WHEN** `TransitionChange` is invoked with target `implementing`
+- **WHEN** a caller requests `archiving → done` outside central gate recovery
 - **THEN** `InvalidStateTransitionError` is thrown
+- **AND** manual `archiving → implementing` and `archiving → verifying` remain forbidden
+
+#### Scenario: Existing archive escapes remain valid
+
+- **WHEN** archive restoration or manual redesign requires `archiving → archivable` or `archiving → designing`
+- **THEN** the existing escape remains permitted
 
 ### Requirement: Implementation and verification loop
 
-#### Scenario: implementation-failure returns to implementing without downgrading unchanged artifacts
+Scenarios:
 
-- **GIVEN** a Change in `verifying` state with validated artifacts
-- **AND** verification concludes that only the implementation is wrong
-- **WHEN** the change returns to `implementing`
-- **THEN** unchanged validated artifacts remain `complete`
-- **AND** no file is moved to `pending-review`
+#### Scenario: Transition checks evidence but does not create it
 
-#### Scenario: artifact-review-required returns to designing
+- **GIVEN** the change is `verifying` with only an unfinished attempt
+- **WHEN** `verifying → done` is requested
+- **THEN** the transition fails because completed current evidence is absent
+- **AND** the attempt can be restarted and completed without a self-transition
 
-- **GIVEN** a Change in `verifying` state
-- **AND** verification concludes that the desired behavior has changed
-- **WHEN** the verification outcome is `artifact-review-required`
-- **THEN** the change returns to `designing`
+#### Scenario: Completed current evidence permits exit
 
-#### Scenario: drift during verification is not treated as implementation-only failure
-
-- **GIVEN** a Change in `verifying` state
-- **AND** a previously validated artifact file changes on disk
-- **WHEN** drift is detected
-- **THEN** the change is invalidated to `designing`
-- **AND** the drifted file is marked `drifted-pending-review`
-
-#### Scenario: implementation-failure from done uses backward hop
-
-- **GIVEN** a Change in `done` with validated artifacts
-- **AND** a late implementation bug is found
-- **WHEN** the operator retries via `done → implementing`
-- **THEN** the hop succeeds without forcing redesign
+- **GIVEN** completed verification matches fresh resolved inputs
+- **WHEN** `verifying → done` is requested
+- **THEN** the verification predicate permits the transition without creating new evidence
 
 ### Requirement: Spec approval gate
 
-#### Scenario: Gate disabled — free transition to implementing
+Scenarios:
 
-- **WHEN** `approvals.spec: false` (default) and a Change is in `ready` state
-- **THEN** it transitions directly to `implementing` with no approval required
+#### Scenario: Current consent is required only when enabled
 
-#### Scenario: Gate enabled — stays in ready until ApproveSpec
+- **GIVEN** the spec gate is enabled and approval fingerprint is stale
+- **WHEN** forward progress from `ready` is evaluated
+- **THEN** progress is blocked and recovery returns through design and renewed ready approval
+- **AND** disabling the gate skips consent without waiving artifact freshness
 
-- **WHEN** `approvals.spec: true` and a Change is in `ready` state
-- **AND** no spec approval is recorded
-- **THEN** `ready → implementing` is not allowed
-- **AND** the change does not enter `pending-spec-approval`
+#### Scenario: Ready approval remains in place
 
-#### Scenario: Gate enabled — implementing after recorded approval in ready
-
-- **WHEN** `approvals.spec: true` and a Change in `ready` has a recorded spec approval
-- **THEN** `ready → implementing` is allowed
-- **AND** no `transitioned` event to `pending-spec-approval` is required
+- **WHEN** current spec consent is granted in `ready`
+- **THEN** the approval projection becomes valid without entering a pending state
 
 ### Requirement: Signoff gate
 
-#### Scenario: Gate disabled — free transition to archivable
+Scenarios:
 
-- **WHEN** `approvals.signoff: false` (default) and a Change is in `done` state
-- **THEN** it transitions directly to `archivable` regardless of change content
+#### Scenario: Signoff cannot rely on stale verification
 
-#### Scenario: Gate enabled — stays in done until ApproveSignoff
+- **GIVEN** signoff is enabled and verification evidence is stale
+- **WHEN** `done → archivable` is evaluated
+- **THEN** the transition is blocked until verification is renewed and signoff is valid for current inputs
 
-- **WHEN** `approvals.signoff: true` and a Change is in `done` state
-- **AND** no signoff is recorded
-- **THEN** `done → archivable` is not allowed
-- **AND** the change does not enter `pending-signoff`
+#### Scenario: Disabled signoff still preserves other archive checks
 
-#### Scenario: Gate enabled — archivable after recorded signoff in done
+- **WHEN** signoff gate is disabled
+- **THEN** approval check skips while verification, freshness, tasks, and archive checks still apply
 
-- **WHEN** `approvals.signoff: true` and a Change in `done` has a recorded signoff
-- **THEN** `done → archivable` is allowed
+### Requirement: Materialized approval and verification projections
 
-#### Scenario: Archive from non-archivable state throws
+#### Scenario: Projection status is independent of history retention
 
-- **WHEN** archiving is attempted on a Change not in `archivable` or `archiving` state
-- **THEN** `InvalidStateTransitionError` is thrown
+- **GIVEN** valid approval and verification evidence
+- **WHEN** fresh inputs make both stale
+- **THEN** current projections become `stale` with causes
+- **AND** their original actors, fingerprints, times, and audit events remain available
+
+#### Scenario: Lifecycle movement preserves unchanged verification
+
+- **GIVEN** completed verification still matches current inputs
+- **WHEN** the change moves to an earlier lifecycle state
+- **THEN** the completed evidence remains valid
+
+#### Scenario: Scope-aware consent detects additions and removals
+
+- **GIVEN** approved artifacts remain byte-identical
+- **WHEN** the canonical spec scope adds or removes one spec
+- **THEN** spec consent becomes stale with the matching scope difference
+- **AND** reordering the same canonical set remains valid
+
+### Requirement: State-independent verification operations and audit
+
+#### Scenario: Starting again supersedes only the active attempt
+
+- **GIVEN** an active verification attempt exists in any active lifecycle state
+- **WHEN** `StartVerification` passes input checks again
+- **THEN** a new attempt becomes active and the earlier attempt remains in history
+- **AND** no successful evidence or lifecycle transition is recorded
+
+#### Scenario: Completion rejects changed inputs
+
+- **GIVEN** an active attempt whose fingerprint no longer matches fresh inputs
+- **WHEN** `CompleteVerification` executes
+- **THEN** it fails without replacing the baseline or recording completion
+- **AND** another explicit start may begin a new attempt in the same state
+
+#### Scenario: Start dependencies include schema check context
+
+- **WHEN** `StartVerification` is constructed through either supported factory
+- **THEN** its deps include the schema provider and reconciler used for operation-specific readiness checks
+- **AND** no fake transition context is required
 
 ### Requirement: Artifacts
 
 #### Scenario: File state is persisted explicitly
 
-- **GIVEN** an artifact file stored in the manifest with `state: 'pending-review'`
+- **GIVEN** an artifact file persisted with `state: 'pending-review'`
 - **WHEN** the Change is loaded
-- **THEN** the file state is `pending-review`
-- **AND** it is not recomputed from `validatedHash` alone
+- **THEN** its state remains `pending-review`, not recomputed from `validatedHash` alone
 
 #### Scenario: Artifact aggregates to drifted-pending-review when any file drifted
 
-- **GIVEN** an artifact with two files
-- **AND** one file is `complete`
-- **AND** one file is `drifted-pending-review`
-- **WHEN** the artifact aggregate state is computed
+- **GIVEN** an artifact has one complete file and another in `drifted-pending-review`
+- **WHEN** its aggregate state is computed
 - **THEN** the artifact state is `drifted-pending-review`
 
-#### Scenario: Returning to designing downgrades files to pending-review
+#### Scenario: Surgical drift recovery does not reopen unrelated files
 
-- **GIVEN** a change with validated artifacts
-- **AND** one file is already `drifted-pending-review`
-- **WHEN** the change returns to `designing`
-- **THEN** every other file becomes `pending-review`
-- **AND** the drifted file remains `drifted-pending-review`
+- **GIVEN** validated non-task files A and B and a validated artifact marked `hasTasks: true`
+- **AND** only A has drifted, artifact policy is `surgical`, workflow is `redesign`, and no gate recovery is required
+- **WHEN** the central reconciler applies the focused drift and returns the change to `designing`
+- **THEN** A remains drifted and requires review
+- **AND** B and the task artifact retain their complete state
+- **AND** the lifecycle return causes no second mass downgrade
+
+#### Scenario: Downstream propagation excludes task artifacts
+
+- **GIVEN** artifact policy is `downstream` and a drifted non-task artifact has both task and non-task descendants
+- **WHEN** canonical reconciliation expands review through the schema DAG
+- **THEN** the affected non-task descendants reopen for review
+- **AND** task artifacts and unrelated complete files are not reopened by that propagation
+
+#### Scenario: Global artifact review still excludes automatic task reopening
+
+- **GIVEN** artifact policy is `global` and a non-task artifact drifts
+- **WHEN** canonical reconciliation applies automatic artifact review
+- **THEN** every non-task artifact file is selected for reopening
+- **AND** artifacts marked `hasTasks: true` remain excluded
+
+#### Scenario: No-reopening policy does not waive freshness
+
+- **GIVEN** artifact policy is `none` and a non-task file has drifted
+- **WHEN** canonical reconciliation evaluates the change
+- **THEN** no additional file reopens merely because of the invalidation
+- **AND** unresolved drift still blocks forward progress
 
 #### Scenario: markComplete sets file and artifact state to complete
 
 - **GIVEN** an artifact file in `in-progress`
 - **WHEN** `markComplete(key, hash)` is called through validation
-- **THEN** the file state becomes `complete`
-- **AND** the parent artifact state is recomputed
+- **THEN** the file becomes complete and the parent aggregate state is recomputed
 
 ### Requirement: Policy-aware invalidation
 
-#### Scenario: Policy none keeps unaffected artifact states unchanged
+Scenarios:
 
-- **GIVEN** a change with complete artifact files and effective invalidation policy `none`
-- **WHEN** `Change.invalidate()` is called with cause `artifact-drift`
-- **THEN** only change-level invalidation and history are applied
-- **AND** no file is moved into a reopened review state solely because of that invalidation
+#### Scenario: Preservation does not waive drift
 
-#### Scenario: Downstream invalidation reopens the target set and descendants
+- **GIVEN** workflow policy is `preserve` and artifact policy is `none`
+- **WHEN** non-task artifact drift is reconciled without a mandatory gate recovery
+- **THEN** lifecycle state is preserved
+- **AND** forward progress remains blocked by the focused drift
 
-- **GIVEN** a change with a DAG where `specs` has downstream descendants
-- **WHEN** `Change.invalidate()` is called with effective policy `downstream` and a focused target set under `specs`
-- **THEN** the focused target files are reopened
-- **AND** all DAG descendants of that target set are reopened
+#### Scenario: Gate recovery overrides workflow preservation
 
-#### Scenario: Downstream policy uses artifactDag descendants
-
-- **GIVEN** schema-std `artifactDag` where invalidating `specs` expands to `verify` and `tasks`
-- **WHEN** `Change.invalidate()` is called with effective policy `downstream`, focused targets under `specs`, and that `artifactDag`
-- **THEN** files under `verify` and `tasks` are reopened according to policy
-- **AND** expansion does not depend on persisted artifact `requires` maps on the change
+- **GIVEN** required spec consent becomes stale
+- **WHEN** invalidation is applied with workflow `preserve`
+- **THEN** the change returns to `designing` exactly once and history is retained
 
 ### Requirement: Per-file drift tracking
 
@@ -320,42 +372,47 @@
 #### Scenario: History is append-only
 
 - **WHEN** any operation is performed on a Change
-- **THEN** new events are appended to history; no existing event is modified or removed
+- **THEN** new events are appended; existing events are never modified or removed
 
 #### Scenario: Invalidated event records artifact drift details
 
-- **GIVEN** two validated spec files drift in the same invalidation pass
-- **WHEN** the change is invalidated for artifact drift
-- **THEN** the `invalidated` event contains `cause: 'artifact-drift'`
-- **AND** it includes a human-readable `message`
-- **AND** `affectedArtifacts` records the artifact type and both file keys
+- **GIVEN** two validated spec files drift in one reconciliation pass
+- **WHEN** artifact drift is materialized
+- **THEN** the `invalidated` event uses `artifact-drift` with a human-readable message
+- **AND** `affectedArtifacts` records both file keys and their artifact types
 
-#### Scenario: Scope change invalidation records spec-change cause
+#### Scenario: Scope consent invalidation records precise projection differences
 
-- **WHEN** `specIds` are edited after prior validation
-- **THEN** the appended `invalidated` event uses `cause: 'spec-change'`
+- **GIVEN** valid spec consent and unchanged artifact bytes
+- **WHEN** `EditChange` adds or removes a canonical spec ID
+- **THEN** reconciliation appends `approval-invalidated` with cause `scope-change` and the precise scope difference
+- **AND** the prior approval event and its original fingerprint remain available
+- **AND** a broad `invalidated` event with cause `spec-change` is not required solely to represent stale consent
+
+#### Scenario: Legacy scope helper records artifact review without lifecycle recovery
+
+- **GIVEN** a Change in `implementing`
+- **WHEN** the legacy entity helper `updateSpecIds` is called with a changed spec set and artifact DAG
+- **THEN** its artifact-review event has cause `spec-change`
+- **AND** that helper does not independently roll the lifecycle back or clear approval projections
 
 #### Scenario: Review-required invalidation remains distinguishable from drift
 
-- **GIVEN** a change returns to `designing` because verification requires artifact review
-- **WHEN** the invalidation event is appended
-- `THEN` its `cause` is `artifact-review-required`
-- `AND` it is distinct from `artifact-drift`
+- **GIVEN** explicit artifact review is requested without physical drift
+- **WHEN** reconciliation records the review invalidation
+- **THEN** its cause is `artifact-review-required`, not `artifact-drift`
 
 #### Scenario: Description update appends description-updated event
 
 - **GIVEN** a Change with description "Original"
 - **WHEN** `updateDescription("New description", actor)` is called
-- **THEN** a `description-updated` event is appended to history
-- **AND** the event contains `description: "New description"`
-- **AND** the event contains `by` with the full `ActorIdentity`
+- **THEN** a `description-updated` event contains the new description and full resolved actor identity
 
 #### Scenario: Description update does not append invalidated event
 
-- **GIVEN** a Change in `spec-approved` state with active approval
-- **WHEN** `updateDescription("New description", actor)` is called
-- **THEN** no `invalidated` event is appended
-- **AND** the change remains in `spec-approved` state
+- **GIVEN** a Change in `spec-approved` with active approval
+- **WHEN** its description changes
+- **THEN** no invalidated event is appended and the lifecycle remains `spec-approved`
 
 ### Requirement: Historical implementation detection
 
@@ -646,3 +703,19 @@
 - **GIVEN** an artifact does not declare a task-completion check
 - **WHEN** lifecycle progress is evaluated
 - **THEN** it is not blocked by inferred task completion
+
+### Requirement: Validity fingerprint scope
+
+#### Scenario: Conservative normalization ignores only declared whitespace differences
+
+- **GIVEN** two linked text files differ only by BOM, line endings, trailing horizontal whitespace, blank-line whitespace, or final newline
+- **WHEN** `text-v1` fingerprints them
+- **THEN** they compare equal
+- **AND** internal whitespace or any binary-byte difference remains significant
+
+#### Scenario: Task artifacts do not invalidate evidence
+
+- **GIVEN** an artifact type declares `hasTasks: true`
+- **WHEN** only its task content changes
+- **THEN** approval and verification fingerprints remain unchanged
+- **AND** live task completion can still block transition or archive

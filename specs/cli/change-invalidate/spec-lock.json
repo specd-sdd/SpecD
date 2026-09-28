@@ -8,5 +8,11 @@
     "core:invalidate-change",
     "core:get-status",
     "default:_global/docs"
+  ],
+  "implementation": [
+    {
+      "file": "cli:src/commands/change/invalidate.ts",
+      "symbols": ["registerChangeInvalidate"]
+    }
   ]
 }

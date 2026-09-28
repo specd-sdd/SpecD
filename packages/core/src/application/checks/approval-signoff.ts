@@ -37,7 +37,11 @@ class ApprovalSignoffCheck extends WorkflowCheck {
    */
   override execute(ctx: CheckExecutionContext) {
     return Promise.resolve(
-      runApprovalSignoff({ signoffGateEnabled: ctx.approvals.signoff, change: ctx.change }),
+      runApprovalSignoff({
+        signoffGateEnabled: ctx.approvals.signoff,
+        change: ctx.change,
+        ...(ctx.validity !== undefined ? { validity: ctx.validity } : {}),
+      }),
     )
   }
 }

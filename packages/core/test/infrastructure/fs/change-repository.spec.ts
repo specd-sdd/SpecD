@@ -2,7 +2,7 @@ import * as fs from 'node:fs/promises'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { Change, SYSTEM_ACTOR } from '../../../src/domain/entities/change.js'
+import { Change } from '../../../src/domain/entities/change.js'
 import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
 import { ArtifactFile } from '../../../src/domain/value-objects/artifact-file.js'
 import { type ActorIdentity } from '../../../src/domain/entities/change.js'
@@ -15,7 +15,11 @@ import { DraftedChangeReadOnlyError } from '../../../src/domain/errors/drafted-c
 import { SchemaMismatchError } from '../../../src/application/errors/schema-mismatch-error.js'
 import { Logger } from '../../../src/application/logger.js'
 import { FsChangeRepository } from '../../../src/infrastructure/fs/change-repository.js'
-import { changeManifestSchema } from '../../../src/infrastructure/fs/manifest.js'
+import {
+  changeManifestSchema,
+  parseChangeManifest,
+} from '../../../src/infrastructure/fs/manifest.js'
+import { UnsupportedManifestVersionError } from '../../../src/domain/errors/unsupported-manifest-version-error.js'
 import { vi } from 'vitest'
 import { sha256 } from '../../../src/infrastructure/fs/hash.js'
 import { artifactDagFromChangeArtifacts } from '../../../src/domain/value-objects/artifact-dag.js'
@@ -722,27 +726,26 @@ describe('FsChangeRepository', () => {
       expect(loaded?.getArtifact('proposal')?.status).toBe('complete')
     })
 
-    it('Hash mismatch on load invalidates with artifact-drift', async () => {
+    it('Hash mismatch on load reports a fresh file fact without invalidating', async () => {
       const change = makeChangeWithArtifact('c1', sha256('original content'))
       await persistChange(ctx.repo, change)
       const dir = path.join(ctx.changesPath, '20240115-100000-c1')
+      const manifestPath = path.join(dir, 'manifest.json')
+      const before = await fs.readFile(manifestPath, 'utf8')
+      const beforeStat = await fs.stat(manifestPath)
       await fs.writeFile(path.join(dir, 'proposal.md'), 'modified content', 'utf8')
 
       const loaded = await ctx.repo.get('c1')
-      expect(loaded?.state).toBe('designing')
-      expect(loaded?.getArtifact('proposal')?.status).toBe('drifted-pending-review')
-      const invalidated = loaded?.history.filter(
-        (event): event is Extract<Change['history'][number], { type: 'invalidated' }> =>
-          event.type === 'invalidated',
-      )
-      expect(invalidated).toHaveLength(1)
-      expect(invalidated?.[0]?.cause).toBe('artifact-drift')
-      expect(invalidated?.[0]?.by).toEqual(SYSTEM_ACTOR)
+      expect(loaded?.state).toBe('drafting')
+      expect(loaded?.getArtifact('proposal')?.status).toBe('in-progress')
+      expect(loaded?.history.filter((event) => event.type === 'invalidated')).toHaveLength(0)
+      expect(await fs.readFile(manifestPath, 'utf8')).toBe(before)
+      expect((await fs.stat(manifestPath)).mtimeMs).toBe(beforeStat.mtimeMs)
 
       const reloaded = await ctx.repo.get('c1')
-      expect(reloaded?.state).toBe('designing')
-      expect(reloaded?.getArtifact('proposal')?.status).toBe('drifted-pending-review')
-      expect(reloaded?.history.filter((event) => event.type === 'invalidated')).toHaveLength(1)
+      expect(reloaded?.state).toBe('drafting')
+      expect(reloaded?.getArtifact('proposal')?.status).toBe('in-progress')
+      expect(reloaded?.history.filter((event) => event.type === 'invalidated')).toHaveLength(0)
     })
 
     it('Reloading after revalidation does not invalidate twice', async () => {
@@ -754,21 +757,25 @@ describe('FsChangeRepository', () => {
       await fs.writeFile(path.join(dir, 'proposal.md'), updatedContent, 'utf8')
 
       const drifted = await ctx.repo.get('c1')
-      expect(drifted?.state).toBe('designing')
-      expect(drifted?.getArtifact('proposal')?.status).toBe('drifted-pending-review')
-      expect(drifted?.history.filter((event) => event.type === 'invalidated')).toHaveLength(1)
+      expect(drifted?.state).toBe('drafting')
+      expect(drifted?.getArtifact('proposal')?.status).toBe('in-progress')
+      expect(drifted?.history.filter((event) => event.type === 'invalidated')).toHaveLength(0)
 
       expect(drifted).not.toBeNull()
       drifted!.getArtifact('proposal')?.markComplete('proposal', updatedHash)
       await persistChange(ctx.repo, drifted!)
+      const savedManifest = await fs.readFile(path.join(dir, 'manifest.json'), 'utf8')
+      const savedStat = await fs.stat(path.join(dir, 'manifest.json'))
 
       const reloaded = await ctx.repo.get('c1')
-      expect(reloaded?.state).toBe('designing')
+      expect(reloaded?.state).toBe('drafting')
       expect(reloaded?.getArtifact('proposal')?.status).toBe('complete')
       expect(reloaded?.getArtifact('proposal')?.getFile('proposal')?.validatedHash).toBe(
         updatedHash,
       )
-      expect(reloaded?.history.filter((event) => event.type === 'invalidated')).toHaveLength(1)
+      expect(reloaded?.history.filter((event) => event.type === 'invalidated')).toHaveLength(0)
+      expect(await fs.readFile(path.join(dir, 'manifest.json'), 'utf8')).toBe(savedManifest)
+      expect((await fs.stat(path.join(dir, 'manifest.json'))).mtimeMs).toBe(savedStat.mtimeMs)
     })
 
     it('given validatedHash is __skipped__ and optional, when get is called, then artifact status is skipped', async () => {
@@ -1057,11 +1064,9 @@ describe('FsChangeRepository', () => {
       expect(statusImmediatelyAfterWrite).toBe('complete')
       expect(hashImmediatelyAfterWrite).toBe(hash)
 
-      expect(reconciled.getArtifact('proposal')?.getFile('proposal')?.status).not.toBe(
-        'in-progress',
-      )
+      expect(reconciled.getArtifact('proposal')?.getFile('proposal')?.status).toBe('in-progress')
       const invalidated = reconciled.history.filter((event) => event.type === 'invalidated')
-      expect(invalidated.length).toBeGreaterThan(0)
+      expect(invalidated).toHaveLength(0)
 
       // post-reconcile .change matches a following get()
       const reloaded = await repoWithTypes.get('save-artifact-status')
@@ -1191,6 +1196,11 @@ describe('FsChangeRepository', () => {
       const raw = await fs.readFile(path.join(dir, 'manifest.json'), 'utf8')
       const parsed = JSON.parse(raw) as Record<string, unknown>
       delete parsed['updatedAt']
+      delete parsed['manifestVersion']
+      delete parsed['invalidation']
+      delete parsed['specApproval']
+      delete parsed['signoff']
+      delete parsed['verification']
       await fs.writeFile(path.join(dir, 'manifest.json'), JSON.stringify(parsed, null, 2), 'utf8')
 
       const loaded = await ctx.repo.get('legacy-auth')
@@ -1494,18 +1504,12 @@ describe('FsChangeRepository', () => {
       specs.files[0].filename = 'specs/default/auth/login/spec.md'
       await fs.writeFile(manifestPath, `${JSON.stringify(stale, null, 2)}\n`, 'utf8')
 
+      const before = await fs.readFile(manifestPath, 'utf8')
       const loaded = await repo.get('legacy-stale')
       expect(loaded?.getArtifact('specs')?.getFile('default:auth/login')?.filename).toBe(
         'deltas/default/auth/login/spec.md.delta.yaml',
       )
-
-      const normalized = JSON.parse(await fs.readFile(manifestPath, 'utf8')) as {
-        artifacts: Array<{ type: string; files: Array<{ filename: string }> }>
-      }
-      const normalizedSpecs = normalized.artifacts.find((artifact) => artifact.type === 'specs')
-      expect(normalizedSpecs?.files[0]?.filename).toBe(
-        'deltas/default/auth/login/spec.md.delta.yaml',
-      )
+      expect(await fs.readFile(manifestPath, 'utf8')).toBe(before)
     })
 
     it('scaffold creates directories from expected filenames', async () => {
@@ -1638,8 +1642,8 @@ describe('FsChangeRepository', () => {
       await fs.writeFile(path.join(dir, 'tasks.md'), '- [ ] task one\n- [ ] task two\n', 'utf8')
 
       const loaded = await repo.get('c1')
-      expect(loaded?.state).toBe('designing')
-      expect(loaded?.getArtifact('tasks')?.status).toBe('drifted-pending-review')
+      expect(loaded?.state).toBe('drafting')
+      expect(loaded?.getArtifact('tasks')?.status).toBe('in-progress')
     })
 
     it('no preHashCleanup rules hashes raw content', async () => {
@@ -1800,14 +1804,13 @@ describe('FsChangeRepository', () => {
 
       const loaded = await repo.get('c1')
 
-      // State should be rolled back to designing
-      expect(loaded?.state).toBe('designing')
+      expect(loaded?.state).toBe('implementing')
       // Proposal (upstream) should remain complete
       expect(loaded?.getArtifact('proposal')?.getFile('proposal')?.validatedHash).toBe(proposalHash)
       // Design (upstream of tasks) should remain complete
       expect(loaded?.getArtifact('design')?.getFile('design')?.validatedHash).toBe(designHash)
       expect(loaded?.getArtifact('tasks')?.getFile('tasks')?.validatedHash).toBe(tasksHash)
-      expect(loaded?.getArtifact('tasks')?.status).toBe('drifted-pending-review')
+      expect(loaded?.getArtifact('tasks')?.status).toBe('in-progress')
     })
 
     it('upstream artifact drifts — it and all downstream are reset', async () => {
@@ -1902,13 +1905,13 @@ describe('FsChangeRepository', () => {
 
       const loaded = await repo.get('c2')
 
-      expect(loaded?.state).toBe('designing')
+      expect(loaded?.state).toBe('implementing')
       expect(loaded?.getArtifact('proposal')?.status).toBe('complete')
       expect(loaded?.getArtifact('proposal')?.getFile('proposal')?.validatedHash).toBe(proposalHash)
       expect(loaded?.getArtifact('design')?.getFile('design')?.validatedHash).toBe(designHash)
-      expect(loaded?.getArtifact('design')?.status).toBe('drifted-pending-review')
+      expect(loaded?.getArtifact('design')?.status).toBe('in-progress')
       expect(loaded?.getArtifact('tasks')?.getFile('tasks')?.validatedHash).toBe(tasksHash)
-      expect(loaded?.getArtifact('tasks')?.status).toBe('pending-review')
+      expect(loaded?.getArtifact('tasks')?.status).toBe('complete')
     })
 
     it('no drift — no invalidation', async () => {
@@ -2027,14 +2030,12 @@ describe('FsChangeRepository', () => {
         return originalLock(name, fn)
       }
 
-      // get() should detect drift, acquire lock, reload, write manifest
+      const before = await fs.readFile(path.join(dir, 'manifest.json'), 'utf8')
       const loaded = await repo.get('drift-lock-test')
 
-      // Lock must be acquired exactly once
-      expect(lockAcquisitions).toBe(1)
-
-      // In-memory change must show invalidation
-      expect(loaded?.state).toBe('designing')
+      expect(lockAcquisitions).toBe(0)
+      expect(loaded?.state).toBe('implementing')
+      expect(await fs.readFile(path.join(dir, 'manifest.json'), 'utf8')).toBe(before)
 
       // On-disk manifest must be updated — a second get() without any further drift
       // should return the same invalidated state (not reverting to implementing)
@@ -2147,7 +2148,7 @@ describe('FsChangeRepository', () => {
       await persistChange(ctx.repo, change)
 
       const loaded = await ctx.repo.get('c1')
-      expect(loaded?.invalidationPolicy).toBe('downstream')
+      expect(loaded?.invalidationPolicy).toEqual({ artifacts: 'downstream', workflow: 'preserve' })
     })
 
     it('persists explicit surgical policy', async () => {
@@ -2171,7 +2172,7 @@ describe('FsChangeRepository', () => {
       await persistChange(ctx.repo, change)
 
       const loaded = await ctx.repo.get('c1')
-      expect(loaded?.invalidationPolicy).toBe('surgical')
+      expect(loaded?.invalidationPolicy).toEqual({ artifacts: 'surgical', workflow: 'redesign' })
     })
 
     it('persists none policy', async () => {
@@ -2195,7 +2196,7 @@ describe('FsChangeRepository', () => {
       await persistChange(ctx.repo, change)
 
       const loaded = await ctx.repo.get('c1')
-      expect(loaded?.invalidationPolicy).toBe('none')
+      expect(loaded?.invalidationPolicy).toEqual({ artifacts: 'none', workflow: 'redesign' })
     })
 
     it('persists global policy', async () => {
@@ -2219,7 +2220,7 @@ describe('FsChangeRepository', () => {
       await persistChange(ctx.repo, change)
 
       const loaded = await ctx.repo.get('c1')
-      expect(loaded?.invalidationPolicy).toBe('global')
+      expect(loaded?.invalidationPolicy).toEqual({ artifacts: 'global', workflow: 'redesign' })
     })
   })
 
@@ -2372,9 +2373,9 @@ describe('FsChangeRepository', () => {
       await fs.writeFile(path.join(dir, 'proposal.md'), 'MODIFIED', 'utf8')
 
       const loaded = await repo.get('c1')
-      expect(loaded?.state).toBe('designing')
-      expect(loaded?.getArtifact('proposal')?.status).toBe('complete')
-      expect(loaded?.getArtifact('proposal')?.getFile('proposal')?.hasDrift).toBe(true)
+      expect(loaded?.state).toBe('implementing')
+      expect(loaded?.getArtifact('proposal')?.status).toBe('in-progress')
+      expect(loaded?.getArtifact('proposal')?.getFile('proposal')?.hasDrift).not.toBe(true)
     })
 
     it('surgical policy: only drifted file is reopened', async () => {
@@ -2446,9 +2447,9 @@ describe('FsChangeRepository', () => {
       await fs.writeFile(path.join(dir, 'design.md'), 'MODIFIED', 'utf8')
 
       const loaded = await repo.get('c2')
-      expect(loaded?.state).toBe('designing')
+      expect(loaded?.state).toBe('implementing')
       expect(loaded?.getArtifact('proposal')?.status).toBe('complete')
-      expect(loaded?.getArtifact('design')?.status).toBe('drifted-pending-review')
+      expect(loaded?.getArtifact('design')?.status).toBe('in-progress')
     })
 
     it('global policy: all artifacts are reopened on drift', async () => {
@@ -2520,9 +2521,9 @@ describe('FsChangeRepository', () => {
       await fs.writeFile(path.join(dir, 'design.md'), 'MODIFIED', 'utf8')
 
       const loaded = await repo.get('c3')
-      expect(loaded?.state).toBe('designing')
-      expect(loaded?.getArtifact('proposal')?.status).toBe('pending-review')
-      expect(loaded?.getArtifact('design')?.status).toBe('drifted-pending-review')
+      expect(loaded?.state).toBe('implementing')
+      expect(loaded?.getArtifact('proposal')?.status).toBe('complete')
+      expect(loaded?.getArtifact('design')?.status).toBe('in-progress')
     })
 
     it('Uninitialized repository skips drift invalidation', async () => {
@@ -2825,6 +2826,153 @@ describe('FsChangeRepository', () => {
       expect(loaded).not.toBeNull()
       expect(loaded!.isImplementationTrackingActive).toBe(true)
       expect(loaded!.implementationTrackingStartedAt).toEqual(histDate)
+    })
+  })
+
+  describe('versioned manifests', () => {
+    it.each(['spec-added', 'spec-removed'] as const)(
+      'round-trips a strict v2 %s approval-invalidation event',
+      async (kind) => {
+        const change = makeChange(`scope-${kind}`)
+        const fingerprint = {
+          version: 1 as const,
+          specIds: ['auth/login'],
+          artifacts: {
+            version: 1 as const,
+            algorithm: 'artifact-pre-hash-v1' as const,
+            files: {},
+          },
+        }
+        change.recordSpecApproval('Approved scope', fingerprint, actor)
+        change.markApprovalInvalid('spec', 'stale', {
+          at: new Date('2024-01-16T10:00:00.000Z'),
+          by: actor,
+          cause: 'scope-change',
+          reason: 'Scope changed',
+          differences: [{ scope: 'spec', key: 'auth/login', kind }],
+        })
+
+        await persistChange(ctx.repo, change)
+        const loaded = await ctx.repo.get(`scope-${kind}`)
+        const event = loaded?.history.find((candidate) => candidate.type === 'approval-invalidated')
+
+        expect(event).toMatchObject({
+          type: 'approval-invalidated',
+          differences: [{ scope: 'spec', key: 'auth/login', kind }],
+        })
+      },
+    )
+
+    it('round-trips the same complete spec-approval fingerprint in projection and event', async () => {
+      const change = makeChange('approval-round-trip')
+      const fingerprint = {
+        version: 1 as const,
+        specIds: ['auth/login'],
+        artifacts: {
+          version: 1 as const,
+          algorithm: 'artifact-pre-hash-v1' as const,
+          files: { proposal: `sha256:${'a'.repeat(64)}` as const },
+        },
+      }
+      change.recordSpecApproval('Approved scope', fingerprint, actor)
+
+      await persistChange(ctx.repo, change)
+      const manifestPath = path.join(
+        ctx.changesPath,
+        '20240115-100000-approval-round-trip',
+        'manifest.json',
+      )
+      const raw = JSON.parse(await fs.readFile(manifestPath, 'utf8')) as {
+        manifestVersion: number
+        specApproval: { fingerprint: unknown }
+        history: Array<{ type: string; fingerprint?: unknown }>
+      }
+      const approvalEvent = raw.history.find((event) => event.type === 'spec-approved')
+
+      expect(raw.manifestVersion).toBe(2)
+      expect(raw.specApproval.fingerprint).toEqual(fingerprint)
+      expect(approvalEvent?.fingerprint).toEqual(fingerprint)
+
+      const loaded = await ctx.repo.get('approval-round-trip')
+      expect(loaded?.specApproval?.fingerprint).toEqual(fingerprint)
+      const loadedEvent = loaded?.history.find((event) => event.type === 'spec-approved')
+      expect(loadedEvent?.type).toBe('spec-approved')
+      if (loadedEvent?.type === 'spec-approved') {
+        expect(loadedEvent.fingerprint).toEqual(fingerprint)
+      }
+    })
+
+    it('writes manifestVersion 2 on create and does not rewrite v1 on get', async () => {
+      const change = makeChange('versioned')
+      await persistChange(ctx.repo, change)
+      const manifestPath = path.join(ctx.changesPath, '20240115-100000-versioned', 'manifest.json')
+      const created = JSON.parse(await fs.readFile(manifestPath, 'utf8')) as {
+        manifestVersion?: number
+        invalidation?: { artifacts: string; workflow: string }
+        history: unknown[]
+      }
+      expect(created.manifestVersion).toBe(2)
+      expect(created.invalidation).toEqual({ artifacts: 'downstream', workflow: 'preserve' })
+
+      delete created.manifestVersion
+      delete created.invalidation
+      const v1 = `${JSON.stringify(created, null, 2)}\n`
+      await fs.writeFile(manifestPath, v1, 'utf8')
+
+      const loaded = await ctx.repo.get('versioned')
+      expect(loaded?.invalidationPolicy).toEqual({ artifacts: 'downstream', workflow: 'redesign' })
+      expect(await fs.readFile(manifestPath, 'utf8')).toBe(v1)
+
+      await ctx.repo.mutate('versioned', (current) => {
+        current.transition('designing', actor)
+      })
+      const upgraded = JSON.parse(await fs.readFile(manifestPath, 'utf8')) as {
+        manifestVersion: number
+        history: Array<{ type: string }>
+      }
+      expect(upgraded.manifestVersion).toBe(2)
+      expect(upgraded.history.some((event) => event.type === 'created')).toBe(true)
+      expect(upgraded.history.some((event) => event.type === 'transitioned')).toBe(true)
+    })
+
+    it('rejects an unsupported manifest version', async () => {
+      const change = makeChange('future')
+      await persistChange(ctx.repo, change)
+      const manifestPath = path.join(ctx.changesPath, '20240115-100000-future', 'manifest.json')
+      const raw = JSON.parse(await fs.readFile(manifestPath, 'utf8')) as Record<string, unknown>
+      raw.manifestVersion = 9
+      await fs.writeFile(manifestPath, JSON.stringify(raw), 'utf8')
+
+      await expect(ctx.repo.get('future')).rejects.toBeInstanceOf(UnsupportedManifestVersionError)
+      expect(() => parseChangeManifest(raw)).toThrow(UnsupportedManifestVersionError)
+    })
+
+    it('reads implementation files inside the project root and rejects escapes', async () => {
+      const repo = new FsChangeRepository({
+        workspace: 'default',
+        ownership: 'owned',
+        isExternal: false,
+        configPath: ctx.configPath,
+        projectRoot: ctx.tmpDir,
+        changesPath: ctx.changesPath,
+        draftsPath: ctx.draftsPath,
+        discardedPath: ctx.discardedPath,
+      })
+      const change = makeChange('files')
+      await persistChange(repo, change)
+      const loaded = await repo.get('files')
+      expect(loaded).not.toBeNull()
+      await fs.writeFile(path.join(ctx.tmpDir, 'note.txt'), 'hello', 'utf8')
+
+      const found = await repo.implementationFile(loaded!, 'note.txt')
+      expect(found.status).toBe('found')
+      if (found.status === 'found') {
+        expect(Buffer.from(found.bytes).toString('utf8')).toBe('hello')
+      }
+      expect((await repo.implementationFile(loaded!, 'missing.txt')).status).toBe('missing')
+      expect((await repo.implementationFile(loaded!, '../outside.txt')).status).toBe(
+        'outside-project',
+      )
     })
   })
 })

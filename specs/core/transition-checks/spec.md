@@ -104,21 +104,50 @@ For a candidate edge (`from` = current state, `to` = requested target):
 
 `ApproveSpec` / `ApproveSignoff` remain separate commands. They MUST record consent on the change and MUST NOT call `TransitionChange` into a pending state.
 
+### Requirement: Shared validity verdict and recovery priority
+
+A pure shared evaluator SHALL derive one canonical verdict from a fresh change snapshot, resolved schema, configured gates and policy, current artifact files, and current confirmed implementation files. The verdict SHALL independently report artifact review, spec approval, sign-off, verification, task completion, current-state validity, blockers, affected inputs, reasons, required recovery, and recommended next action.
+
+Recovery priority SHALL be deterministic:
+
+1. required stale or revoked spec approval returns immediately to `designing`
+2. otherwise required stale or revoked sign-off returns a later change to `done`
+3. stale verification blocks applicable verification-requiring boundaries at `verifying` or later and recommends renewing evidence in place, without mandatory lifecycle movement
+4. otherwise artifact drift uses `invalidation.workflow`, while `preserve` retains state
+
+Recovery never advances a change already earlier than its target. Unresolved non-task drift or pending review blocks every applicable forward transition even under artifact policy `none`. Verification staleness does not block entry into `verifying`. Required task presence, structure, and completion are evaluated live at their configured boundaries and archive.
+
+### Requirement: Single validity reconciliation owner
+
+One application-level reconciler SHALL be the sole orchestration path that acquires fresh file facts, evaluates the canonical verdict, materializes artifact review and approval/verification status changes, appends audit events, selects automatic recovery, and persists the complete result atomically.
+
+`GetStatus`, `ValidateArtifacts`, `ApproveSpec`, `ApproveSignoff`, `TransitionChange`, `ArchiveChange`, `EditChange`, `InvalidateChange`, `StartVerification`, `CompleteVerification`, and `InvalidateVerification` SHALL delegate to it. Repository hydration, individual checks, CLI handlers, and skills MUST NOT independently invalidate gates, choose recovery, or append return transitions.
+
+The reconciler SHALL return the reconciled change, canonical verdict, affected inputs, reasons, and any committed return. Repeated reconciliation of unchanged facts is idempotent. Callers SHALL request a fresh reconciliation after hooks or mutations that may change inputs; a manifest-mtime-only cache cannot prove external-file freshness.
+
+The application owner SHALL be implemented as the typed `ReconcileChangeValidity` use case. It exposes `execute(input): ReconcileChangeValidityResult`, canonical `createReconcileChangeValidity(deps)`, convenience `createReconcileChangeValidity(config, options?)`, and `resolveReconcileChangeValidityDeps(resolver)`. The config form uses `normalizeCompositionFactoryArgs` and delegates to canonical deps construction; options with the deps overload produce the standard invalid-factory-arguments error. Its deps contain the repository mutation boundary, schema/config inputs, actor resolution, implementation tracking/link resolution, and shared fingerprint calculation without duplicating filesystem bootstrap or constructing an entire kernel.
+
+Every mutating use-case dependency path SHALL provide this reconciler. A direct deps overload with no reconciler MUST fail construction or execution with a typed configuration error and MUST NOT fall back to `Change.invalidate(...)` or another legacy mutation path.
+
 ### Requirement: Registry bindings for this capability
 
-The following predicate bindings SHALL be registered (ids stable):
+The following predicate bindings SHALL remain registered with stable ids:
 
-- `protocol.edge` — every transition attempt (fail-fast)
-- `workflow.requires` — `to` = requested target, from the schema step
-- `workflow.taskCompletion` — `to` = requested target, from `requiresTaskCompletion`
-- `deps.consistent` — `to = ready`, `from = *`, `along = any`; same runner on operation `archive`
-- `workspace.readOnly` — `to = ready`, `from = *`, `along = any`; same runner on operation `archive`
-- `impl.filesResolved` and `impl.linksInScope` — `from = implementing`, `to = *`, `along = forward`; same runners on operation `archive`. MUST NOT bind to `to = verifying` as enter-verifying. MUST NOT match `along = redesign` (including `implementing → designing`).
-- `approval.spec` — `from = ready`, `to = *`, `along = forward`. MUST NOT match `ready → designing` (`redesign`). MUST NOT match a hop into `pending-spec-approval`. `skip` when spec gate is off. `pass` when gate is on and an active spec approval is recorded on the change. `fail` with `APPROVAL_REQUIRED` when gate is on and no active spec approval exists.
-- `approval.signoff` — `from = done`, `to = archivable`, `along = forward`. MUST NOT bind `to = *` or operation `archive`. MUST NOT match `done → designing`. `skip` when signoff gate is off. `pass` when an active signoff is recorded. `fail` with `APPROVAL_REQUIRED` otherwise.
-- Operation `archive`: `schema.nameMatch`, `archive.archivable`, `spec.overlap` (skippable with `--allow-overlap`), the shared `workspace.readOnly` / `deps.consistent` / `impl.*` runners. MUST NOT register `archive.publication`. Remaining merge/publish preflight SHALL stay inside `ArchiveChange` after archive predicates allow the operation.
+- `protocol.edge` for every normal transition attempt
+- `workflow.requires` for the requested target's schema step
+- `workflow.taskCompletion` from `requiresTaskCompletion`
+- `deps.consistent` and `workspace.readOnly` for entry to `ready` and archive
+- `impl.filesResolved` and `impl.linksInScope` for every transition whose target is `verifying`, every forward transition whose source is `implementing`, and archive; both are blocking predicates evaluated before the requested operation, and existing archive bypass rules remain unchanged. Explicit verification start reuses these checks through an operation-specific context before capturing its baseline, regardless of lifecycle state, without fabricating a self-transition
+- `verification.current` for `verifying → done`: a blocking predicate requiring already-completed successful evidence with a current fingerprint; an active attempt alone cannot pass. It uses the same freshness evaluator as `CompleteVerification`, without invoking completion or mutating evidence. Missing, unavailable, stale, legacy-unknown, mismatched, and unresolved inputs produce structured actionable failures. It skips only when the canonical verdict explicitly reports `not-required`; an absent verdict fails closed
+- `approval.spec` from `ready` along forward edges: skip when disabled; pass only when the reconciled materialized spec-approval projection is `valid` for current inputs; otherwise fail with `APPROVAL_REQUIRED` and an absent/stale/revoked reason; never route to a pending state
+- `approval.signoff` for `done → archivable`: skip when disabled; pass only when reconciled sign-off and verification evidence are current and `valid`; otherwise return actionable approval or verification recovery
+- archive-operation predicates `schema.nameMatch`, `archive.archivable`, `spec.overlap`, and the shared workspace, dependency, implementation, validity, task, and freshness checks required by archive preflight
 
-When `impl.filesResolved` or `impl.linksInScope` fails, the human-readable `message` used in `format=text` (status blockers, repair guide, transition failure) SHALL be a **compact summary**: count plus at most three examples. When truncated, those examples MUST be labeled `examples:` so it is clear they are not the complete list. Structured `details` MAY hold the full inventory for machine consumers. Text MUST NOT dump the full path/link set — that inventory is available via dedicated CLI listing / JSON-TOON status, not via blocker prose. `DEPS_INCONSISTENT` and `READ_ONLY_WORKSPACE` messages SHALL keep listing every id (small sets; no alternate listing command).
+Validity application and automatic returns occur in the central reconciler before predicates authorize progress. Checks consume its verdict and MUST NOT append invalidation or recovery events themselves. A transition or operation matching multiple applicability bindings SHALL execute each stable check ID at most once. When pre-persist effects may mutate files or links, the caller SHALL reacquire fresh facts and rerun applicable readiness and verification predicates before persistence. Protocol validation always rejects `verifying → verifying`; explicit start and completion are application operations independent of transitions.
+
+`verification.current` SHALL follow the existing check ABI, module/factory conventions, and generic progress bus, with label `Checking verification freshness`. `GetStatus` projects the same predicate without completing an attempt. Shared fingerprint evaluation is pure; application dependencies obtain fresh input facts. Sign-off and archive consume the canonical evidence requirement and freshness verdict. Phase skipping remains deferred; future legitimate skips must distinguish evidence not required from completed valid evidence rather than manufacture a verification record. Compiled transition metadata for future skipped phases SHALL preserve applicable crossed-boundary guards before such a route can be enabled.
+
+Existing compact diagnostic rules remain: implementation-state text reports counts plus at most three labeled examples, full inventories remain structured, and dependency/read-only failures retain their complete small identifier sets.
 
 ### Requirement: Actionable fail diagnostics
 

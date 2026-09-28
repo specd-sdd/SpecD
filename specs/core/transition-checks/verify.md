@@ -161,61 +161,81 @@
 - **AND** `approval.spec` fails with `APPROVAL_REQUIRED`
 - **AND** the persisted state is not `pending-spec-approval`
 
+### Requirement: Shared validity verdict and recovery priority
+
+#### Scenario: Identical facts produce identical recovery
+
+- **GIVEN** the same fresh change, schema, gates, policy, artifacts, and implementation files
+- **WHEN** status, validation, transition, and archive evaluate validity
+- **THEN** each receives the same blockers, affected inputs, recovery priority, and next action
+
+#### Scenario: Verification staleness blocks without moving lifecycle
+
+- **GIVEN** stale verification at a boundary that requires current evidence
+- **WHEN** validity is evaluated
+- **THEN** progress is blocked with in-place verification guidance
+- **AND** no verification-driven lifecycle return is selected
+
+### Requirement: Single validity reconciliation owner
+
+#### Scenario: Repeated observation is idempotent
+
+- **GIVEN** reconciliation already persisted projection changes and required recovery
+- **WHEN** another entry point reconciles unchanged facts
+- **THEN** it appends no duplicate invalidation or transition events
+- **AND** returns the same canonical verdict
+
+#### Scenario: Missing reconciler never selects a legacy path
+
+- **WHEN** a mutating use case is constructed without the required reconciler
+- **THEN** construction or execution fails with the typed configuration error
+- **AND** `Change.invalidate` is not invoked as a fallback
+
 ### Requirement: Registry bindings for this capability
 
-#### Scenario: Impl checks do not bind enter verifying
+Scenarios:
 
-- **GIVEN** a legal `ready → verifying` edge
-- **WHEN** predicates are attached
-- **THEN** `impl.filesResolved` and `impl.linksInScope` do not match
+#### Scenario: Verification exit uses a non-mutating registered check
 
-#### Scenario: Exit implementing runs impl runners
+- **GIVEN** `verifying → done` is evaluated with only an active attempt
+- **WHEN** `verification.current` executes
+- **THEN** it fails with actionable structured detail
+- **AND** it neither completes the attempt nor changes projections
 
-- **GIVEN** a change in `implementing` with an `open` tracked file
-- **WHEN** the attempt is `implementing → verifying`
-- **THEN** `impl.filesResolved` fails
+#### Scenario: Fresh completed evidence passes through shared evaluation
 
-#### Scenario: Redesign from implementing does not run impl runners
+- **GIVEN** completed evidence matches fresh resolved inputs
+- **WHEN** both `CompleteVerification` freshness evaluation and `verification.current` evaluate that snapshot
+- **THEN** both produce the same freshness verdict
+- **AND** only explicit completion is allowed to persist success
 
-- **GIVEN** a change in `implementing` with an `open` tracked file
-- **WHEN** the attempt is `implementing → designing`
-- **THEN** `impl.filesResolved` and `impl.linksInScope` do not match
+#### Scenario: Missing verification verdict fails closed
 
-#### Scenario: Many open files compact the text message
+- **GIVEN** a verification-requiring boundary has no canonical verification verdict
+- **WHEN** `verification.current` executes
+- **THEN** it fails with unavailable-validity guidance rather than skipping
 
-- **GIVEN** `impl.filesResolved` fails with more than three open tracked files
-- **WHEN** the check result is produced
-- **THEN** `details.files` lists every open path
-- **AND** `message` includes the open count
-- **AND** `message` includes at most three paths labeled as examples
+#### Scenario: Explicit not-required verdict skips
 
-#### Scenario: Open-file IMPLEMENTATION_STATE is not out-of-scope skippable
+- **WHEN** the canonical verdict explicitly marks verification `not-required`
+- **THEN** `verification.current` skips without fabricating completed evidence
 
-- **GIVEN** `impl.filesResolved` fails with open tracked files
-- **WHEN** blockers are projected from that fail
-- **THEN** the blocker code is `IMPLEMENTATION_STATE`
-- **AND** it is not marked skippable with `--allow-out-of-scope`
+#### Scenario: Overlapping implementation bindings are deduplicated
 
-#### Scenario: Out-of-scope IMPLEMENTATION_STATE keeps the bypass flag
+- **GIVEN** `implementing → verifying` matches forward-exit and verifying-entry applicability
+- **WHEN** registered checks are evaluated
+- **THEN** `impl.filesResolved` and `impl.linksInScope` each execute exactly once
 
-- **GIVEN** `impl.linksInScope` fails
-- **WHEN** blockers are projected from that fail
-- **THEN** the blocker code is `IMPLEMENTATION_STATE`
-- **AND** it is skippable with `bypassFlag` `--allow-out-of-scope`
+#### Scenario: Each implementation boundary remains independently guarded
 
-#### Scenario: Approval.spec fails implementing until recorded
+- **WHEN** a permitted transition enters `verifying` from another state or exits `implementing` forward to another state
+- **THEN** both implementation readiness checks execute for the applicable boundary
 
-- **GIVEN** spec gate on, change in `ready`, no spec approval recorded
-- **WHEN** the attempt is `ready → implementing`
-- **THEN** `approval.spec` fails
-- **AND** `availableTransitions` omits `implementing`
+#### Scenario: Verification start uses operation context
 
-#### Scenario: Approval.spec passes after ApproveSpec without leaving ready
-
-- **GIVEN** spec gate on and an active spec approval recorded while state is `ready`
-- **WHEN** the attempt is `ready → implementing`
-- **THEN** `approval.spec` passes
-- **AND** the change is still in `ready` until TransitionChange persists `implementing`
+- **WHEN** explicit start runs outside `verifying`
+- **THEN** it executes the registered implementation checks through operation context
+- **AND** does not fabricate a lifecycle edge or self-transition
 
 ### Requirement: Projections
 

@@ -14,6 +14,11 @@ import { output, parseFormat, serializeOutput, type OutputFormat } from '../../f
 import { handleError, cliError } from '../../handle-error.js'
 import { parseCommaSeparatedValues } from '../../helpers/parse-comma-values.js'
 import { createCheckProgressPresenter } from './_check-progress-presenter.js'
+import {
+  publicValidity,
+  publicVerificationEvidence,
+  validityTextLines,
+} from './_validity-present.js'
 
 /**
  * Writes one structured stream record for machine-readable transition output.
@@ -85,6 +90,31 @@ function isRepairGuideError(err: unknown): boolean {
  * @param err - The typed failure whose message is shown first
  * @param status - Fresh GetStatus result after the failed transition
  */
+/**
+ * Copies hash-free validity fields from a fresh status result.
+ *
+ * @param status - GetStatus payload used to fill a failed transition
+ * @returns Fields to merge into structured failure output
+ */
+function repairValidityFields(status: TransitionFailureStatus): {
+  readonly validity?: ReturnType<typeof publicValidity>
+  readonly verification?: ReturnType<typeof publicVerificationEvidence>
+} {
+  const validity = publicValidity((status as { validity?: unknown }).validity)
+  const verification =
+    status.change !== undefined ? publicVerificationEvidence(status.change) : undefined
+  return {
+    ...(validity !== undefined ? { validity } : {}),
+    ...(verification !== undefined ? { verification } : {}),
+  }
+}
+
+/**
+ * Write text repair guide.
+ *
+ * @param err - err
+ * @param status - status
+ */
 function writeTextRepairGuide(err: Error, status: TransitionFailureStatus): void {
   process.stderr.write(`error: ${err.message}\n`)
   for (const b of status.blockers) {
@@ -96,6 +126,15 @@ function writeTextRepairGuide(err: Error, status: TransitionFailureStatus): void
   }
   process.stderr.write('\n')
   process.stderr.write('repair guide:\n')
+  if (status.change !== undefined) {
+    process.stderr.write(`  state:   ${status.change.state}\n`)
+  }
+  const validity = publicValidity((status as { validity?: unknown }).validity)
+  const evidence =
+    status.change !== undefined ? publicVerificationEvidence(status.change) : undefined
+  for (const line of validityTextLines(validity, evidence)) {
+    process.stderr.write(`  ${line}\n`)
+  }
   process.stderr.write(`  target:  ${status.nextAction.targetStep}\n`)
   process.stderr.write(`  command: ${status.nextAction.command ?? '(none)'}\n`)
   process.stderr.write(`  reason:  ${status.nextAction.reason}\n`)
@@ -307,6 +346,8 @@ JSON/TOON output schema:
                       to: requestedTarget,
                       blockers: status.blockers,
                       nextAction: status.nextAction,
+                      ...(status.change !== undefined ? { state: status.change.state } : {}),
+                      ...repairValidityFields(status),
                     },
                   },
                 })

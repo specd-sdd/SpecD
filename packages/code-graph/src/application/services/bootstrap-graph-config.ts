@@ -1,4 +1,4 @@
-import { type SpecdConfig } from '@specd/core'
+import { DEFAULT_INVALIDATION_POLICY, type SpecdConfig } from '@specd/core'
 import { join } from 'node:path'
 
 /**
@@ -57,5 +57,6 @@ export function createBootstrapGraphConfig(params: {
       },
     },
     approvals: { spec: false, signoff: false },
+    invalidation: DEFAULT_INVALIDATION_POLICY,
   }
 }

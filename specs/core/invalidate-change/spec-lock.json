@@ -12,7 +12,12 @@
   ],
   "implementation": [
     {
-      "file": "core:src/composition/use-cases/invalidate-change.ts"
+      "file": "core:src/application/use-cases/invalidate-change.ts",
+      "symbols": ["InvalidateChange"]
+    },
+    {
+      "file": "core:src/application/errors/invalidate-requires-force-error.ts",
+      "symbols": ["InvalidateRequiresForceError", "ForceInvalidationRecovery"]
     }
   ]
 }

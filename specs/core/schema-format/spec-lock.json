@@ -11,41 +11,42 @@
   ],
   "implementation": [
     {
-      "file": "core:test/infrastructure/schema-yaml-parser.spec.ts"
+      "file": "core:src/domain/value-objects/artifact-type.ts",
+      "symbols": ["ArtifactType"]
     }
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "YAML schema contract for artifacts, DAG, validation, metadata extraction, workflow hooks, plugins, extends, and resolution.",
+      "value": "YAML contract for schema kinds, artifacts, DAG, validation, extraction, workflow hooks, compatibility, and reference resolution.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:80efae7f5fe1b278c99e053871f2b8f73c65e40710c8ccb282d45b7c2876b859",
-          "lastModified": "2026-08-30T09:18:36.438Z"
+          "hash": "sha256:c42cfedb492c2cc5d1163854565a75654316491f301124c8d916e2e18842d707",
+          "lastModified": "2026-09-19T19:11:11.554Z"
         },
         "verify.md": {
-          "hash": "sha256:2e8ac27fc9420b2eb85051d151e1fd8715ff6580b98a43ba562da9965c5f1390",
-          "lastModified": "2026-08-30T09:18:36.439Z"
+          "hash": "sha256:e26d09a4fb1af9f7cef215642e117534ac45a0562bb69b19646b0dae33bcc95f",
+          "lastModified": "2026-09-19T19:11:11.556Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# Schema Format\n\n## Rules\n- Top-level: required `kind` (`schema|schema-plugin`), `name`, `version`; schema requires `artifacts`; optional description/extends, validations, workflow, extraction. `schema-plugin`: no `artifacts|workflow|metadataExtraction|extends|compat`; may declare validation/rules-related merge fields. Extends merges root→leaf; path cycle → `SchemaValidationError`.\n- IDs: artifacts `/^[a-z][a-z0-9-]*$/`; hook/validation/rule/cleanup/cross-validation/extraction IDs `/^[a-z][a-z0-9]*(-[a-z0-9]+)*$/`, 1–64. Hooks globally unique across workflow; others unique immediate array; workflow identity `step`, participant identity `as`.\n- Artifact: `id`, required `scope: spec|change`, `output`; `optional` defaults false; optional template/instruction/requires/format/`hasTasks`/rules/cleanup/validations/extraction. `delta` spec-only; change delta rejected. Filename final literal glob segment/template.\n- `artifactDag()` canonical cached `requires` graph: `roots`, `childrenOf`, `topologicalOrder`, `descendantsOf`; consumers use it, never rebuild. Requires acyclic; non-optional cannot depend on optional.\n- `validations` selector XOR JSONPath `path`, plus `required` zero-match only, `count`, `contentMatches`, `children`; delta equivalents run normalized delta YAML AST and require `delta:true`.\n- Cross-artifact: `id`, same-scope `participants` (`artifact`, `as`, selector, optional keySelector, key), `relation` `all-equal|subset|superset`, aliases, optional `ordering: ignore|strict`; compare extracted keys, not raw AST.\n- `metadataExtraction`: field → entries `artifact` + extractor (selector/extract/capture/strip/groupBy/transform/fields); transform runtime registry. `dependsOn` capture label/href, normalize failure explicit.\n- Workflow: valid lifecycle `step`, optional artifact `requires`, subset `requiresTaskCompletion` targeting `hasTasks:true`, pre/post hooks. External hook `id` + `external.type` + opaque `external.config`; unknown runner type rejected. Array order display/axis only.\n- Resolve ref: `@scope/name` npm; `#workspace:name`; `#name`/bare default workspace; path direct. Missing returns null; caller throws `SchemaNotFoundError`. Zod validates before domain construction; unknown top-level ignored.\n- `verify.md`: `### Requirement:` mirrors specs; scenarios WHEN/THEN; verify normally `requires: [spec]`.\n\n## Constraints\n- Kind/scope required; plugin field prohibitions enforced.\n- Duplicate IDs, invalid IDs, unknown requires, cycles, invalid workflow steps/task references, invalid delta validation, duplicate workflow steps → `SchemaValidationError`.\n- Scope defines spec layout/validation/change completeness; delta/selectors/application → core:delta-format.",
+      "value": "# Schema Format\n\n## Rules\n- Top-level requires `kind: schema|schema-plugin`, `name`, integer `version`; full schema requires `artifacts`, may declare description/extends/compat/cross validations/workflow. Plugins forbid artifacts/workflow/extends/compat/metadataExtraction; may contribute documented merge operations. Unknown top-level fields ignored. Zod + semantic validation precede domain construction.\n- `compat`: string or `{name, version?}`; omitted version=1. `Schema.compat()` returns identity; `Schema.canonicalSpecSchema()` prefers compat, then parsed extends, then own name/version. Extends resolves recursively root→leaf, inherits compat unless child overrides, detects path cycles.\n- Artifact IDs match `/^[a-z][a-z0-9-]*$/`; hook/validation/rule/cleanup/cross-validation/extraction IDs match `/^[a-z][a-z0-9]*(-[a-z0-9]+)*$/`, length 1–64. Hooks globally unique across workflow; other IDs unique immediate array; workflow identity=`step`, participant identity=`as`.\n- Artifact fields: required id/scope `spec|change`/output; optional description/template/instruction/requires/format/optional/hasTasks/delta/deltaInstruction/deltaValidations/validations/metadataExtraction/rules/preHashCleanup/taskCompletionCheck. `optional`/`hasTasks`/`delta` default false. Delta only spec scope. Output filename uses final literal glob segment, then template filename, else validation error.\n- `scope: spec` syncs to repository/archive; `scope: change` remains working document. Non-optional artifacts required in change; non-optional spec artifacts required in persisted specs.\n- `Schema.artifactDag()` is cached canonical requires graph: `roots`, `childrenOf`, `parentsOf`, stable `topologicalOrder`, stable `descendantsOf`. All production DAG consumers use it; no local graph rebuild/declaration-order proxy. Requires known IDs, acyclic; non-optional cannot depend on optional.\n- `preHashCleanup` applies ordered regex substitutions before validated and approval hashes. `hasTasks:true` enables task capability; task patterns default Markdown checkboxes. `workflow.requiresTaskCompletion` may reference only hasTasks artifacts.\n- Base validations select by selector XOR RFC 9535 JSONPath, then optional zero-match `required`, `count`, `contentMatches`, nested `children`. Count handles cardinality/unique keys. Delta validations use same model against normalized delta YAML AST and require delta=true.\n- Cross-artifact validation participants are same-scope artifact aliases with selector/key extraction; relations `all-equal|subset|superset`; optional ordering ignore|strict. Compare extracted keys, not raw AST.\n- Metadata extraction maps fields to artifact selectors/extract/capture/strip/groupBy/transform/fields; `dependsOn` captures label/href; transform normalization failures explicit.\n- Workflow rows attach extras to existing `ChangeState`: step, optional artifact requires, task-completion requires, pre/post hooks. Declaration order controls display and known-state axis; missing delivery states are fallback-spliced. Rows never define/remove states or impose adjacency; unknown/duplicate steps rejected.\n- Hook entry: id + exactly one `instruction`, `run`, or `external:{type,config}`. Unknown external runner type rejected after merged registry resolution.\n- Templates resolve relative to schema; loaded eagerly; plain text preserved. Rules pre/post wrap instruction. Format inferred from output extension when omitted.\n- References: `@scope/name` npm; `#workspace:name`; `#name`/bare default workspace; relative/absolute path direct. Missing file returns null; caller throws `SchemaNotFoundError`.\n- `verify.md` mirrors `### Requirement:` headings and contains informative WHEN/THEN scenarios; verify artifact normally requires spec.\n\n## Constraints\n- Every schema declares kind; plugin forbidden fields rejected.\n- Duplicate/invalid IDs, unknown requires, cycles, invalid task references, invalid delta settings, duplicate/unknown workflow steps → `SchemaValidationError`.\n- Optional dependency propagates optionality.\n- Delta format/selectors/application remain defined by core:delta-format.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:80efae7f5fe1b278c99e053871f2b8f73c65e40710c8ccb282d45b7c2876b859",
-          "lastModified": "2026-08-30T09:18:36.438Z"
+          "hash": "sha256:c42cfedb492c2cc5d1163854565a75654316491f301124c8d916e2e18842d707",
+          "lastModified": "2026-09-19T19:11:11.554Z"
         },
         "verify.md": {
-          "hash": "sha256:2e8ac27fc9420b2eb85051d151e1fd8715ff6580b98a43ba562da9965c5f1390",
-          "lastModified": "2026-08-30T09:18:36.439Z"
+          "hash": "sha256:e26d09a4fb1af9f7cef215642e117534ac45a0562bb69b19646b0dae33bcc95f",
+          "lastModified": "2026-09-19T19:11:11.556Z"
         }
       }
     }

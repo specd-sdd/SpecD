@@ -2,10 +2,10 @@ import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
 import { isEnoent } from './is-enoent.js'
 import {
-  changeManifestSchema,
   type ChangeManifest,
   type RawChangeEvent,
   type RawDraftedEvent,
+  parseChangeManifest,
 } from './manifest.js'
 import { CorruptedManifestError } from '../../domain/errors/corrupted-manifest-error.js'
 import {
@@ -346,13 +346,14 @@ function parseManifest(content: string, dir: string): ChangeManifest {
   } catch {
     throw new CorruptedManifestError(`invalid JSON in manifest.json in ${dir}`)
   }
-  const result = changeManifestSchema.safeParse(raw)
-  if (!result.success) {
-    throw new CorruptedManifestError(
-      `invalid manifest.json in ${dir}: ${result.error.issues.map((i) => i.message).join(', ')}`,
-    )
+  try {
+    return parseChangeManifest(raw)
+  } catch (err) {
+    if (err instanceof CorruptedManifestError) {
+      throw new CorruptedManifestError(`invalid manifest.json in ${dir}: ${err.message}`)
+    }
+    throw err
   }
-  return result.data as ChangeManifest
 }
 
 /**

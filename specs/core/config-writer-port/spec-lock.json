@@ -7,36 +7,36 @@
   "implementation": [],
   "optimizations": {
     "optimizedDescription": {
-      "value": "ConfigWriter port: initProject, addPlugin, removePlugin, listPlugins for specd.yaml mutation.",
+      "value": "ConfigWriter port defines project initialization and plugin declaration mutation without application-layer filesystem coupling.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:ab37ae28fbae97886c2b5b39c5dba7ff21495da30fd43be4b8eb7f046035d013",
-          "lastModified": "2026-07-25T11:53:31.663Z"
+          "hash": "sha256:3cd5446fe99def7a8fc11c7b23672fa27a83d2775931921e294f108da3594303",
+          "lastModified": "2026-09-19T19:11:11.829Z"
         },
         "verify.md": {
-          "hash": "sha256:2582e2f73124ca0287186ca7c6c5d9e5f84691aa96ee03038d198bf8e3a2d97f",
-          "lastModified": "2026-07-25T11:53:31.663Z"
+          "hash": "sha256:4e90b97c10437e6f7b31f17bd20432042cb77089acadb13b768d46c390ee0e5d",
+          "lastModified": "2026-09-19T19:11:11.831Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# ConfigWriter\n\n## Rules\n- Interface (not abstract): `initProject`, `addPlugin`, `removePlugin`, `listPlugins`.\n- `initProject(InitProjectOptions)` → `InitProjectResult`. Options: projectRoot, schemaRef, workspaceId, specsPath, force?. Result: configPath, schemaRef, workspaces, metadataCachePath.\n- Behaviour: write specd.yaml (omit storage by default); create specs + `.specd/{changes,drafts,discarded,archive}`; ensure metadata cache; append `/.specd/metadata/` to root .gitignore (default fs layout only); `{configPath}/tmp/.gitignore`; ignore `specd.local.yaml` + `specd.local.*.yaml`.\n- Exists + !force → `AlreadyInitialisedError`; force overwrites.\n- `addPlugin(configPath, type, name, config?)` — no dupes; write config with name. `removePlugin(configPath, type, name)`.\n- Delivery: `createConfigWriter()` from @specd/core only — no FsConfigWriter import. Prefer SpecdConfig snapshot over listPlugins for reads.\n\n## Constraints\n- application/ports/; no fs/yaml at port. AlreadyInitialisedError application-layer. plugins shape: `{ agents: Array<{name, config?}> }`.",
+      "value": "# ConfigWriter\n\n## Rules\n- TypeScript interface, not abstract class: `initProject`, `addPlugin`, `removePlugin`, `listPlugins`. Port lives application/ports.\n- `initProject(InitProjectOptions): Promise<InitProjectResult>`. Options: absolute projectRoot, schemaRef, workspaceId, relative specsPath, optional force. Result: configPath, schemaRef, readonly workspaces, project-relative metadataCachePath.\n- Initialize specd.yaml with schema/default workspace and omit storage; create specs plus `.specd/{changes,drafts,discarded,archive}`; ensure metadata cache. For default fs metadata only, append rooted `/.specd/metadata/` to root .gitignore. Create `{configPath}/tmp/.gitignore` with normative tmp-ignore contents. Add `specd.local.yaml` and `specd.local.*.yaml` ignores idempotently.\n- Existing specd.yaml without force throws `AlreadyInitialisedError`; force overwrites.\n- `addPlugin(configPath,type,name,config?)` adds unique `{name,config?}` under plugins[type]; `removePlugin` removes named entry; both return Promise<void>. Optional config remains absent unless supplied/required.\n- Delivery obtains wired port via `createConfigWriter()` from `@specd/core`; never imports `FsConfigWriter`. Prefer existing `SpecdConfig` snapshot over `listPlugins` for declaration reads.\n\n## Constraints\n- Port has no node:fs/yaml/I/O dependency. `AlreadyInitialisedError` application-layer.\n- Plugin shape: `{ agents: Array<{name, config?}> }`.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:ab37ae28fbae97886c2b5b39c5dba7ff21495da30fd43be4b8eb7f046035d013",
-          "lastModified": "2026-07-25T11:53:31.663Z"
+          "hash": "sha256:3cd5446fe99def7a8fc11c7b23672fa27a83d2775931921e294f108da3594303",
+          "lastModified": "2026-09-19T19:11:11.829Z"
         },
         "verify.md": {
-          "hash": "sha256:2582e2f73124ca0287186ca7c6c5d9e5f84691aa96ee03038d198bf8e3a2d97f",
-          "lastModified": "2026-07-25T11:53:31.663Z"
+          "hash": "sha256:4e90b97c10437e6f7b31f17bd20432042cb77089acadb13b768d46c390ee0e5d",
+          "lastModified": "2026-09-19T19:11:11.831Z"
         }
       }
     }

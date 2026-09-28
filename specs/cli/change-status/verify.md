@@ -148,6 +148,28 @@
 - **AND** JSON `availableSteps` is `[]`
 - **AND** JSON `nextAction.command` is `null`
 
+### Requirement: Reconciled validity and next-action output
+
+#### Scenario: Status renders committed recovery and verification records
+
+- **GIVEN** reconciliation returns the change to design and an unfinished verification attempt exists
+- **WHEN** text and structured status are rendered
+- **THEN** both show the committed state and cause
+- **AND** distinguish the attempt from absent or stale completed evidence without exposing source content
+
+#### Scenario: All formats preserve the same recovery semantics
+
+- **GIVEN** validity contains an automatic return, multiple blockers, and a next action
+- **WHEN** status is rendered as text, JSON, and TOON
+- **THEN** every format carries the same state, recovery cause, blocker codes, and command
+- **AND** structured output remains machine-readable rather than embedding prose-only recovery
+
+#### Scenario: Fingerprint evidence is safe to display
+
+- **WHEN** status reports implementation or artifact differences
+- **THEN** it exposes paths, difference kinds, algorithms, and freshness only
+- **AND** it does not expose source contents, actor-private metadata, or raw internal evaluator objects
+
 ### Requirement: Text status omits duplicated review file lists
 
 #### Scenario: Artifact-review-required does not reprint files under review

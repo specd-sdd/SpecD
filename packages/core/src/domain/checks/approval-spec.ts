@@ -1,4 +1,5 @@
 import { type Change } from '../entities/change.js'
+import { type ChangeValidityVerdict } from '../services/change-validity.js'
 import {
   CHECK_LABELS,
   fail,
@@ -13,6 +14,7 @@ import {
 export interface ApprovalSpecFacts {
   readonly specGateEnabled: boolean
   readonly change: Change
+  readonly validity?: ChangeValidityVerdict
 }
 
 /**
@@ -26,8 +28,15 @@ export function run(facts: ApprovalSpecFacts): CheckResult {
   if (!facts.specGateEnabled) {
     return skip('approval.spec')
   }
-  if (facts.change.activeSpecApproval !== undefined) {
+  const status = facts.validity?.specApproval
+  if (
+    status === 'valid' ||
+    (status === undefined && facts.change.activeSpecApproval !== undefined)
+  ) {
     return pass('approval.spec')
+  }
+  if (status === 'stale' || status === 'revoked') {
+    return fail('approval.spec', 'APPROVAL_STALE', 'Spec approval is stale', { gate: 'spec' })
   }
   return fail(
     'approval.spec',
@@ -44,7 +53,13 @@ export function run(facts: ApprovalSpecFacts): CheckResult {
  * @returns Check result
  */
 function execute(ctx: CheckExecutionContext): Promise<CheckResult> {
-  return Promise.resolve(run({ specGateEnabled: ctx.approvals.spec, change: ctx.change }))
+  return Promise.resolve(
+    run({
+      specGateEnabled: ctx.approvals.spec,
+      change: ctx.change,
+      ...(ctx.validity !== undefined ? { validity: ctx.validity } : {}),
+    }),
+  )
 }
 
 /** Reusable `approval.spec` check. Registry bindings decide when it runs. */

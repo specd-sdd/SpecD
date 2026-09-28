@@ -11,6 +11,7 @@
     "build:debug": "turbo build:debug --filter=!@specd/public-web",
     "dev": "turbo dev",
     "specd": "node packages/cli/dist/index.js",
+    "ai-agents:sync": "node dev/scripts/sync-codex-skills.js",
     "test": "turbo test --concurrency=3 --filter=@specd/core --filter=@specd/cli --filter=@specd/code-graph",
     "typecheck": "turbo typecheck --filter=!@specd/public-web",
     "lint": "eslint . ",

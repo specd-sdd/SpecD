@@ -17,6 +17,14 @@
       "symbols": ["ApproveSignoff"]
     },
     {
+      "file": "core:src/application/errors/verification-in-progress-error.ts",
+      "symbols": ["VerificationInProgressError"]
+    },
+    {
+      "file": "core:src/application/errors/verification-stale-error.ts",
+      "symbols": ["VerificationStaleError"]
+    },
+    {
       "file": "core:test/application/use-cases/approve-signoff.spec.ts"
     }
   ]

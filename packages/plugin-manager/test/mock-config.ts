@@ -1,4 +1,4 @@
-import type { SpecdConfig } from '@specd/core'
+import { DEFAULT_INVALIDATION_POLICY, type SpecdConfig } from '@specd/core'
 
 export function makeMockConfig(projectRoot: string = '/tmp/project'): SpecdConfig {
   return {
@@ -28,6 +28,7 @@ export function makeMockConfig(projectRoot: string = '/tmp/project'): SpecdConfi
       archiveAdapter: { adapter: 'fs', config: {} },
     },
     approvals: { spec: false, signoff: false },
+    invalidation: DEFAULT_INVALIDATION_POLICY,
     plugins: { agents: [] },
   }
 }

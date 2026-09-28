@@ -9,6 +9,15 @@ function readTemplate(...parts: string[]): string {
   return readFileSync(join(templatesRoot, ...parts), 'utf8')
 }
 
+function complianceDecision(content: string, mode: '`change`' | '`delegated`'): string[] {
+  const row = content.split('\n').find((line) => line.startsWith(`| ${mode} |`))
+  if (!row) throw new Error(`Missing compliance decision row for ${mode}`)
+  return row
+    .split('|')
+    .slice(2, -1)
+    .map((cell) => cell.trim())
+}
+
 describe('workflow skill templates', () => {
   it('defines fast-track as a frontmatter-free, resumable standard template', () => {
     const content = readTemplate('skills', 'specd-fasttrack', 'SKILL.md.tpl')
@@ -223,5 +232,108 @@ describe('workflow skill templates', () => {
     expect(archive).toContain('--allow-overlap')
     expect(archive).toContain('spec-overlap-conflict')
     expect(archive).toContain('do not use `--allow-overlap`')
+  })
+
+  it('teaches canonical reconciliation instead of hand-rolled invalidation', () => {
+    const shared = readTemplate('shared', 'shared.md.tpl')
+    expect(shared).toContain('materialized validity projections')
+    expect(shared).toContain('Do not calculate fingerprints')
+    expect(shared).toContain('restart-verification flag')
+    expect(shared).toContain('`artifacts: none` waives reopening')
+    expect(shared).toContain('`workflow: preserve` permits in-place semantic review')
+    expect(shared).toContain('`workflow: redesign` plus unresolved non-task drift')
+    expect(shared).toContain('not semantic review, approval renewal, or verification renewal')
+    expect(shared).toContain('returns to `designing`')
+    expect(shared).toContain('later than `done`')
+    expect(shared).toContain('Verification staleness alone never moves lifecycle state')
+    expect(shared).toContain('specd changes verification start <name>')
+    expect(shared).toContain('specd changes verification complete <name>')
+    expect(shared).toContain('specd changes verification invalidate <name> --reason "<text>"')
+    expect(shared).toContain('hasTasks')
+    expect(shared).toContain('Do not hand-invalidate')
+    expect(shared).not.toContain('--restart-verification')
+  })
+
+  it('gives verify and compliance explicit attempt ownership', () => {
+    const verify = readTemplate('skills', 'specd-verify', 'SKILL.md.tpl')
+    expect(verify).toContain('specd changes verification start <name> --format text')
+    expect(verify).toContain('specd changes verification complete <name> --format text')
+    expect(verify).toContain('/specd-compliance --change <name> --delegated --attempt <attemptId>')
+    expect(verify).toContain('any active lifecycle')
+    expect(verify).toContain('does **not** capture a baseline')
+    expect(verify).toContain('There is no restart-verification flag')
+    expect(verify).toContain('specd changes verification invalidate <name> --reason "<text>"')
+    expect(verify).toContain('repeat all required verification work')
+    expect(verify).toContain('Do not run `verification complete` after a failed scenario')
+    expect(verify).not.toMatch(/--restart-verification/)
+
+    const compliance = readTemplate('skills', 'specd-compliance', 'SKILL.md.tpl')
+    expect(compliance).toContain('specd changes verification start <name> --format text')
+    expect(compliance).toContain('specd changes verification complete <name> --format text')
+    expect(compliance).toContain('`--change <name> --delegated --attempt <attemptId>`')
+    expect(compliance).toContain('Do not run `verification start` or `verification complete`')
+    expect(compliance).toContain('do not claim successful verification')
+    expect(compliance).toContain('An existing active attempt does **not** make this')
+    expect(compliance).toContain('`--all`, `--diff`, `--pr`')
+    expect(compliance.indexOf('mode = delegated')).toBeLessThan(
+      compliance.indexOf('`mode = change`, extract the change name'),
+    )
+  })
+
+  it('routes delegated compliance through every change-scoped downstream decision', () => {
+    const compliance = readTemplate('skills', 'specd-compliance', 'SKILL.md.tpl')
+    const standalone = complianceDecision(compliance, '`change`')
+    const delegated = complianceDecision(compliance, '`delegated`')
+
+    expect(standalone.slice(0, 7)).toEqual([
+      'change status',
+      'project context',
+      'change specs',
+      'depth 1',
+      'changes spec-preview',
+      'change reports',
+      'change',
+    ])
+    expect(delegated.slice(0, 7)).toEqual(standalone.slice(0, 7))
+    expect(standalone.slice(7)).toEqual(['yes', 'yes'])
+    expect(delegated.slice(7)).toEqual(['no', 'no'])
+
+    const invalidDelegation = compliance.indexOf(
+      'contains exactly one of `--delegated` or `--attempt`',
+    )
+    const standaloneFallback = compliance.indexOf('**Argument starts with `--change`**')
+    expect(invalidDelegation).toBeGreaterThan(-1)
+    expect(invalidDelegation).toBeLessThan(standaloneFallback)
+  })
+
+  it('routes design and implement recovery without forcing design for preserve', () => {
+    for (const skill of ['specd-design', 'specd-implement'] as const) {
+      const template = readTemplate('skills', skill, 'SKILL.md.tpl')
+      expect(template).toContain('stale or revoked spec approval')
+      expect(template).toContain('`designing`')
+      expect(template).toContain('sign-off after `done`')
+      expect(template).toContain('`done`')
+      expect(template).toContain('Verification staleness does **not** move lifecycle state')
+      expect(template).toContain('specd changes verification start <name>')
+      expect(template).toContain('`workflow: preserve`')
+      expect(template).toContain('`workflow: redesign`')
+      expect(template).toContain('`artifacts: none` waives reopening, not freshness')
+      expect(template).not.toContain('restart-verification flag on `changes transition`')
+    }
+  })
+
+  it('keeps archive behind a live post-hook preflight', () => {
+    const archive = readTemplate('skills', 'specd-archive', 'SKILL.md.tpl')
+    expect(archive).toContain('### 4b. Live preflight after hooks')
+    expect(archive).toContain('Do not archive until that post-hook status passes')
+    expect(archive).toContain(
+      'Do not bypass tasks, artifacts, implementation, verification, or gates',
+    )
+    expect(archive).toContain('Do not hand-invalidate')
+    expect(archive).toContain('specd changes verification start <name>')
+    expect(archive).toContain('hasTasks')
+    expect(archive.indexOf('### 4b. Live preflight after hooks')).toBeLessThan(
+      archive.indexOf('### 5. Archive'),
+    )
   })
 })

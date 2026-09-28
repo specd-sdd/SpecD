@@ -49,3 +49,4 @@ export { PersistedSchemaDependencyConflictError } from './persisted-schema-depen
 export { SpecMetadataParseError } from './spec-metadata-parse-error.js'
 export { ImplementationFileNotFoundError } from './implementation-file-not-found-error.js'
 export { ImplementationWorkspaceBoundaryError } from './implementation-workspace-boundary-error.js'
+export { UnsupportedManifestVersionError } from './unsupported-manifest-version-error.js'

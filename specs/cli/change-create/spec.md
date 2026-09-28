@@ -8,14 +8,22 @@ Users need a way to start tracking a new unit of spec work before any artifacts 
 
 ### Requirement: Command signature
 
-```
-specd change create <name> [--spec <id>...] [--format text|json|toon]
+```text
+specd changes create <name>
+  [--description <text>]
+  [--spec <id> ...]
+  [--artifact-policy none|surgical|downstream|global]
+  [--workflow-policy preserve|redesign]
+  [--format text|json|toon]
 ```
 
-- `<name>` — required positional; the unique slug name for the new change (e.g. `add-auth-flow`)
-- `--spec <id>` — optional repeatable flag; one or more spec IDs being created or modified. Each `<id>` is `[<workspace>:]<capability-path>` — the workspace qualifier is optional and defaults to `default` when omitted (e.g. `--spec auth/login` means `default:auth/login`, `--spec billing/invoices` with an explicit workspace would be `--spec billing-ws:billing/invoices`). When omitted, the change is created with an empty specIds list — specs can be added later via `change edit`.
-- `--description <text>` — optional; a short free-text description of the change's purpose, stored in the manifest
-- `--format text|json|toon` — optional; output format, defaults to `text`
+The name is required; spec and policy flags are optional and repeatability follows their value shape. The command validates policy values before delegating creation. It does not expose the deprecated scalar policy as a new-write option.
+
+### Requirement: Structured invalidation policy input
+
+The command SHALL expose independent optional inputs for artifact policy (`none | surgical | downstream | global`) and workflow policy (`preserve | redesign`). It SHALL resolve omitted values from validated project configuration and pass one structured policy to `CreateChange`.
+
+With no explicit or configured value, the created change uses `{ artifacts: downstream, workflow: preserve }`. Legacy `invalidationPolicy` compatibility and rejection of simultaneous old/new config shapes belong to core configuration loading; the CLI MUST NOT duplicate them. New manifests persist only the v2 structured shape.
 
 ### Requirement: Workspace resolution
 
@@ -112,6 +120,8 @@ specd change create add-shared-api --spec shared-ws:api/contracts
 
 ## Spec Dependencies
 
-- [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
-- [`core:change`](../../core/change/spec.md) — Change entity, identity requirements
-- [`core:spec-id-format`](../../core/spec-id-format/spec.md) — canonical `workspace:capabilityPath` format, bare path shorthand
+- [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, and output conventions
+- [`core:change`](../../core/change/spec.md) — change identity and structured policy projection
+- [`core:create-change`](../../core/create-change/spec.md) — canonical creation input and v2 persistence
+- [`core:config`](../../core/config/spec.md) — structured defaults and legacy alias adaptation
+- [`core:spec-id-format`](../../core/spec-id-format/spec.md) — canonical spec ID format and bare-path shorthand

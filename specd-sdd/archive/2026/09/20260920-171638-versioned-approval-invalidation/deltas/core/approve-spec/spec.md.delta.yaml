@@ -1,0 +1,57 @@
+- op: modified
+  description: 'Fingerprint only approval-relevant artifacts'
+  selector:
+    type: section
+    matches: '^Requirement: Artifact hash computation$'
+  content: |
+    Before approval, `ApproveSpec` SHALL delegate to the central validity reconciler and use its fresh scope and artifact projection. It SHALL compute a scope-aware fingerprint containing the exact sorted, deduplicated canonical `specIds` and a deterministic artifact fingerprint for every schema-relevant artifact file except artifacts whose type declares `hasTasks: true`, applying each artifact's configured `preHashCleanup` before hashing.
+
+    The approval MUST fail if a required artifact is missing or structurally invalid, or if any non-task artifact has drift or pending review. Validation establishes a structural baseline but does not itself constitute semantic or human approval.
+
+- op: modified
+  description: 'Approve only from ready and materialize renewed consent'
+  selector:
+    type: section
+    matches: '^Requirement: Approval recording and state transition$'
+  content: |
+    Spec approval MAY be granted or renewed only while the reconciled change is in `ready`. `ApproveSpec` MUST NOT transition the change to an approval state.
+
+    On success it SHALL append the `spec-approved` audit event and persist a current spec-approval projection with status `valid`, actor, reason, timestamp, and the exact scope-aware fingerprint reviewed. The current projection and event SHALL contain the same canonical scope and artifact fingerprint. It replaces the current projection but never removes prior approval or invalidation events.
+
+    Actor name and email SHALL continue to be resolved through the existing approval actor decorator and its privacy/fallback rules. One logical approval operation MUST resolve exactly one decorated `ActorIdentity` value and reuse it for reconciliation consequences, the materialized projection, and every appended event. Scope-aware fingerprinting and direct-dependency factory forms MUST NOT introduce a second identity-resolution path or permit inconsistent actor resolvers.
+
+    A stale or revoked required spec approval cannot be renewed in `implementing`; reconciliation first returns the change to `designing`, after which artifacts are reviewed, the change reaches `ready`, and approval is granted there.
+
+- op: added
+  description: 'Delegate validity application to the central reconciler'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    before:
+      type: section
+      matches: '^Requirement: Persistence and return value$'
+  content: |
+    ### Requirement: Canonical pre-approval reconciliation
+
+    `ApproveSpec` MUST use the single application reconciler for validity detection, invalidation, and automatic recovery. It MUST NOT independently mark a gate stale, infer recovery, or append a return transition. If reconciliation changes the state so approval is inapplicable, the use case SHALL persist that result and stop with the reconciled blocker.
+
+- op: modified
+  description: 'Persist reconciliation and approval in one serialized operation'
+  selector:
+    type: section
+    matches: '^Requirement: Persistence and return value$'
+  content: |
+    After the disabled-gate fast failure, `ApproveSpec` SHALL run reconciliation and approval through one serialized repository mutation using fresh persisted state and file facts. If the canonical verdict is not eligible for approval, it persists any detected invalidity or recovery and returns the typed blocker without adding approval.
+
+    If eligible, the mutation records the valid materialized spec approval and its audit event while the change remains in `ready`. Historic drain from `pending-spec-approval` remains supported for in-flight manifests, but new work MUST NOT enter that state. The result is the post-mutation reconciled `Change`.
+
+- op: modified
+  description: 'Compose the canonical reconciler through established factory signatures'
+  selector:
+    type: section
+    matches: '^Requirement: Config-based factory delegates through resolveApproveSpecDeps$'
+  content: |
+    The public factory SHALL retain both established forms: canonical `createApproveSpec(deps: ApproveSpecDeps)` and convenience `createApproveSpec(config, options?)`. The config form uses `normalizeCompositionFactoryArgs`, obtains deps through `resolveApproveSpecDeps(resolver)`, and delegates to the canonical form; options with the deps overload use the standard invalid-factory-arguments error.
+
+    `ApproveSpecDeps` and `resolveApproveSpecDeps` SHALL provide the change repository, actor resolver, schema provider, content hasher or shared fingerprint service, approval gates, and the central validity reconciler. They MUST NOT duplicate filesystem bootstrap or construct an entire kernel to obtain reconciliation.

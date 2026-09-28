@@ -8,71 +8,27 @@ The Change entity's state must survive process restarts and be recoverable from 
 
 ### Requirement: Manifest structure
 
-Each change is persisted as a manifest.json file inside its change directory. It contains:
+Each new active change SHALL be persisted as `manifest.json` with top-level `manifestVersion: 2`. This version is independent of `schema.name` and `schema.version`.
+
+Version 2 retains the existing identity, timestamps, schema identity, `specIds`, optional `specDependsOn`, artifact/file state, implementation tracking and links, and append-only `history`. It replaces `invalidationPolicy` with:
 
 ```jsonc
-{
-  "name": "add-oauth-login",
-  "createdAt": "2026-05-15T10:00:00.000Z",
-  "updatedAt": "2026-05-15T12:30:00.000Z",
-  "schema": { "name": "schema-std", "version": 1 },
-  "specIds": ["core:change"],
-  "invalidationPolicy": "downstream",
-  "implementationTrackingStartedAt": "2026-05-15T11:00:00.000Z",
-  "trackedImplementationFiles": [
-    { "file": "packages/core/src/domain/entities/change.ts", "state": "open" },
-    { "file": "packages/core/src/domain/entities/removed-file.ts", "state": "removed" },
-  ],
-  "implementationLinks": [
-    {
-      "specId": "core:change",
-      "file": "packages/core/src/domain/entities/change.ts",
-      "fileLinkExplicit": true,
-      "symbols": ["Change.transition"],
-    },
-  ],
-  "artifacts": [
-    {
-      "type": "proposal",
-      "optional": false,
-      "requires": [],
-      "state": "complete",
-      "files": [
-        {
-          "key": "proposal",
-          "filename": "proposal.md",
-          "state": "complete",
-          "validatedHash": "sha256:...",
-          "hasDrift": false,
-        },
-      ],
-    },
-  ],
-  "history": [],
-}
+"invalidation": { "artifacts": "downstream", "workflow": "preserve" }
 ```
 
-Field definitions:
+It additionally persists optional current `specApproval`, `signoff`, and `verification` projections. Approval records SHALL contain `status` (`valid`, `stale`, or `revoked`), actor, reason, decision time, and optional invalidation metadata. A spec-approval fingerprint SHALL contain the exact sorted, deduplicated canonical `specIds` approved together with the artifact fingerprint. Sign-off and verification SHALL persist their artifact fingerprint and the implementation fingerprint when known. Each fingerprint SHALL record its algorithm identifiers and a deterministically ordered map of canonical input keys or project-relative implementation paths to hashes.
 
-- `updatedAt` — optional ISO 8601 timestamp string representing the timestamp when the change was last updated.
-- `name` — the change slug; immutable after creation
-- `createdAt` — ISO 8601 timestamp; immutable after creation; source of truth for the directory prefix
-- `schema` — name (string) and version (integer) of the schema active at creation; written once, never updated
-- `workspaces` — optional; accepted on load for backward compatibility with older manifests but no longer written on save. Active workspaces are derived at runtime from specIds via parseSpecId()
-- `specIds` — current snapshot of spec IDs; mutable
-- `invalidationPolicy` — the change's persisted invalidation policy (`none`, `surgical`, `downstream`, `global`)
-- `implementationTrackingStartedAt` — optional ISO 8601 timestamp string representing when implementation tracking started. On hydration, if missing, it defaults to the change's first historical `implementing` transition timestamp if present, or `null`.
-- `trackedImplementationFiles` — optional array of tracked implementation file entries; each entry requires `file` and `state`, where `file` is a raw project-relative path and `state` is one of `open`, `resolved`, `ignored`, or `removed`
-- `implementationLinks` — optional array of confirmed implementation links; each entry requires `specId`, `file`, and `fileLinkExplicit`, and may include `symbols`
-- `fileLinkExplicit: false` is valid only when `symbols` is present and non-empty, because that shape means the file-level presence exists only as the container for symbol-level links
-- `specDependsOn` (optional) — a record keyed by spec ID, each value being an array of spec ID strings representing that spec's current in-change declared dependencies. For existing persisted specs, the entry MUST be seeded when the spec first enters the change scope from spec-lock.json, then legacy metadata.json.dependsOn, then an empty set when neither exists. These entries are archive-time inputs to sidecar and metadata generation, not the long-term archived record.
-- `artifacts` — array of artifact descriptors. Each artifact has type, optional, requires, state, and a files array of ManifestArtifactFile entries. Each file entry has key, filename, state, validatedHash, and hasDrift.
-- state on both artifacts and files uses the ArtifactStatus domain values (missing, in-progress, complete, skipped, pending-review, drifted-pending-review). File state is the source of truth; artifact state is the persisted aggregate.
-- validatedHash remains persisted as the last successfully validated baseline only. It is null when not validated, a SHA-256 string when validated, or "**skipped**" when explicitly skipped. It MUST NOT be interpreted as proof that the file still exists or is still complete on disk.
-- hasDrift is persisted per file and indicates whether the file's current state differs from the validated baseline
-- `history` — append-only array of typed events. The event types, their semantics, and the derivation rules (current state, active approval, draft status) are defined in [specs/core/change/spec.md — Requirement: History and event sourcing](../change/spec.md). This section defines only the JSON serialization of those events. The current lifecycle state is derived from the most recent transitioned event's to field. Each event contains common fields: type, at, and by. The by field is an ActorIdentity object (defined in core:change) which includes name, email, and optional provider, providerId, and metadata.
+A verification record SHALL distinguish the attempt baseline from completed evidence and record completion actor/time when valid or stale. For native v2 changes, absence means never completed or never approved. Missing or `null` implementation fingerprints are permitted only as adapted legacy unknown evidence; an observed empty map is a valid current snapshot.
 
-The JSON serialization of each event type is unchanged.
+Artifact files retain explicit state, `validatedHash`, and `hasDrift`. `history` remains append-only and lifecycle state remains derived from transition events. Projection updates MUST NOT remove, rewrite, or reorder prior events.
+
+### Requirement: Manifest format compatibility
+
+A missing `manifestVersion` SHALL be interpreted as v1. The loader SHALL validate the v1 shape, preserve its complete history, and adapt it in memory to the v2 domain projection. Legacy `invalidationPolicy` maps to `{ artifacts: <legacy value>, workflow: redesign }`; a missing legacy value maps to `{ artifacts: downstream, workflow: redesign }`.
+
+Legacy approval and verification events SHALL produce the best historical projection available without inventing fingerprints or approved scope from current files. A v1 approval, or a transitional v2 approval record without its canonical `specIds` snapshot, has unknown scope freshness and cannot authorize a required spec gate until renewed. Legacy sign-off or verification without implementation evidence is unknown freshness and cannot authorize active forward progress or archive where current evidence is required.
+
+Plain reads and archived inspection MUST NOT rewrite a v1 manifest. Its next actual mutation, including status reconciliation that detects invalidity, MAY write v2. A `manifestVersion` newer than the maximum supported version SHALL fail with a typed unsupported-manifest-version error before hydration.
 
 ### Requirement: Archive outcome history events
 
@@ -117,6 +73,18 @@ When a change is loaded and the active schema's version differs from what is rec
 When a change is loaded and the active schema's name differs from what is recorded in the manifest, the repository MUST reject the load with `SchemaMismatchError`. A schema-name mismatch indicates that the change was created against a different schema family rather than a later compatible revision of the same schema.
 
 The manifest's schema fields remain persisted facts only; enforcement behavior is defined by the change and repository contracts that consume them.
+
+### Requirement: Fingerprint serialization
+
+Spec-approval scope entries SHALL be canonical, deduplicated, and serialized in deterministic lexical order. Artifact fingerprint keys SHALL remain stable and include artifact type plus file key. Implementation entries SHALL use normalized project-relative paths, be deduplicated, and serialize in deterministic lexical order. Equality includes the complete key set as well as each hash. Spec-approval equality additionally includes the complete canonical spec set; additions and removals SHALL remain distinguishable as `spec-added` and `spec-removed`, while reordering alone is equal.
+
+Text entries SHALL identify `text-v1`; binary entries SHALL identify the byte-hash algorithm. Invalidity records SHALL retain the original approved or verified baseline and record the mismatch cause. Restoring matching bytes MUST NOT silently change a persisted `stale` or `revoked` projection back to `valid`.
+
+### Requirement: Verification attempt event serialization
+
+`verification-attempt-started` SHALL serialize actor, timestamp, current lifecycle state, attempt identity, and fingerprint algorithm identifiers for explicit verification start from any active state. Superseding an attempt preserves its baseline and identity in audit evidence. Successful completion records actor, time, attempt identity, and the verified fingerprint independently of lifecycle transitions. `verification-invalidated` SHALL serialize actor, timestamp, mandatory reason, and completed verification identity while leaving its persisted fingerprint untouched. Events MUST NOT serialize source contents.
+
+Capturing the current attempt projection never removes earlier attempt, completion, invalidation, or approval events from `history`. No attempt event or manifest shape may represent `verifying → verifying`.
 
 ### Requirement: Atomic writes
 

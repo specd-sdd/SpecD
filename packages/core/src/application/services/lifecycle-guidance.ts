@@ -1,5 +1,6 @@
 import { type Change } from '../../domain/entities/change.js'
 import { type ChangeState } from '../../domain/value-objects/change-state.js'
+import { type ChangeValidityVerdict } from '../../domain/services/change-validity.js'
 import {
   type LifecycleNextHop,
   type LifecycleReviewSummary,
@@ -21,6 +22,7 @@ export interface LifecycleNextAction extends LifecycleNextHop {
  * @param approvals - Configured approval gates
  * @param approvals.spec - Whether spec approval is enabled in config
  * @param approvals.signoff - Whether signoff approval is enabled in config
+ * @param validity - Reconciled validity verdict, when one is available
  * @returns Skill or CLI command string, or null when no guidance applies
  */
 export function resolveLifecycleCommand(
@@ -29,10 +31,34 @@ export function resolveLifecycleCommand(
   review: LifecycleReviewSummary,
   availableTransitions: readonly ChangeState[],
   approvals: { readonly spec: boolean; readonly signoff: boolean },
+  validity?: ChangeValidityVerdict,
 ): string | null {
   const state = change.state
 
-  if (review.required) {
+  if (validity?.specApproval === 'stale' || validity?.specApproval === 'revoked') {
+    return '/specd-design'
+  }
+
+  if (
+    validity !== undefined &&
+    (state === 'verifying' ||
+      state === 'done' ||
+      state === 'pending-signoff' ||
+      state === 'signed-off' ||
+      state === 'archivable' ||
+      state === 'archiving') &&
+    (validity.verification === 'stale' ||
+      validity.verification === 'absent' ||
+      validity.verification === 'attempt-active')
+  ) {
+    return '/specd-verify'
+  }
+
+  if (validity?.artifactReviewRequired === true && validity.recovery === null) {
+    return phaseCommand(change, nextHop, availableTransitions)
+  }
+
+  if (review.required || validity?.recovery?.cause === 'workflow-redesign') {
     return '/specd-design'
   }
 
@@ -51,6 +77,24 @@ export function resolveLifecycleCommand(
   ) {
     return 'specd changes approve signoff'
   }
+
+  return phaseCommand(change, nextHop, availableTransitions)
+}
+
+/**
+ * Phase command.
+ *
+ * @param change - change
+ * @param nextHop - next hop
+ * @param availableTransitions - available transitions
+ * @returns phase command result
+ */
+function phaseCommand(
+  change: Change,
+  nextHop: LifecycleNextHop,
+  availableTransitions: readonly ChangeState[],
+): string | null {
+  const state = change.state
 
   if (state === 'drafting' || state === 'designing') {
     return '/specd-design'
@@ -124,6 +168,7 @@ export function resolveLifecycleCommand(
  * @param approvals - Configured approval gates
  * @param approvals.spec - Whether spec approval is enabled in config
  * @param approvals.signoff - Whether signoff approval is enabled in config
+ * @param validity - Reconciled validity verdict, when one is available
  * @returns Next hop fields plus resolved command string
  */
 export function resolveLifecycleNextAction(
@@ -132,9 +177,17 @@ export function resolveLifecycleNextAction(
   review: LifecycleReviewSummary,
   availableTransitions: readonly ChangeState[],
   approvals: { readonly spec: boolean; readonly signoff: boolean },
+  validity?: ChangeValidityVerdict,
 ): LifecycleNextAction {
   return {
     ...nextHop,
-    command: resolveLifecycleCommand(change, nextHop, review, availableTransitions, approvals),
+    command: resolveLifecycleCommand(
+      change,
+      nextHop,
+      review,
+      availableTransitions,
+      approvals,
+      validity,
+    ),
   }
 }

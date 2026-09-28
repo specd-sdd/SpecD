@@ -41,6 +41,7 @@ export interface BuildCheckExecutionContextInput {
   readonly effectiveStatusByArtifact?: ReadonlyMap<string, ArtifactStatus>
   readonly onCheckProgress?: OnCheckProgress
   readonly passMemo?: Map<string, unknown>
+  readonly validity?: import('../../domain/services/change-validity.js').ChangeValidityVerdict
 }
 
 /**
@@ -63,6 +64,7 @@ export function buildCheckExecutionContext(
     ...(input.skipHookPhases !== undefined ? { skipHookPhases: input.skipHookPhases } : {}),
     ...(input.onCheckProgress !== undefined ? { onCheckProgress: input.onCheckProgress } : {}),
     ...(input.passMemo !== undefined ? { passMemo: input.passMemo } : {}),
+    ...(input.validity !== undefined ? { validity: input.validity } : {}),
   }
 }
 
@@ -131,10 +133,13 @@ export async function executeMatchingPredicates(
 ): Promise<PredicateExecutionResult> {
   const along = ctx.attempt.scope === 'transition' ? ctx.attempt.along : undefined
   const checks: CheckResult[] = []
+  const seen = new Set<CheckId>()
 
   for (const binding of matchingPredicates(bindings)) {
     const matches = bindingMatches(binding, ctx.attempt, along)
     if (matches) {
+      if (seen.has(binding.check.id)) continue
+      seen.add(binding.check.id)
       const result = await executeCheckWithProgress(binding.check, ctx)
       checks.push(result)
       if (
@@ -198,6 +203,7 @@ export function transitionAttemptFor(
  * @param input.allowOverlap - Optional overlap bypass
  * @param input.allowOutOfScope - Optional impl-scope bypass
  * @param input.passMemo - Shared memo for this GetStatus/TransitionChange pass
+ * @param input.validity - Reconciled validity verdict for this pass
  * @returns Predicate results keyed by target
  */
 export async function executeChecksByLegalTargets(
@@ -210,6 +216,7 @@ export async function executeChecksByLegalTargets(
     readonly allowOverlap?: boolean
     readonly allowOutOfScope?: boolean
     readonly passMemo?: Map<string, unknown>
+    readonly validity?: import('../../domain/services/change-validity.js').ChangeValidityVerdict
   },
 ): Promise<Partial<Record<ChangeState, readonly CheckResult[]>>> {
   const passMemo = input.passMemo ?? new Map<string, unknown>()
@@ -227,6 +234,7 @@ export async function executeChecksByLegalTargets(
         passMemo,
         ...(input.allowOverlap !== undefined ? { allowOverlap: input.allowOverlap } : {}),
         ...(input.allowOutOfScope !== undefined ? { allowOutOfScope: input.allowOutOfScope } : {}),
+        ...(input.validity !== undefined ? { validity: input.validity } : {}),
       }),
     )
     checksByTarget[target] = evaluation.checks

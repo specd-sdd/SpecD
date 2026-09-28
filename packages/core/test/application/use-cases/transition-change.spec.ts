@@ -6,6 +6,7 @@ import { RefreshImplementationTracking } from '../../../src/application/use-case
 import { SchemaNotFoundError } from '../../../src/application/errors/schema-not-found-error.js'
 import { ChangeNotFoundError } from '../../../src/application/errors/change-not-found-error.js'
 import { InvalidStateTransitionError } from '../../../src/domain/errors/invalid-state-transition-error.js'
+import { ReconciledOperationBlockedError } from '../../../src/application/errors/reconciled-operation-blocked-error.js'
 import { HappyPathNextUnavailableError } from '../../../src/domain/errors/happy-path-next-unavailable-error.js'
 import { HookFailedError } from '../../../src/domain/errors/hook-failed-error.js'
 import { Change, type ChangeEvent } from '../../../src/domain/entities/change.js'
@@ -18,6 +19,9 @@ import { ReadOnlyWorkspaceError } from '../../../src/domain/errors/read-only-wor
 import { Logger } from '../../../src/application/logger.js'
 import { createWorkflowCheckRegistry } from '../../../src/application/checks/workflow-check-registry.js'
 import { detectImplLinksInScope } from '../../../src/application/services/detect-impl-links-in-scope.js'
+import { type ReconcileChangeValidity } from '../../../src/application/use-cases/reconcile-change-validity.js'
+import { type ChangeValidityVerdict } from '../../../src/domain/services/change-validity.js'
+import { type ValidityFingerprint } from '../../../src/domain/value-objects/validity-fingerprint.js'
 import {
   makeChangeRepository,
   makeActorResolver,
@@ -28,6 +32,8 @@ import {
   makeWorkflowStep,
   makeListWorkspaces,
   makeNoopParsers,
+  makeObservingReconcile,
+  makeSpecApprovalFingerprint,
   testActor,
 } from './helpers.js'
 
@@ -68,6 +74,7 @@ function makeUseCase(
     refreshExecute?: ReturnType<typeof vi.fn>
     approvals?: { spec: boolean; signoff: boolean }
     countTasks?: CountTasks
+    reconcile?: ReconcileChangeValidity
   },
 ): TransitionChange {
   const refresh =
@@ -99,10 +106,68 @@ function makeUseCase(
     refresh,
     overrides?.approvals ?? { spec: false, signoff: false },
     registry.transitionBindings,
+    overrides?.reconcile ?? makeObservingReconcile(repo, undefined, refresh),
   )
 }
 
 describe('TransitionChange', () => {
+  it('reports a committed automatic recovery instead of a context-free transition failure', async () => {
+    const change = makeChangeInState('recovered-change', [
+      { type: 'transitioned', from: 'drafting', to: 'archivable', at: new Date(), by: actor },
+    ])
+    const repo = makeChangeRepository([change])
+    const recovery = { cause: 'signoff' as const, from: 'archivable' as const, to: 'done' as const }
+    const verdict: ChangeValidityVerdict = {
+      artifactReviewRequired: false,
+      affectedArtifacts: [],
+      projectionChanges: [],
+      specApproval: 'not-required',
+      signoff: 'stale',
+      verification: 'valid',
+      blockers: [{ code: 'SIGNOFF_STALE', message: 'Sign-off is stale' }],
+      recovery,
+    }
+    const reconcile = {
+      execute: async () => {
+        change.recover(recovery, actor)
+        return {
+          change,
+          verdict,
+          projectionChanges: [],
+          affectedArtifacts: [],
+          automaticReturn: recovery,
+          changed: true,
+        }
+      },
+    } as unknown as ReconcileChangeValidity
+    const useCase = makeUseCase(repo, { reconcile })
+
+    await expect(useCase.execute({ name: change.name, to: 'archiving' })).rejects.toMatchObject({
+      name: ReconciledOperationBlockedError.name,
+      code: 'RECONCILED_OPERATION_BLOCKED',
+      operation: 'transition',
+      changeName: change.name,
+      state: 'done',
+      automaticReturn: recovery,
+      blockers: verdict.blockers,
+      nextAction: { targetStep: 'done', command: '/specd-verify' },
+    })
+  })
+
+  it.each(['signed-off', 'archivable', 'archiving'] as const)(
+    'rejects a manual %s to done recovery-only edge',
+    async (from) => {
+      const change = makeChangeInState('manual-recovery', [
+        { type: 'transitioned', from: 'drafting', to: from, at: new Date(), by: actor },
+      ])
+      const useCase = makeUseCase(makeChangeRepository([change]))
+
+      await expect(useCase.execute({ name: change.name, to: 'done' })).rejects.toThrow(
+        InvalidStateTransitionError,
+      )
+    },
+  )
+
   describe('given a drafted change only', () => {
     it('throws ChangeNotFoundError because get returns null for drafted storage', async () => {
       const change = makeChangeInState('parked', [
@@ -269,7 +334,7 @@ describe('TransitionChange', () => {
       expect(refreshExecute).toHaveBeenCalledWith({ name: 'my-change' })
     })
 
-    it('skips refresh when explicitly disabled', async () => {
+    it('skips only the initial refresh when explicitly disabled but keeps the post-hook refresh', async () => {
       const change = makeChangeInState('my-change', [])
       const refreshExecute = vi.fn().mockResolvedValue({ trackedFiles: [], links: [] })
       const uc = makeUseCase(makeChangeRepository([change]), { refreshExecute })
@@ -280,7 +345,8 @@ describe('TransitionChange', () => {
         refreshImplementationTrackingBefore: false,
       })
 
-      expect(refreshExecute).not.toHaveBeenCalled()
+      expect(refreshExecute).toHaveBeenCalledOnce()
+      expect(refreshExecute).toHaveBeenCalledWith({ name: 'my-change' })
     })
   })
 
@@ -392,7 +458,7 @@ describe('TransitionChange', () => {
 
     it('transitions ready → implementing when spec gate is on and consent is recorded', async () => {
       const change = makeReadyChange('my-change')
-      change.recordSpecApproval('ok', {}, actor)
+      change.recordSpecApproval('ok', makeSpecApprovalFingerprint(change.specIds), actor)
       const uc = makeUseCase(makeChangeRepository([change]), {
         approvals: { spec: true, signoff: false },
       })
@@ -2154,7 +2220,7 @@ describe('TransitionChange', () => {
       expect(result.change.state).toBe('designing')
     })
 
-    it('invalidates approvals when transitioning to designing with active spec approval', async () => {
+    it('preserves approvals when lifecycle movement alone returns to designing', async () => {
       const change = makeImplementingChangeWithApproval('my-change')
       expect(change.activeSpecApproval).toBeDefined()
 
@@ -2166,10 +2232,10 @@ describe('TransitionChange', () => {
       })
 
       expect(result.change.state).toBe('designing')
-      expect(result.change.activeSpecApproval).toBeUndefined()
+      expect(result.change.activeSpecApproval).toBeDefined()
     })
 
-    it('invalidates to mark artifacts for review when transitioning to designing', async () => {
+    it('does not fabricate artifact review when transitioning to designing', async () => {
       const change = makeImplementingChange('my-change')
       expect(change.activeSpecApproval).toBeUndefined()
       expect(change.activeSignoff).toBeUndefined()
@@ -2183,17 +2249,10 @@ describe('TransitionChange', () => {
         to: 'designing',
       })
 
-      expect(invalidateSpy).toHaveBeenCalledTimes(1)
-      expect(invalidateSpy).toHaveBeenCalledWith(
-        'artifact-review-required',
-        expect.anything(),
-        'Invalidated because the change returned to designing and all artifacts require review.',
-        expect.any(Array),
-        expect.anything(),
-      )
+      expect(invalidateSpy).not.toHaveBeenCalled()
     })
 
-    it('does not call transition after invalidate when returning to designing', async () => {
+    it('transitions after invalidate when returning to designing', async () => {
       const change = makeImplementingChange('my-change')
       const transitionSpy = vi.spyOn(change, 'transition')
       const uc = makeUseCase(makeChangeRepository([change]))
@@ -2204,7 +2263,7 @@ describe('TransitionChange', () => {
       })
 
       expect(result.change.state).toBe('designing')
-      expect(transitionSpy).not.toHaveBeenCalled()
+      expect(transitionSpy).toHaveBeenCalled()
     })
 
     it('does not trigger invalidation for drafting to designing', async () => {
@@ -2230,6 +2289,8 @@ describe('TransitionChange', () => {
       expect(change.state).toBe('designing')
 
       const invalidateSpy = vi.spyOn(change, 'invalidate')
+      const historyLength = change.history.length
+      const updatedAt = change.updatedAt
       const uc = makeUseCase(makeChangeRepository([change]))
 
       const result = await uc.execute({
@@ -2239,6 +2300,27 @@ describe('TransitionChange', () => {
 
       expect(result.change.state).toBe('designing')
       expect(invalidateSpy).not.toHaveBeenCalled()
+      expect(result.change.history).toHaveLength(historyLength)
+      expect(result.change.updatedAt).toEqual(updatedAt)
+    })
+
+    it('rejects verifying self-entry instead of treating it as a neutral request', async () => {
+      const at = new Date('2024-01-01T00:00:00Z')
+      const change = makeChangeInState('my-change', [
+        { type: 'transitioned', from: 'drafting', to: 'designing', at, by: actor },
+        { type: 'transitioned', from: 'designing', to: 'ready', at, by: actor },
+        { type: 'transitioned', from: 'ready', to: 'implementing', at, by: actor },
+        { type: 'transitioned', from: 'implementing', to: 'verifying', at, by: actor },
+      ])
+      const historyLength = change.history.length
+      const updatedAt = change.updatedAt
+      const uc = makeUseCase(makeChangeRepository([change]))
+
+      await expect(uc.execute({ name: 'my-change', to: 'verifying' })).rejects.toThrow(
+        InvalidStateTransitionError,
+      )
+      expect(change.history).toHaveLength(historyLength)
+      expect(change.updatedAt).toEqual(updatedAt)
     })
 
     it('does not downgrade artifacts when transitioning from designing to designing', async () => {
@@ -2324,7 +2406,7 @@ describe('TransitionChange', () => {
       expect(hooks.execute).not.toHaveBeenCalled()
     })
 
-    it('transitions from archiving to designing and downgrades artifacts', async () => {
+    it('transitions from archiving to designing without fabricating drift', async () => {
       const createdAt = new Date('2024-01-01T00:00:00Z')
       const change = makeChangeInState('my-change', [
         {
@@ -2361,14 +2443,12 @@ describe('TransitionChange', () => {
       })
 
       expect(result.change.state).toBe('designing')
-      expect(result.change.getArtifact('proposal')?.files.get('proposal')?.status).toBe(
-        'pending-review',
-      )
+      expect(result.change.getArtifact('proposal')?.files.get('proposal')?.status).toBe('complete')
     })
   })
 
   describe('given shared predicate evaluation', () => {
-    it('does not CountTasks a second time after a green evaluate', async () => {
+    it('rechecks CountTasks after mutation-capable hooks', async () => {
       const change = makeChangeInState('my-change', [
         { type: 'transitioned', from: 'drafting', to: 'designing', at: new Date(), by: actor },
         { type: 'transitioned', from: 'designing', to: 'ready', at: new Date(), by: actor },
@@ -2415,11 +2495,12 @@ describe('TransitionChange', () => {
         makeRefreshImplementationTracking(),
         { spec: false, signoff: false },
         registry.transitionBindings,
+        makeObservingReconcile(repo),
       )
 
       await uc.execute({ name: 'my-change', to: 'verifying' })
 
-      expect(executeSpy).toHaveBeenCalledOnce()
+      expect(executeSpy).toHaveBeenCalledTimes(2)
     })
 
     it('still fails incomplete tasks when skipHookPhases is all', async () => {
@@ -2514,7 +2595,7 @@ describe('TransitionChange', () => {
         { type: 'transitioned', from: 'implementing', to: 'verifying', at: new Date(), by: actor },
         { type: 'transitioned', from: 'verifying', to: 'done', at: new Date(), by: actor },
       ])
-      change.recordSpecApproval('spec ok', {}, actor)
+      change.recordSpecApproval('spec ok', makeSpecApprovalFingerprint(change.specIds), actor)
       change.recordSignoff('ship it', {}, actor)
       const proposal = new ChangeArtifact({
         type: 'proposal',
@@ -2584,6 +2665,7 @@ describe('TransitionChange', () => {
         makeRefreshImplementationTracking(),
         { spec: false, signoff: false },
         transitionBindings,
+        makeObservingReconcile(repo),
       )
 
       await expect(uc.execute({ name: 'my-change', to: 'ready' })).rejects.toThrow(
@@ -2755,6 +2837,154 @@ describe('TransitionChange', () => {
       expect(result.change.state).toBe('implementing')
       expect(result.change.isImplementationTrackingActive).toBe(true)
       expect(result.change.implementationTrackingStartedAt).toEqual(explicitStart)
+    })
+  })
+
+  describe('reconciled verification evidence', () => {
+    const evidenceSchema = makeSchema({
+      workflow: [
+        {
+          step: 'implementing',
+          requires: [],
+          requiresTaskCompletion: [],
+          hooks: { pre: [], post: [] },
+        },
+        {
+          step: 'verifying',
+          requires: [],
+          requiresTaskCompletion: [],
+          hooks: { pre: [], post: [] },
+        },
+        {
+          step: 'done',
+          requires: [],
+          requiresTaskCompletion: [],
+          hooks: { pre: [], post: [] },
+        },
+      ],
+    })
+    const baseline: ValidityFingerprint = {
+      version: 1,
+      artifacts: { version: 1, algorithm: 'artifact-pre-hash-v1', files: {} },
+      implementation: {
+        version: 1,
+        hashAlgorithm: 'sha256',
+        textNormalization: 'text-v1',
+        binaryNormalization: 'bytes-v1',
+        files: {},
+      },
+    }
+    const openVerdict: ChangeValidityVerdict = {
+      artifactReviewRequired: false,
+      affectedArtifacts: [],
+      projectionChanges: [],
+      specApproval: 'valid',
+      signoff: 'valid',
+      verification: 'valid',
+      blockers: [],
+      recovery: null,
+    }
+
+    function observingReconcile(change: Change): ReconcileChangeValidity {
+      return {
+        execute: async () => ({
+          change,
+          verdict: openVerdict,
+          projectionChanges: [],
+          affectedArtifacts: [],
+          automaticReturn: null,
+          changed: false,
+        }),
+      } as unknown as ReconcileChangeValidity
+    }
+
+    it('does not manufacture verification evidence when entering verifying', async () => {
+      const change = makeChangeInState('my-change', [
+        { type: 'transitioned', from: 'drafting', to: 'designing', at: new Date(), by: actor },
+        { type: 'transitioned', from: 'designing', to: 'ready', at: new Date(), by: actor },
+        { type: 'transitioned', from: 'ready', to: 'implementing', at: new Date(), by: actor },
+      ])
+      const repo = makeChangeRepository([change])
+      const uc = makeUseCase(repo, {
+        schema: evidenceSchema,
+        reconcile: observingReconcile(change),
+      })
+
+      const result = await uc.execute({ name: 'my-change', to: 'verifying' })
+
+      expect(result.change.state).toBe('verifying')
+      expect(result.change.verification.activeAttempt).toBeUndefined()
+      expect(result.change.verification.completed).toBeUndefined()
+      expect(
+        result.change.history.some((event) => event.type === 'verification-attempt-started'),
+      ).toBe(false)
+      expect(result.change.history.some((event) => event.type === 'verification-completed')).toBe(
+        false,
+      )
+    })
+
+    it('preserves spec approval and completed verification on a backward hop', async () => {
+      const change = makeChangeInState('my-change', [
+        { type: 'transitioned', from: 'drafting', to: 'designing', at: new Date(), by: actor },
+        { type: 'transitioned', from: 'designing', to: 'ready', at: new Date(), by: actor },
+        { type: 'transitioned', from: 'ready', to: 'implementing', at: new Date(), by: actor },
+        { type: 'transitioned', from: 'implementing', to: 'verifying', at: new Date(), by: actor },
+        { type: 'transitioned', from: 'verifying', to: 'done', at: new Date(), by: actor },
+      ])
+      change.recordSpecApproval(
+        'approved',
+        makeSpecApprovalFingerprint(change.specIds, baseline.artifacts),
+        actor,
+      )
+      change.startVerification(baseline, actor)
+      const completed = change.completeVerification(actor)
+      change.recordSignoff('signed', baseline, completed.id, actor)
+      const repo = makeChangeRepository([change])
+      const uc = makeUseCase(repo, {
+        schema: evidenceSchema,
+        reconcile: observingReconcile(change),
+      })
+
+      const result = await uc.execute({ name: 'my-change', to: 'implementing' })
+
+      expect(result.change.state).toBe('implementing')
+      expect(result.change.specApproval?.status).toBe('valid')
+      expect(result.change.verification.completed?.id).toBe(completed.id)
+      expect(result.change.verification.completed?.status).toBe('valid')
+      expect(result.change.verification.activeAttempt).toBeUndefined()
+      expect(result.change.signoff?.status).toBe('revoked')
+      expect(
+        result.change.history.filter((event) => event.type === 'verification-completed'),
+      ).toHaveLength(1)
+    })
+
+    it('does not complete verification when leaving verifying', async () => {
+      const change = makeChangeInState('my-change', [
+        { type: 'transitioned', from: 'drafting', to: 'designing', at: new Date(), by: actor },
+        { type: 'transitioned', from: 'designing', to: 'ready', at: new Date(), by: actor },
+        { type: 'transitioned', from: 'ready', to: 'implementing', at: new Date(), by: actor },
+        { type: 'transitioned', from: 'implementing', to: 'verifying', at: new Date(), by: actor },
+      ])
+      const { attempt } = change.startVerification(baseline, actor)
+      const repo = makeChangeRepository([change])
+      const uc = makeUseCase(repo, {
+        schema: evidenceSchema,
+        reconcile: observingReconcile(change),
+      })
+
+      const backward = await uc.execute({ name: 'my-change', to: 'implementing' })
+      expect(backward.change.state).toBe('implementing')
+      expect(backward.change.verification.activeAttempt?.id).toBe(attempt.id)
+      expect(backward.change.verification.completed).toBeUndefined()
+
+      backward.change.transition('verifying', actor)
+      const forward = await uc.execute({ name: 'my-change', to: 'done' })
+      expect(forward.change.state).toBe('done')
+      expect(forward.change.verification.activeAttempt?.id).toBe(attempt.id)
+      expect(forward.change.verification.completed).toBeUndefined()
+      expect(forward.change.history.some((event) => event.type === 'verification-completed')).toBe(
+        false,
+      )
     })
   })
 })

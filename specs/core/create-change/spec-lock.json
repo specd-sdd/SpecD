@@ -14,6 +14,26 @@
     {
       "file": "core:src/application/use-cases/create-change.ts",
       "symbols": ["CreateChange"]
+    },
+    {
+      "file": "core:src/composition/use-cases/create-change.ts",
+      "symbols": ["CreateChangeDeps", "resolveCreateChangeDeps", "createCreateChange"]
+    },
+    {
+      "file": "core:src/composition/kernel.ts",
+      "symbols": ["createKernel"]
+    },
+    {
+      "file": "core:test/application/use-cases/create-change.spec.ts"
+    },
+    {
+      "file": "core:test/composition/use-cases/create-change.spec.ts"
+    },
+    {
+      "file": "core:test/composition/kernel.spec.ts"
+    },
+    {
+      "file": "core:test/application/use-cases/helpers.ts"
     }
   ],
   "optimizations": {

@@ -10,15 +10,7 @@
     "sdk:build-implementation-review",
     "core:transition-checks"
   ],
-  "implementation": [
-    {
-      "file": "cli:src/commands/change/status.ts",
-      "symbols": ["registerChangeStatus"]
-    },
-    {
-      "file": "cli:test/commands/change/status.spec.ts"
-    }
-  ],
+  "implementation": [],
   "optimizations": {
     "optimizedDescription": {
       "value": "Render read-only lifecycle, drift-aware artifact DAG, task progress, dependencies, and optional implementation review.",

@@ -5,6 +5,7 @@ import { type ContentHasher } from '../../application/ports/content-hasher.js'
 import { type SchemaProvider } from '../../application/ports/schema-provider.js'
 import { type SpecWorkspaceRoute } from '../../application/use-cases/_shared/spec-reference-resolver.js'
 import { type ListWorkspaces } from '../../application/use-cases/list-workspaces.js'
+import { type ReconcileChangeValidity } from '../../application/use-cases/reconcile-change-validity.js'
 import { ValidateArtifacts } from '../../application/use-cases/validate-artifacts.js'
 import { type SpecdConfig } from '../../application/specd-config.js'
 import { type ExtractorTransformRegistry } from '../../domain/services/content-extraction.js'
@@ -27,6 +28,8 @@ export interface ValidateArtifactsDeps {
   readonly contentHasher: ContentHasher
   readonly extractorTransforms: ExtractorTransformRegistry
   readonly workspaceRoutes: readonly SpecWorkspaceRoute[]
+  /** Canonical reconciler shared by the composition session. */
+  readonly reconcile: ReconcileChangeValidity
 }
 
 /**
@@ -50,6 +53,7 @@ export function resolveValidateArtifactsDeps(resolver: CompositionResolver): Val
     contentHasher: resolver.getContentHasher(),
     extractorTransforms,
     workspaceRoutes,
+    reconcile: resolver.getReconcileChangeValidity(),
   }
 }
 
@@ -110,6 +114,7 @@ function createValidateArtifactsFromNormalized(
       contentHasher,
       extractorTransforms,
       workspaceRoutes,
+      reconcile,
     } = input.deps
     return new ValidateArtifacts(
       changes,
@@ -120,6 +125,7 @@ function createValidateArtifactsFromNormalized(
       contentHasher,
       extractorTransforms,
       workspaceRoutes,
+      reconcile,
     )
   }
 
@@ -144,6 +150,7 @@ function isValidateArtifactsDeps(
     'actor' in value &&
     'contentHasher' in value &&
     'extractorTransforms' in value &&
-    'workspaceRoutes' in value
+    'workspaceRoutes' in value &&
+    'reconcile' in value
   )
 }

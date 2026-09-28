@@ -1,15 +1,23 @@
 import { type Change } from '../../domain/entities/change.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
 import { type ActorResolver } from '../ports/actor-resolver.js'
-import { type SchemaProvider } from '../ports/schema-provider.js'
-import { type ContentHasher } from '../ports/content-hasher.js'
 import { ApprovalGateDisabledError } from '../errors/approval-gate-disabled-error.js'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
+import { FingerprintInputError } from '../errors/fingerprint-input-error.js'
 import { SchemaMismatchError } from '../errors/schema-mismatch-error.js'
+import { VerificationNotFoundError } from '../errors/verification-not-found-error.js'
+import { VerificationInProgressError } from '../errors/verification-in-progress-error.js'
+import { VerificationStaleError } from '../errors/verification-stale-error.js'
+import { VerificationFingerprintMismatchError } from '../errors/verification-fingerprint-mismatch-error.js'
 import { InvalidStateTransitionError } from '../../domain/errors/invalid-state-transition-error.js'
-import { computeArtifactHash, buildCleanupMap } from './_shared/compute-artifact-hash.js'
-import { boundFromStates } from '../../domain/services/check-bindings.js'
+import { type SchemaProvider } from '../ports/schema-provider.js'
+import { type ChangeValidityVerdict } from '../../domain/services/change-validity.js'
+import { compareValidityFingerprints } from '../../domain/value-objects/validity-fingerprint.js'
+import { type Schema } from '../../domain/value-objects/schema.js'
+import { type ValidityFingerprintService } from '../services/validity-fingerprint-service.js'
 import { type ApprovalGates } from './transition-change.js'
+import { type ReconcileChangeValidity } from './reconcile-change-validity.js'
+import { type RefreshImplementationTracking } from './refresh-implementation-tracking.js'
 
 /** Input for the {@link ApproveSignoff} use case. */
 export interface ApproveSignoffInput {
@@ -20,52 +28,61 @@ export interface ApproveSignoffInput {
 }
 
 /**
- * Records signoff-gate consent in every state the binding table lists as `from` for
- * `approval.signoff` (today: `done`). Drain: `pending-signoff` → `signed-off`.
+ * Records sign-off consent only while the reconciled change is `done`
+ * with current completed verification.
  *
- * Requires the signoff gate (`approvals.signoff: true`) to be active.
- * Artifact hashes are computed internally from the change's artifacts on disk,
- * using schema-defined pre-hash cleanup rules.
+ * Historic `pending-signoff` manifests still drain to `signed-off`.
  */
 export class ApproveSignoff {
   private readonly _changes: ChangeRepository
   private readonly _actor: ActorResolver
   private readonly _schemaProvider: SchemaProvider
-  private readonly _hasher: ContentHasher
   private readonly _approvals: ApprovalGates
+  private readonly _reconcile: ReconcileChangeValidity
+  private readonly _fingerprint: ValidityFingerprintService
+  private readonly _refresh: RefreshImplementationTracking
 
   /**
    * Creates a new `ApproveSignoff` use case instance.
    *
    * @param changes - Repository for loading and persisting the change
-   * @param actor - Resolver for the actor identity
+   * @param actor - Resolver for the privacy-decorated actor identity
    * @param schemaProvider - Provider for the fully-resolved schema
-   * @param hasher - Content hasher for computing artifact hashes
    * @param approvals - Whether approval gates are active in the project configuration
+   * @param reconcile - Canonical validity reconciler
+   * @param fingerprint - Shared complete fingerprint collector
+   * @param refresh - Implementation tracking refresh run before reconciliation
    */
   constructor(
     changes: ChangeRepository,
     actor: ActorResolver,
     schemaProvider: SchemaProvider,
-    hasher: ContentHasher,
     approvals: ApprovalGates,
+    reconcile: ReconcileChangeValidity,
+    fingerprint: ValidityFingerprintService,
+    refresh: RefreshImplementationTracking,
   ) {
     this._changes = changes
     this._actor = actor
     this._schemaProvider = schemaProvider
-    this._hasher = hasher
     this._approvals = approvals
+    this._reconcile = reconcile
+    this._fingerprint = fingerprint
+    this._refresh = refresh
   }
 
   /**
-   * Executes the use case.
+   * Refreshes tracking, reconciles validity, and records sign-off when eligible.
    *
    * @param input - Signoff parameters
    * @returns The updated change
    * @throws {ApprovalGateDisabledError} If the signoff gate is not enabled
    * @throws {ChangeNotFoundError} If no change with the given name exists
-   * @throws {InvalidStateTransitionError} If the change is not in an `approval.signoff` `from` state or `pending-signoff`
+   * @throws {InvalidStateTransitionError} If the reconciled change cannot accept sign-off
    * @throws {SchemaMismatchError} If the change schema differs from the active schema
+   * @throws {VerificationNotFoundError} If completed verification is missing
+   * @throws {VerificationFingerprintMismatchError} If the fresh fingerprint differs from verification
+   * @throws {FingerprintInputError} If the complete fingerprint cannot be collected
    */
   async execute(input: ApproveSignoffInput): Promise<Change> {
     if (!this._approvals.signoff) {
@@ -77,52 +94,106 @@ export class ApproveSignoff {
       throw new ChangeNotFoundError(input.name)
     }
 
-    const actor = await this._actor.identity()
     const schema = await this._schemaProvider.get()
     if (schema.name() !== change.schemaName) {
       throw new SchemaMismatchError(change.name, change.schemaName, schema.name())
     }
 
-    const consentFrom = boundFromStates('approval.signoff')
-    if (!consentFrom.includes(change.state) && change.state !== 'pending-signoff') {
-      throw new InvalidStateTransitionError(change.state, consentFrom[0] ?? 'done')
-    }
-
-    const { change: updatedChange } = await this._changes.mutate(
-      input.name,
-      async (freshChange) => {
-        const artifactHashes = await this._computeArtifactHashes(freshChange)
-        freshChange.recordSignoff(input.reason, artifactHashes, actor)
-        if (freshChange.state === 'pending-signoff') {
-          freshChange.transition('signed-off', actor)
-        }
-      },
-    )
-    return updatedChange
-  }
-
-  /**
-   * Computes artifact hashes for all artifacts in the change, applying
-   * schema-defined pre-hash cleanup rules.
-   *
-   * @param change - The change whose artifacts to hash
-   * @returns Map of artifact filename to hash string
-   */
-  private async _computeArtifactHashes(change: Change): Promise<Record<string, string>> {
-    const schema = await this._schemaProvider.get()
-    const cleanupMap = buildCleanupMap(schema)
-
-    const result: Record<string, string> = {}
-    for (const [type, artifact] of change.artifacts) {
-      const cleanups = cleanupMap.get(type) ?? []
-      for (const [fileKey, file] of artifact.files) {
-        if (file.status === 'missing' || file.status === 'skipped') continue
-        const loaded = await this._changes.artifact(change, file.filename)
-        if (loaded === null) continue
-        const hashKey = `${type}:${fileKey}`
-        result[hashKey] = computeArtifactHash(loaded.content, (c) => this._hasher.hash(c), cleanups)
+    await this._refresh.execute({ name: input.name })
+    const actor = await this._actor.identity()
+    const mutation = await this._reconcile.mutate({ name: input.name, actor }, async (ctx) => {
+      const state = ctx.change.state
+      if (state !== 'done' && state !== 'pending-signoff') {
+        return { outcome: 'state' as const, state }
       }
+      const completed = ctx.change.verification.completed
+      if (completed === undefined) {
+        return {
+          outcome:
+            ctx.change.verification.activeAttempt === undefined
+              ? ('verification-missing' as const)
+              : ('verification-active' as const),
+        }
+      }
+      if (completed.status !== 'valid' || completed.fingerprint.implementation === null) {
+        return { outcome: 'verification-stale' as const }
+      }
+      const collected = await this._fingerprint.completeFingerprint(ctx.change)
+      if (collected.fingerprint === null) {
+        return { outcome: 'fingerprint' as const, failures: collected.failures }
+      }
+      const comparison = compareValidityFingerprints(
+        {
+          version: 1,
+          artifacts: completed.fingerprint.artifacts,
+          implementation: completed.fingerprint.implementation,
+        },
+        collected.fingerprint,
+      )
+      if (!comparison.equal) {
+        return { outcome: 'mismatch' as const, differences: comparison.differences }
+      }
+      const artifactId = blockingArtifact(ctx.change, schema, ctx.before)
+      if (artifactId !== null) {
+        return { outcome: 'ineligible' as const, state, artifactId }
+      }
+      ctx.change.recordSignoff(input.reason, collected.fingerprint, completed.id, actor)
+      if (ctx.change.state === 'pending-signoff') {
+        ctx.change.transition('signed-off', actor)
+      }
+      return { outcome: 'ok' as const }
+    })
+
+    if (mutation.result.outcome === 'state') {
+      throw new InvalidStateTransitionError(mutation.result.state, 'done')
     }
-    return result
+    if (mutation.result.outcome === 'verification-missing') {
+      throw new VerificationNotFoundError(input.name)
+    }
+    if (mutation.result.outcome === 'verification-active') {
+      throw new VerificationInProgressError(input.name)
+    }
+    if (mutation.result.outcome === 'verification-stale') {
+      throw new VerificationStaleError(input.name)
+    }
+    if (mutation.result.outcome === 'fingerprint') {
+      throw new FingerprintInputError(mutation.result.failures)
+    }
+    if (mutation.result.outcome === 'mismatch') {
+      throw new VerificationFingerprintMismatchError(mutation.result.differences)
+    }
+    if (mutation.result.outcome === 'ineligible') {
+      throw new InvalidStateTransitionError(mutation.result.state, 'done', {
+        type: 'incomplete-artifact',
+        artifactId: mutation.result.artifactId,
+      })
+    }
+    return mutation.change
   }
+}
+
+/**
+ * Blocking artifact.
+ *
+ * @param change - change
+ * @param schema - schema
+ * @param verdict - verdict
+ * @returns blocking artifact result
+ */
+function blockingArtifact(
+  change: Change,
+  schema: Schema,
+  verdict: ChangeValidityVerdict,
+): string | null {
+  if (verdict.artifactReviewRequired) {
+    return verdict.affectedArtifacts[0]?.artifactId ?? 'unknown'
+  }
+  const requires = schema.workflowStep(change.state)?.requires ?? []
+  for (const artifactId of requires) {
+    const type = schema.artifact(artifactId)
+    if (type?.hasTasks === true) continue
+    const artifact = change.getArtifact(artifactId)
+    if (artifact === null) return artifactId
+  }
+  return null
 }

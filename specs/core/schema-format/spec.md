@@ -145,6 +145,14 @@ The fields are optional and default to standard markdown checkbox syntax:
 - `incompletePattern` (string, regex, default `^\s*-\s+\[ \]`) — matches an incomplete task item.
 - `completePattern` (string, regex, default `^\s*-\s+\[[xX]\]`) — matches a complete task item, including both `[x]` and `[X]`.
 
+### Requirement: Task artifact validity semantics
+
+`ArtifactType.hasTasks: true` SHALL identify an artifact whose entire content is mutable operational task state. The marker, not the artifact ID or filename, controls this behaviour.
+
+Such artifacts SHALL be excluded from approval and verification fingerprints, automatic content-drift invalidation, and review propagation originating in parent artifacts. They remain subject to required presence, structural and cross-artifact validation, live task counting, applicable forward-transition task completion checks, and archive preflight task completion.
+
+A required task artifact that is missing, unreadable, or structurally invalid is a blocker and MUST NOT be interpreted as zero incomplete tasks. Schemas that require consent over narrative content alongside mutable tasks SHALL model those concerns as separate artifacts rather than set `hasTasks: true` on the combined document.
+
 ### Requirement: Template resolution
 
 Template files are bundled alongside `schema.yaml` in a `templates/` subdirectory by convention. The `template` field is a path relative to the directory containing `schema.yaml`. `SchemaRegistry.resolve()` reads all referenced template files at load time and makes their content available in the resolved schema. Template content is plain text — no interpolation or placeholder substitution is performed. HTML comments (`<!-- ... -->`) are valid template content and are preserved as-is in the scaffolded file; they serve as guidance hints for the AI generating the artifact.
@@ -340,14 +348,6 @@ crossArtifactValidations:
       options:
         ordering: ignore
 ```
-
-### Requirement: Per-spec approval
-
-Any spec file touched by a delta — whether created via an `added` operation or modified via a `modified` or `removed` operation — requires explicit approval before the change can be archived. Approval is tracked per spec ID, not per change.
-
-`specd archive` must refuse to proceed if any spec touched by the change has not been approved. `specd approve <spec-path>` records the approval for that spec within the current change.
-
-A spec created by an `added` operation also requires approval: someone must take ownership of the new spec, even if ownership is granted by the same person who submitted the change.
 
 ### Requirement: Metadata extraction
 

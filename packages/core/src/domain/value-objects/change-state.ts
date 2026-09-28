@@ -25,7 +25,8 @@ export type ChangeState =
  *
  * Pending and approved parking states remain drain-only for in-flight
  * changes. New work stays in `ready` / `done` until recorded approval
- * unblocks the delivery edge.
+ * unblocks the delivery edge. Automatic recovery uses the separate
+ * {@link RECOVERY_ONLY_TRANSITIONS} topology.
  */
 export const VALID_TRANSITIONS: Record<ChangeState, readonly ChangeState[]> = {
   drafting: ['designing'],
@@ -36,10 +37,53 @@ export const VALID_TRANSITIONS: Record<ChangeState, readonly ChangeState[]> = {
   implementing: ['verifying', 'designing'],
   verifying: ['implementing', 'done', 'designing'],
   done: ['archivable', 'designing', 'implementing', 'verifying'],
-  'pending-signoff': ['signed-off', 'designing'],
+  'pending-signoff': ['signed-off', 'designing', 'done'],
   'signed-off': ['archivable', 'designing', 'implementing', 'verifying'],
   archivable: ['archiving', 'designing', 'implementing', 'verifying'],
   archiving: ['archivable', 'designing'],
+}
+
+/** Recovery-only lifecycle topology keyed by the canonical recovery cause. */
+export type RecoveryTransitionTable = Readonly<
+  Record<AutomaticRecovery['cause'], Readonly<Partial<Record<ChangeState, ChangeState>>>>
+>
+
+/**
+ * Lifecycle edges reserved for canonical validity reconciliation.
+ *
+ * They are deliberately absent from {@link VALID_TRANSITIONS} so user-facing
+ * transition discovery and manual transition requests cannot advertise or use them.
+ */
+export const RECOVERY_ONLY_TRANSITIONS: RecoveryTransitionTable = {
+  'spec-approval': {
+    ready: 'designing',
+    'pending-spec-approval': 'designing',
+    'spec-approved': 'designing',
+    implementing: 'designing',
+    verifying: 'designing',
+    done: 'designing',
+    'pending-signoff': 'designing',
+    'signed-off': 'designing',
+    archivable: 'designing',
+    archiving: 'designing',
+  },
+  'workflow-redesign': {
+    ready: 'designing',
+    'pending-spec-approval': 'designing',
+    'spec-approved': 'designing',
+    implementing: 'designing',
+    verifying: 'designing',
+    done: 'designing',
+    'pending-signoff': 'designing',
+    'signed-off': 'designing',
+    archivable: 'designing',
+    archiving: 'designing',
+  },
+  signoff: {
+    'signed-off': 'done',
+    archivable: 'done',
+    archiving: 'done',
+  },
 }
 
 /**
@@ -67,3 +111,4 @@ export const HAPPY_PATH_NEXT: Partial<Record<ChangeState, ChangeState>> = {
 export function isValidTransition(from: ChangeState, to: ChangeState): boolean {
   return VALID_TRANSITIONS[from].includes(to)
 }
+import { type AutomaticRecovery } from '../services/change-validity.js'

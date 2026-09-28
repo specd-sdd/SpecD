@@ -37,7 +37,11 @@ class ApprovalSpecCheck extends WorkflowCheck {
    */
   override execute(ctx: CheckExecutionContext) {
     return Promise.resolve(
-      runApprovalSpec({ specGateEnabled: ctx.approvals.spec, change: ctx.change }),
+      runApprovalSpec({
+        specGateEnabled: ctx.approvals.spec,
+        change: ctx.change,
+        ...(ctx.validity !== undefined ? { validity: ctx.validity } : {}),
+      }),
     )
   }
 }

@@ -39,6 +39,13 @@ export interface DraftedChangeListOptions extends ListOptions {
   readonly includeReason?: boolean
 }
 
+/** Result of reading a project implementation file through {@link ChangeRepository.implementationFile}. */
+export type ImplementationFileReadResult =
+  | { readonly status: 'found'; readonly path: string; readonly bytes: Uint8Array }
+  | { readonly status: 'missing'; readonly path: string }
+  | { readonly status: 'unreadable'; readonly path: string; readonly reason: string }
+  | { readonly status: 'outside-project'; readonly path: string }
+
 /** Options for listing discarded changes. */
 export interface DiscardedChangeListOptions extends ListOptions {
   readonly includeDescription?: boolean
@@ -75,12 +82,11 @@ export abstract class ChangeRepository extends Repository {
   /**
    * Returns the change with the given name, or `null` if not found.
    *
-   * Loads the manifest and derives each artifact's status by comparing
-   * the current file hash against the `validatedHash` stored at last
-   * validation. A hash mismatch indicates drift: filesystem-backed
-   * implementations auto-invalidate with cause `artifact-drift` and mark
-   * drifted files `drifted-pending-review` (see
-   * {@link ChangeRepository.saveArtifact} — byte writes do not reopen status).
+   * Loads the manifest and reports fresh file facts by comparing the current
+   * file hash against the stored `validatedHash`. Reads do not invalidate
+   * approvals, rewrite the manifest, or migrate v1 storage. Validity decisions
+   * belong to reconciliation. Byte writes do not reopen status (see
+   * {@link ChangeRepository.saveArtifact}).
    *
    * This is a snapshot read only. Callers that need a concurrency-safe
    * read-modify-write section for an existing persisted change must use
@@ -329,7 +335,20 @@ export abstract class ChangeRepository extends Repository {
   abstract unscaffold(change: Change, specIds: readonly string[]): Promise<void>
 
   /**
+   * Reads the raw whole bytes of an implementation file safely.
+   *
+   * @param change - The change context
+   * @param projectRelativePath - Project-relative POSIX path to the implementation file
+   * @returns Read result indicating found, missing, unreadable, or outside-project
+   */
+  abstract implementationFile(
+    change: Change,
+    projectRelativePath: string,
+  ): Promise<ImplementationFileReadResult>
+
+  /**
    * Returns the absolute filesystem paths to specd-managed internal directories
+
    * (e.g. `changes/`, `drafts/`, `discarded/`).
    *
    * Used by implementation discovery to exclude internal specd directories

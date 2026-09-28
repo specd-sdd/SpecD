@@ -21,7 +21,20 @@
       "symbols": ["TransitionChange"]
     },
     {
+      "file": "core:test/composition/use-cases/mandatory-validity-reconciler.spec.ts"
+    },
+    {
+      "file": "core:src/application/errors/reconciled-operation-blocked-error.ts",
+      "symbols": ["ReconciledOperationBlockedError", "ReconciledOperation"]
+    },
+    {
       "file": "core:test/application/use-cases/transition-change.spec.ts"
+    },
+    {
+      "file": "core:src/application/checks/verification-current.ts"
+    },
+    {
+      "file": "core:test/application/checks/verification-current.spec.ts"
     }
   ],
   "optimizations": {

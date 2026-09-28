@@ -42,6 +42,7 @@ describe('ListWorkspaces', () => {
         archiveAdapter: { adapter: 'fs', config: {} },
       },
       approvals: { spec: false, signoff: false },
+      invalidation: { artifacts: 'downstream', workflow: 'preserve' },
     }
 
     const defaultRepo = makeSpecRepository('owned')
@@ -101,6 +102,7 @@ describe('ListWorkspaces', () => {
         archiveAdapter: { adapter: 'fs', config: {} },
       },
       approvals: { spec: false, signoff: false },
+      invalidation: { artifacts: 'downstream', workflow: 'preserve' },
     }
     const useCase = new ListWorkspaces(
       config as unknown as SpecdConfig,

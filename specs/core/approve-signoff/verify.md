@@ -21,55 +21,68 @@
 
 ### Requirement: Artifact hash computation
 
-#### Scenario: Artifacts are hashed with schema cleanup rules
+Scenarios:
 
-- **GIVEN** the change has two artifacts of type `spec` and `verify`
-- **AND** the schema defines a pre-hash cleanup rule for `spec` but not `verify`
-- **WHEN** the use case computes artifact hashes
-- **THEN** the `spec` artifact content has the cleanup rule applied before hashing
-- **AND** the `verify` artifact content is hashed without cleanup
+#### Scenario: Whole linked files define implementation evidence
 
-#### Scenario: Artifact cannot be loaded
+- **GIVEN** confirmed links include repeated paths and symbol ranges
+- **WHEN** signoff fingerprints implementation
+- **THEN** each project-relative path appears once in lexical order and its whole file is hashed
+- **AND** unresolved or unreadable files fail signoff
 
-- **GIVEN** the change has an artifact entry but `ChangeRepository.artifact()` returns `null` for it
-- **WHEN** the use case computes artifact hashes
-- **THEN** that artifact is skipped and does not appear in the hash map
+#### Scenario: Empty observed implementation map is valid
 
-#### Scenario: Schema resolution failure propagates
-
-- **GIVEN** `SchemaProvider.get()` throws for the configured schema
-- **WHEN** the use case executes
-- **THEN** the error propagates from the gate guard before hash computation is reached
+- **WHEN** refreshed confirmed links contain no files
+- **THEN** signoff records an empty implementation map distinct from legacy unknown evidence
 
 ### Requirement: Signoff recording and state transition
 
-#### Scenario: Change is in done records signoff without pending
+Scenarios:
 
-- **GIVEN** the change is in `done` and the signoff gate is on
-- **WHEN** `execute()` completes successfully
-- **THEN** the change history contains a `signed-off` event
-- **AND** the change state remains `done`
+#### Scenario: Signoff requires current completed verification
 
-#### Scenario: Drain from pending-signoff still reaches signed-off
+- **GIVEN** the change is `done` but completed verification is stale
+- **WHEN** signoff is requested
+- **THEN** no signoff is recorded and in-place verification renewal is recommended
 
-- **GIVEN** the change is in `pending-signoff` state
-- **WHEN** `execute()` completes successfully
-- **THEN** the change state is `signed-off`
+#### Scenario: Valid signoff stays in done
 
-#### Scenario: Change is not in done or pending-signoff
+- **WHEN** eligible signoff succeeds
+- **THEN** valid evidence is recorded while lifecycle state remains `done`
 
-- **GIVEN** the change is in `drafting` state
-- **WHEN** `execute()` is called
-- **THEN** an `InvalidStateTransitionError` is thrown
+#### Scenario: Verification evidence errors remain distinct
+
+- **WHEN** signoff sees respectively no completion, active-only work, stale or legacy-unknown evidence, or a valid record with a mismatched expected fingerprint
+- **THEN** it returns respectively not-found, in-progress, stale/not-current, or fingerprint-mismatch errors
+- **AND** stale evidence is never reported as not found
+
+#### Scenario: Signoff actor decorator remains authoritative
+
+- **WHEN** signoff resolves actor name and email
+- **THEN** it uses the existing decorated actor resolver with unchanged privacy and fallback behavior
+- **AND** it resolves exactly one decorated identity for the logical operation
+- **AND** reconciliation, the projection, and all appended events receive that same value
+
+### Requirement: Canonical pre-signoff reconciliation
+
+#### Scenario: Reconciliation blocks signing a changed snapshot
+
+- **WHEN** fresh facts invalidate verification or artifact review before signoff
+- **THEN** canonical changes persist and the use case does not approve a later snapshot
 
 ### Requirement: Persistence and return value
 
-#### Scenario: Change is saved and returned through serialized mutation
+Scenarios:
 
-- **GIVEN** a successful signoff from `done`
-- **WHEN** `execute()` returns
-- **THEN** `ChangeRepository.mutate(input.name, fn)` has been called
-- **AND** the returned `Change` has state `done`
+#### Scenario: Signoff fingerprint is atomically current
+
+- **WHEN** eligible signoff succeeds
+- **THEN** its artifact and implementation fingerprints are those evaluated in the same serialized mutation
+
+#### Scenario: Failed eligibility never signs current bytes
+
+- **WHEN** reconciliation makes signoff inapplicable
+- **THEN** canonical effects persist and no signoff event is added
 
 ### Requirement: Input contract
 
@@ -102,10 +115,15 @@
 
 ### Requirement: Config-based factory delegates through resolveApproveSignoffDeps
 
-#### Scenario: createApproveSignoff config form derives ApproveSignoffDeps through resolveApproveSignoffDeps
+Scenarios:
 
-- **WHEN** `createApproveSignoff(config, options?)` is invoked
-- **THEN** it creates a composition resolver for that composition session
-- **AND** it derives `ApproveSignoffDeps` through `resolveApproveSignoffDeps(resolver)`
-- **AND** `resolveApproveSignoffDeps(resolver)` resolves `contentHasher: ContentHasher`
-- **AND** the factory delegates to canonical `createApproveSignoff(deps)`
+#### Scenario: Composition reuses shared tracking and reconciliation
+
+- **WHEN** either supported factory form constructs signoff
+- **THEN** both resolve the same tracking, fingerprint, gate, and reconciler dependencies
+- **AND** no kernel or filesystem graph is rebuilt locally
+
+#### Scenario: Invalid mixed factory arguments fail consistently
+
+- **WHEN** composition options accompany the deps overload
+- **THEN** the established invalid-factory-arguments error is returned

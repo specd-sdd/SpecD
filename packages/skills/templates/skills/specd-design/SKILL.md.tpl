@@ -71,7 +71,28 @@ Follow guidance.
 specd changes transition <name> designing --skip-hooks all
 ```
 
-If state is neither `drafting` nor `designing`, ask the user:
+Follow canonical recovery from status. Do not calculate fingerprints or roll
+state back yourself.
+
+- Required stale or revoked spec approval returns to `designing`, then human
+  `approve spec` only after `ready`. If already `designing`, do not transition
+  again only because approval is stale.
+- Required stale or revoked sign-off after `done` returns to `done`. Do not
+  move an earlier state forward to `done`.
+- Verification staleness does **not** move lifecycle state. Before `verifying`
+  it is contextual. At `verifying` or later it blocks and recommends in-place
+  verification (`/specd-verify` or `specd changes verification start <name>`).
+- `workflow: preserve` plus artifact review stays in the current phase. Review
+  and `changes validate` in place. Do not force `designing` for every drift.
+  Structural validation is not semantic review or approval renewal.
+- `workflow: redesign` plus unresolved non-task drift returns to `designing`.
+- `artifacts: none` waives reopening, not freshness.
+
+If state is neither `drafting` nor `designing`, and next action stays in that
+phase under `workflow: preserve`, review and validate in place. **Stop** after
+that in-place review unless the user explicitly asks to redesign.
+
+If state is neither `drafting` nor `designing` and next action is `designing`, ask the user:
 
 > Current state is **`<state>`**. Design requires **`designing`**.
 > Transition to `designing` and continue?

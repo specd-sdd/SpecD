@@ -30,6 +30,8 @@ export interface TransitionChangeDeps {
   readonly approvals: ApprovalGates
   /** Composed transition check bindings. */
   readonly transitionBindings: readonly CheckBinding[]
+  /** Canonical reconciler. Config resolution always supplies the shared instance. */
+  readonly reconcile: import('../../application/use-cases/reconcile-change-validity.js').ReconcileChangeValidity
 }
 
 /**
@@ -47,6 +49,7 @@ export function resolveTransitionChangeDeps(resolver: CompositionResolver): Tran
     refreshImplementationTracking: resolver.getRefreshImplementationTracking(),
     approvals: resolver.config.approvals,
     transitionBindings: registry.transitionBindings,
+    reconcile: resolver.getReconcileChangeValidity(),
   }
 }
 
@@ -105,6 +108,7 @@ function createTransitionChangeFromNormalized(
       refreshImplementationTracking,
       approvals,
       transitionBindings,
+      reconcile,
     } = input.deps
     return new TransitionChange(
       changes,
@@ -113,6 +117,7 @@ function createTransitionChangeFromNormalized(
       refreshImplementationTracking,
       approvals,
       transitionBindings,
+      reconcile,
     )
   }
 
@@ -135,6 +140,7 @@ function isTransitionChangeDeps(
     'schemaProvider' in value &&
     'refreshImplementationTracking' in value &&
     'approvals' in value &&
-    'transitionBindings' in value
+    'transitionBindings' in value &&
+    'reconcile' in value
   )
 }

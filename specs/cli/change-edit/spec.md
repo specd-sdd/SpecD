@@ -8,20 +8,18 @@ A change's scope often evolves after creation — specs get added, removed, or s
 
 ### Requirement: Command signature
 
-```
-specd change edit <name>
-  [--add-spec <id>] [--remove-spec <id>]
+The canonical command is:
+
+```text
+specd changes edit <name>
+  [--add-spec <id> ...] [--remove-spec <id> ...]
   [--description <text>]
+  [--artifact-policy none|surgical|downstream|global]
+  [--workflow-policy preserve|redesign]
   [--format text|json|toon]
 ```
 
-- `<name>` — required positional; the name of the change to edit
-- `--add-spec <id>` — repeatable; adds a spec ID to `specIds`. `<id>` follows the same `[<workspace>:]<capability-path>` format as `change create`, defaulting to `default` workspace when prefix is omitted
-- `--remove-spec <id>` — repeatable; removes a spec ID from `specIds`
-- `--description <text>` — optional; sets or replaces the free-text description of the change
-- `--format text|json|toon` — optional; output format, defaults to `text`
-
-At least one flag must be provided; running with no flags is a CLI usage error (exit code 1).
+Scope options remain repeatable and use canonical spec IDs. At least one edit flag is required. The CLI maps only supplied policy dimensions to the structured `EditChange` input and does not synthesize unspecified values.
 
 ### Requirement: Workspace derivation
 
@@ -47,7 +45,13 @@ The change must retain at least one `specId` after editing. If `--remove-spec` o
 
 ### Requirement: Approval invalidation
 
-Any modification to `specIds` (and by extension `workspaces`) causes the domain to append an `invalidated` event followed by a `transitioned` event rolling back to `designing`. The CLI reports this in the output. Updating `--description` alone does not trigger invalidation.
+The command SHALL delegate scope and policy edits to `EditChange` and MUST NOT invalidate approvals or move lifecycle state itself.
+
+Output SHALL report `scopeChanged` separately from actual validity changes, which approval or verification projections became stale or revoked, which artifact files require review, canonical blockers and next action, and any automatic return committed by reconciliation. With a required stale spec approval, it SHALL report `designing` even when the workflow policy is `preserve`. Without that gate, a preserved state remains visible together with the forward-progress blocker.
+
+The command SHALL warn that approval was invalidated only when Core reports a committed projection change. A scope edit that leaves the approved canonical spec set and all fingerprinted inputs unchanged MUST NOT emit that warning. Any retained legacy `invalidated` field is deprecated and reflects actual validity change, not merely scope mutation.
+
+Description-only and policy-only edits MUST NOT be described as approval invalidation unless core reports a separately detected fresh drift.
 
 ### Requirement: Output on success
 
@@ -91,7 +95,9 @@ specd change edit add-oauth-login --description "Add OAuth2 login via Google and
 
 ## Spec Dependencies
 
-- [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
-- [`core:change`](../../core/change/spec.md) — mutable fields, approval invalidation rules
-- [`cli:change-create`](../change-create/spec.md) — spec id format and workspace derivation logic
-- [`core:spec-id-format`](../../core/spec-id-format/spec.md) — canonical `workspace:capabilityPath` format
+- [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, and output conventions
+- [`core:change`](../../core/change/spec.md) — mutable fields and validity projections
+- [`core:edit-change`](../../core/edit-change/spec.md) — canonical structured edit and reconciliation result
+- [`core:config`](../../core/config/spec.md) — structured invalidation policy contract
+- [`cli:change-create`](../change-create/spec.md) — shared spec ID option conventions
+- [`core:spec-id-format`](../../core/spec-id-format/spec.md) — canonical spec ID format

@@ -994,3 +994,80 @@ describe('evaluateLifecycle', () => {
     expect(verdict.blockers.some((blocker) => blocker.code === 'MISSING_ARTIFACT')).toBe(false)
   })
 })
+
+describe('canonical validity guidance', () => {
+  function validity(
+    overrides: Partial<
+      import('../../../src/domain/services/change-validity.js').ChangeValidityVerdict
+    >,
+  ) {
+    return {
+      artifactReviewRequired: false,
+      affectedArtifacts: [],
+      projectionChanges: [],
+      specApproval: 'not-required' as const,
+      signoff: 'not-required' as const,
+      verification: 'not-required' as const,
+      blockers: [],
+      recovery: null,
+      ...overrides,
+    }
+  }
+
+  it('keeps the implementing next action when verification is stale', () => {
+    const change = makeChange()
+    change.transition('designing', testActor)
+    change.transition('ready', testActor)
+    change.transition('implementing', testActor)
+    const schema = makeSchema()
+    const verdict = evaluateLifecycle(change, schema, {
+      checksByTarget: {},
+      validity: validity({ verification: 'stale' }),
+    })
+    expect(verdict.nextHop.targetStep).toBe('implementing')
+    expect(verdict.nextAction.command).toBe('/specd-implement')
+  })
+
+  it('routes required stale spec approval to design ahead of preserve', () => {
+    const change = makeChange()
+    change.transition('designing', testActor)
+    change.transition('ready', testActor)
+    change.transition('implementing', testActor)
+    const schema = makeSchema()
+    const verdict = evaluateLifecycle(change, schema, {
+      checksByTarget: {},
+      validity: validity({
+        specApproval: 'stale',
+        artifactReviewRequired: true,
+        recovery: { cause: 'spec-approval', from: 'implementing', to: 'designing' },
+        blockers: [{ code: 'APPROVAL_STALE', message: 'Spec approval is stale' }],
+      }),
+    })
+    expect(verdict.nextHop.targetStep).toBe('designing')
+    expect(verdict.nextAction.command).toBe('/specd-design')
+    expect(verdict.blockers.map((blocker) => blocker.code)).toContain('APPROVAL_STALE')
+  })
+
+  it('blocks the forward hop and renews verification in place', () => {
+    const change = makeChange()
+    change.transition('designing', testActor)
+    change.transition('ready', testActor)
+    change.transition('implementing', testActor)
+    change.transition('verifying', testActor)
+    const schema = makeSchema()
+    const verdict = evaluateLifecycle(change, schema, {
+      checksByTarget: {
+        done: [pass('protocol.edge')],
+      },
+      validity: validity({
+        verification: 'stale',
+        artifactReviewRequired: true,
+        recovery: null,
+        blockers: [{ code: 'VERIFICATION_STALE', message: 'Verification is stale' }],
+      }),
+    })
+    expect(verdict.availableTransitions).not.toContain('done')
+    expect(verdict.nextHop.targetStep).toBe('verifying')
+    expect(verdict.nextAction.command).toBe('/specd-verify')
+  })
+})

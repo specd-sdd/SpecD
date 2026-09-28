@@ -17,14 +17,12 @@
   ],
   "implementation": [
     {
+      "file": "core:src/application/services/lifecycle-guidance.ts",
+      "symbols": ["resolveLifecycleCommand"]
+    },
+    {
       "file": "core:src/application/use-cases/get-status.ts",
-      "symbols": ["GetStatus"]
-    },
-    {
-      "file": "core:test/application/use-cases/get-status.spec.ts"
-    },
-    {
-      "file": "core:test/composition/use-cases/workflow-check-registry.spec.ts"
+      "symbols": ["GetStatus", "ValidityStatusProjection"]
     }
   ],
   "optimizations": {

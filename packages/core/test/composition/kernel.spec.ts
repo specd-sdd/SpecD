@@ -10,6 +10,7 @@ import { GetSpecsHealth } from '../../src/application/use-cases/get-specs-health
 import { SearchSpecs } from '../../src/application/use-cases/search-specs.js'
 import { CountTasks } from '../../src/application/use-cases/count-tasks.js'
 import { type ArtifactParser } from '../../src/application/ports/artifact-parser.js'
+import { type ActorProvider } from '../../src/composition/actor-provider.js'
 import { type SpecdConfig } from '../../src/application/specd-config.js'
 
 let tmpDir: string | undefined
@@ -68,6 +69,7 @@ async function makeConfig(): Promise<SpecdConfig> {
       archiveAdapter: { adapter: 'fs', config: { path: archivePath } },
     },
     approvals: { spec: false, signoff: false },
+    invalidation: { artifacts: 'downstream', workflow: 'preserve' },
   }
 }
 
@@ -169,6 +171,31 @@ describe('createKernel', () => {
     const kernel = await createKernel(config)
 
     expect(kernel.changes.countTasks).toBeInstanceOf(CountTasks)
+  })
+
+  it('wires the configured invalidation policy into kernel change creation', async () => {
+    const base = await makeConfig()
+    const config: SpecdConfig = {
+      ...base,
+      invalidation: { artifacts: 'global', workflow: 'redesign' },
+      actorProvider: 'fixture',
+    }
+    const provider: ActorProvider = {
+      name: 'fixture',
+      create: async () => ({
+        identity: async () => ({ name: 'Test Actor', email: 'test@example.com' }),
+      }),
+    }
+    const kernel = await createKernel(config, { actorProviders: [provider] })
+
+    const result = await kernel.changes.create.execute({
+      name: 'kernel-policy',
+      specIds: [],
+      schemaName: 'schema-std',
+      schemaVersion: 1,
+    })
+
+    expect(result.change.invalidationPolicy).toEqual(config.invalidation)
   })
 
   it('exposes persisted-state metadata surface without legacy editors', async () => {
