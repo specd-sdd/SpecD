@@ -157,7 +157,7 @@ describe('SQLite wide traversal', () => {
     }
   })
 
-  it('computes wide hotspots with a 16-request queue without overloading the store', async () => {
+  it('computes wide hotspots with a 16-request queue without overloading the store', { timeout: 10_000 }, async () => {
     storagePath = mkdtempSync(join(tmpdir(), 'code-graph-wide-hotspots-'))
     const sqlite = new SQLiteGraphStore(storagePath, { maxPendingOperations: 16 })
     const memory = new InMemoryGraphStore()
@@ -243,9 +243,9 @@ describe('SQLite wide traversal', () => {
     } finally {
       await Promise.all([sqlite.close(), memory.close()])
     }
-  }, { timeout: 10_000 })
+  })
 
-  it('matches in-memory single-file impact with a 16-request queue', async () => {
+  it('matches in-memory single-file impact with a 16-request queue', { timeout: 10_000 }, async () => {
     storagePath = mkdtempSync(join(tmpdir(), 'code-graph-wide-single-impact-'))
     const sqlite = new SQLiteGraphStore(storagePath, { maxPendingOperations: 16 })
     const memory = new InMemoryGraphStore()
@@ -309,7 +309,7 @@ describe('SQLite wide traversal', () => {
     } finally {
       await Promise.all([sqlite.close(), memory.close()])
     }
-  }, { timeout: 10_000 })
+  })
 
   it('batches a wide filtered frontier and counts only rows admitted by SQLite', async () => {
     storagePath = mkdtempSync(join(tmpdir(), 'code-graph-wide-filtered-impact-'))
