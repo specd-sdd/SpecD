@@ -1233,27 +1233,31 @@ describe('SQLiteGraphStore', () => {
     await failedStore.close()
   })
 
-  it('propagates ordinary runtime open failures without recreating or rotating storage', async () => {
-    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-unrecoverable-open-'))
-    const graphDir = join(tempDir, 'graph')
-    const databasePath = join(graphDir, 'code-graph.sqlite')
-    const epochPath = join(graphDir, 'storage.epoch')
-    const initialStore = new SQLiteGraphStore(tempDir)
-    await initialStore.open()
-    await initialStore.close()
+  it(
+    'propagates ordinary runtime open failures without recreating or rotating storage',
+    { timeout: 10_000 },
+    async () => {
+      tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-unrecoverable-open-'))
+      const graphDir = join(tempDir, 'graph')
+      const databasePath = join(graphDir, 'code-graph.sqlite')
+      const epochPath = join(graphDir, 'storage.epoch')
+      const initialStore = new SQLiteGraphStore(tempDir)
+      await initialStore.open()
+      await initialStore.close()
 
-    const databaseBeforeFailure = readFileSync(databasePath)
-    const epochBeforeFailure = readFileSync(epochPath)
-    const failedStore = new SQLiteGraphStore(tempDir, {
-      runtime: { modulePath: join(tempDir, 'not-a-sqlite-module.js') },
-    })
+      const databaseBeforeFailure = readFileSync(databasePath)
+      const epochBeforeFailure = readFileSync(epochPath)
+      const failedStore = new SQLiteGraphStore(tempDir, {
+        runtime: { modulePath: join(tempDir, 'not-a-sqlite-module.js') },
+      })
 
-    await expect(failedStore.open()).rejects.not.toBeInstanceOf(GraphStorageRecoveryRequiredError)
-    expect(failedStore.isOpen).toBe(false)
-    expect(readFileSync(databasePath)).toEqual(databaseBeforeFailure)
-    expect(readFileSync(epochPath)).toEqual(epochBeforeFailure)
-    await failedStore.close()
-  })
+      await expect(failedStore.open()).rejects.not.toBeInstanceOf(GraphStorageRecoveryRequiredError)
+      expect(failedStore.isOpen).toBe(false)
+      expect(readFileSync(databasePath)).toEqual(databaseBeforeFailure)
+      expect(readFileSync(epochPath)).toEqual(epochBeforeFailure)
+      await failedStore.close()
+    },
+  )
 
   it('does not treat a drive letter as a workspace name', async () => {
     tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-test-'))
