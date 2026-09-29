@@ -4,20 +4,7 @@
     "version": 1
   },
   "dependsOn": [],
-  "implementation": [
-    {
-      "file": "guide:package.json"
-    },
-    {
-      "file": "guide:tsconfig.json"
-    },
-    {
-      "file": "guide:vitest.config.ts"
-    },
-    {
-      "file": "guide:README.md"
-    }
-  ],
+  "implementation": [],
   "optimizations": {
     "optimizedDescription": {
       "value": "Defines @specd/guide architecture, standalone boundaries, errors, package assets, tests, README, and 1-indexed line semantics.",

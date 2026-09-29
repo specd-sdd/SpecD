@@ -18,11 +18,24 @@
   ],
   "implementation": [
     {
+      "file": "core:src/application/use-cases/transition-change.ts",
+      "symbols": ["TransitionChange"]
+    },
+    {
+      "file": "core:src/application/use-cases/run-step-hooks.ts",
+      "symbols": ["RunStepHooks"]
+    },
+    {
+      "file": "core:src/application/template-expander.ts",
+      "symbols": ["TemplateExpander"]
+    },
+    {
       "file": "core:src/infrastructure/node/hook-runner.ts",
       "symbols": ["NodeHookRunner"]
     },
     {
-      "file": "core:test/infrastructure/node/hook-runner-spawn.spec.ts"
+      "file": "core:src/infrastructure/node/translate-hook-command.ts",
+      "symbols": ["translateHookCommand"]
     }
   ],
   "optimizations": {

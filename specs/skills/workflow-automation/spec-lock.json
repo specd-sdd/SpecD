@@ -12,17 +12,7 @@
     "core:validate-artifacts",
     "core:transition-checks"
   ],
-  "implementation": [
-    {
-      "file": "skills:templates/skills/specd-compliance/SKILL.md.tpl"
-    },
-    {
-      "file": "skills:templates/skills/specd-verify/SKILL.md.tpl"
-    },
-    {
-      "file": "skills:test/template-workflow.spec.ts"
-    }
-  ],
+  "implementation": [],
   "optimizations": {
     "optimizedDescription": {
       "value": "Agent workflow policy for fresh lifecycle guidance, semantic review, verification attempts, CLI formats, and traceability.",

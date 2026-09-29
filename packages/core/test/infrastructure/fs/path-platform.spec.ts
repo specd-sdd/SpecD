@@ -26,15 +26,21 @@ describe('path platform helpers', () => {
     expect(normalizeNewlines('a\r\nb\rc')).toBe('a\nb\nc')
   })
 
-  it('surfaces the original lock error after five attempts', async () => {
-    vi.useFakeTimers()
-    const error = Object.assign(new Error('busy'), { code: 'EBUSY' })
-    const operation = vi.fn(() => Promise.reject(error))
-    const pending = retryOnLock(operation)
-    const assertion = expect(pending).rejects.toBe(error)
-    await vi.runAllTimersAsync()
-    await assertion
-    expect(operation).toHaveBeenCalledTimes(5)
-    vi.useRealTimers()
-  })
+  it.each(['EPERM', 'EBUSY', 'EACCES'] as const)(
+    'surfaces the original %s lock error after five attempts',
+    async (code) => {
+      vi.useFakeTimers()
+      try {
+        const error = Object.assign(new Error('busy'), { code })
+        const operation = vi.fn(() => Promise.reject(error))
+        const pending = retryOnLock(operation)
+        const assertion = expect(pending).rejects.toBe(error)
+        await vi.runAllTimersAsync()
+        await assertion
+        expect(operation).toHaveBeenCalledTimes(5)
+      } finally {
+        vi.useRealTimers()
+      }
+    },
+  )
 })

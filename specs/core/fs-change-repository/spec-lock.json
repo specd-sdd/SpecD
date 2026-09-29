@@ -12,19 +12,13 @@
   ],
   "implementation": [
     {
-      "file": "core:src/infrastructure/fs/path-platform.ts",
-      "symbols": ["isPathInside", "retryOnLock"]
+      "file": "core:test/infrastructure/fs/change-repository.spec.ts"
     },
     {
-      "file": "core:src/infrastructure/fs/move-dir.ts",
-      "symbols": ["moveDir"]
+      "file": "core:test/infrastructure/fs/path-platform.spec.ts"
     },
     {
-      "file": "core:src/infrastructure/fs/change-repository.ts",
-      "symbols": ["FsChangeRepository"]
-    },
-    {
-      "file": "core:test/infrastructure/fs/move-dir.spec.ts"
+      "file": "core:test/infrastructure/fs/fs-index-cache-base.spec.ts"
     }
   ],
   "optimizations": {

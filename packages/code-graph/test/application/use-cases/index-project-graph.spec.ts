@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
 import { IndexProjectGraph } from '../../../src/application/use-cases/index-project-graph.js'
 import { type CodeGraphHostPort } from '../../../src/application/ports/code-graph-host-port.js'
+import { type GraphStatistics } from '../../../src/domain/value-objects/graph-statistics.js'
 import { type IndexResult } from '../../../src/domain/value-objects/index-result.js'
+import { type Relation } from '../../../src/domain/value-objects/relation.js'
+import { type SpecNode } from '../../../src/domain/value-objects/spec-node.js'
 
 const INDEX_RESULT: IndexResult = {
   filesDiscovered: 1,
@@ -41,10 +44,28 @@ const INDEX_RESULT: IndexResult = {
   coverageDiagnostics: [],
 }
 
-function makeProvider(): CodeGraphHostPort {
-  return {
-    index: vi.fn().mockResolvedValue(INDEX_RESULT),
-  } as unknown as CodeGraphHostPort
+class FakeCodeGraphHostPort implements CodeGraphHostPort {
+  readonly index = vi.fn().mockResolvedValue(INDEX_RESULT)
+
+  async getStatistics(): Promise<GraphStatistics> {
+    throw new Error('not implemented')
+  }
+
+  async getSpec(_specId: string): Promise<SpecNode | undefined> {
+    throw new Error('not implemented')
+  }
+
+  async getCoveredFiles(_specId: string): Promise<Relation[]> {
+    throw new Error('not implemented')
+  }
+
+  async getCoveredSymbols(_specId: string): Promise<Relation[]> {
+    throw new Error('not implemented')
+  }
+}
+
+function makeProvider(): FakeCodeGraphHostPort {
+  return new FakeCodeGraphHostPort()
 }
 
 const baseInput = {
@@ -62,6 +83,46 @@ const baseInput = {
 } as const
 
 describe('IndexProjectGraph', () => {
+  it('forwards every prepared project input unchanged', async () => {
+    const provider = makeProvider()
+    const workspaces = [
+      {
+        name: 'fixture',
+        prefix: null,
+        codeRoot: '/project/packages/fixture',
+        specRepo: {} as never,
+        ownership: 'owned' as const,
+        isExternal: false,
+      },
+    ]
+    const onProgress = vi.fn()
+    const getSpecMetadata = { execute: vi.fn() }
+
+    await new IndexProjectGraph().execute({
+      provider,
+      ...baseInput,
+      vcsRoot: '/repo',
+      workspaces,
+      force: true,
+      onProgress,
+      getSpecMetadata: getSpecMetadata as never,
+    })
+
+    expect(provider.index).toHaveBeenCalledWith({
+      projectRoot: baseInput.projectRoot,
+      vcsRoot: '/repo',
+      workspaces: [...workspaces],
+      graphConfig: baseInput.graphConfig,
+      codeGraphVersion: baseInput.codeGraphVersion,
+      force: true,
+      onProgress,
+      getSpecMetadata,
+    })
+    expect(workspaces).toEqual([
+      expect.objectContaining({ name: 'fixture', codeRoot: '/project/packages/fixture' }),
+    ])
+  })
+
   it('calls index without recreate when force is false', async () => {
     const provider = makeProvider()
 

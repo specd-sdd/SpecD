@@ -11,7 +11,12 @@
     "core:get-status",
     "core:transition-checks"
   ],
-  "implementation": [],
+  "implementation": [
+    {
+      "file": "cli:src/commands/change/transition.ts",
+      "symbols": ["registerChangeTransition"]
+    }
+  ],
   "optimizations": {
     "optimizedDescription": {
       "value": "Governed CLI lifecycle transitions with Core-resolved routing, validity recovery, hooks, progress, and repair diagnostics.",

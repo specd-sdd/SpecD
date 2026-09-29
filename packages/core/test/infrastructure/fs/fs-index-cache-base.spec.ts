@@ -2,6 +2,30 @@ import * as fs from 'node:fs/promises'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+const renameControl = vi.hoisted(() => ({
+  calls: 0,
+  failAtCall: null as number | null,
+  error: null as NodeJS.ErrnoException | null,
+}))
+
+vi.mock('node:fs/promises', async () => {
+  const actual = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises')
+  return {
+    ...actual,
+    rename: async (
+      from: Parameters<typeof actual.rename>[0],
+      to: Parameters<typeof actual.rename>[1],
+    ) => {
+      renameControl.calls += 1
+      if (renameControl.failAtCall === renameControl.calls) {
+        throw renameControl.error ?? Object.assign(new Error('publish failed'), { code: 'EIO' })
+      }
+      return actual.rename(from, to)
+    },
+  }
+})
+
 import { FsIndexCache } from '../../../src/infrastructure/fs/fs-index-cache-base.js'
 
 interface TestEntry {
@@ -23,6 +47,9 @@ describe('FsIndexCache', () => {
     await fs.mkdir(sourceDir, { recursive: true })
     rebuildCalls = 0
     stampMap = new Map()
+    renameControl.calls = 0
+    renameControl.failAtCall = null
+    renameControl.error = null
   })
 
   afterEach(async () => {
@@ -143,5 +170,33 @@ describe('FsIndexCache', () => {
 
     expect(changed1).toBe(true)
     expect(changed2).toBe(false)
+  })
+
+  it('recovers a failed meta publish without exposing a stale index pair or retaining the lock', async () => {
+    const cache = createCache()
+    const mtime = new Date('2024-01-01T00:00:00.000Z').toISOString()
+    const publishError = Object.assign(new Error('meta publish failed'), { code: 'EIO' })
+    stampMap.set('item-1', mtime)
+    renameControl.failAtCall = renameControl.calls + 2
+    renameControl.error = publishError
+
+    await expect(cache.upsert({ id: 'item-1', value: 1 }, { sourceMtime: mtime })).rejects.toBe(
+      publishError,
+    )
+
+    renameControl.failAtCall = null
+    await expect(cache.list()).resolves.toEqual(
+      expect.objectContaining({
+        items: [{ id: 'item-1', value: 1 }],
+        meta: expect.objectContaining({ total: 1 }),
+      }),
+    )
+    expect(rebuildCalls).toBe(1)
+
+    const entries = await fs.readdir(bucketDir)
+    expect(entries.filter((entry) => entry.includes('.tmp-'))).toEqual([])
+    await expect(
+      cache.upsert({ id: 'item-2', value: 2 }, { sourceMtime: mtime }),
+    ).resolves.toBeUndefined()
   })
 })

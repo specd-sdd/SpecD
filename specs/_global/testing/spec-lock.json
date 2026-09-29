@@ -6,10 +6,7 @@
   "dependsOn": ["default:_global/architecture", "default:_global/conventions"],
   "implementation": [
     {
-      "file": "default:specd-sdd/changes/20260925-213024-posix-windows-test-compatibility/deltas/default/_global/testing/spec.md.delta.yaml"
-    },
-    {
-      "file": "default:specd-sdd/changes/20260925-213024-posix-windows-test-compatibility/deltas/default/_global/testing/verify.md.delta.yaml"
+      "file": "default:package.json"
     }
   ],
   "optimizations": {

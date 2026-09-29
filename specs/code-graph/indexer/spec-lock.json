@@ -8,25 +8,16 @@
     "code-graph:language-adapter",
     "code-graph:symbol-model",
     "code-graph:workspace-integration",
+    "code-graph:sqlite-graph-store",
     "core:config",
     "core:spec-repository-port",
     "core:list-workspaces",
     "code-graph:document-model",
-    "core:get-spec-metadata",
-    "code-graph:sqlite-graph-store"
+    "core:get-spec-metadata"
   ],
   "implementation": [
     {
-      "file": "code-graph:src/application/use-cases/index-code-graph.ts",
-      "symbols": ["IndexCodeGraph"]
-    },
-    {
-      "file": "code-graph:src/application/services/project-spec-coverage.ts",
-      "symbols": ["projectSpecCoverage"]
-    },
-    {
-      "file": "code-graph:src/application/use-cases/in-memory-index-session.ts",
-      "symbols": ["InMemoryIndexSession"]
+      "file": "code-graph:test/application/use-cases/index-project-graph-integration.spec.ts"
     }
   ],
   "optimizations": {

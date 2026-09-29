@@ -16,25 +16,7 @@
   ],
   "implementation": [
     {
-      "file": "core:src/domain/value-objects/validity-fingerprint.ts",
-      "symbols": [
-        "ValidityFingerprint",
-        "normalizeTextV1",
-        "compareValidityFingerprints",
-        "SpecApprovalFingerprint",
-        "compareSpecApprovalFingerprints"
-      ]
-    },
-    {
-      "file": "core:src/domain/entities/change.ts",
-      "symbols": ["Change", "SpecApprovalProjection", "SignoffProjection", "VerificationProjection"]
-    },
-    {
-      "file": "core:src/domain/value-objects/change-state.ts",
-      "symbols": ["RecoveryTransitionTable", "RECOVERY_ONLY_TRANSITIONS"]
-    },
-    {
-      "file": "core:test/domain/entities/change.spec.ts"
+      "file": "core:test/infrastructure/fs/change-repository.spec.ts"
     }
   ],
   "optimizations": {

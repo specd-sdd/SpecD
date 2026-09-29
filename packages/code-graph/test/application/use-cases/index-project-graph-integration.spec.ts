@@ -77,6 +77,104 @@ describe('IndexProjectGraph integration', () => {
     }
   })
 
+  it('indexes valid files while reporting an isolated adapter parse failure', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'index-project-graph-parse-isolation-'))
+    const codeRoot = join(tempDir, 'workspace')
+    mkdirSync(codeRoot, { recursive: true })
+    writeFileSync(join(codeRoot, 'valid.ts'), 'export const valid = true\n')
+    writeFileSync(join(codeRoot, 'invalid.ts'), 'export const invalid = true\n')
+
+    const store = new SQLiteGraphStore(tempDir)
+    await store.open()
+    try {
+      const adapter = new TypeScriptLanguageAdapter()
+      const analyzeFile = adapter.analyzeFile.bind(adapter)
+      vi.spyOn(adapter, 'analyzeFile').mockImplementation((filePath, content, context) => {
+        if (filePath.endsWith('invalid.ts')) throw new Error('synthetic parse failure')
+        return analyzeFile(filePath, content, context)
+      })
+      const registry = new AdapterRegistry()
+      registry.register(adapter)
+      const indexer = new IndexCodeGraph(store, registry)
+
+      const result = await indexer.execute({
+        projectRoot: tempDir,
+        vcsRoot: null,
+        workspaces: [
+          {
+            name: 'fixture',
+            prefix: null,
+            codeRoot,
+            specRepo: makeMockRepo(),
+            ownership: 'owned',
+            isExternal: false,
+          },
+        ],
+        graphConfig: { includePaths: [], excludePaths: [], workspaces: new Map() },
+        codeGraphVersion: readInstalledCodeGraphVersion(),
+      })
+
+      expect(result.filesIndexed).toBe(1)
+      expect(result.errors).toEqual([
+        expect.objectContaining({
+          filePath: 'fixture:invalid.ts',
+          message: expect.stringContaining('synthetic parse failure'),
+        }),
+      ])
+      await expect(store.getAllFiles()).resolves.toEqual([
+        expect.objectContaining({ path: 'fixture:valid.ts' }),
+      ])
+    } finally {
+      await store.close()
+    }
+  })
+
+  it('aborts and rolls back the complete run when graph persistence fails', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'index-project-graph-store-failure-'))
+    const codeRoot = join(tempDir, 'workspace')
+    mkdirSync(codeRoot, { recursive: true })
+    writeFileSync(join(codeRoot, 'valid.ts'), 'export const valid = true\n')
+
+    const store = new SQLiteGraphStore(tempDir)
+    await store.open()
+    try {
+      const registry = new AdapterRegistry()
+      registry.register(new TypeScriptLanguageAdapter())
+      const persistenceError = new Error('synthetic graph connection failure')
+      const beginBulkIndexSession = store.beginBulkIndexSession.bind(store)
+      vi.spyOn(store, 'beginBulkIndexSession').mockImplementation((metadata) => {
+        const session = beginBulkIndexSession(metadata)
+        vi.spyOn(session, 'writeFiles').mockRejectedValue(persistenceError)
+        return session
+      })
+      const indexer = new IndexCodeGraph(store, registry)
+
+      await expect(
+        indexer.execute({
+          projectRoot: tempDir,
+          vcsRoot: null,
+          workspaces: [
+            {
+              name: 'fixture',
+              prefix: null,
+              codeRoot,
+              specRepo: makeMockRepo(),
+              ownership: 'owned',
+              isExternal: false,
+            },
+          ],
+          graphConfig: { includePaths: [], excludePaths: [], workspaces: new Map() },
+          codeGraphVersion: readInstalledCodeGraphVersion(),
+        }),
+      ).rejects.toBe(persistenceError)
+      await expect(store.getStatistics()).resolves.toEqual(
+        expect.objectContaining({ fileCount: 0 }),
+      )
+    } finally {
+      await store.close()
+    }
+  })
+
   it('indexes after a forced logical rebuild without recreating healthy storage', async () => {
     tempDir = mkdtempSync(join(tmpdir(), 'index-project-graph-force-'))
     const codeRoot = join(tempDir, 'workspace')

@@ -306,3 +306,11 @@
 - **WHEN** the hook command is expanded
 - **THEN** the command is `mkdir "/repo/add-auth"`
 - **AND** neither value is wrapped in an extra pair of quotes
+
+#### Scenario: Host-incompatible quote syntax is translated after expansion
+
+- **GIVEN** a developer-authored `run:` hook whose quotes are valid for the configured source syntax but unsupported by the selected host shell
+- **WHEN** `HookRunner` expands the variables and prepares the command for execution
+- **THEN** substituted values remain verbatim
+- **AND** only the unsupported quote syntax is translated for the host shell
+- **AND** callers do not pre-escape or add quotes around substituted values

@@ -11,11 +11,10 @@
   ],
   "implementation": [
     {
-      "file": "code-graph:src/application/use-cases/index-code-graph.ts",
-      "symbols": ["IndexCodeGraph"]
+      "file": "code-graph:test/application/use-cases/index-project-graph-integration.spec.ts"
     },
     {
-      "file": "code-graph:test/application/use-cases/index-project-graph-integration.spec.ts"
+      "file": "code-graph:test/application/use-cases/index-project-graph.spec.ts"
     }
   ],
   "optimizations": {

@@ -6,19 +6,16 @@
   "dependsOn": ["default:_global/conventions"],
   "implementation": [
     {
+      "file": "default:docs/cli/cli-reference.md"
+    },
+    {
       "file": "default:docs/guide/workflow.md"
     },
     {
-      "file": "default:packages/guide/src/infrastructure/generated/guides.ts"
+      "file": "default:docs/guide/configuration.md"
     },
     {
-      "file": "default:docs/core/ports.md"
-    },
-    {
-      "file": "default:docs/schemas/schema-format.md"
-    },
-    {
-      "file": "default:packages/cli/test/configuration-coverage.spec.ts"
+      "file": "default:docs/guide/getting-started.md"
     }
   ],
   "optimizations": {

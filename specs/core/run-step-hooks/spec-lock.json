@@ -18,9 +18,6 @@
     {
       "file": "core:src/application/use-cases/run-step-hooks.ts",
       "symbols": ["RunStepHooks"]
-    },
-    {
-      "file": "core:test/application/use-cases/run-step-hooks.spec.ts"
     }
   ],
   "optimizations": {

@@ -2,7 +2,7 @@
   "manifestVersion": 2,
   "name": "reconcile-lifecycle-transitions-with-main",
   "createdAt": "2026-09-28T11:28:01.179Z",
-  "updatedAt": "2026-09-29T04:57:21.031Z",
+  "updatedAt": "2026-09-29T13:04:45.674Z",
   "description": "Reconcile lifecycle transition semantics, main portability changes, guide reorganization, and merge-conflicted metadata after integrating main.",
   "schema": {
     "name": "schema-std",
@@ -147,7 +147,246 @@
     "artifacts": "downstream",
     "workflow": "preserve"
   },
-  "implementationTrackingStartedAt": "2026-09-28T17:19:07.503Z",
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:6de718051c8e1742f794271ef5341d6e3d9a1939121f2e81d8ecec1753169348"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:hook-execution-model",
+          "filename": "deltas/core/hook-execution-model/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:23a97fea5ec66e4071416309d68c176f1a036959807cebf877d807f518fb3ea4"
+        },
+        {
+          "key": "core:change",
+          "filename": "deltas/core/change/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:581656006043146137a1c76f3ceacf274a34429df1fb08c4e6c42c4e056224d0"
+        },
+        {
+          "key": "core:change-manifest",
+          "filename": "deltas/core/change-manifest/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:2c39540404dac5ee7acbc04a47bc7ccfa2f32e4b18d702907acb9b137f122318"
+        },
+        {
+          "key": "core:transition-change",
+          "filename": "deltas/core/transition-change/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b57c70418c1f7d073871dae85c91e24d0bb231896fa6467b67f18abf157478f9"
+        },
+        {
+          "key": "core:run-step-hooks",
+          "filename": "deltas/core/run-step-hooks/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:fa1872b36e506443ca84a781c77075bcd4216884077f675ffc8942f18aec640c"
+        },
+        {
+          "key": "core:fs-change-repository",
+          "filename": "deltas/core/fs-change-repository/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:cec79619e52d9c735c706eb8ead3b149c2379e7883ab8a798368690e2964223b"
+        },
+        {
+          "key": "core:change-repository-port",
+          "filename": "deltas/core/change-repository-port/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:29f217fe57801ae6788883aff81b614a97ad880ac11fd563b8c63e28c20e5e33"
+        },
+        {
+          "key": "cli:entrypoint",
+          "filename": "deltas/cli/entrypoint/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:da209e1fa6d002e2d6d8c0d549c5063a28add8b8f18d38d82dd0d4f6adba682c"
+        },
+        {
+          "key": "cli:change-transition",
+          "filename": "deltas/cli/change-transition/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:a05f9b222133e003fafef3e1c33cdb46f6335a35c21b7c3d228f84f96e900f5e"
+        },
+        {
+          "key": "code-graph:indexer",
+          "filename": "deltas/code-graph/indexer/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:42c5bd45e106598a0d22d4b7beb165201da7f74b585e01eedac9eeb047048134"
+        },
+        {
+          "key": "code-graph:index-project-graph",
+          "filename": "deltas/code-graph/index-project-graph/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:5c670f7ba8aa20c6f04a3ba1ad786e43f4574642f3298537c3bb77888ff96bb4"
+        },
+        {
+          "key": "default:_global/testing",
+          "filename": "deltas/default/_global/testing/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:bc1deb306eee62224d89f9e4e853f3f2ce191ce497beb1e0df9484cd3f53b5d5"
+        },
+        {
+          "key": "default:_global/docs",
+          "filename": "deltas/default/_global/docs/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:d59d4a89e187f7064f31e2556e94f10dad0c153fc5b11cc494373190de30e2b8"
+        },
+        {
+          "key": "guide:conventions",
+          "filename": "deltas/guide/conventions/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c503eef00febd1dce23d120027c92f09b0eb4ab5af4c029ed64cdd232c3515ec"
+        },
+        {
+          "key": "skills:workflow-automation",
+          "filename": "deltas/skills/workflow-automation/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:4f4e88060d26eeecba278e00eebd93c1bac1e7cd608a8a3954ffa7ed34b4a5d6"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:hook-execution-model",
+          "filename": "deltas/core/hook-execution-model/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:3dc837748556e78255536f0992a16fe6fec3440d1451a9dbcb6c7131ea8003cf"
+        },
+        {
+          "key": "core:change",
+          "filename": "deltas/core/change/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:11f481464fd32e3eb316c2fca6115abf747a75b8f8cafe931eaba40f3b3e77e8"
+        },
+        {
+          "key": "core:change-manifest",
+          "filename": "deltas/core/change-manifest/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:488f7ce9a9db70363e6abc3dd1841b723ec5480875211b94965262978cd317a5"
+        },
+        {
+          "key": "core:transition-change",
+          "filename": "deltas/core/transition-change/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:9583ec348156b661c2b5d38e4194222bb1e7e82aedb0c3c4d4f0121b7ed2e73b"
+        },
+        {
+          "key": "core:run-step-hooks",
+          "filename": "deltas/core/run-step-hooks/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:091495488e60f4c2e4b05e8782f329a5d8fa8a72596cf530dc94f806673a3585"
+        },
+        {
+          "key": "core:fs-change-repository",
+          "filename": "deltas/core/fs-change-repository/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:6c805a9f9d254e85a6c12153735070009868c68e3d5794e30794876fdf199d57"
+        },
+        {
+          "key": "core:change-repository-port",
+          "filename": "deltas/core/change-repository-port/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:37afa619ded52b9d0c5eeae5f9e2dee24d693a13d69388622b7bbd77024a1617"
+        },
+        {
+          "key": "cli:entrypoint",
+          "filename": "deltas/cli/entrypoint/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:a338ec62fefb70c95ab1d0afa1f926f8711b9073aa4cd7e57f76a119b11c5100"
+        },
+        {
+          "key": "cli:change-transition",
+          "filename": "deltas/cli/change-transition/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:62898f5717a2112ad94d7a297e712617a8a84e838f8d00fc58323b59ef66cebe"
+        },
+        {
+          "key": "code-graph:indexer",
+          "filename": "deltas/code-graph/indexer/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:01a82e61c12f9707e125972ae41a77181d971875a6506f650c4a9b32f95d08c8"
+        },
+        {
+          "key": "code-graph:index-project-graph",
+          "filename": "deltas/code-graph/index-project-graph/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:68d015ba483a3d6135bcd29983a6be6fb20c7f65f9c003a61823df1307498737"
+        },
+        {
+          "key": "default:_global/testing",
+          "filename": "deltas/default/_global/testing/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:f0926cbd0179bd6cc7e560c671609754e520b17ed849ff9529812f066f020144"
+        },
+        {
+          "key": "default:_global/docs",
+          "filename": "deltas/default/_global/docs/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c665e629f7891cd844f0bf6c65c2fb9bc5812eb95ac2243f635862b8262211dd"
+        },
+        {
+          "key": "guide:conventions",
+          "filename": "deltas/guide/conventions/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c766b7d88e0727367c41e5e0d5ded5341dbdc3d813ba6c1b278b4257a5969e70"
+        },
+        {
+          "key": "skills:workflow-automation",
+          "filename": "deltas/skills/workflow-automation/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:0327df0aa33bbf04fd974509b1081ddcc45089f2fe6fff3f0cb96882038c1a7d"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:3746682ad689d5b6c4881554ee77861745526b448cb9d8876736266d0e613256"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "verify", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:84073a791651ab1e719df21a943be22a5681c567effa55fcd3da662a365745a8"
+        }
+      ]
+    }
+  ],
   "trackedImplementationFiles": [
     {
       "file": ".changeset/20260829-filter-impact-results-at-provider-specd.md",
@@ -1127,7 +1366,7 @@
     },
     {
       "file": "packages/core/test/infrastructure/fs/path-platform.spec.ts",
-      "state": "ignored"
+      "state": "resolved"
     },
     {
       "file": "packages/core/test/infrastructure/fs/spec-repository.spec.ts",
@@ -1383,7 +1622,7 @@
     },
     {
       "file": "pnpm-lock.yaml",
-      "state": "resolved"
+      "state": "ignored"
     },
     {
       "file": "pnpm-workspace.yaml",
@@ -2095,7 +2334,7 @@
     },
     {
       "file": "specd-sdd/changes/20260707-153756-implementation-snapshot/manifest.json",
-      "state": "resolved"
+      "state": "ignored"
     },
     {
       "file": "packages/cli/src/commands/change/transition.ts",
@@ -3604,6 +3843,14 @@
     {
       "file": "specs/skills/workflow-automation/verify.md",
       "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/infrastructure/fs/fs-index-cache-base.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/index-project-graph.spec.ts",
+      "state": "resolved"
     }
   ],
   "implementationLinks": [
@@ -3701,22 +3948,7 @@
       "fileLinkExplicit": true
     },
     {
-      "specId": "cli:entrypoint",
-      "file": "docs/cli/cli-reference.md",
-      "fileLinkExplicit": true
-    },
-    {
       "specId": "default:_global/docs",
-      "file": "docs/guide/workflow.md",
-      "fileLinkExplicit": true
-    },
-    {
-      "specId": "skills:workflow-automation",
-      "file": "docs/guide/workflow.md",
-      "fileLinkExplicit": true
-    },
-    {
-      "specId": "guide:conventions",
       "file": "docs/guide/workflow.md",
       "fileLinkExplicit": true
     },
@@ -3726,17 +3958,7 @@
       "fileLinkExplicit": true
     },
     {
-      "specId": "guide:conventions",
-      "file": "docs/guide/configuration.md",
-      "fileLinkExplicit": true
-    },
-    {
       "specId": "default:_global/docs",
-      "file": "docs/guide/getting-started.md",
-      "fileLinkExplicit": true
-    },
-    {
-      "specId": "guide:conventions",
       "file": "docs/guide/getting-started.md",
       "fileLinkExplicit": true
     },
@@ -3746,272 +3968,180 @@
       "fileLinkExplicit": true
     },
     {
-      "specId": "guide:conventions",
-      "file": "package.json",
-      "fileLinkExplicit": true
-    },
-    {
-      "specId": "guide:conventions",
-      "file": "pnpm-lock.yaml",
-      "fileLinkExplicit": true
-    },
-    {
-      "specId": "core:change-manifest",
-      "file": "specd-sdd/changes/20260707-153756-implementation-snapshot/manifest.json",
-      "fileLinkExplicit": true
-    },
-    {
-      "specId": "core:change",
-      "file": "specd-sdd/changes/20260707-153756-implementation-snapshot/manifest.json",
-      "fileLinkExplicit": true
-    },
-    {
       "specId": "cli:change-transition",
       "file": "packages/cli/src/commands/change/transition.ts",
       "fileLinkExplicit": false,
       "symbols": ["registerChangeTransition"]
+    },
+    {
+      "specId": "core:fs-change-repository",
+      "file": "packages/core/test/infrastructure/fs/path-platform.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:fs-change-repository",
+      "file": "packages/core/test/infrastructure/fs/fs-index-cache-base.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:index-project-graph",
+      "file": "packages/code-graph/test/application/use-cases/index-project-graph.spec.ts",
+      "fileLinkExplicit": true
     }
   ],
-  "artifacts": [
-    {
-      "type": "proposal",
-      "optional": false,
-      "requires": [],
-      "state": "complete",
-      "files": [
-        {
-          "key": "proposal",
-          "filename": "proposal.md",
-          "state": "complete",
-          "validatedHash": "sha256:6de718051c8e1742f794271ef5341d6e3d9a1939121f2e81d8ecec1753169348"
+  "implementationTrackingStartedAt": "2026-09-28T17:19:07.503Z",
+  "verification": {
+    "completed": {
+      "id": "verification-7",
+      "attemptId": "verification-attempt-7",
+      "status": "valid",
+      "completedAt": "2026-09-29T13:04:08.781Z",
+      "completedBy": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "fingerprint": {
+        "version": 1,
+        "artifacts": {
+          "version": 1,
+          "algorithm": "artifact-pre-hash-v1",
+          "files": {
+            "design:design": "sha256:3746682ad689d5b6c4881554ee77861745526b448cb9d8876736266d0e613256",
+            "proposal:proposal": "sha256:6de718051c8e1742f794271ef5341d6e3d9a1939121f2e81d8ecec1753169348",
+            "specs:cli:change-transition": "sha256:a05f9b222133e003fafef3e1c33cdb46f6335a35c21b7c3d228f84f96e900f5e",
+            "specs:cli:entrypoint": "sha256:da209e1fa6d002e2d6d8c0d549c5063a28add8b8f18d38d82dd0d4f6adba682c",
+            "specs:code-graph:index-project-graph": "sha256:5c670f7ba8aa20c6f04a3ba1ad786e43f4574642f3298537c3bb77888ff96bb4",
+            "specs:code-graph:indexer": "sha256:42c5bd45e106598a0d22d4b7beb165201da7f74b585e01eedac9eeb047048134",
+            "specs:core:change": "sha256:581656006043146137a1c76f3ceacf274a34429df1fb08c4e6c42c4e056224d0",
+            "specs:core:change-manifest": "sha256:2c39540404dac5ee7acbc04a47bc7ccfa2f32e4b18d702907acb9b137f122318",
+            "specs:core:change-repository-port": "sha256:29f217fe57801ae6788883aff81b614a97ad880ac11fd563b8c63e28c20e5e33",
+            "specs:core:fs-change-repository": "sha256:cec79619e52d9c735c706eb8ead3b149c2379e7883ab8a798368690e2964223b",
+            "specs:core:hook-execution-model": "sha256:23a97fea5ec66e4071416309d68c176f1a036959807cebf877d807f518fb3ea4",
+            "specs:core:run-step-hooks": "sha256:fa1872b36e506443ca84a781c77075bcd4216884077f675ffc8942f18aec640c",
+            "specs:core:transition-change": "sha256:b57c70418c1f7d073871dae85c91e24d0bb231896fa6467b67f18abf157478f9",
+            "specs:default:_global/docs": "sha256:d59d4a89e187f7064f31e2556e94f10dad0c153fc5b11cc494373190de30e2b8",
+            "specs:default:_global/testing": "sha256:bc1deb306eee62224d89f9e4e853f3f2ce191ce497beb1e0df9484cd3f53b5d5",
+            "specs:guide:conventions": "sha256:c503eef00febd1dce23d120027c92f09b0eb4ab5af4c029ed64cdd232c3515ec",
+            "specs:skills:workflow-automation": "sha256:4f4e88060d26eeecba278e00eebd93c1bac1e7cd608a8a3954ffa7ed34b4a5d6",
+            "verify:cli:change-transition": "sha256:62898f5717a2112ad94d7a297e712617a8a84e838f8d00fc58323b59ef66cebe",
+            "verify:cli:entrypoint": "sha256:a338ec62fefb70c95ab1d0afa1f926f8711b9073aa4cd7e57f76a119b11c5100",
+            "verify:code-graph:index-project-graph": "sha256:68d015ba483a3d6135bcd29983a6be6fb20c7f65f9c003a61823df1307498737",
+            "verify:code-graph:indexer": "sha256:01a82e61c12f9707e125972ae41a77181d971875a6506f650c4a9b32f95d08c8",
+            "verify:core:change": "sha256:11f481464fd32e3eb316c2fca6115abf747a75b8f8cafe931eaba40f3b3e77e8",
+            "verify:core:change-manifest": "sha256:488f7ce9a9db70363e6abc3dd1841b723ec5480875211b94965262978cd317a5",
+            "verify:core:change-repository-port": "sha256:37afa619ded52b9d0c5eeae5f9e2dee24d693a13d69388622b7bbd77024a1617",
+            "verify:core:fs-change-repository": "sha256:6c805a9f9d254e85a6c12153735070009868c68e3d5794e30794876fdf199d57",
+            "verify:core:hook-execution-model": "sha256:3dc837748556e78255536f0992a16fe6fec3440d1451a9dbcb6c7131ea8003cf",
+            "verify:core:run-step-hooks": "sha256:091495488e60f4c2e4b05e8782f329a5d8fa8a72596cf530dc94f806673a3585",
+            "verify:core:transition-change": "sha256:9583ec348156b661c2b5d38e4194222bb1e7e82aedb0c3c4d4f0121b7ed2e73b",
+            "verify:default:_global/docs": "sha256:c665e629f7891cd844f0bf6c65c2fb9bc5812eb95ac2243f635862b8262211dd",
+            "verify:default:_global/testing": "sha256:f0926cbd0179bd6cc7e560c671609754e520b17ed849ff9529812f066f020144",
+            "verify:guide:conventions": "sha256:c766b7d88e0727367c41e5e0d5ded5341dbdc3d813ba6c1b278b4257a5969e70",
+            "verify:skills:workflow-automation": "sha256:0327df0aa33bbf04fd974509b1081ddcc45089f2fe6fff3f0cb96882038c1a7d"
+          }
+        },
+        "implementation": {
+          "version": 1,
+          "hashAlgorithm": "sha256",
+          "textNormalization": "text-v1",
+          "binaryNormalization": "bytes-v1",
+          "files": {
+            "docs/cli/cli-reference.md": {
+              "hash": "sha256:5269494688deaf51be78e3a671492c7d5fa3f2d61f8ee9ac0e4eeb92cca5e9b6",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "docs/guide/configuration.md": {
+              "hash": "sha256:9dce112b7614c4e22503ebe9ba4eb75f8379fb463ca69273ecb024b34a21d5f0",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "docs/guide/getting-started.md": {
+              "hash": "sha256:918eb48fea6df1405a4d262d7d860cb42ae4029679e6a7669636a03b2242a23f",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "docs/guide/workflow.md": {
+              "hash": "sha256:01bf358b65e5f6b32ae0c634708ec255669a6ea08b66ade02220812f5f65113e",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "package.json": {
+              "hash": "sha256:810ca64fa4765ee261240040bb7393e73f9a1d1a64d761520e8333be14425e3c",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/cli/src/commands/change/transition.ts": {
+              "hash": "sha256:fbd5e71afff90451426befb3d7fa4919dfca9ab99de2ccf93fdf12c673b1a5f4",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/cli/src/index.ts": {
+              "hash": "sha256:c4296afc0c3c1c330e35f7ea8797389a8df82643dd9982b9c17e4a2b5328fc75",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/cli/src/program.ts": {
+              "hash": "sha256:baf88a51830ed7de920df53ef7f83d426cbe7d96c4d0f8a6c1b97aad25264711",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/code-graph/test/application/use-cases/index-project-graph-integration.spec.ts": {
+              "hash": "sha256:0d21712fd62ea6529db08c74df6ecaf99ecc4305e656558b19a93a0f9f173a47",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/code-graph/test/application/use-cases/index-project-graph.spec.ts": {
+              "hash": "sha256:5217966dded1e1e44c9809c780573271fbe5c6a081fb016edf6d19a4a0a9e011",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/core/src/application/template-expander.ts": {
+              "hash": "sha256:b6dafe4efc8b62273128010da1ebf42a36b6d5390fb571c75f240d1177ad5503",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/core/src/application/use-cases/run-step-hooks.ts": {
+              "hash": "sha256:4ceec46eae6237176868e489d35191d5849ffe46d2827f7778dab43a17eb2f3f",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/core/src/application/use-cases/transition-change.ts": {
+              "hash": "sha256:6d894694792ae701334df22b750b4b175a7a1ff25c240a9082c5e96c11e0510c",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/core/src/infrastructure/node/hook-runner.ts": {
+              "hash": "sha256:afa78875c8a181fd68dd57fdf316699cf38efff752f12e572af55f660ccd394b",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/core/src/infrastructure/node/translate-hook-command.ts": {
+              "hash": "sha256:786bb57be02e03f16caf998cf9285d67b7fcdd9994ab21baa20a3d49b19c7b71",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/core/test/infrastructure/fs/change-repository.spec.ts": {
+              "hash": "sha256:bf0aa63b2283c0ea5a46cc7be30dbadea3ee5f06936edfbc98a7826f3e017091",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/core/test/infrastructure/fs/fs-index-cache-base.spec.ts": {
+              "hash": "sha256:0a1a45e1c6d5c2d4a5591d78ec1a4484f302deb40ec247b6fee5cb32f90a5c9f",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/core/test/infrastructure/fs/path-platform.spec.ts": {
+              "hash": "sha256:fb0c594005c28b56b38f6d2842c77f4a908d4129ca40fd5907cd08a7c623868d",
+              "content": "text",
+              "normalization": "text-v1"
+            }
+          }
         }
-      ]
-    },
-    {
-      "type": "specs",
-      "optional": false,
-      "requires": ["proposal"],
-      "state": "complete",
-      "files": [
-        {
-          "key": "core:hook-execution-model",
-          "filename": "deltas/core/hook-execution-model/spec.md.delta.yaml",
-          "state": "complete",
-          "validatedHash": "sha256:23a97fea5ec66e4071416309d68c176f1a036959807cebf877d807f518fb3ea4"
-        },
-        {
-          "key": "core:change",
-          "filename": "deltas/core/change/spec.md.delta.yaml",
-          "state": "complete",
-          "validatedHash": "sha256:581656006043146137a1c76f3ceacf274a34429df1fb08c4e6c42c4e056224d0"
-        },
-        {
-          "key": "core:change-manifest",
-          "filename": "deltas/core/change-manifest/spec.md.delta.yaml",
-          "state": "complete",
-          "validatedHash": "sha256:2c39540404dac5ee7acbc04a47bc7ccfa2f32e4b18d702907acb9b137f122318"
-        },
-        {
-          "key": "core:transition-change",
-          "filename": "deltas/core/transition-change/spec.md.delta.yaml",
-          "state": "complete",
-          "validatedHash": "sha256:b57c70418c1f7d073871dae85c91e24d0bb231896fa6467b67f18abf157478f9"
-        },
-        {
-          "key": "core:run-step-hooks",
-          "filename": "deltas/core/run-step-hooks/spec.md.delta.yaml",
-          "state": "complete",
-          "validatedHash": "sha256:fa1872b36e506443ca84a781c77075bcd4216884077f675ffc8942f18aec640c"
-        },
-        {
-          "key": "core:fs-change-repository",
-          "filename": "deltas/core/fs-change-repository/spec.md.delta.yaml",
-          "state": "complete",
-          "validatedHash": "sha256:cec79619e52d9c735c706eb8ead3b149c2379e7883ab8a798368690e2964223b"
-        },
-        {
-          "key": "core:change-repository-port",
-          "filename": "deltas/core/change-repository-port/spec.md.delta.yaml",
-          "state": "complete",
-          "validatedHash": "sha256:29f217fe57801ae6788883aff81b614a97ad880ac11fd563b8c63e28c20e5e33"
-        },
-        {
-          "key": "cli:entrypoint",
-          "filename": "deltas/cli/entrypoint/spec.md.delta.yaml",
-          "state": "complete",
-          "validatedHash": "sha256:da209e1fa6d002e2d6d8c0d549c5063a28add8b8f18d38d82dd0d4f6adba682c"
-        },
-        {
-          "key": "cli:change-transition",
-          "filename": "deltas/cli/change-transition/spec.md.delta.yaml",
-          "state": "complete",
-          "validatedHash": "sha256:a05f9b222133e003fafef3e1c33cdb46f6335a35c21b7c3d228f84f96e900f5e"
-        },
-        {
-          "key": "code-graph:indexer",
-          "filename": "deltas/code-graph/indexer/spec.md.delta.yaml",
-          "state": "complete",
-          "validatedHash": "sha256:42c5bd45e106598a0d22d4b7beb165201da7f74b585e01eedac9eeb047048134"
-        },
-        {
-          "key": "code-graph:index-project-graph",
-          "filename": "deltas/code-graph/index-project-graph/spec.md.delta.yaml",
-          "state": "complete",
-          "validatedHash": "sha256:5c670f7ba8aa20c6f04a3ba1ad786e43f4574642f3298537c3bb77888ff96bb4"
-        },
-        {
-          "key": "default:_global/testing",
-          "filename": "deltas/default/_global/testing/spec.md.delta.yaml",
-          "state": "complete",
-          "validatedHash": "sha256:bc1deb306eee62224d89f9e4e853f3f2ce191ce497beb1e0df9484cd3f53b5d5"
-        },
-        {
-          "key": "default:_global/docs",
-          "filename": "deltas/default/_global/docs/spec.md.delta.yaml",
-          "state": "complete",
-          "validatedHash": "sha256:d59d4a89e187f7064f31e2556e94f10dad0c153fc5b11cc494373190de30e2b8"
-        },
-        {
-          "key": "guide:conventions",
-          "filename": "deltas/guide/conventions/spec.md.delta.yaml",
-          "state": "complete",
-          "validatedHash": "sha256:c503eef00febd1dce23d120027c92f09b0eb4ab5af4c029ed64cdd232c3515ec"
-        },
-        {
-          "key": "skills:workflow-automation",
-          "filename": "deltas/skills/workflow-automation/spec.md.delta.yaml",
-          "state": "complete",
-          "validatedHash": "sha256:4f4e88060d26eeecba278e00eebd93c1bac1e7cd608a8a3954ffa7ed34b4a5d6"
-        }
-      ]
-    },
-    {
-      "type": "verify",
-      "optional": false,
-      "requires": ["specs"],
-      "state": "complete",
-      "files": [
-        {
-          "key": "core:hook-execution-model",
-          "filename": "deltas/core/hook-execution-model/verify.md.delta.yaml",
-          "state": "complete",
-          "validatedHash": "sha256:3dc837748556e78255536f0992a16fe6fec3440d1451a9dbcb6c7131ea8003cf"
-        },
-        {
-          "key": "core:change",
-          "filename": "deltas/core/change/verify.md.delta.yaml",
-          "state": "complete",
-          "validatedHash": "sha256:11f481464fd32e3eb316c2fca6115abf747a75b8f8cafe931eaba40f3b3e77e8"
-        },
-        {
-          "key": "core:change-manifest",
-          "filename": "deltas/core/change-manifest/verify.md.delta.yaml",
-          "state": "complete",
-          "validatedHash": "sha256:488f7ce9a9db70363e6abc3dd1841b723ec5480875211b94965262978cd317a5"
-        },
-        {
-          "key": "core:transition-change",
-          "filename": "deltas/core/transition-change/verify.md.delta.yaml",
-          "state": "complete",
-          "validatedHash": "sha256:9583ec348156b661c2b5d38e4194222bb1e7e82aedb0c3c4d4f0121b7ed2e73b"
-        },
-        {
-          "key": "core:run-step-hooks",
-          "filename": "deltas/core/run-step-hooks/verify.md.delta.yaml",
-          "state": "complete",
-          "validatedHash": "sha256:091495488e60f4c2e4b05e8782f329a5d8fa8a72596cf530dc94f806673a3585"
-        },
-        {
-          "key": "core:fs-change-repository",
-          "filename": "deltas/core/fs-change-repository/verify.md.delta.yaml",
-          "state": "complete",
-          "validatedHash": "sha256:6c805a9f9d254e85a6c12153735070009868c68e3d5794e30794876fdf199d57"
-        },
-        {
-          "key": "core:change-repository-port",
-          "filename": "deltas/core/change-repository-port/verify.md.delta.yaml",
-          "state": "complete",
-          "validatedHash": "sha256:37afa619ded52b9d0c5eeae5f9e2dee24d693a13d69388622b7bbd77024a1617"
-        },
-        {
-          "key": "cli:entrypoint",
-          "filename": "deltas/cli/entrypoint/verify.md.delta.yaml",
-          "state": "complete",
-          "validatedHash": "sha256:a338ec62fefb70c95ab1d0afa1f926f8711b9073aa4cd7e57f76a119b11c5100"
-        },
-        {
-          "key": "cli:change-transition",
-          "filename": "deltas/cli/change-transition/verify.md.delta.yaml",
-          "state": "complete",
-          "validatedHash": "sha256:62898f5717a2112ad94d7a297e712617a8a84e838f8d00fc58323b59ef66cebe"
-        },
-        {
-          "key": "code-graph:indexer",
-          "filename": "deltas/code-graph/indexer/verify.md.delta.yaml",
-          "state": "complete",
-          "validatedHash": "sha256:01a82e61c12f9707e125972ae41a77181d971875a6506f650c4a9b32f95d08c8"
-        },
-        {
-          "key": "code-graph:index-project-graph",
-          "filename": "deltas/code-graph/index-project-graph/verify.md.delta.yaml",
-          "state": "complete",
-          "validatedHash": "sha256:68d015ba483a3d6135bcd29983a6be6fb20c7f65f9c003a61823df1307498737"
-        },
-        {
-          "key": "default:_global/testing",
-          "filename": "deltas/default/_global/testing/verify.md.delta.yaml",
-          "state": "complete",
-          "validatedHash": "sha256:f0926cbd0179bd6cc7e560c671609754e520b17ed849ff9529812f066f020144"
-        },
-        {
-          "key": "default:_global/docs",
-          "filename": "deltas/default/_global/docs/verify.md.delta.yaml",
-          "state": "complete",
-          "validatedHash": "sha256:c665e629f7891cd844f0bf6c65c2fb9bc5812eb95ac2243f635862b8262211dd"
-        },
-        {
-          "key": "guide:conventions",
-          "filename": "deltas/guide/conventions/verify.md.delta.yaml",
-          "state": "complete",
-          "validatedHash": "sha256:c766b7d88e0727367c41e5e0d5ded5341dbdc3d813ba6c1b278b4257a5969e70"
-        },
-        {
-          "key": "skills:workflow-automation",
-          "filename": "deltas/skills/workflow-automation/verify.md.delta.yaml",
-          "state": "complete",
-          "validatedHash": "sha256:0327df0aa33bbf04fd974509b1081ddcc45089f2fe6fff3f0cb96882038c1a7d"
-        }
-      ]
-    },
-    {
-      "type": "design",
-      "optional": false,
-      "requires": ["proposal", "specs", "verify"],
-      "state": "complete",
-      "files": [
-        {
-          "key": "design",
-          "filename": "design.md",
-          "state": "complete",
-          "validatedHash": "sha256:3746682ad689d5b6c4881554ee77861745526b448cb9d8876736266d0e613256"
-        }
-      ]
-    },
-    {
-      "type": "tasks",
-      "optional": false,
-      "requires": ["specs", "verify", "design"],
-      "state": "complete",
-      "files": [
-        {
-          "key": "tasks",
-          "filename": "tasks.md",
-          "state": "complete",
-          "validatedHash": "sha256:84073a791651ab1e719df21a943be22a5681c567effa55fcd3da662a365745a8"
-        }
-      ]
+      }
     }
-  ],
+  },
   "history": [
     {
       "type": "created",
@@ -4295,6 +4425,293 @@
           "files": ["design"]
         }
       ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-29T05:29:06.680Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "verification-attempt-started",
+      "at": "2026-09-29T05:30:19.344Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "attemptId": "verification-attempt-1",
+      "state": "verifying",
+      "fingerprintVersion": 1,
+      "artifactAlgorithm": "artifact-pre-hash-v1",
+      "textNormalization": "text-v1",
+      "binaryNormalization": "bytes-v1"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-29T06:03:07.909Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-29T10:40:42.941Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "verification-attempt-started",
+      "at": "2026-09-29T10:40:59.093Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "attemptId": "verification-attempt-2",
+      "state": "verifying",
+      "fingerprintVersion": 1,
+      "artifactAlgorithm": "artifact-pre-hash-v1",
+      "textNormalization": "text-v1",
+      "binaryNormalization": "bytes-v1"
+    },
+    {
+      "type": "verification-attempt-started",
+      "at": "2026-09-29T11:26:21.214Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "attemptId": "verification-attempt-3",
+      "state": "verifying",
+      "fingerprintVersion": 1,
+      "artifactAlgorithm": "artifact-pre-hash-v1",
+      "textNormalization": "text-v1",
+      "binaryNormalization": "bytes-v1"
+    },
+    {
+      "type": "verification-completed",
+      "at": "2026-09-29T11:26:44.034Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "attemptId": "verification-attempt-3",
+      "verificationId": "verification-3"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-29T12:31:02.967Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-29T12:31:48.944Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "verification-invalidated",
+      "at": "2026-09-29T12:38:41.065Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "verificationId": "verification-3",
+      "reason": "Implementation files changed"
+    },
+    {
+      "type": "verification-attempt-started",
+      "at": "2026-09-29T12:46:51.406Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "attemptId": "verification-attempt-4",
+      "state": "archivable",
+      "fingerprintVersion": 1,
+      "artifactAlgorithm": "artifact-pre-hash-v1",
+      "textNormalization": "text-v1",
+      "binaryNormalization": "bytes-v1"
+    },
+    {
+      "type": "verification-completed",
+      "at": "2026-09-29T12:47:11.394Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "attemptId": "verification-attempt-4",
+      "verificationId": "verification-4"
+    },
+    {
+      "type": "verification-invalidated",
+      "at": "2026-09-29T12:48:02.416Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "verificationId": "verification-4",
+      "reason": "Implementation files changed"
+    },
+    {
+      "type": "verification-attempt-started",
+      "at": "2026-09-29T12:51:15.759Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "attemptId": "verification-attempt-5",
+      "state": "archivable",
+      "fingerprintVersion": 1,
+      "artifactAlgorithm": "artifact-pre-hash-v1",
+      "textNormalization": "text-v1",
+      "binaryNormalization": "bytes-v1"
+    },
+    {
+      "type": "verification-completed",
+      "at": "2026-09-29T12:51:23.120Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "attemptId": "verification-attempt-5",
+      "verificationId": "verification-5"
+    },
+    {
+      "type": "verification-invalidated",
+      "at": "2026-09-29T12:56:02.594Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "verificationId": "verification-5",
+      "reason": "Implementation files changed"
+    },
+    {
+      "type": "verification-attempt-started",
+      "at": "2026-09-29T13:01:02.679Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "attemptId": "verification-attempt-6",
+      "state": "archivable",
+      "fingerprintVersion": 1,
+      "artifactAlgorithm": "artifact-pre-hash-v1",
+      "textNormalization": "text-v1",
+      "binaryNormalization": "bytes-v1"
+    },
+    {
+      "type": "verification-completed",
+      "at": "2026-09-29T13:01:21.605Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "attemptId": "verification-attempt-6",
+      "verificationId": "verification-6"
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-09-29T13:01:56.368Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Implementation link \"cli:entrypoint\" points outside workspace \"cli\" codeRoot.",
+      "commitStarted": false
+    },
+    {
+      "type": "verification-invalidated",
+      "at": "2026-09-29T13:03:56.683Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "verificationId": "verification-6",
+      "reason": "Implementation files changed"
+    },
+    {
+      "type": "verification-attempt-started",
+      "at": "2026-09-29T13:03:58.143Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "attemptId": "verification-attempt-7",
+      "state": "archivable",
+      "fingerprintVersion": 1,
+      "artifactAlgorithm": "artifact-pre-hash-v1",
+      "textNormalization": "text-v1",
+      "binaryNormalization": "bytes-v1"
+    },
+    {
+      "type": "verification-completed",
+      "at": "2026-09-29T13:04:08.781Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "attemptId": "verification-attempt-7",
+      "verificationId": "verification-7"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-29T13:04:45.649Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
     }
-  ]
+  ],
+  "archivedAt": "2026-09-29T13:04:47.378Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
 }
