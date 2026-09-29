@@ -22,36 +22,36 @@
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Named organizational unit for specs/code/schemas/ownership; every spec belongs to exactly one workspace.",
+      "value": "Unique named unit for specs, code, schemas, and ownership; every spec belongs to exactly one workspace.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:e644179411adafb4a576ac8bcd8dc9f963766fd326b437fd14423a8e0a8a5617",
-          "lastModified": "2026-06-02T14:44:12.832Z"
+          "hash": "sha256:fd596bd244cb3914da326c31a4732a81c92dc98ee2e47ac4ae1d3450366878ec",
+          "lastModified": "2026-09-25T16:14:41.380Z"
         },
         "verify.md": {
-          "hash": "sha256:f524b926e2b055ef61a6d44e41817fef7fcee6dfa1e203714ae7c9b34a733c33",
-          "lastModified": "2026-06-02T14:44:12.832Z"
+          "hash": "sha256:be7f88b02a3569a8c87ae45806e7516d53c155ae8953a60aee5b69c02ffc20f2",
+          "lastModified": "2026-09-25T16:14:41.381Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# Workspace\n\n## Rules\n- Unique name in `specd.yaml`; `/^[a-z][a-z0-9-]*$/`. Reserved: `default` (mandatory local), `root` (project-global graph).\n- Props: `specs` (always); `codeRoot` (required non-default; default ws → project root); `schemas`; `ownership` (default `owned` / non-default `readOnly`); `prefix`; `contextIncludeSpecs`/`contextExcludeSpecs`. Paths relative to `specd.yaml` dir.\n- `isExternal` inferred when specs path outside repo root — never declared.\n- Ownership: `owned`/`shared`/`readOnly`. `readOnly` rejects: change scope add, ArchiveChange, SpecRepository.save/saveMetadata → `ReadOnlyWorkspaceError` (state blocked op + why; MUST NOT suggest remediation). Reads allowed. `shared`≡`owned` for writes.\n- `prefix` prepended to capability paths; not unique ID. Invalid → `ConfigValidationError`.\n- Spec IDs `workspace:capabilityPath`; bare = `default:`. Internally always qualified.\n- Active workspaces = change `specIds` via `parseSpecId()`/`workspaces` getter — not persisted.\n- Primary workspace = first in `change.workspaces` (archive template / default metadata attribution).\n- Port-per-workspace: `ReadonlyMap<string, RepositoryInstance>`.\n- Workspace context patterns apply only when active; bare qualifier = this ws; excludes never apply to dependsOn-reached specs; evaluated after project patterns.\n- Cross-ws refs OK; unknown ws: config validate error; runtime context warn+skip.\n- Change artifacts always include workspace segment: `specs/<ws>/...`, `deltas/<ws>/...`.\n- Consuming project's `specd.yaml` sole SoT — never read external repo's config.\n\n## Constraints\n- Every project declares default workspace.\n- Name regex enforced; `codeRoot` required for non-default.\n- `isExternal` inferred; spec IDs always qualified internally.\n- Empty `specIds` → empty `workspaces`.\n- External configs never read.\n- ReadOnly blocks all writes; errors must not suggest remediation.",
+      "value": "# Workspace\n\n## Rules\n- Unique name in `specd.yaml`; `/^[a-z][a-z0-9-]*$/`. Reserved: `default` (mandatory local), `root` (project-global graph). Windows device names `con`, `prn`, `aux`, `nul`, `com1`–`com9`, `lpt1`–`lpt9` rejected on every OS when whole name equals device name; `con-foo` legal. No two workspaces share a name.\n- Props: `specs` always; `codeRoot` required non-`default` (default ws → project root); `schemas` optional (default ws `specd/schemas`, else none); `ownership` optional (default ws `owned`, else `readOnly`); `prefix` optional; `contextIncludeSpecs` optional (non-default default `['*']`); `contextExcludeSpecs` optional. Relative paths resolve from `specd.yaml` dir.\n- `isExternal` inferred when `specs` path resolves outside repo root — never declared. Affects ownership defaults and change validation.\n- Ownership: `owned` (freely propose) / `shared` (co-own; coordination) / `readOnly` (read, no modify). Affects change targeting and approval gates. `shared`≡`owned` for writes.\n- `readOnly` MUST reject with `ReadOnlyWorkspaceError`: (1) `change create --spec` / `change edit --add-spec` — spec cannot enter `specIds`; (2) `ArchiveChange` if any change spec is `readOnly` (defense-in-depth; MUST NOT silently merge deltas); (3) `SpecRepository.save()` and `SpecRepository.saveMetadata()` — lowest-level, unbypassable. Errors MUST state blocked op and why (`readOnly`); MUST NOT suggest remediation (e.g. change ownership in `specd.yaml`). Reads allowed: load, list, context deps, `dependsOn`.\n- `prefix` prepended to capability paths: disk `architecture/` → `<prefix>/architecture`. Single- or multi-segment (`_global`, `team/shared/core`). Not a unique ID; two workspaces may share it. Absent → bare capability paths. Invalid syntax → `ConfigValidationError` at startup.\n- Spec IDs `workspace:capabilityPath`; colon separates; `/` belongs to capability path. Bare path = `default:path`. Unknown qualifier rejected. Internally always fully-qualified; bare is user-facing only.\n- Active workspace: ≥1 change `specIds` belongs to it. Derived at runtime by `workspaces` getter via `parseSpecId()` — not persisted. Controls which workspace-level context patterns apply.\n- Primary workspace = first entry in `change.workspaces`. Used for archive template `{{change.workspace}}` and default metadata attribution when archiving.\n- Port-per-workspace: use cases receive `ReadonlyMap<string, RepositoryInstance>` keyed by workspace name. Composition builds one repository per configured workspace.\n- `contextIncludeSpecs` / `contextExcludeSpecs` apply only when workspace active. Bare qualifier means this workspace (not `default`). `['*']` = all specs here; `['auth/*']` = under `auth/` here. Evaluated after project-level patterns. Specs reached via `dependsOn` never subject to exclude patterns.\n- Cross-ws refs OK in `dependsOn`, context patterns, delta targets (`billing:payments/invoices`). Schema refs use `#workspace:name` for another workspace's local schemas. Unknown workspace: config validation → error (abort); runtime context compilation → warning and skip.\n- Change artifacts always include workspace segment, even single-workspace: `specs/<workspace>/<capability-path>/<artifact-filename>`; `deltas/<workspace>/<capability-path>/<artifact-filename>.delta.yaml`.\n- Consuming project's `specd.yaml` is sole SoT. External repo `specd.yaml` never read. Paths, schemas, ownership, prefix independently declared.\n\n## Constraints\n- Every project declares a default workspace.\n- Name regex enforced; whole-name Windows device names rejected on every OS.\n- `codeRoot` required for non-default workspaces.\n- `isExternal` inferred, never declared.\n- Spec IDs always workspace-qualified internally.\n- `workspaces` derived from `specIds` via `parseSpecId()` — not persisted.\n- Empty `specIds` → empty `workspaces`.\n- Workspace-level excludes never apply to specs reached via `dependsOn`.\n- External repository configurations never read.\n- Change artifacts always include the workspace path segment.\n- `readOnly` rejects all writes: change scope additions, archive merges, direct spec writes.\n- `ReadOnlyWorkspaceError` messages must not suggest remediation.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:e644179411adafb4a576ac8bcd8dc9f963766fd326b437fd14423a8e0a8a5617",
-          "lastModified": "2026-06-02T14:44:12.832Z"
+          "hash": "sha256:fd596bd244cb3914da326c31a4732a81c92dc98ee2e47ac4ae1d3450366878ec",
+          "lastModified": "2026-09-25T16:14:41.380Z"
         },
         "verify.md": {
-          "hash": "sha256:f524b926e2b055ef61a6d44e41817fef7fcee6dfa1e203714ae7c9b34a733c33",
-          "lastModified": "2026-06-02T14:44:12.832Z"
+          "hash": "sha256:be7f88b02a3569a8c87ae45806e7516d53c155ae8953a60aee5b69c02ffc20f2",
+          "lastModified": "2026-09-25T16:14:41.381Z"
         }
       }
     }

@@ -25,36 +25,36 @@
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Canonical spec ID: workspace:capabilityPath; bare path → default workspace; reject unknown workspace.",
+      "value": "Canonical spec ID `workspace:capabilityPath`; bare path → default; reject unknown workspace and Windows device segments.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:2d1cedb994fda0e4439c76a3aa860a17a85c3fbf790bf15616a6d8785734e34c",
-          "lastModified": "2026-05-25T06:02:58.480Z"
+          "hash": "sha256:009d5dbd4c9f98247920621b40c2e1713c6cc29d1e355a5be875fd7a6b8ecc13",
+          "lastModified": "2026-09-25T16:14:41.369Z"
         },
         "verify.md": {
-          "hash": "sha256:f9023f0a7de7d50e232e3a5d07456bc5ad2a86f29167e5ec10017e490d9d989a",
-          "lastModified": "2026-05-09T10:25:58.610Z"
+          "hash": "sha256:bb919e307be66179994a8d09d77e71932d9b7566f3c5747231550261a2f50253",
+          "lastModified": "2026-09-25T16:14:41.370Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# Spec ID Format\n\n## Rules\n- Format: `workspace:capabilityPath` (colon sep; all `/` in path). Single format everywhere.\n- No colon → workspace `default`, whole string = capability path.\n- Unknown workspace (colon-qualified) → reject.\n- Parse: first `:` → workspace + path (validate workspace); else default + full string. Never slash-as-workspace.\n- Normalize bare → fully-qualified at boundary. `specDependsOn` MUST use fully-qualified IDs.\n\n## Constraints\n- Workspace: no `/` or `:`. Capability path: no `:`. Separator always `:`.",
+      "value": "# Spec ID Format\n\n## Rules\n- Format: `workspace:capabilityPath` (colon sep; all `/` in path). Single format everywhere: storage (`change.specIds`, manifest), domain refs, CLI input, metadata `dependsOn`, user output. No internal vs external split.\n- No colon → workspace `default`, whole string = capability path. `auth/login` → `default:auth/login`.\n- Unknown workspace (colon-qualified) → reject.\n- Parse: first `:` → workspace + path (validate workspace exists); else default + full string. `/` never workspace separator.\n- Capability-path segment that is Windows device name MUST reject on every OS. Reserved (case-insensitive, whole segment): `con`, `prn`, `aux`, `nul`, `com1` through `com9`, `lpt1` through `lpt9`. Segment `con-foo` legal. Windows drive letter is not a workspace; spec IDs are not filesystem paths.\n- Acceptors SHOULD normalize bare paths to fully-qualified (`default:capPath`) at system boundary. Domain MAY assume already qualified.\n- `specDependsOn` MUST use fully-qualified IDs (`workspace:capabilityPath`). Bare paths in metadata MUST normalize before storage.\n\n## Constraints\n- Workspace names MUST NOT contain `/` or `:`.\n- Capability paths MUST NOT contain `:`.\n- Separator always `:` — `/` never workspace separator.\n- Default workspace implicit when no colon present.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:2d1cedb994fda0e4439c76a3aa860a17a85c3fbf790bf15616a6d8785734e34c",
-          "lastModified": "2026-05-25T06:02:58.480Z"
+          "hash": "sha256:009d5dbd4c9f98247920621b40c2e1713c6cc29d1e355a5be875fd7a6b8ecc13",
+          "lastModified": "2026-09-25T16:14:41.369Z"
         },
         "verify.md": {
-          "hash": "sha256:f9023f0a7de7d50e232e3a5d07456bc5ad2a86f29167e5ec10017e490d9d989a",
-          "lastModified": "2026-05-09T10:25:58.610Z"
+          "hash": "sha256:bb919e307be66179994a8d09d77e71932d9b7566f3c5747231550261a2f50253",
+          "lastModified": "2026-09-25T16:14:41.370Z"
         }
       }
     }
