@@ -1,0 +1,32 @@
+- op: modified
+  description: 'Update GuideSection verification scenarios with startOffset and endOffset assertions'
+  selector:
+    type: section
+    matches: 'Requirement: GuideSection Value Object'
+  content: |
+    #### Scenario: Section boundaries are 1-indexed and inclusive
+
+    - **GIVEN** a heading starting at line 10 and concluding at line 25 in a document body
+    - **WHEN** the `GuideSection` value object is inspected
+    - **THEN** `section.startLine` equals 10
+    - **AND** `section.endLine` equals 25
+    - **AND** `section.lines` equals 16 (inclusive: `25 - 10 + 1`)
+    - **AND** `section.startOffset` marks the character index where the heading begins
+    - **AND** `section.endOffset` marks the character index where line 25 ends
+    - **AND** `section.content` begins with the heading line and ends at line 25 when populated
+
+    #### Scenario: Single-line section (heading with no body)
+
+    - **GIVEN** a heading on line 42 immediately followed by the next equal-level heading on line 43
+    - **WHEN** the `GuideSection` value object is created
+    - **THEN** `section.startLine` equals 42
+    - **AND** `section.endLine` equals 42
+    - **AND** `section.lines` strictly equals 1
+    - **AND** `section.endOffset > section.startOffset` spanning the heading line characters
+
+    #### Scenario: Deep heading levels up to level 6
+
+    - **GIVEN** headings ranging from `# H1` to `###### H6`
+    - **WHEN** `GuideSection` represents each heading
+    - **THEN** `section.level` is an integer between 1 and 6 inclusive
+    - **AND** `section.heading` contains the heading text without leading `#` or trailing whitespace

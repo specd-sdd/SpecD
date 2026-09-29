@@ -104,6 +104,34 @@ Line 9`
       expect(sections[2]!.startLine).toBe(8)
       expect(sections[2]!.endLine).toBe(9)
     })
+
+    it('calculates exact character startOffset and endOffset matching content slices', () => {
+      const content = `# Section A
+Body A text.
+
+## Section B
+Body B text.
+
+# Section C
+Body C text.`
+
+      const sections = extractSections(content)
+      expect(sections).toHaveLength(3)
+
+      expect(sections[0]!.startOffset).toBe(0)
+      expect(content.slice(sections[0]!.startOffset, sections[0]!.endOffset)).toBe(
+        '# Section A\nBody A text.\n\n## Section B\nBody B text.\n',
+      )
+
+      expect(content.slice(sections[1]!.startOffset, sections[1]!.endOffset)).toBe(
+        '## Section B\nBody B text.\n',
+      )
+
+      expect(sections[2]!.endOffset).toBe(content.length)
+      expect(content.slice(sections[2]!.startOffset, sections[2]!.endOffset)).toBe(
+        '# Section C\nBody C text.',
+      )
+    })
   })
 
   describe('compileGuide', () => {

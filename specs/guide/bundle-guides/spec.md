@@ -25,19 +25,23 @@ The compilation script MUST validate frontmatter fields for every file in `docs/
 
 ### Requirement: Heading and Line Range Extraction
 
-The script MUST parse the Markdown document structure from the body text (excluding YAML frontmatter) to extract sections and line bounds:
+The script MUST parse the Markdown document structure from the body text (excluding YAML frontmatter) to extract sections, line bounds, and character offsets:
 
 - Heading extraction MUST recognize Markdown headings at all levels (`#` through `######`).
 - The script MUST compute 1-indexed `startLine` and `endLine` for each section relative to the frontmatter-free document body:
   - `startLine`: The exact line index where the section heading appears.
   - `endLine`: The line immediately preceding the next heading of equal or shallower depth, or the final line of the document for the last section.
 - Section line count MUST be computed as `endLine - startLine + 1`.
+- The script MUST compute 0-indexed character offsets (`startOffset` and `endOffset`) bounding each section within the clean document body text:
+  - `startOffset`: Character index where the section heading begins.
+  - `endOffset`: Character index where the section concludes (at the end of `endLine`).
 
 ### Requirement: Static Catalog Artifact Generation
 
 The generated TypeScript file (`src/infrastructure/generated/guides.ts`) MUST:
 
 - Export an immutable array of `GuideTopic` records containing all pre-parsed guides.
+- Omit serialized redundant `content` from outline section objects in the catalog, providing `startOffset` and `endOffset` character spans for on-demand runtime extraction.
 - Export an index map mapping topic identifiers to their corresponding array indices for $O(1)$ lookup.
 - Be committed or generated deterministically such that packages depending on `@specd/guide` can build cleanly without requiring filesystem access to `docs/guide/`.
 

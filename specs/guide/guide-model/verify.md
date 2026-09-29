@@ -30,12 +30,14 @@
 
 #### Scenario: Section boundaries are 1-indexed and inclusive
 
-- **GIVEN** a heading starting at line 10 and concluding at line 25
+- **GIVEN** a heading starting at line 10 and concluding at line 25 in a document body
 - **WHEN** the `GuideSection` value object is inspected
 - **THEN** `section.startLine` equals 10
 - **AND** `section.endLine` equals 25
 - **AND** `section.lines` equals 16 (inclusive: `25 - 10 + 1`)
-- **AND** `section.content` begins with the heading line and ends at line 25
+- **AND** `section.startOffset` marks the character index where the heading begins
+- **AND** `section.endOffset` marks the character index where line 25 ends
+- **AND** `section.content` begins with the heading line and ends at line 25 when populated
 
 #### Scenario: Single-line section (heading with no body)
 
@@ -44,6 +46,7 @@
 - **THEN** `section.startLine` equals 42
 - **AND** `section.endLine` equals 42
 - **AND** `section.lines` strictly equals 1
+- **AND** `section.endOffset > section.startOffset` spanning the heading line characters
 
 #### Scenario: Deep heading levels up to level 6
 

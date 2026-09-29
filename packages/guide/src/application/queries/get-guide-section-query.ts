@@ -68,7 +68,7 @@ export class GetGuideSectionQuery {
           guide.outline.map((s) => `${s.index}: ${s.heading}`),
         )
       }
-      return found
+      return this.populateSectionContent(guide.content, found)
     }
 
     // Match by heading or slug (case-insensitive)
@@ -82,7 +82,7 @@ export class GetGuideSectionQuery {
     })
 
     if (matches.length === 1) {
-      return matches[0]!
+      return this.populateSectionContent(guide.content, matches[0]!)
     }
 
     if (matches.length > 1) {
@@ -97,5 +97,31 @@ export class GetGuideSectionQuery {
       String(section),
       guide.outline.map((s) => s.heading),
     )
+  }
+
+  /**
+   * Populates the section content dynamically from the guide document body.
+   *
+   * @param guideContent - The full markdown text of the guide
+   * @param section - The guide section outline descriptor
+   * @returns The guide section with populated content
+   */
+  private populateSectionContent(guideContent: string, section: GuideSection): GuideSection {
+    if (section.content !== undefined) {
+      return section
+    }
+
+    const content =
+      section.startOffset !== undefined && section.endOffset !== undefined
+        ? guideContent.slice(section.startOffset, section.endOffset)
+        : guideContent
+            .split(/\r?\n/)
+            .slice(section.startLine - 1, section.endLine)
+            .join('\n')
+
+    return {
+      ...section,
+      content,
+    }
   }
 }

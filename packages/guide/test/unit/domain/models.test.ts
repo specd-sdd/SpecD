@@ -17,6 +17,8 @@ describe('Domain Models & Value Objects', () => {
       startLine: 1,
       endLine: 3,
       lines: 3,
+      startOffset: 0,
+      endOffset: rawContent.length,
       content: rawContent,
     }
 
@@ -88,6 +90,8 @@ describe('Domain Models & Value Objects', () => {
           startLine: 1,
           endLine: 40,
           lines: 40,
+          startOffset: 0,
+          endOffset: 800,
           content: '# Change Lifecycle Guide',
         },
       ],

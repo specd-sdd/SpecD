@@ -8,7 +8,8 @@
 
 - **GIVEN** a section starting with `## Configuration Syntax` on line 20 and next `##` on line 50
 - **WHEN** `GetGuideSectionQuery.execute({ topic: "configuration", sectionHeading: "Configuration Syntax" })` is called
-- **THEN** the returned content starts with `## Configuration Syntax`
+- **THEN** the returned content is extracted dynamically from the guide content
+- **AND** starts with `## Configuration Syntax`
 - **AND** contains lines 20 through 49
 - **AND** excludes the next heading on line 50
 
@@ -45,6 +46,7 @@
 - **WHEN** `GetGuideSectionQuery.execute({ topic: "workflow", section: 3 })` is called
 - **THEN** it returns the 3rd section in the outline
 - **AND** `section.index` strictly equals 3
+- **AND** `section.content` is populated dynamically from topic content
 
 #### Scenario: Section selection by numeric string
 

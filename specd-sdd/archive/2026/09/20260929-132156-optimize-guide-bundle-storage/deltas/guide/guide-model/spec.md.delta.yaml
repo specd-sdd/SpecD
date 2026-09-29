@@ -1,0 +1,17 @@
+- op: modified
+  description: 'Add startOffset and endOffset to GuideSection value object definition'
+  selector:
+    type: section
+    matches: 'Requirement: GuideSection Value Object'
+  content: |
+    The domain layer MUST define the `GuideSection` value object representing a discrete section within a guide:
+
+    - `index`: 1-indexed sequential integer identifying the section's position within the document outline (1, 2, 3...).
+    - `heading`: Raw text of the section heading (excluding leading `#` characters).
+    - `level`: Integer heading depth (e.g. 1 for `#`, 2 for `##`, 3 for `###`).
+    - `startLine`: 1-indexed line number where the heading begins.
+    - `endLine`: 1-indexed line number where the section content concludes.
+    - `lines`: Line span of the section, equal to `endLine - startLine + 1`.
+    - `startOffset`: 0-indexed character start offset within the parent topic's `content` where the section begins.
+    - `endOffset`: 0-indexed character end offset within the parent topic's `content` where the section concludes.
+    - `content`: Optional or dynamically populated full text of the section starting with the heading line up to `endLine`.

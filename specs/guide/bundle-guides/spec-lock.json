@@ -7,14 +7,10 @@
   "implementation": [
     {
       "file": "guide:scripts/bundle-guides.ts",
-      "symbols": ["bundleGuides", "compileGuide", "extractSections", "parseFrontmatter"]
+      "symbols": ["extractSections", "compileGuide", "bundleGuides"]
     },
     {
-      "file": "guide:src/infrastructure/generated/guides.ts",
-      "symbols": ["GUIDES_CATALOG", "GUIDES_INDEX"]
-    },
-    {
-      "file": "guide:test/unit/infrastructure/bundle.test.ts"
+      "file": "guide:src/infrastructure/generated/guides.ts"
     }
   ]
 }

@@ -20,7 +20,7 @@ The application layer MUST implement `GetGuideSectionQuery`:
   - Matching MUST be case-insensitive against heading text or slugified heading text.
   - If multiple sections share the same heading text or slug, the query MUST throw a `GuideSectionAmbiguousError` containing the matching section numbers and formatted titles to prompt explicit disambiguation.
   - If no section matches, the query MUST throw a `GuideSectionNotFoundError` containing the requested query and available headings.
-- The returned section MUST include its heading line and all lines up to `endLine`.
+- The returned section MUST have its `content` populated dynamically on the fly by slicing the parent `GuideTopic.content` using the section's `startOffset` and `endOffset` (or line range), spanning from its heading line up to `endLine`.
 
 ### Requirement: SliceGuideLinesQuery Implementation
 
