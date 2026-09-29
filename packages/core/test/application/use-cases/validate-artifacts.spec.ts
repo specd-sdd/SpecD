@@ -68,6 +68,8 @@ function makeChangeWithArtifacts(
     name,
     createdAt,
     specIds,
+    schemaName: opts.schemaName ?? 'test-schema',
+    schemaVersion: 1,
     history,
     artifacts: artifactMap,
   })

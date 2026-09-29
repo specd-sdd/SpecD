@@ -12,6 +12,14 @@
   ],
   "implementation": [
     {
+      "file": "core:src/domain/errors/incompatible-schema-error.ts",
+      "symbols": ["IncompatibleSchemaError"]
+    },
+    {
+      "file": "core:src/application/use-cases/_shared/load-persisted-spec-schema.ts",
+      "symbols": ["loadPersistedSpecSchema"]
+    },
+    {
       "file": "core:src/application/use-cases/create-change.ts",
       "symbols": ["CreateChange"]
     }

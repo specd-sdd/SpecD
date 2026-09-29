@@ -72,6 +72,8 @@ export function loadChangeFromManifest(manifest: ChangeManifest): Change {
     createdAt: new Date(manifest.createdAt),
     ...(manifest.description !== undefined ? { description: manifest.description } : {}),
     specIds: manifest.specIds,
+    schemaName: manifest.schema.name,
+    schemaVersion: manifest.schema.version,
     ...(manifest.trackedImplementationFiles !== undefined
       ? { trackedImplementationFiles: manifest.trackedImplementationFiles }
       : {}),

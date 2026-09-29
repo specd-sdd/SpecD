@@ -43,7 +43,14 @@ function makeChange(name: string, opts: { schemaName?: string; specIds?: string[
       by: testActor,
     },
   ]
-  return new Change({ name, createdAt, specIds, history: events })
+  return new Change({
+    name,
+    createdAt,
+    specIds,
+    schemaName: opts.schemaName ?? 'test-schema',
+    schemaVersion: 1,
+    history: events,
+  })
 }
 
 function makeTemplateExpander(

@@ -3,11 +3,13 @@ import { type ChangeRepository } from '../ports/change-repository.js'
 import { type ActorResolver } from '../ports/actor-resolver.js'
 import { ChangeAlreadyExistsError } from '../errors/change-already-exists-error.js'
 import { InvalidCreateChangeInputError } from '../errors/invalid-create-change-input-error.js'
+import { IncompatibleSchemaError } from '../../domain/errors/incompatible-schema-error.js'
 import { type InvalidationPolicy } from '../../domain/value-objects/invalidation-policy.js'
 import { parseSpecId } from '../../domain/services/parse-spec-id.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { OverlapReport } from '../../domain/value-objects/overlap-report.js'
 import { loadPersistedSpecDependsOn } from './_shared/load-persisted-spec-depends-on.js'
+import { loadPersistedSpecSchema } from './_shared/load-persisted-spec-schema.js'
 import { type ListWorkspaces, type ProjectWorkspace } from './list-workspaces.js'
 import { type GetActiveSchema } from './get-active-schema.js'
 import { type DetectOverlap } from './detect-overlap.js'
@@ -124,6 +126,33 @@ export class CreateChange {
     const workspaces = await this._listWorkspaces.execute()
     const workspaceMap = new Map(workspaces.map((ws) => [ws.name, ws]))
 
+    for (const specId of input.specIds) {
+      const persisted = await loadPersistedSpecSchema(workspaceMap, specId)
+      if (persisted.schema !== null) {
+        const specSchemaName = persisted.schema.name
+        let isCompatible = specSchemaName === schemaName
+        if (!isCompatible) {
+          try {
+            const activeResult = await this._getActiveSchema.execute()
+            if (!activeResult.raw) {
+              const changeSchema = activeResult.schema
+              if (
+                changeSchema.name() === schemaName &&
+                changeSchema.compat()?.name === specSchemaName
+              ) {
+                isCompatible = true
+              }
+            }
+          } catch {
+            // Ignore resolution error, isCompatible remains false
+          }
+        }
+        if (!isCompatible) {
+          throw new IncompatibleSchemaError(specId, specSchemaName, schemaName)
+        }
+      }
+    }
+
     const specDependsOn = new Map<string, readonly string[]>()
     for (const specId of input.specIds) {
       const persisted = await loadPersistedSpecDependsOn(workspaceMap, specId)
@@ -137,6 +166,8 @@ export class CreateChange {
       createdAt: now,
       ...(input.description !== undefined ? { description: input.description } : {}),
       specIds: [...input.specIds],
+      schemaName,
+      schemaVersion,
       history: [created],
       specDependsOn,
       ...(input.invalidationPolicy !== undefined

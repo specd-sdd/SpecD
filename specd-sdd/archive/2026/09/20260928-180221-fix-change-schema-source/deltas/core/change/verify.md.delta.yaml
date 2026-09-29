@@ -1,0 +1,30 @@
+- op: modified
+  description: 'Update scenario to reflect root schema properties instead of created event'
+  selector:
+    type: section
+    matches: 'Requirement: Schema version'
+  content: |
+    #### Scenario: Schema version mismatch warns
+
+    - **WHEN** a Change is loaded and the active schema's version differs from the `schemaVersion` initialized from the root schema properties
+    - **THEN** specd emits a warning but the change remains fully usable
+
+    #### Scenario: Schema mismatch does not block archive
+
+    - **WHEN** a Change with a schema version mismatch is in `archivable` state
+    - **THEN** archiving proceeds normally — the mismatch warning is advisory only
+
+    #### Scenario: Schema name mismatch throws SchemaMismatchError
+
+    - **GIVEN** a change was created with schema name `schema-std`
+    - **AND** the active system schema is `custom-schema`
+    - **WHEN** the change is loaded or a use case is executed
+    - **THEN** `SchemaMismatchError` is thrown
+
+    #### Scenario: Schema version mismatch emits warning
+
+    - **GIVEN** a change was created with schema version 1
+    - **AND** the active system schema version is 2
+    - **WHEN** the change is loaded
+    - **THEN** a warning is emitted mentioning both versions
+    - **AND** the change remains usable

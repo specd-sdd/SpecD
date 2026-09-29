@@ -19,6 +19,8 @@ function makeChange(): Change {
     name: 'my-change',
     createdAt: new Date('2024-01-01T00:00:00Z'),
     specIds: ['default:auth/login'],
+    schemaName: '@specd/schema-std',
+    schemaVersion: 1,
     history: [created],
   })
 }
@@ -171,6 +173,8 @@ describe('LifecycleEngine', () => {
       name: 'my-change',
       createdAt,
       specIds: ['default:auth/login'],
+      schemaName: '@specd/schema-std',
+      schemaVersion: 1,
       history: [
         {
           type: 'created',
@@ -290,6 +294,8 @@ describe('LifecycleEngine', () => {
       name: 'my-change',
       createdAt,
       specIds: ['default:auth/login'],
+      schemaName: '@specd/schema-std',
+      schemaVersion: 1,
       history: [
         {
           type: 'created',
@@ -318,6 +324,8 @@ describe('LifecycleEngine', () => {
       name: 'my-change',
       createdAt,
       specIds: ['default:auth/login'],
+      schemaName: '@specd/schema-std',
+      schemaVersion: 1,
       history: [
         {
           type: 'created',

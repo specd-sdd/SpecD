@@ -13,6 +13,8 @@ function makeChange(): Change {
     name: 'implementation-detector-test',
     createdAt,
     specIds: ['default:auth/login'],
+    schemaName: '@specd/schema-std',
+    schemaVersion: 1,
     history: [
       {
         type: 'created',

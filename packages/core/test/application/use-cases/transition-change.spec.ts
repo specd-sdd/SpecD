@@ -28,6 +28,8 @@ function makeChangeInState(name: string, events: ChangeEvent[]): Change {
     name,
     createdAt: new Date('2024-01-01T00:00:00Z'),
     specIds: ['auth/login'],
+    schemaName: '@specd/schema-std',
+    schemaVersion: 1,
     history: events,
   })
 }

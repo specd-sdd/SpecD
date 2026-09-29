@@ -147,6 +147,8 @@ function makeArchivableChange(
     name,
     createdAt,
     specIds: opts.specIds ?? ['default:auth/oauth'],
+    schemaName: opts.schemaName ?? 'test-schema',
+    schemaVersion: 1,
     history: events,
   })
 }
@@ -195,6 +197,8 @@ describe('ArchiveChange', () => {
         name: 'my-change',
         createdAt: new Date(),
         specIds: ['core/some-spec'],
+        schemaName: 'test-schema',
+        schemaVersion: 1,
         history: [
           {
             type: 'created',
@@ -2657,6 +2661,8 @@ describe('ArchiveChange', () => {
         name: 'other-change',
         createdAt: new Date(),
         specIds: ['default:auth/oauth'],
+        schemaName: 'test-schema',
+        schemaVersion: 1,
         history: [
           {
             type: 'created',
@@ -2692,6 +2698,8 @@ describe('ArchiveChange', () => {
         name: 'other-change',
         createdAt: new Date(),
         specIds: ['default:auth/oauth'],
+        schemaName: 'test-schema',
+        schemaVersion: 1,
         history: [
           {
             type: 'created',
@@ -2736,6 +2744,8 @@ describe('ArchiveChange', () => {
         name: 'other-one',
         createdAt: new Date(),
         specIds: ['default:auth/oauth'],
+        schemaName: 'test-schema',
+        schemaVersion: 1,
         history: [
           {
             type: 'created',
@@ -2751,6 +2761,8 @@ describe('ArchiveChange', () => {
         name: 'other-two',
         createdAt: new Date(),
         specIds: ['default:auth/oauth'],
+        schemaName: 'test-schema',
+        schemaVersion: 1,
         history: [
           {
             type: 'created',

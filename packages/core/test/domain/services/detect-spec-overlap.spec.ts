@@ -38,6 +38,8 @@ function makeChange(name: string, specIds: string[], state?: string): Change {
     name,
     createdAt: new Date(),
     specIds,
+    schemaName: 'std',
+    schemaVersion: 1,
     history,
   })
 }

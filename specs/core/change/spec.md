@@ -329,7 +329,7 @@ The signal is historical, not state-based. It remains true once reached unless t
 
 ### Requirement: Schema version
 
-The `created` event records the `schemaName` and `schemaVersion` of the schema active at creation time.
+The `Change` entity is initialized with `schemaName` and `schemaVersion` as top-level properties hydrated at creation time. These properties are the definitive source of truth, decoupled from the `created` event in the history.
 
 A **`schemaName` mismatch** (e.g. `schema-std` → `custom-schema`) indicates structural incompatibility. When a use case detects that `schema.name() !== change.schemaName`, it MUST throw `SchemaMismatchError` before performing any work.
 

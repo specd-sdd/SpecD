@@ -127,6 +127,8 @@ export function makeChange(
     name,
     createdAt,
     specIds,
+    schemaName,
+    schemaVersion: 1,
     history: [created],
     ...overrides,
   })

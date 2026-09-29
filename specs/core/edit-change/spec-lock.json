@@ -6,12 +6,16 @@
   "dependsOn": ["core:change", "core:composition", "core:composition-resolver"],
   "implementation": [
     {
-      "file": "core:src/application/use-cases/edit-change.ts",
-      "symbols": ["EditChange.execute"]
+      "file": "core:src/domain/errors/incompatible-schema-error.ts",
+      "symbols": ["IncompatibleSchemaError"]
     },
     {
-      "file": "core:src/composition/use-cases/edit-change.ts",
-      "symbols": ["resolveEditChangeDeps"]
+      "file": "core:src/application/use-cases/_shared/load-persisted-spec-schema.ts",
+      "symbols": ["loadPersistedSpecSchema"]
+    },
+    {
+      "file": "core:src/application/use-cases/edit-change.ts",
+      "symbols": ["EditChange"]
     }
   ]
 }

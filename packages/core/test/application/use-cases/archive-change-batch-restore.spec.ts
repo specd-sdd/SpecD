@@ -145,6 +145,8 @@ function makeArchivableChange(
     name,
     createdAt,
     specIds: opts.specIds ?? ['default:auth/oauth'],
+    schemaName: opts.schemaName ?? 'test-schema',
+    schemaVersion: 1,
     history: events,
   })
 }

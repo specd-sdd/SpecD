@@ -1,7 +1,7 @@
 {
   "name": "report-overlap-dependency-changes",
   "createdAt": "2026-08-20T09:52:16.759Z",
-  "updatedAt": "2026-09-25T16:06:26.122Z",
+  "updatedAt": "2026-09-29T10:29:37.735Z",
   "description": "Record and surface dependency deltas when archive overlap invalidates active changes.",
   "schema": {
     "name": "schema-std",
@@ -748,6 +748,35 @@
         {
           "type": "verify",
           "files": ["core:change"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-09-29T10:29:37.734Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'fix-change-schema-source' was archived with overlapping specs: core:change, core:change-manifest",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:change", "core:change-manifest"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:change", "core:change-manifest"]
         },
         {
           "type": "design",

@@ -110,7 +110,7 @@ Any normalization that changes the representation class of a tracked artifact fi
 
 ### Requirement: Schema version
 
-`schema.name` is the value of the `schema` field from `specd.yaml` at creation time. `schema.version` is the `version` integer from the schema's `schema.yaml`. Both are written once at change creation and never updated.
+The root `schema` object (`schema.name` and `schema.version`) in `manifest.json` is the definitive source of truth used to hydrate the `Change` domain entity at runtime. It is written once at change creation and never updated. The `type: 'created'` event in the history also contains schema information for historical tracking, but the root `schema` object takes precedence for operational checks.
 
 When a change is loaded and the active schema's version differs from what is recorded in the manifest, specd MUST emit a warning. The change remains usable — the version mismatch warning is advisory, not a hard error. Archiving a change with a schema version mismatch MUST still be possible; the warning surfaces the mismatch so the user can decide whether to proceed.
 

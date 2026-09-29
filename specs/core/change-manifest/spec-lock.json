@@ -13,10 +13,12 @@
   ],
   "implementation": [
     {
-      "file": "core:src/infrastructure/fs/manifest.ts"
+      "file": "core:src/infrastructure/fs/change-repository.ts",
+      "symbols": ["changeToManifest", "FsChangeRepository"]
     },
     {
-      "file": "core:src/infrastructure/fs/change-repository.ts"
+      "file": "core:src/infrastructure/fs/manifest-change-loader.ts",
+      "symbols": ["loadChangeFromManifest"]
     }
   ],
   "optimizations": {

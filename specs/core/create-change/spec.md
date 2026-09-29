@@ -140,3 +140,14 @@ The helper is the only use-case-specific composition entry for config-based boot
 - [`core:get-active-schema`](../get-active-schema/spec.md)
 - [`core:spec-overlap`](../spec-overlap/spec.md)
 - [`core:composition-resolver`](../composition-resolver/spec.md)
+
+### Requirement: Schema compatibility guardrail
+
+When `specIds` are provided, the system MUST verify that every included spec is compatible with the Change's schema. For every spec:
+
+1. If the spec has no persisted semantic state (uninitialized) or its persisted state lacks a schema definition, the system assumes it uses the project's active global schema (`GetActiveSchema`).
+2. Otherwise, it extracts the spec's persisted schema identity (`name` and `version`).
+
+A spec is considered compatible if its schema name matches the Change's schema name, or if the Change's schema explicitly declares a `compat` property matching the spec's schema name.
+
+If any spec in `specIds` is found to be incompatible, the use case MUST throw an `IncompatibleSchemaError` and abort creation.

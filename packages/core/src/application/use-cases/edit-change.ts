@@ -3,11 +3,13 @@ import { type ChangeRepository } from '../ports/change-repository.js'
 import { type ActorResolver } from '../ports/actor-resolver.js'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 import { SpecNotInChangeError } from '../errors/spec-not-in-change-error.js'
+import { IncompatibleSchemaError } from '../../domain/errors/incompatible-schema-error.js'
 import { type InvalidationPolicy } from '../../domain/value-objects/invalidation-policy.js'
 import { parseSpecId } from '../../domain/services/parse-spec-id.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { type SchemaProvider } from '../ports/schema-provider.js'
 import { loadPersistedSpecDependsOn } from './_shared/load-persisted-spec-depends-on.js'
+import { loadPersistedSpecSchema } from './_shared/load-persisted-spec-schema.js'
 import { type ListWorkspaces, type ProjectWorkspace } from './list-workspaces.js'
 import { type RefreshImplementationTracking } from './refresh-implementation-tracking.js'
 
@@ -97,6 +99,20 @@ export class EditChange {
     const actor = await this._actor.identity()
     const workspaces = await this._listWorkspaces.execute()
     const workspaceMap = new Map(workspaces.map((ws) => [ws.name, ws]))
+
+    if (input.addSpecIds !== undefined && input.addSpecIds.length > 0) {
+      const schema = await this._schemaProvider.get()
+      for (const specId of input.addSpecIds) {
+        const persisted = await loadPersistedSpecSchema(workspaceMap, specId)
+        const specSchemaName = persisted.schema !== null ? persisted.schema.name : schema.name()
+        const isCompatible =
+          specSchemaName === change.schemaName || schema.compat()?.name === specSchemaName
+
+        if (!isCompatible) {
+          throw new IncompatibleSchemaError(specId, specSchemaName, change.schemaName)
+        }
+      }
+    }
 
     const { result: persisted, change: initialChange } = await this._changes.mutate(
       input.name,

@@ -96,6 +96,8 @@ async function makeArchivableChange(
     name,
     createdAt: at,
     specIds: ['default:auth/login'],
+    schemaName: '@specd/schema-std',
+    schemaVersion: 1,
     history: [
       {
         type: 'created',
@@ -235,6 +237,8 @@ describe('FsArchiveRepository', () => {
         name: 'not-ready',
         createdAt: at,
         specIds: ['auth/login'],
+        schemaName: '@specd/schema-std',
+        schemaVersion: 1,
         history: [
           {
             type: 'created',
@@ -257,6 +261,8 @@ describe('FsArchiveRepository', () => {
         name: 'forced',
         createdAt: at,
         specIds: ['auth/login'],
+        schemaName: '@specd/schema-std',
+        schemaVersion: 1,
         history: [
           {
             type: 'created',

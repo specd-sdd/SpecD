@@ -10,6 +10,8 @@ function change(name: string): Change {
     name,
     createdAt: at,
     specIds: ['auth/login'],
+    schemaName: '@specd/schema-std',
+    schemaVersion: 1,
     history: [
       {
         type: 'created',

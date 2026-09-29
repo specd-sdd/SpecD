@@ -3,6 +3,7 @@ import { makeSpec } from '../../helpers/make-spec.js'
 import { ChangeAlreadyExistsError } from '../../../src/application/errors/change-already-exists-error.js'
 import { InvalidCreateChangeInputError } from '../../../src/application/errors/invalid-create-change-input-error.js'
 import { SchemaNotFoundError } from '../../../src/application/errors/schema-not-found-error.js'
+import { IncompatibleSchemaError } from '../../../src/domain/errors/incompatible-schema-error.js'
 import { Spec } from '../../../src/domain/entities/spec.js'
 import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
 import { OverlapEntry } from '../../../src/domain/value-objects/overlap-entry.js'
@@ -488,6 +489,127 @@ describe('CreateChange', () => {
           schemaVersion: 1,
         }),
       ).rejects.toThrow(ChangeAlreadyExistsError)
+    })
+  })
+
+  describe('schema compatibility guardrail', () => {
+    it('allows uninitialized spec fallback when global schema matches change', async () => {
+      const repo = makeChangeRepository()
+      const specs = new Map([
+        [
+          'default',
+          makeSpecRepository({
+            specs: [makeSpec({ workspace: 'default', name: 'auth/login', filenames: ['spec.md'] })],
+          }),
+        ],
+      ])
+      const uc = makeCreateChange(repo, makeListWorkspaces(specs))
+
+      const result = await uc.execute({
+        name: 'new-change',
+        specIds: ['default:auth/login'],
+        schemaName: 'specd-std',
+        schemaVersion: 1,
+      })
+
+      expect(result.change.name).toBe('new-change')
+    })
+
+    it('succeeds when adding a spec with identical schema', async () => {
+      const repo = makeChangeRepository()
+      const specs = new Map([
+        [
+          'default',
+          makeSpecRepository({
+            specs: [makeSpec({ workspace: 'default', name: 'auth/login', filenames: ['spec.md'] })],
+            artifacts: {
+              'auth/login/spec-lock.json': JSON.stringify({
+                schema: { name: 'schema-custom', version: 1 },
+                dependsOn: [],
+              }),
+            },
+          }),
+        ],
+      ])
+      const uc = makeCreateChange(repo, makeListWorkspaces(specs), {
+        getActiveSchema: makeGetActiveSchema(makeSchema({ name: 'schema-custom' })),
+      })
+
+      const result = await uc.execute({
+        name: 'new-change',
+        specIds: ['default:auth/login'],
+        schemaName: 'schema-custom',
+        schemaVersion: 1,
+      })
+
+      expect(result.change.name).toBe('new-change')
+    })
+
+    it('succeeds when adding a spec with a different but compatible schema', async () => {
+      const repo = makeChangeRepository()
+      const specs = new Map([
+        [
+          'default',
+          makeSpecRepository({
+            specs: [makeSpec({ workspace: 'default', name: 'ui/button', filenames: ['spec.md'] })],
+            artifacts: {
+              'ui/button/spec-lock.json': JSON.stringify({
+                schema: { name: 'schema-ui', version: 1 },
+                dependsOn: [],
+              }),
+            },
+          }),
+        ],
+      ])
+      const fullstackSchema = makeSchema({
+        name: 'schema-fullstack',
+        compat: { name: 'schema-ui', version: 1 },
+      })
+      const uc = makeCreateChange(repo, makeListWorkspaces(specs), {
+        getActiveSchema: makeGetActiveSchema(fullstackSchema),
+      })
+
+      const result = await uc.execute({
+        name: 'new-change',
+        specIds: ['default:ui/button'],
+        schemaName: 'schema-fullstack',
+        schemaVersion: 1,
+      })
+
+      expect(result.change.name).toBe('new-change')
+    })
+
+    it('throws IncompatibleSchemaError and aborts creation when spec schema is incompatible', async () => {
+      const repo = makeChangeRepository()
+      const specs = new Map([
+        [
+          'default',
+          makeSpecRepository({
+            specs: [makeSpec({ workspace: 'default', name: 'api/users', filenames: ['spec.md'] })],
+            artifacts: {
+              'api/users/spec-lock.json': JSON.stringify({
+                schema: { name: 'schema-api', version: 1 },
+                dependsOn: [],
+              }),
+            },
+          }),
+        ],
+      ])
+      const uiSchema = makeSchema({ name: 'schema-ui' })
+      const uc = makeCreateChange(repo, makeListWorkspaces(specs), {
+        getActiveSchema: makeGetActiveSchema(uiSchema),
+      })
+
+      await expect(
+        uc.execute({
+          name: 'new-change',
+          specIds: ['default:api/users'],
+          schemaName: 'schema-ui',
+          schemaVersion: 1,
+        }),
+      ).rejects.toThrow(IncompatibleSchemaError)
+
+      expect(repo.store.get('new-change')).toBeUndefined()
     })
   })
 })

@@ -2,7 +2,6 @@ import { type ChangeState, isValidTransition } from '../value-objects/change-sta
 import { InvalidStateTransitionError } from '../errors/invalid-state-transition-error.js'
 import { InvalidChangeError } from '../errors/invalid-change-error.js'
 import { isWindowsDeviceName } from '../services/windows-device-name.js'
-import { CorruptedManifestError } from '../errors/corrupted-manifest-error.js'
 import { HistoricalImplementationGuardError } from '../errors/historical-implementation-guard-error.js'
 import { ChangeArtifact } from './change-artifact.js'
 import { ArtifactFile } from '../value-objects/artifact-file.js'
@@ -200,6 +199,10 @@ export interface ChangeProps {
   readonly description?: string
   /** Current snapshot of spec paths being modified. */
   readonly specIds: readonly string[]
+  /** Schema name recorded at creation time; immutable. */
+  readonly schemaName: string
+  /** Schema version recorded at creation time; immutable. */
+  readonly schemaVersion: number
   /** Append-only event history from which lifecycle state is derived. */
   readonly history: readonly ChangeEvent[]
   /** Pre-loaded artifact map; defaults to an empty map. */
@@ -258,6 +261,8 @@ export class Change {
   private readonly _createdAt: Date
   private _updatedAt: Date
   private _description: string | undefined
+  private readonly _schemaName: string
+  private readonly _schemaVersion: number
   private _specIds: string[]
   private _history: ChangeEvent[]
   private _artifacts: Map<string, ChangeArtifact>
@@ -286,6 +291,8 @@ export class Change {
     }
     this._updatedAt = new Date(updatedAt.getTime())
     this._description = props.description
+    this._schemaName = props.schemaName
+    this._schemaVersion = props.schemaVersion
     this._specIds = [...new Set(props.specIds)]
     this._history = [...props.history]
     this._artifacts =
@@ -352,14 +359,14 @@ export class Change {
     return this._description
   }
 
-  /** Schema name recorded at creation time, derived from the `created` history event. */
+  /** Schema name recorded at creation time from root manifest properties. */
   get schemaName(): string {
-    return this._createdEvent().schemaName
+    return this._schemaName
   }
 
-  /** Schema version recorded at creation time, derived from the `created` history event. */
+  /** Schema version recorded at creation time from root manifest properties. */
   get schemaVersion(): number {
-    return this._createdEvent().schemaVersion
+    return this._schemaVersion
   }
 
   /** Workspace IDs derived from specIds at runtime. */
@@ -1256,20 +1263,6 @@ export class Change {
    */
   getArtifact(type: string): ChangeArtifact | null {
     return this._artifacts.get(type) ?? null
-  }
-
-  /**
-   * Returns the `created` event from the history.
-   *
-   * @returns The `created` event
-   * @throws {CorruptedManifestError} If no `created` event exists — every Change must have one
-   */
-  private _createdEvent(): CreatedEvent {
-    const event = this._history.find((e): e is CreatedEvent => e.type === 'created')
-    if (event === undefined) {
-      throw new CorruptedManifestError(this._name)
-    }
-    return event
   }
 }
 
