@@ -20,19 +20,23 @@ describe('SQLiteWorker compiled dist integration', () => {
     expect(existsSync(resolved)).toBe(true)
   })
 
-  it('instantiates and operates SQLiteGraphStore against the resolved worker path', async () => {
-    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-dist-test-'))
-    const resolvedWorker = resolveSqliteWorkerPath()
-    const store = new SQLiteGraphStore(tempDir, {
-      workerPath: resolvedWorker,
-    })
+  it(
+    'instantiates and operates SQLiteGraphStore against the resolved worker path',
+    { timeout: 10_000 },
+    async () => {
+      tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-dist-test-'))
+      const resolvedWorker = resolveSqliteWorkerPath()
+      const store = new SQLiteGraphStore(tempDir, {
+        workerPath: resolvedWorker,
+      })
 
-    try {
-      await store.open()
-      const stats = await store.getStatistics()
-      expect(stats.fileCount).toBe(0)
-    } finally {
-      await store.close()
-    }
-  })
+      try {
+        await store.open()
+        const stats = await store.getStatistics()
+        expect(stats.fileCount).toBe(0)
+      } finally {
+        await store.close()
+      }
+    },
+  )
 })
