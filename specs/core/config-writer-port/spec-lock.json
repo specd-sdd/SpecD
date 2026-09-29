@@ -4,7 +4,16 @@
     "version": 1
   },
   "dependsOn": ["default:_global/architecture", "core:config"],
-  "implementation": [],
+  "implementation": [
+    {
+      "file": "core:src/application/ports/config-writer.ts",
+      "symbols": ["ConfigWriter"]
+    },
+    {
+      "file": "core:src/infrastructure/fs/config-writer.ts",
+      "symbols": ["FsConfigWriter"]
+    }
+  ],
   "optimizations": {
     "optimizedDescription": {
       "value": "ConfigWriter port: initProject, addPlugin, removePlugin, listPlugins for specd.yaml mutation.",

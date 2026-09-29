@@ -405,19 +405,7 @@
 - **WHEN** `load()` is called
 - **THEN** `load()` throws `ConfigValidationError` identifying the workspace and field
 
-### Requirement: Workflow and context entry mapping
-
-#### Scenario: Run hook mapped to typed form
-
-- **GIVEN** the config declares a workflow step with `hooks.post: [{ run: 'make test' }]`
-- **WHEN** `load()` is called
-- **THEN** the corresponding hook has `type: 'run'` and `command: 'make test'`
-
-#### Scenario: Instruction hook mapped to typed form
-
-- **GIVEN** the config declares a workflow step with `hooks.pre: [{ instruction: 'Check coverage' }]`
-- **WHEN** `load()` is called
-- **THEN** the corresponding hook has `type: 'instruction'` and `text: 'Check coverage'`
+### Requirement: Schema plugins, schema overrides, and context entry mapping
 
 #### Scenario: Context entry with id is preserved
 

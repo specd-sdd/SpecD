@@ -1,0 +1,6 @@
+- op: modified
+  description: 'Rename requirement heading to reflect schema plugins and overrides rather than workflow'
+  selector:
+    type: section
+    matches: 'Requirement: Workflow and context entry mapping'
+  rename: 'Requirement: Schema plugins, schema overrides, and context entry mapping'

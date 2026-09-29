@@ -1,0 +1,18 @@
+- op: added
+  description: 'Add requirement for ListPlugins method specifying optional type filter'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: RemovePlugin'
+  content: |
+    ### Requirement: ListPlugins
+
+    The `listPlugins` method accepts two parameters:
+
+    1. `configPath: string` — absolute path to the `specd.yaml` to read
+    2. `type?: string` — optional plugin type filter (e.g. `"agents"`)
+
+    It MUST return `Promise<Array<{ name: string; config?: Record<string, unknown> }>>`. When `type` is specified, it returns entries under `plugins.<type>`. When `type` is omitted, it returns all declared plugins across all plugin categories. If `specd.yaml` does not exist or declares no plugins, it MUST return an empty array.

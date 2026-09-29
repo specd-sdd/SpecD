@@ -13,21 +13,8 @@
   ],
   "implementation": [
     {
-      "file": "core:src/infrastructure/fs/path-platform.ts",
-      "symbols": ["isPathInside"]
-    },
-    {
       "file": "core:src/infrastructure/fs/config-loader.ts",
       "symbols": ["FsConfigLoader"]
-    },
-    {
-      "file": "core:test/infrastructure/fs/config-loader-root-containment.spec.ts"
-    },
-    {
-      "file": "core:test/infrastructure/fs/config-loader.spec.ts"
-    },
-    {
-      "file": "core:test/infrastructure/fs/windows-containment.spec.ts"
     }
   ]
 }

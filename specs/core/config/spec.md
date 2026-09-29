@@ -522,10 +522,10 @@ Each plugin entry has `name` (required) and optional `config`. Unknown plugin ty
 
 The port MUST define the following methods:
 
-- `initProject(configPath: string, options: InitProjectOptions): Promise<InitProjectResult>` — creates a new `specd.yaml` with default content
+- `initProject(options: InitProjectOptions): Promise<InitProjectResult>` — creates a new `specd.yaml` with default content
 - `addPlugin(configPath: string, type: string, name: string, config?: Record<string, unknown>): Promise<void>` — adds a plugin entry to `plugins.<type>`, with optional config
 - `removePlugin(configPath: string, type: string, name: string): Promise<void>` — removes a plugin entry from `plugins.<type>`
-- `listPlugins(configPath: string, type: string): Promise<Array<{ name: string; config?: Record<string, unknown> }>>` — reads plugin entries from `plugins.<type>`
+- `listPlugins(configPath: string, type?: string): Promise<Array<{ name: string; config?: Record<string, unknown> }>>` — reads plugin entries from `plugins.<type>`, or all plugins if type is omitted
 
 The `addPlugin` method accepts four parameters:
 
