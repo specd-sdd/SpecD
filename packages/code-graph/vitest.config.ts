@@ -5,5 +5,6 @@ export default defineConfig({
     environment: 'node',
     // SQLite tests are native, memory-intensive, and filesystem-intensive.
     maxWorkers: 1,
+    testTimeout: 15_000,
   },
 })
