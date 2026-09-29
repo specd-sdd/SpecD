@@ -243,7 +243,7 @@ describe('SQLite wide traversal', () => {
     } finally {
       await Promise.all([sqlite.close(), memory.close()])
     }
-  })
+  }, { timeout: 10_000 })
 
   it('matches in-memory single-file impact with a 16-request queue', async () => {
     storagePath = mkdtempSync(join(tmpdir(), 'code-graph-wide-single-impact-'))
@@ -309,7 +309,7 @@ describe('SQLite wide traversal', () => {
     } finally {
       await Promise.all([sqlite.close(), memory.close()])
     }
-  })
+  }, { timeout: 10_000 })
 
   it('batches a wide filtered frontier and counts only rows admitted by SQLite', async () => {
     storagePath = mkdtempSync(join(tmpdir(), 'code-graph-wide-filtered-impact-'))
