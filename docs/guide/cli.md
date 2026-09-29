@@ -75,7 +75,7 @@ flowchart LR
 Inspects project health, compiles context, and monitors change pipelines.
 
 - **`specd project init`** (or root shorthand **`specd init`**): Scaffolds a new project interactively, generating `specd.yaml`.
-- **`specd project status`**: High-level status showing active schema, workspaces, spec counts, active changes, and graph freshness.
+- **`specd project status`**: High-level status showing active schema, workspaces, spec counts, active changes, always-on overlaps, and graph freshness.
   ```bash
   specd project status --context --graph --format toon
   ```

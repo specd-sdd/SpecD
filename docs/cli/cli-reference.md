@@ -1192,11 +1192,12 @@ Display consolidated project state including workspaces, spec counts, change cou
 By default, the output includes:
 
 - Project root path and schema reference
-- Workspaces with name, prefix, and ownership
+- Workspaces with name, prefix, ownership, `isExternal`, and `codeRoot`
 - Spec counts (total and per-workspace)
 - Change counts (active, drafts, discarded, archived)
 - Active and draft change listings with per-change task progress (`incomplete/total`)
 - Specs health aggregates (text: `ok` / `failed` / `warning` labels; json/toon: `passed` / `failed` / `warned` and issue list)
+- Active-change overlaps copied from the snapshot summary onto the command root as `overlaps` (`hasOverlap` and `entries`). Text prints `overlaps: (none)` when there is no overlap, or one line per spec id with change names and states. json/toon keep that object at the root, not under `summary`. There is no flag to disable it.
 - Graph freshness (stale boolean, last indexed timestamp) — always included
 - Approval gates (spec enabled, signoff enabled)
 - Config flags (llmOptimizedContext)

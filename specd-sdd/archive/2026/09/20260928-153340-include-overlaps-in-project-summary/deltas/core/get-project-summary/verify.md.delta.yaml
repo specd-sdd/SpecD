@@ -1,0 +1,110 @@
+- op: modified
+  description: Count-only result also omits overlaps
+  selector:
+    type: section
+    matches: 'Scenario: Result contains all count fields without entities'
+  content: |
+    - **GIVEN** a configured project with active changes, drafts, discarded changes, archived changes, and specs across multiple workspaces
+    - **WHEN** `GetProjectSummary.execute()` is called without enrichment flags
+    - **THEN** the result includes `activeCount`, `draftCount`, `discardedCount`, `archivedCount`, `specsByWorkspace`, and `workspaceCount`
+    - **AND** the result does not include `active`, `drafts`, `specsHealth`, or `overlaps` keys
+    - **AND** the result does not include change entities, spec metadata, graph data, or context payloads
+
+- op: modified
+  description: Omitted flags also skip DetectOverlap
+  selector:
+    type: section
+    matches: 'Scenario: Omitted flags keep count-only behaviour'
+  content: |
+    - **WHEN** `GetProjectSummary.execute()` or `execute({})` is called
+    - **THEN** list use cases are not invoked for enrichment
+    - **AND** `GetSpecsHealth` is not invoked
+    - **AND** `DetectOverlap` is not invoked
+    - **AND** enrichment keys are absent from the result
+
+- op: added
+  description: Health still includes a spec that sits in an active change
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Optional specs health enrichment'
+    after:
+      type: section
+      matches: 'Scenario: includeSpecsHealth false does not invoke GetSpecsHealth'
+  content: |
+    #### Scenario: specsHealth keeps a spec that is in an active change
+
+    - **GIVEN** an active change whose `specIds` include `core:get-project-summary`
+    - **AND** `GetSpecsHealth.execute({})` reports that spec
+    - **WHEN** `GetProjectSummary.execute({ includeSpecsHealth: true })` is called
+    - **THEN** `specsHealth` still includes `core:get-project-summary`
+    - **AND** the use case does not drop or reclassify that spec because it appears in the change
+
+- op: added
+  description: Overlap present, empty, and absent cases
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: 'Requirement: Optional specs health enrichment'
+  content: |
+    ### Requirement: Optional active-change overlap enrichment
+
+    #### Scenario: includeOverlaps returns the active-change OverlapReport
+
+    - **GIVEN** two active changes share a spec id
+    - **AND** `DetectOverlap.execute()` with no name returns an `OverlapReport` whose `hasOverlap` is `true`
+    - **WHEN** `GetProjectSummary.execute({ includeOverlaps: true })` is called
+    - **THEN** `overlaps` equals that report
+    - **AND** `DetectOverlap` is invoked without a `name` filter
+
+    #### Scenario: includeOverlaps with no overlap returns an empty report
+
+    - **GIVEN** active changes do not share spec ids
+    - **AND** `DetectOverlap.execute()` returns an `OverlapReport` with empty `entries` and `hasOverlap` `false`
+    - **WHEN** `GetProjectSummary.execute({ includeOverlaps: true })` is called
+    - **THEN** `overlaps` is present
+    - **AND** `overlaps.entries` is empty
+    - **AND** `overlaps.hasOverlap` is `false`
+
+    #### Scenario: includeOverlaps false omits overlaps and skips DetectOverlap
+
+    - **WHEN** `GetProjectSummary.execute({ includeOverlaps: false })` is called
+    - **THEN** `DetectOverlap` is not invoked
+    - **AND** the `overlaps` key is absent
+
+- op: modified
+  description: Constructor accepts DetectOverlap
+  selector:
+    type: section
+    matches: 'Scenario: Constructor accepts enrichment collaborators'
+  content: |
+    - **WHEN** `GetProjectSummary` is instantiated with enrichment support
+    - **THEN** it receives dependencies sufficient to invoke `ListChanges`, `ListDrafts`, `CountTasks`, `GetSpecsHealth`, and `DetectOverlap`
+    - **AND** count fields are still measured via repository `count*` surfaces rather than list `.length`
+
+- op: modified
+  description: Factory resolves detectOverlap
+  selector:
+    type: section
+    matches: 'Scenario: createGetProjectSummary config form derives GetProjectSummaryDeps through resolveGetProjectSummaryDeps'
+  content: |
+    - **WHEN** `createGetProjectSummary(config, options?)` is invoked
+    - **THEN** it creates a composition resolver for that composition session
+    - **AND** it derives `GetProjectSummaryDeps` through `resolveGetProjectSummaryDeps(resolver)`
+    - **AND** `resolveGetProjectSummaryDeps(resolver)` resolves at least `changes`, `archive`, `listWorkspaces`, `listChanges`, `listDrafts`, `countTasks`, `getSpecsHealth`, and `detectOverlap`
+    - **AND** `detectOverlap` comes from `createDetectOverlap(resolveDetectOverlapDeps(resolver))`
+    - **AND** the factory delegates to canonical `createGetProjectSummary(deps)`
+
+- op: modified
+  description: Spec counts do not wait on change counts or overlap
+  selector:
+    type: section
+    matches: 'Scenario: Independent count operations run concurrently'
+  content: |
+    - **WHEN** `GetProjectSummary.execute()` runs
+    - **THEN** change-bucket `count()` calls run concurrently with `ListWorkspaces.execute()`
+    - **AND** per-workspace `specRepo.count()` starts when that workspace list resolves
+    - **AND** those spec counts do not wait for change-bucket `count()` calls or for `DetectOverlap.execute()` to finish

@@ -2,6 +2,7 @@ import * as fs from 'node:fs/promises'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
+import { DetectOverlap } from '../../../src/application/use-cases/detect-overlap.js'
 import { GetProjectSummary } from '../../../src/application/use-cases/get-project-summary.js'
 import { InvalidCompositionFactoryArgumentsError } from '../../../src/domain/errors/invalid-composition-factory-arguments-error.js'
 import {
@@ -127,9 +128,46 @@ describe('createGetProjectSummary', () => {
           issues: [],
         }),
       } as never,
+      detectOverlap: {
+        execute: async () => ({ entries: [], hasOverlap: false }),
+      } as never,
     }
 
     expect(createGetProjectSummary(deps)).toBeInstanceOf(GetProjectSummary)
+  })
+
+  it('given a deps object omits detectOverlap, when createGetProjectSummary is called, then it rejects the arguments', () => {
+    const deps = {
+      changes: {
+        count: async () => 0,
+        countDrafts: async () => 0,
+        countDiscarded: async () => 0,
+      },
+      archive: { count: async () => 0 },
+      listWorkspaces: { execute: async () => [] },
+      listChanges: {
+        execute: async () => ({ items: [], meta: { total: 0, count: 0, limit: 0 } }),
+      },
+      listDrafts: {
+        execute: async () => ({ items: [], meta: { total: 0, count: 0, limit: 0 } }),
+      },
+      countTasks: {
+        execute: async () => ({ total: { incomplete: 0, total: 0 }, byArtifact: {} }),
+      },
+      getSpecsHealth: {
+        execute: async () => ({
+          totalSpecs: 0,
+          passed: 0,
+          failed: 0,
+          warned: 0,
+          issues: [],
+        }),
+      },
+    }
+
+    expect(() => createGetProjectSummary(deps as unknown as GetProjectSummaryDeps)).toThrow(
+      InvalidCompositionFactoryArgumentsError,
+    )
   })
 
   it('rejects deps plus composition options', () => {
@@ -162,6 +200,9 @@ describe('createGetProjectSummary', () => {
           issues: [],
         }),
       } as never,
+      detectOverlap: {
+        execute: async () => ({ entries: [], hasOverlap: false }),
+      } as never,
     }
 
     expect(() =>
@@ -174,10 +215,12 @@ describe('createGetProjectSummary', () => {
     const resolver = createCompositionResolver(config)
     const deps = resolveGetProjectSummaryDeps(resolver)
 
+    expect(deps.detectOverlap).toBeInstanceOf(DetectOverlap)
     expect(Object.keys(deps).sort()).toEqual([
       'archive',
       'changes',
       'countTasks',
+      'detectOverlap',
       'getSpecsHealth',
       'listChanges',
       'listDrafts',

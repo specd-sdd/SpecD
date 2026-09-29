@@ -23,7 +23,8 @@
 #### Scenario: Spec counts use GetProjectSummary
 
 - **WHEN** `specd project status` calculates spec counts
-- **THEN** it calls `kernel.project.getProjectSummary.execute()`
+- **THEN** spec counts come from `buildProjectStatusSnapshot` / `GetProjectSummary`
+- **AND** the handler does not call `kernel.project.getProjectSummary.execute()` beside the snapshot
 - **AND** it does not call `SpecRepository.count()` directly or orchestrate `ListWorkspaces` for counting
 - **AND** it does not perform full metadata extraction
 
@@ -62,6 +63,40 @@
 - **THEN** the specs-health summary line includes the labels `ok`, `failed`, and `warning` (not glyph-only markers such as `✓` / `✗` / `⚠`)
 - **AND** json/toon still expose structured `passed` / `failed` / `warned` fields
 
+### Requirement: includes active-change overlaps (always)
+
+#### Scenario: Overlaps always requested from the snapshot
+
+- **GIVEN** active changes share a spec id
+- **WHEN** `specd project status` runs
+- **THEN** `buildProjectStatusSnapshot` is requested with `includeOverlaps: true` together with `includeChanges: true` and `includeSpecsHealth: true`
+- **AND** json/toon output includes root `overlaps` with `hasOverlap` `true` and the shared `specId`, copied from `snapshot.summary.overlaps`
+- **AND** the command does not call `GetProjectSummary` or `DetectOverlap` beside the snapshot
+
+#### Scenario: Empty overlap report is still shown
+
+- **GIVEN** active changes do not share spec ids
+- **WHEN** `specd project status` runs
+- **THEN** root `overlaps` is present
+- **AND** `entries` is empty
+- **AND** `hasOverlap` is `false`
+
+#### Scenario: Text lists spec ids and change names
+
+- **GIVEN** an overlap entry for `core:get-project-summary` involving changes `alpha` and `beta`
+- **WHEN** `specd project status` runs in text mode
+- **THEN** the text lists `core:get-project-summary`, `alpha`, and `beta`
+- **AND** json/toon keep the structured `OverlapReport` fields on the command root `overlaps`, copied from `snapshot.summary.overlaps`
+
+### Requirement: help schema matches the command payload
+
+#### Scenario: Help schema shows overlaps and approval field names
+
+- **WHEN** `specd project status --help` is shown
+- **THEN** the JSON/TOON schema lists `overlaps` with `hasOverlap` and `entries` and does not mark it optional
+- **AND** approvals are `specEnabled` and `signoffEnabled`
+- **AND** each workspace entry includes `name`, `prefix`, `ownership`, `isExternal`, and `codeRoot`
+
 ### Requirement: includes approval gates
 
 #### Scenario: Output shows approval gate status
@@ -77,7 +112,7 @@
 - **GIVEN** a project with an indexed code graph
 - **WHEN** `specd project status` runs without --graph flag
 - **THEN** graph staleness and last indexed timestamp are included
-- **AND** the command obtains them via `buildProjectStatusSnapshot` with `{ includeGraph: true, includeChanges: true, includeSpecsHealth: true }`
+- **AND** the command obtains them via `buildProjectStatusSnapshot` with `{ includeGraph: true, includeChanges: true, includeSpecsHealth: true, includeOverlaps: true }`
 - **AND** graph data comes exclusively from `@specd/sdk`
 
 ### Requirement: supports --graph flag
@@ -87,7 +122,7 @@
 - **GIVEN** a project with indexed code
 - **WHEN** `specd project status --graph` runs
 - **THEN** indexed files count, symbols count, and hotspots are included
-- **AND** the command calls `buildProjectStatusSnapshot` with `{ includeGraph: true, includeHotspots: true, includeChanges: true, includeSpecsHealth: true }`
+- **AND** the command calls `buildProjectStatusSnapshot` with `{ includeGraph: true, includeHotspots: true, includeChanges: true, includeSpecsHealth: true, includeOverlaps: true }`
 
 ### Requirement: supports --context flag
 

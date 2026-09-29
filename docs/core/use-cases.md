@@ -1155,7 +1155,7 @@ Lifecycle state, requested-step readiness, blockers, and per-step availability a
 
 ### GetProjectSummary
 
-Returns consolidated project-level counts (active/draft/discarded/archived changes and specs per workspace). By default it does not load change entities, spec metadata, graph statistics, or compiled context. Optional execute input flags can add active/draft listings with task progress and specs health.
+Returns consolidated project-level counts (active/draft/discarded/archived changes and specs per workspace). By default it does not load change entities, spec metadata, graph statistics, or compiled context. Optional execute input flags can add active/draft listings with task progress, specs health, and the active-change overlap report.
 
 **Constructor:**
 
@@ -1168,10 +1168,11 @@ new GetProjectSummary(
   listDrafts: ListDrafts,
   countTasks: CountTasks,
   getSpecsHealth: GetSpecsHealth,
+  detectOverlap: DetectOverlap,
 )
 ```
 
-**Input:** optional `GetProjectSummaryInput` with `includeChanges?` and `includeSpecsHealth?` (both default to false).
+**Input:** optional `GetProjectSummaryInput` with `includeChanges?`, `includeSpecsHealth?`, and `includeOverlaps?` (each defaults to false).
 
 **Returns:** `Promise<GetProjectSummaryResult>`
 
@@ -1186,10 +1187,11 @@ interface GetProjectSummaryResult {
   active?: readonly ProjectChangeSummaryEntry[]
   drafts?: readonly ProjectChangeSummaryEntry[]
   specsHealth?: GetSpecsHealthResult
+  overlaps?: OverlapReport
 }
 ```
 
-When enrichment flags are omitted or false, `active`, `drafts`, and `specsHealth` are absent from the result. When `includeChanges` is true, `active` and `drafts` are always present (possibly empty arrays).
+When enrichment flags are omitted or false, `active`, `drafts`, `specsHealth`, and `overlaps` are absent from the result. When `includeChanges` is true, `active` and `drafts` are always present (possibly empty arrays). When `includeOverlaps` is true, `overlaps` is the `OverlapReport` from `DetectOverlap.execute()` with no name filter, including an empty report (`entries: []`, `hasOverlap: false`). `specsHealth` stays the project-wide `GetSpecsHealth.execute({})` result and is not filtered because a spec is in an active change.
 
 Change counts use `ChangeRepository.count()` / `countDrafts()` / `countDiscarded()` and `ArchiveRepository.count()` — no full list materialization for counts. Spec counts call `SpecRepository.count()` on each workspace from `ListWorkspaces`.
 

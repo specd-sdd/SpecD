@@ -115,13 +115,12 @@ const health = await createGetGraphHealth().execute({
   provider,
   codeGraphVersion,
   workspaces, // optional, for fingerprint comparison
-  assertUnlocked: true, // default; set false when lock checked earlier
 })
 ```
 
 Returns `GraphStatistics` fields plus `stale`, `currentRef`, and `fingerprintMismatch`.
 
-**Consumers:** `specd graph stats`, `project status --graph`, future SDK `buildProjectStatusSnapshot`.
+**Consumers:** `specd graph stats`, `project status --graph`, SDK `buildProjectStatusSnapshot`.
 
 ### IndexProjectGraph
 

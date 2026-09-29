@@ -14,6 +14,9 @@
     {
       "file": "cli:src/commands/project/status.ts",
       "symbols": ["registerProjectStatus"]
+    },
+    {
+      "file": "cli:test/commands/project/status.spec.ts"
     }
   ]
 }

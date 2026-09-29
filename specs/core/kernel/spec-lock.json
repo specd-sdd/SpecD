@@ -55,9 +55,27 @@
     "core:get-persisted-spec-schema",
     "core:update-persisted-spec-schema",
     "core:initialize-persisted-spec-state",
-    "core:generate-metadata"
+    "core:generate-metadata",
+    "core:get-project-summary",
+    "core:archive-repository-port",
+    "core:get-draft",
+    "core:get-discarded",
+    "core:invalidate-change",
+    "core:update-implementation-tracking",
+    "core:refresh-implementation-tracking",
+    "core:get-implementation-review",
+    "core:preview-spec",
+    "core:get-spec-outline",
+    "core:validate-schema",
+    "core:resolve-context-specs",
+    "core:actor-resolver"
   ],
-  "implementation": [],
+  "implementation": [
+    {
+      "file": "core:src/composition/kernel.ts",
+      "symbols": ["getProjectSummary"]
+    }
+  ],
   "optimizations": {
     "optimizedDescription": {
       "value": "Facade wiring domain use cases from SpecdConfig into changes/specs/project groups; config mutation via createConfigWriter().",

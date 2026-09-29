@@ -42,8 +42,9 @@ JSON/TOON output schema:
     workspaces: Array<{ name, prefix, ownership, isExternal, codeRoot }>
     specs: { total: number, byWorkspace: Record<string, number> }
     changes: { active, drafts, discarded, archived }
+    overlaps: { entries, hasOverlap }
     graph: { freshness, stale, fingerprintMismatch, files?, symbols?, languages?, hotspots? }
-    approvals: { spec, signoff }
+    approvals: { specEnabled, signoffEnabled }
     llmOptimizedContext: boolean
     context?: { instructions, files, specs, optimizedContext? }
   }
@@ -69,6 +70,7 @@ JSON/TOON output schema:
           includeHotspots: opts.graph ?? false,
           includeChanges: true,
           includeSpecsHealth: true,
+          includeOverlaps: true,
         })
         const summary = snapshot.summary
         const graphHealth = snapshot.graphHealth
@@ -89,6 +91,19 @@ JSON/TOON output schema:
         const activeChanges = summary.active ?? []
         const draftChanges = summary.drafts ?? []
         const specsHealth = summary.specsHealth
+        const overlaps =
+          summary.overlaps === undefined
+            ? undefined
+            : {
+                hasOverlap: summary.overlaps.hasOverlap,
+                entries: summary.overlaps.entries.map((entry) => ({
+                  specId: entry.specId,
+                  changes: entry.changes.map((change) => ({
+                    name: change.name,
+                    state: change.state,
+                  })),
+                })),
+              }
 
         let contextData:
           | {
@@ -165,6 +180,7 @@ JSON/TOON output schema:
               active: activeChanges,
               drafts: draftChanges,
               ...(specsHealth !== undefined ? { specsHealth } : {}),
+              ...(overlaps !== undefined ? { overlaps } : {}),
               graph: {
                 freshness: graphFreshness,
                 stale: graphStale,
@@ -244,6 +260,19 @@ JSON/TOON output schema:
                   : []),
               ]
             : []),
+          ...(overlaps === undefined
+            ? []
+            : overlaps.hasOverlap
+              ? [
+                  `overlaps:`,
+                  ...overlaps.entries.map((entry) => {
+                    const changes = entry.changes
+                      .map((change) => `${change.name} [${change.state}]`)
+                      .join(', ')
+                    return `  ${entry.specId}: ${changes}`
+                  }),
+                ]
+              : ['overlaps: (none)']),
           `graph.freshness: ${graphFreshness ?? 'never indexed'} (${graphStale === true ? 'stale' : graphStale === false ? 'fresh' : 'unknown'})`,
           ...(fingerprintMismatch === true
             ? ['graph.derivation: ⚠ fingerprint mismatch — reindex recommended']

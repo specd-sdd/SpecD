@@ -1,0 +1,150 @@
+- op: modified
+  description: Map every changes key createKernel already returns
+  selector:
+    type: section
+    matches: '^kernel\.changes$'
+  content: |
+    | Kernel path                            | Use case class                   | Spec                                                                 | Description                                             |
+    | -------------------------------------- | -------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------- |
+    | `changes.repo`                         | `ChangeRepository`               | —                                                                    | Underlying repository for adapter-level queries         |
+    | `changes.archiveRepo`                  | `ArchiveRepository`              | [core:archive-repository-port](../archive-repository-port/spec.md)   | Underlying archive repository for adapter-level queries |
+    | `changes.create`                       | `CreateChange`                   | [core:create-change](../create-change/spec.md)                       | Creates a new change                                    |
+    | `changes.status`                       | `GetStatus`                      | [core:get-status](../get-status/spec.md)                             | Reports lifecycle state and artifact statuses           |
+    | `changes.countTasks`                   | `CountTasks`                     | [core:count-tasks](../count-tasks/spec.md)                           | Counts task completion by artifact and for the change   |
+    | `changes.transition`                   | `TransitionChange`               | [core:transition-change](../transition-change/spec.md)               | Performs a lifecycle state transition                   |
+    | `changes.draft`                        | `DraftChange`                    | [core:draft-change](../draft-change/spec.md)                         | Shelves a change to drafts                              |
+    | `changes.restore`                      | `RestoreChange`                  | [core:restore-change](../restore-change/spec.md)                     | Recovers a drafted change                               |
+    | `changes.discard`                      | `DiscardChange`                  | [core:discard-change](../discard-change/spec.md)                     | Permanently abandons a change                           |
+    | `changes.archive`                      | `ArchiveChange`                  | [core:archive-change](../archive-change/spec.md)                     | Finalises a change: merges deltas, moves to archive     |
+    | `changes.validate`                     | `ValidateArtifacts`              | [core:validate-artifacts](../validate-artifacts/spec.md)             | Validates artifact files against the active schema      |
+    | `changes.compile`                      | `CompileContext`                 | [core:compile-context](../compile-context/spec.md)                   | Assembles the context block for a lifecycle step        |
+    | `changes.list`                         | `ListChanges`                    | [core:list-changes](../list-changes/spec.md)                         | Lists all active changes                                |
+    | `changes.listDrafts`                   | `ListDrafts`                     | [core:list-drafts](../list-drafts/spec.md)                           | Lists all drafted changes                               |
+    | `changes.getDraft`                     | `GetDraft`                       | [core:get-draft](../get-draft/spec.md)                               | Loads one drafted change by name                        |
+    | `changes.listDiscarded`                | `ListDiscarded`                  | [core:list-discarded](../list-discarded/spec.md)                     | Lists all discarded changes                             |
+    | `changes.getDiscarded`                 | `GetDiscarded`                   | [core:get-discarded](../get-discarded/spec.md)                       | Loads one discarded change by name                      |
+    | `changes.edit`                         | `EditChange`                     | [core:edit-change](../edit-change/spec.md)                           | Edits the spec scope of a change                        |
+    | `changes.invalidate`                   | `InvalidateChange`               | [core:invalidate-change](../invalidate-change/spec.md)               | Invalidates a change for semantic drift                 |
+    | `changes.skipArtifact`                 | `SkipArtifact`                   | [core:skip-artifact](../skip-artifact/spec.md)                       | Explicitly skips an optional artifact                   |
+    | `changes.updateSpecDeps`               | `UpdateSpecDeps`                 | [core:update-spec-deps](../update-spec-deps/spec.md)                 | Updates declared dependencies for a spec                |
+    | `changes.listArchived`                 | `ListArchived`                   | [core:list-archived](../list-archived/spec.md)                       | Lists all archived changes                              |
+    | `changes.getArchived`                  | `GetArchivedChange`              | [core:get-archived-change](../get-archived-change/spec.md)           | Retrieves a single archived change by name              |
+    | `changes.runStepHooks`                 | `RunStepHooks`                   | [core:run-step-hooks](../run-step-hooks/spec.md)                     | Executes run: hooks for a step and phase                |
+    | `changes.getHookInstructions`          | `GetHookInstructions`            | [core:get-hook-instructions](../get-hook-instructions/spec.md)       | Returns instruction: hook text for a step and phase     |
+    | `changes.getArtifactInstruction`       | `GetArtifactInstruction`         | [core:get-artifact-instruction](../get-artifact-instruction/spec.md) | Returns artifact instruction block with rules and delta |
+    | `changes.updateImplementationTracking` | `UpdateImplementationTracking`   | [core:update-implementation-tracking](../update-implementation-tracking/spec.md) | Mutates persisted implementation review state |
+    | `changes.refreshImplementationTracking`| `RefreshImplementationTracking`  | [core:refresh-implementation-tracking](../refresh-implementation-tracking/spec.md) | Refreshes tracked implementation files from VCS |
+    | `changes.getImplementationReview`      | `GetImplementationReview`        | [core:get-implementation-review](../get-implementation-review/spec.md) | Reads persisted implementation review state    |
+    | `changes.detectOverlap`                | `DetectOverlap`                  | [core:spec-overlap](../spec-overlap/spec.md)                         | Detects specs targeted by multiple active changes       |
+    | `changes.preview`                      | `PreviewSpec`                    | [core:preview-spec](../preview-spec/spec.md)                         | Previews the spec merge for an active change            |
+    | `changes.approveSpec`                  | `ApproveSpec`                    | [core:approve-spec](../approve-spec/spec.md)                         | Records spec gate approval and transitions state        |
+    | `changes.approveSignoff`               | `ApproveSignoff`                 | [core:approve-signoff](../approve-signoff/spec.md)                   | Records signoff gate approval and transitions state     |
+
+- op: modified
+  description: Map specs.getOutline and specs.validateSchema, and name the resolve key
+  selector:
+    type: section
+    matches: '^kernel\.specs$'
+  content: |
+    | Kernel path                           | Use case class                        | Spec                                                                                         | Description                                                        |
+    | ------------------------------------- | ------------------------------------- | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+    | `specs.repos`                         | `ReadonlyMap<string, SpecRepository>` | —                                                                                            | Spec repositories keyed by workspace name                          |
+    | `specs.list`                          | `ListSpecs`                           | [core:list-specs](../list-specs/spec.md)                                                     | Lists all specs across all workspaces                              |
+    | `specs.search`                        | `SearchSpecs`                         | [core:search-specs](../search-specs/spec.md)                                                 | Searches spec content across all workspaces                        |
+    | `specs.get`                           | `GetSpec`                             | [core:get-spec](../get-spec/spec.md)                                                         | Loads a spec and all artifact files                                |
+    | `specs.getOutline`                    | `GetSpecOutline`                      | [core:get-spec-outline](../get-spec-outline/spec.md)                                         | Returns a spec outline                                             |
+    | `specs.getActiveSchema`               | `GetActiveSchema`                     | [core:get-active-schema](../get-active-schema/spec.md)                                       | Resolves and returns the active schema                             |
+    | `specs.validate`                      | `ValidateSpecs`                       | [core:validate-specs](../validate-specs/spec.md)                                             | Validates spec artifacts against schema rules                      |
+    | `specs.validateSchema`                | `ValidateSchema`                      | [core:validate-schema](../validate-schema/spec.md)                                           | Validates a schema document                                        |
+    | `specs.generateMetadata`              | `GenerateSpecMetadata`                | [core:generate-metadata](../generate-metadata/spec.md)                                       | Deterministic, non-writing metadata projection                     |
+    | `specs.materializeMetadata`           | `MaterializeSpecMetadata`             | [core:materialize-spec-metadata](../materialize-spec-metadata/spec.md)                       | Self-healing reuse-or-regenerate metadata materialization          |
+    | `specs.getMetadata`                   | `GetSpecMetadata`                     | [core:get-spec-metadata](../get-spec-metadata/spec.md)                                       | Normal self-healing metadata query and diagnostics                 |
+    | `specs.regenerateMetadata`            | `RegenerateSpecMetadata`              | [core:regenerate-spec-metadata](../regenerate-spec-metadata/spec.md)                         | Explicit forced one-spec/batch metadata rebuild                    |
+    | `specs.initializePersistedState`      | `InitializePersistedSpecState`        | [core:initialize-persisted-spec-state](../initialize-persisted-spec-state/spec.md)           | One-time adoption of lock-less specs into persisted semantic state |
+    | `specs.getPersistedSchema`            | `GetPersistedSpecSchema`              | [core:get-persisted-spec-schema](../get-persisted-spec-schema/spec.md)                       | Reads the schema identity assigned by persisted spec state         |
+    | `specs.updatePersistedSchema`         | `UpdatePersistedSpecSchema`           | [core:update-persisted-spec-schema](../update-persisted-spec-schema/spec.md)                 | Reassigns an initialized spec to a compatible resolved schema      |
+    | `specs.getPersistedDeps`              | `GetPersistedSpecDeps`                | [core:get-persisted-spec-deps](../get-persisted-spec-deps/spec.md)                           | Reads canonical dependencies from persisted spec state             |
+    | `specs.updatePersistedDeps`           | `UpdatePersistedSpecDeps`             | [core:update-persisted-spec-deps](../update-persisted-spec-deps/spec.md)                     | Applies list/add/remove/set/clear dependency mutations             |
+    | `specs.getPersistedImplementation`    | `GetPersistedSpecImplementation`      | [core:get-persisted-spec-implementation](../get-persisted-spec-implementation/spec.md)       | Reads canonical implementation links                               |
+    | `specs.updatePersistedImplementation` | `UpdatePersistedSpecImplementation`   | [core:update-persisted-spec-implementation](../update-persisted-spec-implementation/spec.md) | Adds, enriches, or removes canonical implementation links          |
+    | `specs.getPersistedOptimizations`     | `GetPersistedSpecOptimizations`       | [core:get-persisted-spec-optimizations](../get-persisted-spec-optimizations/spec.md)         | Returns persisted optimized fields with per-field freshness        |
+    | `specs.updatePersistedOptimizations`  | `UpdatePersistedSpecOptimizations`    | [core:update-persisted-spec-optimizations](../update-persisted-spec-optimizations/spec.md)   | Sets or clears selected optimized fields                           |
+    | `specs.getContext`                    | `GetSpecContext`                      | [core:get-spec-context](../get-spec-context/spec.md)                                         | Builds structured context entries with dependency traversal        |
+    | `specs.resolve`                       | `ResolveSchema`                       | [core:resolve-schema](../resolve-schema/spec.md)                                             | Resolves base schema with extends, plugins, and overrides          |
+    | `specs.getHealth`                     | `GetSpecsHealth`                      | [core:get-specs-health](../get-specs-health/spec.md)                                         | Provides validation health summary of specs                        |
+
+    `kernel.specs` MUST NOT expose `saveMetadata` or `invalidateMetadata` paths. `PersistSpecMetadata` is not mounted on the kernel — it is an internal collaborator of `MaterializeSpecMetadata`.
+
+- op: modified
+  description: Map project.getProjectSummary and project.resolveContextSpecs
+  selector:
+    type: section
+    matches: '^kernel\.project$'
+  content: |
+    | Kernel path                   | Use case class          | Spec                                                               | Description                                                         |
+    | ----------------------------- | ----------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------- |
+    | `project.listWorkspaces`      | `ListWorkspaces`        | [core:list-workspaces](../list-workspaces/spec.md)                 | Lists configured workspace IDs                                      |
+    | `project.getProjectSummary`   | `GetProjectSummary`     | [core:get-project-summary](../get-project-summary/spec.md)         | Returns count-only project aggregates with optional enrichments     |
+    | `project.getProjectContext`   | `GetProjectContext`     | [core:get-project-context](../get-project-context/spec.md)         | Compiles the project-level context block                            |
+    | `project.resolveContextSpecs` | `ResolveContextSpecs`   | [core:resolve-context-specs](../resolve-context-specs/spec.md)     | Resolves context include and exclude patterns into spec IDs         |
+    | `project.getConfig`           | `GetConfig`             | [core:get-config](../get-config/spec.md)                           | Returns the readonly construction-time `SpecdConfig` snapshot       |
+    | `project.getMetadata`         | `GetProjectMetadata`    | [core:project-metadata](../project-metadata/spec.md)               | Reads cached project metadata                                       |
+    | `project.updateMetadata`      | `UpdateProjectMetadata` | [core:update-project-metadata](../update-project-metadata/spec.md) | Writes cached project metadata                                      |
+
+- op: added
+  description: Declare the newly mapped kernel dependencies
+  position:
+    parent:
+      type: section
+      matches: '^Spec Dependencies$'
+  content: |
+    - [`core:archive-repository-port`](../archive-repository-port/spec.md) — `changes.archiveRepo`
+    - [`core:get-draft`](../get-draft/spec.md) — `changes.getDraft`
+    - [`core:get-discarded`](../get-discarded/spec.md) — `changes.getDiscarded`
+    - [`core:invalidate-change`](../invalidate-change/spec.md) — `changes.invalidate`
+    - [`core:update-implementation-tracking`](../update-implementation-tracking/spec.md) — `changes.updateImplementationTracking`
+    - [`core:refresh-implementation-tracking`](../refresh-implementation-tracking/spec.md) — `changes.refreshImplementationTracking`
+    - [`core:get-implementation-review`](../get-implementation-review/spec.md) — `changes.getImplementationReview`
+    - [`core:preview-spec`](../preview-spec/spec.md) — `changes.preview`
+    - [`core:get-spec-outline`](../get-spec-outline/spec.md) — `specs.getOutline`
+    - [`core:validate-schema`](../validate-schema/spec.md) — `specs.validateSchema`
+    - [`core:resolve-context-specs`](../resolve-context-specs/spec.md) — `project.resolveContextSpecs`
+    - [`core:get-project-summary`](../get-project-summary/spec.md) — `project.getProjectSummary`
+    - [`core:actor-resolver`](../actor-resolver/spec.md) — `createLazyVcsActorResolver` used by `CompositionResolver.getActorResolver`
+
+- op: modified
+  description: Document resolver-owned VCS auto-detect
+  selector:
+    type: section
+    matches: 'Requirement: Project-level VCS and actor adapters must use auto-detect'
+  content: |
+    `createKernel` obtains project VCS and actor adapters from the shared `CompositionResolver`. It MUST NOT define `createKernelInternals`, and it MUST NOT construct `GitVcsAdapter` or `GitActorResolver`.
+
+    `CompositionResolver.getVcsAdapter()` MUST call `createVcsAdapter(config.projectRoot, registry.vcsProviders)` and reuse that promise.
+
+    When `config.actorProvider` is omitted, `CompositionResolver.getActorResolver()` MUST use `createLazyVcsActorResolver(() => getVcsAdapter())`. When `config.privacy` is set, that resolver MUST be wrapped in `PrivacyActorResolver`.
+
+    Standalone use-case factories in `composition/use-cases/` MUST NOT construct `GitActorResolver`. They MUST obtain the actor through the composition resolver.
+
+    This keeps git, Mercurial, Subversion, and non-VCS projects working without a caller-visible kernel helper.
+
+- op: removed
+  description: Drop the old createKernelInternals export label
+  selector:
+    type: list-item
+    matches: 'createKernelInternals is not exported'
+    parent:
+      type: section
+      matches: '^Constraints$'
+
+- op: added
+  description: State that createKernel does not export createKernelInternals
+  position:
+    parent:
+      type: section
+      matches: '^Constraints$'
+    after:
+      type: list-item
+      matches: 'The kernel must not contain business logic'
+  content: |
+    - `createKernel` does not export `createKernelInternals`. Project VCS and actor resolution stay on `CompositionResolver`.

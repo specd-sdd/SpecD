@@ -7,6 +7,8 @@ import {
 import { type ChangeRepository } from '../ports/change-repository.js'
 import { type ArchiveRepository } from '../ports/archive-repository.js'
 import { type CountTasks } from './count-tasks.js'
+import { type OverlapReport } from '../../domain/value-objects/overlap-report.js'
+import { type DetectOverlap } from './detect-overlap.js'
 import { type GetSpecsHealth, type GetSpecsHealthResult } from './get-specs-health.js'
 import { type ListChanges } from './list-changes.js'
 import { type ListDrafts } from './list-drafts.js'
@@ -16,6 +18,7 @@ import { type ListWorkspaces } from './list-workspaces.js'
 export interface GetProjectSummaryInput {
   readonly includeChanges?: boolean
   readonly includeSpecsHealth?: boolean
+  readonly includeOverlaps?: boolean
 }
 
 /** Lightweight listing row for active or drafted changes. */
@@ -39,12 +42,13 @@ export interface GetProjectSummaryResult {
   readonly active?: readonly ProjectChangeSummaryEntry[]
   readonly drafts?: readonly ProjectChangeSummaryEntry[]
   readonly specsHealth?: GetSpecsHealthResult
+  readonly overlaps?: OverlapReport
 }
 
 /**
  * Returns consolidated project counts without loading change entities,
  * spec metadata, graph statistics, or compiled context unless enrichment
- * flags request optional listings or specs health.
+ * flags request optional listings, specs health, or active-change overlaps.
  */
 export class GetProjectSummary {
   private readonly _changes: ChangeRepository
@@ -54,6 +58,7 @@ export class GetProjectSummary {
   private readonly _listDrafts: ListDrafts
   private readonly _countTasks: CountTasks
   private readonly _getSpecsHealth: GetSpecsHealth
+  private readonly _detectOverlap: DetectOverlap
 
   /**
    * Creates a new `GetProjectSummary` use case instance.
@@ -65,6 +70,7 @@ export class GetProjectSummary {
    * @param listDrafts - Draft change listing use case
    * @param countTasks - Task completion counting use case
    * @param getSpecsHealth - Specs health aggregation use case
+   * @param detectOverlap - Active-change spec overlap use case
    */
   constructor(
     changes: ChangeRepository,
@@ -74,6 +80,7 @@ export class GetProjectSummary {
     listDrafts: ListDrafts,
     countTasks: CountTasks,
     getSpecsHealth: GetSpecsHealth,
+    detectOverlap: DetectOverlap,
   ) {
     this._changes = changes
     this._archive = archive
@@ -82,6 +89,7 @@ export class GetProjectSummary {
     this._listDrafts = listDrafts
     this._countTasks = countTasks
     this._getSpecsHealth = getSpecsHealth
+    this._detectOverlap = detectOverlap
   }
 
   /**
@@ -93,31 +101,37 @@ export class GetProjectSummary {
   async execute(input?: GetProjectSummaryInput): Promise<GetProjectSummaryResult> {
     const includeChanges = input?.includeChanges === true
     const includeSpecsHealth = input?.includeSpecsHealth === true
+    const includeOverlaps = input?.includeOverlaps === true
+
+    const workspacesPromise = this._listWorkspaces.execute()
+    const specCountsPromise = workspacesPromise.then((workspaces) =>
+      Promise.all(workspaces.map(async (ws) => [ws.name, await ws.specRepo.count()] as const)).then(
+        (specCountEntries) => ({ workspaces, specCountEntries }),
+      ),
+    )
 
     const [
       activeCount,
       draftCount,
       discardedCount,
       archivedCount,
-      workspaces,
+      specCounts,
       changeListings,
       specsHealth,
+      overlaps,
     ] = await Promise.all([
       this._changes.count(),
       this._changes.countDrafts(),
       this._changes.countDiscarded(),
       this._archive.count(),
-      this._listWorkspaces.execute(),
+      specCountsPromise,
       includeChanges ? this._buildChangeListings() : Promise.resolve(undefined),
       includeSpecsHealth ? this._getSpecsHealth.execute({}) : Promise.resolve(undefined),
+      includeOverlaps ? this._detectOverlap.execute() : Promise.resolve(undefined),
     ])
 
-    const specCountEntries = await Promise.all(
-      workspaces.map(async (ws) => [ws.name, await ws.specRepo.count()] as const),
-    )
-
     const specsByWorkspace: Record<string, number> = {}
-    for (const [name, specCount] of specCountEntries) {
+    for (const [name, specCount] of specCounts.specCountEntries) {
       specsByWorkspace[name] = specCount
     }
 
@@ -127,11 +141,12 @@ export class GetProjectSummary {
       discardedCount,
       archivedCount,
       specsByWorkspace,
-      workspaceCount: workspaces.length,
+      workspaceCount: specCounts.workspaces.length,
       ...(includeChanges && changeListings !== undefined
         ? { active: changeListings.active, drafts: changeListings.drafts }
         : {}),
       ...(includeSpecsHealth && specsHealth !== undefined ? { specsHealth } : {}),
+      ...(includeOverlaps && overlaps !== undefined ? { overlaps } : {}),
     }
   }
 

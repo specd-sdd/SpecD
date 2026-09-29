@@ -4,7 +4,7 @@
 
 Delivery mechanisms (`project status`, SDK snapshot builders) need consolidated project counts without loading change entities, spec metadata, graph statistics, or compiled context by default. Today each caller orchestrates multiple list use cases and per-workspace counting independently. `GetProjectSummary` provides a single application use case that returns count-only aggregates for the default workspace change buckets and all configured workspaces' spec totals.
 
-Callers that need agent-oriented detail MAY request optional enrichments via execute input flags: active/draft change listings with per-change task progress, and/or specs health. Without those flags, the use case MUST remain on the cheap count-only path.
+Callers that need agent-oriented detail MAY request optional enrichments via execute input flags: active/draft change listings with per-change task progress, specs health, and/or active-change spec overlap. Without those flags, the use case MUST remain on the cheap count-only path.
 
 ## Requirements
 
@@ -19,7 +19,7 @@ Callers that need agent-oriented detail MAY request optional enrichments via exe
 - `specsByWorkspace` — map of workspace name to spec count
 - `workspaceCount` — number of configured workspaces
 
-When enrichment flags are omitted or false, the result MUST NOT include `active`, `drafts`, or `specsHealth` keys (absent / TypeScript-optional omitted — not `null`).
+When enrichment flags are omitted or false, the result MUST NOT include `active`, `drafts`, `specsHealth`, or `overlaps` keys (absent / TypeScript-optional omitted — not `null`).
 
 The count-only path MUST NOT include change entities, spec metadata, graph data, or context payloads.
 
@@ -29,8 +29,9 @@ The count-only path MUST NOT include change entities, spec metadata, graph data,
 
 - `includeChanges?: boolean` — default `false`
 - `includeSpecsHealth?: boolean` — default `false`
+- `includeOverlaps?: boolean` — default `false`
 
-When both flags are omitted or `false`, behaviour MUST match the count-only path (no list materialization, no specs validation for health).
+When all three flags are omitted or `false`, behaviour MUST match the count-only path (no list materialization, no specs validation for health, no overlap detection).
 
 ### Requirement: Optional active and draft change listings with tasks
 
@@ -62,7 +63,19 @@ When `includeChanges` is `false` or omitted, the use case MUST NOT call list use
 
 When `includeSpecsHealth` is `true`, the result MUST include `specsHealth` set to the `GetSpecsHealthResult` returned by `GetSpecsHealth.execute({})` (project-wide; no workspace filter unless a future input adds one).
 
+A spec MUST still be included in that health result when its id appears in `specIds` of an active change. `GetProjectSummary` MUST NOT drop, rewrite, or reclassify health rows because the spec is in a change.
+
 When `includeSpecsHealth` is `false` or omitted, the `specsHealth` key MUST be absent and `GetSpecsHealth` MUST NOT be invoked.
+
+### Requirement: Optional active-change overlap enrichment
+
+When `includeOverlaps` is `true`, the result MUST include `overlaps` set to the `OverlapReport` returned by `DetectOverlap.execute()` with no `name` filter (every active change participates).
+
+When that report has no overlap entries, `overlaps` MUST still be present. `entries` MUST be empty and `hasOverlap` MUST be `false`.
+
+When `includeOverlaps` is `false` or omitted, the `overlaps` key MUST be absent and `DetectOverlap` MUST NOT be invoked.
+
+`overlaps` is a separate signal from `specsHealth`. The use case MUST NOT fold overlap entries into specs health, MUST NOT introduce `failedClosedSpecs`, and MUST NOT filter health by `activeSpecIds` or by whether a spec appears in an active change.
 
 ### Requirement: Orchestrates existing list use cases
 
@@ -91,7 +104,9 @@ It MUST NOT invoke `ListSpecs.execute()` or materialize spec list entries solely
 
 `GetProjectSummary.execute()` MUST run independent count operations concurrently (for example via `Promise.all`) so summary assembly does not serialize unrelated I/O.
 
-Change-bucket counts and per-workspace spec counts MAY run in parallel when their repository instances are independent.
+Change-bucket counts, the archive count, `ListWorkspaces.execute()`, and any enabled enrichment calls MAY share one concurrent batch.
+
+Per-workspace `SpecRepository.count()` MUST start as soon as `ListWorkspaces.execute()` resolves. Those spec counts MUST NOT wait for change-bucket `count()` calls or for `DetectOverlap.execute()` to finish.
 
 ### Requirement: Constructor accepts orchestration dependencies
 
@@ -100,7 +115,7 @@ Change-bucket counts and per-workspace spec counts MAY run in parallel when thei
 - Invoke `ChangeRepository.count()` / `countDrafts()` / `countDiscarded()`
 - Invoke `ArchiveRepository.count()` (or equivalent) for archived totals
 - Invoke `ListWorkspaces` for per-workspace `SpecRepository.count()`
-- When enrichment is supported: invoke `ListChanges` / `ListDrafts` (or equivalent repository list surfaces), load change details for `CountTasks`, invoke `CountTasks`, and invoke `GetSpecsHealth`
+- When enrichment is supported: invoke `ListChanges` / `ListDrafts` (or equivalent repository list surfaces), load change details for `CountTasks`, invoke `CountTasks`, invoke `GetSpecsHealth`, and invoke `DetectOverlap`
 
 It MUST NOT construct repositories or read `specd.yaml` directly.
 
@@ -131,6 +146,9 @@ The config-based `createGetProjectSummary(config, options?)` form MUST derive `G
 - `listDrafts: ListDrafts`
 - `countTasks: CountTasks`
 - `getSpecsHealth: GetSpecsHealth`
+- `detectOverlap: DetectOverlap`
+
+`detectOverlap` MUST be built with `createDetectOverlap(resolveDetectOverlapDeps(resolver))`. The helper MUST NOT construct a second overlap implementation.
 
 Count fields MUST still be obtained from `ChangeRepository.count()` / `countDrafts()` / `countDiscarded()` and `ArchiveRepository.count()`, never by measuring list result length.
 
@@ -139,10 +157,12 @@ The helper is the only use-case-specific composition entry for config-based boot
 ## Constraints
 
 - The use case MUST NOT invoke code-graph providers or context compilation.
-- On the count-only path (both enrichment flags false/omitted), the use case MUST NOT load spec metadata, change artifact content, or materialize list entries.
+- On the count-only path (all enrichment flags false/omitted), the use case MUST NOT load spec metadata, change artifact content, or materialize list entries, and MUST NOT invoke `DetectOverlap`.
 - When `includeChanges` is true, the use case MAY materialize list entries and load change/task artifact content required by `CountTasks`.
 - When `includeSpecsHealth` is true, the use case MAY invoke `GetSpecsHealth` (which validates specs).
+- When `includeOverlaps` is true, the use case MAY invoke `DetectOverlap` (which loads active changes).
 - The use case MUST NOT mutate configuration, repositories, or stored changes.
+- The use case MUST NOT add a validation or overlap cache. Spec validation caching stays in `ValidateSpecs`.
 
 ## Spec Dependencies
 
@@ -153,5 +173,6 @@ The helper is the only use-case-specific composition entry for config-based boot
 - [`core:list-archived`](../list-archived/spec.md) — archived count semantics
 - [`core:count-tasks`](../count-tasks/spec.md) — per-change task incomplete/total when `includeChanges`
 - [`core:get-specs-health`](../get-specs-health/spec.md) — specs health when `includeSpecsHealth`
+- [`core:spec-overlap`](../spec-overlap/spec.md) — `DetectOverlap` / `OverlapReport` when `includeOverlaps`
 - [`core:kernel`](../kernel/spec.md) — kernel exposure
 - [`core:composition-resolver`](../composition-resolver/spec.md) — resolver-backed factory deps

@@ -41,7 +41,7 @@ specd project init --schema @specd/schema-std --specs-path specs
 
 ### `specd project status`
 
-Inspect current project health, active schema, configured workspaces, specification counts, active changes, and code graph freshness.
+Inspect current project health, active schema, configured workspaces, specification counts, active changes, specs health, active-change overlaps, and code graph freshness. Overlaps are always included: text prints `overlaps: (none)` or one line per shared spec id, and json/toon put `overlaps` (`hasOverlap`, `entries`) on the command root.
 
 ```bash
 specd project status [options]
@@ -50,7 +50,7 @@ specd project status [options]
 **Options:**
 
 - `--context`: Include compiled high-level project context.
-- `--graph`: Include code graph indexing and freshness metrics.
+- `--graph`: Include extended graph statistics and hotspots. Freshness is always in the default output. This flag does not index the graph.
 - `--format <text|json|toon>`: Output format (default: `text`).
 
 **Examples:**

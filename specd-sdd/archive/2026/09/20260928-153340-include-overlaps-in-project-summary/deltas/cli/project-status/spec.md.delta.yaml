@@ -1,0 +1,105 @@
+- op: modified
+  description: Mention overlap in the command purpose
+  selector:
+    type: section
+    matches: '^Purpose$'
+  content: |
+    The specd entry skill and other downstream tools need a consolidated way to get project state. Currently they must call multiple CLI commands (config show, spec list, change list, drafts list, project context, graph stats), creating latency and scattered output. This spec defines a `project status` command that consolidates this information, including active/draft change listings with task progress, specs health, and active-change spec overlaps for agent bootstrap.
+
+- op: added
+  description: Always include snapshot overlaps
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: 'Requirement: includes specs health \(always\)'
+  content: |
+    ### Requirement: includes active-change overlaps (always)
+
+    The command MUST always request summary enrichment with `includeOverlaps: true` via `buildProjectStatusSnapshot` options, together with `includeChanges: true` and `includeSpecsHealth: true`.
+
+    Output MUST copy `snapshot.summary.overlaps` onto the command root as `overlaps` (`entries` and `hasOverlap`). The command payload MUST NOT nest that report under a `summary` key. When there is no overlap, root `overlaps` MUST still be present, `entries` MUST be empty, and `hasOverlap` MUST be `false`.
+
+    There is no CLI flag to disable overlaps on `project status`.
+
+    The command MUST NOT call `GetProjectSummary` or `DetectOverlap` beside the snapshot. Overlaps come from `snapshot.summary`.
+
+    Text mode MUST list each overlap entry's `specId` and the change names on that entry. json/toon MUST keep the structured `OverlapReport` fields (`hasOverlap`, `entries[].specId`, `entries[].changes[].name`, `entries[].changes[].state`) on the command root `overlaps`, copied from `snapshot.summary.overlaps`.
+
+- op: added
+  description: Help schema matches the emitted payload
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: 'Requirement: includes active-change overlaps \(always\)'
+  content: |
+    ### Requirement: help schema matches the command payload
+
+    The after-help JSON/TOON schema MUST show `overlaps` as present, with `hasOverlap` and `entries`. It MUST NOT mark `overlaps` optional.
+
+    That schema MUST name the approval fields `specEnabled` and `signoffEnabled`. It MUST NOT document them as `spec` and `signoff`.
+
+    Workspace entries in that schema MUST include `name`, `prefix`, `ownership`, `isExternal`, and `codeRoot`.
+
+- op: modified
+  description: Spec counts come from the snapshot summary
+  selector:
+    type: section
+    matches: 'Requirement: includes spec counts'
+  content: |
+    The command output MUST include spec counts obtained from `snapshot.summary` produced by `buildProjectStatusSnapshot` (which calls `GetProjectSummary`):
+
+    - Total spec count across all workspaces (sum of `specsByWorkspace` values)
+    - Spec count per workspace (`specsByWorkspace` map)
+
+    The command SHALL NOT load full spec metadata or artifacts to perform this count.
+    The command MUST NOT call `SpecRepository.count()` directly or orchestrate `ListWorkspaces` for counting.
+    The command MUST NOT call `GetProjectSummary.execute()` beside `buildProjectStatusSnapshot`.
+
+- op: modified
+  description: Pass includeOverlaps on the always-on snapshot call
+  selector:
+    type: section
+    matches: 'Requirement: includes graph freshness \(always\)'
+  content: |
+    The command MUST obtain graph freshness fields via `buildProjectStatusSnapshot` from `@specd/sdk` with at least `{ includeGraph: true, includeChanges: true, includeSpecsHealth: true, includeOverlaps: true }`:
+
+    - Whether the code graph is stale (boolean)
+    - Last indexed timestamp (or null if never indexed)
+
+    The command MUST map `graphHealth.stale` and `graphHealth.lastIndexedAt` from the snapshot result. When graph health is unavailable (`graphHealth: null`), freshness fields MUST be emitted as `null`.
+
+    Graph orchestration for this command MUST go through `@specd/sdk`; the handler obtains graph data exclusively via `buildProjectStatusSnapshot`.
+
+    Graph freshness is included by default, not behind a flag. Summary change listings, specs health, and active-change overlaps are also always requested (see their requirements).
+
+- op: modified
+  description: Pass includeOverlaps when --graph is set
+  selector:
+    type: section
+    matches: 'Requirement: supports --graph flag'
+  content: |
+    When `--graph` flag is provided, the command MUST call `buildProjectStatusSnapshot` with `{ includeGraph: true, includeHotspots: true, includeChanges: true, includeSpecsHealth: true, includeOverlaps: true }` and include extended graph statistics from the snapshot:
+
+    - Number of indexed files (`graphHealth.fileCount`)
+    - Number of indexed symbols (`graphHealth.symbolCount`)
+    - Hotspots (from snapshot `hotspots` when available)
+
+    Presenter formatting (text/json/toon) remains in the CLI command handler.
+
+- op: modified
+  description: Note that the snapshot also carries overlaps
+  selector:
+    type: section
+    matches: '^Spec Dependencies$'
+  content: |
+    - [`core:list-workspaces`](../../core/list-workspaces/spec.md) — source for orchestrated project structure in workspace output
+    - [`core:get-project-summary`](../../core/get-project-summary/spec.md) — consolidated change counts, spec counts, specs health, and overlaps on `summary`
+    - [`core:get-project-context`](../../core/get-project-context/spec.md) — baked context defaults and runtime override merge for `--context` assembly
+    - [`sdk:build-project-status-snapshot`](../../sdk/build-project-status-snapshot/spec.md) — summary enrichment, graph freshness, and extended graph stats orchestration
+    - [`sdk:host-context`](../../sdk/host-context/spec.md) — host bootstrap via `openSpecdHost`

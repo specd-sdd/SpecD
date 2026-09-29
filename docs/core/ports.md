@@ -37,7 +37,16 @@ console.log(kernel.registry.externalHookRunners.has('http')) // true
 If you need several standalone factories but do not want to build the full kernel, create one shared `CompositionResolver` and derive explicit deps from it. This keeps adapter construction and cache scope aligned across those factories:
 
 ```typescript
-import { createCompositionResolver, createGetProjectSummary, createGetStatus } from '@specd/core'
+import {
+  createCompositionResolver,
+  createCountTasks,
+  createDetectOverlap,
+  createGetProjectSummary,
+  createGetSpecsHealth,
+  createGetStatus,
+  createListChanges,
+  createListDrafts,
+} from '@specd/core'
 
 const resolver = createCompositionResolver(config, {
   extraNodeModulesPaths: ['/custom/node_modules'],
@@ -51,12 +60,19 @@ const getStatus = createGetStatus({
   lifecycle: resolver.getLifecycleEngine(),
 })
 
+const changes = resolver.getChangeRepository()
 const getProjectSummary = createGetProjectSummary({
-  listChanges: resolver.getListChanges(),
-  listDrafts: resolver.getListDrafts(),
-  listDiscarded: resolver.getListDiscarded(),
-  listArchived: resolver.getListArchived(),
+  changes,
+  archive: resolver.getArchiveRepository(),
   listWorkspaces: resolver.getListWorkspaces(),
+  listChanges: createListChanges({ changes }),
+  listDrafts: createListDrafts({ changes }),
+  countTasks: createCountTasks({
+    changes,
+    schemaProvider: resolver.getSchemaProvider(),
+  }),
+  getSpecsHealth: createGetSpecsHealth(config),
+  detectOverlap: createDetectOverlap({ changes }),
 })
 ```
 

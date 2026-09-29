@@ -18,6 +18,8 @@ export interface BuildProjectStatusSnapshotOptions {
   readonly includeChanges?: boolean
   /** When true, include specs health aggregates on `summary`. */
   readonly includeSpecsHealth?: boolean
+  /** When true, include the active-change overlap report on `summary`. */
+  readonly includeOverlaps?: boolean
 }
 
 /** Merged project and optional graph status snapshot. */
@@ -49,12 +51,14 @@ export async function buildProjectStatusSnapshot(
   const includeHotspots = options?.includeHotspots ?? false
   const includeChanges = options?.includeChanges === true
   const includeSpecsHealth = options?.includeSpecsHealth === true
+  const includeOverlaps = options?.includeOverlaps === true
 
   const summaryInput =
-    includeChanges || includeSpecsHealth
+    includeChanges || includeSpecsHealth || includeOverlaps
       ? {
           ...(includeChanges ? { includeChanges: true as const } : {}),
           ...(includeSpecsHealth ? { includeSpecsHealth: true as const } : {}),
+          ...(includeOverlaps ? { includeOverlaps: true as const } : {}),
         }
       : undefined
 
