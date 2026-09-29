@@ -51,10 +51,10 @@ The difference is the dispatch backend, not the lifecycle semantics.
 
 By default, `TransitionChange` and `ArchiveChange` auto-execute matching `run:` **effects** after predicates pass. Slot and failure policy come from the binding (`phase`, `onFailure`), not from check id:
 
-- **`TransitionChange`** — select effects with the same `from` / `to` / `along` matcher as predicates, then call `execute` on those whose `phase` is `before-persist` (both `hook.post` and `hook.pre` on transitions). `onFailure` is `abort`. `RunStepHooks` SHALL be a constructor dep of the hook checks, not launched by check id in the use case.
-- **`ArchiveChange`** — call `execute` on operation-`archive` effects with `phase = before-persist` before persist; `phase = after-persist` after the archive commits. Default bindings: `hook.pre` abort/before-persist; `hook.post` collect/after-persist.
+- **`TransitionChange`** — select effects with the same `from` / `to` / `along` matcher as predicates, then call `execute` on those whose `phase` is `before-persist` (both `hook.post` and `hook.pre` on transitions). `onFailure` is `abort`. `RunStepHooks` SHALL be a constructor dependency of the hook checks, not launched by check id in the use case.
+- **`ArchiveChange`** — call `execute` on operation-`archive` effects with `phase = before-persist` before persist; `phase = after-persist` after the archive commits. Default bindings are `hook.pre` abort/before-persist and `hook.post` collect/after-persist.
 
-Both use cases MUST NOT keep a private “always source.post on any exit” path and MUST NOT branch on `hook.pre` / `hook.post` ids for timing, failure policy, skip mapping, or launching `RunStepHooks`. `skipHookPhases` SHALL select by binding `phase` plus skip selectors (`target.pre` / `source.post` / archive `pre`/`post`). Transition `hook.pre` and `hook.post` share `before-persist`, so skip MUST NOT rely on `binding.phase` alone.
+Both use cases SHALL delegate hook collection, command recording, and execution to `RunStepHooks` through the registered hook effects. They MUST NOT keep a private “always source.post on any exit” path and MUST NOT branch on `hook.pre` / `hook.post` ids for timing, failure policy, skip mapping, or launching `RunStepHooks`. `skipHookPhases` SHALL select by binding phase plus skip selectors (`target.pre`, `source.post`, archive `pre`/`post`). Transition `hook.pre` and `hook.post` share `before-persist`, so skip behavior MUST NOT rely on `binding.phase` alone.
 
 ### Requirement: Two execution modes for run hooks
 
@@ -123,7 +123,7 @@ Before executing a `run:` hook command, `HookRunner` expands `{{key.path}}` temp
 
 `{{change.workspace}}` MUST NOT be a supported token. A change has no single primary workspace — workspaces touched by the change are derived from `specIds` and MUST NOT be injected into `HookVariables` as a singular workspace field. See [`core:template-variables`](../template-variables/spec.md) and [`core:change`](../change/spec.md).
 
-Unknown variable paths are left unexpanded (the original `{{key.path}}` token is preserved). All substituted values are shell-escaped to prevent injection attacks.
+Unknown variable paths SHALL remain unexpanded. Substituted values SHALL be inserted verbatim, and the hook author owns any surrounding quotes. After expansion, `HookRunner` SHALL translate only quote syntax that the selected host shell does not understand. Callers MUST NOT shell-escape or add quoting around substituted values.
 
 ## Constraints
 
@@ -137,8 +137,8 @@ Unknown variable paths are left unexpanded (the original `{{key.path}}` token is
 - Schema-level hooks always precede project-level hooks within the same phase
 - `TransitionChange` and `ArchiveChange` MUST select effects by binding `phase` / `onFailure`, not by check id
 - Hook `execute` SHALL call `RunStepHooks`; use cases MUST NOT launch `RunStepHooks` by check id
-- `RunStepHooks` is the single hook execution engine used by hook checks and the CLI
-- Template variable expansion and shell escaping are handled by `HookRunner`, not by callers
+- `RunStepHooks` is the single hook execution engine used by hook checks, lifecycle use cases, and the CLI
+- Template substitution for developer `run:` hooks is verbatim; `HookRunner` translates only quote syntax unsupported by the selected host shell, and callers MUST NOT shell-escape substituted values
 - `--skip-hooks` skips effects only
 
 ## Examples

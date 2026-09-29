@@ -1,0 +1,13 @@
+- op: added
+  description: 'A change slug that is a Windows device name is invalid on every OS.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: 'Requirement: Identity'
+  content: |
+    ### Requirement: Change names reject Windows device names
+
+    A change slug that is a Windows device name MUST be rejected on every operating system. The reserved names are `con`, `prn`, `aux`, `nul`, `com1` through `com9`, and `lpt1` through `lpt9`, compared case-insensitively as the whole slug. A slug that only contains a device name as part of a larger segment, such as `con-foo`, MUST remain legal when it matches the existing slug pattern.

@@ -175,3 +175,30 @@
 - **WHEN** `saveArtifact` overwrites the file
 - **THEN** disk content changes
 - **AND** the supplied `Change` object's file status is unchanged by `saveArtifact`
+
+### Requirement: Windows path containment and rename recovery
+
+#### Scenario: A prefix collision is outside the root
+
+- **GIVEN** the root is `C:/work/app`
+- **AND** a candidate resolves to `C:/work/application`
+- **WHEN** confinement is checked
+- **THEN** the candidate is outside
+
+#### Scenario: Locked rename retries then surfaces the original error
+
+- **GIVEN** a rename keeps failing with `EPERM`, `EBUSY`, or `EACCES`
+- **WHEN** the bounded retries are exhausted
+- **THEN** the original error is surfaced
+
+#### Scenario: EXDEV falls back to copy
+
+- **GIVEN** a directory move fails with `EXDEV`
+- **WHEN** the repository moves that directory
+- **THEN** it copies instead of failing on the rename
+
+#### Scenario: Different artifact bytes are not success
+
+- **GIVEN** the destination exists and its bytes differ from the source
+- **WHEN** the write finishes
+- **THEN** the result is not treated as success

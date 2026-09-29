@@ -5,7 +5,7 @@ import { RelationType } from '../../../src/domain/value-objects/relation-type.js
 import { projectSpecCoverage } from '../../../src/application/services/project-spec-coverage.js'
 
 describe('projectSpecCoverage', () => {
-  it('projects file and uniquely resolved logical-symbol coverage', () => {
+  it('projects file and uniquely resolved logical-symbol coverage', async () => {
     const filePath = 'code-graph:src/service.ts'
     const symbol = createSymbolNode({
       name: 'run',
@@ -15,7 +15,7 @@ describe('projectSpecCoverage', () => {
       column: 0,
     })
 
-    const result = projectSpecCoverage({
+    const result = await projectSpecCoverage({
       specs: [
         {
           specId: 'code-graph:coverage',
@@ -42,7 +42,7 @@ describe('projectSpecCoverage', () => {
     ])
   })
 
-  it('reports missing files, missing symbols, and ambiguous logical targets without fallback', () => {
+  it('reports missing files, missing symbols, and ambiguous logical targets without fallback', async () => {
     const filePath = 'code-graph:src/service.ts'
     const first = createSymbolNode({
       name: 'duplicate',
@@ -59,7 +59,7 @@ describe('projectSpecCoverage', () => {
       column: 0,
     })
 
-    const result = projectSpecCoverage({
+    const result = await projectSpecCoverage({
       specs: [
         {
           specId: 'code-graph:coverage',

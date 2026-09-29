@@ -4,5 +4,41 @@
     "version": 1
   },
   "dependsOn": ["skills:skill"],
-  "implementation": []
+  "implementation": [],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Defines resolved install bundles: local/shared files plus target routing, write/remove behavior.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:c7b1a94cc5160e767b4949bfb8835d9a1c6fc7496248c3636d096150beb23c93",
+          "lastModified": "2026-05-25T06:02:58.507Z"
+        },
+        "verify.md": {
+          "hash": "sha256:9a3ad66c1acef4b963ac8cd6ffc7cc150acfdfdb9e37ed8a267c4e24b027693b",
+          "lastModified": "2026-05-25T06:02:58.507Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Skill Bundle\n\n## Rules\n- `ResolvedFile`: `filename:string`, substituted `content:string`, optional `shared?:boolean`; missing/false = skill-local, true = installer-shared.\n- `SkillBundle`: `name`, `description`, `files: ResolvedFile[]`, `install(target)`, `uninstall(target)`. Target string ≡ `{targetDir:string}`; `SkillBundleInstallTarget` also permits `sharedTargetDir?:string`.\n- Install: normal dir = string/`targetDir`; shared dir = `sharedTargetDir` else normal. Create normal always; create shared only if shared file; write each preserving filename to routed dir; fail gracefully on write error.\n- Uninstall: same routing; remove all routed files; absent file no failure.\n\n## Constraints\n- File operations belong to `SkillBundle` domain layer (unlike lazy `Skill`).",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:c7b1a94cc5160e767b4949bfb8835d9a1c6fc7496248c3636d096150beb23c93",
+          "lastModified": "2026-05-25T06:02:58.507Z"
+        },
+        "verify.md": {
+          "hash": "sha256:9a3ad66c1acef4b963ac8cd6ffc7cc150acfdfdb9e37ed8a267c4e24b027693b",
+          "lastModified": "2026-05-25T06:02:58.507Z"
+        }
+      }
+    }
+  }
 }

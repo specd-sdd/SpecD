@@ -1,0 +1,44 @@
+- op: modified
+  description: 'Run hooks insert template values verbatim.'
+  selector:
+    type: section
+    matches: 'Requirement: Template variable expansion'
+  content: |
+    Before executing a `run:` hook command, `HookRunner` expands `{{key.path}}` template variables using a `HookVariables` object. The variables available are:
+
+    - `{{change.name}}` — the change name
+    - `{{change.path}}` — the absolute path to the change directory
+    - `{{project.root}}` — the absolute path to the project root
+
+    `{{change.workspace}}` MUST NOT be a supported token. A change has no single primary workspace — workspaces touched by the change are derived from `specIds` and MUST NOT be injected into `HookVariables` as a singular workspace field. See [`core:template-variables`](../template-variables/spec.md) and [`core:change`](../change/spec.md).
+
+    Unknown variable paths are left unexpanded (the original `{{key.path}}` token is preserved). Substituted values MUST be inserted verbatim. The developer writes any quotes. Host-shell quote translation is defined by [`core:hook-runner-port`](../hook-runner-port/spec.md).
+
+- op: modified
+  description: 'HookRunner expands run hooks verbatim and translates quotes.'
+  selector:
+    type: section
+    matches: '^Constraints$'
+  content: |
+    - `instruction:` hooks are never executed — they are passive text consumed exclusively by `GetHookInstructions`
+    - `run:` hooks are never injected into agent context — they are commands executed by `HookRunner`
+    - All workflow steps can have both `instruction:` and `run:` hooks — no restrictions by step type
+    - Pre-hooks use fail-fast semantics in all execution contexts
+    - Post-hooks use fail-soft semantics in all execution contexts
+    - Schema-level hooks always precede project-level hooks within the same phase
+    - `TransitionChange` and `ArchiveChange` delegate hook execution to `RunStepHooks`
+    - `RunStepHooks` is the single hook execution engine used by all use cases and the CLI
+    - Template variable expansion for developer `run:` hooks is verbatim. `HookRunner` then translates only quote syntax the host shell does not understand. Callers do not shell-escape those values.
+
+- op: modified
+  description: 'RunStepHooks collects hooks. HookRunner expands them.'
+  selector:
+    type: section
+    matches: 'Requirement: Default hook execution for transitions and archives'
+  content: |
+    By default, `TransitionChange` and `ArchiveChange` auto-execute `run:` hooks at step boundaries:
+
+    - **`TransitionChange`** — when transitioning to a state that has a workflow step with `run:` hooks, executes pre-hooks before the state change and post-hooks after. Pre-hook failure aborts the transition (fail-fast). Post-hook failures are collected but do not roll back (fail-soft). Hook execution is delegated to `RunStepHooks`.
+    - **`ArchiveChange`** — executes pre-archive hooks before any file modifications and post-archive hooks after the archive completes. Pre-hook failure aborts the archive. Post-hook failures are collected. Hook execution is delegated to `RunStepHooks`.
+
+    Both use cases delegate hook execution to `RunStepHooks`, which collects the hooks and records the schema command. `HookRunner` expands `{{...}}` and translates quotes. `RunStepHooks` MUST NOT expand the command itself.

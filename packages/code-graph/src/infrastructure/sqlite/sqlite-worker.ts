@@ -28,6 +28,7 @@ import {
   type UpdateIndexedInputObservationInput,
 } from '../../domain/value-objects/indexed-input-freshness.js'
 import {
+  type ImpactFrontierQuery,
   type LocalBindingLookup,
   type LogicalSymbolLookup,
   type PublicBindingLookup,
@@ -181,6 +182,11 @@ export async function handleMessage(
       case 'clear': {
         bulkSessions.clear()
         database.clear()
+        break
+      }
+      case 'queryImpactFrontier': {
+        const p = payload as { input: ImpactFrontierQuery }
+        result = database.queryImpactFrontier(p.input)
         break
       }
       case 'getFile': {
@@ -504,6 +510,11 @@ export async function handleMessage(
       case 'findLogicalSymbols': {
         const p = payload as { lookups: readonly LogicalSymbolLookup[] }
         result = database.findLogicalSymbols(p.lookups)
+        break
+      }
+      case 'findLogicalSymbolsByQualifiedNames': {
+        const p = payload as { qualifiedNames: readonly string[] }
+        result = database.findLogicalSymbolsByQualifiedNames(p.qualifiedNames)
         break
       }
       case 'findLogicalDeclarations': {

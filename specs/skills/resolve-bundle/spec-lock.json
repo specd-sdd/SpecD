@@ -8,5 +8,41 @@
     {
       "file": "skills:test/template-workflow.spec.ts"
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Resolves rendered skill bundles with safe config defaults, frontmatter gating, recursive variables, and shared-file safety.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:c7d562b8a185ec1143544cf50c76190e6afe9c45919f5fb474bb3d0b8169a3bc",
+          "lastModified": "2026-08-27T16:46:08.178Z"
+        },
+        "verify.md": {
+          "hash": "sha256:1f51fed41a6cd8d06250d3c277d650bf8853865cb9a6628da9d242e7e93c5bd3",
+          "lastModified": "2026-08-27T16:46:08.179Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Resolve bundle\n\n## Rules\n- Output: `ResolveBundleOutput { bundle: SkillBundle }`.\n- Input: `ResolveBundleInput { name: string; config?: SpecdConfig; context?: SkillTemplateContext }`; default empty context; recursive `context.variables`.\n- With `config`, inject only safe built-ins: `configPath` privacy-safe relative runtime path; `schemaRef: config.schemaRef`; missing `variables.sharedFolder` default relative path from runtime config directory.\n- Strip trailing `/` from `variables.sharedFolder`; validate resolved path stays within `projectRoot`; never expose `projectRoot`; rendered `sharedFolder` remains relative.\n- Merge built-ins + install context; `SkillRepository.getBundle(input.name, mergedContext)`.\n- Render template recursively using `variables` + capabilities. `variables.frontmatter` composes frontmatter only if `frontmatter` capability present.\n- Preserve all non-content `ResolvedFile` metadata, including shared flag; return resolved bundle.\n- Plugin installs needing `configPath`, `schemaRef`, default `sharedFolder` must use this use case, not repository direct.\n- `specd-fasttrack`: generic repository path only; preserve built-ins, capability IDs, structured frontmatter, shared routing; no fast-track resolver branch. Keep conditional workflow only for target capabilities; shared files no runtime skill frontmatter.\n\n## Constraints\n- Invocation supplies install render context.\n- Repository must not invent missing capability/frontmatter values.\n- `variables.frontmatter` alone must not emit frontmatter; capability gates it.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:c7d562b8a185ec1143544cf50c76190e6afe9c45919f5fb474bb3d0b8169a3bc",
+          "lastModified": "2026-08-27T16:46:08.178Z"
+        },
+        "verify.md": {
+          "hash": "sha256:1f51fed41a6cd8d06250d3c277d650bf8853865cb9a6628da9d242e7e93c5bd3",
+          "lastModified": "2026-08-27T16:46:08.179Z"
+        }
+      }
+    }
+  }
 }

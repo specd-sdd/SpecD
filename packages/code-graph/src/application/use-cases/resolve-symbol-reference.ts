@@ -5,6 +5,10 @@ import {
   type PublicBindingLookup,
   type GraphStore,
 } from '../../domain/ports/graph-store.js'
+import { splitWorkspaceIdentity } from '../../domain/services/split-workspace-identity.js'
+import { isExactLaneQuery, qualifiedLookupText } from '../../domain/services/exact-lane-query.js'
+import { parseDottedMemberReference } from '../../domain/services/parse-member-reference.js'
+import { type AdapterRegistryPort } from '../../domain/ports/adapter-registry-port.js'
 import { IndexCoverageStatus } from '../../domain/value-objects/index-session.js'
 import {
   FreshnessState,
@@ -14,8 +18,10 @@ import {
 } from '../../domain/value-objects/indexed-input-freshness.js'
 import {
   parseLogicalSymbol,
+  deriveQualifiedName,
   type DeclarationOccurrence,
   type LogicalSymbol,
+  type MemberSemantics,
   type ResolutionCandidate,
   type ResolutionHealth,
   type ResolutionStep,
@@ -32,6 +38,7 @@ export class ResolveSymbolReference {
    * @param store - Open graph store containing reference facts.
    * @param getHealth - Returns one current graph-health snapshot per batch.
    * @param assessResources - Optionally proves freshness for exact addressed resources.
+   * @param registry - Shared adapter registry used to parse anchored member text.
    */
   constructor(
     private readonly store: GraphStore,
@@ -39,6 +46,7 @@ export class ResolveSymbolReference {
     private readonly assessResources?: (
       resources: readonly IndexedResourceKey[],
     ) => Promise<readonly IndexedResourceFreshnessResult[]>,
+    private readonly registry?: AdapterRegistryPort,
   ) {}
 
   /**
@@ -63,16 +71,27 @@ export class ResolveSymbolReference {
 
     const health = await this.getHealth()
     const requests = inputs.map(normalizeRequest)
-    const logicalLookups = requests.map(toLogicalLookup)
+    const logicalLookups = deduplicateLogicalLookups(requests.flatMap(expandedLookups))
+    const qualifiedNames = [
+      ...new Set(
+        requests.flatMap((input) => {
+          const spelling = qualifiedLookupText(input.requested)
+          return spelling === undefined ? [] : [spelling]
+        }),
+      ),
+    ]
     const publicLookups = requests
       .filter((input) => input.publicSurface !== undefined)
       .map(toPublicLookup)
     const localLookups = requests.filter((input) => input.filePath !== undefined).map(toLocalLookup)
 
-    const [logicalSymbols, publicBindings, localBindings] = await Promise.all([
+    const [logicalSymbols, publicBindings, localBindings, qualifiedTargets] = await Promise.all([
       this.store.findLogicalSymbols(logicalLookups),
       publicLookups.length === 0 ? [] : this.store.findPublicBindings(publicLookups),
       localLookups.length === 0 ? [] : this.store.findLocalBindings(localLookups),
+      qualifiedNames.length === 0
+        ? []
+        : this.store.findLogicalSymbolsByQualifiedNames(qualifiedNames),
     ])
 
     const pathSources = [
@@ -99,7 +118,7 @@ export class ResolveSymbolReference {
             name: request.requested,
             space: request.symbolSpace,
             ownerId,
-            memberForm: request.memberForm,
+            ...memberLookupAxes(request.memberSemantics),
           }),
         )
       }),
@@ -108,7 +127,12 @@ export class ResolveSymbolReference {
       targetIds.size === 0 ? [] : this.store.findLogicalSymbolsByIds([...targetIds]),
       hierarchyLookups.length === 0 ? [] : this.store.findLogicalSymbols(hierarchyLookups),
     ])
-    const allTargets = deduplicateTargets([...logicalSymbols, ...boundTargets, ...hierarchyTargets])
+    const allTargets = deduplicateTargets([
+      ...logicalSymbols,
+      ...boundTargets,
+      ...hierarchyTargets,
+      ...qualifiedTargets,
+    ])
     const declarations = await this.store.findDeclarations(allTargets.map((target) => target.id))
     const declarationMap = groupDeclarations(declarations)
     const resourceFiles = [
@@ -130,7 +154,7 @@ export class ResolveSymbolReference {
     )
 
     return requests.map((request) =>
-      resolvePrepared({
+      resolvePrepared(this.registry, {
         request,
         health,
         logicalSymbols,
@@ -171,10 +195,16 @@ interface PreparedResolution {
 
 /**
  * Resolves a request from the prepared batch facts.
+ * @param registry - Shared adapter registry used to parse anchored member text.
  * @param prepared - Prepared request and indexed facts.
  * @returns Conservative resolution outcome.
  */
-function resolvePrepared(prepared: PreparedResolution): SymbolResolutionResult {
+function resolvePrepared(
+  registry: AdapterRegistryPort | undefined,
+  prepared: PreparedResolution,
+): SymbolResolutionResult {
+  const qualified = resolveQualifiedMember(registry, prepared)
+  if (qualified !== undefined) return qualified
   const { request } = prepared
   const exact = prepared.logicalSymbols.filter(
     (target) =>
@@ -350,8 +380,7 @@ function deduplicateFileResources(
  * @returns Encoded workspace or the supplied fallback.
  */
 function workspaceFromFilePath(filePath: string, fallback: string): string {
-  const separator = filePath.indexOf(':')
-  return separator > 0 ? filePath.slice(0, separator) : fallback
+  return splitWorkspaceIdentity(filePath)?.workspace ?? fallback
 }
 
 /**
@@ -464,8 +493,8 @@ function hierarchyCandidatesForRequest(prepared: PreparedResolution): Resolution
       target.name !== prepared.request.requested ||
       (prepared.request.symbolSpace !== undefined &&
         target.space !== prepared.request.symbolSpace) ||
-      (prepared.request.memberForm !== undefined &&
-        target.memberForm !== prepared.request.memberForm)
+      (prepared.request.memberSemantics !== undefined &&
+        !sameMemberSemantics(target.memberSemantics, prepared.request.memberSemantics))
     ) {
       return []
     }
@@ -606,8 +635,146 @@ function normalizeRequest(input: ResolveSymbolReferenceInput): ResolveSymbolRefe
     publicSurface: parsed.surface,
     symbolSpace: parsed.space,
     ...(parsed.ownerId !== undefined ? { ownerId: parsed.ownerId } : {}),
-    ...(parsed.memberForm !== undefined ? { memberForm: parsed.memberForm } : {}),
+    ...(parsed.memberSemantics !== undefined ? { memberSemantics: parsed.memberSemantics } : {}),
   }
+}
+
+/**
+ * Projects a request into a logical-symbol lookup.
+ * @param input - Normalized request.
+ * @returns Logical-symbol lookup.
+ */
+function expandedLookups(input: ResolveSymbolReferenceInput): LogicalSymbolLookup[] {
+  const base = toLogicalLookup(input)
+  if (!isExactLaneQuery(input.requested) || input.requested.startsWith('logical|')) return [base]
+  const parts = input.requested.split(/::|\./).filter((part) => part.length > 0)
+  if (parts.length < 2) return [base]
+  return parts.map((name) => ({
+    ...base,
+    name,
+    ownerId: undefined,
+    memberKind: undefined,
+    memberDispatch: undefined,
+    memberAccessor: undefined,
+    nativeKind: undefined,
+  }))
+}
+
+/**
+ * Resolves a single dotted or native member spelling by stored qualified name.
+ * Other exact-lane text still needs a file or language adapter.
+ * @param registry - Shared adapter registry. Absent adapters fall back to dotted parsing.
+ * @param prepared - Prepared request and indexed facts.
+ * @returns A terminal outcome, or undefined when the request is not an exact-lane member query.
+ */
+function resolveQualifiedMember(
+  registry: AdapterRegistryPort | undefined,
+  prepared: PreparedResolution,
+): SymbolResolutionResult | undefined {
+  const request = prepared.request
+  if (!isExactLaneQuery(request.requested) || request.requested.startsWith('logical|'))
+    return undefined
+  if (request.ownerId !== undefined || request.logicalId !== undefined) return undefined
+  const spelling = qualifiedLookupText(request.requested)
+  const anchored = request.filePath ?? request.publicSurface
+  if (spelling !== undefined) {
+    const byId = new Map(prepared.allTargets.map((target) => [target.id, target]))
+    const matches = prepared.allTargets.filter((target) => {
+      const stored = target.qualifiedName ?? deriveQualifiedName(target, byId)
+      if (stored !== spelling) return false
+      if (anchored !== undefined) return symbolVisibleIn(prepared, target, anchored)
+      return request.workspace.length === 0 || target.workspace === request.workspace
+    })
+    if (matches.length === 0) return unresolved(prepared, 'REFERENCE_UNPROVEN')
+    return outcomeFromTargets(prepared, matches, [])
+  }
+  if (anchored === undefined && request.language === undefined) {
+    return unresolved(prepared, 'REFERENCE_UNPROVEN')
+  }
+  const parsed = parseAnchoredReference(registry, request, anchored)
+  if (parsed.candidates.length === 0) return undefined
+  if (parsed.candidates.length > 1) {
+    return {
+      request,
+      status: 'ambiguous',
+      reasonCode: 'AMBIGUOUS_MULTIPLE_TARGETS',
+      health: prepared.health,
+      target: null,
+      candidates: [],
+      path: [],
+    }
+  }
+  const names = parsed.candidates[0]!.segments.map((segment) => segment.name)
+  let ownerIds: Array<string | undefined> = [undefined]
+  for (const name of names.slice(0, -1)) {
+    const next: string[] = []
+    for (const ownerId of ownerIds) {
+      for (const target of prepared.allTargets) {
+        if (target.name !== name || target.ownerId !== ownerId) continue
+        if (!symbolVisibleIn(prepared, target, anchored)) continue
+        next.push(target.id)
+      }
+    }
+    ownerIds = [...new Set(next)]
+  }
+  const memberName = names.at(-1)!
+  const members = prepared.allTargets.filter(
+    (target) =>
+      target.name === memberName &&
+      target.ownerId !== undefined &&
+      ownerIds.includes(target.ownerId) &&
+      (request.memberSemantics === undefined ||
+        sameMemberSemantics(target.memberSemantics, request.memberSemantics)) &&
+      symbolVisibleIn(prepared, target, anchored),
+  )
+  if (members.length === 0) return unresolved(prepared, 'REFERENCE_UNPROVEN')
+  return outcomeFromTargets(prepared, members, [])
+}
+
+/**
+ * Parses anchored member text with the file or language adapter.
+ * @param registry - Shared adapter registry.
+ * @param request - Normalized resolution request.
+ * @param anchored - File or public surface used to choose an adapter.
+ * @returns Parsed member candidates. Empty when a named language has no parser.
+ */
+function parseAnchoredReference(
+  registry: AdapterRegistryPort | undefined,
+  request: ResolveSymbolReferenceInput,
+  anchored: string | undefined,
+): ReturnType<typeof parseDottedMemberReference> {
+  const adapter =
+    request.language !== undefined
+      ? registry
+          ?.getAdapters()
+          .find((candidate) => candidate.languages().includes(request.language!))
+      : anchored === undefined
+        ? undefined
+        : registry?.getAdapterForFile(anchored)
+  if (adapter?.parseSymbolReference !== undefined)
+    return adapter.parseSymbolReference(request.requested)
+  if (registry !== undefined && request.language !== undefined) return { candidates: [] }
+  return parseDottedMemberReference(request.requested)
+}
+
+/**
+ * Checks whether a logical target is visible at the anchored file or workspace.
+ * @param prepared - Prepared request and declaration map.
+ * @param target - Candidate logical symbol.
+ * @param anchored - File or public surface. Absent means the workspace must match.
+ * @returns Whether the target is visible for this request.
+ */
+function symbolVisibleIn(
+  prepared: PreparedResolution,
+  target: LogicalSymbol,
+  anchored: string | undefined,
+): boolean {
+  if (anchored === undefined) return target.workspace === prepared.request.workspace
+  const declarations = prepared.declarationMap.get(target.id) ?? []
+  return (
+    declarations.some((declaration) => declaration.location.filePath === anchored) ||
+    target.surface === anchored
+  )
 }
 
 /**
@@ -622,7 +789,7 @@ function toLogicalLookup(input: ResolveSymbolReferenceInput): LogicalSymbolLooku
     name: input.requested,
     space: input.symbolSpace,
     ownerId: input.ownerId,
-    memberForm: input.memberForm,
+    ...memberLookupAxes(input.memberSemantics),
   }
 }
 
@@ -666,7 +833,8 @@ function matchesRequest(target: LogicalSymbol, input: ResolveSymbolReferenceInpu
     (input.publicSurface === undefined || target.surface === input.publicSurface) &&
     (input.symbolSpace === undefined || target.space === input.symbolSpace) &&
     (input.ownerId === undefined || target.ownerId === input.ownerId) &&
-    (input.memberForm === undefined || target.memberForm === input.memberForm)
+    (input.memberSemantics === undefined ||
+      sameMemberSemantics(target.memberSemantics, input.memberSemantics))
   )
 }
 
@@ -738,7 +906,10 @@ function deduplicateLogicalLookups(lookups: readonly LogicalSymbolLookup[]): Log
           lookup.name,
           lookup.space,
           lookup.ownerId,
-          lookup.memberForm,
+          lookup.memberKind,
+          lookup.memberDispatch,
+          lookup.memberAccessor,
+          lookup.nativeKind,
         ]),
         lookup,
       ]),
@@ -770,7 +941,7 @@ function compareTargets(left: LogicalSymbol, right: LogicalSymbol): number {
     left.ownerId ?? '',
     left.space,
     left.name,
-    left.memberForm ?? '',
+    memberSemanticsKey(left.memberSemantics),
     left.id,
   ]
     .join('\u0000')
@@ -781,7 +952,7 @@ function compareTargets(left: LogicalSymbol, right: LogicalSymbol): number {
         right.ownerId ?? '',
         right.space,
         right.name,
-        right.memberForm ?? '',
+        memberSemanticsKey(right.memberSemantics),
         right.id,
       ].join('\u0000'),
     )
@@ -795,6 +966,55 @@ function compareTargets(left: LogicalSymbol, right: LogicalSymbol): number {
  */
 function compareCandidates(left: ResolutionCandidate, right: ResolutionCandidate): number {
   return compareTargets(left.target, right.target)
+}
+
+/**
+ * Projects member semantics into lookup axes. An absent axis stays undefined.
+ * @param semantics - Requested member semantics, when the caller supplied them.
+ * @returns The four lookup axes.
+ */
+function memberLookupAxes(
+  semantics: MemberSemantics | undefined,
+): Pick<LogicalSymbolLookup, 'memberKind' | 'memberDispatch' | 'memberAccessor' | 'nativeKind'> {
+  return {
+    memberKind: semantics?.kind,
+    memberDispatch: semantics?.dispatch,
+    memberAccessor: semantics?.accessor,
+    nativeKind: semantics?.nativeKind,
+  }
+}
+
+/**
+ * Compares stored member semantics with a requested form.
+ * @param stored - Semantics stored on the logical symbol.
+ * @param requested - Semantics required by the request.
+ * @returns Whether every supplied axis matches.
+ */
+function sameMemberSemantics(
+  stored: MemberSemantics | undefined,
+  requested: MemberSemantics,
+): boolean {
+  return (
+    stored?.kind === requested.kind &&
+    stored.dispatch === requested.dispatch &&
+    stored.accessor === requested.accessor &&
+    stored.nativeKind === requested.nativeKind
+  )
+}
+
+/**
+ * Builds a stable sort key for member semantics.
+ * @param semantics - Member semantics to encode. Absent semantics sort first.
+ * @returns A delimiter-joined key.
+ */
+function memberSemanticsKey(semantics: MemberSemantics | undefined): string {
+  if (semantics === undefined) return ''
+  return [
+    semantics.kind,
+    semantics.dispatch ?? '',
+    semantics.accessor ?? '',
+    semantics.nativeKind ?? '',
+  ].join('\u0000')
 }
 
 /**

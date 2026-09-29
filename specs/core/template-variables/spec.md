@@ -78,9 +78,11 @@ When a token is not resolved (step 3), `TemplateExpander` MUST invoke the `onUnk
 
 ### Requirement: Shell escaping for run hooks
 
-When expanding variables in `run:` hook commands, all substituted values MUST be shell-escaped to prevent injection attacks. Values are wrapped in single quotes with embedded single quotes escaped using the `'\''` idiom.
+When expanding variables in `run:` hook commands, substituted values MUST be inserted verbatim. SpecD MUST NOT add quotes around a substituted value. The developer writes the quotes in the command. Several variables inside one pair of quotes MUST stay one string after substitution. `mkdir "{{project.root}}/{{change.name}}"` with root `/repo` and name `add-auth` MUST become `mkdir "/repo/add-auth"`.
 
-When expanding variables in `instruction:` text or artifact instructions, values are substituted verbatim without shell escaping — these are text blocks consumed by agents, not shell commands.
+`expandForShell()` MUST remain available for a command string that SpecD itself builds. That method wraps each substituted value. The POSIX dialect uses single quotes and the `'\''` idiom. The `cmd.exe` dialect turns an empty value into `""`, replaces `%` with `%%` and `"` with `""`, then wraps the value in double quotes. `HookRunner` MUST NOT use `expandForShell()` for a developer `run:` hook.
+
+When expanding variables in `instruction:` text or artifact instructions, values are substituted verbatim without shell escaping and without quote translation. These are text blocks consumed by agents, not shell commands.
 
 ### Requirement: TemplateExpander class
 
@@ -93,14 +95,14 @@ class TemplateExpander {
   constructor(builtins: TemplateVariables, onUnknown?: OnUnknownVariable)
 
   expand(template: string, variables?: TemplateVariables): string
-  expandForShell(template: string, variables?: TemplateVariables): string
+  expandForShell(template: string, variables?: TemplateVariables, dialect?: 'posix' | 'cmd'): string
 }
 ```
 
 - The `builtins` provided at construction (e.g. `{ project: { root: '...' } }`) are always present in every expansion.
 - `onUnknown` is an optional callback invoked when a `{{namespace.key}}` token cannot be resolved. When provided, it is called once per unresolved token. The callback is informational only — it does not affect the expansion result.
-- `expand(template, variables?)` — merges contextual `variables` with built-ins and substitutes values verbatim. Used by `GetHookInstructions` and `GetArtifactInstruction` for instruction text.
-- `expandForShell(template, variables?)` — merges contextual `variables` with built-ins and substitutes values with shell escaping. Used by `HookRunner` for `run:` commands.
+- `expand(template, variables?)` — merges contextual `variables` with built-ins and substitutes values verbatim. Used by `GetHookInstructions`, `GetArtifactInstruction`, and `HookRunner` for developer `run:` commands.
+- `expandForShell(template, variables?, dialect?)` — merges contextual `variables` with built-ins and substitutes values with shell escaping for a command SpecD itself builds. `dialect` defaults to `posix`. `HookRunner` does not call it for developer hooks.
 - Contextual variables MUST NOT override built-in variables. If a contextual namespace collides with a built-in namespace, the built-in keys take precedence.
 - Both methods share the same traversal and resolution logic — only the substitution step differs.
 
@@ -132,7 +134,7 @@ Namespace names and key names MUST be lowercase alphanumeric with hyphens allowe
 
 ## Spec Dependencies
 
-- [`core:hook-runner-port`](../hook-runner-port/spec.md) — `HookRunner` uses `expandForShell()` for `run:` commands
+- [`core:hook-runner-port`](../hook-runner-port/spec.md) — `HookRunner` expands developer `run:` commands with `expand()` and then translates quote syntax for the host shell
 - [`core:hook-execution-model`](../hook-execution-model/spec.md) — instruction hooks and run hooks both support template variables
 - [`core:get-hook-instructions`](../get-hook-instructions/spec.md) — expands variables in instruction text via `expand()`
 - [`core:get-artifact-instruction`](../get-artifact-instruction/spec.md) — expands variables in instruction and rules text via `expand()`

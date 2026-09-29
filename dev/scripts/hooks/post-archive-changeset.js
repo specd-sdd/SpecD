@@ -14,13 +14,16 @@ const WORKSPACE_PACKAGE_MAP = {
   'core': '@specd/core',
   'cli': '@specd/cli',
   'code-graph': '@specd/code-graph',
+  'sdk': '@specd/sdk',
   'skills': '@specd/skills',
   'schema-std': '@specd/schema-std',
+  'guide': '@specd/guide',
   'mcp': '@specd/mcp',
   'plugin-manager': '@specd/plugin-manager',
   'plugin-agent-claude': '@specd/plugin-agent-claude',
   'plugin-agent-copilot': '@specd/plugin-agent-copilot',
   'plugin-agent-codex': '@specd/plugin-agent-codex',
+  'plugin-agent-opencode': '@specd/plugin-agent-opencode',
   'plugin-agent-standard': '@specd/plugin-agent-standard',
 }
 

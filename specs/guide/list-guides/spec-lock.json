@@ -1,0 +1,24 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["guide:conventions", "guide:guide-model"],
+  "implementation": [
+    {
+      "file": "guide:src/application/ports/guide-catalog-port.ts",
+      "symbols": ["GuideCatalogPort"]
+    },
+    {
+      "file": "guide:src/application/ports/index.ts"
+    },
+    {
+      "file": "guide:src/application/queries/list-guides-query.ts",
+      "symbols": ["ListGuidesQuery"]
+    },
+    {
+      "file": "guide:src/infrastructure/adapters/prebundled-guide-catalog-adapter.ts",
+      "symbols": ["PrebundledGuideCatalogAdapter"]
+    }
+  ]
+}

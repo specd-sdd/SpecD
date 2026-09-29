@@ -1,0 +1,45 @@
+- op: modified
+  description: 'RunStepHooks passes verbatim expansion to HookRunner.'
+  selector:
+    type: section
+    matches: 'Requirement: Ports and constructor'
+  content: |
+    `RunStepHooks` receives at construction time: `ChangeRepository`, `ArchiveRepository`, `HookRunner`, a `ReadonlyMap<string, ExternalHookRunner>`, and `SchemaProvider`.
+
+    ```typescript
+    class RunStepHooks {
+      constructor(
+        changes: ChangeRepository,
+        archive: ArchiveRepository,
+        hooks: HookRunner,
+        externalHookRunners: ReadonlyMap<string, ExternalHookRunner>,
+        schemaProvider: SchemaProvider,
+      )
+    }
+    ```
+
+    `HookRunner` expands developer `run:` commands with `TemplateExpander.expand()` and then translates quote syntax for the host shell. `RunStepHooks` does not call the expander directly. It builds the `TemplateVariables` map and passes it to `HookRunner.run()`.
+
+    The external hook runner registry is indexed by accepted external type and is used only for explicit `external` hook entries.
+
+    `SchemaProvider` returns the fully-resolved schema with plugins and overrides applied — all workflow hooks (including those added via `schemaOverrides`) are already present in the schema's workflow steps. All dependencies are injected at kernel composition time, not passed per invocation.
+
+- op: modified
+  description: 'The reported command is the schema command. HookRunner expands it.'
+  selector:
+    type: section
+    matches: 'Requirement: Result shape'
+  content: |
+    `RunStepHooks.execute` MUST return a result object containing:
+
+    - `hooks` — array of per-hook results, each with:
+      - `id` (string) — the hook's `id` from the schema or project config
+      - `command` (string) — the schema `run:` command, still containing the developer's `{{...}}` tokens. `HookRunner` expands and translates that string. The result MUST NOT record a second expansion performed by `RunStepHooks`. An external hook records `external:<type>`.
+      - `exitCode` (number) — the process exit code
+      - `stdout` (string) — captured stdout
+      - `stderr` (string) — captured stderr
+      - `success` (boolean) — `true` when exit code is 0
+    - `success` (boolean) — `true` when all executed hooks succeeded
+    - `failedHooks` (array) — the subset of executed hook results whose `success` is `false`, in execution order; empty when every executed hook succeeded
+
+    Progress reporting during execution MUST be additive only. It does not replace the final result object, which MUST still contain the complete captured stdout/stderr and final exit information for every executed hook.

@@ -54,6 +54,15 @@ You MUST prioritize formats according to the following rules:
 
 Never use `--format json` unless `toon` is unavailable or explicitly requested.
 
+## On-Demand Documentation (`specd guide`)
+
+When working within skills, do NOT guess or extrapolate configuration syntax, schema rules, delta formats, workflow behaviors, or CLI options. Query the built-in documentation system on demand:
+
+- `specd guide [topic] --format toon`: Retrieve documentation topics
+- `specd guide <topic> --meta --format toon`: Inspect document outline and statistics
+- `specd guide <topic> --section "<heading|index>" --format toon`: Extract specific section content
+- `specd guide search "<query>" --format toon`: Search across all guides with BM25 full-text search
+
 ## Command necessity and freshness
 
 Avoid redundant reads, but only when the replacement is explicit and fresh.

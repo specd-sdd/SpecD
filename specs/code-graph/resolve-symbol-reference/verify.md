@@ -7,7 +7,7 @@
 #### Scenario: Structured fields disambiguate a member
 
 - **GIVEN** the same member text exists in different owners and symbol spaces
-- **WHEN** resolution includes workspace, owner, symbol space, and member form
+- **WHEN** resolution includes workspace, owner, symbol space, and member semantics
 - **THEN** only the matching structured target is considered
 - **AND** its rendered reference round-trips to the same fields
 
@@ -16,6 +16,34 @@
 - **WHEN** two identifiers differ only by case
 - **THEN** resolution follows the addressed language's comparison rules
 - **AND** no global lowercase normalization is applied
+
+#### Scenario: Unanchored dotted spelling matches qualified_name
+
+- **GIVEN** `EditChange.execute` is stored as `qualified_name` and the request has no file, public surface, or language
+- **WHEN** it is resolved
+- **THEN** the outcome is that member
+- **AND** no adapter is selected
+
+#### Scenario: Double-colon spelling matches the same qualified name
+
+- **GIVEN** `qualified_name` is `ArchiveChange.execute`
+- **WHEN** the request text is `ArchiveChange::execute` with no file or language
+- **THEN** the outcome is that member
+- **AND** the PHP adapter is not required
+
+#### Scenario: Several equal qualified names are all returned
+
+- **GIVEN** two logical symbols store `GetStatus.execute`
+- **WHEN** the request text is `GetStatus.execute` with no file
+- **THEN** both are returned
+- **AND** neither is dropped
+
+#### Scenario: Anchored file filters the equal names
+
+- **GIVEN** two logical symbols store `EditChange.execute`
+- **AND** the request file declares only one of them
+- **WHEN** the text is `EditChange.execute`
+- **THEN** only the member visible in that file is returned
 
 ### Requirement: Logical canonical targets
 
@@ -66,6 +94,55 @@
 - **GIVEN** two package conditions expose different targets
 - **WHEN** no selecting build context is supplied
 - **THEN** no incidental host condition is chosen
+
+#### Scenario: Owner is resolved before the member
+
+- **GIVEN** `EditChange.execute` and another type also declares `execute`
+- **WHEN** the anchored TypeScript file requests `EditChange.execute`
+- **THEN** the owner path is resolved first
+- **AND** only `EditChange`'s `execute` member is eligible
+
+#### Scenario: Public binding matches surface and exported name
+
+- **GIVEN** `runIsolatedGraphIndex` is published on `sdk:src/index.ts` and declared in code-graph
+- **WHEN** resolution addresses that public surface and exported name
+- **THEN** the logical target is the code-graph symbol
+- **AND** a different file that merely contains the same simple name is not selected
+
+#### Scenario: File path alone does not select a binding
+
+- **GIVEN** a public binding's surface differs from the request file
+- **AND** the request does not set that public surface
+- **WHEN** resolution runs
+- **THEN** that binding is not a match
+
+#### Scenario: Value and type pair stays ambiguous
+
+- **GIVEN** the anchored file declares `MemberForm` as both a value and a type
+- **WHEN** resolution requests the simple name `MemberForm` with no symbol space
+- **THEN** the outcome is ambiguous
+- **AND** neither candidate is chosen
+
+#### Scenario: Missing member of a known owner is unresolved
+
+- **GIVEN** `EditChange` exists and does not declare `missing`
+- **WHEN** resolution requests `EditChange.missing`
+- **THEN** the outcome is unresolved
+- **AND** another type's `missing` member is not selected
+
+#### Scenario: Legacy occurrence id still resolves
+
+- **GIVEN** a location-backed symbol id is stored
+- **WHEN** resolution receives that id
+- **THEN** the current logical symbol for that declaration is returned
+- **AND** the id is not parsed as owner-qualified text
+
+#### Scenario: Current canonical id skips human parsing
+
+- **GIVEN** a versioned canonical logical id
+- **WHEN** resolution receives it
+- **THEN** the matching logical symbol is returned
+- **AND** no language adapter parses the id as human text
 
 ### Requirement: Resolution outcomes
 

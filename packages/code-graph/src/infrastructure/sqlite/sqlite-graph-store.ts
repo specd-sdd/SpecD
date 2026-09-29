@@ -2,6 +2,8 @@ import {
   GraphStore,
   type IndexWriteSession,
   type IndexWriteSessionMetadata,
+  type ImpactFrontierQuery,
+  type ImpactFrontierResult,
   type LocalBindingLookup,
   type LogicalDeclaration,
   type LogicalSymbolLookup,
@@ -41,7 +43,7 @@ import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { SQLiteWorkerClient } from './sqlite-worker-client.js'
 import { type InternalSQLiteGraphStoreOptions } from './sqlite-runtime-descriptor.js'
-import { rotateStorageGenerationAsync } from '../storage-generation.js'
+import { rotateStorageGenerationAsync, retryLockedAsync } from '../storage-generation.js'
 import { StoreNotOpenError } from '../../domain/errors/store-not-open-error.js'
 import { BulkSessionStateError } from '../../domain/errors/bulk-session-state-error.js'
 import { GraphStoreRecreateRequiresClosedError } from '../../domain/errors/graph-store-recreate-requires-closed-error.js'
@@ -396,6 +398,22 @@ export class SQLiteGraphStore extends GraphStore {
   }
 
   /**
+   * Reads one filtered impact frontier through the SQLite worker.
+   *
+   * An empty frontier cannot have adjacent relations, so it avoids a worker
+   * round-trip while retaining the complete deterministic result shape.
+   *
+   * @param input - Frontier resource, traversal orientation, and optional filters.
+   * @returns Admitted relations and the requested hydrated resource categories.
+   */
+  async queryImpactFrontier(input: ImpactFrontierQuery): Promise<ImpactFrontierResult> {
+    if (input.frontier.length === 0) {
+      return { relations: [], symbols: [], files: [], specs: [] }
+    }
+    return this.client.sendRequest('queryImpactFrontier', { input })
+  }
+
+  /**
    * Retrieves incoming Import relations targeting the specified file.
    *
    * @param filePath - Target file path.
@@ -734,7 +752,12 @@ export class SQLiteGraphStore extends GraphStore {
       throw new GraphStoreRecreateRequiresClosedError()
     }
     const graphDir = join(this.storagePath, 'graph')
-    await rm(graphDir, { recursive: true, force: true })
+    const dbPath = join(graphDir, 'code-graph.sqlite')
+    for (const suffix of ['', '-wal', '-shm']) {
+      await retryLockedAsync(async () => {
+        await rm(`${dbPath}${suffix}`, { force: true })
+      })
+    }
     await rotateStorageGenerationAsync(this.storagePath)
   }
 
@@ -825,6 +848,17 @@ export class SQLiteGraphStore extends GraphStore {
     lookups: readonly LogicalSymbolLookup[],
   ): Promise<LogicalSymbol[]> {
     return this.client.sendRequest('findLogicalSymbols', { lookups })
+  }
+
+  /**
+   * Looks up logical symbols by stored qualified spelling.
+   * @param qualifiedNames - Generic dotted spellings.
+   * @returns Promise resolving to every equal logical symbol.
+   */
+  override async findLogicalSymbolsByQualifiedNames(
+    qualifiedNames: readonly string[],
+  ): Promise<LogicalSymbol[]> {
+    return this.client.sendRequest('findLogicalSymbolsByQualifiedNames', { qualifiedNames })
   }
 
   /**

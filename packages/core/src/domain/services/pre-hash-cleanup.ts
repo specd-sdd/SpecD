@@ -21,5 +21,5 @@ export function applyPreHashCleanup(content: string, cleanups: readonly PreHashC
       result = result.replace(re, cleanup.replacement)
     }
   }
-  return result
+  return result.replace(/\s+/g, ' ').trim()
 }

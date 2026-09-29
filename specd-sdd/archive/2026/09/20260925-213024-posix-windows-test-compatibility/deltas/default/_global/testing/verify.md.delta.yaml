@@ -1,0 +1,64 @@
+- op: added
+  description: 'Add verify scenarios for POSIX and Windows compatibility'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: 'Requirement: Integration tests for infrastructure adapters'
+  content: |
+    ### Requirement: Tests are POSIX- and Windows-compatible
+
+    #### Scenario: Path asserted with a hardcoded POSIX absolute temp path
+
+    - **WHEN** a test asserts that a temporary directory equals `/tmp/...` or concatenates path segments with a hardcoded `/`
+    - **THEN** it must use `node:path` (`join`, `resolve`, or `sep`) and host-derived locations instead
+
+    #### Scenario: Fixture map keys do not match host absolute paths
+
+    - **GIVEN** an in-memory fixture map keyed like `/project/src/foo.ts`
+    - **WHEN** the code under test returns host-resolved absolute paths
+    - **THEN** the test remaps fixture keys with `path.resolve` (or equivalent) before comparing
+
+    #### Scenario: Windows drive-letter paths on a non-Windows host
+
+    - **GIVEN** a unit test runs on macOS or Linux
+    - **WHEN** it exercises Windows drive-letter or backslash path rules
+    - **THEN** it routes those inputs through `path.win32` (or an equivalent `node:path` mock), not the host `path` APIs alone
+
+    #### Scenario: Hook or spawn test uses a POSIX-only shell builtin
+
+    - **WHEN** a portable behaviour assertion spawns `printf`, bare `echo`, or `sleep` as the subject command
+    - **THEN** it must use a portable command such as `node -e`, or document a Windows-safe alternative
+
+    #### Scenario: Windows cmd entry point and expansion
+
+    - **GIVEN** the test runs on Windows or stubs `process.platform` to `win32`
+    - **WHEN** it spawns a `*.cmd` tool such as `pnpm.cmd` or asserts expanded hook text containing `%PATH%`
+    - **THEN** spawn uses a shell when required (and may set `windowsHide`)
+    - **AND** assertions account for Windows shell expansion and cmd versus POSIX quoting
+
+    #### Scenario: CRLF changes logical text identity
+
+    - **WHEN** content hashing or an “already installed” marker file compares text that may use CRLF or lone CR
+    - **THEN** CRLF and lone CR are treated as equivalent to LF for logical identity
+
+- op: modified
+  description: 'Mention pathToFileURL in temporary path scenario'
+  selector:
+    type: section
+    matches: 'Requirement: Fixtures are valid on Windows'
+  content: |
+    #### Scenario: Temporary paths come from the OS
+
+    - **WHEN** a filesystem test creates a temporary directory or builds a file URL for a dynamic import
+    - **THEN** the directory is under `os.tmpdir()`
+    - **AND** file URLs are built from the local path (for example with `pathToFileURL`)
+    - **AND** the test does not hardcode `/tmp` or `file:///tmp/`
+
+    #### Scenario: Unreadable files do not depend on chmod zero on Windows
+
+    - **GIVEN** the test runs on Windows
+    - **WHEN** it needs a file the process cannot read
+    - **THEN** it does not use `chmod 0o000` as that condition

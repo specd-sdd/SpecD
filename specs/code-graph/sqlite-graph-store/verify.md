@@ -59,6 +59,14 @@
 - **WHEN** `SQLiteGraphStore.open()` starts the worker
 - **THEN** the worker dynamically loads the specified SQLite module inside its execution context without requiring function-valued loaders across IPC
 
+#### Scenario: Absolute filesystem modulePath uses a file URL for dynamic import
+
+- **GIVEN** a `SqliteRuntimeDescriptor` whose `modulePath` is an absolute filesystem path, including a Windows drive-letter path
+- **WHEN** the SQLite runtime module is loaded during `open()`
+- **THEN** the path is converted to a `file:` URL before dynamic `import()`
+- **AND** package specifiers and already-qualified `file:`, `data:`, and `node:` URLs are imported unchanged
+- **AND** a resolvable absolute path loads the module successfully
+
 #### Scenario: Deterministic error propagation on unexpected worker termination and manual recovery
 
 - **GIVEN** an open `SQLiteGraphStore` with in-flight and pending operations
@@ -193,6 +201,41 @@
 - **WHEN** a batch symbol query has no symbol ids or a relation query has no ids or relation types
 - **THEN** it returns an empty array without dispatching a worker RPC or executing SQL
 
+### Requirement: Query-time filtered impact reads
+
+#### Scenario: Category predicates prevent unrequested hydration
+
+- **GIVEN** one impact frontier has matching file, symbol, and spec rows
+- **WHEN** the query requests only `files` and `specs`
+- **THEN** SQLite does not execute or hydrate the symbol-result collection
+- **AND** the returned file and spec rows remain deterministically ordered
+
+#### Scenario: SQL applies kind and workspace predicates
+
+- **GIVEN** symbols of several kinds whose owning files span included and excluded workspaces
+- **WHEN** SQLite executes the filtered symbol frontier
+- **THEN** bound SQL parameters constrain symbol kind and owning workspace before materialization
+- **AND** a workspace present in both sets is excluded
+
+#### Scenario: Empty filters do not generate invalid SQL
+
+- **WHEN** normalized inclusion, exclusion, or kind lists are empty
+- **THEN** SQLite omits the corresponding `IN` or `NOT IN` clause
+- **AND** the query remains valid and preserves unfiltered compatibility
+
+#### Scenario: Worker transports the normalized request losslessly
+
+- **GIVEN** a typed filtered-impact payload containing all filter fields
+- **WHEN** `SQLiteGraphStore` sends it through the worker operation map
+- **THEN** the dispatcher invokes `SQLiteGraphDatabase` with the same values and ordering
+- **AND** the generic worker client's lifecycle, overload, and typed error behavior remain unchanged
+
+#### Scenario: Dynamic filter values are parameterized
+
+- **WHEN** workspace or kind values contain SQL metacharacters
+- **THEN** they are passed only as bound values
+- **AND** they cannot alter the generated statement structure
+
 ### Requirement: Worker-backed exact batch node lookups
 
 #### Scenario: Exact batch node lookup crosses the worker boundary once
@@ -266,6 +309,20 @@
 - **GIVEN** an opened healthy SQLite store
 - **WHEN** force indexing runs
 - **THEN** it uses logical clear and full reanalysis without physical recreation
+
+### Requirement: Locked recreation preserves the index lease
+
+#### Scenario: A locked WAL file surfaces the original error after retries
+
+- **GIVEN** deleting a WAL sidecar keeps failing with `EBUSY`
+- **WHEN** `recreate()` exhausts its bounded retries
+- **THEN** the original error is surfaced
+
+#### Scenario: A live index lock is not deleted
+
+- **GIVEN** an index process holds `index.lock`
+- **WHEN** `recreate()` removes the database files
+- **THEN** `index.lock` is still present
 
 ### Requirement: SQLite logical clear parity
 
@@ -528,10 +585,53 @@
 
 #### Scenario: SQLite old schema rebuilds safely
 
-- **GIVEN** schema version 8 and the reference schema expects 9
+- **GIVEN** schema version 10 or 11 and the reference schema expects 12
 - **WHEN** normal read and then graph index are attempted
-- **THEN** read rejects without empty recreation
-- **AND** index rotates generation, rebuilds fields/FTS, and opens the new version
+- **THEN** read rejects with `GraphSchemaIncompatibleError` without empty recreation
+- **AND** index rotates generation, rebuilds fields and FTS, and opens version 12
+
+#### Scenario: member_form is replaced in place
+
+- **WHEN** a version 12 database is created
+- **THEN** `logical_symbols` has `member_kind`, `member_dispatch`, `member_accessor`, `native_kind`, and `qualified_name`
+- **AND** `qualified_name` has an equality index
+- **AND** it has no `member_form` column
+- **AND** `public_bindings`, `symbols.search_text`, and `symbol_fts` keep their previous columns
+
+#### Scenario: Version 12 opens without rebuild
+
+- **GIVEN** `meta.schemaVersion` is already 12
+- **WHEN** the store opens for a read
+- **THEN** it does not throw `GraphSchemaIncompatibleError`
+- **AND** it does not recreate the database
+
+#### Scenario: Any other version is incompatible
+
+- **GIVEN** `meta.schemaVersion` is 9 or 13
+- **WHEN** the store opens
+- **THEN** the error is `GraphSchemaIncompatibleError`
+- **AND** no `ALTER TABLE` is executed
+
+#### Scenario: Rebuild discards old logical ids
+
+- **GIVEN** a version 10 database contains logical ids that embed member form
+- **WHEN** graph index recreates version 12
+- **THEN** those old id strings are absent
+- **AND** new ids round-trip through the versioned encoding
+
+#### Scenario: Qualified spelling is an equality column
+
+- **GIVEN** `EditChange` owns `execute`
+- **WHEN** the member is indexed
+- **THEN** `logical_symbols.qualified_name` is `EditChange.execute`
+- **AND** `symbols.search_text` is the expanded bare name
+- **AND** `symbol_fts` has no extra column
+
+#### Scenario: Worker row uses the new columns
+
+- **WHEN** a logical symbol is inserted and selected through the worker
+- **THEN** the row carries `member_kind`, `member_dispatch`, `member_accessor`, `native_kind`, and `qualified_name`
+- **AND** the statement does not reference `member_form`
 
 #### Scenario: SQLite source search preserves occurrence and range semantics
 

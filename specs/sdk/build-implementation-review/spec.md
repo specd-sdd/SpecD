@@ -36,6 +36,12 @@ One invocation SHALL evaluate graph health once and SHALL resolve its symbol lin
 through the resolver's batch contract under one opened-provider lifecycle. It MUST
 NOT open a provider or scan the complete graph independently for every link.
 
+### Requirement: Unparsed stored symbol text
+
+`buildImplementationReview` SHALL pass each stored implementation symbol string to the provider resolver unchanged, together with the link file when one exists. The SDK MUST NOT parse owner-qualified syntax, package specifiers, or canonical logical ids, and MUST NOT select a language adapter.
+
+The provider result SHALL remain the review outcome. An unresolved or ambiguous provider result MUST stay unresolved or ambiguous in the review projection.
+
 ### Requirement: Graph availability behavior
 
 Readable but non-current or incomplete graph state SHALL be represented through

@@ -1,0 +1,15 @@
+- op: modified
+  description: 'Workspace names that are Windows device names are reserved on every OS.'
+  selector:
+    type: section
+    matches: 'Requirement: Workspace identity'
+  content: |
+    A workspace is identified by a unique name within a project's `specd.yaml`. Names must match `/^[a-z][a-z0-9-]*$/`.
+
+    The following names are RESERVED and MUST NOT be used for spec workspaces:
+
+    - `default` — reserved for the local project workspace (mandatory).
+    - `root` — reserved for project-global graph identities.
+    - Windows device names — `con`, `prn`, `aux`, `nul`, `com1` through `com9`, and `lpt1` through `lpt9`. These MUST be rejected on every operating system when the whole workspace name is the device name. A name such as `con-foo` MUST remain legal.
+
+    No two workspaces in the same configuration may share the same name.

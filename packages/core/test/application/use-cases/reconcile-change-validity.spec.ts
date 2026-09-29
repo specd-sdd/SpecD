@@ -210,7 +210,7 @@ describe('ReconcileChangeValidity', () => {
   })
 
   it('does not mutate a fresh aggregate', async () => {
-    const change = implementingChange(hasher.hash(content))
+    const change = implementingChange(hasher.hash('hello'))
     const result = await reconciler(change).execute({ name: 'c1' })
     expect(result.changed).toBe(false)
     expect(result.verdict.artifactReviewRequired).toBe(false)

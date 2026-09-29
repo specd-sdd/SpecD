@@ -170,6 +170,56 @@
 - **WHEN** `analyzeImpact(store, target.id, 'upstream')` is called
 - **THEN** overriding methods are included in `affectedSymbols`
 
+### Requirement: Filtered impact results
+
+#### Scenario: Omitted filter preserves legacy impact
+
+- **GIVEN** the same graph and impact target
+- **WHEN** impact analysis runs once without a filter and once with an omitted optional filter
+- **THEN** both results have identical traversal evidence, aggregates, risk, and deterministic ordering
+
+#### Scenario: Kind and workspace eligibility shape aggregates
+
+- **GIVEN** reachable symbols of several kinds across included and excluded workspaces
+- **WHEN** impact analysis receives symbol-kind, workspace-inclusion, and workspace-exclusion predicates
+- **THEN** returned symbols contain only admitted kinds and workspaces
+- **AND** depth counts, risk, affected files, and covering-spec evidence are derived from the admitted traversal evidence
+
+#### Scenario: Result types control materialized categories
+
+- **GIVEN** admitted reachability can produce file, symbol, and spec results
+- **WHEN** the filter requests only `files` and `specs`
+- **THEN** Code Graph materializes those categories without returning a symbol collection for CLI-side removal
+- **AND** it may use admitted symbol reachability internally to derive the requested categories
+
+#### Scenario: Symbol specs are derived from admitted coverage
+
+- **GIVEN** an impacted symbol or its admitted file is covered by indexed specs
+- **WHEN** symbol impact requests only the `specs` result type
+- **THEN** `affectedSpecs` contains the deterministic covering spec identifiers
+- **AND** `affectedFiles` and `affectedSymbols` remain present as empty arrays
+
+#### Scenario: Spec impact derives files from symbol coverage under files-only filter
+
+- **GIVEN** a spec covers only symbols whose owning files are in the graph
+- **WHEN** spec impact requests only the `files` result type
+- **THEN** `affectedFiles` contains the owning files of those covered symbols
+- **AND** `affectedSymbols` remains an empty array
+
+#### Scenario: File impact derives specs from call-affected symbols under specs-only filter
+
+- **GIVEN** a file's root symbols have call-affected dependents that have spec coverage
+- **WHEN** file impact requests only the `specs` result type
+- **THEN** `affectedSpecs` and `coveringSpecs` contain the covering specs discovered through the full blast-radius traversal
+- **AND** `affectedFiles` and `affectedSymbols` remain empty arrays while impact counts and risk reflect the full admitted traversal
+
+#### Scenario: Filtering precedes result limits
+
+- **GIVEN** excluded candidates would otherwise occupy the available result limit
+- **WHEN** filtered impact analysis executes
+- **THEN** the store predicates exclude those candidates before the final limit
+- **AND** admitted candidates fill the deterministic result up to that limit
+
 ### Requirement: Spec impact
 
 #### Scenario: Upstream spec impact includes dependent specs
@@ -304,6 +354,51 @@
 - **THEN** only the case-exact declaration is traversed
 - **AND** if several case-exact candidates exist, bounded ambiguity is returned with no traversal
 - **AND** prefix and textual discovery matches are ignored
+
+### Requirement: Owner-qualified impact target
+
+#### Scenario: Qualified member traverses only that member
+
+- **GIVEN** the request is anchored to the TypeScript file that declares `EditChange`
+- **AND** other types declare `execute`
+- **WHEN** symbol impact is requested for `EditChange.execute`
+- **THEN** traversal starts at that member's id
+- **AND** the other `execute` symbols are not start nodes
+
+#### Scenario: Unanchored qualified member is the start node
+
+- **GIVEN** one logical symbol stores `qualified_name` `EditChange.execute`
+- **AND** no file is supplied
+- **WHEN** symbol impact is requested for `EditChange.execute`
+- **THEN** traversal starts at that member's id
+- **AND** other symbols named `execute` are not start nodes
+
+#### Scenario: Several equal qualified names do not traverse one
+
+- **GIVEN** two logical symbols store `GetStatus.execute`
+- **WHEN** symbol impact is requested for `GetStatus.execute`
+- **THEN** both are reported
+- **AND** traversal does not start on a guessed member
+- **AND** the terminal name `execute` is not used as a fallback query
+
+#### Scenario: Unresolved qualified reference does not traverse
+
+- **GIVEN** `EditChange.missing` resolves as unresolved
+- **WHEN** symbol impact is requested
+- **THEN** no start symbol is selected
+
+#### Scenario: Legacy location id still traverses
+
+- **GIVEN** a location-backed symbol id resolves to one logical symbol
+- **WHEN** symbol impact is requested with that id
+- **THEN** traversal starts at that symbol
+- **AND** the traversal algorithm does not parse the id as human text
+
+#### Scenario: Public binding target is the start node
+
+- **GIVEN** a public binding on `sdk:src/index.ts` targets a code-graph logical id
+- **WHEN** impact is requested for that exported name on that surface
+- **THEN** traversal starts at the code-graph logical id
 
 ### Requirement: File-impact covering specs
 

@@ -42,6 +42,18 @@
 - **THEN** the update happens only through the `IndexSession` API provided in context
 - **AND** no side effect escapes the indexing session
 
+#### Scenario: Resolution manifests are declared without reading the filesystem
+
+- **WHEN** a language adapter implements `resolutionManifests()`
+- **THEN** the method returns exact basenames
+- **AND** it does not read or stat the filesystem
+- **AND** an adapter that reads no resolution manifest returns an empty array
+
+#### Scenario: TypeScript adapter declares package.json
+
+- **WHEN** the default TypeScript adapter reports resolution manifests
+- **THEN** the result is exactly `['package.json']`
+
 ### Requirement: Full-file analysis contract
 
 #### Scenario: Adapter emits all deterministic facts in one pass
@@ -326,6 +338,32 @@
 - **WHEN** `getPackageIdentity` is called
 - **THEN** it does not read `/package.json` — search stops at `/project`
 
+#### Scenario: Declared manifests are the files package identity reads
+
+- **GIVEN** a built-in adapter reads `package.json`, `pyproject.toml`, `go.mod`, or `composer.json` for package identity
+- **WHEN** that adapter reports `resolutionManifests()`
+- **THEN** the basename it reads is included
+- **AND** the result does not name a file that adapter does not read
+
+#### Scenario: Python identity is the project table name
+
+- **GIVEN** a `pyproject.toml` whose `[tool.poetry]` table has `name = "poetry-name"` and whose `[project]` table has `name = "project-name"`
+- **WHEN** the Python adapter reads package identity
+- **THEN** the result is `project-name`
+
+#### Scenario: Python identity accepts a single-quoted project name
+
+- **GIVEN** a `pyproject.toml` with `[project]` and `name = 'quoted-name'`
+- **WHEN** the Python adapter reads package identity
+- **THEN** the result is `quoted-name`
+
+#### Scenario: Python identity skips a file without a project name
+
+- **GIVEN** a nearer `pyproject.toml` has only `[tool.poetry]` `name = "poetry-name"`
+- **AND** a parent `pyproject.toml` inside the repository root has `[project]` `name = "project-name"`
+- **WHEN** the Python adapter reads package identity
+- **THEN** the result is `project-name`
+
 ### Requirement: Import specifier resolution
 
 #### Scenario: TypeScript scoped package specifier
@@ -424,6 +462,135 @@
 - **WHEN** an adapter emits member facts
 - **THEN** each member uses its declaring type's logical identity
 - **AND** neither member uses a parser or location-based parent ID
+
+### Requirement: Member semantics and declaration parent
+
+#### Scenario: Instance getter keeps both axes
+
+- **GIVEN** a TypeScript class declares an instance getter
+- **WHEN** the adapter emits the member
+- **THEN** `kind`, `dispatch`, and `accessor` are all present
+- **AND** the retired member form is absent
+- **AND** the declaration `parentId` is set by that adapter
+
+#### Scenario: Top-level function has no parent
+
+- **WHEN** the adapter emits a top-level function
+- **THEN** `parentId` is omitted
+
+#### Scenario: Go method parent is emitted
+
+- **GIVEN** a Go method has a receiver type
+- **WHEN** the Go adapter emits the declaration
+- **THEN** `parentId` points at that receiver's declaration
+- **AND** the indexer did not skip Go because it was absent from a language list
+
+#### Scenario: Cyclic owner is not invented
+
+- **GIVEN** member ownership would cycle
+- **WHEN** the adapter builds logical members
+- **THEN** the cyclic member is dropped
+- **AND** no synthetic owner id is stored
+
+### Requirement: Human reference parse and render
+
+#### Scenario: Dotted member text becomes a structured selector
+
+- **GIVEN** the anchored file is TypeScript
+- **WHEN** the adapter parses `EditChange.execute`
+- **THEN** the result is one owner-then-member selector
+- **AND** the shared domain did not split the string on `.`
+
+#### Scenario: Ambiguous syntax stays unresolved
+
+- **WHEN** the adapter parses a dynamic or ambiguous member expression
+- **THEN** it returns no guessed candidate
+
+#### Scenario: Native and generic spellings round-trip
+
+- **GIVEN** one logical member
+- **WHEN** the adapter renders the generic spelling and the language-native spelling
+- **THEN** both parse back to that same structured member
+
+#### Scenario: PHP native spelling is not a TypeScript path
+
+- **GIVEN** the anchored file is PHP
+- **WHEN** the adapter parses `ArchiveChange::execute`
+- **THEN** the selector is the same member as the generic `ArchiveChange.execute` spelling
+- **AND** the TypeScript adapter is not used
+
+#### Scenario: Canonical text is not parsed as human syntax
+
+- **GIVEN** the input is already a versioned canonical logical id
+- **WHEN** an adapter parse is requested for human syntax
+- **THEN** the canonical id is not split on `.` or `::`
+
+#### Scenario: Resolution manifests do not read the disk
+
+- **WHEN** `resolutionManifests()` is called
+- **THEN** it returns manifest basenames
+- **AND** it does not open `package.json`
+
+### Requirement: Re-export public bindings
+
+#### Scenario: Package export map selects the public entry
+
+- **GIVEN** `@specd/code-graph` exports `.` to `dist/public.js` and `./internal` to `dist/index.js`
+- **WHEN** the TypeScript adapter resolves `export { runIsolatedGraphIndex } from '@specd/code-graph'`
+- **THEN** the entry file is the indexed source of `dist/public.js`
+- **AND** the binding surface is the re-exporting file
+- **AND** the target is the logical id that entry file already publishes
+
+#### Scenario: Subpath export selects the internal entry
+
+- **WHEN** the adapter resolves a re-export from `@specd/code-graph/internal`
+- **THEN** the entry file is the indexed source of `dist/index.js`
+
+#### Scenario: Unresolved package specifier emits no binding
+
+- **GIVEN** the specifier does not match exactly one indexed entry file
+- **WHEN** the adapter resolves the re-export
+- **THEN** it emits no public binding
+
+#### Scenario: Indexer does not read the manifest
+
+- **WHEN** re-export bindings are persisted
+- **THEN** the indexer writes the adapter payload
+- **AND** the indexer does not read `package.json` or copy bindings itself
+
+#### Scenario: Relative re-export stays inside the workspace
+
+- **GIVEN** `code-graph:src/index.ts` re-exports a name from `./public.js`
+- **WHEN** the adapter resolves that specifier
+- **THEN** the entry file is the indexed `public.ts` in the code-graph workspace
+- **AND** a package-entry lookup is not used
+
+#### Scenario: Two entry candidates emit no binding
+
+- **GIVEN** a specifier resolves to both `file.ts` and `file/index.ts` and both are indexed
+- **WHEN** the adapter resolves the re-export
+- **THEN** it emits no public binding
+
+#### Scenario: Star re-export skips default
+
+- **GIVEN** an entry file publishes a default binding and named bindings
+- **WHEN** the adapter resolves `export * from` that entry
+- **THEN** named bindings are copied onto the re-exporting file
+- **AND** the default binding is not copied
+
+#### Scenario: Missing exported name emits no binding
+
+- **GIVEN** the entry file does not publish the requested name
+- **WHEN** the adapter resolves `export { Missing } from` that entry
+- **THEN** it emits no public binding for `Missing`
+
+#### Scenario: JavaScript extension maps to the indexed source
+
+- **GIVEN** `exports["."]` points at `./dist/public.js`
+- **AND** `code-graph:src/public.ts` is indexed
+- **WHEN** the adapter resolves the package root
+- **THEN** the candidate is `code-graph:src/public.ts`
+- **AND** `sdk:src/@specd/code-graph.ts` is not a candidate
 
 ### Requirement: Hierarchy evidence consistency
 

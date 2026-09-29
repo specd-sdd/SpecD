@@ -37,7 +37,7 @@ export const publicGithubHref = 'https://github.com/specd-sdd/SpecD'
 /**
  * Primary public docs route promoted from the landing page.
  */
-export const publicDocsHref = '/docs/guide/getting-started'
+export const publicDocsHref = '/docs/guide/what-is-specd'
 
 /**
  * Dedicated public API reference route.

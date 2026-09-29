@@ -6,44 +6,53 @@
   "dependsOn": ["default:_global/conventions"],
   "implementation": [
     {
+      "file": "default:docs/guide/workflow.md"
+    },
+    {
+      "file": "default:packages/guide/src/infrastructure/generated/guides.ts"
+    },
+    {
       "file": "default:docs/core/ports.md"
     },
     {
-      "file": "default:docs/core/use-cases.md"
+      "file": "default:docs/schemas/schema-format.md"
+    },
+    {
+      "file": "default:packages/cli/test/configuration-coverage.spec.ts"
     }
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "All docs under `docs/`; MADR ADRs; CLI/MCP/Core/SDK references; JSDoc on all symbols; docs updated with API/template changes.",
+      "value": "Docs live under `docs/`; guides mirror runtime; CLI/MCP/SDK refs stay complete; MADR ADRs and JSDoc preserve traceability.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:e689008bd3a3facc0fcb2f59dd7d531765f0c60d0335f998cb25d2a7bfffb1db",
-          "lastModified": "2026-07-23T07:56:44.065Z"
+          "hash": "sha256:5962359f4c1e63c20edcd48030958163061948e3ff078dd2db45dc4bc127594e",
+          "lastModified": "2026-09-28T11:19:58.857Z"
         },
         "verify.md": {
-          "hash": "sha256:4d8ad4dc2a992c1d5a0217a292d300b61f2b92adda0d8efa185e137b1731bc83",
-          "lastModified": "2026-07-23T07:28:57.623Z"
+          "hash": "sha256:c210a6aad6eae87d91d0cceae4f9d5adff09b5dda2ad8424828cdbeb994ac903",
+          "lastModified": "2026-09-28T11:19:58.862Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# Documentation Conventions\n\n## Rules\n- Structure: `docs/{adr,cli,mcp,core,schemas}/`; nothing outside except root `README.md`, `AGENTS.md`, `CLAUDE.md`\n- ADRs: MADR format in `docs/adr/`; sequential `NNNN-kebab-title.md`; never reuse numbers; `### Confirmation` always present; `### Spec` in `## More Information` links related specs\n- ADR creation: every significant decision (multi-package, constrains future, non-obvious choice)\n- CLI: every command documented in `docs/cli/` (purpose, flags, examples, exit codes); output/caching contract changes update docs in same change\n- MCP: every tool/resource in `docs/mcp/` (input/output schema, examples)\n- Core docs (`docs/core/`): `@specd/core` package reference — semantics/contracts; NOT integrator import guide\n- Integrators (cli, mcp, API, IPC): import `@specd/sdk` only; no mixing `@specd/core` + `@specd/code-graph`\n- `docs/core/index.md` + `docs/code-graph/index.md`: prominent callout — hosts start at `docs/sdk/`, import `@specd/sdk`\n- `@specd/core` examples labeled plugin/core-only; MAY note re-export from sdk; MUST NOT imply integrators choose either\n- `docs/sdk/`: only integrator Docusaurus entry (sidebar SDK, before package-reference); `@specd/sdk` single import surface; host bootstrap; kernel + standalone factories\n- JSDoc on ALL symbols (not just exports): description, `@param`, `@returns` (omit void), `@throws`\n- Composition API docs: update `docs/` when public surface changes; document `createX(deps)`, `createX(config, options?)`, kernel/builder roles, `CompositionResolver` path\n- Template variable removal/rename or list/summary contract changes: update all affected `docs/` in same change\n\n## Constraints\n- Markdown files; ADR `NNNN-kebab-case-title.md`; sequential numbers never reused\n- Significant decisions need ADR with `### Spec` subsection\n- Specs may have `## ADRs` for provenance (not dependencies); specs depend on specs only, never ADRs directly\n- ADR constraints enforced via spec first\n- Doc changes in-scope: `docs/config/`, `docs/guide/`, `docs/schemas/`, `docs/adr/`, `docs/core/`, `docs/cli/` and any file with stale tokens",
+      "value": "# Documentation Conventions\n\n## Rules\n- Layout: `docs/{adr,cli,code-graph,core,guide,mcp,schemas,sdk,skills}/`. Outside `docs/`: only root `README.md`, `AGENTS.md`, `CLAUDE.md`\n- `docs/guide/`: user concepts, workflows, tutorials. Internal package/template/subsystem details belong in package refs (`docs/skills/`, `docs/core/`, `docs/code-graph/`)\n- Every guide: Docusaurus frontmatter `title`, `description`, integer `sidebar_position`; compatible with `apps/public-web` generation and `@specd/guide` bundling\n- Guide configuration/workflow/schema/lifecycle content MUST match `@specd/core`:\n  - `FsArchiveRepository`: `{{year}}`, `{{month}}`, `{{day}}`, `{{date}}`, `{{change.name}}`, `{{change.archivedName}}`; never cite uninstalled engines\n  - Document substitution for hooks (`run:`, `instruction:`) and schema artifacts (`template`, `instruction`, `deltaInstruction`, rules). `run:` inserted verbatim; SpecD translates only quote syntax unsupported by host shell. Non-Windows hooks use absolute `SHELL` when absolute, else `/bin/sh`. Never call this shell escaping\n  - Exhaustive workspace config: `metadataPath`, `graph` discovery, `prefix` segment rules, reserved `root`\n  - `specd project update`: orchestrates declared agent plugins; synthesizes `AGENTS.md`, `CLAUDE.md`, skill templates. Required after manual `plugins.agents` edits or SpecD upgrades; ordinary config resolves dynamically\n  - Code Graph core capability across `code-graph.md`, `index.md`, `philosophy.md`, `skills.md`, `cli.md`: `--documents`, `--files`, `--spec <id>`, `--export <name> --from <surface>`, aggregated multi-file blast radius, direction/depth traversal, hotspots, implementation coverage\n- Public docs start at `docs/guide/what-is-specd.md`: first sidebar page; explains SpecD and outcomes; presents symbol/document search, blast radius, spec-to-code traceability; links installation, quickstart, philosophy, guide index, `docs/guide/code-graph.md`. Index remains topic map and links opening page\n- `docs/guide/skills.md`: skills as user↔CLI interface; slash command → agent steps → CLI; catalog `/specd`, `/specd-new`, `/specd-design`, `/specd-implement`, `/specd-verify`, `/specd-archive`, `/specd-compliance`, `/specd-fasttrack` plus usage guidance; `--format toon`, `specd guide`; files in `.agents/skills/`\n- ADRs: MADR verbatim plus `### Spec` inside `## More Information`, linking specs capturing derived constraints. Frontmatter: `status`, `date`, `decision-makers`, `consulted`, `informed`. Required: `## Context and Problem Statement`; `## Decision Outcome` with `### Confirmation`; `## More Information` with `### Spec`. Other MADR sections optional when valueless\n- ADR numbering: sequential from `0001`; filename `NNNN-kebab-title.md`; never reuse; deprecated/superseded retain number and update status\n- Create ADR for decisions affecting multiple packages, constraining future development, or choosing non-obvious alternatives. Natural consequences of existing ADRs need none\n- CLI: `docs/cli/index.md` command directory plus dedicated doc per `specd` command, including `guide.md` and lifecycle groups; purpose, flags, examples, exit codes. Document command-specific output, caching, machine contracts without implementation reading. Output-contract change updates matching reference same change. Tutorials/recipes remain `docs/guide/cli.md`\n- MCP: each `@specd/mcp` tool/resource documented under `docs/mcp/` with input schema, output schema, example\n- `docs/core/`: `@specd/core` package semantics/contracts/behavior, not host integration. Hosts (cli, mcp, API, IPC) import only `@specd/sdk`; never mix `@specd/core` and `@specd/code-graph`\n- `docs/core/index.md` and `docs/code-graph/index.md`: prominent hosts-start-at-`docs/sdk/`, import-`@specd/sdk` callout\n- `@specd/core` examples labeled plugin/core-only. Optional re-export note must not imply host choice. Core-only `plugin-*`, `skills` may primarily import `@specd/core`\n- `docs/sdk/`: only Docusaurus integrator entry, category **SDK** before package refs. Examples import `@specd/sdk`; document single host surface on `\".\"`, `\"./ports\"`, `\"./extensions\"`; no parallel core/code-graph dependencies; `openSpecdHost`, `createSdkContext`, orchestration helpers; both `createKernel` + `kernel.*.execute()` and standalone `createX` / `create*Repository`\n- Move legacy `docs/core/sdk.md` into `docs/sdk/`. Core/code-graph stay package refs for plugins/symbol semantics. Website API generation and landing copy treat `@specd/sdk` as integrator surface per `public-web:api-reference`\n- JSDoc on every function, method, class, type alias, interface: description; `@param` each parameter; `@returns` except `void`/constructors; `@throws` each error type\n- Public `@specd/core` composition changes update docs: canonical `createX(deps)`; convenience `createX(config, options?)`; roles of standalone factories, `createKernel(...)`, `createKernelBuilder()`; shared config-bootstrap `CompositionResolver`\n- Same change updates every doc containing removed/renamed public template tokens, changed config cascade, or changed list/summary inputs, outputs, dependency-resolution contract\n- `docs/guide/configuration.md` and `docs/guide/configuration-examples.md`: consistent cascade `specd.yaml` + `specd.*.yaml` + `specd.local.yaml`\n- Search beyond illustrative scope: `docs/guide/{configuration,configuration-examples,installation,getting-started,workspaces,workflow,schemas}.md`, `docs/schemas/schema-format.md`, `docs/adr/0013-workspaces-not-scopes.md`, `docs/core/use-cases.md`, `docs/cli/cli-reference.md`\n\n## Constraints\n- Documentation Markdown only\n- ADR filenames `NNNN-kebab-case-title.md`; sequential, never reused\n- Every significant architectural decision has ADR\n- Every ADR has `### Spec` inside `## More Information`; associated specs have `## ADRs`, omitted when none\n- Spec `## ADRs` lists only provenance-producing ADRs, never dependencies\n- Spec dependencies only through `## Spec Dependencies`; ADR constraints first captured in spec, then depended upon\n- No docs outside `docs/` except `README.md`, `AGENTS.md`, `CLAUDE.md`\n- Template-token rename/removal or listing/summary contract change affects all applicable `docs/config/`, `docs/guide/`, `docs/schemas/`, `docs/adr/`, `docs/core/`, `docs/cli/` files",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:e689008bd3a3facc0fcb2f59dd7d531765f0c60d0335f998cb25d2a7bfffb1db",
-          "lastModified": "2026-07-23T07:56:44.065Z"
+          "hash": "sha256:5962359f4c1e63c20edcd48030958163061948e3ff078dd2db45dc4bc127594e",
+          "lastModified": "2026-09-28T11:19:58.857Z"
         },
         "verify.md": {
-          "hash": "sha256:4d8ad4dc2a992c1d5a0217a292d300b61f2b92adda0d8efa185e137b1731bc83",
-          "lastModified": "2026-07-23T07:28:57.623Z"
+          "hash": "sha256:c210a6aad6eae87d91d0cceae4f9d5adff09b5dda2ad8424828cdbeb994ac903",
+          "lastModified": "2026-09-28T11:19:58.862Z"
         }
       }
     }

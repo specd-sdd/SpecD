@@ -20,6 +20,7 @@ import { parseLogicalSymbol } from '../../../src/domain/value-objects/symbol-ref
 interface TestAdapter {
   languages(): string[]
   extensions(): Record<string, string>
+  resolutionManifests(): readonly string[]
   getPackageIdentity(codeRoot: string, repoRoot?: string): string | undefined
   resolvePackageFromSpecifier(specifier: string, knownPackages: string[]): string | undefined
   extractSymbols(filePath: string, content: string): SymbolNode[]
@@ -206,6 +207,25 @@ describe('GoLanguageAdapter', () => {
     expect(second.publicBindings[0]?.surface).toBe('workspace:')
   })
 
+  it('keeps a drive letter in the package surface', () => {
+    const facts = baseAdapter.analyzeFile('C:/repo/src/a.go', 'package src\ntype Widget struct{}', {
+      session: new InMemoryIndexSession(),
+      workspaceName: 'ws',
+    }).referenceFacts!
+
+    expect(facts.publicBindings[0]?.surface).toBe('C:/repo/src')
+    expect(facts.publicBindings[0]?.surface).not.toBe('C:')
+  })
+
+  it('keeps a drive-root package surface from becoming workspace C', () => {
+    const facts = baseAdapter.analyzeFile('C:/a.go', 'package root\ntype Widget struct{}', {
+      session: new InMemoryIndexSession(),
+      workspaceName: 'ws',
+    }).referenceFacts!
+
+    expect(facts.publicBindings[0]?.surface).toBe('C:')
+  })
+
   it('owner-qualifies receiver methods and emits interface evidence', () => {
     const session = new InMemoryIndexSession()
     const facts = baseAdapter.analyzeFile(
@@ -227,7 +247,7 @@ func (Second) Read() {}
       .filter((logical) => logical?.name === 'Read')
     expect(reads).toHaveLength(3)
     expect(new Set(reads.map((logical) => logical?.ownerId)).size).toBe(3)
-    expect(reads.map((logical) => logical?.memberForm)).toContain('signature')
+    expect(reads.map((logical) => logical?.memberSemantics)).toContainEqual({ kind: 'signature' })
     expect(facts.hierarchy.filter((fact) => fact.kind === 'implements')).toHaveLength(2)
     expect(facts.steps.filter((step) => step.kind === 'implements:0')).toHaveLength(2)
     expect(facts.publicBindings.some((binding) => binding.exportedName === 'Read')).toBe(false)
@@ -265,7 +285,7 @@ func (p *Partial) Read() {}
       .find((logical) => logical?.name === 'Read')
 
     expect(read?.ownerId).toBeDefined()
-    expect(read?.memberForm).toBe('signature')
+    expect(read?.memberSemantics).toEqual({ kind: 'signature' })
   })
 
   describe('extractSymbols', () => {
@@ -536,6 +556,13 @@ type HandlerFn func(event Event) Result`
     })
   })
 
+  describe('resolutionManifests', () => {
+    it('given go adapter, when asked for manifests, then returns go.mod only', () => {
+      expect(adapter.resolutionManifests()).toEqual(['go.mod'])
+      expect(adapter.resolutionManifests()).not.toContain('go.work')
+    })
+  })
+
   describe('getPackageIdentity', () => {
     let tempDir: string
 
@@ -552,6 +579,28 @@ type HandlerFn func(event Event) Result`
     it('returns undefined when no go.mod', () => {
       tempDir = mkdtempSync(join(tmpdir(), 'go-pkg-'))
       expect(adapter.getPackageIdentity(tempDir)).toBeUndefined()
+    })
+
+    it('sets a method parentId from the receiver and omits it on a top-level function', () => {
+      const session = new InMemoryIndexSession()
+      session.registerFile({
+        filePath: 'workspace:service/reader.go',
+        configRelativePath: 'service/reader.go',
+        language: 'go',
+        contentHash: 'hash',
+        workspace: 'workspace',
+      })
+      const draft = baseAdapter.analyzeFile(
+        'workspace:service/reader.go',
+        'package service\ntype Reader struct {}\nfunc top() {}\nfunc (r Reader) Read() {}\n',
+        { session, workspaceName: 'workspace' },
+      )
+      const reader = draft.symbols.find((symbol) => symbol.name === 'Reader')
+      const read = draft.symbols.find((symbol) => symbol.name === 'Read')
+      const top = draft.symbols.find((symbol) => symbol.name === 'top')
+
+      expect(read?.parentId).toBe(reader?.id)
+      expect(top?.parentId).toBeUndefined()
     })
 
     it('walks up to find go.mod above codeRoot', () => {

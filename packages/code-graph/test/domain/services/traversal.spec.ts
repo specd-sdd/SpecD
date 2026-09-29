@@ -26,6 +26,16 @@ function file(path: string) {
   })
 }
 
+function fileInWorkspace(path: string, workspace: string) {
+  return createFileNode({
+    path,
+    configRelativePath: '',
+    language: 'typescript',
+    contentHash: 'sha256:x',
+    workspace,
+  })
+}
+
 describe('Traversal services', () => {
   let store: InMemoryGraphStore
 
@@ -595,6 +605,150 @@ describe('Traversal services', () => {
       expect(result.affectedFiles).toContain('consumer.ts')
       expect(result.directDependents).toBe(1)
     })
+
+    it('admits only matching filtered endpoints before counts, depth, risk, and cycles', async () => {
+      const target = sym('target', 'target.ts', 1)
+      const admitted = sym('admitted', 'included.ts', 1)
+      const transitive = sym('transitive', 'transitive.ts', 1)
+      const excludedWorkspace = sym('excludedWorkspace', 'excluded.ts', 1)
+      const excludedKind = createSymbolNode({
+        name: 'excludedKind',
+        kind: SymbolKind.Class,
+        filePath: 'class.ts',
+        line: 1,
+        column: 0,
+      })
+
+      await store.upsertFile(fileInWorkspace('target.ts', 'root'), [target], [])
+      await store.upsertFile(
+        fileInWorkspace('included.ts', 'included'),
+        [admitted],
+        [createRelation({ source: admitted.id, target: target.id, type: RelationType.Calls })],
+      )
+      await store.upsertFile(
+        fileInWorkspace('transitive.ts', 'included'),
+        [transitive],
+        [
+          createRelation({ source: transitive.id, target: admitted.id, type: RelationType.Calls }),
+          createRelation({ source: target.id, target: transitive.id, type: RelationType.Calls }),
+        ],
+      )
+      await store.upsertFile(
+        fileInWorkspace('excluded.ts', 'excluded'),
+        [excludedWorkspace],
+        [
+          createRelation({
+            source: excludedWorkspace.id,
+            target: target.id,
+            type: RelationType.Calls,
+          }),
+        ],
+      )
+      await store.upsertFile(
+        fileInWorkspace('class.ts', 'included'),
+        [excludedKind],
+        [
+          createRelation({
+            source: excludedKind.id,
+            target: target.id,
+            type: RelationType.Calls,
+          }),
+        ],
+      )
+
+      const result = await analyzeImpact(store, target.id, 'upstream', 3, undefined, {
+        types: ['symbols'],
+        kinds: [SymbolKind.Function],
+        workspaces: ['included', 'excluded'],
+        excludeWorkspaces: ['excluded'],
+      })
+
+      expect(result.directDependents).toBe(1)
+      expect(result.indirectDependents).toBe(1)
+      expect(result.transitiveDependents).toBe(0)
+      expect(result.riskLevel).toBe('MEDIUM')
+      expect(result.affectedFiles).toEqual([])
+      expect(result.affectedSymbols).toEqual([
+        expect.objectContaining({ id: admitted.id, depth: 1 }),
+        expect.objectContaining({ id: transitive.id, depth: 2 }),
+      ])
+    })
+
+    it('materializes selected categories while an empty filter preserves legacy output', async () => {
+      const target = sym('target', 'target.ts', 1)
+      const caller = sym('caller', 'caller.ts', 1)
+      await store.upsertFile(file('target.ts'), [target], [])
+      await store.upsertFile(
+        file('caller.ts'),
+        [caller],
+        [createRelation({ source: caller.id, target: target.id, type: RelationType.Calls })],
+      )
+
+      const legacy = await analyzeImpact(store, target.id, 'upstream')
+      const emptyFilter = await analyzeImpact(store, target.id, 'upstream', 3, undefined, {})
+      const filesOnly = await analyzeImpact(store, target.id, 'upstream', 3, undefined, {
+        types: ['files'],
+      })
+
+      expect(emptyFilter).toEqual(legacy)
+      expect(filesOnly.affectedFiles).toEqual(['caller.ts'])
+      expect(filesOnly.affectedSymbols).toEqual([])
+      expect(filesOnly.affectedProcesses).toEqual([])
+      expect(filesOnly.directDependents).toBe(1)
+    })
+
+    it('derives specs-only symbol impact from root and admitted coverage', async () => {
+      const target = sym('SpecRepository', 'core:src/spec-repository.ts', 1)
+      const caller = sym('caller', 'cli:src/command.ts', 1)
+      await store.bulkLoad({
+        files: [fileInWorkspace(target.filePath, 'core'), fileInWorkspace(caller.filePath, 'cli')],
+        symbols: [target, caller],
+        specs: [
+          {
+            specId: 'core:spec-repository',
+            workspace: 'core',
+            path: 'spec-repository',
+            title: 'Spec repository',
+            description: '',
+            contentHash: 'sha256:root',
+            content: '',
+            dependsOn: [],
+          },
+          {
+            specId: 'cli:graph-impact',
+            workspace: 'cli',
+            path: 'graph-impact',
+            title: 'Graph impact',
+            description: '',
+            contentHash: 'sha256:caller',
+            content: '',
+            dependsOn: [],
+          },
+        ],
+        relations: [
+          createRelation({ source: caller.id, target: target.id, type: RelationType.Calls }),
+          createRelation({
+            source: 'core:spec-repository',
+            target: target.id,
+            type: RelationType.CoversSymbol,
+          }),
+          createRelation({
+            source: 'cli:graph-impact',
+            target: caller.filePath,
+            type: RelationType.CoversFile,
+          }),
+        ],
+      })
+
+      const result = await analyzeImpact(store, target.id, 'upstream', 3, undefined, {
+        types: ['specs'],
+      })
+
+      expect(result.affectedSpecs).toEqual(['cli:graph-impact', 'core:spec-repository'])
+      expect(result.affectedFiles).toEqual([])
+      expect(result.affectedSymbols).toEqual([])
+      expect(result.directDependents).toBe(1)
+    })
   })
 
   describe('analyzeFileImpact', () => {
@@ -613,6 +767,27 @@ describe('Traversal services', () => {
       const result = await analyzeFileImpact(store, 'a.ts', 'upstream')
       expect(result.symbols).toHaveLength(2)
       expect(result.affectedFiles).toContain('b.ts')
+    })
+
+    it('keeps required file-impact category arrays empty when they are not selected', async () => {
+      const target = sym('target', 'a.ts', 1)
+      const caller = sym('caller', 'b.ts', 1)
+      await store.upsertFile(file('a.ts'), [target], [])
+      await store.upsertFile(
+        file('b.ts'),
+        [caller],
+        [createRelation({ source: caller.id, target: target.id, type: RelationType.Calls })],
+      )
+
+      const result = await analyzeFileImpact(store, 'a.ts', 'upstream', 3, undefined, {
+        types: ['files'],
+      })
+
+      expect(result.affectedFiles).toEqual(['b.ts'])
+      expect(result.affectedSymbols).toEqual([])
+      expect(result.symbols).toEqual([])
+      expect(result.coveringSpecs).toEqual([])
+      expect(result.affectedProcesses).toEqual([])
     })
   })
 
@@ -699,6 +874,74 @@ describe('Traversal services', () => {
       expect(result.affectedFiles).toEqual(['core:src/change.ts', 'core:src/status.ts'])
       expect(result.affectedSymbols.map((symbol) => symbol.name)).toEqual(['transition'])
       expect(result.directDependents).toBe(1)
+    })
+
+    it('derives files from covered symbols when types is files only (D-2)', async () => {
+      const coveredSymbol = sym('transition', 'core:src/change.ts', 10)
+
+      await store.bulkLoad({
+        files: [file('core:src/change.ts')],
+        symbols: [coveredSymbol],
+        specs: [
+          {
+            specId: 'core:change',
+            workspace: 'core',
+            path: 'change',
+            title: 'Change',
+            description: '',
+            contentHash: 'sha256:change',
+            content: '',
+            dependsOn: [],
+          },
+        ],
+        relations: [
+          createRelation({
+            source: 'core:change',
+            target: coveredSymbol.id,
+            type: RelationType.CoversSymbol,
+          }),
+        ],
+      })
+
+      const result = await analyzeSpecImpact(store, 'core:change', 'upstream', 3, undefined, {
+        types: ['files'],
+      })
+
+      expect(result.affectedFiles).toEqual(['core:src/change.ts'])
+      expect(result.affectedSymbols).toEqual([])
+      expect(result.affectedSpecs).toEqual([])
+    })
+
+    it('does not dispatch unrequested symbol coverage query when types is specs only (D-5)', async () => {
+      const querySpy = vi.spyOn(store, 'queryImpactFrontier')
+      await store.bulkLoad({
+        files: [],
+        symbols: [],
+        specs: [
+          {
+            specId: 'core:change',
+            workspace: 'core',
+            path: 'change',
+            title: 'Change',
+            description: '',
+            contentHash: 'sha256:change',
+            content: '',
+            dependsOn: [],
+          },
+        ],
+        relations: [],
+      })
+
+      const result = await analyzeSpecImpact(store, 'core:change', 'upstream', 3, undefined, {
+        types: ['specs'],
+      })
+
+      expect(result.affectedSpecs).toEqual([])
+      // Verify queryImpactFrontier was NOT called with resource: 'symbol' or 'file' for coverage
+      const coverageCalls = querySpy.mock.calls.filter(
+        ([input]) => input.resource === 'symbol' || input.resource === 'file',
+      )
+      expect(coverageCalls).toHaveLength(0)
     })
   })
 

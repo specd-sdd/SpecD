@@ -12,7 +12,7 @@ Each hash is returned as a prefixed hex string: `sha256:<64 hex characters>`. Th
 
 ### Requirement: Determinism
 
-The same content always produces the same hash. Two calls with identical content for the same path must return the same digest.
+The same text always produces the same hash after the injected `hashContent` function runs. `hashFiles` MUST forward each string to `hashContent` unchanged. It MUST NOT detect a binary string and MUST NOT rewrite newlines itself. Newline normalization belongs to the text hasher from `core:content-hasher-port`. Raw file bytes are not strings and MUST NOT be passed through `hashFiles`.
 
 ### Requirement: Path preservation
 
@@ -35,3 +35,4 @@ A file with empty string content is hashed normally — the SHA-256 of an empty 
 ## Spec Dependencies
 
 - [`default:_global/architecture`](../../_global/architecture/spec.md) — pure function requirement for domain services
+- [`core:content-hasher-port`](../content-hasher-port/spec.md) — text hashes normalize newlines before the digest

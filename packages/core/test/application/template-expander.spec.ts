@@ -60,6 +60,16 @@ describe('TemplateExpander', () => {
       expect(result).toBe('/builtin')
     })
 
+    it('substitutes numbers and booleans verbatim', () => {
+      const expander = new TemplateExpander({})
+
+      expect(
+        expander.expand('n={{change.count}} ok={{change.ready}}', {
+          change: { count: 2, ready: true },
+        }),
+      ).toBe('n=2 ok=true')
+    })
+
     it('does not expand nested object values', () => {
       const expander = new TemplateExpander({})
 
@@ -80,6 +90,36 @@ describe('TemplateExpander', () => {
       })
 
       expect(result).toBe("echo 'it'\\''s-fine'")
+    })
+
+    it('quotes cmd values and doubles percents and quotes', () => {
+      const expander = new TemplateExpander({})
+
+      const result = expander.expandForShell(
+        'echo {{change.name}}',
+        {
+          change: { name: 'a b %PATH% &' },
+        },
+        'cmd',
+      )
+
+      expect(result).toBe('echo "a b %%PATH%% &"')
+    })
+
+    it('doubles an embedded quote for cmd', () => {
+      const expander = new TemplateExpander({})
+
+      expect(
+        expander.expandForShell('echo {{change.name}}', { change: { name: 'say "hi"' } }, 'cmd'),
+      ).toBe('echo "say ""hi"""')
+    })
+
+    it('quotes an empty cmd value', () => {
+      const expander = new TemplateExpander({})
+
+      expect(expander.expandForShell('echo {{change.name}}', { change: { name: '' } }, 'cmd')).toBe(
+        'echo ""',
+      )
     })
   })
 })

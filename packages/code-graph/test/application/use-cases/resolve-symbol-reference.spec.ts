@@ -2,7 +2,9 @@ import { describe, expect, it, vi } from 'vitest'
 import { ResolveSymbolReference } from '../../../src/application/use-cases/resolve-symbol-reference.js'
 import { SymbolKind } from '../../../src/domain/value-objects/symbol-kind.js'
 import {
-  MemberForm,
+  MemberAccessor,
+  MemberDispatch,
+  MemberKind,
   SymbolSpace,
   createLocalBinding,
   createLogicalSymbol,
@@ -13,6 +15,9 @@ import {
 } from '../../../src/domain/value-objects/symbol-reference.js'
 import { IndexCoverageStatus } from '../../../src/domain/value-objects/index-session.js'
 import { InMemoryGraphStore } from '../../helpers/in-memory-graph-store.js'
+import { AdapterRegistry } from '../../../src/infrastructure/tree-sitter/adapter-registry.js'
+import { PhpLanguageAdapter } from '../../../src/infrastructure/tree-sitter/php-language-adapter.js'
+import { TypeScriptLanguageAdapter } from '../../../src/infrastructure/tree-sitter/typescript-language-adapter.js'
 import {
   FreshnessState,
   IndexedResourceKind,
@@ -75,7 +80,7 @@ function symbol(name: string, surface = 'src/api.ts'): LogicalSymbol {
     name,
     space: SymbolSpace.Value,
     ownerId: undefined,
-    memberForm: undefined,
+    memberSemantics: undefined,
   })
 }
 
@@ -495,7 +500,7 @@ describe('ResolveSymbolReference', () => {
       name: 'run',
       space: SymbolSpace.Value,
       ownerId: 'base',
-      memberForm: MemberForm.Instance,
+      memberSemantics: { kind: MemberKind.Method, dispatch: MemberDispatch.Instance },
     })
     const store = await makeStore({
       symbols: [inherited],
@@ -509,7 +514,7 @@ describe('ResolveSymbolReference', () => {
       workspace: 'core',
       requested: 'run',
       ownerId: 'derived',
-      memberForm: MemberForm.Instance,
+      memberSemantics: { kind: MemberKind.Method, dispatch: MemberDispatch.Instance },
     })
 
     expect(result.status).toBe('resolved')
@@ -524,7 +529,7 @@ describe('ResolveSymbolReference', () => {
       name: 'run',
       space: SymbolSpace.Value,
       ownerId: 'near',
-      memberForm: MemberForm.Instance,
+      memberSemantics: { kind: MemberKind.Method, dispatch: MemberDispatch.Instance },
     })
     const competing = createLogicalSymbol({
       workspace: 'core',
@@ -532,7 +537,7 @@ describe('ResolveSymbolReference', () => {
       name: 'run',
       space: SymbolSpace.Value,
       ownerId: 'competing',
-      memberForm: MemberForm.Instance,
+      memberSemantics: { kind: MemberKind.Method, dispatch: MemberDispatch.Instance },
     })
     const far = createLogicalSymbol({
       workspace: 'core',
@@ -540,7 +545,7 @@ describe('ResolveSymbolReference', () => {
       name: 'run',
       space: SymbolSpace.Value,
       ownerId: 'far',
-      memberForm: MemberForm.Instance,
+      memberSemantics: { kind: MemberKind.Method, dispatch: MemberDispatch.Instance },
     })
     const steps: ResolutionStep[] = [
       { fromId: 'derived', toId: 'near', kind: 'extends' },
@@ -556,7 +561,7 @@ describe('ResolveSymbolReference', () => {
       workspace: 'core',
       requested: 'run',
       ownerId: 'derived',
-      memberForm: MemberForm.Instance,
+      memberSemantics: { kind: MemberKind.Method, dispatch: MemberDispatch.Instance },
     })
 
     expect(ambiguous.status).toBe('ambiguous')
@@ -572,7 +577,7 @@ describe('ResolveSymbolReference', () => {
         workspace: 'core',
         requested: 'run',
         ownerId: 'derived',
-        memberForm: MemberForm.Instance,
+        memberSemantics: { kind: MemberKind.Method, dispatch: MemberDispatch.Instance },
       },
     )
 
@@ -608,7 +613,11 @@ describe('ResolveSymbolReference', () => {
       name: 'value',
       space: SymbolSpace.Property,
       ownerId: 'owner',
-      memberForm: MemberForm.Getter,
+      memberSemantics: {
+        kind: MemberKind.Property,
+        dispatch: MemberDispatch.Instance,
+        accessor: MemberAccessor.Get,
+      },
     })
     const setter = createLogicalSymbol({
       workspace: 'core',
@@ -616,7 +625,11 @@ describe('ResolveSymbolReference', () => {
       name: 'value',
       space: SymbolSpace.Property,
       ownerId: 'owner',
-      memberForm: MemberForm.Setter,
+      memberSemantics: {
+        kind: MemberKind.Property,
+        dispatch: MemberDispatch.Instance,
+        accessor: MemberAccessor.Set,
+      },
     })
     const store = await makeStore({
       symbols: [getter, setter],
@@ -631,9 +644,260 @@ describe('ResolveSymbolReference', () => {
       requested: 'value',
       filePath: 'core:src/model.ts',
       ownerId: 'owner',
-      memberForm: MemberForm.Getter,
+      memberSemantics: {
+        kind: MemberKind.Property,
+        dispatch: MemberDispatch.Instance,
+        accessor: MemberAccessor.Get,
+      },
     })
 
-    expect(result.target?.memberForm).toBe(MemberForm.Getter)
+    expect(result.target?.memberSemantics).toEqual({
+      kind: MemberKind.Property,
+      dispatch: MemberDispatch.Instance,
+      accessor: MemberAccessor.Get,
+    })
+  })
+
+  it('resolves unanchored EditChange.execute and ArchiveChange::execute by qualified name', async () => {
+    const owner = symbol('EditChange', 'src/edit.ts')
+    const member = createLogicalSymbol({
+      workspace: 'core',
+      surface: 'src/edit.ts',
+      name: 'execute',
+      space: SymbolSpace.Value,
+      ownerId: owner.id,
+      memberSemantics: { kind: MemberKind.Method, dispatch: MemberDispatch.Instance },
+    })
+    const store = await makeStore({
+      symbols: [owner, member],
+      declarations: [
+        { logicalSymbolId: owner.id, filePath: 'core:src/edit.ts' },
+        { logicalSymbolId: member.id, filePath: 'core:src/edit.ts' },
+      ],
+    })
+    const php = new PhpLanguageAdapter()
+    const phpParse = vi.spyOn(php, 'parseSymbolReference')
+    const registry = new AdapterRegistry()
+    registry.register(php)
+    const resolver = new ResolveSymbolReference(store, async () => freshHealth, undefined, registry)
+
+    const dotted = await resolver.execute({
+      workspace: 'core',
+      requested: 'EditChange.execute',
+    })
+    const native = await resolver.execute({
+      workspace: 'core',
+      requested: 'EditChange::execute',
+    })
+    const elsewhere = await resolver.execute({
+      workspace: 'core',
+      requested: 'EditChange.execute',
+      filePath: 'core:src/other.ts',
+      publicSurface: 'core:src/other.ts',
+    })
+
+    expect(dotted.status).toBe('resolved')
+    expect(dotted.target?.id).toBe(member.id)
+    expect(native.status).toBe('resolved')
+    expect(native.target?.id).toBe(member.id)
+    expect(elsewhere.status).toBe('unresolved')
+    expect(phpParse).not.toHaveBeenCalled()
+  })
+
+  it('returns every equal qualified name and does not borrow a missing member', async () => {
+    const first = symbol('GetStatus', 'core:src/a.ts')
+    const second = symbol('GetStatus', 'core:src/b.ts')
+    const firstMember = createLogicalSymbol({
+      workspace: 'core',
+      surface: 'core:src/a.ts',
+      name: 'execute',
+      space: SymbolSpace.Value,
+      ownerId: first.id,
+      memberSemantics: { kind: MemberKind.Method, dispatch: MemberDispatch.Instance },
+    })
+    const secondMember = createLogicalSymbol({
+      workspace: 'core',
+      surface: 'core:src/b.ts',
+      name: 'execute',
+      space: SymbolSpace.Value,
+      ownerId: second.id,
+      memberSemantics: { kind: MemberKind.Method, dispatch: MemberDispatch.Instance },
+    })
+    const store = await makeStore({
+      symbols: [first, second, firstMember, secondMember],
+      declarations: [
+        { logicalSymbolId: firstMember.id, filePath: 'core:src/a.ts' },
+        { logicalSymbolId: secondMember.id, filePath: 'core:src/b.ts' },
+      ],
+    })
+    const resolver = new ResolveSymbolReference(store, async () => freshHealth)
+
+    const matches = await resolver.execute({ workspace: 'core', requested: 'GetStatus.execute' })
+    const missing = await resolver.execute({ workspace: 'core', requested: 'GetStatus.missing' })
+
+    expect(matches.status).toBe('ambiguous')
+    expect(matches.candidates.map((candidate) => candidate.target.id).sort()).toEqual(
+      [firstMember.id, secondMember.id].sort(),
+    )
+    expect(missing.status).toBe('unresolved')
+  })
+
+  it('uses the PHP adapter for syntax that is not a single qualified spelling', async () => {
+    const php = new PhpLanguageAdapter()
+    const typescript = new TypeScriptLanguageAdapter()
+    const phpParse = vi.spyOn(php, 'parseSymbolReference')
+    const tsParse = vi.spyOn(typescript, 'parseSymbolReference')
+    const registry = new AdapterRegistry()
+    registry.register(typescript)
+    registry.register(php)
+    const store = await makeStore({ symbols: [] })
+
+    const result = await new ResolveSymbolReference(
+      store,
+      async () => freshHealth,
+      undefined,
+      registry,
+    ).execute({
+      workspace: 'core',
+      requested: 'ArchiveChange::execute()',
+      language: 'php',
+    })
+
+    expect(result.status).toBe('unresolved')
+    expect(phpParse).toHaveBeenCalledWith('ArchiveChange::execute()')
+    expect(tsParse).not.toHaveBeenCalled()
+  })
+
+  it('resolves the owner before the member and does not borrow a member from another owner', async () => {
+    const edit = symbol('EditChange', 'core:src/edit.ts')
+    const other = symbol('Other', 'core:src/other.ts')
+    const execute = createLogicalSymbol({
+      workspace: 'core',
+      surface: 'core:src/edit.ts',
+      name: 'execute',
+      space: SymbolSpace.Value,
+      ownerId: edit.id,
+      memberSemantics: { kind: MemberKind.Method, dispatch: MemberDispatch.Instance },
+    })
+    const missing = createLogicalSymbol({
+      workspace: 'core',
+      surface: 'core:src/other.ts',
+      name: 'missing',
+      space: SymbolSpace.Value,
+      ownerId: other.id,
+      memberSemantics: { kind: MemberKind.Method, dispatch: MemberDispatch.Instance },
+    })
+    const store = await makeStore({
+      symbols: [edit, other, execute, missing],
+      declarations: [
+        { logicalSymbolId: edit.id, filePath: 'core:src/edit.ts' },
+        { logicalSymbolId: execute.id, filePath: 'core:src/edit.ts' },
+        { logicalSymbolId: other.id, filePath: 'core:src/other.ts' },
+        { logicalSymbolId: missing.id, filePath: 'core:src/other.ts' },
+      ],
+    })
+    const resolver = new ResolveSymbolReference(store, async () => freshHealth)
+
+    const found = await resolver.execute({
+      workspace: 'core',
+      requested: 'EditChange.execute',
+      filePath: 'core:src/edit.ts',
+      publicSurface: 'core:src/edit.ts',
+    })
+    const absent = await resolver.execute({
+      workspace: 'core',
+      requested: 'EditChange.missing',
+      filePath: 'core:src/edit.ts',
+      publicSurface: 'core:src/edit.ts',
+    })
+
+    expect(found.status).toBe('resolved')
+    expect(found.target?.id).toBe(execute.id)
+    expect(absent.status).toBe('unresolved')
+  })
+
+  it('matches a public binding by surface and exported name, not by file path alone', async () => {
+    const target = symbol('run', 'src/internal.ts')
+    const binding = createPublicBinding({
+      surface: 'core:src/index.ts',
+      exportedName: 'run',
+      space: SymbolSpace.Value,
+      targetId: target.id,
+    })
+    const store = await makeStore({
+      symbols: [target],
+      declarations: [{ logicalSymbolId: target.id, filePath: 'core:src/internal.ts' }],
+      publicBindings: [binding],
+    })
+    const resolver = new ResolveSymbolReference(store, async () => freshHealth)
+
+    const matched = await resolver.execute({
+      workspace: 'core',
+      requested: 'run',
+      publicSurface: 'core:src/index.ts',
+    })
+    const byFile = await resolver.execute({
+      workspace: 'core',
+      requested: 'run',
+      filePath: 'core:src/other.ts',
+    })
+
+    expect(matched.status).toBe('resolved')
+    expect(matched.target?.id).toBe(target.id)
+    expect(byFile.status).not.toBe('resolved')
+  })
+
+  it('reports value and type MemberForm as ambiguous when space is omitted', async () => {
+    const value = createLogicalSymbol({
+      workspace: 'code-graph',
+      surface: 'src/symbol-reference.ts',
+      name: 'MemberForm',
+      space: SymbolSpace.Value,
+      ownerId: undefined,
+      memberSemantics: undefined,
+    })
+    const type = createLogicalSymbol({
+      ...value,
+      space: SymbolSpace.Type,
+    })
+    const store = await makeStore({
+      symbols: [value, type],
+      declarations: [
+        { logicalSymbolId: value.id, filePath: 'code-graph:src/symbol-reference.ts' },
+        { logicalSymbolId: type.id, filePath: 'code-graph:src/symbol-reference.ts' },
+      ],
+    })
+
+    const result = await new ResolveSymbolReference(store, async () => freshHealth).execute({
+      workspace: 'code-graph',
+      requested: 'MemberForm',
+      filePath: 'code-graph:src/symbol-reference.ts',
+    })
+
+    expect(result.status).toBe('ambiguous')
+  })
+
+  it('resolves a logical|2| id and a location-backed symbol id without human parsing', async () => {
+    const target = symbol('execute', 'src/edit.ts')
+    const store = await makeStore({
+      symbols: [target],
+      declarations: [{ logicalSymbolId: target.id, filePath: 'core:src/edit.ts' }],
+    })
+    const resolver = new ResolveSymbolReference(store, async () => freshHealth)
+
+    const byLogical = await resolver.execute({
+      workspace: 'other',
+      requested: target.id,
+    })
+    const byLocation = await resolver.execute({
+      workspace: 'core',
+      requested: 'core:src/edit.ts:method:execute:12:0',
+      filePath: 'core:src/edit.ts',
+    })
+
+    expect(byLogical.status).toBe('resolved')
+    expect(byLogical.target?.id).toBe(target.id)
+    expect(byLocation.status).not.toBe('resolved')
+    expect(byLocation.target?.id).not.toBe(target.id)
   })
 })

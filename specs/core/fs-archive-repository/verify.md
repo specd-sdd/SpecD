@@ -102,3 +102,19 @@
 - **GIVEN** two otherwise-identical archive pattern configurations, one containing `{{change.scope}}` and one containing `{{change.workspace}}`
 - **WHEN** `FsArchiveRepository` is constructed with each pattern in turn
 - **THEN** both constructions throw `UnsupportedPatternError`
+
+### Requirement: Archive paths stay inside the repository root
+
+#### Scenario: Drive-letter case stays inside
+
+- **GIVEN** the root is `c:/repo`
+- **AND** an archive path resolves to `C:/repo/archive`
+- **WHEN** confinement is checked
+- **THEN** the path is inside
+
+#### Scenario: A longer directory name is outside
+
+- **GIVEN** the root is `C:/repo`
+- **AND** an archive path resolves to `C:/repository/archive`
+- **WHEN** confinement is checked
+- **THEN** the path is outside

@@ -12,7 +12,7 @@
     "dev": "turbo dev",
     "specd": "node packages/cli/dist/index.js",
     "ai-agents:sync": "node dev/scripts/sync-codex-skills.js",
-    "test": "turbo test --concurrency=3 --filter=@specd/core --filter=@specd/cli --filter=@specd/code-graph",
+    "test": "turbo test --concurrency=3 --filter=@specd/core --filter=@specd/cli --filter=@specd/code-graph --filter=@specd/guide --filter=@specd/sdk --filter=@specd/skills --filter=@specd/plugin-manager --filter=@specd/plugin-agent-claude --filter=@specd/plugin-agent-codex --filter=@specd/plugin-agent-copilot --filter=@specd/plugin-agent-opencode --filter=@specd/plugin-agent-standard",
     "typecheck": "turbo typecheck --filter=!@specd/public-web",
     "lint": "eslint . ",
     "lint:fix": "eslint . --fix",
@@ -27,7 +27,7 @@
     "preflight:check": "node dev/scripts/preflight-check.js",
     "preflight:typecheck": "turbo typecheck --filter=!@specd/public-web",
     "preflight:build": "turbo build --filter=!@specd/public-web",
-    "preflight:test": "turbo test --concurrency=3 --filter=@specd/core --filter=@specd/cli --filter=@specd/code-graph",
+    "preflight:test": "pnpm test",
     "preflight:changeset": "pnpm changeset status",
     "prepublish:check": "node dev/scripts/prepublish-check.js",
     "preflight:fast": "pnpm preflight:check && pnpm preflight:typecheck",
@@ -61,15 +61,5 @@
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.58.2",
     "vitest": "^4.1.10"
-  },
-  "lint-staged": {
-    "*.ts": [
-      "eslint --fix",
-      "prettier --write",
-      "bash -c 'pnpm typecheck'"
-    ],
-    "*.{json,yaml,yml,md}": [
-      "prettier --write"
-    ]
   }
 }

@@ -14,8 +14,15 @@
   ],
   "implementation": [
     {
+      "file": "core:src/infrastructure/fs/path-platform.ts",
+      "symbols": ["retryOnLock"]
+    },
+    {
       "file": "core:src/infrastructure/fs/spec-repository.ts",
-      "symbols": ["FsSpecRepository.publish"]
+      "symbols": ["publicationRenameError", "isPublicationLockError"]
+    },
+    {
+      "file": "core:test/infrastructure/fs/spec-repository.spec.ts"
     }
   ]
 }

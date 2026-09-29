@@ -9,5 +9,41 @@
       "file": "plugin-manager:src/domain/types/agent-plugin.ts",
       "symbols": ["AgentInstallOptions"]
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Defines agent-plugin contract, capabilities and templating inputs, install fallback, and pure subtype guard.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:31f7942db1a5e5d33a7c354b1324cf4c97da0e475d6eefdde89478c3586e3bbc",
+          "lastModified": "2026-06-16T14:28:14.955Z"
+        },
+        "verify.md": {
+          "hash": "sha256:f4bc738d25fec0cdccbc07b2da688159e5f5c6043b66984c3d3ef4f52e8efcf4",
+          "lastModified": "2026-06-16T14:28:14.956Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Agent Plugin Type\n\n## Rules\n- `AgentPlugin extends SpecdPlugin`: `type:'agent'`; `install(config: SpecdConfig, options?: AgentInstallOptions): Promise<AgentInstallResult>`; `uninstall(config, options?): Promise<void>`. Config is full project config.\n- Options: `skills?:string[]`, `agents?:string[]`, recursive `variables?:Record<string,TemplateVariable>`, `capabilities?:string[]`; omit selectors = all. Initial capability IDs: `mcp`, `agents`, `frontmatter` (MCP branches, delegated-agent branches, compose `variables.frontmatter`).\n- Pass frontmatter data only at `variables.frontmatter`, never prebuilt YAML. `variables.sharedFolder` is project-root-relative; `@specd/skills` normalizes/validates it. Capabilities are plain IDs, never normalized objects.\n- Result: `{installed:Array<{skill,path}>, skipped:Array<{skill,reason}>}`. Install target follows runtime convention; without `agents`, copy agent template beside `shared.md`.\n- Export domain-pure `isAgentPlugin(value: SpecdPlugin): value is AgentPlugin`: type `agent`, functional `install`, functional `uninstall`.\n\n## Constraints\n- Agent plugins specialize base plugin; install capability data separate from variables.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:31f7942db1a5e5d33a7c354b1324cf4c97da0e475d6eefdde89478c3586e3bbc",
+          "lastModified": "2026-06-16T14:28:14.955Z"
+        },
+        "verify.md": {
+          "hash": "sha256:f4bc738d25fec0cdccbc07b2da688159e5f5c6043b66984c3d3ef4f52e8efcf4",
+          "lastModified": "2026-06-16T14:28:14.956Z"
+        }
+      }
+    }
+  }
 }

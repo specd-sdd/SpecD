@@ -5,6 +5,7 @@ import { type ImplementationDetector } from '../../application/ports/implementat
 import { RefreshImplementationTracking } from '../../application/use-cases/refresh-implementation-tracking.js'
 import { type SpecdConfig } from '../../application/specd-config.js'
 import { VcsImplementationDetector } from '../../infrastructure/vcs/vcs-implementation-detector.js'
+import { isPathInside, normalizeVcsRoot } from '../../infrastructure/fs/path-platform.js'
 import {
   createCompositionResolver,
   type CompositionResolver,
@@ -110,6 +111,7 @@ function createRefreshImplementationTrackingFromNormalized(
       input.deps.implementationDetector,
       input.deps.files,
       input.deps.projectRoot,
+      { isPathInside, normalizeVcsRoot },
       input.deps.specRepositories,
     )
   }

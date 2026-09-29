@@ -1,0 +1,54 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["default:_global/testing"],
+  "implementation": [
+    {
+      "file": "default:.github/workflows/ci.yml"
+    },
+    {
+      "file": "default:.gitignore"
+    },
+    {
+      "file": "default:pnpm-workspace.yaml"
+    }
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "GitHub Actions CI validates identical build, typecheck, and test flows across macOS, Linux, and Windows.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:44edcd129831c52a00d33520ada20118ad23a1528537bb663b39aff1155ea9ce",
+          "lastModified": "2026-09-28T11:19:58.847Z"
+        },
+        "verify.md": {
+          "hash": "sha256:337189fec712447c98bd6dc507e93aa72421231636aba3c5bf6f1dd0f6d7cd70",
+          "lastModified": "2026-09-28T11:19:58.848Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Continuous Integration\n\n## Rules\n\n- Track `.github/workflows/ci.yml`; keep remaining `.github/` ignored, including agent files, skill copies, `copilot-instructions.md`.\n- Run identical job on `macos-latest`, `ubuntu-latest`, `windows-latest`; any runner failure fails check.\n- Trigger pull requests and pushes to `main`; never call Gemini workflows.\n- Each job: checkout; install pnpm `10.6.5`; install Node 22; run `pnpm install --frozen-lockfile`.\n- Install builds `better-sqlite3`, `@ast-grep/lang-go`, `@ast-grep/lang-php`, `@ast-grep/lang-python`, `esbuild`; add no apt, brew, or Chocolatey packages.\n- Run, in order: `pnpm build`, `pnpm typecheck`, `pnpm test`.\n- Build/typecheck skip `@specd/public-web`.\n- Test via Vitest: `@specd/core`, `@specd/cli`, `@specd/code-graph`, `@specd/guide`, `@specd/sdk`, `@specd/skills`, `@specd/plugin-manager`, all five `@specd/plugin-agent-*` packages. Exclude `@specd/mcp`, `@specd/public-web`.\n- Never run changeset status or publish.\n\n## Constraints\n\n- GitHub Actions only; no new test runner.\n- Gemini workflow files may remain tracked; behavior out of scope.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:44edcd129831c52a00d33520ada20118ad23a1528537bb663b39aff1155ea9ce",
+          "lastModified": "2026-09-28T11:19:58.847Z"
+        },
+        "verify.md": {
+          "hash": "sha256:337189fec712447c98bd6dc507e93aa72421231636aba3c5bf6f1dd0f6d7cd70",
+          "lastModified": "2026-09-28T11:19:58.848Z"
+        }
+      }
+    }
+  }
+}

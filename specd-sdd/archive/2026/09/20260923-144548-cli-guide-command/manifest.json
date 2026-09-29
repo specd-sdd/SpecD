@@ -1,0 +1,2545 @@
+{
+  "name": "cli-guide-command",
+  "createdAt": "2026-09-23T14:45:48.519Z",
+  "updatedAt": "2026-09-24T13:35:20.261Z",
+  "description": "Add specd guide command to CLI for retrieving documentation topics in terminal and agent-friendly formats",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "cli:guide",
+    "default:_global/docs",
+    "skills:agent-instruction-template",
+    "guide:conventions",
+    "guide:guide-model",
+    "guide:bundle-guides",
+    "guide:list-guides",
+    "guide:get-guide",
+    "guide:get-guide-outline",
+    "guide:slice-guide-content",
+    "guide:search-guides",
+    "guide:composition",
+    "guide:errors",
+    "cli:entrypoint"
+  ],
+  "specDependsOn": {
+    "default:_global/docs": ["default:_global/conventions"],
+    "cli:guide": ["cli:entrypoint", "default:_global/docs", "guide:composition"],
+    "skills:agent-instruction-template": [],
+    "guide:conventions": [],
+    "guide:guide-model": ["guide:conventions"],
+    "guide:bundle-guides": ["guide:conventions", "guide:guide-model"],
+    "guide:list-guides": ["guide:conventions", "guide:guide-model"],
+    "guide:get-guide": ["guide:conventions", "guide:guide-model", "guide:errors"],
+    "guide:get-guide-outline": ["guide:conventions", "guide:guide-model"],
+    "guide:slice-guide-content": ["guide:conventions", "guide:guide-model", "guide:errors"],
+    "guide:search-guides": ["guide:conventions", "guide:guide-model"],
+    "guide:composition": [
+      "guide:conventions",
+      "guide:guide-model",
+      "guide:errors",
+      "guide:list-guides",
+      "guide:get-guide",
+      "guide:get-guide-outline",
+      "guide:slice-guide-content",
+      "guide:search-guides"
+    ],
+    "guide:errors": ["guide:conventions", "default:_global/error-handling-conventions"],
+    "cli:entrypoint": ["core:config", "default:_global/error-handling-conventions"]
+  },
+  "invalidationPolicy": "downstream",
+  "implementationTrackingStartedAt": "2026-09-23T15:56:37.625Z",
+  "trackedImplementationFiles": [
+    {
+      "file": "packages/guide/package.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/tsconfig.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/vitest.config.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/README.md",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/src/domain/errors/specd-guide-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/src/domain/errors/guide-topic-not-found-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/src/domain/errors/guide-section-not-found-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/src/domain/errors/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/src/domain/models/guide-section.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/src/domain/models/guide-topic.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/src/domain/models/guide-summary.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/src/domain/models/guide-outline.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/src/domain/models/guide-search-hit.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/src/domain/models/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/src/domain/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/src/application/ports/guide-catalog-port.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/src/application/ports/guide-search-port.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/src/application/ports/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/src/application/queries/list-guides-query.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/src/application/queries/get-guide-query.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/src/application/queries/get-guide-outline-query.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/src/application/queries/slice-guide-lines.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/src/application/queries/get-guide-section-query.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "dev/scripts/spec-completeness-poc.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "dev/scripts/universal-spec-completeness-codegraph-ontology.md",
+      "state": "resolved"
+    },
+    {
+      "file": "pnpm-lock.yaml",
+      "state": "resolved"
+    },
+    {
+      "file": "specd.yaml",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/src/application/queries/search-guides-query.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/src/application/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/src/application/queries/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/src/domain/errors/guide-section-ambiguous-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/scripts/bundle-guides.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/skills/skills-template-rendering.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/config/config-reference.md",
+      "state": "removed"
+    },
+    {
+      "file": "docs/guide/workspaces.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/guide/custom-schemas.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/guide/templates.md",
+      "state": "removed"
+    },
+    {
+      "file": "docs/guide/cli.md",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/src/infrastructure/generated/guides.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/src/infrastructure/adapters/prebundled-guide-catalog-adapter.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/src/infrastructure/adapters/minisearch-guide-engine-adapter.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/src/composition/guide-engine.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/src/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/test/unit/domain/errors.test.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/test/unit/domain/models.test.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/test/unit/application/slicing.test.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/test/unit/infrastructure/bundle.test.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/test/unit/infrastructure/search.test.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/test/integration/guide-engine.test.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/guide/code-graph.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/guide/configuration.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/guide/deltas.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/guide/getting-started.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/guide/schemas.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/guide/selectors.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/guide/skills-template-rendering.md",
+      "state": "removed"
+    },
+    {
+      "file": "docs/guide/standard-schema.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/guide/workflow.md",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/src/composition/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/src/infrastructure/adapters/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/src/infrastructure/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/src/public.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/test/unit/application/queries.test.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/guide/_sections/getting-started/project-structure.md",
+      "state": "removed"
+    },
+    {
+      "file": "packages/cli/test/commands/guide/guide.test.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/skills/test/application/render-base-agent-instruction.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "apps/public-web/README.md",
+      "state": "resolved"
+    },
+    {
+      "file": "apps/public-web/sidebars.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/cli/archive.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/cli/changes.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/cli/config.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/cli/discarded.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/cli/drafts.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/cli/graph.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/cli/guide.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/cli/index.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/cli/schema.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/cli/storage.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/guide/changes.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/guide/context-compilation.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/guide/index.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/guide/philosophy.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/guide/project-structure.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/guide/specs.md",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/package.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/guide/formatters.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/guide/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/skills/templates/prompt/agent-instruction.md.tpl",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/skills/templates/shared/shared.md.tpl",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/cli/specs.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/cli/project.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/cli/plugins.md",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/program.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/documentation-coverage.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/helpers/table.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/helpers/table.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/guide/skills.md",
+      "state": "resolved"
+    },
+    {
+      "file": "AGENTS.md",
+      "state": "resolved"
+    },
+    {
+      "file": "CLAUDE.md",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/configuration-coverage.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/cli/cli-reference.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/config/examples/index.md",
+      "state": "removed"
+    },
+    {
+      "file": "docs/guide/configuration-examples.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/schemas/schema-format.md",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/specd-config.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "CONTRIBUTING.md",
+      "state": "resolved"
+    },
+    {
+      "file": "README.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/config/examples/_category_.json",
+      "state": "removed"
+    },
+    {
+      "file": "docs/config/examples/approvals-and-workflow-hooks.md",
+      "state": "removed"
+    },
+    {
+      "file": "docs/config/examples/multi-repo-coordinator.md",
+      "state": "removed"
+    },
+    {
+      "file": "docs/config/examples/single-repo-local-schema.md",
+      "state": "removed"
+    },
+    {
+      "file": "docs/config/examples/single-repo-minimal.md",
+      "state": "removed"
+    },
+    {
+      "file": "docs/core/overview.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/guide/_sections/getting-started/change-directory.md",
+      "state": "removed"
+    },
+    {
+      "file": "docs/guide/_sections/getting-started/context-compilation.md",
+      "state": "removed"
+    },
+    {
+      "file": "docs/guide/_sections/getting-started/core-concepts.md",
+      "state": "removed"
+    },
+    {
+      "file": "docs/guide/_sections/getting-started/lifecycle.md",
+      "state": "removed"
+    },
+    {
+      "file": "docs/guide/_sections/getting-started/local-site.md",
+      "state": "removed"
+    },
+    {
+      "file": "docs/guide/_sections/getting-started/philosophy.md",
+      "state": "removed"
+    },
+    {
+      "file": "docs/guide/_sections/getting-started/setting-up.md",
+      "state": "removed"
+    },
+    {
+      "file": "docs/guide/_sections/getting-started/spec-directory.md",
+      "state": "removed"
+    },
+    {
+      "file": "docs/guide/_sections/getting-started/spec-metadata.md",
+      "state": "removed"
+    },
+    {
+      "file": "docs/guide/_sections/getting-started/usage.md",
+      "state": "removed"
+    },
+    {
+      "file": "docs/guide/artifacts.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/guide/installation.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/public-web/index.md",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/specd/README.md",
+      "state": "resolved"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "guide:conventions",
+      "file": "packages/guide/package.json",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "guide:conventions",
+      "file": "packages/guide/tsconfig.json",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "guide:conventions",
+      "file": "packages/guide/vitest.config.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "guide:conventions",
+      "file": "packages/guide/README.md",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "guide:errors",
+      "file": "packages/guide/src/domain/errors/specd-guide-error.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["SpecdGuideError"]
+    },
+    {
+      "specId": "guide:errors",
+      "file": "packages/guide/src/domain/errors/guide-topic-not-found-error.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["GuideTopicNotFoundError"]
+    },
+    {
+      "specId": "guide:errors",
+      "file": "packages/guide/src/domain/errors/guide-section-not-found-error.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["GuideSectionNotFoundError"]
+    },
+    {
+      "specId": "guide:errors",
+      "file": "packages/guide/src/domain/errors/index.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "guide:guide-model",
+      "file": "packages/guide/src/domain/models/guide-section.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["GuideSection"]
+    },
+    {
+      "specId": "guide:guide-model",
+      "file": "packages/guide/src/domain/models/guide-topic.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["GuideTopic"]
+    },
+    {
+      "specId": "guide:guide-model",
+      "file": "packages/guide/src/domain/models/guide-summary.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["GuideSummary"]
+    },
+    {
+      "specId": "guide:guide-model",
+      "file": "packages/guide/src/domain/models/guide-outline.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["GuideOutline"]
+    },
+    {
+      "specId": "guide:guide-model",
+      "file": "packages/guide/src/domain/models/guide-search-hit.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["GuideSearchHit"]
+    },
+    {
+      "specId": "guide:guide-model",
+      "file": "packages/guide/src/domain/models/index.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "guide:guide-model",
+      "file": "packages/guide/src/domain/index.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "guide:list-guides",
+      "file": "packages/guide/src/application/ports/guide-catalog-port.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["GuideCatalogPort"]
+    },
+    {
+      "specId": "guide:search-guides",
+      "file": "packages/guide/src/application/ports/guide-search-port.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["GuideSearchPort", "GuideSearchOptions"]
+    },
+    {
+      "specId": "guide:list-guides",
+      "file": "packages/guide/src/application/ports/index.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "guide:list-guides",
+      "file": "packages/guide/src/application/queries/list-guides-query.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["ListGuidesQuery"]
+    },
+    {
+      "specId": "guide:get-guide",
+      "file": "packages/guide/src/application/queries/get-guide-query.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["GetGuideQuery", "GetGuideInput"]
+    },
+    {
+      "specId": "guide:get-guide-outline",
+      "file": "packages/guide/src/application/queries/get-guide-outline-query.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["GetGuideOutlineQuery", "GetGuideOutlineInput"]
+    },
+    {
+      "specId": "guide:slice-guide-content",
+      "file": "packages/guide/src/application/queries/slice-guide-lines.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["sliceGuideLines", "formatWithLineNumbers"]
+    },
+    {
+      "specId": "guide:slice-guide-content",
+      "file": "packages/guide/src/application/queries/get-guide-section-query.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["GetGuideSectionQuery", "GetGuideSectionInput"]
+    },
+    {
+      "specId": "guide:search-guides",
+      "file": "packages/guide/src/application/queries/search-guides-query.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["SearchGuidesQuery", "SearchGuidesInput"]
+    },
+    {
+      "specId": "guide:errors",
+      "file": "packages/guide/src/domain/errors/guide-section-ambiguous-error.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["GuideSectionAmbiguousError"]
+    },
+    {
+      "specId": "guide:bundle-guides",
+      "file": "packages/guide/scripts/bundle-guides.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["bundleGuides", "compileGuide", "extractSections", "parseFrontmatter"]
+    },
+    {
+      "specId": "default:_global/docs",
+      "file": "docs/skills/skills-template-rendering.md",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "default:_global/docs",
+      "file": "docs/guide/workspaces.md",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "default:_global/docs",
+      "file": "docs/guide/custom-schemas.md",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "default:_global/docs",
+      "file": "docs/guide/cli.md",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "guide:bundle-guides",
+      "file": "packages/guide/src/infrastructure/generated/guides.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["GUIDES_CATALOG", "GUIDES_INDEX"]
+    },
+    {
+      "specId": "guide:list-guides",
+      "file": "packages/guide/src/infrastructure/adapters/prebundled-guide-catalog-adapter.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["PrebundledGuideCatalogAdapter"]
+    },
+    {
+      "specId": "guide:get-guide",
+      "file": "packages/guide/src/infrastructure/adapters/prebundled-guide-catalog-adapter.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["PrebundledGuideCatalogAdapter"]
+    },
+    {
+      "specId": "guide:search-guides",
+      "file": "packages/guide/src/infrastructure/adapters/minisearch-guide-engine-adapter.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["MiniSearchGuideEngineAdapter"]
+    },
+    {
+      "specId": "guide:composition",
+      "file": "packages/guide/src/composition/guide-engine.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["GuideEngine", "createGuideEngine", "GuideEngineOptions"]
+    },
+    {
+      "specId": "guide:composition",
+      "file": "packages/guide/src/index.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "guide:errors",
+      "file": "packages/guide/test/unit/domain/errors.test.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "guide:guide-model",
+      "file": "packages/guide/test/unit/domain/models.test.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "guide:slice-guide-content",
+      "file": "packages/guide/test/unit/application/slicing.test.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "guide:bundle-guides",
+      "file": "packages/guide/test/unit/infrastructure/bundle.test.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "guide:search-guides",
+      "file": "packages/guide/test/unit/infrastructure/search.test.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "guide:composition",
+      "file": "packages/guide/test/integration/guide-engine.test.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:guide",
+      "file": "packages/cli/test/commands/guide/guide.test.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "skills:agent-instruction-template",
+      "file": "packages/skills/test/application/render-base-agent-instruction.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "default:_global/docs",
+      "file": "docs/guide/context-compilation.md",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "default:_global/docs",
+      "file": "docs/guide/index.md",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "default:_global/docs",
+      "file": "apps/public-web/sidebars.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "default:_global/docs",
+      "file": "docs/cli/specs.md",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "default:_global/docs",
+      "file": "docs/cli/project.md",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "default:_global/docs",
+      "file": "docs/cli/plugins.md",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:guide",
+      "file": "packages/cli/src/program.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:guide",
+      "file": "packages/cli/test/documentation-coverage.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "default:_global/docs",
+      "file": "docs/cli/guide.md",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "default:_global/docs",
+      "file": "docs/guide/skills.md",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:guide",
+      "file": "packages/cli/src/commands/guide/formatters.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:guide",
+      "file": "packages/cli/src/commands/guide/index.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:entrypoint",
+      "file": "packages/cli/src/helpers/table.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:entrypoint",
+      "file": "packages/cli/src/program.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:entrypoint",
+      "file": "packages/cli/src/index.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:entrypoint",
+      "file": "packages/cli/test/helpers/table.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:entrypoint",
+      "file": "packages/cli/test/documentation-coverage.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:entrypoint",
+      "file": "packages/cli/test/configuration-coverage.spec.ts",
+      "fileLinkExplicit": true
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:7f416929a001818ab693f5cecc8b581a6d2fd927171427594dd1ad3cf858e869"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "cli:guide",
+          "filename": "specs/cli/guide/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:04d9ff8cf1f7aa141967f66f72f0a90463ed09d0fedd0851d025125d52b4ee25"
+        },
+        {
+          "key": "default:_global/docs",
+          "filename": "deltas/default/_global/docs/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:52659c4050e13ff24a23dce96a02d2264dbae11235f4f36e51178789d14947bb"
+        },
+        {
+          "key": "skills:agent-instruction-template",
+          "filename": "deltas/skills/agent-instruction-template/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:25b11306c2561ee4e901eb20c6dac7d50e7f5adb1b69aa1a19cc0cccc4c366f9"
+        },
+        {
+          "key": "guide:conventions",
+          "filename": "specs/guide/conventions/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:9e8ffbf3af14a81956a94b4a8a0a17ae643a3489a4edeaf7e2698127bd0a146b"
+        },
+        {
+          "key": "guide:guide-model",
+          "filename": "specs/guide/guide-model/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:c9244eabe1e312a169f8c989520285a4c4e7142189ac035469a0c71cb391cbc3"
+        },
+        {
+          "key": "guide:bundle-guides",
+          "filename": "specs/guide/bundle-guides/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:e7c398216d8428401d4e6164cfe3eb09d6df53941f9dc726c9efa8a2062f33a5"
+        },
+        {
+          "key": "guide:list-guides",
+          "filename": "specs/guide/list-guides/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:f32df0d70379a782d5439fca576c55e0d6ad4b2926e6cb6f7c9efe27e87ba6c9"
+        },
+        {
+          "key": "guide:get-guide",
+          "filename": "specs/guide/get-guide/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:6289713024212d0b07dc3dd48bc87e88408608b594ce0e3ee8512bff914b6789"
+        },
+        {
+          "key": "guide:get-guide-outline",
+          "filename": "specs/guide/get-guide-outline/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:c5a514701a7a0a3ad68ec6cee696e485eee370440b936b0527f7acdaec72411b"
+        },
+        {
+          "key": "guide:slice-guide-content",
+          "filename": "specs/guide/slice-guide-content/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:ab9e865f18e2e3460d6b0f29022679479d09bad8e8f5c6a828648db784920be8"
+        },
+        {
+          "key": "guide:search-guides",
+          "filename": "specs/guide/search-guides/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:81a546d92242a8774a374678f9288b1dde97a33519c89abf8ed697aec90de940"
+        },
+        {
+          "key": "guide:composition",
+          "filename": "specs/guide/composition/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:a9480ab04d1252dd90889882dfcd78ef7b1ce638fd97c6731beb9c7400e661af"
+        },
+        {
+          "key": "guide:errors",
+          "filename": "specs/guide/errors/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:9c03fd876aae5daf7810b2a52b2ce4cae1423a73ce1c475776c0e9f3880368a2"
+        },
+        {
+          "key": "cli:entrypoint",
+          "filename": "deltas/cli/entrypoint/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:1502f506c947919c44b2bf10f7a199b21a223ed092ee91ef9c1ce8daa35a5118"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "cli:guide",
+          "filename": "specs/cli/guide/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:6216a0ec781ff3558188df79a306ccb40038a43fb0f5203992ba043e54ac02f2"
+        },
+        {
+          "key": "default:_global/docs",
+          "filename": "deltas/default/_global/docs/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c7a08493790edf358f2af6d853887519e4a2ef8565b1ba68fb2865374c2fa8ce"
+        },
+        {
+          "key": "skills:agent-instruction-template",
+          "filename": "deltas/skills/agent-instruction-template/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:8711d1995544d917f93e41b0e0c4933e96cf011cffe8612b969431de2f92866d"
+        },
+        {
+          "key": "guide:conventions",
+          "filename": "specs/guide/conventions/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:0c96ad4a1c2898e3d5091e3eb0bd693ec3a89a89f4f064c0b464dbc3921992a2"
+        },
+        {
+          "key": "guide:guide-model",
+          "filename": "specs/guide/guide-model/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:07324a4f86b9a52e64c34b06507ab8ce9da0267586f917bc1bd880b9a6b61344"
+        },
+        {
+          "key": "guide:bundle-guides",
+          "filename": "specs/guide/bundle-guides/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:70813ef546e50c746ce17a53ab1ddbc0c2cbe974fb827f0240c4d5187a29ba31"
+        },
+        {
+          "key": "guide:list-guides",
+          "filename": "specs/guide/list-guides/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:6a68d7a0f668513834d5ee98d7bc69de817fc546ee476bc32809b0a397b8309b"
+        },
+        {
+          "key": "guide:get-guide",
+          "filename": "specs/guide/get-guide/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:599a2dd68fd9015099e8521697e1b72b9f7c3261afd42add90fd946a19610eac"
+        },
+        {
+          "key": "guide:get-guide-outline",
+          "filename": "specs/guide/get-guide-outline/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:d2b4a86617389f0250aa195e849a92530536c25e9f0ea3705d19abc5431c85b7"
+        },
+        {
+          "key": "guide:slice-guide-content",
+          "filename": "specs/guide/slice-guide-content/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:16feea4322fbd4f6b8d16ec6f9f368540955136801d7e6083ac87a257d9c8b82"
+        },
+        {
+          "key": "guide:search-guides",
+          "filename": "specs/guide/search-guides/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:1e3c471448cb332ec1a3f8d8211df1daa7ba0c626aa3083cf7bd503822677201"
+        },
+        {
+          "key": "guide:composition",
+          "filename": "specs/guide/composition/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:9155ca9e0ece7f9d93d41084206d785c0d201608d96c63583e8bc7d99d4e1550"
+        },
+        {
+          "key": "guide:errors",
+          "filename": "specs/guide/errors/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:2d707789e2fb783e3bc1b98733650a88aec5b357547549bb08d6e774b3b19304"
+        },
+        {
+          "key": "cli:entrypoint",
+          "filename": "deltas/cli/entrypoint/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:2f7173dccb6281f343173979148906ecef02573759c3de9e999c395241a9f9dd"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:38e41268f7a4e9e7ad9dde0882b397762e110568c5a4a0d0a31d93191384a79e"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "verify", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:ce42111e6478d84879780414b9558ac699704eaa6ec942f9ee435df608dd8e4e"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-09-23T14:45:48.519Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": ["cli:guide"],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-09-23T14:45:48.528Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "cli:guide"
+        },
+        {
+          "type": "verify",
+          "key": "cli:guide"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-23T14:46:47.114Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-09-23T15:02:24.740Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["cli:guide"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:guide"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-09-23T15:02:24.756Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "default:_global/docs"
+        },
+        {
+          "type": "verify",
+          "key": "default:_global/docs"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-09-23T15:16:29.936Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["cli:guide", "default:_global/docs"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:guide", "default:_global/docs"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-09-23T15:18:13.015Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["cli:guide", "default:_global/docs"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:guide", "default:_global/docs"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-09-23T15:18:13.020Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "skills:agent-instruction-template"
+        },
+        {
+          "type": "verify",
+          "key": "skills:agent-instruction-template"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-09-23T15:22:57.379Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["cli:guide", "default:_global/docs", "skills:agent-instruction-template"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:guide", "default:_global/docs", "skills:agent-instruction-template"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-09-23T15:24:14.075Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["cli:guide", "default:_global/docs", "skills:agent-instruction-template"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:guide", "default:_global/docs", "skills:agent-instruction-template"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-09-23T15:32:48.018Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["cli:guide", "default:_global/docs", "skills:agent-instruction-template"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:guide", "default:_global/docs", "skills:agent-instruction-template"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-09-23T15:37:32.797Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["cli:guide", "default:_global/docs", "skills:agent-instruction-template"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:guide", "default:_global/docs", "skills:agent-instruction-template"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-09-23T15:37:32.797Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "guide:guide"
+        },
+        {
+          "type": "verify",
+          "key": "guide:guide"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-09-23T15:43:37.668Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:guide",
+            "default:_global/docs",
+            "skills:agent-instruction-template",
+            "guide:guide"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:guide",
+            "default:_global/docs",
+            "skills:agent-instruction-template",
+            "guide:guide"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-09-23T15:43:43.037Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:guide",
+            "default:_global/docs",
+            "skills:agent-instruction-template",
+            "guide:guide"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:guide",
+            "default:_global/docs",
+            "skills:agent-instruction-template",
+            "guide:guide"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-09-23T15:43:43.041Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "guide:conventions"
+        },
+        {
+          "type": "specs",
+          "key": "guide:guide-model"
+        },
+        {
+          "type": "specs",
+          "key": "guide:bundle-guides"
+        },
+        {
+          "type": "specs",
+          "key": "guide:list-guides"
+        },
+        {
+          "type": "specs",
+          "key": "guide:get-guide"
+        },
+        {
+          "type": "specs",
+          "key": "guide:get-guide-outline"
+        },
+        {
+          "type": "specs",
+          "key": "guide:slice-guide-content"
+        },
+        {
+          "type": "specs",
+          "key": "guide:search-guides"
+        },
+        {
+          "type": "specs",
+          "key": "guide:composition"
+        },
+        {
+          "type": "verify",
+          "key": "guide:conventions"
+        },
+        {
+          "type": "verify",
+          "key": "guide:guide-model"
+        },
+        {
+          "type": "verify",
+          "key": "guide:bundle-guides"
+        },
+        {
+          "type": "verify",
+          "key": "guide:list-guides"
+        },
+        {
+          "type": "verify",
+          "key": "guide:get-guide"
+        },
+        {
+          "type": "verify",
+          "key": "guide:get-guide-outline"
+        },
+        {
+          "type": "verify",
+          "key": "guide:slice-guide-content"
+        },
+        {
+          "type": "verify",
+          "key": "guide:search-guides"
+        },
+        {
+          "type": "verify",
+          "key": "guide:composition"
+        }
+      ],
+      "filesRemoved": [
+        {
+          "type": "specs",
+          "key": "guide:guide"
+        },
+        {
+          "type": "verify",
+          "key": "guide:guide"
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-09-23T15:49:36.142Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:guide",
+            "default:_global/docs",
+            "skills:agent-instruction-template",
+            "guide:conventions",
+            "guide:guide-model",
+            "guide:bundle-guides",
+            "guide:list-guides",
+            "guide:get-guide",
+            "guide:get-guide-outline",
+            "guide:slice-guide-content",
+            "guide:search-guides",
+            "guide:composition"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:guide",
+            "default:_global/docs",
+            "skills:agent-instruction-template",
+            "guide:conventions",
+            "guide:guide-model",
+            "guide:bundle-guides",
+            "guide:list-guides",
+            "guide:get-guide",
+            "guide:get-guide-outline",
+            "guide:slice-guide-content",
+            "guide:search-guides",
+            "guide:composition"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-09-23T15:49:36.144Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "guide:errors"
+        },
+        {
+          "type": "verify",
+          "key": "guide:errors"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-23T15:56:05.795Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-23T15:56:37.625Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-09-23T16:02:05.410Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:guide",
+            "default:_global/docs",
+            "skills:agent-instruction-template",
+            "guide:conventions",
+            "guide:guide-model",
+            "guide:bundle-guides",
+            "guide:list-guides",
+            "guide:get-guide",
+            "guide:get-guide-outline",
+            "guide:slice-guide-content",
+            "guide:search-guides",
+            "guide:composition",
+            "guide:errors"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:guide",
+            "default:_global/docs",
+            "skills:agent-instruction-template",
+            "guide:conventions",
+            "guide:guide-model",
+            "guide:bundle-guides",
+            "guide:list-guides",
+            "guide:get-guide",
+            "guide:get-guide-outline",
+            "guide:slice-guide-content",
+            "guide:search-guides",
+            "guide:composition",
+            "guide:errors"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-23T16:02:05.410Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-23T16:07:30.612Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-23T16:07:47.772Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-09-23T16:09:40.546Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:guide",
+            "default:_global/docs",
+            "skills:agent-instruction-template",
+            "guide:conventions",
+            "guide:guide-model",
+            "guide:bundle-guides",
+            "guide:list-guides",
+            "guide:get-guide",
+            "guide:get-guide-outline",
+            "guide:slice-guide-content",
+            "guide:search-guides",
+            "guide:composition",
+            "guide:errors"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:guide",
+            "default:_global/docs",
+            "skills:agent-instruction-template",
+            "guide:conventions",
+            "guide:guide-model",
+            "guide:bundle-guides",
+            "guide:list-guides",
+            "guide:get-guide",
+            "guide:get-guide-outline",
+            "guide:slice-guide-content",
+            "guide:search-guides",
+            "guide:composition",
+            "guide:errors"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-23T16:09:40.546Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-23T16:11:50.578Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-23T16:12:03.145Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-09-23T17:12:24.986Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:guide",
+            "default:_global/docs",
+            "skills:agent-instruction-template",
+            "guide:conventions",
+            "guide:guide-model",
+            "guide:bundle-guides",
+            "guide:list-guides",
+            "guide:get-guide",
+            "guide:get-guide-outline",
+            "guide:slice-guide-content",
+            "guide:search-guides",
+            "guide:composition",
+            "guide:errors"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:guide",
+            "default:_global/docs",
+            "skills:agent-instruction-template",
+            "guide:conventions",
+            "guide:guide-model",
+            "guide:bundle-guides",
+            "guide:list-guides",
+            "guide:get-guide",
+            "guide:get-guide-outline",
+            "guide:slice-guide-content",
+            "guide:search-guides",
+            "guide:composition",
+            "guide:errors"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-23T17:12:24.986Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-09-23T17:12:24.989Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "cli:entrypoint"
+        },
+        {
+          "type": "verify",
+          "key": "cli:entrypoint"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-09-23T17:14:22.231Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-23T17:14:33.342Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-23T17:14:44.002Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-09-23T17:49:32.351Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:guide, default:_global/docs, guide:search-guides]; verify [default:_global/docs, guide:search-guides]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:guide", "default:_global/docs", "guide:search-guides"]
+        },
+        {
+          "type": "verify",
+          "files": ["default:_global/docs", "guide:search-guides"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-23T17:49:32.351Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-23T17:49:53.200Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-23T17:49:54.108Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-09-24T06:44:33.651Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [default:_global/docs]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["default:_global/docs"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:guide",
+            "default:_global/docs",
+            "skills:agent-instruction-template",
+            "guide:conventions",
+            "guide:guide-model",
+            "guide:bundle-guides",
+            "guide:list-guides",
+            "guide:get-guide",
+            "guide:get-guide-outline",
+            "guide:slice-guide-content",
+            "guide:search-guides",
+            "guide:composition",
+            "guide:errors",
+            "cli:entrypoint"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-24T06:44:33.651Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-09-24T06:46:51.026Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [guide:bundle-guides, guide:guide-model]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["guide:bundle-guides", "guide:guide-model"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:guide",
+            "default:_global/docs",
+            "skills:agent-instruction-template",
+            "guide:conventions",
+            "guide:guide-model",
+            "guide:bundle-guides",
+            "guide:list-guides",
+            "guide:get-guide",
+            "guide:get-guide-outline",
+            "guide:slice-guide-content",
+            "guide:search-guides",
+            "guide:composition",
+            "guide:errors",
+            "cli:entrypoint"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-24T06:47:09.358Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-24T06:47:10.177Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-09-24T07:43:09.536Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [default:_global/docs]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["default:_global/docs"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:guide",
+            "default:_global/docs",
+            "skills:agent-instruction-template",
+            "guide:conventions",
+            "guide:guide-model",
+            "guide:bundle-guides",
+            "guide:list-guides",
+            "guide:get-guide",
+            "guide:get-guide-outline",
+            "guide:slice-guide-content",
+            "guide:search-guides",
+            "guide:composition",
+            "guide:errors",
+            "cli:entrypoint"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-24T07:43:09.536Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-24T10:38:25.438Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-24T10:38:45.916Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-24T10:38:53.870Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-24T11:19:47.191Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-24T11:20:15.527Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-09-24T11:26:24.415Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:guide",
+            "default:_global/docs",
+            "skills:agent-instruction-template",
+            "guide:conventions",
+            "guide:guide-model",
+            "guide:bundle-guides",
+            "guide:list-guides",
+            "guide:get-guide",
+            "guide:get-guide-outline",
+            "guide:slice-guide-content",
+            "guide:search-guides",
+            "guide:composition",
+            "guide:errors",
+            "cli:entrypoint"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:guide",
+            "default:_global/docs",
+            "skills:agent-instruction-template",
+            "guide:conventions",
+            "guide:guide-model",
+            "guide:bundle-guides",
+            "guide:list-guides",
+            "guide:get-guide",
+            "guide:get-guide-outline",
+            "guide:slice-guide-content",
+            "guide:search-guides",
+            "guide:composition",
+            "guide:errors",
+            "cli:entrypoint"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-24T11:26:24.415Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-24T11:26:50.284Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-24T11:26:53.771Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-24T11:27:16.017Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-24T11:34:56.777Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-24T11:35:27.663Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-09-24T13:18:03.106Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Tracked implementation files remain open for change \"cli-guide-command\". Resolve or ignore them first.",
+      "commitStarted": false
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-24T13:35:20.254Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-09-24T13:35:21.021Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

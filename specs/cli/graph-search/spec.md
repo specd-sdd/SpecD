@@ -83,13 +83,15 @@ Existing `--kind` behavior SHALL remain based on the closed broad `SymbolKind`; 
 
 ### Requirement: Semantic-first candidate lanes
 
-Symbol search SHALL obtain semantic-identity candidates independently from backend full-text/raw-symbol candidates. It SHALL merge and logically group both lanes before applying the requested limit.
+Symbol search SHALL obtain semantic-identity candidates independently from backend full-text and raw-symbol candidates. It SHALL merge and logically group both lanes before applying the requested limit.
+
+Symbol search SHALL always run the existing full-query symbol search, including full-text search and bare-name identity, and MUST NOT remove any token from that query. It SHALL additionally extract every whitespace token that is wholly a canonical logical id or a `Tipo.miembro` / `Tipo::miembro` spelling and look each one up by exact identity. Every equal logical symbol SHALL be included and SHALL rank ahead of the normal full-query hits. If an extracted spelling matches nothing, the normal search result MUST remain unchanged. A bare name such as `execute` MUST NOT be treated as a qualified spelling. The CLI MUST NOT parse member syntax; the provider extracts and resolves those tokens.
 
 An exact rendered canonical logical ID SHALL add its logical target directly to the result candidate set even when that target has no public binding and its rendered ID produces no backend text hit. Its declarations SHALL be loaded from logical identity and it SHALL receive the exact-logical-identity tier. Matching only a logical target's simple name MUST NOT be labeled exact logical identity.
 
-Ordering SHALL prioritize exact logical identity, exact public binding, exact declaration with matching case, exact declaration after language-appropriate case normalization, logical prefix or structural-component match, exact local symbol, then textual relevance. Declaration tiers SHALL apply only to hits proven to belong to a logical target; a case-exact hit without a logical target SHALL use the exact-local-symbol tier, which MUST remain reachable after logical-component candidates. Backend-native scores SHALL order candidates only within the same semantic tier.
+When the exact lookup proves one or more targets, ordering SHALL place every exact target first, then the existing tiers: exact logical identity, exact public binding, exact declaration with matching case, exact declaration after language-appropriate case normalization, logical prefix or structural-component match, exact local symbol, then textual relevance. Declaration tiers SHALL apply only to hits proven to belong to a logical target; a case-exact hit without a logical target SHALL use the exact-local-symbol tier, which MUST remain reachable after logical-component candidates. Backend-native scores SHALL order candidates only within the same semantic tier. Full-text search MUST NOT be identity proof for the exact lane.
 
-Structured output SHALL expose stable `matchTier` and `matchReasons`. Explicit kind, workspace, and path filters SHALL remain authoritative. An unfiltered search for `Change` MUST rank the exact `Change` logical declaration ahead of CLI/test variables or helper functions named `change`; `--kind variable` SHALL continue to expose those local values.
+Structured output SHALL expose stable `matchTier` and `matchReasons`. Explicit kind, workspace, and path filters SHALL remain authoritative. An unfiltered search for `Change` MUST rank the exact `Change` logical declaration ahead of CLI or test variables or helper functions named `change`; `--kind variable` SHALL continue to expose those local values. Command signature, filters, snippets, and output formats MUST stay unchanged.
 
 ## Constraints
 

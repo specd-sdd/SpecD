@@ -4,5 +4,18 @@
     "version": 1
   },
   "dependsOn": ["default:_global/architecture"],
-  "implementation": []
+  "implementation": [
+    {
+      "file": "core:src/infrastructure/fs/path-platform.ts",
+      "symbols": ["isPathInside"]
+    },
+    {
+      "file": "core:src/infrastructure/fs/file-reader.ts",
+      "symbols": ["FsFileReader"]
+    },
+    {
+      "file": "core:src/infrastructure/fs/path-confinement.ts",
+      "symbols": ["resolveConfinedPath"]
+    }
+  ]
 }

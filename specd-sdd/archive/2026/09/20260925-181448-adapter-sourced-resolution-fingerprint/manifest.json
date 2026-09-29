@@ -1,0 +1,901 @@
+{
+  "name": "adapter-sourced-resolution-fingerprint",
+  "createdAt": "2026-09-25T18:14:48.400Z",
+  "updatedAt": "2026-09-25T20:32:15.792Z",
+  "description": "Derive graph resolution fingerprint manifests from language adapters and hash them as newline-normalized text",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "code-graph:staleness-detection",
+    "code-graph:indexer",
+    "code-graph:language-adapter",
+    "code-graph:go-language-adapter",
+    "code-graph:php-language-adapter",
+    "code-graph:python-language-adapter"
+  ],
+  "specDependsOn": {
+    "code-graph:staleness-detection": [
+      "code-graph:graph-store",
+      "code-graph:indexer",
+      "code-graph:get-graph-health",
+      "code-graph:language-adapter"
+    ],
+    "code-graph:indexer": [
+      "code-graph:graph-store",
+      "code-graph:language-adapter",
+      "code-graph:symbol-model",
+      "code-graph:workspace-integration",
+      "core:config",
+      "core:spec-repository-port",
+      "core:list-workspaces",
+      "code-graph:document-model",
+      "core:get-spec-metadata",
+      "code-graph:sqlite-graph-store"
+    ],
+    "code-graph:language-adapter": ["code-graph:symbol-model"],
+    "code-graph:go-language-adapter": [
+      "code-graph:language-adapter",
+      "code-graph:symbol-model",
+      "code-graph:workspace-integration"
+    ],
+    "code-graph:php-language-adapter": [
+      "code-graph:language-adapter",
+      "code-graph:symbol-model",
+      "code-graph:workspace-integration"
+    ],
+    "code-graph:python-language-adapter": [
+      "code-graph:language-adapter",
+      "code-graph:symbol-model",
+      "code-graph:workspace-integration"
+    ]
+  },
+  "invalidationPolicy": "downstream",
+  "implementationTrackingStartedAt": "2026-09-25T18:56:07.713Z",
+  "trackedImplementationFiles": [
+    {
+      "file": "dev/scripts/spec-completeness-poc.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "dev/scripts/universal-spec-completeness-codegraph-ontology.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/_global/continuous-integration/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/_global/docs/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/_global/testing/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/composition/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/indexer/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/sqlite-graph-store/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/workspace-integration/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/language-adapter.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/typescript-language-adapter.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/go-language-adapter.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/php-language-adapter.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/python-language-adapter.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/use-cases/_shared/compute-graph-fingerprint.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/use-cases/index-code-graph.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/use-cases/get-graph-health.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/composition/create-code-graph-provider.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/helpers/expected-fingerprint-map.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/graph-stats.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/compute-graph-fingerprint.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/get-graph-health.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/staleness-detection.verify.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/go-language-adapter.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/php-language-adapter.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/python-language-adapter.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/typescript-language-adapter.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/ports/resolution-manifest-source.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/fs/node-resolution-manifest-source.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/stats.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/workspace-indexing.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/fs/node-resolution-manifest-source.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/resolution-manifests.spec.ts",
+      "state": "resolved"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "code-graph:language-adapter",
+      "file": "packages/code-graph/src/domain/value-objects/language-adapter.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["LanguageAdapter"]
+    },
+    {
+      "specId": "code-graph:language-adapter",
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/typescript-language-adapter.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["TypeScriptLanguageAdapter"]
+    },
+    {
+      "specId": "code-graph:go-language-adapter",
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/go-language-adapter.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["GoLanguageAdapter"]
+    },
+    {
+      "specId": "code-graph:php-language-adapter",
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/php-language-adapter.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["PhpLanguageAdapter"]
+    },
+    {
+      "specId": "code-graph:python-language-adapter",
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/python-language-adapter.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["PythonLanguageAdapter", "readPythonProjectName"]
+    },
+    {
+      "specId": "code-graph:indexer",
+      "file": "packages/code-graph/src/application/use-cases/_shared/compute-graph-fingerprint.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "computeGraphFingerprint",
+        "computeWorkspaceFingerprint",
+        "computeRootFingerprint",
+        "detectFingerprintMismatch",
+        "discoverResolutionInputs",
+        "FULL_REBUILD_FINGERPRINT_REASON"
+      ]
+    },
+    {
+      "specId": "code-graph:indexer",
+      "file": "packages/code-graph/src/application/use-cases/index-code-graph.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["IndexCodeGraph"]
+    },
+    {
+      "specId": "code-graph:staleness-detection",
+      "file": "packages/code-graph/src/application/use-cases/_shared/compute-graph-fingerprint.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "detectFingerprintMismatch",
+        "computeGraphFingerprint",
+        "GRAPH_STATS_FINGERPRINT_WARNING"
+      ]
+    },
+    {
+      "specId": "code-graph:staleness-detection",
+      "file": "packages/code-graph/src/application/use-cases/get-graph-health.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["GetGraphHealth"]
+    },
+    {
+      "specId": "code-graph:indexer",
+      "file": "packages/code-graph/src/composition/create-code-graph-provider.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createCodeGraphProvider"]
+    },
+    {
+      "specId": "code-graph:indexer",
+      "file": "packages/code-graph/test/helpers/expected-fingerprint-map.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["buildExpectedFingerprintMap"]
+    },
+    {
+      "specId": "code-graph:indexer",
+      "file": "packages/code-graph/src/application/ports/resolution-manifest-source.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["ResolutionManifestSource", "emptyResolutionManifestSource"]
+    },
+    {
+      "specId": "code-graph:indexer",
+      "file": "packages/code-graph/src/infrastructure/fs/node-resolution-manifest-source.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["NodeResolutionManifestSource"]
+    },
+    {
+      "specId": "code-graph:language-adapter",
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/python-language-adapter.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["readPythonProjectName"]
+    },
+    {
+      "specId": "code-graph:staleness-detection",
+      "file": "packages/code-graph/test/application/use-cases/staleness-detection.verify.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:staleness-detection",
+      "file": "packages/code-graph/test/application/use-cases/get-graph-health.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:indexer",
+      "file": "packages/code-graph/test/application/use-cases/compute-graph-fingerprint.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:indexer",
+      "file": "packages/code-graph/test/application/use-cases/workspace-indexing.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:indexer",
+      "file": "packages/code-graph/test/infrastructure/fs/node-resolution-manifest-source.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:language-adapter",
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/typescript-language-adapter.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:language-adapter",
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/resolution-manifests.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:go-language-adapter",
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/go-language-adapter.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:php-language-adapter",
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/php-language-adapter.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:python-language-adapter",
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/python-language-adapter.spec.ts",
+      "fileLinkExplicit": true
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:3263fd5baa7a0f876ca3f88a38b88b46b9e27dd4a3b003a2d5243be2e0c97c28"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "code-graph:staleness-detection",
+          "filename": "deltas/code-graph/staleness-detection/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:564cd0b26e27cae1c6eee402b49005cab37123fffdabf02b2896abdecfb15738"
+        },
+        {
+          "key": "code-graph:indexer",
+          "filename": "deltas/code-graph/indexer/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:dadb2d348884a08b914a2bc363d11f306f1b5a66a1a1f5e7216fbeb83e3993fe"
+        },
+        {
+          "key": "code-graph:language-adapter",
+          "filename": "deltas/code-graph/language-adapter/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:2f028e1828fb1e0c9f38de3938f77be3a1d69a1f6ded044085e91e61c4ebe6b7"
+        },
+        {
+          "key": "code-graph:go-language-adapter",
+          "filename": "deltas/code-graph/go-language-adapter/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:095fe034f1ce4259bfa3a6590f9c064d32f5cb71a4c2f11f68ca0e262c1d3457"
+        },
+        {
+          "key": "code-graph:php-language-adapter",
+          "filename": "deltas/code-graph/php-language-adapter/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:7d03275fa2333a23de230e8d6d199a9d537b8c539f006395d0d15e5edb057cb8"
+        },
+        {
+          "key": "code-graph:python-language-adapter",
+          "filename": "deltas/code-graph/python-language-adapter/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:a4523fd0f29b82d983f0a7f5ad1b0d8389eeb166aaea74fa014e6a9475d71770"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "code-graph:staleness-detection",
+          "filename": "deltas/code-graph/staleness-detection/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:3132ba0e84aa5432b48d9608db585eaddb9c9fa966447dedb50a6a0e32ff8771"
+        },
+        {
+          "key": "code-graph:indexer",
+          "filename": "deltas/code-graph/indexer/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:fc92465ff2b83b71b7e4c9d51162d354fa563cf897a02dafc421d1479c6346fb"
+        },
+        {
+          "key": "code-graph:language-adapter",
+          "filename": "deltas/code-graph/language-adapter/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:ce749fea7c94a1488526d7b36fd4f5b2a83597afbfae782b2411f105f1a06c39"
+        },
+        {
+          "key": "code-graph:go-language-adapter",
+          "filename": "deltas/code-graph/go-language-adapter/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:7bf0822fa73725820c9f7a958776dffff0eb791dcf136f39436f88d4c1930d34"
+        },
+        {
+          "key": "code-graph:php-language-adapter",
+          "filename": "deltas/code-graph/php-language-adapter/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:e44a6b36d895b0a2730ba216d8d00d5112a3ff5c32d8d8e0c644ac4105d84974"
+        },
+        {
+          "key": "code-graph:python-language-adapter",
+          "filename": "deltas/code-graph/python-language-adapter/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c6f088d65534cec7dedd985817c9f7196ca12d6f480d50a6ce324c00a4d4cd56"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:1fe1cd47918588648878ce1c72b66a8d6aa01097baae1b822d16cca71fdc8f04"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "verify", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:340f4bf03f4496cc188b493c7ccc15c280857a01bc70bffb7a00c959cfc44a6b"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-09-25T18:14:48.400Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": [
+        "code-graph:staleness-detection",
+        "code-graph:indexer",
+        "code-graph:language-adapter",
+        "code-graph:go-language-adapter",
+        "code-graph:php-language-adapter",
+        "code-graph:python-language-adapter"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-09-25T18:14:48.476Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:staleness-detection"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:indexer"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:language-adapter"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:go-language-adapter"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:php-language-adapter"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:python-language-adapter"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:staleness-detection"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:indexer"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:language-adapter"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:go-language-adapter"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:php-language-adapter"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:python-language-adapter"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-25T18:20:32.920Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-09-25T18:30:47.393Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:staleness-detection",
+            "code-graph:indexer",
+            "code-graph:language-adapter",
+            "code-graph:go-language-adapter",
+            "code-graph:php-language-adapter",
+            "code-graph:python-language-adapter"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:staleness-detection",
+            "code-graph:indexer",
+            "code-graph:language-adapter",
+            "code-graph:go-language-adapter",
+            "code-graph:php-language-adapter",
+            "code-graph:python-language-adapter"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-09-25T18:39:22.374Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-25T18:40:26.074Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-25T18:56:07.713Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-25T19:09:59.295Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-09-25T19:21:04.233Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:staleness-detection",
+            "code-graph:indexer",
+            "code-graph:language-adapter",
+            "code-graph:go-language-adapter",
+            "code-graph:php-language-adapter",
+            "code-graph:python-language-adapter"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:staleness-detection",
+            "code-graph:indexer",
+            "code-graph:language-adapter",
+            "code-graph:go-language-adapter",
+            "code-graph:php-language-adapter",
+            "code-graph:python-language-adapter"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-25T19:21:04.233Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-09-25T19:27:27.340Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]; specs [code-graph:indexer]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:staleness-detection",
+            "code-graph:indexer",
+            "code-graph:language-adapter",
+            "code-graph:go-language-adapter",
+            "code-graph:php-language-adapter",
+            "code-graph:python-language-adapter"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-25T19:29:18.013Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-25T19:29:45.738Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-25T19:50:38.111Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-25T20:08:04.059Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-25T20:13:30.016Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-25T20:17:17.146Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-25T20:23:48.766Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-25T20:25:11.018Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-25T20:25:20.997Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-09-25T20:31:48.503Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Implementation link \"code-graph:staleness-detection\" points outside workspace \"code-graph\" codeRoot.",
+      "commitStarted": false
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-25T20:32:15.791Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-09-25T20:32:16.065Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

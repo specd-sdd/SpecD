@@ -9,6 +9,21 @@
 - **WHEN** a Change is created with name `add-auth-flow`
 - **THEN** the name cannot be changed by any subsequent operation
 
+### Requirement: Change names reject Windows device names
+
+#### Scenario: A device-name slug is rejected
+
+- **GIVEN** the requested slug is `con`
+- **WHEN** the change name is validated
+- **THEN** the name is rejected
+
+#### Scenario: A longer slug that contains the device name is legal
+
+- **GIVEN** the requested slug is `con-foo`
+- **AND** it matches the existing slug pattern
+- **WHEN** the change name is validated
+- **THEN** the name is accepted
+
 ### Requirement: Revision timestamp
 
 #### Scenario: Initialized with createdAt default

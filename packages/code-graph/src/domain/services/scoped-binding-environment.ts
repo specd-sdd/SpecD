@@ -8,6 +8,7 @@ import { CallForm, type CallFact, type ResolvedDependency } from '../value-objec
 import { RelationType } from '../value-objects/relation-type.js'
 import { type SymbolNode } from '../value-objects/symbol-node.js'
 import { type FileAnalysis } from '../value-objects/file-analysis.js'
+import { splitWorkspaceIdentity } from './split-workspace-identity.js'
 
 /**
  * Read-only symbol lookup backed by the indexer's in-memory symbol index.
@@ -375,8 +376,8 @@ function findTargetCandidates(
  * @returns Prefix including `:`, or undefined when no prefix exists.
  */
 function extractWorkspacePrefix(filePath: string): string | undefined {
-  const index = filePath.indexOf(':')
-  return index === -1 ? undefined : filePath.substring(0, index + 1)
+  const identity = splitWorkspaceIdentity(filePath)
+  return identity === null ? undefined : `${identity.workspace}:`
 }
 
 /**

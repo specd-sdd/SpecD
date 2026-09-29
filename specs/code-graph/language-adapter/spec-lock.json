@@ -6,100 +6,58 @@
   "dependsOn": ["code-graph:symbol-model"],
   "implementation": [
     {
-      "file": "code-graph:src/domain/value-objects/language-adapter.ts",
-      "symbols": ["LanguageAdapter"]
-    },
-    {
-      "file": "code-graph:src/domain/value-objects/file-analysis.ts",
-      "symbols": ["FileAnalysisDraft"]
-    },
-    {
-      "file": "code-graph:test/domain/value-objects/symbol-reference.spec.ts"
-    },
-    {
-      "file": "code-graph:src/infrastructure/tree-sitter/adapter-registry.ts",
-      "symbols": ["AdapterRegistry"]
-    },
-    {
       "file": "code-graph:src/infrastructure/tree-sitter/typescript-language-adapter.ts",
       "symbols": ["TypeScriptLanguageAdapter"]
-    },
-    {
-      "file": "code-graph:src/infrastructure/tree-sitter/python-language-adapter.ts",
-      "symbols": ["PythonLanguageAdapter"]
-    },
-    {
-      "file": "code-graph:src/infrastructure/tree-sitter/go-language-adapter.ts",
-      "symbols": ["GoLanguageAdapter"]
     },
     {
       "file": "code-graph:src/infrastructure/tree-sitter/php-language-adapter.ts",
       "symbols": ["PhpLanguageAdapter"]
     },
     {
-      "file": "code-graph:test/infrastructure/tree-sitter/typescript-language-adapter.spec.ts"
+      "file": "code-graph:src/infrastructure/tree-sitter/go-language-adapter.ts",
+      "symbols": ["GoLanguageAdapter"]
     },
     {
-      "file": "code-graph:test/infrastructure/tree-sitter/python-language-adapter.spec.ts"
-    },
-    {
-      "file": "code-graph:test/infrastructure/tree-sitter/go-language-adapter.spec.ts"
-    },
-    {
-      "file": "code-graph:test/infrastructure/tree-sitter/php-language-adapter.spec.ts"
+      "file": "code-graph:src/infrastructure/tree-sitter/python-language-adapter.ts",
+      "symbols": ["PythonLanguageAdapter"]
     },
     {
       "file": "code-graph:src/infrastructure/tree-sitter/reference-fact-helpers.ts",
-      "symbols": [
-        "buildLogicalDeclarationFacts",
-        "buildHierarchyReferenceFacts",
-        "containsSymbolRange",
-        "createAdapterDeclarationDescriptor"
-      ]
-    },
-    {
-      "file": "code-graph:test/infrastructure/tree-sitter/reference-fact-helpers.spec.ts"
-    },
-    {
-      "file": "code-graph:src/application/use-cases/in-memory-index-session.ts",
-      "symbols": ["InMemoryIndexSession"]
-    },
-    {
-      "file": "code-graph:test/application/use-cases/symbol-index.spec.ts"
+      "symbols": ["withOwnerParents", "withEnclosingTypeParents"]
     }
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Stateless language adapter interface for parsing files, extracting symbols and imports, building relations, and resolving packages.",
+      "value": "Defines deterministic stateless adapters for full-file analysis, resolution manifests, semantic facts, relations, and human references.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:2b888389a2fe9870fb69515e465f9b8f41fcb726d98ff0120e19c761c662055d",
-          "lastModified": "2026-08-16T08:12:47.365Z"
+          "hash": "sha256:522d143345a3e48f9eb701a0b38ebb418ab7635d31f48785584f5b561d3c0cfc",
+          "lastModified": "2026-09-28T11:19:59.073Z"
         },
         "verify.md": {
-          "hash": "sha256:6c37a6c3803b1869d4169db7c96246e208e7706400220e770b09f4dd046fc681",
-          "lastModified": "2026-08-16T08:12:47.368Z"
+          "hash": "sha256:ec6b3228ccfcfb08a7faeb5f66654b743b23a65aa206f1aa1d6ceddd57c53933",
+          "lastModified": "2026-09-28T11:19:59.074Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# language-adapter\n\n## Rules\n\n### Unified Interface\n- `LanguageAdapter` interface (stateless, synchronous, deterministic):\n  - `languages(): string[]`\n  - `extensions(): Record<string, string>`\n  - `analyzeFile(filePath, content, context: AdapterAnalyzeContext): FileAnalysisDraft`\n  - `resolveImports(analysis, context: ImportResolutionContext): ResolvedImports`\n  - `buildRelations(analysis, context: RelationBuildContext): readonly Relation[]`\n  - Optional: `getPackageIdentity?`, `resolvePackageFromSpecifier?`, `resolveQualifiedNameToPath?`\n- Single `analyzeFile` emits complete `FileAnalysisDraft` (symbols, imports, binding/call facts, namespace data). Plain serializable data, NO retained AST/parser trees.\n- `TypeScriptLanguageAdapter` default. Unsupported extensions silently skipped.\n\n### Detection & Registry\n- `AdapterRegistry`: `register`, `getAdapter`, `getAdapterForFile`, `getLanguageForFile`, `getAdapters`. Dynamic extension mapping.\n\n### Imports, Calls & Scoped Facts\n- Extract imports during `analyzeFile`, resolve in Pass 2 via `resolveImports`.\n  - TS/Python: relative if starts `.`. Go/PHP: never relative.\n- Innermost function/method = caller. Drop top-level calls, unresolved globals, ambiguous/dynamic callees.\n- Facts cover scope, typed params/properties, construction, receivers (`this`, `self`, `cls`, `parent`, `super`), deterministic aliases, framework bindings.\n- Drop runtime reflection, monkey patching, dynamic paths, ambiguous receivers, interprocedural alias flow.\n\n### Hierarchy & Manifests\n- Emit `EXTENDS` (inheritance), `IMPLEMENTS` (contract), `OVERRIDES` (method replacement).\n- `getPackageIdentity` searches upward from `codeRoot` bounded by `repoRoot`: `package.json.name` (TS), `pyproject.toml` (Python), `go.mod` (Go), `composer.json` (PHP).\n- `resolveImports` uses shared `IndexSession` lookups, not whole-symbol scans or Pass 2 filesystem reads.\n\n### PHP Specifics\n- `require`/`include` string literals resolve relative to importer (`IMPORTS`). Drop concatenation/variables.\n- Support loader patterns (CakePHP `App::uses`, CodeIgniter `->load->model`, Yii `Yii::import`, Zend `Zend_Loader`).\n- Bare & receiver loaders share flow. Drop non-literal/container/unresolved targets; no fallback to file `DEPENDS_ON`.\n\n## Constraints\n- Interface stateless; methods synchronous and deterministic.\n- Analysis/cache state compact plain data. No parser tree retention.\n- Only `getPackageIdentity` & `resolveQualifiedNameToPath` may perform I/O (Pass 2 MUST NOT probe filesystem per candidate).\n- Indexer contains NO language-specific resolution.\n- Unrecognized extensions / non-deterministic calls / dynamic paths silently dropped.\n- TypeScript adapter default.\n- No runtime/fuzzy inference; no `@specd/core` dependency.",
+      "value": "# language-adapter\n\n## Rules\n- Stateless `LanguageAdapter` interface, synchronous/deterministic:\n  - `languages(): string[]`\n  - `extensions(): Record<string, string>`\n  - `resolutionManifests(): readonly string[]`\n  - `analyzeFile(filePath, content, context): FileAnalysisDraft`\n  - `resolveImports(analysis, context): ResolvedImports`\n  - `buildRelations(analysis, context): readonly Relation[]`\n  - optional `getPackageIdentity`, `resolvePackageFromSpecifier`, `resolveQualifiedNameToPath`.\n- `resolutionManifests()` returns exact manifest basenames, no globs/paths/I/O. TypeScript returns `package.json`; built-ins declare every manifest actually read.\n- One `analyzeFile` emits complete serializable compact facts: symbols, imports, bindings, calls, namespaces, source ranges, optional compact parser state. Never retain AST/parser trees or parallel legacy extraction.\n- Registry dynamically maps adapters/languages/extensions via `register`, `getAdapter`, `getAdapterForFile`, `getLanguageForFile`, `getAdapters`; TypeScript default; unknown extension silently skipped.\n- Import facts contain `localName`, `originalName`, `specifier`, `isRelative`; syntax parsed in analysis, targets resolved Pass 2. TS/Python relative starts `.`; Go/PHP never relative.\n- Call caller is innermost function/method/arrow; deterministic local/import/receiver candidates only. Drop top-level, unresolved, ambiguous, dynamic calls.\n- Extract scoped facts for lexical ownership, typed parameters/properties, construction, deterministic receivers/aliases/types/framework bindings. Common pipeline owns lookup/shadowing/candidate filtering. Drop runtime reflection, containers, monkey patching, dynamic expressions, interprocedural aliases.\n- Built-in TS/JS, Python, Go, PHP implement common analysis/resolution/relation/reference/range/coverage/capability contract; adapter-specific specs own language semantics. Generic pipeline has no language-name compensating branches.\n- Emit resolvable `IMPORTS`, `CALLS`, `CONSTRUCTS`, `USES_TYPE`, `EXTENDS`, `IMPLEMENTS`, `OVERRIDES`; `DEPENDS_ON` reserved for specs. Unsupported or ambiguous static evidence is dropped or explicit unsupported coverage, never guessed.\n- Package identity walks from `codeRoot` toward bounded `repoRoot`: TS `package.json.name`; Python `[project].name` only; Go `go.mod module`; PHP `composer.json.name`. CLI/MCP obtains repo root from `VcsAdapter.rootDir()`. Import resolution uses `IndexSession`, not symbol scans or Pass-2 filesystem probing.\n- Each adapter truthfully declares capabilities for declarations, members, public/local bindings, hierarchy, build-context selection. Facts use shared logical-symbol, binding, symbol-space, `MemberSemantics`, range, hierarchy, provenance, coverage vocabulary.\n- Member-capable adapters derive logical declaring owner from syntax; never parser IDs. Emit `MemberSemantics` (`kind`, `dispatch`, `accessor`, optional `nativeKind`), never retired member form. Declaration occurrence with owner gets `parentId`; top-level omits it. Same-name members under different owners stay distinct.\n- Parse supported human/native member references into zero/one/many explicit owner-then-member selectors; render generic and optional native spellings. Dynamic/ambiguous remains unresolved. Never parse canonical/structured requests as human text or split `.` in shared domain.\n- Re-exports: adapter resolves each specifier and emits public binding/provenance. Relative → importing-workspace file; package → language package identity/public entry map. TypeScript honors `name`, `exports`, `main`, `.js`→indexed source. Binding `surface` is re-exporting file; `targetId` is entry-published logical ID, including cross-workspace. Non-unique entry produces no guess. Indexer only persists; never interprets manifests/routes or copies bindings.\n- `hierarchy:true` requires shared hierarchy facts and ordered provenance sufficient for child→ancestor/embedded/composed/contract owner then member lookup, consistent with persisted hierarchy relations. Supported resolvable syntax cannot emit empty evidence; unsupported precedence/build alternatives become unsupported/unresolved.\n- Every symbol has parser-derived complete construct range plus contained exact-name `selectionRange`, half-open. Omit untrustworthy candidate and report capability gap; never approximate via next symbol/line regex.\n- `getPackageIdentity` and optional `resolveQualifiedNameToPath` alone may perform I/O; qualified-name metadata must be prepared/cached before Pass 2 candidate resolution.\n\n## Constraints\n- Interface, not abstract class; no `@specd/core` dependency.\n- Analysis/cache state compact plain data; no parser retention.\n- All resolution synchronous/deterministic; Pass 2 no per-candidate filesystem probes.\n- Indexer contains no language-specific resolution.\n- Unrecognized, unresolved, dynamic, fuzzy, runtime-only facts silently dropped unless explicit unsupported coverage required.\n- Tree-sitter queries internal implementation details.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:2b888389a2fe9870fb69515e465f9b8f41fcb726d98ff0120e19c761c662055d",
-          "lastModified": "2026-08-16T08:12:47.365Z"
+          "hash": "sha256:522d143345a3e48f9eb701a0b38ebb418ab7635d31f48785584f5b561d3c0cfc",
+          "lastModified": "2026-09-28T11:19:59.073Z"
         },
         "verify.md": {
-          "hash": "sha256:6c37a6c3803b1869d4169db7c96246e208e7706400220e770b09f4dd046fc681",
-          "lastModified": "2026-08-16T08:12:47.368Z"
+          "hash": "sha256:ec6b3228ccfcfb08a7faeb5f66654b743b23a65aa206f1aa1d6ceddd57c53933",
+          "lastModified": "2026-09-28T11:19:59.074Z"
         }
       }
     }

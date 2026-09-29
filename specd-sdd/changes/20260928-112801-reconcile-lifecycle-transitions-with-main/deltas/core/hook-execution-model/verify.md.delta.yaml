@@ -1,0 +1,47 @@
+- op: modified
+  description: 'Verify verbatim substitution and host-portable quote translation'
+  selector:
+    type: section
+    matches: '^Requirement: Template variable expansion$'
+  content: |
+    #### Scenario: HookRunner expands template variables in run commands
+
+    - **GIVEN** a `run:` hook with command `"echo {{change.name}}"`
+    - **WHEN** the hook is executed via `HookRunner`
+    - **THEN** `{{change.name}}` is substituted with the change name value
+
+    #### Scenario: Unknown template variables left unexpanded
+
+    - **GIVEN** a `run:` hook with command `"echo {{unknown.variable}}"`
+    - **WHEN** the hook is executed
+    - **THEN** the literal `{{unknown.variable}}` token is preserved in the command
+
+    #### Scenario: {{change.workspace}} is not a supported token
+
+    - **GIVEN** a `run:` hook with command `"echo {{change.workspace}}"`
+    - **WHEN** the hook is executed via `HookRunner`
+    - **THEN** `{{change.workspace}}` is left unexpanded, the same as any other unknown token
+    - **AND** `HookVariables` passed to `HookRunner` never contains a `workspace` key under `change`
+
+    #### Scenario: Multi-workspace change never yields a singular workspace variable
+
+    - **GIVEN** a change whose `specIds` touch both `default` and `billing` workspaces
+    - **WHEN** `{{key.path}}` template variables are expanded for a `run:` hook on that change
+    - **THEN** the `change` namespace has no `workspace` key
+    - **AND** no hook command can resolve `{{change.workspace}}` to either touched workspace name
+
+    #### Scenario: Substituted values are not quoted by SpecD
+
+    - **GIVEN** a `run:` hook with command `mkdir "{{project.root}}/{{change.name}}"`
+    - **AND** `project.root` is `/repo` and `change.name` is `add-auth`
+    - **WHEN** the hook command is expanded
+    - **THEN** the command is `mkdir "/repo/add-auth"`
+    - **AND** neither value is wrapped in an extra pair of quotes
+
+    #### Scenario: Host-incompatible quote syntax is translated after expansion
+
+    - **GIVEN** a developer-authored `run:` hook whose quotes are valid for the configured source syntax but unsupported by the selected host shell
+    - **WHEN** `HookRunner` expands the variables and prepares the command for execution
+    - **THEN** substituted values remain verbatim
+    - **AND** only the unsupported quote syntax is translated for the host shell
+    - **AND** callers do not pre-escape or add quotes around substituted values

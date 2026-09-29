@@ -23,6 +23,33 @@
 - **THEN** their canonical FileNode paths are `core:src/index.ts` and `cli:src/index.ts`
 - **AND** both can still be stored in the same graph without conflict
 
+### Requirement: Drive letters are not workspace names
+
+#### Scenario: C: is not a workspace name
+
+- **GIVEN** the identity string `C:/repo/src/a.ts`
+- **WHEN** a graph identity is parsed
+- **THEN** the workspace name is not `C`
+- **AND** the drive letter stays part of the path
+
+#### Scenario: Workspace C does not include a drive-letter path
+
+- **GIVEN** a stored path `C:/repo/src/a.ts` and a workspace filter `C`
+- **WHEN** hotspot classification or SQLite inclusion reads the workspace
+- **THEN** the path is not in workspace `C`
+
+#### Scenario: A bare drive letter is not workspace C
+
+- **GIVEN** the identity string `C:`
+- **WHEN** a graph identity is parsed
+- **THEN** the workspace name is not `C`
+
+#### Scenario: Exclusion and CLI display do not treat C: as workspace C
+
+- **GIVEN** the identity string `C:`
+- **WHEN** exclusion reads the workspace and the CLI display splitter parses the identity
+- **THEN** neither result is workspace `C`
+
 ### Requirement: SymbolNode ID includes workspace
 
 #### Scenario: Symbol ID format with column zero

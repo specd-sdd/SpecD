@@ -1,7 +1,7 @@
 import * as fs from 'node:fs/promises'
 import * as os from 'node:os'
 import * as path from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Change } from '../../../src/domain/entities/change.js'
 import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
 import { ArtifactFile } from '../../../src/domain/value-objects/artifact-file.js'
@@ -20,10 +20,15 @@ import {
   parseChangeManifest,
 } from '../../../src/infrastructure/fs/manifest.js'
 import { UnsupportedManifestVersionError } from '../../../src/domain/errors/unsupported-manifest-version-error.js'
-import { vi } from 'vitest'
 import { sha256 } from '../../../src/infrastructure/fs/hash.js'
+import { applyPreHashCleanup } from '../../../src/domain/services/pre-hash-cleanup.js'
+import { type PreHashCleanup } from '../../../src/domain/value-objects/validation-rule.js'
 import { artifactDagFromChangeArtifacts } from '../../../src/domain/value-objects/artifact-dag.js'
 import { ArtifactType } from '../../../src/domain/value-objects/artifact-type.js'
+
+function artifactHash(content: string, cleanups: readonly PreHashCleanup[] = []): string {
+  return sha256(applyPreHashCleanup(content, cleanups))
+}
 
 async function persistChange(repo: FsChangeRepository, change: Change): Promise<void> {
   const active = await repo.get(change.name)
@@ -716,7 +721,7 @@ describe('FsChangeRepository', () => {
 
     it('given validatedHash matches the file on disk, when get is called, then artifact status is complete', async () => {
       const content = '# Proposal\n'
-      const hash = sha256(content)
+      const hash = artifactHash(content)
       const change = makeChangeWithArtifact('c1', hash)
       await persistChange(ctx.repo, change)
       const dir = path.join(ctx.changesPath, '20240115-100000-c1')
@@ -727,7 +732,7 @@ describe('FsChangeRepository', () => {
     })
 
     it('Hash mismatch on load reports a fresh file fact without invalidating', async () => {
-      const change = makeChangeWithArtifact('c1', sha256('original content'))
+      const change = makeChangeWithArtifact('c1', artifactHash('original content'))
       await persistChange(ctx.repo, change)
       const dir = path.join(ctx.changesPath, '20240115-100000-c1')
       const manifestPath = path.join(dir, 'manifest.json')
@@ -750,8 +755,8 @@ describe('FsChangeRepository', () => {
 
     it('Reloading after revalidation does not invalidate twice', async () => {
       const updatedContent = 'modified content'
-      const updatedHash = sha256(updatedContent)
-      const change = makeChangeWithArtifact('c1', sha256('original content'))
+      const updatedHash = artifactHash(updatedContent)
+      const change = makeChangeWithArtifact('c1', artifactHash('original content'))
       await persistChange(ctx.repo, change)
       const dir = path.join(ctx.changesPath, '20240115-100000-c1')
       await fs.writeFile(path.join(dir, 'proposal.md'), updatedContent, 'utf8')
@@ -1014,7 +1019,7 @@ describe('FsChangeRepository', () => {
       })
 
       const content = '# Original\n'
-      const hash = sha256(content)
+      const hash = artifactHash(content)
       const change = makeChange('save-artifact-status')
       change.setArtifact(
         new ChangeArtifact({
@@ -1615,7 +1620,10 @@ describe('FsChangeRepository', () => {
     it('preHashCleanup-normalized edit preserves complete status', async () => {
       const originalContent = '- [ ] task one\n'
       // Hash is computed after cleanup — but original already has [ ], so hash = sha256(original)
-      const cleanedHash = sha256(originalContent)
+      const cleanedHash = artifactHash(
+        originalContent,
+        makeArtifactTypeWithCleanup().preHashCleanup,
+      )
 
       const repo = makeRepoWithArtifactTypes(ctx.tmpDir, [makeArtifactTypeWithCleanup()])
       const change = makeChangeWithTasks('c1', cleanedHash)
@@ -1631,7 +1639,10 @@ describe('FsChangeRepository', () => {
 
     it('non-normalized edit triggers drifted-pending-review', async () => {
       const originalContent = '- [ ] task one\n'
-      const cleanedHash = sha256(originalContent)
+      const cleanedHash = artifactHash(
+        originalContent,
+        makeArtifactTypeWithCleanup().preHashCleanup,
+      )
 
       const repo = makeRepoWithArtifactTypes(ctx.tmpDir, [makeArtifactTypeWithCleanup()])
       const change = makeChangeWithTasks('c1', cleanedHash)
@@ -1648,7 +1659,7 @@ describe('FsChangeRepository', () => {
 
     it('no preHashCleanup rules hashes raw content', async () => {
       const content = '- [x] task one\n'
-      const rawHash = sha256(content)
+      const rawHash = artifactHash(content)
 
       const repo = makeRepoWithArtifactTypes(ctx.tmpDir, [makeArtifactTypeNoCleanup()])
       const change = makeChangeWithTasks('c1', rawHash)
@@ -1715,9 +1726,9 @@ describe('FsChangeRepository', () => {
       const proposalContent = '# Proposal\n'
       const designContent = '# Design\n'
       const tasksContent = '# Tasks\n'
-      const proposalHash = sha256(proposalContent)
-      const designHash = sha256(designContent)
-      const tasksHash = sha256(tasksContent)
+      const proposalHash = artifactHash(proposalContent)
+      const designHash = artifactHash(designContent)
+      const tasksHash = artifactHash(tasksContent)
 
       const at = new Date('2024-01-15T10:00:00.000Z')
       const change = new Change({
@@ -1817,9 +1828,9 @@ describe('FsChangeRepository', () => {
       const proposalContent = '# Proposal\n'
       const designContent = '# Design\n'
       const tasksContent = '# Tasks\n'
-      const proposalHash = sha256(proposalContent)
-      const designHash = sha256(designContent)
-      const tasksHash = sha256(tasksContent)
+      const proposalHash = artifactHash(proposalContent)
+      const designHash = artifactHash(designContent)
+      const tasksHash = artifactHash(tasksContent)
 
       const at = new Date('2024-01-15T10:00:00.000Z')
       const change = new Change({
@@ -1916,7 +1927,7 @@ describe('FsChangeRepository', () => {
 
     it('no drift — no invalidation', async () => {
       const proposalContent = '# Proposal\n'
-      const proposalHash = sha256(proposalContent)
+      const proposalHash = artifactHash(proposalContent)
 
       const at = new Date('2024-01-15T10:00:00.000Z')
       const change = new Change({
@@ -1971,7 +1982,7 @@ describe('FsChangeRepository', () => {
 
     it('given an initialized repository and a change with a drifted artifact, when get is called, then the lock is acquired, the invalidation is persisted to disk, and the returned change reflects the invalidation', async () => {
       const proposalContent = '# Proposal\n'
-      const proposalHash = sha256(proposalContent)
+      const proposalHash = artifactHash(proposalContent)
 
       const at = new Date('2024-01-15T10:00:00.000Z')
       const change = new Change({
@@ -2325,7 +2336,7 @@ describe('FsChangeRepository', () => {
 
     it('none policy: state does not roll back on drift', async () => {
       const content = '# Proposal\n'
-      const hash = sha256(content)
+      const hash = artifactHash(content)
       const at = new Date('2024-01-15T10:00:00.000Z')
       const change = new Change({
         name: 'c1',
@@ -2381,8 +2392,8 @@ describe('FsChangeRepository', () => {
     it('surgical policy: only drifted file is reopened', async () => {
       const proposalContent = '# Proposal\n'
       const designContent = '# Design\n'
-      const proposalHash = sha256(proposalContent)
-      const designHash = sha256(designContent)
+      const proposalHash = artifactHash(proposalContent)
+      const designHash = artifactHash(designContent)
       const at = new Date('2024-01-15T10:00:00.000Z')
       const change = new Change({
         name: 'c2',
@@ -2455,8 +2466,8 @@ describe('FsChangeRepository', () => {
     it('global policy: all artifacts are reopened on drift', async () => {
       const proposalContent = '# Proposal\n'
       const designContent = '# Design\n'
-      const proposalHash = sha256(proposalContent)
-      const designHash = sha256(designContent)
+      const proposalHash = artifactHash(proposalContent)
+      const designHash = artifactHash(designContent)
       const at = new Date('2024-01-15T10:00:00.000Z')
       const change = new Change({
         name: 'c3',
@@ -2528,7 +2539,7 @@ describe('FsChangeRepository', () => {
 
     it('Uninitialized repository skips drift invalidation', async () => {
       const content = '# Proposal\n'
-      const hash = sha256(content)
+      const hash = artifactHash(content)
       const at = new Date('2024-01-15T10:00:00.000Z')
 
       // Uninitialized repo: artifactTypes not provided

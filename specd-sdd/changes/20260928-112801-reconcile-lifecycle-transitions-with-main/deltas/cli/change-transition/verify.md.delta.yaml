@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'Existing CLI lifecycle and hook-selector scenarios remain valid.'

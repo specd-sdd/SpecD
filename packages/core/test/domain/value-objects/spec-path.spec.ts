@@ -32,6 +32,17 @@ describe('SpecPath', () => {
       expect(() => SpecPath.parse('   ')).toThrow(InvalidSpecPathError)
     })
 
+    it('throws on a Windows device-name segment', () => {
+      expect(() => SpecPath.parse('con')).toThrow(InvalidSpecPathError)
+      expect(() => SpecPath.parse('prn')).toThrow(InvalidSpecPathError)
+      expect(() => SpecPath.parse('auth/aux')).toThrow(InvalidSpecPathError)
+      expect(() => SpecPath.parse('auth/com1')).toThrow(InvalidSpecPathError)
+    })
+
+    it('accepts a slug that only contains a device name', () => {
+      expect(SpecPath.parse('con-foo').toString()).toBe('con-foo')
+    })
+
     it('throws on dot segment', () => {
       expect(() => SpecPath.parse('auth/./oauth')).toThrow(InvalidSpecPathError)
     })

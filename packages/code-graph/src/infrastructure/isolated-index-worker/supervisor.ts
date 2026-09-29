@@ -29,7 +29,7 @@ import {
 } from './protocol.js'
 
 /** Signals that the supervisor forwards to an active child. */
-type ParentSignal = 'SIGINT' | 'SIGTERM'
+type ParentSignal = 'SIGINT' | 'SIGTERM' | 'SIGBREAK'
 
 /** Dependencies used by the supervisor; exported only for direct infrastructure tests. */
 export interface IsolatedGraphIndexRuntime {
@@ -136,6 +136,8 @@ export function runIsolatedGraphIndexWithRuntime<
       finalized = Promise.resolve().then(() => {
         runtime.process.removeListener('SIGINT', onSigint)
         runtime.process.removeListener('SIGTERM', onSigterm)
+        runtime.process.removeListener('SIGBREAK', onSigbreak)
+        runtime.process.removeListener('exit', onProcessExit)
         const currentChild = child
         child = undefined
         if (currentChild !== undefined) {
@@ -260,6 +262,13 @@ export function runIsolatedGraphIndexWithRuntime<
     }
     const onSigint = (): void => forwardSignal('SIGINT')
     const onSigterm = (): void => forwardSignal('SIGTERM')
+    const onSigbreak = (): void => {
+      lease.release()
+      forwardSignal('SIGBREAK')
+    }
+    const onProcessExit = (): void => {
+      lease.release()
+    }
 
     try {
       child = runtime.fork(fileURLToPath(runtime.workerUrl), [], {
@@ -272,6 +281,8 @@ export function runIsolatedGraphIndexWithRuntime<
       child.on('exit', onExit)
       runtime.process.on('SIGINT', onSigint)
       runtime.process.on('SIGTERM', onSigterm)
+      runtime.process.on('SIGBREAK', onSigbreak)
+      runtime.process.on('exit', onProcessExit)
       if (!child.connected) {
         terminal = {
           kind: 'failure',

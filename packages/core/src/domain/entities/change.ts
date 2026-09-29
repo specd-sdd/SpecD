@@ -6,6 +6,7 @@ import {
 import { type AutomaticRecovery } from '../services/change-validity.js'
 import { InvalidStateTransitionError } from '../errors/invalid-state-transition-error.js'
 import { InvalidChangeError } from '../errors/invalid-change-error.js'
+import { isWindowsDeviceName } from '../services/windows-device-name.js'
 import { CorruptedManifestError } from '../errors/corrupted-manifest-error.js'
 import { HistoricalImplementationGuardError } from '../errors/historical-implementation-guard-error.js'
 import { ChangeArtifact } from './change-artifact.js'
@@ -444,7 +445,7 @@ export class Change {
    * @param props - Change construction properties
    */
   constructor(props: ChangeProps) {
-    if (!CHANGE_NAME_PATTERN.test(props.name)) {
+    if (!CHANGE_NAME_PATTERN.test(props.name) || isWindowsDeviceName(props.name)) {
       throw new InvalidChangeError(
         `invalid change name '${props.name}' — must be kebab-case (lowercase alphanumeric segments separated by hyphens)`,
       )

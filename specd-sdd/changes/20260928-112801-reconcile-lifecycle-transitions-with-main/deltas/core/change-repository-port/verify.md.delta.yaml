@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'Existing port-contract scenarios remain valid.'

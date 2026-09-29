@@ -1,0 +1,14 @@
+- op: added
+  description: 'RunStepHooks does not shell-escape developer hook values.'
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Ports and constructor'
+  content: |
+    #### Scenario: Developer hook text is passed to HookRunner verbatim
+
+    - **GIVEN** a `run:` hook command `echo "Resultado: {{change.name}}"`
+    - **WHEN** `RunStepHooks` builds the variables and calls `HookRunner.run`
+    - **THEN** the command string still contains the developer quotes around `{{change.name}}`
+    - **AND** the recorded result command is that same schema string
+    - **AND** `RunStepHooks` does not call `expandForShell()`

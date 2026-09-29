@@ -4,39 +4,58 @@
     "version": 1
   },
   "dependsOn": ["core:config"],
-  "implementation": [],
+  "implementation": [
+    {
+      "file": "code-graph:src/infrastructure/sqlite/sqlite-graph-database.ts",
+      "symbols": ["SQLiteGraphDatabase"]
+    },
+    {
+      "file": "code-graph:src/domain/services/split-workspace-identity.ts",
+      "symbols": ["isDriveLetterPath", "splitWorkspaceIdentity"]
+    },
+    {
+      "file": "code-graph:test/infrastructure/sqlite/split-workspace-identity.spec.ts"
+    },
+    {
+      "file": "code-graph:src/domain/services/matches-exclude.ts",
+      "symbols": ["matchesExclude"]
+    },
+    {
+      "file": "code-graph:test/domain/services/matches-exclude.spec.ts"
+    }
+  ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Indexes multi-workspace code and specs into unified graph with collision-free identities, config-relative lookups, and cross-workspace resolution.",
+      "value": "Indexes multi-workspace code/specs into one graph with collision-free identities, exact selector normalization, and package-aware resolution.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:4869ca3b8ea71cfff6c36ae603e3843bde45fec3da94a951db18dcd4bafe39d3",
-          "lastModified": "2026-08-16T08:12:48.299Z"
+          "hash": "sha256:bc1d7f001ad4efb175b86d097457d47ea4330d14388559aaddd550aa219d48d6",
+          "lastModified": "2026-09-28T11:19:59.109Z"
         },
         "verify.md": {
-          "hash": "sha256:2b226d4b01784fdbe8ce88a2b2ccbd5f4a40a1194efdd7348692d72c01512e74",
-          "lastModified": "2026-08-16T08:12:48.302Z"
+          "hash": "sha256:98cba951c5d672237d05bf1834a61810ea10e35b93cef5119f95cdcde713ee16",
+          "lastModified": "2026-09-28T11:19:59.110Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# Workspace Integration\n\n## Rules\n\n- Identity & lookup:\n  - File/Document ID: `{workspaceName}:{relativeToCodeRoot}` (e.g. `core:src/index.ts`); project-global resources outside workspaces use `root:{projectRelativePath}`. Workspace `codeRoot` wins over `root:`.\n  - `SymbolNode.id`: `{filePath}:{kind}:{name}:{line}:{column}`.\n  - `SpecNode.workspace`: workspace name string (e.g. `core`, `_global`). Spec ID format: `{workspace}:{specPath}`.\n  - `configRelativePath`: path relative to active `specd.yaml` directory (forward slashes, no leading `./`); supports unprefixed CLI file selectors.\n- Discovery & Specs:\n  - Discover code from `SpecdWorkspaceConfig.codeRoot`; `discoverFiles` returns root-relative paths, indexer applies workspace prefix.\n  - Index specs directly via workspace `SpecRepository`: `repo.list()`, `repo.persistedStateHash()`, concatenate artifacts from `repo.artifact()` (`spec.md` first, then alphabetical), `repo.metadata()` (title, description), `repo.readPersistedDependsOn()`, `repo.readPersistedImplementation()`. No pre-computed CLI callbacks.\n- Cross-workspace import resolution:\n  - Pass 2 resolves relative imports within workspace; package imports via `packageName → workspaceName` (`LanguageAdapter.getPackageIdentity`); PHP qualified names globally. `SymbolIndex` holds all workspace symbols before Pass 2.\n- Index contract:\n  - `IndexOptions`: `projectRoot`, `workspaces: readonly ProjectWorkspace[]`, `graphConfig: ProjectGraphConfig`, `onProgress`, `chunkBytes`, `vcsRef`, `vcsRoot: string | null`. `specs` callback on `WorkspaceIndexTarget` removed.\n  - `IndexResult`: includes `workspaces: readonly WorkspaceIndexBreakdown[]` (`name`, `filesDiscovered`, `filesIndexed`, `filesSkipped`, `filesRemoved`, `specsDiscovered`, `specsIndexed`).\n- `.gitignore` handling:\n  - `respectGitignore: true` + non-null `vcsRoot`: load root and nested `.gitignore`; gitignore exclusion has absolute priority over `excludePaths`.\n  - Null `vcsRoot`: skip root `.gitignore`; MUST NOT probe VCS directory markers (`.git/`, `.hg/`, `.svn/`).\n  - `respectGitignore: false`: skip all `.gitignore` files; only `excludePaths` applies.\n\n## Constraints\n\n- `@specd/code-graph` depends on `@specd/core`.\n- Single `.specd/code-graph.lbug` database per project.\n- `discoverFiles` workspace-agnostic; indexer owns prefixing and `configRelativePath`.\n- Spec resolution exclusively via `SpecRepository`; no filesystem fallback.\n- File identity changes require full graph rebuild.",
+      "value": "# Workspace Integration\n\n## Rules\n- File/Document canonical ID `{workspaceName}:{relativeToCodeRoot}`; project-global included resources outside workspaces use reserved `root:{projectRelativePath}`. Workspace ownership wins; never duplicate as `root:`.\n- Persist `configRelativePath` from active `specd.yaml` directory, forward-slash, no leading `./`, permitting `..`; supports unprefixed selectors but never replaces canonical identity.\n- Graph identity parser must recognize `^[A-Za-z]:[/\\\\]` and `^[A-Za-z]:$` as Windows drive paths, never workspaces. Workspace filter `C` cannot match drive path or `C:`. Applies to exclusions, hotspots, SQLite inclusion, package surfaces, CLI display.\n- `SymbolNode.id = {filePath}:{kind}:{name}:{line}:{column}`; workspace enters through canonical file path.\n- `SpecNode.workspace` stores configured workspace; spec IDs follow `{workspace}:{specPath}` with configured prefix.\n- Discover each workspace from absolute `SpecdWorkspaceConfig.codeRoot`; `discoverFiles` returns root-relative paths and remains workspace-agnostic; indexer applies workspace prefix and config-relative path.\n- Index specs directly through each `ProjectWorkspace` `SpecRepository`: `list()`, `persistedStateHash()`, artifact content from declared filenames (`spec.md` first, rest alphabetical; exclude metadata/locks), `metadata()`, `readPersistedDependsOn()`, `readPersistedImplementation()`. Missing metadata → title `specId`, empty description/dependencies. No CLI callbacks, heading parsing, or filesystem fallback.\n- Pass 2 resolves relative imports inside workspace; packages through adapter-derived `packageName → workspaceName`; PHP qualified names globally. `SymbolIndex` contains every workspace before Pass 2.\n- Resolution identity is structured workspace + module/package + public surface + symbol space, respecting language case/visibility and deterministic project config. Never global same-name inference. Workspace roots/package identities/project refs/autoload inputs affect derivation fingerprint.\n- Exact file selectors normalize canonical workspace-relative, config/project-relative, and absolute paths to one file identity. Wildcards preserve pattern semantics and are never coerced to one file.\n- `IndexOptions`: `projectRoot`, `workspaces: readonly ProjectWorkspace[]`, `graphConfig: ProjectGraphConfig`, optional progress/chunk/vcsRef, required `vcsRoot: string | null`. Removed `WorkspaceIndexTarget.specs` callback.\n- `ProjectGraphConfig` supplies global include/exclude and per-workspace allowed/excluded paths plus `respectGitignore`; populated upstream from `SpecdConfig.graph`.\n- `IndexResult.workspaces` reports each name with files discovered/indexed/skipped/removed and specs discovered/indexed.\n- With `respectGitignore` true and non-null VCS-root from `VcsAdapter.rootDir()`, load root and nested `.gitignore`; evaluate relative to each file; ignore exclusions cannot be re-included by `excludePaths`. Null VCS root skips root ignore and never probes `.git/.hg/.svn`. False loads no ignore files.\n\n## Constraints\n- Runtime dependency on `@specd/core`.\n- Single `.specd/code-graph.lbug` per project.\n- Indexer owns workspace prefixing/config-relative derivation; discovery stays workspace-agnostic.\n- Spec semantics exclusively through `SpecRepository`.\n- File identity metadata changes make existing stores incompatible; full rebuild required.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:4869ca3b8ea71cfff6c36ae603e3843bde45fec3da94a951db18dcd4bafe39d3",
-          "lastModified": "2026-08-16T08:12:48.299Z"
+          "hash": "sha256:bc1d7f001ad4efb175b86d097457d47ea4330d14388559aaddd550aa219d48d6",
+          "lastModified": "2026-09-28T11:19:59.109Z"
         },
         "verify.md": {
-          "hash": "sha256:2b226d4b01784fdbe8ce88a2b2ccbd5f4a40a1194efdd7348692d72c01512e74",
-          "lastModified": "2026-08-16T08:12:48.302Z"
+          "hash": "sha256:98cba951c5d672237d05bf1834a61810ea10e35b93cef5119f95cdcde713ee16",
+          "lastModified": "2026-09-28T11:19:59.110Z"
         }
       }
     }

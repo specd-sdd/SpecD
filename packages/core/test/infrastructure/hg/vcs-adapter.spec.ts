@@ -11,6 +11,9 @@ vi.mock('../../../src/infrastructure/hg/exec.js', () => ({
 }))
 
 import { HgVcsAdapter } from '../../../src/infrastructure/hg/vcs-adapter.js'
+import { normalizeVcsRoot } from '../../../src/infrastructure/fs/path-platform.js'
+
+const repoRoot = normalizeVcsRoot('/repo')
 
 describe('HgVcsAdapter', () => {
   beforeEach(() => {
@@ -21,15 +24,22 @@ describe('HgVcsAdapter', () => {
   it('returns the cached repository root synchronously when provided', () => {
     const adapter = new HgVcsAdapter('/repo/worktree', '/repo')
 
-    expect(adapter.rootDir()).toBe('/repo')
+    expect(adapter.rootDir()).toBe(repoRoot)
     expect(hgSyncMock).not.toHaveBeenCalled()
+  })
+
+  it('uppercases a Windows drive letter from hg stdout', () => {
+    hgSyncMock.mockReturnValue('c:\\repo')
+    const adapter = new HgVcsAdapter('/repo/worktree')
+
+    expect(adapter.rootDir()).toBe('C:\\repo')
   })
 
   it('queries hg synchronously for the repository root when uncached', () => {
     hgSyncMock.mockReturnValue('/repo')
     const adapter = new HgVcsAdapter('/repo/worktree')
 
-    expect(adapter.rootDir()).toBe('/repo')
+    expect(adapter.rootDir()).toBe(repoRoot)
     expect(hgSyncMock).toHaveBeenCalledWith('/repo/worktree', 'root')
   })
 
@@ -61,7 +71,7 @@ describe('HgVcsAdapter', () => {
     const adapter = new HgVcsAdapter('/repo/worktree', '/repo')
 
     await expect(adapter.ref()).resolves.toBe('abc123def456')
-    expect(hgMock).toHaveBeenCalledWith('/repo', 'log', '-r', '.', '--template', '{node|short}')
+    expect(hgMock).toHaveBeenCalledWith(repoRoot, 'log', '-r', '.', '--template', '{node|short}')
   })
 
   it('enumerates modified, added, missing, untracked, and rename-side paths at the root', async () => {
@@ -87,7 +97,14 @@ describe('HgVcsAdapter', () => {
       'src/untracked.ts',
       'nested/portable.ts',
     ])
-    expect(hgMock).toHaveBeenCalledWith('/repo', 'status', '--rev', 'base123', '--print0')
+    expect(hgMock).toHaveBeenCalledWith(repoRoot, 'status', '--rev', 'base123', '--print0')
+  })
+
+  it('keeps parent segments when making modified paths portable', async () => {
+    hgMock.mockResolvedValue('M src\\..\\secret\0')
+    const adapter = new HgVcsAdapter('/repo/nested', '/repo')
+
+    await expect(adapter.modifiedFiles('base123')).resolves.toEqual(['src/../secret'])
   })
 
   it('rejects modified-file enumeration failures', async () => {

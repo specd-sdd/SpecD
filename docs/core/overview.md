@@ -8,7 +8,7 @@
 
 **Delivery hosts** (CLI, MCP, API) should use [`@specd/sdk`](../sdk/index.md) as the single import; see the SDK docs for bootstrap and orchestration.
 
-If you are using the `specd` CLI or MCP server as an end user, you do not need to read these documents — the [configuration reference](../config/config-reference.md) and [schema format reference](../schemas/schema-format.md) are the right starting points.
+If you are using the `specd` CLI or MCP server as an end user, you do not need to read these documents — the [configuration guide](../guide/configuration.md) and [schema format reference](../schemas/schema-format.md) are the right starting points.
 
 ## Architecture
 

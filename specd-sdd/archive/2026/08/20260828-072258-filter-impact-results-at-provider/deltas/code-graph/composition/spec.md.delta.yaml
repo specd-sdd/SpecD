@@ -1,0 +1,19 @@
+- op: added
+  description: 'Expose typed filtered-impact requests through the lifecycle-managed provider facade'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: CodeGraphProvider facade$'
+  content: |
+    ### Requirement: Filtered-impact provider surface
+
+    `CodeGraphProvider` SHALL accept the shared typed impact filter on its symbol, file, multi-file, spec, and public-binding impact operations. Each operation SHALL delegate the complete request through the existing lifecycle and single availability-validation boundary and SHALL return an already-filtered deterministic impact result.
+
+    The public `ImpactResult` contract SHALL expose `affectedSpecs` for every impact target family. Provider symbol and public-binding operations requesting the `specs` result type SHALL return coverage-derived specs rather than an empty target-specific projection.
+
+    Provider composition SHALL pass filter predicates to traversal and the active `GraphStore`; it MUST NOT recreate filtering by projecting an unrestricted result after traversal. The SQLite composition path SHALL preserve the request through its store and worker boundary so physical queries receive the normalized predicates.
+
+    The curated package surface SHALL export the host-facing impact filter, result-type, and request types needed by delivery adapters. Concrete query plans, SQLite predicate builders, worker request DTOs, and backend candidate types SHALL remain internal.

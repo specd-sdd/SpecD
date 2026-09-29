@@ -11,39 +11,51 @@
     "core:run-step-hooks",
     "core:archive-change"
   ],
-  "implementation": [],
+  "implementation": [
+    {
+      "file": "core:src/infrastructure/node/hook-runner.ts",
+      "symbols": ["NodeHookRunner"]
+    },
+    {
+      "file": "core:src/application/template-expander.ts",
+      "symbols": ["TemplateExpander"]
+    },
+    {
+      "file": "core:test/application/template-expander.spec.ts"
+    }
+  ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Defines shared, single-pass template expansion with immutable built-ins, contextual namespaces, unknown-token handling, and shell safety.",
+      "value": "Defines shared single-pass template expansion, immutable built-ins, contextual namespaces, unknown handling, and dual shell dialects.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:ac81ccfdaccd651772b91cb81bdff87438149a854d3717d5ccef133d1291d0ee",
-          "lastModified": "2026-07-22T16:55:45.985Z"
+          "hash": "sha256:201d2acea049a71aca1dd068fd1734dfbe2e44aed6a8c4fcd7267e786b8fd136",
+          "lastModified": "2026-09-28T11:19:59.183Z"
         },
         "verify.md": {
-          "hash": "sha256:918883e8d0dd465bc3527551b9ac13f6952deff4cd39f7af54534f94c9c0c81a",
-          "lastModified": "2026-07-22T16:55:45.985Z"
+          "hash": "sha256:528c55d38c51c4a70d65e7a9fa981569de50a7d6375f2a213ac44b49f3d093cd",
+          "lastModified": "2026-09-28T11:19:59.184Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# Template Variables\n## Rules\n- Tokens use `{{namespace.key}}`, detected by `\\{\\{([^}]+)\\}\\}`. Namespace/key names match `[a-z0-9-]+`; dots separate path components. Only string, number, boolean values substitute.\n- Variable shape: `type TemplateVariables = Record<string, Record<string, string | number | boolean>>`; flat keys inside each namespace.\n- Built-in `project.root` is absolute project root containing `specd.yaml`, always present, injected by composition at construction.\n- Active-change context may supply `change.name` and absolute `change.path`. Archived runtime may also supply optional `change.archivedName` basename `YYYYMMDD-HHmmss-<name>`.\n- `change.workspace` MUST NOT exist, including fallback derivations such as `[0] ?? 'default'`; derive touched workspace sets from `specIds` outside templates.\n- Future namespaces are allowed; engine traverses supplied map without fixed registry.\n- Expansion resolves namespace then key. Primitive resolves to value; missing namespace/key or non-primitive preserves original token. Single pass only; substituted values are not rescanned.\n- For each unresolved token, optional `onUnknown(token)` runs once; informational only, preserving output and never halting.\n- `expand()` substitutes verbatim for `instruction:` and artifact instructions. `expandForShell()` single-quotes every substituted value and escapes embedded single quotes with shell `'\\''` idiom for `run:` commands.\n- `TemplateExpander` is shared class, not port:\n  `constructor(builtins: TemplateVariables, onUnknown?: OnUnknownVariable)`\n  `expand(template: string, variables?: TemplateVariables): string`\n  `expandForShell(template: string, variables?: TemplateVariables): string`\n- Composition constructs one `TemplateExpander` with built-ins and optional logging callback, then injects consumers. Use cases build contextual maps per invocation; expander merges them internally.\n- Contextual variables MUST NOT override built-ins; built-in keys win on namespace collision. Both methods share resolution logic, differing only in substitution escaping.\n\n## Constraints\n- No recursive expansion.\n- Unknown tokens preserved unchanged; never errors.\n- Shell escaping only through `expandForShell()`, never `expand()`.\n- `project` always present; other namespaces optional.\n- Built-ins immutable; contextual variables per call.\n- Expander does not validate injected values or path safety; caller owns validation.",
+      "value": "# Template Variables\n\n## Rules\n- Tokens use `{{namespace.key}}`, detected by `\\{\\{([^}]+)\\}`. Namespace/key names match `[a-z0-9-]+`; dots separate path components. Only string, number, boolean values substitute.\n- `TemplateVariables = Record<string, Record<string, string | number | boolean>>`; namespaces contain flat keys.\n- Immutable built-in `project.root` is absolute directory containing `specd.yaml`, injected by composition and always present.\n- Active change may supply `change.name`, absolute `change.path`; archived runtime may supply `change.archivedName` basename `YYYYMMDD-HHmmss-<name>`.\n- `change.workspace` is forbidden, including `[0] ?? default` derivations; derive workspace sets from `specIds` outside templates.\n- Future namespaces allowed; engine traverses supplied map without registry.\n- Resolve namespace then key. Primitive → substituted value; missing/non-primitive → original token plus optional `onUnknown(token)` once per unresolved occurrence. Single pass; never rescan inserted values.\n- `expand()` substitutes verbatim for instructions and developer-authored `run:` hooks. Developer controls quoting; multiple tokens inside one quote remain one string. `HookRunner` MUST NOT call `expandForShell()` for developer hooks.\n- `expandForShell(template, variables?, dialect?)` serves commands SpecD builds. Default `posix`: single-quote escaping. `cmd`: empty → `\"\"`; `%` → `%%`; `\"` → `\"\"`; wrap value in double quotes.\n- `TemplateExpander` class:\n  `constructor(builtins: TemplateVariables, onUnknown?: OnUnknownVariable)`\n  `expand(template: string, variables?: TemplateVariables): string`\n  `expandForShell(template: string, variables?: TemplateVariables, dialect?: posix | cmd): string`\n- Composition constructs one expander with built-ins and optional logging callback. Use cases pass contextual maps per invocation; contextual values cannot override built-in keys. Methods share resolution logic, differ only substitution escaping.\n\n## Constraints\n- No recursive expansion.\n- Unknown tokens preserved; callback informational, never halts.\n- Flat values within namespaces; no nested objects.\n- Shell escaping only via `expandForShell()`.\n- `project` always present; other namespaces optional.\n- Expander validates neither values nor path safety; injecting caller owns validation.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:ac81ccfdaccd651772b91cb81bdff87438149a854d3717d5ccef133d1291d0ee",
-          "lastModified": "2026-07-22T16:55:45.985Z"
+          "hash": "sha256:201d2acea049a71aca1dd068fd1734dfbe2e44aed6a8c4fcd7267e786b8fd136",
+          "lastModified": "2026-09-28T11:19:59.183Z"
         },
         "verify.md": {
-          "hash": "sha256:918883e8d0dd465bc3527551b9ac13f6952deff4cd39f7af54534f94c9c0c81a",
-          "lastModified": "2026-07-22T16:55:45.985Z"
+          "hash": "sha256:528c55d38c51c4a70d65e7a9fa981569de50a7d6375f2a213ac44b49f3d093cd",
+          "lastModified": "2026-09-28T11:19:59.184Z"
         }
       }
     }

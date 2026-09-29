@@ -127,6 +127,16 @@ Unlike `upsertFile` which replaces all data for a file, `addRelations` is purely
 
 `SymbolQuery` is a value object with optional fields: `name` (glob or regex), `kinds` (array of `SymbolKind` for filtering by one or more kinds), `filePath` (exact match or glob), `comment` (substring match for full-text search within symbol comments), `caseSensitive` (boolean, defaults to `false` — when `false`, `name` and `comment` matching is case insensitive).
 
+### Requirement: Filtered impact query contract
+
+`GraphStore` SHALL expose backend-neutral impact-query inputs that carry requested result types, symbol kinds, included workspaces, and excluded workspaces together with the target, relation direction, candidate resource category, and traversal depth needed by impact analysis.
+
+Filtered impact reads SHALL return only nodes and relations admitted by the normalized predicates. The query `resource` field SHALL identify the candidate or neighbor resource category to expand towards or hydrate. Traversal reads SHALL support depth-zero queries for direct coverage lookups. Workspace matching SHALL use canonical workspace identity, an empty inclusion set SHALL admit every workspace, and exclusions SHALL take precedence. Symbol-kind predicates SHALL be applied to symbol candidates before those candidates are returned from the store.
+
+Store implementations SHALL apply supported type, kind, inclusion, and exclusion predicates in their physical query execution. An implementation MUST NOT load an unrestricted impact candidate set across the adapter boundary and then remove excluded rows in TypeScript. Batch and worker-backed implementations SHALL preserve the filters through their request protocol without widening the query.
+
+The contract SHALL remain backend-neutral: it defines predicate and result semantics but MUST NOT expose SQLite statements, worker messages, table names, or storage-specific pagination details.
+
 ### Requirement: Batched symbol traversal reads
 
 `GraphStore` SHALL expose storage-neutral batch queries for traversal:
@@ -288,6 +298,14 @@ The Store SHALL expose one deterministic complete reference-fact snapshot for in
 Search SHALL index structured simple name, owner, symbol space, member form, public surface, and exported name fields. It SHALL group public bindings with their logical target while returning every binding independently and identifying which bindings matched the request.
 
 Reverse coverage queries SHALL accept batches of canonical file paths and symbol ids and return all matching `COVERS_FILE` or `COVERS_SYMBOL` relations in deterministic source/type/target order. Empty batches SHALL return empty results without backend work. File-impact traversal MUST be able to retrieve coverage for its complete deduplicated blast radius without one call per resource.
+
+### Requirement: Member-semantics persistence
+
+`GraphStore` SHALL persist and look up logical symbols by workspace, surface, simple name, symbol space, owner id, and `MemberSemantics` (`kind`, `dispatch`, `accessor`, optional `nativeKind`). Lookups MUST be equality queries on those structured fields. The store MUST NOT keep a `memberForm` field beside those axes and MUST NOT parse a serialized canonical id to recover them.
+
+The store SHALL persist `qualified_name` for a logical symbol that has an owner and SHALL look up every logical symbol whose `qualified_name` equals a requested spelling. The lookup MUST be equality and MUST return every match. The store MUST NOT use full-text search for that lookup, MUST NOT store the spelling only inside symbol search text, and MUST NOT add an alias table.
+
+Public bindings SHALL remain addressable by surface, exported name, symbol space, and target id. The target id MAY identify a logical symbol whose workspace differs from the binding surface.
 
 ### Requirement: Logical-symbol coverage endpoints
 

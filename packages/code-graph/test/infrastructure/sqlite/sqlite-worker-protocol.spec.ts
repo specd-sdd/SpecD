@@ -12,7 +12,10 @@ import { InvalidGraphStoreConfigurationError } from '../../../src/domain/errors/
 import { GraphSchemaIncompatibleError } from '../../../src/domain/errors/graph-schema-incompatible-error.js'
 import { GraphStorageRecoveryRequiredError } from '../../../src/domain/errors/graph-storage-recovery-required-error.js'
 import { RelationType } from '../../../src/domain/value-objects/relation-type.js'
-import { type SQLiteWorkerRequest } from '../../../src/infrastructure/sqlite/sqlite-worker-protocol.js'
+import {
+  type SQLiteWorkerRequest,
+  type SQLiteWorkerResponse,
+} from '../../../src/infrastructure/sqlite/sqlite-worker-protocol.js'
 
 describe('SQLiteWorkerProtocol serialization', () => {
   it('round-trips typed traversal batch requests through structured clone', () => {
@@ -41,6 +44,47 @@ describe('SQLiteWorkerProtocol serialization', () => {
     ]
 
     expect(structuredClone(requests)).toEqual(requests)
+  })
+
+  it('round-trips filtered impact frontier payloads and result arrays through structured clone', () => {
+    const request: SQLiteWorkerRequest<'queryImpactFrontier'> = {
+      id: 9,
+      op: 'queryImpactFrontier',
+      payload: {
+        input: {
+          resource: 'symbol',
+          frontier: ['core:src/target.ts:function:target:1:0'],
+          direction: 'upstream',
+          depth: 1,
+          maxDepth: 3,
+          relationTypes: [RelationType.Calls],
+          filter: {
+            types: ['symbols'],
+            kinds: ['function'],
+            workspaces: ['core'],
+            excludeWorkspaces: ['generated'],
+          },
+        },
+      },
+    }
+    const response: SQLiteWorkerResponse = {
+      id: 9,
+      type: 'result',
+      result: { relations: [], symbols: [], files: [], specs: [] },
+    }
+
+    const cloned = structuredClone({ request, response })
+
+    expect(cloned).toEqual({ request, response })
+    expect(cloned.request.op).toBe('queryImpactFrontier')
+    if (cloned.request.op !== 'queryImpactFrontier') throw new Error('unexpected worker operation')
+    expect(cloned.request.payload.input.filter).toEqual({
+      types: ['symbols'],
+      kinds: ['function'],
+      workspaces: ['core'],
+      excludeWorkspaces: ['generated'],
+    })
+    expect(cloned.response.type).toBe('result')
   })
 
   it('serializes and deserializes standard Error instances', () => {

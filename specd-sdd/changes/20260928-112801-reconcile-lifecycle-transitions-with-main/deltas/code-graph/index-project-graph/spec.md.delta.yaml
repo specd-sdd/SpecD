@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'The orchestration contract remains valid; the multi-workspace integration fixture is made portable without changing behavior.'

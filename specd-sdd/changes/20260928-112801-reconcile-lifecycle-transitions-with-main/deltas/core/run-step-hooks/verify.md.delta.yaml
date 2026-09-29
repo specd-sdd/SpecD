@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'Existing shared hook execution scenarios remain valid.'

@@ -532,7 +532,7 @@ import { type HookRunner, type HookResult, type TemplateVariables } from '@specd
 
 #### `run(command: string, variables: TemplateVariables): Promise<HookResult>`
 
-Executes `command` in a subprocess, substituting template variables from `variables` before invoking the shell. Unknown variables are left unexpanded. All substituted values are shell-escaped to prevent injection.
+Executes `command` in a subprocess, substituting template variables from `variables` before invoking the shell. Unknown variables are left unexpanded. Values are inserted verbatim; the hook author writes any quotes. On Windows, single quotes in the command are translated to double quotes. On other platforms, `""` inside double quotes is translated to a POSIX escaped quote. `%` is not rewritten.
 
 Template variable syntax is `{{namespace.key}}`, e.g. `{{change.name}}`, `{{project.root}}`.
 

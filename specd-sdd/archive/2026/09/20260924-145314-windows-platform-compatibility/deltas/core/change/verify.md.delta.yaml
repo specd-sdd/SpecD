@@ -1,0 +1,24 @@
+- op: added
+  description: 'Device-name change slugs are rejected; con-foo stays legal.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: 'Requirement: Identity'
+  content: |
+    ### Requirement: Change names reject Windows device names
+
+    #### Scenario: A device-name slug is rejected
+
+    - **GIVEN** the requested slug is `con`
+    - **WHEN** the change name is validated
+    - **THEN** the name is rejected
+
+    #### Scenario: A longer slug that contains the device name is legal
+
+    - **GIVEN** the requested slug is `con-foo`
+    - **AND** it matches the existing slug pattern
+    - **WHEN** the change name is validated
+    - **THEN** the name is accepted

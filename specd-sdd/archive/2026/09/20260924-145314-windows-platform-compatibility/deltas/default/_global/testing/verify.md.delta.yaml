@@ -1,0 +1,23 @@
+- op: added
+  description: 'Fixtures and unreadable-file setups work on Windows.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: 'Requirement: Integration tests for infrastructure adapters'
+  content: |
+    ### Requirement: Fixtures are valid on Windows
+
+    #### Scenario: Temporary paths come from the OS
+
+    - **WHEN** a filesystem test creates a temporary directory
+    - **THEN** the directory is under `os.tmpdir()`
+    - **AND** the test does not hardcode `/tmp` or `file:///tmp/`
+
+    #### Scenario: Unreadable files do not depend on chmod zero on Windows
+
+    - **GIVEN** the test runs on Windows
+    - **WHEN** it needs a file the process cannot read
+    - **THEN** it does not use `chmod 0o000` as that condition

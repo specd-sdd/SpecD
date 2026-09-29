@@ -98,6 +98,5 @@ When no results match, the output is `[]`.
 ## Spec Dependencies
 
 - [`cli:entrypoint`](../entrypoint/spec.md)
-- [`default:_global/spec-layout`](../../../_global/spec-layout/spec.md)
 - [`core:search-specs`](../../core/search-specs/spec.md)
 - [`core:list-workspaces`](../../core/list-workspaces/spec.md)

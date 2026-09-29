@@ -2,7 +2,7 @@
   "manifestVersion": 2,
   "name": "implementation-snapshot",
   "createdAt": "2026-07-07T15:37:56.057Z",
-  "updatedAt": "2026-09-28T06:29:43.257Z",
+  "updatedAt": "2026-09-28T11:51:21.786Z",
   "description": "Add VCS-agnostic working tree snapshot capability with mtime+hash baseline filtering and indexed patch restore as safety net against accidental data loss",
   "schema": {
     "name": "schema-std",
@@ -110,85 +110,99 @@
           "key": "core:change",
           "filename": "deltas/core/change/spec.md.delta.yaml",
           "state": "missing",
-          "validatedHash": null
+          "validatedHash": null,
+          "hasDrift": true
         },
         {
           "key": "core:vcs-adapter",
           "filename": "deltas/core/vcs-adapter/spec.md.delta.yaml",
           "state": "missing",
-          "validatedHash": null
+          "validatedHash": null,
+          "hasDrift": true
         },
         {
           "key": "core:implementation-detector-port",
           "filename": "deltas/core/implementation-detector-port/spec.md.delta.yaml",
           "state": "missing",
-          "validatedHash": null
+          "validatedHash": null,
+          "hasDrift": true
         },
         {
           "key": "core:vcs-implementation-detector",
           "filename": "deltas/core/vcs-implementation-detector/spec.md.delta.yaml",
           "state": "missing",
-          "validatedHash": null
+          "validatedHash": null,
+          "hasDrift": true
         },
         {
           "key": "core:refresh-implementation-tracking",
           "filename": "deltas/core/refresh-implementation-tracking/spec.md.delta.yaml",
           "state": "missing",
-          "validatedHash": null
+          "validatedHash": null,
+          "hasDrift": true
         },
         {
           "key": "core:update-implementation-tracking",
           "filename": "deltas/core/update-implementation-tracking/spec.md.delta.yaml",
           "state": "missing",
-          "validatedHash": null
+          "validatedHash": null,
+          "hasDrift": true
         },
         {
           "key": "cli:change-implementation",
           "filename": "deltas/cli/change-implementation/spec.md.delta.yaml",
           "state": "missing",
-          "validatedHash": null
+          "validatedHash": null,
+          "hasDrift": true
         },
         {
           "key": "core:get-implementation-snapshots",
           "filename": "specs/core/get-implementation-snapshots/spec.md",
           "state": "missing",
-          "validatedHash": null
+          "validatedHash": null,
+          "hasDrift": true
         },
         {
           "key": "core:take-implementation-snapshot",
           "filename": "specs/core/take-implementation-snapshot/spec.md",
           "state": "missing",
-          "validatedHash": null
+          "validatedHash": null,
+          "hasDrift": true
         },
         {
           "key": "core:show-implementation-snapshot",
           "filename": "specs/core/show-implementation-snapshot/spec.md",
           "state": "missing",
-          "validatedHash": null
+          "validatedHash": null,
+          "hasDrift": true
         },
         {
           "key": "core:composition",
           "filename": "deltas/core/composition/spec.md.delta.yaml",
           "state": "missing",
-          "validatedHash": null
+          "validatedHash": null,
+          "hasDrift": true
         },
         {
           "key": "core:implementation-snapshot",
           "filename": "specs/core/implementation-snapshot/spec.md",
           "state": "missing",
-          "validatedHash": null
+          "validatedHash": null,
+          "hasDrift": true
         },
         {
           "key": "core:get-implementation-snapshot-file",
           "filename": "specs/core/get-implementation-snapshot-file/spec.md",
           "state": "missing",
-          "validatedHash": null
+          "validatedHash": null,
+          "hasDrift": true
         },
         {
           "key": "core:restore-implementation-snapshot",
           "filename": "specs/core/restore-implementation-snapshot/spec.md",
           "state": "missing",
-          "validatedHash": null
+          "validatedHash": null,
+          "hasDrift": true
         }
       ]
     },
@@ -202,85 +216,99 @@
           "key": "core:change",
           "filename": "deltas/core/change/verify.md.delta.yaml",
           "state": "missing",
-          "validatedHash": null
+          "validatedHash": null,
+          "hasDrift": true
         },
         {
           "key": "core:vcs-adapter",
           "filename": "deltas/core/vcs-adapter/verify.md.delta.yaml",
           "state": "missing",
-          "validatedHash": null
+          "validatedHash": null,
+          "hasDrift": true
         },
         {
           "key": "core:implementation-detector-port",
           "filename": "deltas/core/implementation-detector-port/verify.md.delta.yaml",
           "state": "missing",
-          "validatedHash": null
+          "validatedHash": null,
+          "hasDrift": true
         },
         {
           "key": "core:vcs-implementation-detector",
           "filename": "deltas/core/vcs-implementation-detector/verify.md.delta.yaml",
           "state": "missing",
-          "validatedHash": null
+          "validatedHash": null,
+          "hasDrift": true
         },
         {
           "key": "core:refresh-implementation-tracking",
           "filename": "deltas/core/refresh-implementation-tracking/verify.md.delta.yaml",
           "state": "missing",
-          "validatedHash": null
+          "validatedHash": null,
+          "hasDrift": true
         },
         {
           "key": "core:update-implementation-tracking",
           "filename": "deltas/core/update-implementation-tracking/verify.md.delta.yaml",
           "state": "missing",
-          "validatedHash": null
+          "validatedHash": null,
+          "hasDrift": true
         },
         {
           "key": "cli:change-implementation",
           "filename": "deltas/cli/change-implementation/verify.md.delta.yaml",
           "state": "missing",
-          "validatedHash": null
+          "validatedHash": null,
+          "hasDrift": true
         },
         {
           "key": "core:get-implementation-snapshots",
           "filename": "specs/core/get-implementation-snapshots/verify.md",
           "state": "missing",
-          "validatedHash": null
+          "validatedHash": null,
+          "hasDrift": true
         },
         {
           "key": "core:take-implementation-snapshot",
           "filename": "specs/core/take-implementation-snapshot/verify.md",
           "state": "missing",
-          "validatedHash": null
+          "validatedHash": null,
+          "hasDrift": true
         },
         {
           "key": "core:show-implementation-snapshot",
           "filename": "specs/core/show-implementation-snapshot/verify.md",
           "state": "missing",
-          "validatedHash": null
+          "validatedHash": null,
+          "hasDrift": true
         },
         {
           "key": "core:composition",
           "filename": "deltas/core/composition/verify.md.delta.yaml",
           "state": "missing",
-          "validatedHash": null
+          "validatedHash": null,
+          "hasDrift": true
         },
         {
           "key": "core:implementation-snapshot",
           "filename": "specs/core/implementation-snapshot/verify.md",
           "state": "missing",
-          "validatedHash": null
+          "validatedHash": null,
+          "hasDrift": true
         },
         {
           "key": "core:get-implementation-snapshot-file",
           "filename": "specs/core/get-implementation-snapshot-file/verify.md",
           "state": "missing",
-          "validatedHash": null
+          "validatedHash": null,
+          "hasDrift": true
         },
         {
           "key": "core:restore-implementation-snapshot",
           "filename": "specs/core/restore-implementation-snapshot/verify.md",
           "state": "missing",
-          "validatedHash": null
+          "validatedHash": null,
+          "hasDrift": true
         }
       ]
     },
@@ -294,7 +322,8 @@
           "key": "design",
           "filename": "design.md",
           "state": "missing",
-          "validatedHash": null
+          "validatedHash": null,
+          "hasDrift": true
         }
       ]
     },
@@ -3449,6 +3478,64 @@
     },
     {
       "type": "invalidated",
+      "at": "2026-09-25T16:05:58.803Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'windows-platform-compatibility' was archived with overlapping specs: core:change, core:refresh-implementation-tracking, core:vcs-adapter",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:change", "core:vcs-adapter", "core:refresh-implementation-tracking"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:change", "core:vcs-adapter", "core:refresh-implementation-tracking"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-09-25T16:06:26.092Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'windows-platform-compatibility' was archived with overlapping specs: core:change, core:refresh-implementation-tracking, core:vcs-adapter",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:change", "core:vcs-adapter", "core:refresh-implementation-tracking"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:change", "core:vcs-adapter", "core:refresh-implementation-tracking"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
       "at": "2026-09-28T06:23:18.347Z",
       "by": {
         "name": "M***a",
@@ -3527,6 +3614,65 @@
         {
           "type": "verify",
           "files": ["core:change"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-09-28T11:51:21.784Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Artifact files require review",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:change",
+            "core:vcs-adapter",
+            "core:implementation-detector-port",
+            "core:vcs-implementation-detector",
+            "core:refresh-implementation-tracking",
+            "core:update-implementation-tracking",
+            "cli:change-implementation",
+            "core:get-implementation-snapshots",
+            "core:take-implementation-snapshot",
+            "core:show-implementation-snapshot",
+            "core:composition",
+            "core:implementation-snapshot",
+            "core:get-implementation-snapshot-file",
+            "core:restore-implementation-snapshot"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:change",
+            "core:vcs-adapter",
+            "core:implementation-detector-port",
+            "core:vcs-implementation-detector",
+            "core:refresh-implementation-tracking",
+            "core:update-implementation-tracking",
+            "cli:change-implementation",
+            "core:get-implementation-snapshots",
+            "core:take-implementation-snapshot",
+            "core:show-implementation-snapshot",
+            "core:composition",
+            "core:implementation-snapshot",
+            "core:get-implementation-snapshot-file",
+            "core:restore-implementation-snapshot"
+          ]
         },
         {
           "type": "design",

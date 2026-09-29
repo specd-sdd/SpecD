@@ -234,25 +234,39 @@ By extending `SpecdError`, all code-graph errors automatically follow the "Specd
 
 The graph SHALL distinguish syntax-level declaration occurrences from logical symbols. A logical symbol MAY contain multiple declarations when the source language defines an overload set, declaration merge, augmentation, or equivalent single semantic identity. Competing declarations that do not form one language-defined symbol MUST remain distinct.
 
-Every logical symbol SHALL expose structured workspace, module/package, declaring owner, symbol space, simple name, and member-form identity plus a rendered canonical reference. Structured fields are authoritative and SHALL drive semantic lookup; rendered references are external identities that MUST round-trip with escaping and remain stable across line/column movement. Human text presentations MUST NOT treat their serialized representation as the primary actionable location.
+Every logical symbol SHALL expose structured workspace, declaring surface, declaring owner, symbol space, simple name, and member semantics, plus one versioned canonical reference. Structured fields are authoritative and SHALL drive semantic lookup. The canonical reference MUST be delimiter-safe, MUST include the member-semantics axes, and MUST round-trip with escaping. It MUST remain stable across line and column movement. Human text presentations MUST NOT be the primary actionable location, and `.` or `::` MUST NOT be the canonical identity delimiter.
 
-The existing location-based `SymbolNode.id` and closed `SymbolKind` remain valid. Symbol space and member form are additive dimensions and MUST NOT overload `SymbolKind`.
+The canonical reference replaces the previous encoding that embedded a single member form. Readers MUST NOT accept that previous encoding as a current logical id. Derived storage is rebuilt; the model MUST NOT keep both encodings as canonical.
 
-A logical member's `declaringOwner` SHALL be the canonical logical identity of the type, namespace, module, object, receiver type, trait, contract, or other language-defined owner that syntactically declares it. It MUST NOT contain a parser-node identifier, a location-based child/parent ID, or a display-only qualified name. Adapters SHALL create or locate the logical owner before constructing member identities. Only declarations that are top-level in their language surface MAY omit the owner.
+A logical symbol that has a declaring owner SHALL expose `qualified_name`: the generic dotted path rebuilt from the owner chain and the simple name, such as `GetStatus.execute`. A symbol with no owner MUST NOT expose a qualified name. `qualified_name` is a stored exact-match spelling. It MUST NOT be part of the canonical id, MUST NOT replace the simple name, and MUST NOT be stored as an alias row. `.` is the only stored separator. A `::` query compares as that same spelling. Generic and language-native spellings MAY still be rendered on demand. Full-text search text MUST NOT be the exact-match store for this spelling.
+
+A logical symbol MUST NOT carry a package name. Workspace on the file id and the adapter's package-to-workspace map are the package identity.
+
+The existing location-based `SymbolNode.id` and closed `SymbolKind` remain valid. Symbol space and member semantics are additive dimensions and MUST NOT overload `SymbolKind`. `SymbolKind` stays the closed broad enum (`function`, `class`, `method`, `variable`, `type`, `interface`, `enum`). Namespace or module is an owner-path role and a surface, not a new `SymbolKind`.
+
+A logical member's `declaringOwner` SHALL be the canonical logical identity of the type, namespace, module, object, receiver type, trait, contract, or other language-defined owner that syntactically declares it. It MUST NOT contain a parser-node identifier, a location-based child or parent ID, or a display-only qualified name. Adapters SHALL create or locate the logical owner before constructing member identities. Only declarations that are top-level in their language surface MAY omit the owner.
+
+`parentId` on a declaration occurrence SHALL be emitted by the language adapter that analyzed the file. The shared model MUST NOT assign it from a hardcoded language list.
 
 Same-name members under different declaring owners SHALL always have different logical identities. Moving a declaration within the same logical owner without changing its semantic identity MUST NOT change its canonical reference merely because its source line or parser node changes.
 
-### Requirement: Member forms and symbol spaces
+### Requirement: Member semantics and symbol spaces
 
-The common model SHALL represent methods, properties, getters, setters, constructors, fields, static members, and interface/contract members without collapsing distinct same-name forms. It SHALL preserve language-defined lookup spaces such as type, value, namespace/module, function, and constant.
+The common model SHALL represent a member with `MemberSemantics`: `kind`, `dispatch`, `accessor`, and optional `nativeKind`. These axes MUST be representable together. An instance getter is both an accessor and instance-dispatched. A static getter is static and an accessor. `nativeKind` MAY retain a proven language nuance. The shared model MUST NOT depend on a TypeScript, Python, Go, or PHP enum for that nuance.
 
-Identifier normalization and case comparison SHALL be language-sensitive. No shared model operation may globally lowercase symbol identifiers.
+`MemberForm` MUST NOT remain on `LogicalSymbol`, resolver inputs, store lookups, or persisted columns beside these axes.
+
+The model SHALL preserve language-defined lookup spaces such as type, value, namespace or module, and property. Identifier normalization and case comparison SHALL be language-sensitive. No shared model operation may globally lowercase symbol identifiers.
+
+The model SHALL NOT collapse distinct same-name forms that differ in kind, dispatch, accessor, or symbol space.
 
 ### Requirement: First-class binding model
 
 A public export slot SHALL be looked up by public surface, exported name, and symbol space. Each proven route occupying that slot SHALL have an independently addressable binding identity that also distinguishes its canonical target or ordered re-export provenance, so competing routes cannot overwrite one another. Anonymous and default exports SHALL remain addressable through binding identity.
 
-A local binding SHALL preserve lexical scope and source range. Distinct aliases, shadowed bindings, multiple public routes between identical relation endpoints, and competing targets exposed through the same public slot MUST NOT collapse because ordinary `Relation` equality ignores metadata.
+A public binding's `surface` is the file that exports the name. Its `targetId` is the logical symbol that name publishes. That logical symbol MAY be declared in another workspace. The binding MUST NOT be created by choosing the first same-named symbol in the target workspace.
+
+A local binding SHALL preserve lexical scope and source range. Distinct aliases, shadowed bindings, multiple public routes between identical relation endpoints, and competing targets exposed through the same public slot MUST NOT collapse because ordinary `Relation` equality ignores metadata. Generic and native spellings MUST NOT be stored as alias rows.
 
 ### Requirement: Index coverage facts
 

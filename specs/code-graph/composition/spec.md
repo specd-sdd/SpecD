@@ -39,6 +39,16 @@ callers MUST NOT use recreation as ordinary indexing maintenance: the SDK forced
 reindex orchestration is the supported recovery path. Worker protocol operations and
 lock-helper methods remain internal.
 
+### Requirement: Filtered-impact provider surface
+
+`CodeGraphProvider` SHALL accept the shared typed impact filter on its symbol, file, multi-file, spec, and public-binding impact operations. Each operation SHALL delegate the complete request through the existing lifecycle and single availability-validation boundary and SHALL return an already-filtered deterministic impact result.
+
+The public `ImpactResult` contract SHALL expose `affectedSpecs` for every impact target family. Provider symbol and public-binding operations requesting the `specs` result type SHALL return coverage-derived specs rather than an empty target-specific projection.
+
+Provider composition SHALL pass filter predicates to traversal and the active `GraphStore`; it MUST NOT recreate filtering by projecting an unrestricted result after traversal. The SQLite composition path SHALL preserve the request through its store and worker boundary so physical queries receive the normalized predicates.
+
+The curated package surface SHALL export the host-facing impact filter, result-type, and request types needed by delivery adapters. Concrete query plans, SQLite predicate builders, worker request DTOs, and backend candidate types SHALL remain internal.
+
 ### Requirement: Factory function
 
 Two factory signatures are provided:
@@ -76,7 +86,7 @@ The built-in graph-store registry SHALL contain exactly the `sqlite` backend. Th
 
 `graphStoreFactories` SHALL remain a supported additive registration seam for future graph-store plugins. External factories MUST obey the same lifecycle and storage-root contract as the built-in factory. A registration whose id collides with the built-in `sqlite` id MUST fail deterministically and MUST NOT replace the built-in factory. The `Readonly<Record<string, GraphStoreFactory>>` input structurally provides at most one external factory per id.
 
-`createSqliteGraphStoreFactory()` SHALL accept `SqliteGraphStoreFactoryOptions`, including an optional serializable `SqliteRuntimeDescriptor`. Factory creation MUST remain synchronous. Native SQLite module loading, worker startup, schema preparation, and runtime-specific binding resolution MUST happen during `open()`, not during `createCodeGraphProvider(...)`.
+`createSqliteGraphStoreFactory()` SHALL accept `SqliteGraphStoreFactoryOptions`, including an optional serializable `SqliteRuntimeDescriptor`. Factory creation MUST remain synchronous. Native SQLite module loading, worker startup, schema preparation, and runtime-specific binding resolution MUST happen during `open()`, not during `createCodeGraphProvider(...)`. Absolute `modulePath` values MUST be converted to `file:` URLs before dynamic import so Windows drive-letter paths load correctly.
 
 `CodeGraphProvider` SHALL be a type-only public interface describing the provider lifecycle and query surface. The concrete implementation class, its constructor, `GraphStore`, worker protocol, and `IndexCodeGraph` inputs MUST remain internal to the package. Callers MUST obtain the interface only from `createCodeGraphProvider(...)` and MUST NOT construct a provider directly.
 
@@ -196,6 +206,12 @@ Selector resolution SHALL distinguish unique, ambiguous, and missing outcomes. U
 Selector validation failures that are reachable from host input (for example an empty selector) SHALL reject with a typed graph error carrying a stable machine-readable code (`INVALID_GRAPH_SELECTOR`) rather than a generic `Error`, preserving the descriptive message. When ambiguous-symbol presentation must enrich candidates with symbol details, it SHALL issue exactly one exact batch lookup rather than one call per candidate.
 
 The curated package surface SHALL export resolver input/result/status/reason/provenance types and factories, logical-symbol/public-binding/member/coverage vocabulary, and the enriched health/index result types. Concrete resolver implementations and backend storage details SHALL remain internal.
+
+### Requirement: Adapter-backed reference normalization
+
+`createCodeGraphProvider` SHALL pass the same `AdapterRegistry` used for indexing into provider symbol resolution. The provider MUST NOT build a second registry and MUST NOT hardcode language names to choose an adapter.
+
+An unanchored `Tipo.miembro` or `Tipo::miembro` request SHALL resolve by stored `qualified_name` equality and MUST NOT require an adapter. Other text normalization SHALL select an adapter only from an explicit language, an anchored indexed file, or indexed public-surface metadata. When none of those is present, that other text MUST return unresolved. The provider MUST NOT parse package manifests or member syntax itself.
 
 ### Requirement: Code Graph-orchestrated search surface
 

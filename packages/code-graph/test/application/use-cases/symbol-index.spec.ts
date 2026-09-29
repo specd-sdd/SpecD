@@ -6,7 +6,9 @@ import {
   createLocalBinding,
   createLogicalSymbol,
   createPublicBinding,
-  MemberForm,
+  MemberAccessor,
+  MemberDispatch,
+  MemberKind,
   SymbolSpace,
 } from '../../../src/domain/value-objects/symbol-reference.js'
 import { createRelation } from '../../../src/domain/value-objects/relation.js'
@@ -156,7 +158,7 @@ describe('InMemoryIndexSession', () => {
       name: 'overload',
       space: SymbolSpace.Value,
       ownerId: undefined,
-      memberForm: undefined,
+      memberSemantics: undefined,
     })
     const competing = createLogicalSymbol({
       workspace: 'ws',
@@ -164,7 +166,7 @@ describe('InMemoryIndexSession', () => {
       name: 'overload',
       space: SymbolSpace.Value,
       ownerId: undefined,
-      memberForm: undefined,
+      memberSemantics: undefined,
     })
 
     for (const [symbol, logicalId] of [
@@ -232,7 +234,7 @@ describe('InMemoryIndexSession', () => {
       name: 'Base',
       space: SymbolSpace.Type,
       ownerId: undefined,
-      memberForm: undefined,
+      memberSemantics: undefined,
     })
     const member = createLogicalSymbol({
       workspace: 'ws',
@@ -240,7 +242,7 @@ describe('InMemoryIndexSession', () => {
       name: 'run',
       space: SymbolSpace.Value,
       ownerId: owner.id,
-      memberForm: MemberForm.Instance,
+      memberSemantics: { kind: MemberKind.Method, dispatch: MemberDispatch.Instance },
     })
     const publicBinding = createPublicBinding({
       surface: 'pkg',
@@ -343,7 +345,7 @@ describe('InMemoryIndexSession', () => {
       name: childDeclaration.name,
       space: SymbolSpace.Type,
       ownerId: undefined,
-      memberForm: undefined,
+      memberSemantics: undefined,
     })
     const parent = createLogicalSymbol({
       workspace: 'ws',
@@ -351,7 +353,7 @@ describe('InMemoryIndexSession', () => {
       name: parentDeclaration.name,
       space: SymbolSpace.Type,
       ownerId: undefined,
-      memberForm: undefined,
+      memberSemantics: undefined,
     })
     session.hydrateReferenceFacts({
       logicalSymbols: [child, parent],

@@ -1,0 +1,12 @@
+releases:
+  code-graph:symbol-model: minor
+  code-graph:language-adapter: minor
+  code-graph:resolve-symbol-reference: minor
+  code-graph:graph-store: minor
+  code-graph:sqlite-graph-store: minor
+  code-graph:indexer: minor
+  code-graph:composition: minor
+  code-graph:traversal: minor
+  cli:graph-search: minor
+  cli:graph-impact: minor
+  sdk:build-implementation-review: minor

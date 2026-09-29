@@ -1,3 +1,4 @@
+import path from 'node:path'
 import { describe, it, expect, vi } from 'vitest'
 import { RefreshImplementationTracking } from '../../../src/application/use-cases/refresh-implementation-tracking.js'
 import { ChangeNotFoundError } from '../../../src/application/errors/change-not-found-error.js'
@@ -8,8 +9,22 @@ import {
   makeChange,
   testActor,
 } from './helpers.js'
+import { isPathInside, normalizeVcsRoot } from '../../../src/infrastructure/fs/path-platform.js'
+
+const pathHelpers = { isPathInside, normalizeVcsRoot }
 
 const PROJECT_ROOT = '/test'
+
+function hostFiles(files: Record<string, string>): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(files).map(([file, content]) => [
+      file.startsWith(`${PROJECT_ROOT}/`)
+        ? path.resolve(PROJECT_ROOT, file.slice(PROJECT_ROOT.length + 1))
+        : file,
+      content,
+    ]),
+  )
+}
 
 function makeRefresh(
   repo: ReturnType<typeof makeChangeRepository>,
@@ -28,8 +43,9 @@ function makeRefresh(
     repo,
     archives,
     { detectModifiedFiles },
-    makeFileReader(files),
+    makeFileReader(hostFiles(files)),
     PROJECT_ROOT,
+    pathHelpers,
     specRepositories,
   )
 }
@@ -70,6 +86,46 @@ describe('RefreshImplementationTracking', () => {
     await uc.execute({ name: 'impl-change' })
 
     expect(detectModifiedFiles).toHaveBeenCalledTimes(1)
+  })
+
+  it('ignores a longer path prefix when collecting exclusions', async () => {
+    const change = changeInImplementing('prefix-change')
+    const repo = makeChangeRepository([change])
+    repo.internalPaths = () => ['C:/work/application', 'c:/work/app/specd']
+    const detectModifiedFiles = vi.fn().mockResolvedValue([])
+    const uc = new RefreshImplementationTracking(
+      repo,
+      makeArchiveRepository([]),
+      { detectModifiedFiles },
+      makeFileReader({}),
+      'C:/work/app',
+      pathHelpers,
+    )
+
+    await uc.execute({ name: 'prefix-change' })
+
+    expect(detectModifiedFiles.mock.calls[0]?.[1]?.excludePaths).toEqual(['specd'])
+  })
+
+  it('treats the project root as inside without an empty exclusion', async () => {
+    const change = changeInImplementing('root-change')
+    const repo = makeChangeRepository([change])
+    repo.internalPaths = () => ['C:/work/app', 'C:/work/app/specd']
+    const detectModifiedFiles = vi.fn().mockResolvedValue([])
+    const uc = new RefreshImplementationTracking(
+      repo,
+      makeArchiveRepository([]),
+      { detectModifiedFiles },
+      makeFileReader({}),
+      'C:/work/app',
+      pathHelpers,
+    )
+
+    await uc.execute({ name: 'root-change' })
+
+    const excludePaths = detectModifiedFiles.mock.calls[0]?.[1]?.excludePaths
+    expect(excludePaths).toEqual(['specd'])
+    expect(excludePaths).not.toContain('')
   })
 
   it('passes exclusion paths to detector', async () => {

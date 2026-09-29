@@ -120,6 +120,12 @@ When `publish` is called to publish a spec whose directory does not yet exist on
 
 If `!specDirExists && publication.artifacts.length === 0`, `publish` MUST throw `SpecPublicationError` rather than creating a directory containing only `spec-lock.json`.
 
+### Requirement: Publication rename recovery
+
+Spec publication renames that fail with `EPERM`, `EBUSY`, or `EACCES` MUST be retried a bounded number of times and then MUST surface the original error.
+
+The temporary `.gitignore` equality check MUST treat `\r\n` and `\r` as `\n`. Identical normalized content MUST count as success for that file only. Differing artifact bytes MUST NOT count as success.
+
 ### Requirement: Metadata snapshot persistence
 
 `FsSpecRepository` MUST implement `readMetadataSnapshot(spec)` and

@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'The filesystem repository contract already covers portable persistence; only the merged implementation and tests require reconciliation.'

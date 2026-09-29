@@ -1,0 +1,57 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [],
+  "implementation": [
+    {
+      "file": "guide:package.json"
+    },
+    {
+      "file": "guide:tsconfig.json"
+    },
+    {
+      "file": "guide:vitest.config.ts"
+    },
+    {
+      "file": "guide:README.md"
+    }
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Defines @specd/guide architecture, standalone boundaries, errors, package assets, tests, README, and 1-indexed line semantics.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:0a83eb47995dc64e3c2c79115a829c8281e3d03bdd41ed2086ec9f962ba34940",
+          "lastModified": "2026-09-28T11:19:59.223Z"
+        },
+        "verify.md": {
+          "hash": "sha256:d42752e56c686778dcc4eaaa25c122f154cbcc0eabd547e0552cab869ee08b9e",
+          "lastModified": "2026-09-28T11:19:59.225Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Guide Conventions\n\n## Rules\n\n- Enforce hexagonal architecture:\n  - `domain/`: business logic, entities, value objects, domain errors/services; MUST NOT import `application/`, `infrastructure/`, `composition/`.\n  - `application/`: use cases, queries, driven ports; depends only on `domain/`; MUST NOT import `infrastructure/`, `composition/`.\n  - `infrastructure/`: driven adapters implementing application ports, including pre-bundled catalog storage and in-memory BM25 search via `minisearch`; depends on `domain/`, `application/`.\n  - `composition/`: dependency-injection factories, composition root, unified `createGuideEngine()` facade.\n  - `src/index.ts`, `src/public.ts`: re-export public facade, domain types, typed errors.\n- `@specd/guide` MUST have no runtime dependency on `@specd/core`, `@specd/cli`, or `@specd/mcp`; remain self-contained for CI runners, client CLI binaries, MCP server processes; avoid SpecD kernel, AST parsers, delta engines, schema validators.\n- Parse Markdown frontmatter/headings only at build time; no runtime AST parsing.\n- Define error hierarchy under `domain/errors/` per `guide:errors`. All domain errors extend `SpecdGuideError`, implementing SpecD Error Contract (`specd = true`, `code: string`) without `@specd/core`. Application queries throw `GuideTopicNotFoundError` or `GuideSectionNotFoundError`; delivery adapters handle gracefully.\n- `packages/guide/` supplies standard package assets: `package.json` (`@specd/guide`, `type: module`, `build`/`test`/`lint`, clean dependencies), monorepo-compatible `tsconfig.json`, `vitest.config.ts`, comprehensive `test/` coverage for domain models, queries, adapters, composition facade.\n- `packages/guide/README.md` documents overview, motivation, zero-runtime-core-dependency design, hexagonal-layer diagram, pre-bundled topic catalog, `createGuideEngine()` quick start/query usage, and schemas for `GuideTopic`, `GuideSection`, `GuideOutline`, `GuideSearchHit`, `GuideSummary`.\n\n## Constraints\n\n- Zero runtime dependencies on `@specd/core`.\n- Follow monorepo package conventions across all files/directories.\n- All package line numbers MUST be 1-indexed.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:0a83eb47995dc64e3c2c79115a829c8281e3d03bdd41ed2086ec9f962ba34940",
+          "lastModified": "2026-09-28T11:19:59.223Z"
+        },
+        "verify.md": {
+          "hash": "sha256:d42752e56c686778dcc4eaaa25c122f154cbcc0eabd547e0552cab869ee08b9e",
+          "lastModified": "2026-09-28T11:19:59.225Z"
+        }
+      }
+    }
+  }
+}

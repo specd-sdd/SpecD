@@ -1,7 +1,8 @@
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { analyzeImpact } from '../../src/domain/services/analyze-impact.js'
 import { analyzeFileImpact } from '../../src/domain/services/analyze-file-impact.js'
 import { analyzeFilesImpact } from '../../src/domain/services/analyze-files-impact.js'
 import { computeHotspots } from '../../src/domain/services/compute-hotspots.js'
@@ -307,6 +308,135 @@ describe('SQLite wide traversal', () => {
       expect(sqliteImpact.affectedSymbols).toHaveLength(callers.length)
     } finally {
       await Promise.all([sqlite.close(), memory.close()])
+    }
+  })
+
+  it('batches a wide filtered frontier and counts only rows admitted by SQLite', async () => {
+    storagePath = mkdtempSync(join(tmpdir(), 'code-graph-wide-filtered-impact-'))
+    const sqlite = new SQLiteGraphStore(storagePath, { maxPendingOperations: 16 })
+
+    try {
+      await sqlite.open()
+
+      const targetFile = createFileNode({
+        path: 'core:src/target.ts',
+        configRelativePath: 'src/target.ts',
+        language: 'typescript',
+        contentHash: 'sha256:wide-filtered-target',
+        workspace: 'core',
+      })
+      const admittedFile = createFileNode({
+        path: 'allowed:src/callers.ts',
+        configRelativePath: 'src/callers.ts',
+        language: 'typescript',
+        contentHash: 'sha256:wide-filtered-allowed',
+        workspace: 'allowed',
+      })
+      const excludedFile = createFileNode({
+        path: 'excluded:src/callers.ts',
+        configRelativePath: 'src/callers.ts',
+        language: 'typescript',
+        contentHash: 'sha256:wide-filtered-excluded',
+        workspace: 'excluded',
+      })
+      const target = createSymbolNode({
+        name: 'target',
+        kind: SymbolKind.Function,
+        filePath: targetFile.path,
+        line: 1,
+        column: 0,
+      })
+      const admittedDirect = Array.from({ length: 64 }, (_, index) =>
+        createSymbolNode({
+          name: `admittedDirect${String(index)}`,
+          kind: SymbolKind.Function,
+          filePath: admittedFile.path,
+          line: index + 1,
+          column: 0,
+        }),
+      )
+      const admittedIndirect = Array.from({ length: 64 }, (_, index) =>
+        createSymbolNode({
+          name: `admittedIndirect${String(index)}`,
+          kind: SymbolKind.Function,
+          filePath: admittedFile.path,
+          line: index + 65,
+          column: 0,
+        }),
+      )
+      const excludedDirect = Array.from({ length: 64 }, (_, index) =>
+        createSymbolNode({
+          name: `excludedDirect${String(index)}`,
+          kind: SymbolKind.Function,
+          filePath: excludedFile.path,
+          line: index + 1,
+          column: 0,
+        }),
+      )
+      await sqlite.bulkLoad({
+        files: [targetFile, admittedFile, excludedFile],
+        symbols: [target, ...admittedDirect, ...admittedIndirect, ...excludedDirect],
+        specs: [],
+        relations: [
+          ...admittedDirect.map((symbol) =>
+            createRelation({ source: symbol.id, target: target.id, type: RelationType.Calls }),
+          ),
+          ...excludedDirect.map((symbol) =>
+            createRelation({ source: symbol.id, target: target.id, type: RelationType.Calls }),
+          ),
+          ...admittedIndirect.map((symbol, index) =>
+            createRelation({
+              source: symbol.id,
+              target: admittedDirect[index]!.id,
+              type: RelationType.Calls,
+            }),
+          ),
+        ],
+      })
+
+      const frontierResults: { readonly symbols: readonly string[] }[] = []
+      const originalQueryImpactFrontier = sqlite.queryImpactFrontier.bind(sqlite)
+      const frontierSpy = vi
+        .spyOn(sqlite, 'queryImpactFrontier')
+        .mockImplementation(async (input) => {
+          const result = await originalQueryImpactFrontier(input)
+          frontierResults.push({ symbols: result.symbols.map((symbol) => symbol.id) })
+          return result
+        })
+
+      const impact = await analyzeImpact(sqlite, target.id, 'upstream', 2, undefined, {
+        types: ['symbols'],
+        kinds: [SymbolKind.Function],
+        workspaces: ['allowed', 'excluded'],
+        excludeWorkspaces: ['excluded'],
+      })
+
+      // One symbol request per breadth-first frontier plus the root-file request;
+      // no query is issued for every individual admitted caller.
+      expect(frontierSpy).toHaveBeenCalledTimes(3)
+      expect(
+        frontierSpy.mock.calls.map(([input]) => [input.resource, input.frontier.length]),
+      ).toEqual([
+        ['symbol', 1],
+        ['symbol', admittedDirect.length],
+        ['file', 1],
+      ])
+      expect(frontierResults.flatMap((result) => result.symbols)).not.toContain(
+        excludedDirect[0]!.id,
+      )
+      expect(impact).toMatchObject({
+        directDependents: admittedDirect.length,
+        indirectDependents: admittedIndirect.length,
+        transitiveDependents: 0,
+        riskLevel: 'CRITICAL',
+        affectedFiles: [],
+      })
+      expect(impact.affectedSymbols).toHaveLength(admittedDirect.length + admittedIndirect.length)
+      expect(impact.affectedSymbols.every((symbol) => symbol.filePath === admittedFile.path)).toBe(
+        true,
+      )
+    } finally {
+      await sqlite.close()
     }
   })
 })

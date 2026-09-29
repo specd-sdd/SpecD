@@ -1,0 +1,4300 @@
+{
+  "manifestVersion": 2,
+  "name": "reconcile-lifecycle-transitions-with-main",
+  "createdAt": "2026-09-28T11:28:01.179Z",
+  "updatedAt": "2026-09-29T04:57:21.031Z",
+  "description": "Reconcile lifecycle transition semantics, main portability changes, guide reorganization, and merge-conflicted metadata after integrating main.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "core:hook-execution-model",
+    "core:change",
+    "core:change-manifest",
+    "core:transition-change",
+    "core:run-step-hooks",
+    "core:fs-change-repository",
+    "core:change-repository-port",
+    "cli:entrypoint",
+    "cli:change-transition",
+    "code-graph:indexer",
+    "code-graph:index-project-graph",
+    "default:_global/testing",
+    "default:_global/docs",
+    "guide:conventions",
+    "skills:workflow-automation"
+  ],
+  "specDependsOn": {
+    "core:hook-execution-model": [
+      "core:workflow-model",
+      "core:schema-format",
+      "core:hook-runner-port",
+      "core:transition-change",
+      "core:archive-change",
+      "core:run-step-hooks",
+      "core:get-hook-instructions",
+      "core:config",
+      "cli:change-transition",
+      "cli:change-archive",
+      "core:transition-checks"
+    ],
+    "core:change": [
+      "core:change-manifest",
+      "core:workflow-model",
+      "core:spec-metadata",
+      "core:spec-id-format",
+      "default:_global/architecture",
+      "core:lifecycle-engine",
+      "default:_global/logging",
+      "core:implementation-detector-port",
+      "core:transition-checks"
+    ],
+    "core:change-manifest": [
+      "core:change",
+      "core:change-layout",
+      "core:storage",
+      "core:spec-metadata",
+      "core:spec-id-format",
+      "core:workspace"
+    ],
+    "core:transition-change": [
+      "core:change",
+      "core:run-step-hooks",
+      "core:hook-execution-model",
+      "core:workflow-model",
+      "default:_global/architecture",
+      "core:lifecycle-engine",
+      "core:refresh-implementation-tracking",
+      "core:composition-resolver",
+      "core:count-tasks",
+      "core:transition-checks"
+    ],
+    "core:run-step-hooks": [
+      "core:hook-execution-model",
+      "core:hook-runner-port",
+      "core:external-hook-runner-port",
+      "core:schema-format",
+      "core:config",
+      "core:change",
+      "core:template-variables",
+      "core:archive-repository-port",
+      "core:composition-resolver"
+    ],
+    "core:fs-change-repository": [
+      "default:_global/architecture",
+      "core:composition",
+      "core:storage",
+      "core:change-list-entry",
+      "core:change-repository-port"
+    ],
+    "core:change-repository-port": [
+      "core:repository-port",
+      "core:change-list-entry",
+      "default:_global/architecture",
+      "core:change",
+      "core:read-only-change-view",
+      "core:drafted-change-view",
+      "core:discarded-change-view",
+      "core:drafted-change-read-only-error",
+      "core:storage",
+      "core:change-manifest",
+      "core:schema-format",
+      "core:transition-checks",
+      "default:_global/logging"
+    ],
+    "cli:entrypoint": ["core:config", "default:_global/error-handling-conventions"],
+    "cli:change-transition": [
+      "cli:entrypoint",
+      "core:change",
+      "core:transition-change",
+      "core:hook-execution-model",
+      "core:get-status",
+      "core:transition-checks"
+    ],
+    "code-graph:indexer": [
+      "code-graph:graph-store",
+      "code-graph:language-adapter",
+      "code-graph:symbol-model",
+      "code-graph:workspace-integration",
+      "code-graph:sqlite-graph-store",
+      "core:config",
+      "core:spec-repository-port",
+      "core:list-workspaces",
+      "code-graph:document-model",
+      "core:get-spec-metadata"
+    ],
+    "code-graph:index-project-graph": [
+      "code-graph:composition",
+      "code-graph:indexer",
+      "code-graph:graph-store",
+      "core:config"
+    ],
+    "default:_global/testing": ["default:_global/architecture", "default:_global/conventions"],
+    "default:_global/docs": ["default:_global/conventions"],
+    "guide:conventions": [],
+    "skills:workflow-automation": [
+      "cli:command-resource-naming",
+      "skills:agents",
+      "cli:spec-context",
+      "cli:spec-metadata",
+      "core:get-status",
+      "core:validate-artifacts",
+      "core:transition-checks"
+    ]
+  },
+  "invalidation": {
+    "artifacts": "downstream",
+    "workflow": "preserve"
+  },
+  "implementationTrackingStartedAt": "2026-09-28T17:19:07.503Z",
+  "trackedImplementationFiles": [
+    {
+      "file": ".changeset/20260829-filter-impact-results-at-provider-specd.md",
+      "state": "ignored"
+    },
+    {
+      "file": ".changeset/20260829-filter-impact-results-at-provider.md",
+      "state": "ignored"
+    },
+    {
+      "file": ".changeset/20260829-normalize-pre-hash-whitespace-specd.md",
+      "state": "ignored"
+    },
+    {
+      "file": ".changeset/20260829-normalize-pre-hash-whitespace.md",
+      "state": "ignored"
+    },
+    {
+      "file": ".changeset/20260923-retire-spec-layout-specd.md",
+      "state": "ignored"
+    },
+    {
+      "file": ".changeset/20260923-retire-spec-layout.md",
+      "state": "ignored"
+    },
+    {
+      "file": ".changeset/20260924-cli-guide-command-specd.md",
+      "state": "ignored"
+    },
+    {
+      "file": ".changeset/20260924-cli-guide-command.md",
+      "state": "ignored"
+    },
+    {
+      "file": ".changeset/20260925-adapter-sourced-resolution-fingerprint-specd.md",
+      "state": "ignored"
+    },
+    {
+      "file": ".changeset/20260925-adapter-sourced-resolution-fingerprint.md",
+      "state": "ignored"
+    },
+    {
+      "file": ".changeset/20260925-windows-platform-compatibility-specd.md",
+      "state": "ignored"
+    },
+    {
+      "file": ".changeset/20260925-windows-platform-compatibility.md",
+      "state": "ignored"
+    },
+    {
+      "file": ".changeset/20260928-language-agnostic-member-symbol-references-specd.md",
+      "state": "ignored"
+    },
+    {
+      "file": ".changeset/20260928-language-agnostic-member-symbol-references.md",
+      "state": "ignored"
+    },
+    {
+      "file": ".gitattributes",
+      "state": "ignored"
+    },
+    {
+      "file": ".github/workflows/ci.yml",
+      "state": "ignored"
+    },
+    {
+      "file": ".gitignore",
+      "state": "ignored"
+    },
+    {
+      "file": "AGENTS.md",
+      "state": "ignored"
+    },
+    {
+      "file": "CLAUDE.md",
+      "state": "ignored"
+    },
+    {
+      "file": "CONTRIBUTING.md",
+      "state": "ignored"
+    },
+    {
+      "file": "README.md",
+      "state": "ignored"
+    },
+    {
+      "file": "apps/public-web/README.md",
+      "state": "ignored"
+    },
+    {
+      "file": "apps/public-web/sidebars.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "apps/public-web/src/lib/public-docs-config.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "apps/public-web/test/components/landing-page.spec.tsx",
+      "state": "ignored"
+    },
+    {
+      "file": "apps/public-web/test/lib/public-docs-config.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "apps/public-web/test/lib/sidebar-config.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "apps/public-web/test/setup.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "commitlint.config.mjs",
+      "state": "ignored"
+    },
+    {
+      "file": "dev/scripts/hooks/post-archive-changeset.js",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/adr/0011-spec-layout.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/adr/0024-logical-symbol-resolution.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/cli/archive.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/cli/changes.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/cli/cli-reference.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/cli/config.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/cli/discarded.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/cli/drafts.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/cli/graph.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/cli/guide.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/cli/index.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/cli/plugins.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/cli/project.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/cli/schema.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/cli/specs.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/cli/storage.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/config/examples/_category_.json",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/config/examples/index.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/config/examples/multi-repo-coordinator.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/config/examples/single-repo-local-schema.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/config/examples/single-repo-minimal.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/core/overview.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/core/ports.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/core/use-cases.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/guide/_sections/getting-started/change-directory.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/guide/_sections/getting-started/context-compilation.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/guide/_sections/getting-started/local-site.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/guide/_sections/getting-started/philosophy.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/guide/_sections/getting-started/project-structure.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/guide/_sections/getting-started/setting-up.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/guide/_sections/getting-started/spec-directory.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/guide/_sections/getting-started/spec-metadata.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/guide/artifacts.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/guide/changes.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/guide/cli.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/guide/code-graph.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/guide/configuration-examples.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/guide/configuration.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/guide/context-compilation.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/guide/custom-schemas.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/guide/deltas.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/guide/getting-started.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/guide/index.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/guide/installation.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/guide/philosophy.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/guide/project-structure.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/guide/schemas.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/guide/selectors.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/guide/skills-template-rendering.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/guide/skills.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/guide/specs.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/guide/standard-schema.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/guide/what-is-specd.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/guide/workflow.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/guide/workspaces.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/public-web/index.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/schemas/schema-format.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/skills/skills-template-rendering.md",
+      "state": "ignored"
+    },
+    {
+      "file": "lint-staged.config.js",
+      "state": "ignored"
+    },
+    {
+      "file": "package.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/package.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/hotspots.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/impact.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/resolve-impact-file-selectors.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/search.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/stats.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/commands/guide/formatters.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/commands/guide/index.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/helpers/table.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/program.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change-implementation-tracking.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/graph-impact.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/graph-search.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/graph-stats.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/graph/resolve-impact-file-selectors.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/guide/guide.test.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/schema-show.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/configuration-coverage.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/documentation-coverage.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/helpers/table.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/application/ports/resolution-manifest-source.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/application/services/project-spec-coverage.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/application/services/resolve-graph-selector.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/application/services/session-reference-store.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/application/use-cases/_shared/compute-graph-fingerprint.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/application/use-cases/get-graph-health.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/application/use-cases/in-memory-index-session.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/application/use-cases/index-code-graph.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/application/use-cases/resolve-symbol-reference.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/application/use-cases/search-code-graph.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/composition/code-graph-provider.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/composition/create-code-graph-provider.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/domain/errors/isolated-graph-index-errors.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/domain/ports/graph-store.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/domain/services/analyze-file-impact.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/domain/services/analyze-files-impact.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/domain/services/analyze-impact.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/domain/services/analyze-spec-impact.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/domain/services/collect-impact-specs.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/domain/services/compute-hotspots.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/domain/services/exact-lane-query.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/domain/services/matches-exclude.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/domain/services/parse-member-reference.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/domain/services/scoped-binding-environment.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/domain/services/split-workspace-identity.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/impact-result.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/index-session.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/index.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/language-adapter.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/symbol-reference.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/index.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/fs/node-resolution-manifest-source.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/isolated-index-worker/supervisor.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/sqlite/schema.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/sqlite/sqlite-graph-database.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/sqlite/sqlite-graph-store.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/sqlite/sqlite-runtime-descriptor.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/sqlite/sqlite-worker-protocol.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/sqlite/sqlite-worker.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/storage-generation.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/go-language-adapter.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/php-language-adapter.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/python-language-adapter.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/reference-fact-helpers.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/typescript-language-adapter.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/public.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/application/services/bootstrap-graph-config.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/application/services/project-spec-coverage.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/application/services/resolve-graph-selector.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/compute-graph-fingerprint.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/get-graph-health.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/index-project-graph-integration.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/resolve-symbol-reference.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/search-code-graph.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/staleness-detection.verify.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/symbol-index.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/workspace-indexing.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/barrel.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/composition/code-graph-provider.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/composition/create-sqlite-graph-store-factory.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/domain/ports/graph-store.contract.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/domain/services/analyze-files-impact.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/domain/services/compute-hotspots.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/domain/services/matches-exclude.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/domain/services/scoped-binding-environment.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/domain/services/traversal.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/domain/value-objects/symbol-reference.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/helpers/expected-fingerprint-map.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/helpers/in-memory-graph-store.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/fs/node-resolution-manifest-source.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/isolated-index-worker/signals.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/isolated-index-worker/supervisor.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/sqlite/split-workspace-identity.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/sqlite/sqlite-graph-store.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/sqlite/sqlite-worker-lifecycle.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/sqlite/sqlite-worker-protocol.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/go-language-adapter.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/php-language-adapter.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/python-language-adapter.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/reference-fact-helpers.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/resolution-manifests.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/typescript-language-adapter.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/integration/sqlite-wide-traversal.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/ports/hook-runner.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/specd-config.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/template-expander.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/_shared/compute-artifact-hash.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/refresh-implementation-tracking.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/composition/composition-resolver.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/refresh-implementation-tracking.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/entities/change.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/services/normalize-newlines.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/services/pre-hash-cleanup.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/services/windows-device-name.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/value-objects/spec-path.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/archive-repository.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/change-repository.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/config-loader.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/ensure-tmp-gitignore.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/file-reader.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/hash.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/move-dir.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/path-confinement.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/path-platform.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/spec-repository.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/write-atomic.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/infrastructure/git/exec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/infrastructure/git/vcs-adapter.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/infrastructure/hg/exec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/infrastructure/hg/vcs-adapter.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/infrastructure/node/content-hasher.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/infrastructure/node/hook-runner.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/node/translate-hook-command.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/svn/exec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/infrastructure/svn/vcs-adapter.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/template-expander.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/get-project-context.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/refresh-implementation-tracking.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/run-step-hooks.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/update-implementation-tracking.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/update-project-metadata.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/validate-artifacts.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/domain/entities/change-device-name.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/domain/services/hash-files.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/domain/services/pre-hash-cleanup.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/domain/services/windows-device-name.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/domain/value-objects/spec-path.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/infrastructure/fs/change-repository.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/infrastructure/fs/config-loader-root-containment.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/infrastructure/fs/config-loader.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/infrastructure/fs/ensure-tmp-gitignore.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/infrastructure/fs/hash-newlines.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/infrastructure/fs/move-dir.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/infrastructure/fs/path-platform.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/infrastructure/fs/spec-repository.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/infrastructure/fs/windows-containment.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/infrastructure/fs/write-atomic.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/infrastructure/git/vcs-adapter.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/infrastructure/hg/vcs-adapter.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/infrastructure/node/hook-runner-spawn.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/infrastructure/node/hook-runner.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/infrastructure/node/translate-hook-command.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/infrastructure/svn/vcs-adapter.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/infrastructure/vcs-spawn-options.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/guide/README.md",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/guide/package.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/guide/scripts/bundle-guides.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/guide/src/application/index.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/guide/src/application/ports/guide-catalog-port.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/guide/src/application/ports/guide-search-port.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/guide/src/application/ports/index.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/guide/src/application/queries/get-guide-outline-query.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/guide/src/application/queries/get-guide-query.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/guide/src/application/queries/get-guide-section-query.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/guide/src/application/queries/index.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/guide/src/application/queries/list-guides-query.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/guide/src/application/queries/search-guides-query.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/guide/src/application/queries/slice-guide-lines.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/guide/src/composition/guide-engine.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/guide/src/composition/index.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/guide/src/domain/errors/guide-section-ambiguous-error.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/guide/src/domain/errors/guide-section-not-found-error.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/guide/src/domain/errors/guide-topic-not-found-error.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/guide/src/domain/errors/index.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/guide/src/domain/errors/specd-guide-error.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/guide/src/domain/index.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/guide/src/domain/models/guide-outline.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/guide/src/domain/models/guide-search-hit.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/guide/src/domain/models/guide-section.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/guide/src/domain/models/guide-summary.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/guide/src/domain/models/guide-topic.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/guide/src/domain/models/index.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/guide/src/index.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/guide/src/infrastructure/adapters/index.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/guide/src/infrastructure/adapters/minisearch-guide-engine-adapter.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/guide/src/infrastructure/adapters/prebundled-guide-catalog-adapter.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/guide/src/infrastructure/generated/guides.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/src/infrastructure/index.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/guide/src/public.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/guide/test/integration/guide-engine.test.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/guide/test/unit/application/queries.test.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/guide/test/unit/application/slicing.test.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/guide/test/unit/domain/errors.test.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/guide/test/unit/domain/models.test.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/guide/test/unit/infrastructure/bundle.test.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/guide/test/unit/infrastructure/search.test.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/guide/tsconfig.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/guide/vitest.config.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/sdk/src/index.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/sdk/src/orchestration/run-index-project-graph.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/sdk/test/barrel.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/sdk/test/fixtures/publish-shaped-worker-consumer.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/sdk/test/orchestration/build-implementation-review.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/templates/prompt/agent-instruction.md.tpl",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/templates/shared/shared.md.tpl",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/test/application/render-base-agent-instruction.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/specd/README.md",
+      "state": "ignored"
+    },
+    {
+      "file": "pnpm-lock.yaml",
+      "state": "resolved"
+    },
+    {
+      "file": "pnpm-workspace.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/_global/commits/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/_global/commits/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/_global/continuous-integration/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/_global/continuous-integration/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/_global/continuous-integration/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/_global/docs/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/_global/docs/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/_global/docs/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/_global/spec-layout/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/_global/spec-layout/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/_global/spec-layout/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/_global/testing/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/_global/testing/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/_global/testing/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/change-archive/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/cli/change-transition/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/cli/entrypoint/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/cli/entrypoint/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/entrypoint/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/graph-impact/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/cli/graph-impact/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/graph-impact/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/graph-search/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/graph-search/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/guide/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/cli/guide/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/guide/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/project-context/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/cli/spec-search/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/cli/spec-search/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/composition/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/code-graph/composition/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/composition/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/go-language-adapter/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/go-language-adapter/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/graph-store/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/code-graph/graph-store/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/graph-store/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/indexer/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/code-graph/indexer/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/indexer/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/isolated-index-worker/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/code-graph/isolated-index-worker/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/isolated-index-worker/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/language-adapter/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/code-graph/language-adapter/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/language-adapter/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/php-language-adapter/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/php-language-adapter/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/python-language-adapter/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/code-graph/python-language-adapter/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/python-language-adapter/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/resolve-symbol-reference/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/code-graph/resolve-symbol-reference/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/resolve-symbol-reference/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/sqlite-graph-store/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/code-graph/sqlite-graph-store/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/sqlite-graph-store/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/staleness-detection/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/code-graph/staleness-detection/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/staleness-detection/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/symbol-model/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/code-graph/symbol-model/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/symbol-model/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/traversal/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/code-graph/traversal/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/traversal/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/workspace-integration/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/code-graph/workspace-integration/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/workspace-integration/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/archive-change/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/change-manifest/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/change/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/change/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/change/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/config-loader/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/config-loader/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/config-loader/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/config/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/content-hasher-port/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/content-hasher-port/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/content-hasher-port/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/file-reader-port/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/file-reader-port/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/file-reader-port/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/fs-archive-repository/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/fs-archive-repository/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/fs-archive-repository/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/fs-change-repository/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/fs-change-repository/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/fs-change-repository/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/fs-spec-repository/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/fs-spec-repository/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/fs-spec-repository/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-status/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/hook-execution-model/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/hook-execution-model/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/hook-runner-port/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/hook-runner-port/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/hook-runner-port/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/refresh-implementation-tracking/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/refresh-implementation-tracking/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/refresh-implementation-tracking/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/run-step-hooks/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/run-step-hooks/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/run-step-hooks/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/schema-format/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/snapshot-hasher/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/snapshot-hasher/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/snapshot-hasher/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/spec-id-format/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/spec-id-format/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/spec-id-format/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/storage/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/storage/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/storage/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/template-variables/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/template-variables/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/template-variables/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/transition-change/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/transition-checks/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/validate-artifacts/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/validate-artifacts/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/validate-artifacts/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/vcs-adapter/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/vcs-adapter/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/vcs-adapter/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/workspace/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/workspace/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/workspace/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/guide/bundle-guides/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/guide/bundle-guides/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/guide/bundle-guides/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/guide/composition/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/guide/composition/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/guide/composition/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/guide/conventions/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/guide/conventions/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/guide/conventions/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/guide/errors/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/guide/errors/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/guide/errors/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/guide/get-guide-outline/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/guide/get-guide-outline/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/guide/get-guide-outline/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/guide/get-guide/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/guide/get-guide/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/guide/get-guide/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/guide/guide-model/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/guide/guide-model/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/guide/guide-model/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/guide/list-guides/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/guide/list-guides/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/guide/list-guides/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/guide/search-guides/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/guide/search-guides/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/guide/search-guides/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/guide/slice-guide-content/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/guide/slice-guide-content/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/guide/slice-guide-content/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/plugins-manager/agent-plugin-type/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/plugins-manager/specd-plugin-type/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/sdk/build-implementation-review/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/sdk/build-implementation-review/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/sdk/build-implementation-review/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/skills/agent-instruction-template/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/skills/agent-instruction-template/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/skills/agent-instruction-template/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/skills/resolve-bundle/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/skills/skill-bundle/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/skills/skill-repository-port/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/skills/skill-repository/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/skills/workflow-automation/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/transition-change.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/run-step-hooks.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "specd-sdd/changes/20260707-153756-implementation-snapshot/manifest.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/change/transition.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/config/config-reference.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/config/examples/approvals-and-workflow-hooks.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/guide/_sections/getting-started/core-concepts.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/guide/_sections/getting-started/lifecycle.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/guide/_sections/getting-started/usage.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/hook-execution-model/spec.md",
+      "state": "resolved"
+    },
+    {
+      "file": ".changeset/20260829-workflow-transition-checks-specd.md",
+      "state": "ignored"
+    },
+    {
+      "file": ".changeset/20260829-workflow-transition-checks.md",
+      "state": "ignored"
+    },
+    {
+      "file": ".changeset/20260919-lifecycle-polish-followups-specd.md",
+      "state": "ignored"
+    },
+    {
+      "file": ".changeset/20260919-lifecycle-polish-followups.md",
+      "state": "ignored"
+    },
+    {
+      "file": ".changeset/20260928-versioned-approval-invalidation-specd.md",
+      "state": "ignored"
+    },
+    {
+      "file": ".changeset/20260928-versioned-approval-invalidation.md",
+      "state": "ignored"
+    },
+    {
+      "file": "dev/scripts/sync-codex-skills.js",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/adr/0028-materialized-validity-reconciliation.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/adr/0029-scope-aware-approval-and-implementation-fingerprints.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/cli/change-verification.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/core/domain-model.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/core/errors.md",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/commands/change/_check-progress-presenter.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/commands/change/_hook-progress-presenter.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/commands/change/_invalidation-flags.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/commands/change/_validity-present.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/commands/change/approve.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/commands/change/archive.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/commands/change/create.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/commands/change/edit.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/commands/change/invalidate.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/commands/change/status.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/commands/change/verification.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/change-approve.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/change-archive.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/change-create.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/change-edit.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/change-status.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/change-transition.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/change.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/change/approve.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/change/archive.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/change/change-invalidate.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/change/change-status.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/change/status.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/change/transition.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/change/verification.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/helpers.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/helpers/spec-path.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/application/services/bootstrap-graph-config.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/application/services/build-project-graph-config.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/helpers/stub-change-repository.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/index-lock.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/checks/approval-signoff.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/checks/approval-spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/checks/archive-archivable.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/checks/deps-consistent.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/checks/hook-effect-shared.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/checks/hook-failed.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/checks/hook-post.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/checks/hook-pre.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/checks/impl-files-resolved.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/checks/impl-links-in-scope.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/checks/protocol-edge.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/checks/schema-name-match.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/checks/spec-overlap.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/checks/verification-current.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/checks/workflow-check-registry.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/checks/workflow-check.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/checks/workflow-requires.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/checks/workflow-task-completion.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/checks/workspace-read-only.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/errors/fingerprint-input-error.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/errors/index.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/errors/invalidate-requires-force-error.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/errors/reconciled-operation-blocked-error.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/errors/verification-attempt-not-found-error.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/errors/verification-fingerprint-mismatch-error.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/errors/verification-in-progress-error.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/errors/verification-not-found-error.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/errors/verification-stale-error.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/logger.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/ports/binary-content-hasher.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/ports/change-repository.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/ports/config-schema.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/ports/index.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/ports/logger.port.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/services/detect-impl-links-in-scope.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/services/execute-hook-effect.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/services/execute-matching-predicates.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/services/is-excluded-by-prefix.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/services/lifecycle-evaluation.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/services/lifecycle-guidance.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/services/ready-predicate-facts.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/services/resolve-sealed-archive-depends-on.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/services/validity-fingerprint-service.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/approve-signoff.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/approve-spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/archive-change.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/complete-verification.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/create-change.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/edit-change.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/get-artifact-instruction.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/get-status.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/index.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/invalidate-change.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/invalidate-verification.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/list-workspaces.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/reconcile-change-validity.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/start-verification.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/validate-artifacts.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/composition/kernel.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/approve-signoff.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/approve-spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/archive-change.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/create-change.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/edit-change.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/get-artifact-instruction.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/get-status.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/index.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/invalidate-change.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/transition-change.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/validate-artifacts.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/verification-factories.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/workflow-check-registry.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/checks/approval-signoff.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/checks/approval-spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/checks/archive-archivable.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/checks/deps-consistent.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/checks/hook-post.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/checks/hook-pre.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/checks/impl-files-resolved.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/checks/impl-links-in-scope.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/checks/index.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/checks/protocol-edge.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/checks/schema-name-match.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/checks/spec-overlap.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/checks/verification-current.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/checks/workflow-requires.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/checks/workflow-task-completion.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/checks/workspace-read-only.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/entities/change-artifact.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/entities/index.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/errors/happy-path-next-unavailable-error.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/errors/index.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/errors/unsupported-manifest-version-error.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/services/change-validity.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/services/check-bindings.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/services/detect-spec-overlap.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/services/evaluate-transition-predicates.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/services/index.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/services/lifecycle-engine.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/services/lifecycle-verdict.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/services/transition-checks.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/value-objects/artifact-dag.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/value-objects/artifact-file.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/value-objects/artifact-type.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/value-objects/change-state.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/value-objects/index.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/value-objects/invalidation-policy.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/value-objects/validity-fingerprint.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/value-objects/workflow-step.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/fs-archive-index-cache.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/fs-change-index-cache.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/manifest-change-loader.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/manifest.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/infrastructure/logging/pino-logger.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/infrastructure/node/binary-content-hasher.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/observability/index.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/observability/logger.port.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/observability/logger.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/ports.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/public.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/checks/verification-current.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/checks/workflow-check-factories.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/logger-port.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/services/execute-check-with-progress.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/services/execute-matching-predicates.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/services/is-excluded-by-prefix.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/services/matching-effects.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/services/validity-fingerprint-service.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/approve-signoff.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/approve-spec.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/archive-change-batch-restore.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/archive-change.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/complete-verification.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/count-tasks.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/create-change.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/edit-change.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/get-artifact-instruction.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/get-config.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/get-project-metadata.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/get-status.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/helpers.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/invalidate-change.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/invalidate-verification.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/list-workspaces.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/reconcile-change-validity.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/reconciled-transition-status.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/start-verification.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/transition-change.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/validate-specs.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/barrel-kernel-coverage.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/composition/archive-batch-snapshot-port.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/composition/composition-resolver.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/composition/kernel-builder.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/composition/kernel-get-config.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/composition/kernel.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/composition/privacy-decorated-identity.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/composition/repository-factories.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/composition/shared-repository-wiring.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/approve-signoff.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/approve-spec.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/archive-change.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/compile-context.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/create-change.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/get-config.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/get-implementation-review.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/get-project-summary.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/get-status.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/helpers.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/list-changes.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/list-discarded.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/list-drafts.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/list-specs.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/list-workspaces.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/mandatory-validity-reconciler.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/transition-change.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/update-implementation-tracking.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/verification-factories.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/workflow-check-registry.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/domain/checks/workflow-requires.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/domain/entities/change.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/domain/services/build-schema.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/domain/services/change-validity.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/domain/services/detect-spec-overlap.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/domain/services/lifecycle-engine.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/domain/services/lifecycle-verdict.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/domain/services/transition-checks.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/domain/value-objects/artifact-dag.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/domain/value-objects/artifact-file.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/domain/value-objects/change-state.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/domain/value-objects/validity-fingerprint.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/infrastructure/artifact-parser/markdown-parser-real-merge.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/infrastructure/fs/manifest-change-loader.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/infrastructure/node/binary-content-hasher.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/infrastructure/schema-yaml-parser.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/observability/logger.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/public-api.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/plugin-agent-claude/test/install-skills.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/plugin-agent-codex/test/install-skills.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/plugin-agent-copilot/test/install-skills.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/plugin-agent-opencode/test/install-skills.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/plugin-agent-standard/test/install-skills.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/plugin-manager/test/mock-config.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/sdk/src/core-reexports.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/templates/skills/specd-archive/SKILL.md.tpl",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/templates/skills/specd-compliance/SKILL.md.tpl",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/templates/skills/specd-design/SKILL.md.tpl",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/templates/skills/specd-fasttrack/SKILL.md.tpl",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/templates/skills/specd-implement/SKILL.md.tpl",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/templates/skills/specd-new/SKILL.md.tpl",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/templates/skills/specd-verify/SKILL.md.tpl",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/test/generated-skill-protocol.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/test/infrastructure/skill-repository.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/test/resolve-bundle.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/test/template-workflow.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/_global/architecture/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/_global/architecture/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/_global/architecture/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/_global/logging/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/_global/logging/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/_global/logging/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/change-approve/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/cli/change-approve/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/change-approve/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/change-archive/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/change-archive/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/change-artifact-instruction/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/change-artifact-instruction/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/change-create/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/cli/change-create/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/change-create/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/change-edit/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/cli/change-edit/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/change-edit/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/change-invalidate/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/cli/change-invalidate/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/change-invalidate/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/change-status/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/cli/change-status/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/change-status/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/change-transition/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/change-transition/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/change-verification/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/cli/change-verification/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/change-verification/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/spec-optimizations/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/code-graph/get-graph-health/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/approve-signoff/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/approve-signoff/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/approve-signoff/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/approve-spec/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/approve-spec/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/approve-spec/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/archive-change/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/archive-change/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/artifact-ast/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/change-manifest/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/change-manifest/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/change-repository-port/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/change-repository-port/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/change-repository-port/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/compile-context/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/config-writer-port/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/config-writer-port/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/config-writer-port/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/config/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/config/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/create-change/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/create-change/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/create-change/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/discard-change/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/draft-change/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/edit-change/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/edit-change/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/edit-change/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/generate-metadata/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/get-archived-change/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/get-artifact-instruction/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/get-artifact-instruction/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-artifact-instruction/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-config/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/get-hook-instructions/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/get-persisted-spec-deps/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/get-persisted-spec-implementation/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/get-persisted-spec-schema/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/get-project-context/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/get-spec-context/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/get-spec/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/get-status/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-status/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/initialize-persisted-spec-state/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/invalidate-change/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/invalidate-change/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/invalidate-change/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/invalidate-verification/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/invalidate-verification/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/invalidate-verification/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/lifecycle-engine/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/lifecycle-engine/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/lifecycle-engine/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/list-specs/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/resolve-schema/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/restore-change/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/schema-format/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/schema-format/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/schema-merge/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/skip-artifact/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/spec-lock/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/transition-change/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/transition-change/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/transition-checks/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/transition-checks/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/update-persisted-spec-deps/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/update-persisted-spec-implementation/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/update-persisted-spec-optimizations/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/update-persisted-spec-schema/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/update-project-metadata/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/update-spec-deps/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/workflow-model/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/workflow-model/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/workflow-model/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/sdk/with-open-graph-provider/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/skills/agents/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/skills/skill-templates-source/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/skills/skill-templates-source/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/skills/skill-templates-source/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/skills/workflow-automation/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/skills/workflow-automation/verify.md",
+      "state": "ignored"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "core:transition-change",
+      "file": "packages/core/src/application/use-cases/transition-change.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["TransitionChange"]
+    },
+    {
+      "specId": "core:hook-execution-model",
+      "file": "packages/core/src/application/use-cases/transition-change.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["TransitionChange"]
+    },
+    {
+      "specId": "core:run-step-hooks",
+      "file": "packages/core/src/application/use-cases/run-step-hooks.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["RunStepHooks"]
+    },
+    {
+      "specId": "core:hook-execution-model",
+      "file": "packages/core/src/application/use-cases/run-step-hooks.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["RunStepHooks"]
+    },
+    {
+      "specId": "core:hook-execution-model",
+      "file": "packages/core/src/application/template-expander.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["TemplateExpander"]
+    },
+    {
+      "specId": "core:hook-execution-model",
+      "file": "packages/core/src/infrastructure/node/hook-runner.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["NodeHookRunner"]
+    },
+    {
+      "specId": "core:hook-execution-model",
+      "file": "packages/core/src/infrastructure/node/translate-hook-command.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["translateHookCommand"]
+    },
+    {
+      "specId": "cli:entrypoint",
+      "file": "packages/cli/src/index.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:entrypoint",
+      "file": "packages/cli/src/program.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createProgram"]
+    },
+    {
+      "specId": "core:fs-change-repository",
+      "file": "packages/core/test/infrastructure/fs/change-repository.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:change-repository-port",
+      "file": "packages/core/test/infrastructure/fs/change-repository.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:change-manifest",
+      "file": "packages/core/test/infrastructure/fs/change-repository.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:change",
+      "file": "packages/core/test/infrastructure/fs/change-repository.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:index-project-graph",
+      "file": "packages/code-graph/test/application/use-cases/index-project-graph-integration.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:indexer",
+      "file": "packages/code-graph/test/application/use-cases/index-project-graph-integration.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "default:_global/testing",
+      "file": "packages/code-graph/test/application/use-cases/index-project-graph-integration.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "default:_global/docs",
+      "file": "docs/cli/cli-reference.md",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:entrypoint",
+      "file": "docs/cli/cli-reference.md",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "default:_global/docs",
+      "file": "docs/guide/workflow.md",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "skills:workflow-automation",
+      "file": "docs/guide/workflow.md",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "guide:conventions",
+      "file": "docs/guide/workflow.md",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "default:_global/docs",
+      "file": "docs/guide/configuration.md",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "guide:conventions",
+      "file": "docs/guide/configuration.md",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "default:_global/docs",
+      "file": "docs/guide/getting-started.md",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "guide:conventions",
+      "file": "docs/guide/getting-started.md",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "default:_global/testing",
+      "file": "package.json",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "guide:conventions",
+      "file": "package.json",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "guide:conventions",
+      "file": "pnpm-lock.yaml",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:change-manifest",
+      "file": "specd-sdd/changes/20260707-153756-implementation-snapshot/manifest.json",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:change",
+      "file": "specd-sdd/changes/20260707-153756-implementation-snapshot/manifest.json",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:change-transition",
+      "file": "packages/cli/src/commands/change/transition.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["registerChangeTransition"]
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:6de718051c8e1742f794271ef5341d6e3d9a1939121f2e81d8ecec1753169348"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:hook-execution-model",
+          "filename": "deltas/core/hook-execution-model/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:23a97fea5ec66e4071416309d68c176f1a036959807cebf877d807f518fb3ea4"
+        },
+        {
+          "key": "core:change",
+          "filename": "deltas/core/change/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:581656006043146137a1c76f3ceacf274a34429df1fb08c4e6c42c4e056224d0"
+        },
+        {
+          "key": "core:change-manifest",
+          "filename": "deltas/core/change-manifest/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:2c39540404dac5ee7acbc04a47bc7ccfa2f32e4b18d702907acb9b137f122318"
+        },
+        {
+          "key": "core:transition-change",
+          "filename": "deltas/core/transition-change/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b57c70418c1f7d073871dae85c91e24d0bb231896fa6467b67f18abf157478f9"
+        },
+        {
+          "key": "core:run-step-hooks",
+          "filename": "deltas/core/run-step-hooks/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:fa1872b36e506443ca84a781c77075bcd4216884077f675ffc8942f18aec640c"
+        },
+        {
+          "key": "core:fs-change-repository",
+          "filename": "deltas/core/fs-change-repository/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:cec79619e52d9c735c706eb8ead3b149c2379e7883ab8a798368690e2964223b"
+        },
+        {
+          "key": "core:change-repository-port",
+          "filename": "deltas/core/change-repository-port/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:29f217fe57801ae6788883aff81b614a97ad880ac11fd563b8c63e28c20e5e33"
+        },
+        {
+          "key": "cli:entrypoint",
+          "filename": "deltas/cli/entrypoint/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:da209e1fa6d002e2d6d8c0d549c5063a28add8b8f18d38d82dd0d4f6adba682c"
+        },
+        {
+          "key": "cli:change-transition",
+          "filename": "deltas/cli/change-transition/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:a05f9b222133e003fafef3e1c33cdb46f6335a35c21b7c3d228f84f96e900f5e"
+        },
+        {
+          "key": "code-graph:indexer",
+          "filename": "deltas/code-graph/indexer/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:42c5bd45e106598a0d22d4b7beb165201da7f74b585e01eedac9eeb047048134"
+        },
+        {
+          "key": "code-graph:index-project-graph",
+          "filename": "deltas/code-graph/index-project-graph/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:5c670f7ba8aa20c6f04a3ba1ad786e43f4574642f3298537c3bb77888ff96bb4"
+        },
+        {
+          "key": "default:_global/testing",
+          "filename": "deltas/default/_global/testing/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:bc1deb306eee62224d89f9e4e853f3f2ce191ce497beb1e0df9484cd3f53b5d5"
+        },
+        {
+          "key": "default:_global/docs",
+          "filename": "deltas/default/_global/docs/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:d59d4a89e187f7064f31e2556e94f10dad0c153fc5b11cc494373190de30e2b8"
+        },
+        {
+          "key": "guide:conventions",
+          "filename": "deltas/guide/conventions/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c503eef00febd1dce23d120027c92f09b0eb4ab5af4c029ed64cdd232c3515ec"
+        },
+        {
+          "key": "skills:workflow-automation",
+          "filename": "deltas/skills/workflow-automation/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:4f4e88060d26eeecba278e00eebd93c1bac1e7cd608a8a3954ffa7ed34b4a5d6"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:hook-execution-model",
+          "filename": "deltas/core/hook-execution-model/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:3dc837748556e78255536f0992a16fe6fec3440d1451a9dbcb6c7131ea8003cf"
+        },
+        {
+          "key": "core:change",
+          "filename": "deltas/core/change/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:11f481464fd32e3eb316c2fca6115abf747a75b8f8cafe931eaba40f3b3e77e8"
+        },
+        {
+          "key": "core:change-manifest",
+          "filename": "deltas/core/change-manifest/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:488f7ce9a9db70363e6abc3dd1841b723ec5480875211b94965262978cd317a5"
+        },
+        {
+          "key": "core:transition-change",
+          "filename": "deltas/core/transition-change/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:9583ec348156b661c2b5d38e4194222bb1e7e82aedb0c3c4d4f0121b7ed2e73b"
+        },
+        {
+          "key": "core:run-step-hooks",
+          "filename": "deltas/core/run-step-hooks/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:091495488e60f4c2e4b05e8782f329a5d8fa8a72596cf530dc94f806673a3585"
+        },
+        {
+          "key": "core:fs-change-repository",
+          "filename": "deltas/core/fs-change-repository/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:6c805a9f9d254e85a6c12153735070009868c68e3d5794e30794876fdf199d57"
+        },
+        {
+          "key": "core:change-repository-port",
+          "filename": "deltas/core/change-repository-port/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:37afa619ded52b9d0c5eeae5f9e2dee24d693a13d69388622b7bbd77024a1617"
+        },
+        {
+          "key": "cli:entrypoint",
+          "filename": "deltas/cli/entrypoint/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:a338ec62fefb70c95ab1d0afa1f926f8711b9073aa4cd7e57f76a119b11c5100"
+        },
+        {
+          "key": "cli:change-transition",
+          "filename": "deltas/cli/change-transition/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:62898f5717a2112ad94d7a297e712617a8a84e838f8d00fc58323b59ef66cebe"
+        },
+        {
+          "key": "code-graph:indexer",
+          "filename": "deltas/code-graph/indexer/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:01a82e61c12f9707e125972ae41a77181d971875a6506f650c4a9b32f95d08c8"
+        },
+        {
+          "key": "code-graph:index-project-graph",
+          "filename": "deltas/code-graph/index-project-graph/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:68d015ba483a3d6135bcd29983a6be6fb20c7f65f9c003a61823df1307498737"
+        },
+        {
+          "key": "default:_global/testing",
+          "filename": "deltas/default/_global/testing/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:f0926cbd0179bd6cc7e560c671609754e520b17ed849ff9529812f066f020144"
+        },
+        {
+          "key": "default:_global/docs",
+          "filename": "deltas/default/_global/docs/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c665e629f7891cd844f0bf6c65c2fb9bc5812eb95ac2243f635862b8262211dd"
+        },
+        {
+          "key": "guide:conventions",
+          "filename": "deltas/guide/conventions/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c766b7d88e0727367c41e5e0d5ded5341dbdc3d813ba6c1b278b4257a5969e70"
+        },
+        {
+          "key": "skills:workflow-automation",
+          "filename": "deltas/skills/workflow-automation/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:0327df0aa33bbf04fd974509b1081ddcc45089f2fe6fff3f0cb96882038c1a7d"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:3746682ad689d5b6c4881554ee77861745526b448cb9d8876736266d0e613256"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "verify", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:84073a791651ab1e719df21a943be22a5681c567effa55fcd3da662a365745a8"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-09-28T11:28:01.179Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": [],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-09-28T11:28:01.198Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-28T11:45:58.703Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-09-28T12:43:54.533Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:hook-execution-model"
+        },
+        {
+          "type": "specs",
+          "key": "core:change"
+        },
+        {
+          "type": "specs",
+          "key": "core:change-manifest"
+        },
+        {
+          "type": "specs",
+          "key": "core:transition-change"
+        },
+        {
+          "type": "specs",
+          "key": "core:run-step-hooks"
+        },
+        {
+          "type": "specs",
+          "key": "core:fs-change-repository"
+        },
+        {
+          "type": "specs",
+          "key": "core:change-repository-port"
+        },
+        {
+          "type": "specs",
+          "key": "cli:entrypoint"
+        },
+        {
+          "type": "specs",
+          "key": "cli:change-transition"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:indexer"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:index-project-graph"
+        },
+        {
+          "type": "specs",
+          "key": "default:_global/testing"
+        },
+        {
+          "type": "specs",
+          "key": "default:_global/docs"
+        },
+        {
+          "type": "specs",
+          "key": "guide:conventions"
+        },
+        {
+          "type": "specs",
+          "key": "skills:workflow-automation"
+        },
+        {
+          "type": "verify",
+          "key": "core:hook-execution-model"
+        },
+        {
+          "type": "verify",
+          "key": "core:change"
+        },
+        {
+          "type": "verify",
+          "key": "core:change-manifest"
+        },
+        {
+          "type": "verify",
+          "key": "core:transition-change"
+        },
+        {
+          "type": "verify",
+          "key": "core:run-step-hooks"
+        },
+        {
+          "type": "verify",
+          "key": "core:fs-change-repository"
+        },
+        {
+          "type": "verify",
+          "key": "core:change-repository-port"
+        },
+        {
+          "type": "verify",
+          "key": "cli:entrypoint"
+        },
+        {
+          "type": "verify",
+          "key": "cli:change-transition"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:indexer"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:index-project-graph"
+        },
+        {
+          "type": "verify",
+          "key": "default:_global/testing"
+        },
+        {
+          "type": "verify",
+          "key": "default:_global/docs"
+        },
+        {
+          "type": "verify",
+          "key": "guide:conventions"
+        },
+        {
+          "type": "verify",
+          "key": "skills:workflow-automation"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-09-28T16:47:39.034Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-drift",
+      "message": "Artifact files require review",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-28T16:48:16.110Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-28T17:19:07.503Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-09-29T04:56:45.059Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Artifact files require review",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:hook-execution-model",
+            "core:change",
+            "core:change-manifest",
+            "core:transition-change",
+            "core:run-step-hooks",
+            "core:fs-change-repository",
+            "core:change-repository-port",
+            "cli:entrypoint",
+            "cli:change-transition",
+            "code-graph:indexer",
+            "code-graph:index-project-graph",
+            "default:_global/testing",
+            "default:_global/docs",
+            "guide:conventions",
+            "skills:workflow-automation"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:hook-execution-model",
+            "core:change",
+            "core:change-manifest",
+            "core:transition-change",
+            "core:run-step-hooks",
+            "core:fs-change-repository",
+            "core:change-repository-port",
+            "cli:entrypoint",
+            "cli:change-transition",
+            "code-graph:indexer",
+            "code-graph:index-project-graph",
+            "default:_global/testing",
+            "default:_global/docs",
+            "guide:conventions",
+            "skills:workflow-automation"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    }
+  ]
+}

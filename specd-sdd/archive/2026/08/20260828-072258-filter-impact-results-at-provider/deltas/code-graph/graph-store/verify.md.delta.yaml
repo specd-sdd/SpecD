@@ -1,0 +1,43 @@
+- op: added
+  description: 'Verify backend and SQLite query-time impact filtering'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Query methods$'
+  content: |
+    ### Requirement: Filtered impact query contract
+
+    #### Scenario: Store applies canonical filter precedence
+
+    - **GIVEN** candidates span included, excluded, and unrelated canonical workspaces and symbol kinds
+    - **WHEN** a filtered impact read executes
+    - **THEN** it returns only candidates admitted by type, kind, inclusion, and exclusion predicates
+    - **AND** exclusion wins when the same workspace is also included
+
+    #### Scenario: SQLite filters before crossing the adapter boundary
+
+    - **GIVEN** an SQLite graph containing both admitted and excluded impact candidates
+    - **WHEN** the store executes a filtered impact query
+    - **THEN** its physical statements include the normalized predicates before rows are materialized
+    - **AND** excluded rows are not returned to TypeScript for post-query removal
+
+    #### Scenario: Worker request preserves filters
+
+    - **GIVEN** the SQLite store runs through its worker-backed protocol
+    - **WHEN** a filtered impact request crosses the worker boundary
+    - **THEN** all normalized filter fields reach the database query unchanged
+    - **AND** the worker response contains no candidates excluded by those fields
+
+    #### Scenario: Port remains storage neutral
+
+    - **WHEN** a non-SQLite test store implements the filtered impact contract
+    - **THEN** it requires no SQLite table, statement, worker-message, or pagination type
+
+    #### Scenario: Store frontier query supports candidate resource category and depth-zero reads
+
+    - **GIVEN** a frontier of symbol or file nodes and a request for covering specs
+    - **WHEN** `queryImpactFrontier` is invoked with candidate resource category `spec` and depth `0`
+    - **THEN** it queries and hydrates the admitted spec nodes directly without requiring a positive traversal depth

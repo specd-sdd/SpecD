@@ -1,3 +1,4 @@
+import path from 'node:path'
 import { describe, it, expect } from 'vitest'
 import { UpdateImplementationTracking } from '../../../src/application/use-cases/update-implementation-tracking.js'
 import { ChangeNotFoundError } from '../../../src/application/errors/change-not-found-error.js'
@@ -14,6 +15,17 @@ import {
 
 const PROJECT_ROOT = '/test'
 
+function hostFiles(files: Record<string, string>): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(files).map(([file, content]) => [
+      file.startsWith(`${PROJECT_ROOT}/`)
+        ? path.resolve(PROJECT_ROOT, file.slice(PROJECT_ROOT.length + 1))
+        : file,
+      content,
+    ]),
+  )
+}
+
 function makeUpdate(
   repo: ReturnType<typeof makeChangeRepository>,
   files: Record<string, string> = {},
@@ -21,7 +33,7 @@ function makeUpdate(
 ) {
   return new UpdateImplementationTracking(
     repo,
-    makeFileReader(files),
+    makeFileReader(hostFiles(files)),
     PROJECT_ROOT,
     specRepositories,
   )

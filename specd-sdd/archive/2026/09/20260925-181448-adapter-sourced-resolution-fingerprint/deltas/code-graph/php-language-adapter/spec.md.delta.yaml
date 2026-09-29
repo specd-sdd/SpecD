@@ -1,0 +1,15 @@
+- op: added
+  description: PHP resolution fingerprint manifest is composer.json
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: 'Requirement: Namespaces, use aliases, and Composer resolution'
+  content: |
+    ### Requirement: Resolution manifests
+
+    `resolutionManifests()` SHALL return exactly `['composer.json']`.
+
+    That basename covers both the Composer package `name` and the PSR-4 map the adapter reads. The adapter MUST NOT declare any other resolution manifest.

@@ -1,3 +1,9 @@
+---
+title: Change Lifecycle Guide
+description: Guide to SpecD change lifecycles, states, transitions, approvals, hooks, and verification.
+sidebar_position: 2
+---
+
 # Change Lifecycle Guide
 
 Every piece of work in specd is a **change**. A change tracks everything related to modifying one or more specs — the proposal, the spec files, the design, the implementation tasks, and the final archive record. This guide explains how changes move through their lifecycle, what each state means, and how approval gates, task completion checks, and hooks affect that progression.
@@ -62,7 +68,7 @@ The initial state. A newly created change starts here before any work has been d
 The active design and specification phase. This is where the bulk of artifact work happens.
 
 - **What it means:** You are writing the proposal, specs, verify files, design, and tasks.
-- **What you do:** Create and refine the five standard artifacts (proposal, specs, verify, design, tasks). Run `specd changes status <name>` to check artifact progress.
+- **What you do:** Create and refine the five standard artifacts (proposal, specs, verify, design, tasks). Run `specd changes status <name>` to check artifact progress. Before writing `design.md`, use the [Code Graph](./code-graph.md) to locate symbols (`specd graph search`) and record blast radius (`specd graph impact`) for the files and symbols the design will change.
 - **Transition out:** `specd changes transition <name> ready` once all required artifacts are complete and validated.
 - **What can block it:** The `ready` step requires all artifacts listed in the schema's `requires` field (by default: proposal, specs, verify, design, tasks) to have `complete` status. The CLI reports which artifacts are still missing or in progress.
 
@@ -109,7 +115,7 @@ Historic post-approval parking state. New work records spec approval in `ready` 
 Active development is in progress.
 
 - **What it means:** The implementation tasks are being worked through.
-- **What you do:** Work through the task list in `tasks.md`, checking off items as you go (`- [x]`). Run `specd changes status <name>` to see task progress.
+- **What you do:** Work through the task list in `tasks.md`, checking off items as you go (`- [x]`). Run `specd changes status <name>` to see task progress. Re-check `specd graph impact` when a task touches a symbol or file that `design.md` did not already cover, and prefer `specd graph search` over repository-wide text search.
 - **Transition out:** `verifying` once task-completion checks on the **target** step pass, or back to `designing` (redesign).
 - **What can block it:** The `workflow.taskCompletion` check on the target step (typically `verifying`), driven by `taskCompletionCheck` on task-bearing artifacts listed in that step's `requiresTaskCompletion`. By default, any unchecked `- [ ]` line in `tasks.md` prevents advancing to `verifying`. Open implementation-tracking files can also block leaving `implementing`. The CLI reports "N/M tasks complete" when the task gate is active.
 
@@ -413,13 +419,50 @@ External hooks use the same workflow phase semantics as shell hooks:
 
 ### Template variables
 
-Hook `run:` commands support template variable substitution:
+Hook commands (`run:`) and instructions (`instruction:`) support dynamic template variable substitution:
 
-| Variable           | Value                                                        |
-| ------------------ | ------------------------------------------------------------ |
-| `{{change.name}}`  | The change's slug name (e.g. `add-auth`)                     |
-| `{{change.path}}`  | Absolute path to the change directory                        |
-| `{{project.root}}` | Absolute path to the project root (where `specd.yaml` lives) |
+| Variable                  | Availability       | Description                                                              |
+| :------------------------ | :----------------- | :----------------------------------------------------------------------- |
+| `{{project.root}}`        | All hooks          | Absolute path to the repository root directory                           |
+| `{{change.name}}`         | All hooks          | The change's slug name (e.g. `add-auth`)                                 |
+| `{{change.path}}`         | All hooks          | Absolute path to the active change (or archive) directory                |
+| `{{change.archivedName}}` | Post-archive hooks | The timestamped archive directory name (e.g. `20260924-143511-add-auth`) |
+
+#### Substitution
+
+`{{...}}` is replaced with the value exactly as it is. SpecD does not add quotes around it. You write the quotes in the command, around the whole string you want:
+
+```yaml
+run: echo "Resultado: {{change.name}}"
+run: mkdir "{{project.root}}/out/{{change.name}}"
+```
+
+`{{change.name}}` is a kebab-case slug. `{{project.root}}` and `{{change.path}}` are absolute paths and can contain spaces, so quote the whole path. A value inserted into the middle of a path stays one path: `mkdir "{{project.root}}/{{change.name}}"` becomes `mkdir "/repo/add-auth"`.
+
+`instruction:` text is also substituted verbatim. It is not a shell command, so the quote translation below does not apply.
+
+#### Running on macOS, Linux, and Windows
+
+A `run:` command is a shell command. macOS and Linux run it with the absolute `$SHELL` or `/bin/sh`. Windows runs it with `cmd.exe`. SpecD does not translate program names, flags, or pipes (`mkdir -p`, `rm -rf`, `$(...)`).
+
+It does translate quote syntax the host shell does not understand:
+
+| You write                     | On `$SHELL` or `/bin/sh`                  | On `cmd.exe`                         |
+| ----------------------------- | ----------------------------------------- | ------------------------------------ |
+| `mkdir '{{change.path}}'`     | unchanged, `sh` understands single quotes | `mkdir "C:\Users\Ada Lovelace\repo"` |
+| `mkdir "{{change.path}}"`     | unchanged                                 | unchanged                            |
+| `echo "Resultado: ""listo"""` | `echo "Resultado: \"listo\""`             | unchanged                            |
+| `echo "100%"`                 | unchanged                                 | unchanged                            |
+
+`cmd.exe` still expands `%NAME%` even inside double quotes. SpecD does not rewrite `%`. If you want a literal percent on Windows, write it the way `cmd.exe` expects.
+
+When the hook must run different commands per operating system, put that choice in your own script and call the script from the hook:
+
+```yaml
+run: node scripts/prepare-hook.js "{{change.path}}"
+```
+
+The script decides what to run. SpecD will not rewrite it.
 
 ### Hook execution order
 
@@ -597,7 +640,7 @@ Each scenario mirrors a requirement from `spec.md`.
 **Step 3d: Design** — The agent writes `design.md`:
 
 - Reads the proposal, specs, and verify files
-- Analyses the existing codebase to identify affected areas
+- Analyses the existing codebase with `specd graph search` and `specd graph impact` (see [Code Graph](./code-graph.md)) to identify affected areas, and records `HIGH` or `CRITICAL` risk in the design
 - Lists new constructs: `AuthService`, `SessionStore`, login/logout route handlers, auth middleware
 - Documents the approach, key decisions, and trade-offs
 - Maps every requirement and scenario to a concrete implementation path
@@ -750,7 +793,8 @@ Time passes between exploration and design. Code changes, specs get renamed, dec
 ## Where to go next
 
 - [Schema format reference](../schemas/schema-format.md) — define custom workflow steps, artifacts, hooks, and task completion checks for your project.
-- [Configuration reference](../config/config-reference.md) — enable approval gates, configure workspaces, and add schema overrides.
+- [Configuration guide](configuration.md) — enable approval gates, configure workspaces, and add schema overrides.
+- [Code Graph](./code-graph.md) — search symbols, specs, and documents, and measure blast radius before design and implementation.
 - [CLI reference](../cli/cli-reference.md) — all `specd changes`, `specd drafts`, `specd discard`, and `specd archives` commands.
 - [Change verification](../cli/change-verification.md) — `verification start`, `complete`, and `invalidate`.
 - [Domain model](../core/domain-model.md) — the `Change`, `ChangeState`, `ChangeEvent`, and `ChangeArtifact` types returned by `@specd/core` use cases.

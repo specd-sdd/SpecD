@@ -39,12 +39,15 @@ import { ReconcileChangeValidity } from '../../../src/application/use-cases/reco
 import { type RefreshImplementationTracking } from '../../../src/application/use-cases/refresh-implementation-tracking.js'
 import { NodeBinaryContentHasher } from '../../../src/infrastructure/node/binary-content-hasher.js'
 
+import { applyPreHashCleanup } from '../../../src/domain/services/pre-hash-cleanup.js'
+import { type PreHashCleanup } from '../../../src/domain/value-objects/validation-rule.js'
+
 // ---------------------------------------------------------------------------
 // Test helpers
 // ---------------------------------------------------------------------------
 
-function sha256(content: string): string {
-  return `sha256:${createHash('sha256').update(content, 'utf8').digest('hex')}`
+function sha256(content: string, cleanups: readonly PreHashCleanup[] = []): string {
+  return `sha256:${createHash('sha256').update(applyPreHashCleanup(content, cleanups), 'utf8').digest('hex')}`
 }
 
 /** Builds the real canonical reconciler for validation fixtures that omit one. */

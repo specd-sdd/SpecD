@@ -1,0 +1,32 @@
+- op: modified
+  description: 'Show dependency changes for invalidated peers in archive output'
+  selector:
+    type: section
+    matches: 'Requirement: Output on success \(extended\)'
+  content: |
+    When archiving with `--allow-overlap`:
+
+    - Text mode MUST include an `invalidated N overlapping changes:` section listing every successfully invalidated change and all of its overlapping specs.
+    - For each non-empty `dependencyChanges` entry, text mode MUST visibly render the affected `specId` with separate `added` and `removed` dependency lists. An empty side MUST render as `(none)`.
+    - An invalidated change with no dependency changes MUST retain the existing concise change/spec line and MUST NOT render an empty dependency-change subsection.
+    - JSON and TOON mode MUST include the `invalidatedChanges` array from `ArchiveChange`. Each entry MUST contain `name`, `specIds`, and `dependencyChanges`; every dependency-change entry MUST contain `specId`, `added`, and `removed`.
+
+    The CLI MUST preserve Core's deterministic ordering and MUST NOT recompute dependency differences or parse invalidation messages.
+
+    When no changes are invalidated, the section is omitted in text mode and `invalidatedChanges` is an empty array in structured output.
+
+- op: added
+  description: 'Distinguish a post-commit peer invalidation failure from archive failure'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Output on success \(extended\)'
+  content: |
+    ### Requirement: Post-commit overlap invalidation failure
+
+    If `ArchiveChange` reports that a peer invalidation could not be persisted after the archive became durable, the command MUST emit an actionable error that states the named change was archived successfully and identifies the peer still requiring invalidation or repair.
+
+    The command MUST NOT print the normal successful `invalidatedChanges` result for an incomplete peer invalidation pass, and it MUST NOT describe the durable archive as rolled back or uncommitted.

@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { hashFiles } from '../../../src/domain/services/hash-files.js'
 import { NodeContentHasher } from '../../../src/infrastructure/node/content-hasher.js'
 
@@ -60,6 +60,13 @@ describe('hashFiles', () => {
   it('preserves the path as key', () => {
     const result = hashFiles({ 'specd/changes/foo/proposal.md': 'content' }, hash)
     expect(result).toHaveProperty('specd/changes/foo/proposal.md')
+  })
+
+  it('forwards a string that contains CRLF without rewriting it', () => {
+    const content = 'line\r\nline'
+    const hashContent = vi.fn((value: string) => value)
+    hashFiles({ 'notes.txt': content }, hashContent)
+    expect(hashContent).toHaveBeenCalledWith(content)
   })
 
   it('hashes empty file content', () => {

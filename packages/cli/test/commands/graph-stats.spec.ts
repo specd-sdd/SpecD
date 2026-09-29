@@ -145,6 +145,8 @@ function setup(
                 input.config.projectRoot,
                 [...input.workspaces],
                 graphConfig,
+                input.adapters ?? [],
+                null,
               )
             } catch {
               fingerprintMismatch = null
@@ -421,6 +423,21 @@ describe('graph stats — staleness detection', () => {
     expect(stdout).toContain('VCS_REF_STALE')
   })
 
+  it('given a derivation mismatch, when graph stats runs in text mode, then the warning names resolution manifests', async () => {
+    const { getStdout } = setup(
+      'configured',
+      { lastIndexedRef: 'abc1234def', graphFingerprint: '{"core":"stale-digest"}' },
+      { vcsRef: 'abc1234def' },
+    )
+
+    const program = makeStatsProgram()
+    await runStats(program, 'graph', 'stats')
+
+    expect(getStdout()).toContain(
+      '⚠ Derivation fingerprint mismatch — code-graph version, workspace configuration, or resolution manifest content changed',
+    )
+  })
+
   it('shows exact stale warning with truncated refs in text output', async () => {
     const { getStdout } = setup(
       'configured',
@@ -506,6 +523,8 @@ describe('graph stats — staleness detection', () => {
             specRepo: {} as never,
           })),
           graphConfig,
+          [],
+          null,
         ),
       ]),
       [
@@ -522,6 +541,8 @@ describe('graph stats — staleness detection', () => {
             specRepo: {} as never,
           })),
           graphConfig,
+          [],
+          null,
         ),
       ],
     ]

@@ -30,6 +30,12 @@ The adapter SHALL extract `import`, `from ... import ...`, aliases, relative imp
 
 Relative resolution SHALL honor leading-dot parent traversal and deterministic module/package candidates including module files, package `__init__.py`, stub files, and common `src/` layouts when known indexed paths prove them. Package identities SHALL be read from the nearest bounded `pyproject.toml` and compared with underscore/hyphen normalization. Namespace-package selection or other ambiguous layouts SHALL remain unresolved unless indexed context selects one route.
 
+### Requirement: Resolution manifests
+
+`resolutionManifests()` SHALL return exactly `['pyproject.toml']`.
+
+The adapter MUST NOT declare `setup.cfg`, `setup.py`, or any other basename. Package identity MUST come from `[project].name` in the nearest bounded `pyproject.toml`, and MUST NOT come from a `name` key in another table of that file.
+
 ### Requirement: Scoped bindings, calls, annotations, and construction
 
 The adapter SHALL emit deterministic facts for lexical scopes, imported aliases, parameter and return annotations, annotated assignments, type-alias right-hand sides, `self` and `cls` receiver bindings, explicit class construction calls, and locally proven aliases. It SHALL build `IMPORTS`, `CALLS`, `CONSTRUCTS`, and `USES_TYPE` only where these facts identify one indexed target.

@@ -217,7 +217,9 @@
 
 - **GIVEN** `TransitionChange` needs to execute hooks
 - **WHEN** hook execution is triggered
-- **THEN** `RunStepHooks` is used for collection, variable expansion, and execution
+- **THEN** `RunStepHooks` is used for collection, schema-command recording, and execution
+- **AND** `HookRunner` expands the command
+- **AND** `RunStepHooks` does not expand the command
 
 #### Scenario: Transition source.post skipped on redesign
 
@@ -296,3 +298,11 @@
 - **WHEN** `{{key.path}}` template variables are expanded for a `run:` hook on that change
 - **THEN** the `change` namespace has no `workspace` key
 - **AND** no hook command can resolve `{{change.workspace}}` to either touched workspace name
+
+#### Scenario: Substituted values are not quoted by SpecD
+
+- **GIVEN** a `run:` hook with command `mkdir "{{project.root}}/{{change.name}}"`
+- **AND** `project.root` is `/repo` and `change.name` is `add-auth`
+- **WHEN** the hook command is expanded
+- **THEN** the command is `mkdir "/repo/add-auth"`
+- **AND** neither value is wrapped in an extra pair of quotes

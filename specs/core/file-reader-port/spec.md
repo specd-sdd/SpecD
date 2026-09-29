@@ -28,7 +28,9 @@ For filesystem errors other than "file not found" (e.g. permission denied), the 
 
 ### Requirement: Path traversal protection (implementation concern)
 
-Implementations MAY accept an optional `basePath` constraint at construction time. When a `basePath` is configured, the implementation MUST verify that the resolved path does not escape the base directory. If it does, the implementation MUST throw a `PathTraversalError`.
+Implementations MAY accept an optional `basePath` constraint at construction time. When a `basePath` is configured, the implementation MUST reject a resolved path that escapes the base directory and MUST throw a `PathTraversalError`.
+
+Escape detection MUST use the inside-root rule: after both paths are resolved, the candidate is inside when the relative path from `basePath` is empty, or it does not start with `..` and is not absolute. Drive-letter case MUST NOT make an inside path look outside. A string prefix of `basePath` plus a separator MUST NOT be the escape test.
 
 ### Requirement: Path resolution
 

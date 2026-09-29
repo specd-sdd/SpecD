@@ -1,0 +1,6 @@
+releases:
+  cli:graph-impact: minor
+  code-graph:traversal: minor
+  code-graph:graph-store: minor
+  code-graph:composition: minor
+  code-graph:sqlite-graph-store: minor

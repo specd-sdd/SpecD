@@ -1,0 +1,54 @@
+- op: added
+  description: 'Verify impact starts from one resolved logical member'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Resolved canonical and public-binding impact'
+  content: |
+    ### Requirement: Owner-qualified impact target
+
+    #### Scenario: Qualified member traverses only that member
+
+    - **GIVEN** the request is anchored to the TypeScript file that declares `EditChange`
+    - **AND** other types declare `execute`
+    - **WHEN** symbol impact is requested for `EditChange.execute`
+    - **THEN** traversal starts at that member's id
+    - **AND** the other `execute` symbols are not start nodes
+
+    #### Scenario: Unanchored qualified member is the start node
+
+    - **GIVEN** one logical symbol stores `qualified_name` `EditChange.execute`
+    - **AND** no file is supplied
+    - **WHEN** symbol impact is requested for `EditChange.execute`
+    - **THEN** traversal starts at that member's id
+    - **AND** other symbols named `execute` are not start nodes
+
+    #### Scenario: Several equal qualified names do not traverse one
+
+    - **GIVEN** two logical symbols store `GetStatus.execute`
+    - **WHEN** symbol impact is requested for `GetStatus.execute`
+    - **THEN** both are reported
+    - **AND** traversal does not start on a guessed member
+    - **AND** the terminal name `execute` is not used as a fallback query
+
+    #### Scenario: Unresolved qualified reference does not traverse
+
+    - **GIVEN** `EditChange.missing` resolves as unresolved
+    - **WHEN** symbol impact is requested
+    - **THEN** no start symbol is selected
+
+    #### Scenario: Legacy location id still traverses
+
+    - **GIVEN** a location-backed symbol id resolves to one logical symbol
+    - **WHEN** symbol impact is requested with that id
+    - **THEN** traversal starts at that symbol
+    - **AND** the traversal algorithm does not parse the id as human text
+
+    #### Scenario: Public binding target is the start node
+
+    - **GIVEN** a public binding on `sdk:src/index.ts` targets a code-graph logical id
+    - **WHEN** impact is requested for that exported name on that surface
+    - **THEN** traversal starts at the code-graph logical id

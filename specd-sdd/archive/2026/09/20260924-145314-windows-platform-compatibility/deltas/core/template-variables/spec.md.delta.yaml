@@ -1,0 +1,52 @@
+- op: modified
+  description: 'run: hooks insert values verbatim. Quote translation is separate from substitution.'
+  selector:
+    type: section
+    matches: 'Requirement: Shell escaping for run hooks'
+  content: |
+    When expanding variables in `run:` hook commands, substituted values MUST be inserted verbatim. SpecD MUST NOT add quotes around a substituted value. The developer writes the quotes in the command. Several variables inside one pair of quotes MUST stay one string after substitution. `mkdir "{{project.root}}/{{change.name}}"` with root `/repo` and name `add-auth` MUST become `mkdir "/repo/add-auth"`.
+
+    `expandForShell()` MUST remain available for a command string that SpecD itself builds. That method wraps each substituted value. The POSIX dialect uses single quotes and the `'\''` idiom. The `cmd.exe` dialect turns an empty value into `""`, replaces `%` with `%%` and `"` with `""`, then wraps the value in double quotes. `HookRunner` MUST NOT use `expandForShell()` for a developer `run:` hook.
+
+    When expanding variables in `instruction:` text or artifact instructions, values are substituted verbatim without shell escaping and without quote translation. These are text blocks consumed by agents, not shell commands.
+
+- op: modified
+  description: 'HookRunner expands run hooks verbatim.'
+  selector:
+    type: section
+    matches: 'Requirement: TemplateExpander class'
+  content: |
+    `TemplateExpander` is a class (not a port) that encapsulates template expansion logic. It receives the built-in variables at construction time:
+
+    ```typescript
+    type OnUnknownVariable = (token: string) => void
+
+    class TemplateExpander {
+      constructor(builtins: TemplateVariables, onUnknown?: OnUnknownVariable)
+
+      expand(template: string, variables?: TemplateVariables): string
+      expandForShell(template: string, variables?: TemplateVariables, dialect?: 'posix' | 'cmd'): string
+    }
+    ```
+
+    - The `builtins` provided at construction (e.g. `{ project: { root: '...' } }`) are always present in every expansion.
+    - `onUnknown` is an optional callback invoked when a `{{namespace.key}}` token cannot be resolved. When provided, it is called once per unresolved token. The callback is informational only — it does not affect the expansion result.
+    - `expand(template, variables?)` — merges contextual `variables` with built-ins and substitutes values verbatim. Used by `GetHookInstructions`, `GetArtifactInstruction`, and `HookRunner` for developer `run:` commands.
+    - `expandForShell(template, variables?, dialect?)` — merges contextual `variables` with built-ins and substitutes values with shell escaping for a command SpecD itself builds. `dialect` defaults to `posix`. `HookRunner` does not call it for developer hooks.
+    - Contextual variables MUST NOT override built-in variables. If a contextual namespace collides with a built-in namespace, the built-in keys take precedence.
+    - Both methods share the same traversal and resolution logic — only the substitution step differs.
+
+    The composition layer constructs a single `TemplateExpander` instance with built-in variables and an `onUnknown` callback (typically `console.warn` or a logging adapter), and injects it into all use cases that need expansion.
+
+- op: modified
+  description: 'Run hooks no longer depend on expandForShell.'
+  selector:
+    type: section
+    matches: '^Spec Dependencies$'
+  content: |
+    - [`core:hook-runner-port`](../hook-runner-port/spec.md) — `HookRunner` expands developer `run:` commands with `expand()` and then translates quote syntax for the host shell
+    - [`core:hook-execution-model`](../hook-execution-model/spec.md) — instruction hooks and run hooks both support template variables
+    - [`core:get-hook-instructions`](../get-hook-instructions/spec.md) — expands variables in instruction text via `expand()`
+    - [`core:get-artifact-instruction`](../get-artifact-instruction/spec.md) — expands variables in instruction and rules text via `expand()`
+    - [`core:run-step-hooks`](../run-step-hooks/spec.md) — builds variable map for hook execution
+    - [`core:archive-change`](../archive-change/spec.md) — builds variable map for deterministic hook execution

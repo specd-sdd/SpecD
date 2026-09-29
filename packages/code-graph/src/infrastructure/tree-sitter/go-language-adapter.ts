@@ -12,6 +12,11 @@ import { type Relation, createRelation } from '../../domain/value-objects/relati
 import { SymbolKind } from '../../domain/value-objects/symbol-kind.js'
 import { RelationType } from '../../domain/value-objects/relation-type.js'
 import { findManifestField } from './find-manifest-field.js'
+import { splitWorkspaceIdentity } from '../../domain/services/split-workspace-identity.js'
+import {
+  parseDottedMemberReference,
+  renderDottedMemberReference,
+} from '../../domain/services/parse-member-reference.js'
 import { type ImportDeclaration } from '../../domain/value-objects/import-declaration.js'
 import { ImportDeclarationKind } from '../../domain/value-objects/import-declaration-kind.js'
 import { BindingSourceKind, type BindingFact } from '../../domain/value-objects/binding-fact.js'
@@ -23,11 +28,14 @@ import {
   type FileAnalysis,
 } from '../../domain/value-objects/file-analysis.js'
 import {
-  MemberForm,
+  MemberDispatch,
+  MemberKind,
   SymbolSpace,
   createLocalBinding,
   createPublicBinding,
   type AdapterCapabilities,
+  type LogicalSymbol,
+  type ParsedSymbolReference,
   type ReferenceFacts,
 } from '../../domain/value-objects/symbol-reference.js'
 import {
@@ -36,6 +44,7 @@ import {
   containsSymbolRange,
   createAdapterDeclarationDescriptor,
   type AdapterHierarchyDescriptor,
+  withOwnerParents,
 } from './reference-fact-helpers.js'
 
 /**
@@ -148,8 +157,8 @@ interface GoReceiverFacts {
 function goPackageSurface(filePath: string): string {
   const slash = filePath.lastIndexOf('/')
   if (slash >= 0) return filePath.slice(0, slash)
-  const workspaceSeparator = filePath.indexOf(':')
-  return workspaceSeparator >= 0 ? filePath.slice(0, workspaceSeparator + 1) : '.'
+  const identity = splitWorkspaceIdentity(filePath)
+  return identity === null ? '.' : `${identity.workspace}:`
 }
 
 /**
@@ -177,6 +186,28 @@ export class GoLanguageAdapter implements LanguageAdapter {
    */
   languages(): string[] {
     return ['go']
+  }
+
+  /**
+   * Parses one Go dotted member spelling.
+   * @param text - Human reference text.
+   * @returns One owner-then-member candidate, or none.
+   */
+  parseSymbolReference(text: string): ParsedSymbolReference {
+    return parseDottedMemberReference(text)
+  }
+
+  /**
+   * Renders a Go member with the generic dotted spelling.
+   * @param symbol - Logical symbol.
+   * @param ownerPath - Owner simple names.
+   * @returns Generic dotted spelling.
+   */
+  renderSymbolReference(
+    symbol: LogicalSymbol,
+    ownerPath: readonly string[],
+  ): { readonly generic: string } {
+    return renderDottedMemberReference(symbol, ownerPath)
   }
 
   /**
@@ -313,9 +344,21 @@ export class GoLanguageAdapter implements LanguageAdapter {
       methodReceivers,
       interfaceMethods,
     )
+    const ownerByMemberId = new Map<string, string>()
+    const typeByName = new Map(typeInfos.map((item) => [item.name, item]))
+    for (const [receiver, methods] of methodReceivers) {
+      const owner = typeByName.get(receiver)
+      if (owner === undefined) continue
+      for (const methodId of methods.values()) ownerByMemberId.set(methodId, owner.symbolId)
+    }
+    for (const info of typeInfos) {
+      for (const methodId of Object.values(info.interfaceMethodIds)) {
+        ownerByMemberId.set(methodId, info.symbolId)
+      }
+    }
     return {
       language: 'go',
-      symbols,
+      symbols: withOwnerParents(symbols, ownerByMemberId),
       imports,
       bindingFacts,
       callFacts,
@@ -377,11 +420,11 @@ export class GoLanguageAdapter implements LanguageAdapter {
               : SymbolSpace.Value,
           ownerSymbolId: ownerByMemberId.get(symbol.id),
           requiresOwner: symbol.kind === SymbolKind.Method,
-          memberForm:
+          memberSemantics:
             symbol.kind === SymbolKind.Method
               ? typeInfos.some((info) => info.interfaceMethodIds[symbol.name] === symbol.id)
-                ? MemberForm.Signature
-                : MemberForm.Instance
+                ? { kind: MemberKind.Signature }
+                : { kind: MemberKind.Method, dispatch: MemberDispatch.Instance }
               : undefined,
         }),
       ),
@@ -1048,6 +1091,14 @@ export class GoLanguageAdapter implements LanguageAdapter {
       }
     }
     return best
+  }
+
+  /**
+   * Declares the resolution manifests this adapter reads.
+   * @returns Exact basenames used for package identity.
+   */
+  resolutionManifests(): readonly string[] {
+    return ['go.mod']
   }
 
   /**

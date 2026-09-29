@@ -545,3 +545,54 @@
 - **WHEN** both semantic lanes are classified and ordered
 - **THEN** the logical component uses `logical-component`
 - **AND** the local symbol uses `exact-local-symbol` rather than a declaration tier
+
+#### Scenario: Ordinary text does not extract a qualified token
+
+- **WHEN** symbol search receives `execute`
+- **THEN** no qualified-name lookup runs
+- **AND** the full query still uses the existing declaration, public-binding, and lexical tiers
+- **AND** full-text rank is not treated as proof of an owner-qualified member
+
+#### Scenario: Qualified text is an exact hit and the full query is still searched
+
+- **GIVEN** `qualified_name` `EditChange.execute` exists and no file is supplied
+- **WHEN** symbol search receives `EditChange.execute`
+- **THEN** that member is an exact hit ahead of lexical relatives
+- **AND** the original query is still searched, including full-text search
+- **AND** the CLI did not parse the delimiter itself
+
+#### Scenario: Extra words do not drop the qualified token or the rest of the query
+
+- **GIVEN** `qualified_name` `GetStatus.execute` exists
+- **WHEN** symbol search receives `GetStatus.execute otra cosa`
+- **THEN** that member is an exact hit
+- **AND** the full original query is still searched
+- **AND** no token is removed from that search
+
+#### Scenario: Several equal qualified names are all exact hits
+
+- **GIVEN** two logical symbols store `Owner.execute`
+- **WHEN** symbol search receives `Owner.execute`
+- **THEN** both are exact hits
+- **AND** the full-query results are still present
+
+#### Scenario: A missing qualified token leaves the normal search
+
+- **GIVEN** no logical symbol stores `EditChange.missing`
+- **WHEN** symbol search receives `EditChange.missing`
+- **THEN** there is no exact qualified hit
+- **AND** the normal full-query search result remains
+
+#### Scenario: Filters still apply after the exact lookup
+
+- **GIVEN** `EditChange.execute` resolves to a method
+- **WHEN** symbol search receives that text with `--kind variable`
+- **THEN** the method is excluded by the kind filter
+
+#### Scenario: PHP spelling is the same exact lookup
+
+- **GIVEN** `qualified_name` is `ArchiveChange.execute` and no language or file is supplied
+- **WHEN** symbol search receives `ArchiveChange::execute`
+- **THEN** that member is an exact hit
+- **AND** the full query is still searched
+- **AND** the CLI does not treat `::` as its own syntax

@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'The repository port contract remains unchanged while its filesystem adapter tests are reconciled.'

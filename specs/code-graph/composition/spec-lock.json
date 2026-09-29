@@ -18,54 +18,46 @@
   ],
   "implementation": [
     {
-      "file": "code-graph:test/composition/code-graph-provider.spec.ts",
-      "symbols": ["CodeGraphProvider"]
-    },
-    {
-      "file": "code-graph:test/barrel.spec.ts",
-      "symbols": ["@specd/code-graph barrel"]
-    },
-    {
       "file": "code-graph:src/composition/code-graph-provider.ts",
-      "symbols": ["CodeGraphProvider", "CodeGraphProviderImpl"]
+      "symbols": ["CodeGraphProviderImpl"]
     },
     {
-      "file": "code-graph:src/domain/errors/graph-storage-recovery-required-error.ts",
-      "symbols": ["GraphStorageRecoveryRequiredError"]
+      "file": "code-graph:src/composition/create-code-graph-provider.ts",
+      "symbols": ["createCodeGraphProvider"]
     }
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Composes lifecycle-managed graph facade, backends, indexing, isolation, traversal, search, and curated public API.",
+      "value": "Lifecycle-managed CodeGraphProvider composes stores, adapters, indexing, normalized resolution, impact, search, and public API.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:a3fb56f3f6d13d242e92daac0c81835f85b4023d78f736d1ea88cdc58a3e18b6",
-          "lastModified": "2026-08-25T14:41:04.208Z"
+          "hash": "sha256:5394d730d061310785e78870b2784f32727b09369b80aaaf52fff72fb2bab395",
+          "lastModified": "2026-09-28T11:19:59.037Z"
         },
         "verify.md": {
-          "hash": "sha256:378cd63df7c9bd70993864a8142cb9b30a8c8b9dcad367c6b5461668a6b79dad",
-          "lastModified": "2026-08-25T14:41:04.208Z"
+          "hash": "sha256:631f9272a864cc6b1049b585992062de437f2cfcbdf0350762035f81fc508f89",
+          "lastModified": "2026-09-28T11:19:59.044Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# Composition\n\n## Rules\n\n- `CodeGraphProvider`: lifecycle-managed facade. `index(options)` with `force: true` clears logical contents and reprocesses every selected input; MUST NOT physically recreate storage. `clear()` removes logical contents from open reusable store. `recreate()` physically recovers storage only while closed; open call rejects typed precondition; success leaves closed. `open()` parameterless, reports typed recoverable corruption/schema error, never recreates implicitly. `close()` idempotent and settles outstanding requests before shutdown.\n- Queries, exact batches, search, traversal, impact, selectors, coverage, statistics delegate to store/services. Composite operation performs one availability/staleness validation before bounded fan-out. `getSpec` returns `undefined` when absent.\n- Factory overloads: `createCodeGraphProvider(config: SpecdConfig, options?: CodeGraphCompositionOptions)` derives storage root; `createCodeGraphProvider(options: CodeGraphOptions)` requires `storagePath`. Both select `options.graphStoreId ?? \"sqlite\"`, merge built-in `sqlite` plus additive `graphStoreFactories`, reject `sqlite` collision/unknown id, create one `GraphStore`, register TypeScript/Python/Go/PHP plus additive adapters, wire `IndexCodeGraph`.\n- `createSqliteGraphStoreFactory()` accepts `SqliteGraphStoreFactoryOptions`, including serializable `SqliteRuntimeDescriptor`. Factory/provider creation synchronous; native loading, worker startup, schema preparation, generation checks during `open()`.\n- `CodeGraphProvider` type-only; concrete provider, `GraphStore`, worker protocol, raw locks, `IndexCodeGraph` inputs internal. Callers construct only through `createCodeGraphProvider(...)`.\n- Public `.` exports curated composition/types, `runIsolatedGraphIndex` host contracts/errors, host use cases, config/fingerprint helpers, index/discovery types, traversal/impact/hotspot/search APIs, language/model vocabulary, public errors including `GraphStorageRecoveryRequiredError`, `GraphStoreRecreateRequiresClosedError`, busy/isolated-worker failures, `CODE_GRAPH_VERSION`. No concrete stores, raw IPC/locks, launchers, child implementation, recreation helpers, or test seams.\n- `./internal` exposes development internals. Published package includes stable built ESM isolated-worker child resolved from installed module location, not public host-selectable export.\n- Hosts explicitly open/reuse/close provider; helpers such as `withOpenGraphProvider` may manage lifecycle. Long-lived hosts remain non-blocking and host-controlled.\n- Host use cases receive open provider: `GetGraphHealth`, `IndexProjectGraph`, `GetSpecCoverage`, `GetChangeSpecCoverage`. Search/hotspots/impact/traversal remain provider methods.\n- Symbol-reference surface supports single/batch resolution, exact public-binding lookup, canonical/public-binding impact, unique/ambiguous/missing results. Unqualified selectors: case-exact, then case-insensitive exact; never prefix/text widening; bounded candidates. Invalid host selectors use typed `INVALID_GRAPH_SELECTOR`. Candidate enrichment uses one exact batch lookup.\n- Unified search accepts query, `symbols | files | specs | documents`, filters, per-category limit, snippets. Normalize exact file filters; retain wildcard patterns. Shared use case expands, searches, locates occurrences, suppresses only symbol-covered ranges, groups/ranks, then limits. Exact single-file search retains every occurrence. Delivery adapters MUST NOT reimplement merge/dedup/limits.\n- Runtime dependency `@specd/core`; configuration used only for composition. Workspace targets/spec sources supplied per `IndexOptions`.\n\n## Constraints\n\n- One selected `GraphStore`; registry-driven backend; default/built-in only `sqlite`.\n- Explicit lifecycle; no auto-open/close or implicit recreation.\n- Facade owns lifecycle, availability, locks, destructive recovery; delegates domain logic.\n- Public construction only `createCodeGraphProvider`; internals only `./internal`; `LanguageAdapter` public.",
+      "value": "# Composition\n## Rules\n- `CodeGraphProvider` lifecycle facade: `index({force:true})` clears logical state and reprocesses inputs, never recreates physical storage; `clear()` resets open reusable store; `recreate()` only while closed, rejects open call with typed precondition, succeeds closed; parameterless `open()` surfaces typed corruption/schema recovery error without implicit recreation; idempotent `close()` settles/rejects outstanding work before worker/DB shutdown.\n- Queries, exact batches, FTS, traversal, impact, selector normalization delegate to store/services. `getSpec` missing => `undefined`. Each composite operation performs exactly one availability/staleness validation before bounded fan-out. Public callers use SDK forced-reindex recovery, not routine recreation. Worker/lock helpers internal.\n- Symbol/file/multi-file/spec/public-binding impact accepts shared typed filter, returns deterministic prefiltered `ImpactResult` with `affectedSpecs` for every target family. Symbol/public-binding `specs` use coverage. Pass normalized predicates through traversal, store, SQLite worker, physical query; never post-project unrestricted results. Export host filter/result/request types; query plans, predicate builders, worker DTOs, backend candidates internal.\n- Factories: `createCodeGraphProvider(config: SpecdConfig, options?: CodeGraphCompositionOptions)` derives root from `config.configPath`; legacy `createCodeGraphProvider(options: CodeGraphOptions)` requires `storagePath`. Detect by project-root-bearing `SpecdConfig`. Select `graphStoreId ?? \"sqlite\"`; merge sole built-in `sqlite` with additive `graphStoreFactories`; reject `sqlite` collision and unknown id; create exactly one store. Register TypeScript/Python/Go/PHP plus additive `adapters`; wire `IndexCodeGraph`. External factories share lifecycle/root contract.\n- `createSqliteGraphStoreFactory()` accepts `SqliteGraphStoreFactoryOptions` and optional serializable `SqliteRuntimeDescriptor`; factory/provider creation synchronous. Native load, worker start, schema prep, binding resolution, generation checks occur during `open()`. Absolute `modulePath` becomes `file:` URL before import.\n- `CodeGraphProvider` public type only; concrete class/constructor, `GraphStore`, worker protocol, `IndexCodeGraph` inputs internal. Construction only through factory.\n- Public `.` exports curated composition, isolated indexing host contracts, host use cases, graph config, public index/discovery types, traversal/impact/hotspot/search/fingerprint helpers and types, `LanguageAdapter`, graph model/reference/search vocabulary, public typed errors, `CODE_GRAPH_VERSION`. No raw locks/IPC/bootstrap/launchers/child implementation/concrete stores/test helpers/star leaks/Ladybug symbols. Host isolated-worker contracts remain public.\n- `src/public.ts` maps `.`; `src/index.ts` maps `./internal` for development internals including adapters, raw locks, launchers, `InMemoryIndexSession`. Publish ESM isolated-worker child under `dist/`, resolved internally relative to installed module; no host-selectable export.\n- Explicit lifecycle: callers `open()` before query/traversal/index unless helper manages it. Backends may defer readiness to `open()`. Long-lived hosts create synchronously, await open, reuse without sync SQLite on host event loop, close explicitly. No auto-open/close.\n- Runtime dependency `@specd/core` for `SpecdConfig`, `SpecdWorkspaceConfig`, optional services. Config only derives composition inputs; provider stores no project config. Caller supplies workspace targets/spec sources per `index()`.\n- Host use cases receive open provider: `GetGraphHealth`/`createGetGraphHealth`, `IndexProjectGraph`/`createIndexProjectGraph`, `GetSpecCoverage`/`createGetSpecCoverage`, `GetChangeSpecCoverage`/`createGetChangeSpecCoverage`. Search/hotspots/impact/traversal stay provider methods.\n- Symbol-reference surface supports single/batch resolution, canonical/public-binding impact, exact public-binding lookup by surface + exported name + symbol space + canonical target. Exact lookup returns binding/declarations without ranked pagination. Outcomes unique/ambiguous/missing. Unqualified selectors: case-exact then case-insensitive exact only; no prefix/text widening; bound candidates. Invalid host selector uses typed `INVALID_GRAPH_SELECTOR`. Ambiguity enrichment uses exactly one exact batch lookup. Export contracts/vocabulary/factories; implementations/storage internal.\n- Factory passes same indexing `AdapterRegistry` into provider resolution; never second registry or hardcoded language dispatch. Unanchored `Tipo.miembro`/`Tipo::miembro` resolves by stored `qualified_name` equality without adapter. Other normalization selects adapter only from explicit language, anchored indexed file, or indexed public-surface metadata; absent anchor => unresolved. Provider never parses manifests/member syntax itself.\n- Unified search accepts query, `symbols | files | specs | documents`, shared filters, per-category limit, snippet preference. Normalize exact file filters (workspace-relative, config/project-relative, absolute) to one graph file; preserve wildcards. Shared use case builds plan, runs semantic/backend lanes, locates occurrences, suppresses only symbol-selection-covered ranges, groups/ranks, caps general/wildcard occurrences per file, applies limits after grouping. Exact single-file returns all retained occurrences. Delivery adapters cannot reimplement expansion, independent merge, dedupe, or limits. Lower-level search may remain; unified operation authoritative.\n## Constraints\n- Only construction path `createCodeGraphProvider`; `CodeGraphProvider` type-only.\n- Internals/store adapters only from `\"./internal\"`; `LanguageAdapter` from `\".\"`.\n- Registry-driven backend selection, not `specd.yaml`; exactly one active store; built-in/default only `sqlite`.\n- Facade owns lifecycle/availability/locks/recovery, not domain logic.\n- Explicit lifecycle; no auto-open/close or implicit recreation.\n- Provider locks/recreation helpers internal.\n- Depends on `@specd/core` for `SpecdConfig`.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:a3fb56f3f6d13d242e92daac0c81835f85b4023d78f736d1ea88cdc58a3e18b6",
-          "lastModified": "2026-08-25T14:41:04.208Z"
+          "hash": "sha256:5394d730d061310785e78870b2784f32727b09369b80aaaf52fff72fb2bab395",
+          "lastModified": "2026-09-28T11:19:59.037Z"
         },
         "verify.md": {
-          "hash": "sha256:378cd63df7c9bd70993864a8142cb9b30a8c8b9dcad367c6b5461668a6b79dad",
-          "lastModified": "2026-08-25T14:41:04.208Z"
+          "hash": "sha256:631f9272a864cc6b1049b585992062de437f2cfcbdf0350762035f81fc508f89",
+          "lastModified": "2026-09-28T11:19:59.044Z"
         }
       }
     }

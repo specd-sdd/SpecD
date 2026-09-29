@@ -1,5 +1,6 @@
 import { mkdirSync, rmSync } from 'node:fs'
-import { join } from 'node:path'
+import { isAbsolute, join } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { StoreNotOpenError } from '../../domain/errors/store-not-open-error.js'
 import { GraphSchemaIncompatibleError } from '../../domain/errors/graph-schema-incompatible-error.js'
 import {
@@ -10,6 +11,7 @@ import { GraphStoreRecreateRequiresClosedError } from '../../domain/errors/graph
 import { expandSearchQuery } from '../../domain/services/expand-search-query.js'
 import { expandSymbolName } from '../../domain/services/expand-symbol-name.js'
 import { matchesExclude } from '../../domain/services/matches-exclude.js'
+import { splitWorkspaceIdentity } from '../../domain/services/split-workspace-identity.js'
 import { createDocumentNode, type DocumentNode } from '../../domain/value-objects/document-node.js'
 import { createFileNode, type FileNode } from '../../domain/value-objects/file-node.js'
 import { type GraphStatistics } from '../../domain/value-objects/graph-statistics.js'
@@ -23,8 +25,12 @@ import { createSpecNode, type SpecNode } from '../../domain/value-objects/spec-n
 import { createSymbolNode, type SymbolNode } from '../../domain/value-objects/symbol-node.js'
 import { type SymbolQuery } from '../../domain/value-objects/symbol-query.js'
 import {
+  MemberAccessor,
+  MemberDispatch,
+  MemberKind,
   type LocalBinding,
   type LogicalSymbol,
+  type MemberSemantics,
   type PublicBinding,
   type ResolutionStep,
 } from '../../domain/value-objects/symbol-reference.js'
@@ -41,6 +47,8 @@ import {
   type UpdateIndexedInputObservationInput,
 } from '../../domain/value-objects/indexed-input-freshness.js'
 import {
+  type ImpactFrontierQuery,
+  type ImpactFrontierResult,
   type LocalBindingLookup,
   type LogicalDeclaration,
   type LogicalSymbolLookup,
@@ -52,6 +60,7 @@ import { SQLITE_SCHEMA_DDL, SQLITE_SCHEMA_VERSION } from './schema.js'
 import {
   ensureStorageGeneration,
   readStorageGeneration,
+  retryLocked,
   rotateStorageGeneration,
 } from '../storage-generation.js'
 import { type SqliteRuntimeDescriptor } from './sqlite-runtime-descriptor.js'
@@ -100,6 +109,24 @@ const SQLITE_BATCH_PARAMETER_LIMIT = 900
 const SYMBOL_ROW_COLUMNS =
   'id, name, kind, file_path, parent_id, line, column_number, end_line, end_column, selection_start_line, selection_start_column, selection_end_line, selection_end_column, comment'
 
+/**
+ * Converts a SqliteRuntimeDescriptor modulePath into a dynamic-import target.
+ * Absolute filesystem paths become `file:` URLs so Windows drive letters are not
+ * misread as URL schemes. Package specifiers and already-qualified URLs pass through.
+ * @param modulePath - Path or module specifier from the runtime descriptor.
+ * @returns Specifier safe for `import()`.
+ */
+export function resolveSqliteModuleImportTarget(modulePath: string): string {
+  const trimmed = modulePath.trim()
+  if (trimmed.startsWith('file:') || trimmed.startsWith('data:') || trimmed.startsWith('node:')) {
+    return trimmed
+  }
+  if (isAbsolute(trimmed)) {
+    return pathToFileURL(trimmed).href
+  }
+  return trimmed
+}
+
 /** Raw SQLite row projected into a domain symbol. */
 interface SymbolRow {
   readonly id: string
@@ -138,7 +165,11 @@ interface LogicalSymbolRow {
   readonly name: string
   readonly space: LogicalSymbol['space']
   readonly owner_id: string | null
-  readonly member_form: LogicalSymbol['memberForm'] | null
+  readonly member_kind: string | null
+  readonly member_dispatch: string | null
+  readonly member_accessor: string | null
+  readonly native_kind: string | null
+  readonly qualified_name: string | null
 }
 
 /**
@@ -326,7 +357,8 @@ export class SQLiteGraphDatabase {
     runtime?: SqliteRuntimeDescriptor,
   ): Promise<SqliteDatabaseModule> {
     if (runtime?.modulePath && runtime.modulePath.trim().length > 0) {
-      return (await import(runtime.modulePath)) as unknown as SqliteDatabaseModule
+      const importTarget = resolveSqliteModuleImportTarget(runtime.modulePath)
+      return (await import(importTarget)) as unknown as SqliteDatabaseModule
     }
     return (await import('better-sqlite3')) as unknown as SqliteDatabaseModule
   }
@@ -351,7 +383,12 @@ export class SQLiteGraphDatabase {
     if (this.db !== undefined) {
       throw new GraphStoreRecreateRequiresClosedError()
     }
-    rmSync(this.graphDir, { recursive: true, force: true })
+    const dbPath = join(this.graphDir, 'code-graph.sqlite')
+    for (const suffix of ['', '-wal', '-shm']) {
+      retryLocked(() => {
+        rmSync(`${dbPath}${suffix}`, { force: true })
+      })
+    }
     rotateStorageGeneration(this.storagePath)
     this._lastIndexedAt = undefined
     this._lastIndexedRef = null
@@ -536,6 +573,58 @@ export class SQLiteGraphDatabase {
     relationTypes: readonly RelationTypeValue[],
   ): Relation[] {
     return this.getSymbolRelationsBatch('source', symbolIds, relationTypes)
+  }
+
+  /**
+   * Selects one filtered, deterministic impact frontier entirely in SQLite.
+   *
+   * Each relation is admitted only when its neighboring endpoint belongs to
+   * the requested resource category and satisfies the optional kind and
+   * workspace constraints. Result types control hydration, not relation
+   * admission, so callers can still traverse and aggregate from the returned
+   * relation evidence without receiving unrequested resource rows.
+   *
+   * @param input - Current traversal frontier, orientation, and filters.
+   * @returns Admitted relations and only the requested hydrated resources.
+   */
+  queryImpactFrontier(input: ImpactFrontierQuery): ImpactFrontierResult {
+    const frontier = [...new Set(input.frontier)].sort()
+    const relationTypes = [...new Set(input.relationTypes)].sort()
+    if (frontier.length === 0 || relationTypes.length === 0) {
+      return { relations: [], symbols: [], files: [], specs: [] }
+    }
+
+    const relationRows = new Map<string, RelationRow>()
+    const neighborIds = new Set<string>()
+    const directions =
+      input.direction === 'both'
+        ? (['upstream', 'downstream'] as const)
+        : ([input.direction] as const)
+    for (const direction of directions) {
+      for (const row of this.queryImpactFrontierDirection(
+        input,
+        direction,
+        frontier,
+        relationTypes,
+      )) {
+        relationRows.set(`${row.source}\u0000${row.type}\u0000${row.target}`, row)
+        neighborIds.add(direction === 'upstream' ? row.source : row.target)
+      }
+    }
+
+    const relations = this.readRelations([...relationRows.values()]).sort(compareRelations)
+    const ids = [...neighborIds].sort()
+    const types = input.filter?.types
+    const materializes = (type: 'files' | 'symbols' | 'specs'): boolean =>
+      types === undefined || types.length === 0 || types.includes(type)
+
+    return {
+      relations,
+      symbols:
+        input.resource === 'symbol' && materializes('symbols') ? this.getSymbolsByIds(ids) : [],
+      files: input.resource === 'file' && materializes('files') ? this.getFilesByPaths(ids) : [],
+      specs: input.resource === 'spec' && materializes('specs') ? this.getSpecsByIds(ids) : [],
+    }
   }
 
   /**
@@ -1067,7 +1156,7 @@ export class SQLiteGraphDatabase {
   getAllReferenceFacts(): ReferenceFactsWrite {
     const logicalSymbols = (
       this.statement(
-        'SELECT id, workspace, surface, name, space, owner_id, member_form FROM logical_symbols',
+        'SELECT id, workspace, surface, name, space, owner_id, member_kind, member_dispatch, member_accessor, native_kind, qualified_name FROM logical_symbols',
       ).all() as LogicalSymbolRow[]
     )
       .map((row) => this.mapLogicalSymbolRow(row))
@@ -1120,7 +1209,7 @@ export class SQLiteGraphDatabase {
     if (ids.length === 0) return []
     const placeholders = ids.map(() => '?').join(', ')
     const rows = this.statement(
-      `SELECT id, workspace, surface, name, space, owner_id, member_form FROM logical_symbols WHERE id IN (${placeholders}) ORDER BY workspace, surface, name, space, owner_id, member_form, id`,
+      `SELECT id, workspace, surface, name, space, owner_id, member_kind, member_dispatch, member_accessor, native_kind, qualified_name FROM logical_symbols WHERE id IN (${placeholders}) ORDER BY workspace, surface, name, space, owner_id, member_kind, member_dispatch, member_accessor, native_kind, id`,
     ).all(...ids) as LogicalSymbolRow[]
     return rows.map((row) => this.mapLogicalSymbolRow(row))
   }
@@ -1412,12 +1501,15 @@ export class SQLiteGraphDatabase {
         )
         if (!pattern.test(row.file_path)) return false
       }
-      if (options.workspace !== undefined && !row.file_path.startsWith(options.workspace + ':')) {
+      if (
+        options.workspace !== undefined &&
+        splitWorkspaceIdentity(row.file_path)?.workspace !== options.workspace
+      ) {
         return false
       }
       if (options.excludeWorkspaces !== undefined) {
-        const wsName = row.file_path.substring(0, row.file_path.indexOf(':'))
-        if (options.excludeWorkspaces.includes(wsName)) return false
+        const wsName = splitWorkspaceIdentity(row.file_path)?.workspace
+        if (wsName !== undefined && options.excludeWorkspaces.includes(wsName)) return false
       }
       return !matchesExclude(row.file_path, options.excludePaths, options.excludeWorkspaces)
     })
@@ -2123,12 +2215,15 @@ export class SQLiteGraphDatabase {
   findLogicalSymbols(lookups: readonly LogicalSymbolLookup[]): LogicalSymbol[] {
     if (lookups.length === 0) return []
     const rows = this.statement(
-      `SELECT id, workspace, surface, name, space, owner_id, member_form FROM logical_symbols
+      `SELECT id, workspace, surface, name, space, owner_id, member_kind, member_dispatch, member_accessor, native_kind, qualified_name FROM logical_symbols
        WHERE workspace = ? AND name = ?
          AND (? IS NULL OR surface = ?)
          AND (? IS NULL OR space = ?)
          AND (? IS NULL OR owner_id = ?)
-         AND (? IS NULL OR member_form = ?)`,
+         AND (? IS NULL OR member_kind = ?)
+         AND (? IS NULL OR member_dispatch = ?)
+         AND (? IS NULL OR member_accessor = ?)
+         AND (? IS NULL OR native_kind = ?)`,
     )
     const results = new Map<string, LogicalSymbol>()
     for (const lookup of lookups) {
@@ -2141,14 +2236,36 @@ export class SQLiteGraphDatabase {
         lookup.space ?? null,
         lookup.ownerId ?? null,
         lookup.ownerId ?? null,
-        lookup.memberForm ?? null,
-        lookup.memberForm ?? null,
+        lookup.memberKind ?? null,
+        lookup.memberKind ?? null,
+        lookup.memberDispatch ?? null,
+        lookup.memberDispatch ?? null,
+        lookup.memberAccessor ?? null,
+        lookup.memberAccessor ?? null,
+        lookup.nativeKind ?? null,
+        lookup.nativeKind ?? null,
       ) as LogicalSymbolRow[]) {
         const symbol = this.mapLogicalSymbolRow(row)
         results.set(symbol.id, symbol)
       }
     }
     return [...results.values()].sort(compareLogicalSymbols)
+  }
+
+  /**
+   * Finds every logical symbol whose stored qualified spelling equals one of the names.
+   * @param qualifiedNames - Generic dotted spellings such as `GetStatus.execute`.
+   * @returns Matching logical symbols in deterministic order.
+   */
+  findLogicalSymbolsByQualifiedNames(qualifiedNames: readonly string[]): LogicalSymbol[] {
+    const names = [...new Set(qualifiedNames.filter((name) => name.length > 0))]
+    if (names.length === 0) return []
+    const placeholders = names.map(() => '?').join(', ')
+    const rows = this.statement(
+      `SELECT id, workspace, surface, name, space, owner_id, member_kind, member_dispatch, member_accessor, native_kind, qualified_name
+       FROM logical_symbols WHERE qualified_name IN (${placeholders})`,
+    ).all(...names) as LogicalSymbolRow[]
+    return rows.map((row) => this.mapLogicalSymbolRow(row)).sort(compareLogicalSymbols)
   }
 
   /**
@@ -2886,6 +3003,89 @@ export class SQLiteGraphDatabase {
   }
 
   /**
+   * Reads one oriented, resource-filtered set of impact relations.
+   *
+   * SQL identifiers below are selected exclusively from the closed resource and
+   * direction unions. Every value derived from the request is supplied through
+   * a bound parameter.
+   *
+   * @param input - Full frontier request.
+   * @param direction - One concrete relation orientation.
+   * @param frontier - Canonical, non-empty frontier identifiers.
+   * @param relationTypes - Canonical, non-empty relation types.
+   * @returns Rows admitted by the resource and filter predicates.
+   * @throws {RangeError} If fixed filter values exhaust SQLite's parameter budget.
+   */
+  private queryImpactFrontierDirection(
+    input: ImpactFrontierQuery,
+    direction: 'upstream' | 'downstream',
+    frontier: readonly string[],
+    relationTypes: readonly RelationTypeValue[],
+  ): RelationRow[] {
+    const endpoint = direction === 'upstream' ? 'r.source' : 'r.target'
+    const frontierEndpoint = direction === 'upstream' ? 'r.target' : 'r.source'
+    const joins: string[] = []
+    const conditions: string[] = []
+    const filterParams: unknown[] = []
+    const filter = input.filter
+
+    let workspaceColumn: string
+    if (input.resource === 'symbol') {
+      joins.push(`JOIN symbols n ON n.id = ${endpoint}`, 'JOIN files f ON f.path = n.file_path')
+      workspaceColumn = 'f.workspace'
+      const kinds = [...new Set(filter?.kinds ?? [])].sort()
+      if (kinds.length > 0) {
+        conditions.push(`n.kind IN (${kinds.map(() => '?').join(', ')})`)
+        filterParams.push(...kinds)
+      }
+    } else if (input.resource === 'file') {
+      joins.push(`JOIN files n ON n.path = ${endpoint}`)
+      workspaceColumn = 'n.workspace'
+    } else {
+      joins.push(`JOIN specs n ON n.spec_id = ${endpoint}`)
+      workspaceColumn = 'n.workspace'
+    }
+
+    const includedWorkspaces = [...new Set(filter?.workspaces ?? [])].sort()
+    if (includedWorkspaces.length > 0) {
+      conditions.push(`${workspaceColumn} IN (${includedWorkspaces.map(() => '?').join(', ')})`)
+      filterParams.push(...includedWorkspaces)
+    }
+    const excludedWorkspaces = [...new Set(filter?.excludeWorkspaces ?? [])].sort()
+    if (excludedWorkspaces.length > 0) {
+      conditions.push(`${workspaceColumn} NOT IN (${excludedWorkspaces.map(() => '?').join(', ')})`)
+      filterParams.push(...excludedWorkspaces)
+    }
+
+    const fixedParameterCount = relationTypes.length + filterParams.length
+    const frontierChunkSize = SQLITE_BATCH_PARAMETER_LIMIT - fixedParameterCount
+    if (frontierChunkSize < 1) {
+      throw new RangeError('impact frontier filters exceed the SQLite batch parameter limit')
+    }
+
+    const rows: RelationRow[] = []
+    const relationTypePlaceholders = relationTypes.map(() => '?').join(', ')
+    for (const frontierChunk of chunksOf(frontier, frontierChunkSize)) {
+      const frontierPlaceholders = frontierChunk.map(() => '?').join(', ')
+      const predicateSql = [
+        `${frontierEndpoint} IN (${frontierPlaceholders})`,
+        `r.type IN (${relationTypePlaceholders})`,
+        ...conditions,
+      ].join(' AND ')
+      rows.push(
+        ...(this.statement(
+          `SELECT r.source, r.target, r.type, r.metadata_json
+           FROM relations r
+           ${joins.join('\n')}
+           WHERE ${predicateSql}
+           ORDER BY r.source, r.type, r.target`,
+        ).all(...frontierChunk, ...relationTypes, ...filterParams) as RelationRow[]),
+      )
+    }
+    return rows
+  }
+
+  /**
    * Retrieves relations by source.
    *
    * @param type - Type parameter.
@@ -3028,7 +3228,7 @@ export class SQLiteGraphDatabase {
 
     executeBatchedInsert(
       db,
-      'INSERT INTO logical_symbols (id, workspace, surface, name, space, owner_id, member_form)',
+      'INSERT INTO logical_symbols (id, workspace, surface, name, space, owner_id, member_kind, member_dispatch, member_accessor, native_kind, qualified_name)',
       facts.logicalSymbols.map((symbol) => [
         symbol.id,
         symbol.workspace,
@@ -3036,7 +3236,11 @@ export class SQLiteGraphDatabase {
         symbol.name,
         symbol.space,
         symbol.ownerId ?? null,
-        symbol.memberForm ?? null,
+        symbol.memberSemantics?.kind ?? null,
+        symbol.memberSemantics?.dispatch ?? null,
+        symbol.memberSemantics?.accessor ?? null,
+        symbol.memberSemantics?.nativeKind ?? null,
+        symbol.qualifiedName ?? null,
       ]),
     )
 
@@ -3129,7 +3333,8 @@ export class SQLiteGraphDatabase {
                 COALESCE(lb.local_name, '')
               )),
               ''
-            ) AS reference_search
+            ) AS reference_search,
+            COALESCE(group_concat(DISTINCT l.id), '') AS logical_ids
           FROM symbols s
           LEFT JOIN logical_declarations ld ON ld.symbol_id = s.id
           LEFT JOIN logical_symbols l ON l.id = ld.logical_symbol_id
@@ -3143,11 +3348,34 @@ export class SQLiteGraphDatabase {
       name: string
       comment: string | null
       reference_search: string
+      logical_ids: string
     }>
+    const logicalNames = new Map(
+      (
+        db.prepare('SELECT id, name, owner_id FROM logical_symbols').all() as Array<{
+          id: string
+          name: string
+          owner_id: string | null
+        }>
+      ).map((logical) => [logical.id, logical]),
+    )
+    const qualifiedPath = (id: string, seen = new Set<string>()): string => {
+      const logical = logicalNames.get(id)
+      if (logical === undefined || seen.has(id)) return ''
+      seen.add(id)
+      if (logical.owner_id === null) return logical.name
+      const owner = qualifiedPath(logical.owner_id, seen)
+      return owner.length === 0 ? logical.name : `${owner}.${logical.name}`
+    }
     for (const row of symbolRows) {
+      const qualified = row.logical_ids
+        .split(',')
+        .map((id) => qualifiedPath(id))
+        .filter((value) => value.length > 0)
+        .join(' ')
       symbolInsert.run(
         row.id,
-        expandSymbolName(`${row.name} ${row.reference_search}`),
+        expandSymbolName(`${row.name} ${row.reference_search} ${qualified}`),
         row.comment ?? '',
       )
     }
@@ -3391,7 +3619,10 @@ export class SQLiteGraphDatabase {
       name: row.name,
       space: row.space,
       ownerId: row.owner_id ?? undefined,
-      memberForm: row.member_form ?? undefined,
+      memberSemantics: memberSemanticsFromRow(row),
+      ...(row.qualified_name == null || row.qualified_name === ''
+        ? {}
+        : { qualifiedName: row.qualified_name }),
     }
   }
 
@@ -3551,11 +3782,60 @@ function compareStrings(left: readonly string[], right: readonly string[]): numb
 }
 
 /**
- * Executes compare logical symbols operation.
- *
- * @param left - Left parameter.
- * @param right - Right parameter.
- * @returns The result of compare logical symbols.
+ * Rebuilds member semantics from the four nullable columns.
+ * @param row - Logical-symbol table row.
+ * @returns Member semantics, or undefined when the kind column is empty.
+ */
+function memberSemanticsFromRow(row: LogicalSymbolRow): MemberSemantics | undefined {
+  if (row.member_kind == null || !isMemberKindValue(row.member_kind)) return undefined
+  const dispatch =
+    row.member_dispatch != null && isMemberDispatchValue(row.member_dispatch)
+      ? row.member_dispatch
+      : undefined
+  const accessor =
+    row.member_accessor != null && isMemberAccessorValue(row.member_accessor)
+      ? row.member_accessor
+      : undefined
+  return {
+    kind: row.member_kind,
+    ...(dispatch === undefined ? {} : { dispatch }),
+    ...(accessor === undefined ? {} : { accessor }),
+    ...(row.native_kind == null || row.native_kind === '' ? {} : { nativeKind: row.native_kind }),
+  }
+}
+
+/**
+ * Checks whether a stored column is a member kind.
+ * @param value - Column text.
+ * @returns Whether the value is a member kind.
+ */
+function isMemberKindValue(value: string): value is MemberSemantics['kind'] {
+  return Object.values(MemberKind).includes(value as MemberSemantics['kind'])
+}
+
+/**
+ * Checks whether a stored column is a member dispatch.
+ * @param value - Column text.
+ * @returns Whether the value is a member dispatch.
+ */
+function isMemberDispatchValue(value: string): value is NonNullable<MemberSemantics['dispatch']> {
+  return Object.values(MemberDispatch).includes(value as NonNullable<MemberSemantics['dispatch']>)
+}
+
+/**
+ * Checks whether a stored column is a member accessor.
+ * @param value - Column text.
+ * @returns Whether the value is a member accessor.
+ */
+function isMemberAccessorValue(value: string): value is NonNullable<MemberSemantics['accessor']> {
+  return Object.values(MemberAccessor).includes(value as NonNullable<MemberSemantics['accessor']>)
+}
+
+/**
+ * Orders logical symbols by workspace, surface, owner, space, and name.
+ * @param left - First logical symbol.
+ * @param right - Second logical symbol.
+ * @returns Locale comparison result.
  */
 function compareLogicalSymbols(left: LogicalSymbol, right: LogicalSymbol): number {
   return compareStrings(
@@ -3565,7 +3845,10 @@ function compareLogicalSymbols(left: LogicalSymbol, right: LogicalSymbol): numbe
       left.ownerId ?? '',
       left.space,
       left.name,
-      left.memberForm ?? '',
+      left.memberSemantics?.kind ?? '',
+      left.memberSemantics?.dispatch ?? '',
+      left.memberSemantics?.accessor ?? '',
+      left.memberSemantics?.nativeKind ?? '',
       left.id,
     ],
     [
@@ -3574,7 +3857,10 @@ function compareLogicalSymbols(left: LogicalSymbol, right: LogicalSymbol): numbe
       right.ownerId ?? '',
       right.space,
       right.name,
-      right.memberForm ?? '',
+      right.memberSemantics?.kind ?? '',
+      right.memberSemantics?.dispatch ?? '',
+      right.memberSemantics?.accessor ?? '',
+      right.memberSemantics?.nativeKind ?? '',
       right.id,
     ],
   )
@@ -4168,7 +4454,10 @@ function relationEndpointsExist(relation: Relation, ids: RelationEndpointIds): b
     case RelationType.CoversFile:
       return ids.specs.has(relation.source) && ids.files.has(relation.target)
     case RelationType.CoversSymbol:
-      return ids.specs.has(relation.source) && ids.logicalSymbols.has(relation.target)
+      return (
+        ids.specs.has(relation.source) &&
+        (ids.symbols.has(relation.target) || ids.logicalSymbols.has(relation.target))
+      )
     default:
       return false
   }

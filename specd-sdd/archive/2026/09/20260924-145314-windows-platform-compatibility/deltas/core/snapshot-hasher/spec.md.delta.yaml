@@ -1,0 +1,16 @@
+- op: modified
+  description: 'Snapshot digests use the same text newline normalization as ContentHasher.'
+  selector:
+    type: section
+    matches: 'Requirement: Determinism'
+  content: |
+    The same text always produces the same hash after the injected `hashContent` function runs. `hashFiles` MUST forward each string to `hashContent` unchanged. It MUST NOT detect a binary string and MUST NOT rewrite newlines itself. Newline normalization belongs to the text hasher from `core:content-hasher-port`. Raw file bytes are not strings and MUST NOT be passed through `hashFiles`.
+
+- op: modified
+  description: 'Snapshot hashing depends on the content hasher newline contract.'
+  selector:
+    type: section
+    matches: '^Spec Dependencies$'
+  content: |
+    - [`default:_global/architecture`](../../_global/architecture/spec.md) — pure function requirement for domain services
+    - [`core:content-hasher-port`](../content-hasher-port/spec.md) — text hashes normalize newlines before the digest

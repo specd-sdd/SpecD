@@ -47,7 +47,11 @@ to these invariants:
    MUST NOT claim a hard wall-clock bound while native code is executing.
 7. SQLite runtime configuration crossing the boundary MUST use a serializable
    `SqliteRuntimeDescriptor`. A custom `modulePath` MAY select a compatible
-   runtime binding. Internal worker-path test overrides MUST NOT be public options.
+   runtime binding. When `modulePath` is an absolute filesystem path, the loader
+   MUST convert it to a `file:` URL before dynamic `import()` so Windows
+   drive-letter paths are not misread as URL schemes. Package specifiers and
+   already-qualified `file:`, `data:`, and `node:` URLs MUST pass through unchanged.
+   Internal worker-path test overrides MUST NOT be public options.
 8. Unexpected worker error or exit MUST fault the store and reject outstanding
    operations with `StoreWorkerError`. Recovery is explicit `close()` then
    `open()`; the store MUST NOT silently restart.
@@ -75,6 +79,16 @@ Large input sets MUST be divided into deterministic bounded SQL parameter chunks
 inside the worker so SQLite parameter limits cannot make a valid graph traversal
 fail. Results MUST preserve the deterministic ordering and empty-input semantics
 of the abstract contract.
+
+### Requirement: Query-time filtered impact reads
+
+The SQLite graph database SHALL implement the backend-neutral filtered-impact query contract using parameterized SQL predicates for requested result types, symbol kinds, included workspaces, and excluded workspaces. Workspace predicates SHALL use the persisted canonical workspace columns for files, specs, and logical symbols, or the owning file join for declaration symbols. Exclusions SHALL be applied in SQL after inclusion normalization and SHALL take precedence.
+
+SQLite SHALL constrain each impact frontier before materializing candidate rows. Result-type selection SHALL avoid hydrating unrequested file, symbol, or spec collections; symbol-kind predicates SHALL be part of the symbol query; and workspace predicates SHALL be part of every requested category query. Excluded rows MUST NOT cross from `SQLiteGraphDatabase` to `SQLiteGraphStore` for TypeScript post-filtering.
+
+The worker operation map SHALL define a serializable filtered-impact payload and result. `SQLiteGraphStore` SHALL send the normalized filter unchanged, the worker dispatcher SHALL pass it unchanged to `SQLiteGraphDatabase`, and database results SHALL be returned without widening. The generic worker client SHALL retain its existing typed request, overload, lifecycle, and error behavior.
+
+Filtered reads SHALL remain bounded and deterministic. Empty inclusion lists SHALL omit the inclusion predicate, empty exclusion or kind lists SHALL omit their predicates, duplicate filter values SHALL be normalized before the worker request, and all dynamic values SHALL use bound parameters rather than SQL interpolation.
 
 ### Requirement: Worker-backed exact batch node lookups
 
@@ -131,6 +145,12 @@ unrelated I/O errors MUST propagate without recreation authority.
 
 A healthy forced reindex SHALL use the existing opened-store logical clear path and
 MUST NOT implement force by closing, deleting, reopening, or re-closing SQLite.
+
+### Requirement: Locked recreation preserves the index lease
+
+When `recreate()` deletes the SQLite database or its WAL sidecars and the deletion fails with `EPERM`, `EBUSY`, or `EACCES`, it MUST retry a bounded number of times and then MUST surface the original error.
+
+`recreate()` MUST NOT delete a live `index.lock`. A lock that is held by a running index MUST survive recreation of the database files.
 
 ### Requirement: SQLite logical clear parity
 
@@ -302,26 +322,17 @@ abstract `GraphStore` contract.
 
 ### Requirement: Reference schema upgrade
 
-SQLite SHALL persist the logical-symbol, declaration, member, symbol-space,
-binding, provenance, coverage, construct-range, and selection-range fields
-required by `GraphStore`. Structured lookup columns SHALL be indexed; serialized
-canonical ids MUST NOT be parsed or substring-ranked to implement semantic lookup.
-Canonical ids remain unique external identities; backend-local integer row keys
-MAY be used for physical joins when provider-visible ids do not change.
+SQLite SHALL persist the logical-symbol, declaration, member-semantics, symbol-space, binding, provenance, coverage, construct-range, and selection-range fields required by `GraphStore`. Structured lookup columns SHALL be indexed. Serialized canonical ids MUST NOT be parsed or substring-ranked to implement semantic lookup. Canonical ids remain unique external identities; backend-local integer row keys MAY be used for physical joins when provider-visible ids do not change.
 
-SQLite SHALL maintain the substring-capable source-content index and bounded
-short-query fallback required by the abstract store. Reverse coverage and new
-traversal batch reads SHALL use set-based predicates and deterministic ordering.
+The reference schema version MUST be **12**. `SQLITE_SCHEMA_VERSION` MUST change to 12 in the same revision as the DDL. `CREATE TABLE IF NOT EXISTS` does not alter an existing database, so the version mismatch MUST reject ordinary reads with `GraphSchemaIncompatibleError` and recovery reason `SCHEMA_INCOMPATIBLE`. `graph index` SHALL recreate derived storage, rotate `storage.epoch`, and rebuild search indexes before readiness. The implementation MUST NOT use `ALTER TABLE` and MUST NOT read version 10 or version 11 rows beside version 12 rows.
 
-The backend SHALL track reference schema version `9`. A later schema-affecting
-change SHALL increment the version exactly once. Incompatible data MUST reject
-ordinary reads; `graph index` SHALL rebuild destructively, rotate
-`storage.epoch`, and rebuild search indexes before readiness.
+`logical_symbols` SHALL drop `member_form` and SHALL add nullable `member_kind`, `member_dispatch`, `member_accessor`, `native_kind`, and `qualified_name`. `qualified_name` stores the generic dotted owner path and MUST have an equality index. `idx_logical_symbols_member_lookup` SHALL use the member-semantics columns in place of `member_form`. `id`, `workspace`, `surface`, `name`, `space`, and `owner_id` stay. Stored `id` text MUST use the versioned canonical encoding; previous ids are discarded by the rebuild.
 
-Indexed-input observations, freshness latches, VCS evidence, and compact
-unchanged-file facts SHALL remain persisted. One indexing run SHALL use one
-transaction, set-based endpoint validation, bounded writes, one commit, and one
-semantic/content index rebuild.
+`public_bindings`, `resolution_steps`, `symbols.parent_id`, `symbols.search_text`, `logical_declarations`, `local_bindings`, `index_coverage`, `relations`, and `symbol_fts` (`id`, `search_text`, `comment`) MUST keep their current columns. New re-export bindings and resolution steps are new rows. `symbol_fts.search_text` MAY still contain a qualified spelling for discovery. It MUST NOT be the exact-match key. `symbols.search_text` remains the expanded bare name.
+
+SQLite SHALL maintain the substring-capable source-content index and bounded short-query fallback required by the abstract store. Reverse coverage and traversal batch reads SHALL use set-based predicates and deterministic ordering.
+
+Indexed-input observations, freshness latches, VCS evidence, and compact unchanged-file facts SHALL remain persisted. One indexing run SHALL use one transaction, set-based endpoint validation, bounded writes, one commit, and one semantic and content index rebuild. Inserts, selects, and the worker row shape MUST use the version 12 columns in the same revision.
 
 ## Constraints
 

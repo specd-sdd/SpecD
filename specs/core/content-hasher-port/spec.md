@@ -14,13 +14,19 @@ The port MUST be declared as a TypeScript `abstract class` named `ContentHasher`
 
 The `hash` method MUST accept a single `content` parameter of type `string`. Implementations MUST treat the input as UTF-8 encoded text.
 
+### Requirement: Text newline normalization
+
+`ContentHasher.hash` and the shared text `sha256` helper MUST normalize line endings before the digest: every `\r\n` and every remaining `\r` MUST become `\n`. Every string passed to those functions is text. There is no binary string mode on this port.
+
+Artifact hashes are a different contract. Pre-hash cleanup collapses whitespace before the digest, so an artifact hash MUST NOT be required to preserve line endings. Callers that hash raw file bytes MUST NOT send those bytes through the text helper.
+
 ### Requirement: Hash output format
 
 The `hash` method MUST return a string in the format `<algorithm>:<hex>`, where `<algorithm>` is a lowercase identifier for the hashing algorithm (e.g. `sha256`) and `<hex>` is the lowercase hexadecimal digest. This prefixed format makes the algorithm explicit and allows future algorithm changes without ambiguity.
 
 ### Requirement: Determinism
 
-The same input string MUST always produce the same output. Two calls with identical `content` values MUST return identical results.
+The same input string MUST always produce the same output after text newline normalization. Two calls whose content is identical once `\r\n` and `\r` are normalized to `\n` MUST return identical results.
 
 ### Requirement: Empty content
 

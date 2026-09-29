@@ -95,12 +95,26 @@
 - **WHEN** `expandForShell()` is called
 - **THEN** the result is `"echo 'it'\\''s-a-test'"` (value is single-quote escaped)
 
+#### Scenario: A composed path stays inside the developer quotes
+
+- **GIVEN** a template `mkdir "{{project.root}}/{{change.name}}"`
+- **AND** variables `{ project: { root: "/repo" }, change: { name: "add-auth" } }`
+- **WHEN** `expand()` is called
+- **THEN** the result is `mkdir "/repo/add-auth"`
+- **AND** SpecD has not added another pair of quotes around either value
+
 #### Scenario: expand does not escape
 
 - **GIVEN** a template `"Read {{change.name}}"`
 - **AND** variables `{ change: { name: "it's-a-test" } }`
 - **WHEN** `expand()` is called
 - **THEN** the result is `"Read it's-a-test"` (value is verbatim)
+
+#### Scenario: Instruction text stays verbatim
+
+- **GIVEN** an `instruction:` template contains a value with spaces
+- **WHEN** the template is expanded with `expand()`
+- **THEN** the value is substituted without shell escaping
 
 ### Requirement: Namespace naming rules
 

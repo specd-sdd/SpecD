@@ -34,6 +34,18 @@ When no VCS is detected (all probes fail), `createVcsAdapter` MUST return a `Nul
 
 The factory remains responsible only for composition and backend selection. It does not itself perform implementation detection.
 
+### Requirement: Built-in adapters normalize repository roots
+
+The git, Mercurial, and Subversion adapters selected by `createVcsAdapter` MUST normalize the repository root before caching it and before returning it from `rootDir()`.
+
+Normalization MUST produce an absolute path. A Windows drive letter MUST be uppercased. The adapter MUST NOT canonicalize the root with `realpath`. The normalized value MUST remain a valid working directory for later CLI invocations of that same VCS.
+
+`NullVcsAdapter` MUST continue to throw from `rootDir()` and MUST NOT invent a root.
+
+Modified-file paths returned by those three adapters MUST use `/` as the separator. That conversion MUST NOT collapse `.` or `..` segments.
+
+On Windows, process spawns of `git`, `hg`, and `svn` MUST hide the console window.
+
 ## Constraints
 
 - The factory is async — VCS detection requires spawning external processes

@@ -54,6 +54,22 @@
 - **WHEN** derivation freshness is checked
 - **THEN** the derivation-freshness state is unknown rather than silently treated as matching
 
+#### Scenario: CRLF resolution manifest stays derivation-fresh
+
+- **GIVEN** the persisted derivation fingerprint was computed from LF resolution manifests
+- **AND** the current manifests differ only by CRLF
+- **AND** the code-graph version, workspace layout, and discovery configuration are unchanged
+- **WHEN** derivation freshness is checked
+- **THEN** derivation freshness is not mismatched
+
+#### Scenario: Edited resolution manifest is a derivation mismatch
+
+- **GIVEN** the VCS ref is unchanged
+- **AND** a declared resolution manifest's normalized text differs from the text hashed at index time
+- **WHEN** derivation freshness is checked
+- **THEN** VCS freshness stays fresh
+- **AND** derivation freshness is mismatched
+
 ### Requirement: Warn-not-block policy
 
 #### Scenario: Stale graph still returns results
@@ -108,6 +124,12 @@
 - **GIVEN** `lastIndexedRef` is `null`
 - **WHEN** `graph stats` is run in text mode
 - **THEN** no staleness line SHALL be shown
+
+#### Scenario: Text output names resolution manifests on derivation mismatch
+
+- **GIVEN** a derivation fingerprint mismatch is known
+- **WHEN** `graph stats` is run in text mode
+- **THEN** the output includes `⚠ Derivation fingerprint mismatch — code-graph version, workspace configuration, or resolution manifest content changed`
 
 #### Scenario: JSON output includes staleness fields
 

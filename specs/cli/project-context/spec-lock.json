@@ -18,5 +18,41 @@
     {
       "file": "cli:test/commands/project-context.spec.ts"
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "CLI prints baseline project context via GetProjectContext; project-level patterns only; text via projectContextToMarkdown.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:1723aa56d6dce64276f5488e00ae559197fe130ff01dcf57d6021bd7be6ff528",
+          "lastModified": "2026-07-26T18:50:55.583Z"
+        },
+        "verify.md": {
+          "hash": "sha256:8028dca04ae813fa36db39efa410127ada0fe39a99522c4aaf54332ba98e8f17",
+          "lastModified": "2026-07-26T18:50:55.586Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# cli:project-context\n\n## Rules\n\n### Command\n- MUST support: `specd project context [options]`\n- `--mode <mode>` — optional; `list|summary|full|hybrid`\n- `--rules` / `--constraints` / `--scenarios` — when present, include only those sections in each spec content block; if none passed, all sections\n- `--follow-deps` — transitive `dependsOn` from `.specd-metadata.yaml` beyond include/exclude; default: no traversal\n- `--depth <n>` — only with `--follow-deps`; N levels (1 = direct); unlimited if `--follow-deps` without `--depth`\n- `--optimized` / `--no-optimized` — force/suppress optimized-context preference\n- `--format text|json|toon` — default `text`\n\n### Optimization warning\n- When `llmOptimizedContext: true` and project optimized context missing/stale per `UpdateProjectMetadata` rules: SHALL warn + instruct run optimization skill; structured formats include warning in response\n\n### Behaviour\n- Compiles project-level context only: `context:` entries + specs matched by project `contextIncludeSpecs`/`contextExcludeSpecs` (workspace patterns NOT applied)\n- MUST NOT build `CompileContextConfig` inline from `SpecdConfig`; yaml config baked into kernel-wired `GetProjectContext` at composition\n- Pass only runtime overrides to `GetProjectContext.execute`:\n  - `contextMode` from `--mode` or effective-mode derivation (section flags may force `full` when yaml default not `full`/`hybrid`)\n  - `llmOptimizedContext` only when `--optimized`/`--no-optimized` differs from yaml default\n  - `followDeps`, `depth`, `sections` from flags\n- Use case: (1) render project `context:` (instruction text verbatim; file entries from disk) (2) apply project `contextIncludeSpecs` across workspaces (default `['default:*']`) (3) apply project `contextExcludeSpecs` (4) optional `dependsOn` only with `--follow-deps` (5) render per effective `contextMode`\n- When baked `llmOptimizedContext` enabled: prefer fresh optimized project-level content\n- Optimization bypass for partial sections enforced by `GetProjectContext` via forwarded `sections`; CLI MUST NOT recompute `llmOptimizedContext` from section flags except via `--optimized`/`--no-optimized`\n- MUST suppress `stale-optimization` warnings when optimization effectively bypassed (`--no-optimized` or partial sections)\n\n### Output\n- MUST use structured `GetProjectContextResult`; MUST NOT assemble agent markdown inline\n- **text** (default): call `projectContextToMarkdown(context)` from `@specd/sdk`; print stdout; helper owns entry formatting, full content, catalogue for non-`full` mode\n- Catalogue MUST tell agents: `specd specs context <specId>` for full optimized context; MUST NEVER mention `changes spec-preview` or change-scoped preview\n- Helper returns `no project context configured` → print that; exit 0\n- Section flags apply only to full entries; `list`/`summary` stay list/summary-shaped even with section flags\n- **json/toon**: `contextEntries`, `specs`, `warnings`; shared shape — list omits title/description/content, summary omits content, full includes content; MUST NOT call markdown helper\n\n### Warnings\n- Advisories (missing `file:`, stale metadata, unknown workspace patterns, spec not found) → `warning:` stderr all formats; also `warnings` in json/toon; exit 0\n\n### Errors\n- Config load/discovery/parse failure → entrypoint exit rules\n- Schema unresolved → exit 3\n\n### Full mode / sections\n- `full` (default without section flags): Description, Rules, Constraints per spec\n- One+ section flags → only those sections (headers persist)\n\n## Constraints\n- Read-only\n- Text rendering MUST come from `projectContextToMarkdown`; CLI MUST NOT hardcode catalogue hints or markdown tables\n- Project context text MUST NEVER suggest `changes spec-preview`\n- Only project-level include/exclude; workspace patterns are change-specific\n- `dependsOn` opt-in via `--follow-deps`\n- `--depth` without `--follow-deps` → CLI usage error exit 1\n- Section flags filter full-mode spec content only; project `context:` entries always full\n- Section flags no effect in list/summary modes",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:1723aa56d6dce64276f5488e00ae559197fe130ff01dcf57d6021bd7be6ff528",
+          "lastModified": "2026-07-26T18:50:55.583Z"
+        },
+        "verify.md": {
+          "hash": "sha256:8028dca04ae813fa36db39efa410127ada0fe39a99522c4aaf54332ba98e8f17",
+          "lastModified": "2026-07-26T18:50:55.586Z"
+        }
+      }
+    }
+  }
 }

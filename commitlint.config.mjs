@@ -12,6 +12,8 @@ export default {
         'skills',
         'schema-std',
         'code-graph',
+        'guide',
+        'sdk',
         'specd',
         'plugin-manager',
         'plugin-agent-claude',

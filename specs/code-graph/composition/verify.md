@@ -27,6 +27,35 @@
 - **WHEN** `resolveFileSelector()` is called with a project-relative path
 - **THEN** it resolves correctly to the canonical graph identity
 
+### Requirement: Filtered-impact provider surface
+
+#### Scenario: Facade delegates one complete filtered request
+
+- **GIVEN** an opened provider and a typed impact filter
+- **WHEN** each symbol, file, multi-file, spec, and public-binding impact operation is invoked
+- **THEN** the facade performs its single availability validation and delegates the complete filter once
+- **AND** it returns the deterministic filtered result without facade-side projection
+
+#### Scenario: Symbol and public-binding results expose specs
+
+- **GIVEN** admitted impact evidence with covering specs
+- **WHEN** symbol and public-binding impact request the `specs` category
+- **THEN** each provider result contains the coverage-derived `affectedSpecs`
+- **AND** the facade does not synthesize the collection
+
+#### Scenario: SQLite composition preserves predicates
+
+- **GIVEN** the built-in SQLite provider composition
+- **WHEN** a host invokes filtered impact
+- **THEN** traversal and the active store receive the same normalized predicates
+- **AND** the provider does not first request an unrestricted impact result
+
+#### Scenario: Hosts can import filtered-impact contracts
+
+- **WHEN** a delivery adapter imports from `@specd/code-graph`
+- **THEN** the public impact filter, result-type, and request types are available
+- **AND** SQLite predicate builders, worker DTOs, and backend candidate types are not available from the curated entrypoint
+
 ### Requirement: Factory function
 
 #### Scenario: Primary factory with SpecdConfig
@@ -72,6 +101,7 @@
 - **WHEN** `createCodeGraphProvider` or `createSqliteGraphStoreFactory` is configured with that descriptor
 - **THEN** the factory creates the provider synchronously without error
 - **AND** the descriptor is passed to the underlying SQLite worker during `open()`
+- **AND** an absolute filesystem `modulePath` is loaded via a `file:` URL so Windows drive-letter paths succeed
 
 ### Requirement: Package exports
 
@@ -259,6 +289,42 @@
 - **WHEN** presentation loads symbol details for those candidates
 - **THEN** exactly one exact batch symbol lookup serves all candidates
 - **AND** candidate order, missing-symbol handling, and deterministic output are preserved
+
+### Requirement: Adapter-backed reference normalization
+
+#### Scenario: Indexing and resolution share one registry
+
+- **WHEN** a provider is created
+- **THEN** symbol resolution uses the same adapter registry instance as indexing
+- **AND** no second registry is built
+
+#### Scenario: Unanchored qualified spelling does not guess a language
+
+- **GIVEN** `EditChange.execute` is stored and the request has no explicit language, anchored file, or public surface
+- **WHEN** the provider resolves it
+- **THEN** the result is that member
+- **AND** no adapter is selected
+
+#### Scenario: Other text without context stays unresolved
+
+- **GIVEN** reference text is not a `Tipo.miembro` or `Tipo::miembro` spelling
+- **AND** it has no explicit language, anchored file, or public surface
+- **WHEN** the provider normalizes it
+- **THEN** the result is unresolved
+
+#### Scenario: Anchored file filters a qualified spelling
+
+- **GIVEN** the anchored file is indexed as TypeScript and declares `EditChange.execute`
+- **WHEN** the provider resolves `EditChange.execute`
+- **THEN** the member in that file is returned
+- **AND** the provider does not read `package.json`
+
+#### Scenario: Custom adapter is visible to resolution
+
+- **GIVEN** a custom adapter is registered on the indexing registry
+- **WHEN** resolution needs that adapter's language
+- **THEN** the same registry returns it
+- **AND** no hardcoded built-in language list is consulted instead
 
 ### Requirement: Code Graph-orchestrated search surface
 

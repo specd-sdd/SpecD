@@ -12,7 +12,7 @@ const execFileAsync = promisify(execFile)
  * @throws When the git process exits with a non-zero code
  */
 export async function git(cwd: string, ...args: string[]): Promise<string> {
-  const { stdout } = await execFileAsync('git', args, { cwd })
+  const { stdout } = await execFileAsync('git', args, spawnOptions(cwd))
   return stdout.trim()
 }
 
@@ -26,5 +26,19 @@ export async function git(cwd: string, ...args: string[]): Promise<string> {
  * @throws When the git process exits with a non-zero code
  */
 export function gitSync(cwd: string, ...args: string[]): string {
-  return execFileSync('git', args, { cwd, encoding: 'utf-8' }).trim()
+  return execFileSync('git', args, { ...spawnOptions(cwd), encoding: 'utf-8' }).trim()
+}
+
+/**
+ * Hides the console window when git runs on Windows.
+ *
+ * @param cwd - Working directory for the git command
+ * @param platform - Host platform used to decide `windowsHide`
+ * @returns Spawn options for `execFile`
+ */
+export function spawnOptions(
+  cwd: string,
+  platform: NodeJS.Platform = process.platform,
+): { cwd: string; windowsHide?: true } {
+  return platform === 'win32' ? { cwd, windowsHide: true } : { cwd }
 }

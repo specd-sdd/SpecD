@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { parse, Lang } from '@ast-grep/napi'
 import { type SgNode } from '@ast-grep/napi'
 import {
@@ -17,18 +19,30 @@ import { type Relation, createRelation } from '../../domain/value-objects/relati
 import { SymbolKind } from '../../domain/value-objects/symbol-kind.js'
 import { RelationType } from '../../domain/value-objects/relation-type.js'
 import { findManifestField } from './find-manifest-field.js'
+import { splitWorkspaceIdentity } from '../../domain/services/split-workspace-identity.js'
+import {
+  parseDottedMemberReference,
+  renderDottedMemberReference,
+} from '../../domain/services/parse-member-reference.js'
 import {
   type FileAnalysisDraft,
   type FileAnalysis,
 } from '../../domain/value-objects/file-analysis.js'
 import { type IndexSession } from '../../domain/value-objects/index-session.js'
 import {
-  MemberForm,
+  MemberAccessor,
+  MemberDispatch,
+  MemberKind,
+  type MemberSemantics,
   SymbolSpace,
   createLocalBinding,
   createPublicBinding,
   type AdapterCapabilities,
+  type LogicalSymbol,
+  type ParsedSymbolReference,
+  type PublicBinding,
   type ReferenceFacts,
+  type ResolutionStep,
 } from '../../domain/value-objects/symbol-reference.js'
 import {
   buildHierarchyReferenceFacts,
@@ -36,6 +50,7 @@ import {
   containsSymbolRange,
   createAdapterDeclarationDescriptor,
   type AdapterHierarchyDescriptor,
+  withEnclosingTypeParents,
 } from './reference-fact-helpers.js'
 
 /**
@@ -242,7 +257,7 @@ interface TsTypeDeclarationInfo {
   readonly symbolId: string
   readonly methodsByName: Record<string, string>
   readonly memberSymbolIds: readonly string[]
-  readonly memberFormsById: Readonly<Record<string, MemberForm>>
+  readonly memberSemanticsById: Readonly<Record<string, MemberSemantics>>
   readonly extendsNames: readonly string[]
   readonly implementsNames: readonly string[]
 }
@@ -253,16 +268,29 @@ interface TsTypeDeclarationInfo {
  * @param name - Declared member name.
  * @returns Proven shared member form.
  */
-function typeScriptMemberForm(node: SgNode, name: string): MemberForm {
-  if (name === 'constructor') return MemberForm.Constructor
-  if (nodeKind(node) === 'method_signature') return MemberForm.Signature
+function typeScriptMemberSemantics(node: SgNode, name: string): MemberSemantics {
+  if (name === 'constructor') return { kind: MemberKind.Constructor }
+  if (nodeKind(node) === 'method_signature') return { kind: MemberKind.Signature }
   const source = node.text().trimStart()
-  if (/^(?:public\s+|protected\s+|private\s+)?static\b/.test(source)) {
-    return MemberForm.Static
+  const isStatic =
+    /^(?:(?:public|protected|private|readonly|declare|abstract|override)\s+)*static\b/.test(source)
+  const dispatch = isStatic ? MemberDispatch.Static : MemberDispatch.Instance
+  if (
+    /\bget\b/.test(source) &&
+    /^(?:(?:public|protected|private|static|readonly|declare|abstract|override)\s+)*get\b/.test(
+      source,
+    )
+  ) {
+    return { kind: MemberKind.Property, dispatch, accessor: MemberAccessor.Get }
   }
-  if (/^(?:public\s+|protected\s+|private\s+)?get\b/.test(source)) return MemberForm.Getter
-  if (/^(?:public\s+|protected\s+|private\s+)?set\b/.test(source)) return MemberForm.Setter
-  return MemberForm.Instance
+  if (
+    /^(?:(?:public|protected|private|static|readonly|declare|abstract|override)\s+)*set\b/.test(
+      source,
+    )
+  ) {
+    return { kind: MemberKind.Property, dispatch, accessor: MemberAccessor.Set }
+  }
+  return { kind: MemberKind.Method, dispatch }
 }
 
 /** A statically named or star re-export retained for pass-2 target linking. */
@@ -287,6 +315,8 @@ interface TypeScriptParserState {
  * Uses tree-sitter via ast-grep to extract symbols and relations from source code.
  */
 export class TypeScriptLanguageAdapter implements LanguageAdapter {
+  private readonly workspaceCodeRoots = new Map<string, string>()
+
   /**
    * Declares deterministic TypeScript and JavaScript reference semantics.
    * @returns Supported reference capabilities.
@@ -328,6 +358,29 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
   }
 
   /**
+   * Parses one TypeScript dotted member spelling.
+   * @param text - Human reference text.
+   * @returns One owner-then-member candidate, or none for dynamic text and canonical ids.
+   */
+  parseSymbolReference(text: string): ParsedSymbolReference {
+    return parseDottedMemberReference(text)
+  }
+
+  /**
+   * Renders a TypeScript member with the generic dotted spelling.
+   * @param symbol - Logical symbol.
+   * @param ownerPath - Owner simple names.
+   * @returns Generic and identical native spelling.
+   */
+  renderSymbolReference(
+    symbol: LogicalSymbol,
+    ownerPath: readonly string[],
+  ): { readonly generic: string; readonly native: string } {
+    const generic = renderDottedMemberReference(symbol, ownerPath).generic
+    return { generic, native: generic }
+  }
+
+  /**
    * Returns the file extension to language ID mapping for TypeScript/JavaScript.
    * @returns Extension-to-language map.
    */
@@ -359,6 +412,9 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
       context.session.setAdapterState('napi-keepalive', keepAlive)
     }
     keepAlive.push(sgRoot)
+    if (context.codeRoot !== undefined) {
+      this.workspaceCodeRoots.set(context.workspaceName, context.codeRoot)
+    }
     const root = sgRoot.root()
     const symbols: SymbolNode[] = []
     const seenSymbol = new Set<string>()
@@ -569,7 +625,7 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
             : lang === Lang.JavaScript
               ? 'javascript'
               : 'jsx',
-      symbols,
+      symbols: withEnclosingTypeParents(symbols),
       imports,
       bindingFacts,
       callFacts,
@@ -590,7 +646,7 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
    * @param symbols - Extracted declarations.
    * @param imports - Extracted static imports.
    * @param exportedNames - Names proven to be exported by this module.
-   * @param reExports - Named and star re-exports retained for pass-2 linking.
+   * @param _reExports - Re-exports are linked later from parser state, not stored unresolved.
    * @param typeDeclarations - Syntax-proven local type owners and base clauses.
    * @returns Additive reference facts.
    */
@@ -600,17 +656,17 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
     symbols: readonly SymbolNode[],
     imports: readonly ImportDeclaration[],
     exportedNames: ReadonlySet<string>,
-    reExports: readonly TsReExportInfo[],
+    _reExports: readonly TsReExportInfo[],
     typeDeclarations: readonly TsTypeDeclarationInfo[],
   ): ReferenceFacts {
     const ownerByMemberId = new Map<string, string>()
-    const formByMemberId = new Map<string, MemberForm>()
+    const semanticsByMemberId = new Map<string, MemberSemantics>()
     for (const declaration of typeDeclarations) {
       for (const methodId of declaration.memberSymbolIds) {
         ownerByMemberId.set(methodId, declaration.symbolId)
       }
-      for (const [methodId, form] of Object.entries(declaration.memberFormsById)) {
-        formByMemberId.set(methodId, form)
+      for (const [methodId, semantics] of Object.entries(declaration.memberSemanticsById)) {
+        semanticsByMemberId.set(methodId, semantics)
       }
     }
     const logicalFacts = buildLogicalDeclarationFacts({
@@ -622,7 +678,7 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
           space: this.symbolSpace(symbol.kind),
           ownerSymbolId: ownerByMemberId.get(symbol.id),
           requiresOwner: symbol.kind === SymbolKind.Method,
-          memberForm: formByMemberId.get(symbol.id) ?? this.memberForm(symbol),
+          memberSemantics: semanticsByMemberId.get(symbol.id) ?? this.memberSemantics(symbol),
         }),
       ),
     })
@@ -666,17 +722,6 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
           targetId: logicalFacts.logicalBySymbolId.get(symbol.id)?.id,
         }),
       )
-    for (const reExport of reExports) {
-      if (reExport.exportedName === '*') continue
-      publicBindings.push(
-        createPublicBinding({
-          surface: filePath,
-          exportedName: reExport.exportedName,
-          space: SymbolSpace.Value,
-          targetId: undefined,
-        }),
-      )
-    }
     const localBindings = imports
       .filter((item) => item.localName.length > 0)
       .map((item) =>
@@ -718,8 +763,10 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
    * @param symbol - Extracted symbol.
    * @returns Proven member form, if any.
    */
-  private memberForm(symbol: SymbolNode): MemberForm | undefined {
-    if (symbol.kind === SymbolKind.Method) return MemberForm.Instance
+  private memberSemantics(symbol: SymbolNode): MemberSemantics | undefined {
+    if (symbol.kind === SymbolKind.Method) {
+      return { kind: MemberKind.Method, dispatch: MemberDispatch.Instance }
+    }
     return undefined
   }
 
@@ -1738,7 +1785,7 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
       const implementsMatch = header.match(/\bimplements\s+([^{]+)$/)
       const methodsByName: Record<string, string> = {}
       const memberSymbolIds: string[] = []
-      const memberFormsById: Record<string, MemberForm> = {}
+      const memberSemanticsById: Record<string, MemberSemantics> = {}
 
       for (const symbol of symbols) {
         if (symbol.kind !== SymbolKind.Method) continue
@@ -1750,7 +1797,7 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
         if (!memberNode) continue
         memberSymbolIds.push(symbol.id)
         methodsByName[symbol.name] = symbol.id
-        memberFormsById[symbol.id] = typeScriptMemberForm(memberNode, symbol.name)
+        memberSemanticsById[symbol.id] = typeScriptMemberSemantics(memberNode, symbol.name)
       }
 
       declarations.push({
@@ -1758,7 +1805,7 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
         symbolId,
         methodsByName,
         memberSymbolIds,
-        memberFormsById,
+        memberSemanticsById,
         extendsNames:
           nodeKind(node) === 'interface_declaration'
             ? parseTypeNames(extendsMatch?.[1])
@@ -1810,10 +1857,203 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
    * @param specifier - The relative import specifier.
    * @returns The resolved file path.
    */
+  /**
+   * Copies proven public bindings from a relative or package entry file onto re-exporting files.
+   * @param session - Session that already holds same-file bindings.
+   * @param packageToWorkspace - Package name to workspace name.
+   * @returns Bindings and steps added by this linking pass.
+   */
+  linkReExports(
+    session: IndexSession,
+    packageToWorkspace: ReadonlyMap<string, string>,
+  ): {
+    readonly publicBindings: readonly PublicBinding[]
+    readonly steps: readonly ResolutionStep[]
+  } {
+    const logicalById = new Map(session.getLogicalSymbols().map((symbol) => [symbol.id, symbol]))
+    const logicalIdByDeclaration = new Map<string, string>()
+    for (const [logicalId, declarations] of session.getDeclarationsByLogicalId()) {
+      for (const declaration of declarations)
+        logicalIdByDeclaration.set(declaration.symbolId, logicalId)
+    }
+    const bindingsById = new Map(
+      session.getPublicBindings().map((binding) => [binding.id, binding]),
+    )
+    const originalTargets = new Map(
+      [...bindingsById].map(([id, binding]) => [id, binding.targetId]),
+    )
+    const bindingsBySurface = new Map<string, Map<string, PublicBinding>>()
+    const bindingsByRoute = new Map<string, Map<string, PublicBinding>>()
+    const routeKey = (surface: string, exportedName: string): string =>
+      `${surface}\u0000${exportedName}`
+    const indexBinding = (binding: PublicBinding): void => {
+      bindingsById.set(binding.id, binding)
+      const surfaceBindings =
+        bindingsBySurface.get(binding.surface) ?? new Map<string, PublicBinding>()
+      surfaceBindings.set(binding.id, binding)
+      bindingsBySurface.set(binding.surface, surfaceBindings)
+      const routeBindings =
+        bindingsByRoute.get(routeKey(binding.surface, binding.exportedName)) ??
+        new Map<string, PublicBinding>()
+      routeBindings.set(binding.id, binding)
+      bindingsByRoute.set(routeKey(binding.surface, binding.exportedName), routeBindings)
+    }
+    for (const binding of bindingsById.values()) indexBinding(binding)
+    const steps: ResolutionStep[] = []
+    const maxPasses = Math.max(session.getAllFilePaths().size, 1)
+    for (let pass = 0; pass < maxPasses; pass++) {
+      let changed = false
+      for (const filePath of session.getAllFilePaths()) {
+        const state = session.getAnalysis(filePath)?.parserState as
+          | TypeScriptParserState
+          | undefined
+        if (state?.kind !== 'typescript' || state.reExports.length === 0) continue
+        for (const reExport of state.reExports) {
+          const sourcePath = this.resolveReExportSource(
+            filePath,
+            reExport.specifier,
+            session,
+            packageToWorkspace,
+          )
+          if (sourcePath === undefined) continue
+          const sourceBindings = [...(bindingsBySurface.get(sourcePath)?.values() ?? [])].filter(
+            (binding) => binding.targetId !== undefined && logicalById.has(binding.targetId),
+          )
+          const routes =
+            reExport.importedName === '*'
+              ? sourceBindings.filter((binding) => binding.exportedName !== 'default')
+              : [
+                  ...(bindingsByRoute.get(routeKey(sourcePath, reExport.importedName))?.values() ??
+                    []),
+                ].filter(
+                  (binding) => binding.targetId !== undefined && logicalById.has(binding.targetId),
+                )
+          const emit = (
+            exportedName: string,
+            space: PublicBinding['space'],
+            targetId: string,
+            kind: string,
+          ): void => {
+            const binding = createPublicBinding({
+              surface: filePath,
+              exportedName,
+              space,
+              targetId,
+            })
+            if (bindingsById.get(binding.id)?.targetId !== binding.targetId) changed = true
+            indexBinding(binding)
+            steps.push({ fromId: binding.id, toId: targetId, kind })
+          }
+          for (const route of routes) {
+            if (route.targetId === undefined) continue
+            emit(
+              reExport.exportedName === '*' ? route.exportedName : reExport.exportedName,
+              route.space,
+              route.targetId,
+              reExport.importedName === '*' ? 're-export:star' : 're-export:named',
+            )
+          }
+          if (reExport.importedName !== '*' && routes.length === 0) {
+            const matches = session
+              .findSymbolsByFile(sourcePath)
+              .filter((symbol) => symbol.name === reExport.importedName)
+            if (matches.length !== 1) continue
+            const logicalId = logicalIdByDeclaration.get(matches[0]!.id)
+            const logical = logicalId === undefined ? undefined : logicalById.get(logicalId)
+            if (logical === undefined) continue
+            emit(reExport.exportedName, logical.space, logical.id, 're-export:named')
+          }
+        }
+      }
+      if (!changed) break
+    }
+    return {
+      publicBindings: [...bindingsById.values()].filter(
+        (binding) => originalTargets.get(binding.id) !== binding.targetId,
+      ),
+      steps,
+    }
+  }
+
+  /**
+   * Resolves one re-export specifier to exactly one indexed source file.
+   * @param fromFile - Re-exporting file id.
+   * @param specifier - Module specifier.
+   * @param session - Session used to test indexed candidates.
+   * @param packageToWorkspace - Package name to workspace name.
+   * @returns The single indexed file, or undefined.
+   */
+  private resolveReExportSource(
+    fromFile: string,
+    specifier: string,
+    session: IndexSession,
+    packageToWorkspace: ReadonlyMap<string, string>,
+  ): string | undefined {
+    const candidates = specifier.startsWith('.')
+      ? this.relativeCandidates(fromFile, specifier)
+      : this.packageEntryCandidates(specifier, packageToWorkspace)
+    const indexed = candidates.filter((candidate) => session.getFileId(candidate) !== undefined)
+    return indexed.length === 1 ? indexed[0] : undefined
+  }
+
+  /**
+   * Lists relative import candidates without choosing among them.
+   * @param fromFile - Importing file id.
+   * @param specifier - Relative specifier.
+   * @returns Candidate file ids.
+   */
+  private relativeCandidates(fromFile: string, specifier: string): readonly string[] {
+    const resolved = this.resolveRelativeImportPath(fromFile, specifier)
+    return Array.isArray(resolved) ? resolved : [resolved]
+  }
+
+  /**
+   * Maps a package specifier through `exports` or `main` to source candidates.
+   * @param specifier - Non-relative specifier.
+   * @param packageToWorkspace - Package name to workspace name.
+   * @returns Source file ids to test against the session. Empty when the package is unknown.
+   */
+  private packageEntryCandidates(
+    specifier: string,
+    packageToWorkspace: ReadonlyMap<string, string>,
+  ): readonly string[] {
+    const packageName = this.resolvePackageFromSpecifier(specifier, [...packageToWorkspace.keys()])
+    if (packageName === undefined) return []
+    const workspace = packageToWorkspace.get(packageName)
+    const codeRoot = workspace === undefined ? undefined : this.workspaceCodeRoots.get(workspace)
+    if (workspace === undefined || codeRoot === undefined) return []
+    let manifest: { exports?: unknown; main?: string }
+    try {
+      manifest = JSON.parse(readFileSync(join(codeRoot, 'package.json'), 'utf8')) as {
+        exports?: unknown
+        main?: string
+      }
+    } catch {
+      return []
+    }
+    const subpath = specifier === packageName ? '.' : `./${specifier.slice(packageName.length + 1)}`
+    const published =
+      subpath === '.'
+        ? (publishedTarget(manifest.exports) ?? manifest.main)
+        : publishedTarget(
+            manifest.exports !== null && typeof manifest.exports === 'object'
+              ? (manifest.exports as Record<string, unknown>)[subpath]
+              : undefined,
+          )
+    if (published === undefined) return []
+    return sourceCandidates(workspace, published)
+  }
+
+  /**
+   * Resolves a relative specifier from a workspace file id.
+   * @param fromFile - Importing file id.
+   * @param specifier - Relative module specifier.
+   * @returns One resolved file id, or several candidates when the extension is absent.
+   */
   resolveRelativeImportPath(fromFile: string, specifier: string): string | string[] {
-    const colonIdx = fromFile.indexOf(':')
-    const wsPrefix = colonIdx === -1 ? '' : fromFile.substring(0, colonIdx + 1)
-    const relFile = colonIdx === -1 ? fromFile : fromFile.substring(colonIdx + 1)
+    const identity = splitWorkspaceIdentity(fromFile)
+    const wsPrefix = identity === null ? '' : `${identity.workspace}:`
+    const relFile = identity === null ? fromFile : identity.relativePath
 
     const relDir = relFile.substring(0, relFile.lastIndexOf('/'))
     const parts = specifier.split('/')
@@ -1861,6 +2101,14 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
   }
 
   /**
+   * Declares the resolution manifests this adapter reads.
+   * @returns Exact basenames used for package identity.
+   */
+  resolutionManifests(): readonly string[] {
+    return ['package.json']
+  }
+
+  /**
    * Reads the package identity by searching for `package.json` at or above
    * the given directory, bounded by the repository root.
    * @param codeRoot - Absolute path to the workspace's code root.
@@ -1878,4 +2126,43 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
       repoRoot,
     )
   }
+}
+
+/**
+ * Reads the published relative path from an exports target.
+ * @param raw - String target or conditional exports object.
+ * @returns The published relative path, or undefined when the target is not a string path.
+ */
+function publishedTarget(raw: unknown): string | undefined {
+  if (typeof raw === 'string') return raw
+  if (raw === null || typeof raw !== 'object') return undefined
+  const record = raw as Record<string, unknown>
+  if (
+    typeof record['.'] === 'string' ||
+    (record['.'] !== null && typeof record['.'] === 'object')
+  ) {
+    return publishedTarget(record['.'])
+  }
+  for (const key of ['import', 'default', 'require']) {
+    if (typeof record[key] === 'string') return record[key]
+  }
+  return undefined
+}
+
+/**
+ * Maps a published package path onto indexed source file ids.
+ * @param workspace - Workspace that owns the package.
+ * @param published - Relative path from package exports or main.
+ * @returns Candidate source file ids. The caller keeps a candidate only when exactly one is indexed.
+ */
+function sourceCandidates(workspace: string, published: string): readonly string[] {
+  let relative = published.replace(/^\.\//, '')
+  relative = relative.replace(/\.(?:js|jsx|mjs|cjs)$/, '')
+  if (relative.startsWith('dist/')) relative = `src/${relative.slice('dist/'.length)}`
+  relative = relative.replace(/\.(?:ts|tsx)$/, '')
+  return [
+    `${workspace}:${relative}.ts`,
+    `${workspace}:${relative}.tsx`,
+    `${workspace}:${relative}/index.ts`,
+  ]
 }

@@ -21,16 +21,18 @@ export type TemplateVariables = Record<string, Record<string, string | number | 
 export type OnUnknownVariable = (token: string) => void
 
 /**
- * Escapes a value for safe interpolation into a shell command.
- *
- * Wraps the value in single quotes and escapes any embedded single quotes
- * using the `'\''` idiom (end quote, escaped quote, start quote).
+ * Escapes a value for safe interpolation into a POSIX or cmd command.
  *
  * @param value - The string value to escape
+ * @param dialect - `posix` uses single quotes; `cmd` uses doubled quotes and percents
  * @returns The shell-escaped string
  */
-function shellEscape(value: string): string {
-  return "'" + value.replace(/'/g, "'\\''") + "'"
+function shellEscape(value: string, dialect: 'posix' | 'cmd'): string {
+  if (dialect === 'cmd') {
+    if (value.length === 0) return '""'
+    return `"${value.replaceAll('%', '%%').replaceAll('"', '""')}"`
+  }
+  return "'" + value.replaceAll("'", "'\\''") + "'"
 }
 
 /**
@@ -58,7 +60,7 @@ export class TemplateExpander {
   /**
    * Expands `{{namespace.key}}` tokens with verbatim substitution.
    *
-   * Used for instruction text consumed by agents — no shell escaping.
+   * Used for instruction text and for `run:` hook values. Substitution is verbatim.
    *
    * @param template - The template string containing optional `{{namespace.key}}` tokens
    * @param variables - Contextual variables merged with built-ins (built-ins win on collision)
@@ -69,16 +71,22 @@ export class TemplateExpander {
   }
 
   /**
-   * Expands `{{namespace.key}}` tokens with shell-escaped substitution.
+   * Expands `{{namespace.key}}` tokens and quotes each substituted value.
    *
-   * Used for `run:` hook commands — all values are shell-escaped to prevent injection.
+   * Used only for commands SpecD itself builds. Developer `run:` hooks use {@link expand}
+   * and keep the developer's own quotes.
    *
    * @param template - The command string containing optional `{{namespace.key}}` tokens
    * @param variables - Contextual variables merged with built-ins (built-ins win on collision)
-   * @returns The expanded and shell-escaped string
+   * @param dialect - Shell dialect used when SpecD quotes a value it substitutes
+   * @returns The expanded string with each substituted value quoted for the dialect
    */
-  expandForShell(template: string, variables?: TemplateVariables): string {
-    return this._replace(template, variables, true)
+  expandForShell(
+    template: string,
+    variables?: TemplateVariables,
+    dialect: 'posix' | 'cmd' = 'posix',
+  ): string {
+    return this._replace(template, variables, dialect)
   }
 
   /**
@@ -86,13 +94,13 @@ export class TemplateExpander {
    *
    * @param template - The template string to process
    * @param variables - Optional contextual variables
-   * @param shell - Whether to shell-escape substituted values
+   * @param shell - `false` leaves instruction text verbatim; `posix` or `cmd` escapes substituted values
    * @returns The processed string with tokens replaced
    */
   private _replace(
     template: string,
     variables: TemplateVariables | undefined,
-    shell: boolean,
+    shell: false | 'posix' | 'cmd',
   ): string {
     const merged = this._merge(variables)
     return template.replace(/\{\{([^}]+)\}\}/g, (_match, path: string) => {
@@ -108,7 +116,7 @@ export class TemplateExpander {
         typeof current === 'boolean'
       ) {
         const value = String(current)
-        return shell ? shellEscape(value) : value
+        return shell === false ? value : shellEscape(value, shell)
       }
       return this._unknown(path)
     })

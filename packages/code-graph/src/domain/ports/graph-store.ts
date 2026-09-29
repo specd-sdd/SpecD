@@ -7,6 +7,7 @@ import { type RelationType } from '../value-objects/relation-type.js'
 import { type SymbolQuery } from '../value-objects/symbol-query.js'
 import { type GraphStatistics } from '../value-objects/graph-statistics.js'
 import { type SearchOptions } from '../value-objects/search-options.js'
+import { type ImpactResultFilter } from '../value-objects/impact-result.js'
 import {
   type DeclarationOccurrence,
   type LocalBinding,
@@ -84,7 +85,10 @@ export interface LogicalSymbolLookup {
   readonly name: string
   readonly space: string | undefined
   readonly ownerId: string | undefined
-  readonly memberForm: string | undefined
+  readonly memberKind: string | undefined
+  readonly memberDispatch: string | undefined
+  readonly memberAccessor: string | undefined
+  readonly nativeKind: string | undefined
 }
 
 /** Indexed lookup key for a named public route. */
@@ -110,6 +114,55 @@ export interface StorageGenerationSnapshot {
   readonly token: string
   /** Sidecar modification time in milliseconds since epoch. */
   readonly mtimeMs: number
+}
+
+/** Direction in which an impact frontier expands from its current resources. */
+export type ImpactDirection = 'upstream' | 'downstream' | 'both'
+
+/** Resource category represented by candidate or neighboring nodes in an impact frontier. */
+export type ImpactResourceKind = 'symbol' | 'file' | 'spec'
+
+/**
+ * Backend-neutral request for one deterministic, filtered impact frontier.
+ *
+ * The store selects relations adjacent to {@link frontier} in {@link direction},
+ * applies {@link relationTypes} and the optional result {@link filter}, then
+ * hydrates only the candidate result categories matching {@link resource} and admitted by that filter.
+ * Traversal depth is provided as query context (where depth 0 is permitted for direct coverage lookups);
+ * implementations must not expand beyond this frontier.
+ */
+export interface ImpactFrontierQuery {
+  /** Category of candidate or neighboring nodes to expand towards or hydrate. */
+  readonly resource: ImpactResourceKind
+  /** Canonical resource identifiers at the current breadth-first frontier. */
+  readonly frontier: readonly string[]
+  /** Relation orientation to consider from the current frontier. */
+  readonly direction: ImpactDirection
+  /** Breadth-first depth of the current frontier (0 for direct coverage reads). */
+  readonly depth: number
+  /** Inclusive traversal-depth limit established by the caller. */
+  readonly maxDepth: number
+  /** Relation types that may admit a neighboring resource into the traversal. */
+  readonly relationTypes: readonly RelationType[]
+  /** Optional result-category, symbol-kind, and workspace membership constraints. */
+  readonly filter?: ImpactResultFilter
+}
+
+/**
+ * Deterministic rows admitted and hydrated for one impact frontier query.
+ *
+ * Arrays not selected by a result-type filter are empty. Implementations must
+ * return stable, deduplicated ordering within every array.
+ */
+export interface ImpactFrontierResult {
+  /** Relations admitted for traversal from the current frontier. */
+  readonly relations: readonly Relation[]
+  /** Hydrated neighboring symbol nodes selected by the query. */
+  readonly symbols: readonly SymbolNode[]
+  /** Hydrated neighboring file nodes selected by the query. */
+  readonly files: readonly FileNode[]
+  /** Hydrated neighboring spec nodes selected by the query. */
+  readonly specs: readonly SpecNode[]
 }
 
 /**
@@ -343,6 +396,16 @@ export abstract class GraphStore {
   }
 
   /**
+   * Returns every logical symbol whose stored `qualifiedName` equals one of the spellings.
+   * @param qualifiedNames - Generic dotted spellings.
+   * @returns Matching logical symbols in deterministic order.
+   */
+  findLogicalSymbolsByQualifiedNames(qualifiedNames: readonly string[]): Promise<LogicalSymbol[]> {
+    void qualifiedNames
+    return Promise.reject(new Error('Reference facts are not supported by this graph store'))
+  }
+
+  /**
    * Batch-retrieves all declaration occurrences for logical targets.
    * @param logicalSymbolIds - Logical target identifiers to retrieve.
    * @returns Matching logical declarations in deterministic order.
@@ -473,6 +536,17 @@ export abstract class GraphStore {
     symbolIds: readonly string[],
     relationTypes: readonly RelationType[],
   ): Promise<Relation[]>
+
+  /**
+   * Selects and hydrates one filtered impact frontier in the storage backend.
+   *
+   * Implementations must apply direction, relation-type, result-category,
+   * symbol-kind, and workspace predicates before rows leave the backend. An
+   * empty frontier returns empty deterministic arrays without backend work.
+   * @param input - The immutable resource frontier and its filtering constraints.
+   * @returns Admitted relations and deterministically hydrated resource rows.
+   */
+  abstract queryImpactFrontier(input: ImpactFrontierQuery): Promise<ImpactFrontierResult>
 
   /**
    * Retrieves existing files for an exact batch of canonical paths.

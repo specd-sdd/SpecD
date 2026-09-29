@@ -1,0 +1,20 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["guide:conventions", "guide:guide-model", "guide:errors"],
+  "implementation": [
+    {
+      "file": "guide:src/application/queries/slice-guide-lines.ts",
+      "symbols": ["sliceGuideLines", "formatWithLineNumbers"]
+    },
+    {
+      "file": "guide:src/application/queries/get-guide-section-query.ts",
+      "symbols": ["GetGuideSectionQuery", "GetGuideSectionInput"]
+    },
+    {
+      "file": "guide:test/unit/application/slicing.test.ts"
+    }
+  ]
+}

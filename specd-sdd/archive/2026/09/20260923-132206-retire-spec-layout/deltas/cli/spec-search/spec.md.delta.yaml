@@ -1,0 +1,9 @@
+- op: modified
+  description: 'Remove obsolete default:_global/spec-layout dependency'
+  selector:
+    type: section
+    matches: '^Spec Dependencies$'
+  content: |
+    - [`cli:entrypoint`](../entrypoint/spec.md)
+    - [`core:search-specs`](../../core/search-specs/spec.md)
+    - [`core:list-workspaces`](../../core/list-workspaces/spec.md)

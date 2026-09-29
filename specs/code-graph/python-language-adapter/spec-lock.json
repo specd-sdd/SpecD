@@ -11,7 +11,7 @@
   "implementation": [
     {
       "file": "code-graph:src/infrastructure/tree-sitter/python-language-adapter.ts",
-      "symbols": ["PythonLanguageAdapter"]
+      "symbols": ["PythonLanguageAdapter", "readPythonProjectName"]
     },
     {
       "file": "code-graph:test/infrastructure/tree-sitter/python-language-adapter.spec.ts"

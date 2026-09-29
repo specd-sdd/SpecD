@@ -1,0 +1,20 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["guide:conventions", "guide:guide-model"],
+  "implementation": [
+    {
+      "file": "guide:scripts/bundle-guides.ts",
+      "symbols": ["bundleGuides", "compileGuide", "extractSections", "parseFrontmatter"]
+    },
+    {
+      "file": "guide:src/infrastructure/generated/guides.ts",
+      "symbols": ["GUIDES_CATALOG", "GUIDES_INDEX"]
+    },
+    {
+      "file": "guide:test/unit/infrastructure/bundle.test.ts"
+    }
+  ]
+}

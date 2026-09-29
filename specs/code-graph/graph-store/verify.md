@@ -353,6 +353,40 @@
 - **WHEN** `getCoveringSpecsForSymbol('core:Change.transition')` is called
 - **THEN** the persisted `COVERS_SYMBOL` relation is returned
 
+### Requirement: Filtered impact query contract
+
+#### Scenario: Store applies canonical filter precedence
+
+- **GIVEN** candidates span included, excluded, and unrelated canonical workspaces and symbol kinds
+- **WHEN** a filtered impact read executes
+- **THEN** it returns only candidates admitted by type, kind, inclusion, and exclusion predicates
+- **AND** exclusion wins when the same workspace is also included
+
+#### Scenario: SQLite filters before crossing the adapter boundary
+
+- **GIVEN** an SQLite graph containing both admitted and excluded impact candidates
+- **WHEN** the store executes a filtered impact query
+- **THEN** its physical statements include the normalized predicates before rows are materialized
+- **AND** excluded rows are not returned to TypeScript for post-query removal
+
+#### Scenario: Worker request preserves filters
+
+- **GIVEN** the SQLite store runs through its worker-backed protocol
+- **WHEN** a filtered impact request crosses the worker boundary
+- **THEN** all normalized filter fields reach the database query unchanged
+- **AND** the worker response contains no candidates excluded by those fields
+
+#### Scenario: Port remains storage neutral
+
+- **WHEN** a non-SQLite test store implements the filtered impact contract
+- **THEN** it requires no SQLite table, statement, worker-message, or pagination type
+
+#### Scenario: Store frontier query supports candidate resource category and depth-zero reads
+
+- **GIVEN** a frontier of symbol or file nodes and a request for covering specs
+- **WHEN** `queryImpactFrontier` is invoked with candidate resource category `spec` and depth `0`
+- **THEN** it queries and hydrates the admitted spec nodes directly without requiring a positive traversal depth
+
 ### Requirement: Batched symbol traversal reads
 
 #### Scenario: Batch symbol lookup deduplicates and preserves requested order
@@ -477,6 +511,45 @@
 - **WHEN** the complete reference snapshot and direct affected files are requested
 - **THEN** the SQLite backend returns deterministically ordered facts and file paths
 - **AND** affected lookup uses a bounded batch operation rather than one query per relation
+
+### Requirement: Member-semantics persistence
+
+#### Scenario: Lookup uses the four member axes
+
+- **GIVEN** two logical symbols share workspace, surface, name, space, and owner
+- **AND** their dispatch or accessor differs
+- **WHEN** a lookup supplies one member-semantics value
+- **THEN** only the matching symbol is returned
+- **AND** the query does not parse the canonical id
+
+#### Scenario: Qualified name equality returns every match
+
+- **GIVEN** two logical symbols store `qualified_name` `GetStatus.execute`
+- **WHEN** the store looks up that spelling
+- **THEN** both symbols are returned
+- **AND** the lookup is equality, not full-text search
+- **AND** there is no alias table
+- **AND** a cross-workspace public binding remains readable by surface, exported name, space, and target id
+
+#### Scenario: Partial member axes do not match a different member
+
+- **GIVEN** a lookup sets dispatch to instance and leaves accessor unset
+- **AND** the stored member is a static getter
+- **WHEN** the lookup runs
+- **THEN** that static getter is not returned
+
+#### Scenario: Non-member leaves member axes empty
+
+- **GIVEN** a top-level function has no member semantics
+- **WHEN** it is persisted and looked up by name and space
+- **THEN** the row is returned
+- **AND** its member axes are null
+
+#### Scenario: Search text is not identity
+
+- **GIVEN** search text contains the qualified spelling `EditChange.execute`
+- **WHEN** an exact logical lookup asks for that string as a simple name
+- **THEN** no logical symbol is returned from search text alone
 
 ### Requirement: Logical-symbol coverage endpoints
 

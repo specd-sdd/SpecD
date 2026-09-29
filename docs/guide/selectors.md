@@ -1,3 +1,9 @@
+---
+title: Selectors, Extractors, and Validation Rules
+description: Targeting and validating structured document content in SpecD schemas.
+sidebar_position: 7
+---
+
 # Selectors, Extractors, and Validation Rules
 
 SpecD schemas work with the content of your artifact files — not just their existence. To do that, schemas need a way to describe exactly which part of a file they care about: a heading, a list item, a YAML key, a specific sequence entry. That is what selectors do.

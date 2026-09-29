@@ -8,50 +8,62 @@
     "core:implementation-detector-port",
     "core:storage",
     "core:archive-repository-port",
-    "core:composition-resolver"
+    "core:composition-resolver",
+    "core:vcs-adapter"
   ],
   "implementation": [
     {
+      "file": "core:src/infrastructure/fs/path-platform.ts",
+      "symbols": ["isPathInside"]
+    },
+    {
       "file": "core:src/application/use-cases/refresh-implementation-tracking.ts",
-      "symbols": ["RefreshImplementationTracking._specSweep"]
+      "symbols": ["RefreshImplementationTracking", "ProjectPathHelpers"]
+    },
+    {
+      "file": "core:test/application/use-cases/refresh-implementation-tracking.spec.ts"
     },
     {
       "file": "core:src/composition/use-cases/refresh-implementation-tracking.ts",
-      "symbols": ["resolveRefreshImplementationTrackingDeps"]
+      "symbols": ["createRefreshImplementationTracking"]
+    },
+    {
+      "file": "core:src/composition/composition-resolver.ts",
+      "symbols": ["createCompositionResolver"]
     }
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Refreshes active change implementation tracking with targeted VCS detection, removal and resurrection handling, link pruning, and shared projection.",
+      "value": "Refreshes active implementation tracking with targeted detection, deletion and resurrection handling, link pruning, and shared projection.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:c8f43b165264a6d8fa479f566edd52da14a52b5d2f94c116dc358ddc9dbfc6ac",
-          "lastModified": "2026-08-30T09:18:36.435Z"
+          "hash": "sha256:60c8e8f6ea40e6b1c3b48ccbb250a2cf7ab53d307e10205774d75f628e0b7dd9",
+          "lastModified": "2026-09-28T11:19:59.162Z"
         },
         "verify.md": {
-          "hash": "sha256:12233b08625cc981093dd74263fae2bd7b05a194c3bd2e08c8e07c46314fb0c2",
-          "lastModified": "2026-08-30T09:18:36.435Z"
+          "hash": "sha256:91f185efbd81a3f202855cc875e4f160d6e45d2459fb05062ee80506f2043d25",
+          "lastModified": "2026-09-28T11:19:59.163Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# RefreshImplementationTracking\n\n## Rules\n- `execute({ name })`; missing change → `ChangeNotFoundError` code `CHANGE_NOT_FOUND`. `GetStatus` and `TransitionChange` pre-refresh through this use case, never detector directly; standalone refresh supported.\n- Guard: if `Change.isImplementationTrackingActive` false, load through `mutate` but do not detect/mutate tracking. Active: targeted detection demand-driven.\n- Gather `ChangeRepository.internalPaths()` + `ArchiveRepository.internalPaths()`, normalize absolute paths to project-relative portable, pass as `excludePaths` to `ImplementationDetector.detectModifiedFiles(change, options)`.\n- Detector path new to `trackedImplementationFiles` → `trackImplementationFile(file, 'open')`; tracked state preserved except `removed` returned → `open`. Never resolve/ignore during merge.\n- Existence-check every tracked non-ignored file: missing → `removed` and remove all file/symbol links; removed file found → `open`.\n- Sweep links: prune each link whose `specId` absent from both `change.specIds` and workspace canonical `SpecRepository`. Persist via `ChangeRepository.mutate`.\n- Return `ImplementationTrackingProjection` using `projectImplementationTracking`: post-refresh `trackedFiles`, `links`.\n- Constructor: `changes`, `archives`, `implementationDetector`. Config factory derives `RefreshImplementationTrackingDeps` with `resolveRefreshImplementationTrackingDeps(resolver)`, then canonical factory. Resolver provides `changes`, `archives`, `implementationDetector`, `files`, `projectRoot`, optional `specRepositories`.\n\n## Constraints\n- VCS-backed, delivery-agnostic: no CLI/MCP/watcher references.\n- Paths project-relative, forward-slash-normalized per core:implementation-detector-port.\n- Manual add/remove/resolve/ignore remains `UpdateImplementationTracking`.",
+      "value": "# RefreshImplementationTracking\n\n## Rules\n- `execute({ name })`; missing change → `ChangeNotFoundError` code `CHANGE_NOT_FOUND`.\n- `GetStatus` and `TransitionChange` delegate refresh here; standalone refresh remains supported. Other read-only use cases project persisted state.\n- If `Change.isImplementationTrackingActive` false: load through `ChangeRepository.mutate`; never detect or alter tracking. If true: run targeted detection and persist updates.\n- Before detection, collect `ChangeRepository.internalPaths()` and `ArchiveRepository.internalPaths()`; normalize only paths inside project root to project-relative portable form; pass non-empty results as `excludePaths`.\n- Project containment requires root equality or separator-bounded descendant; string-prefix siblings excluded; drive-letter case ignored. Root itself maps to empty string and is never exclusion prefix.\n- Call `ImplementationDetector.detectModifiedFiles(change, options)`. New returned path → `trackImplementationFile(file, open)`; preserve existing state except `removed` → `open`. Never auto-resolve or auto-ignore.\n- Check every tracked non-ignored file on disk: missing → `removed` and remove all file/symbol links; present `removed` file → `open`.\n- Sweep links: prune link when `specId` absent from both `change.specIds` and workspace canonical `SpecRepository`.\n- Return `ImplementationTrackingProjection` via `projectImplementationTracking`, containing post-refresh `trackedFiles` and `links`.\n- Constructor receives `changes`, `archives`, `implementationDetector`.\n- `createRefreshImplementationTracking(config, options?)` must call `resolveRefreshImplementationTrackingDeps(resolver)`, then canonical factory. Resolver yields `changes`, `archives`, `implementationDetector`, `files`, `projectRoot`, optional `specRepositories`.\n\n## Constraints\n- VCS-backed, delivery-agnostic; no CLI, MCP, watcher coupling.\n- Detection demand-driven per invocation.\n- Detector paths project-relative and forward-slash-normalized per core:implementation-detector-port.\n- Manual add/remove/resolve/ignore remains `UpdateImplementationTracking`.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:c8f43b165264a6d8fa479f566edd52da14a52b5d2f94c116dc358ddc9dbfc6ac",
-          "lastModified": "2026-08-30T09:18:36.435Z"
+          "hash": "sha256:60c8e8f6ea40e6b1c3b48ccbb250a2cf7ab53d307e10205774d75f628e0b7dd9",
+          "lastModified": "2026-09-28T11:19:59.162Z"
         },
         "verify.md": {
-          "hash": "sha256:12233b08625cc981093dd74263fae2bd7b05a194c3bd2e08c8e07c46314fb0c2",
-          "lastModified": "2026-08-30T09:18:36.435Z"
+          "hash": "sha256:91f185efbd81a3f202855cc875e4f160d6e45d2459fb05062ee80506f2043d25",
+          "lastModified": "2026-09-28T11:19:59.163Z"
         }
       }
     }

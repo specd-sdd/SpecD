@@ -72,6 +72,12 @@ The use case MUST:
 2. Normalize these absolute paths to project-relative portable paths.
 3. Pass the normalized paths as `excludePaths` to `ImplementationDetector.detectModifiedFiles`.
 
+### Requirement: Project-relative paths keep a separator boundary
+
+A path is project-relative only when it is the project root or a descendant of that root. Matching MUST require a path-separator boundary after the root. A longer path that merely shares the root as a string prefix MUST NOT count as inside. Drive-letter case MUST NOT change the result.
+
+The portable form of the project root itself is the empty string. That empty string means the path is inside. It MUST NOT be added as an exclusion prefix. An empty result is not the signal for a path outside the root.
+
 ### Requirement: Persistence
 
 The use case MUST persist tracking updates through `ChangeRepository.mutate`.
@@ -133,3 +139,4 @@ The helper is the only use-case-specific composition entry for config-based boot
 - [`core:storage`](../storage/spec.md)
 - [`core:archive-repository-port`](../archive-repository-port/spec.md)
 - [`core:composition-resolver`](../composition-resolver/spec.md)
+- [`core:vcs-adapter`](../vcs-adapter/spec.md) — repository root used for project-relative path checks is the normalized adapter root

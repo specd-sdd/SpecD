@@ -30,6 +30,8 @@ The current graph fingerprint for this iteration SHALL be computed from:
 
 - the effective `@specd/code-graph` package version loaded by the running process
 - a canonical hash of the resolved workspace objects used for indexing
+- the effective discovery configuration in Requirement: Discovery fingerprint uses effective config
+- the adapter-declared resolution manifests in Requirement: Adapter-sourced resolution fingerprint
 
 Only three categories of files are processed during a normal incremental run when the graph fingerprint matches:
 
@@ -39,7 +41,7 @@ Only three categories of files are processed during a normal incremental run whe
 
 Files whose hash matches the stored hash are skipped entirely — no parsing, no I/O beyond the hash comparison — only during a non-forced run when the persisted graph fingerprint matches the current fingerprint and the persisted indexed resource needed by downstream phases still exists.
 
-When the persisted graph fingerprint differs from the current fingerprint, the indexer SHALL treat the run as a full rebuild of the active graph store rather than a normal incremental skip. The preferred behavior is to recreate the store and re-index every discovered file while surfacing a visible explanation that the code-graph version or resolved workspace configuration changed. If a backend cannot safely recreate in-place, the caller MAY fail fast and require an explicit force-reindex command instead.
+When the persisted graph fingerprint differs from the current fingerprint, the indexer SHALL treat the run as a full rebuild of the active graph store rather than a normal incremental skip. The preferred behavior is to recreate the store and re-index every discovered file while surfacing this visible explanation: `Graph derivation fingerprint mismatch — code-graph version, workspace configuration, or resolution manifest content changed`. If a backend cannot safely recreate in-place, the caller MAY fail fast and require an explicit force-reindex command instead.
 
 Changed files are removed from the store before bulk load, because CSV `COPY FROM` cannot upsert — it can only insert. Removing changed files first ensures the bulk load inserts fresh data without conflicts.
 
@@ -49,7 +51,9 @@ A forced run SHALL reconsider every discovered input selected for that run. Pers
 
 Spec indexing SHALL read implementation links through the canonical `SpecRepository` persisted-state API and project coverage against the semantic generation that will be committed by the same indexing run.
 
-A file-only implementation link SHALL produce `COVERS_FILE` when its canonical workspace-prefixed file target exists in that generation. A symbol-qualified implementation link SHALL produce `COVERS_SYMBOL` only when the named target resolves deterministically to exactly one current logical symbol declared by the linked file. The relation target MUST be that logical symbol identity rather than a declaration-occurrence ID.
+A file-only implementation link SHALL produce `COVERS_FILE` when its canonical workspace-prefixed file target exists in that generation. A symbol-qualified implementation link SHALL produce `COVERS_SYMBOL` only when the shared symbol resolver returns exactly one logical symbol for that link anchored to the linked file. The relation target MUST be that logical symbol identity rather than a declaration-occurrence ID.
+
+The anchored file's declarations and its public bindings SHALL both be visible to that resolution. A name that the file re-exports MUST match the public binding on that file. Qualified-member parsing MUST NOT move a link to a different file. Coverage projection MUST run after the adapter's re-export bindings for that generation are stored. Exact `SymbolNode.name` equality MUST NOT be the identity proof.
 
 Coverage projection SHALL have access to the current or persisted semantic state required for resolution even when no code file was analyzed in the current run. A persisted implementation-only change MUST therefore be able to add, remove, or replace coverage during an otherwise incremental run.
 
@@ -69,6 +73,21 @@ The effective fingerprint inputs MUST include:
 - each workspace's `excludePaths`
 - each workspace's `respectGitignore`
 - any synthetic exclusions derived from filesystem-backed repository `specsPath` roots
+- the newline-normalized resolution-manifest hashes from Requirement: Adapter-sourced resolution fingerprint
+
+### Requirement: Adapter-sourced resolution fingerprint
+
+Resolution manifests that participate in the graph fingerprint MUST come from `resolutionManifests()` on the registered language adapters. The indexer MUST NOT keep a separate hardcoded manifest list.
+
+For each workspace, discovery SHALL start at that workspace's `codeRoot` and walk parent directories until the repository root, inclusive. When the indexing run has no repository root, the project root is the bound. The walk MUST NOT continue above that bound.
+
+Every existing file on that walk whose basename is declared by a registered adapter SHALL be included. Missing basenames SHALL be omitted. `computeGraphFingerprint`, `computeWorkspaceFingerprint`, and `computeRootFingerprint` MUST use this same per-workspace set.
+
+Each included file SHALL be read as UTF-8 text. Its fingerprint digest SHALL be the SHA-256 hex of the text after the same newline normalization as `normalizeNewlines` in `@specd/core` (CRLF and a lone CR become LF). The fingerprint module MUST NOT depend on that symbol being imported when it is not part of the `@specd/core` public API; a private function with those same replacements is required in that case. The digest MUST NOT use a `sha256:` prefix and MUST NOT hash raw file bytes. CRLF and LF encodings of the same manifest MUST produce the same digest. A newline-only change of a declared manifest MUST NOT by itself make the persisted fingerprint differ, so it MUST NOT by itself escalate the run to a full rebuild.
+
+Application code that discovers or hashes these manifests MUST read existence and text through an application port. That application code MUST NOT import `node:fs` or `node:fs/promises`. An infrastructure adapter MUST implement the port with the filesystem. Composition MUST supply that adapter to indexing and graph-health callers.
+
+Project-relative paths in the fingerprint payload MUST be sorted deterministically.
 
 ### Requirement: Multi-workspace file discovery
 
@@ -105,6 +124,12 @@ Textual fallback SHALL decode document content using this policy:
 - **`respectGitignore`** (default `true`): when `true`, `.gitignore` files are loaded hierarchically and applied with absolute priority.
 - **`excludePaths`** (default: built-in list): gitignore-syntax patterns applied as an additional exclusion layer. Built-in default excludes MUST include `.git/`, `.hg/`, and `.svn/`.
 - **`vcsRoot`** (`string | null`): the root directory of the VCS repository, resolved upstream from `VcsAdapter.rootDir()` and used to bound hierarchical `.gitignore` searches. Callers MUST pass `null` explicitly when no repository root exists. `discoverFiles` MUST NOT probe for repository markers on its own.
+
+### Requirement: Portable graph paths
+
+Relative paths persisted by the indexer MUST use `/` as the separator. That conversion MUST NOT collapse `.` or `..` segments.
+
+A key that begins with a Windows drive letter, matching `^[A-Za-z]:[/\\]`, MUST NOT be split into a workspace name and a path. A bare drive letter, matching `^[A-Za-z]:$`, is the same kind of path: the directory of a file at the drive root. `goPackageSurface('C:/a.go')` is `C:`, and that string MUST NOT parse as workspace `C`. The drive letter is part of the path, not a workspace prefix. Every graph-identity split MUST use that rule, including language-adapter relative imports, package surfaces, scoped binding, and hotspot caller classification. A PHP namespace separator is not a graph identity and MUST stay local.
 
 ### Requirement: Binary file filtering
 
@@ -198,11 +223,11 @@ The indexer SHALL log the execution time of each major internal phase (e.g., Fil
 
 ### Requirement: Cross-workspace package resolution
 
-Before Pass 2, the indexer builds a `packageName → workspaceName` map by calling `adapter.getPackageIdentity(codeRoot)` for each workspace. The indexer iterates over all registered adapters and the first one to return a non-`undefined` identity wins. This is language-agnostic — each adapter reads its own manifest format (`package.json`, `go.mod`, `pyproject.toml`, `composer.json`).
+Before later resolution passes, the indexer SHALL build a `packageName → workspaceName` map by calling `adapter.getPackageIdentity(codeRoot)` for each workspace. The indexer iterates over registered adapters and the first one to return a non-`undefined` identity wins. Each adapter reads its own manifest. The indexer MUST NOT parse `package.json`, `exports`, `main`, `go.mod`, `pyproject.toml`, or `composer.json` itself.
 
-For non-relative import specifiers (e.g. `@specd/core`), the indexer extracts the package name from the specifier, looks it up in the `packageName → workspaceName` map, and searches the shared `IndexSession` lookups for symbols with the imported name within the matching workspace scope.
+Public re-export bindings, including bindings whose target is another workspace, SHALL be the facts the adapter emits after resolving the specifier to an entry file. The indexer MUST NOT extract a package specifier and then select the first symbol of that name in the target workspace.
 
-This works for both monorepo (workspaces in the same repo) and multirepo (workspaces in separate repos configured in `specd.yaml`) because the resolution depends only on the adapter reading each workspace's manifest — not on `pnpm-workspace.yaml` or any monorepo-specific tooling.
+The map SHALL work for workspaces in one repo and for workspaces configured from separate repos, because identity comes from the adapter reading each workspace manifest.
 
 ### Requirement: Error isolation
 
@@ -250,7 +275,7 @@ When indexing specs into the code graph, the indexer SHALL prefer `optimizedDesc
 
 ### Requirement: Reference fact indexing
 
-The two-pass indexing session SHALL group declaration occurrences into logical symbols, normalize member forms and symbol spaces, preserve public/local bindings and every proven route, and persist hierarchy and binding provenance atomically.
+The indexing session SHALL persist the logical symbols, member semantics, declaration occurrences, public bindings, local bindings, hierarchy facts, and resolution steps emitted by language adapters. Each persisted logical symbol that has an owner SHALL store `qualified_name` as the generic dotted path rebuilt from the owner chain and the simple name. A symbol with no owner MUST NOT store a qualified name. The indexer MUST NOT treat full-text search text as that exact spelling. The indexer MUST NOT hardcode a language name, parser-state kind, package manifest, or syntax rule. It MUST NOT contain a TypeScript re-export pass and MUST NOT assign declaration parents from a fixed language set.
 
 The indexer SHALL persist a coverage outcome for every discovered or considered source target, including indexed content hash, excluded, unsupported capability, parse-failed, and partial states. Index errors required for later absence decisions MUST NOT exist only in the transient `IndexResult`.
 
@@ -258,7 +283,7 @@ The indexer SHALL persist a coverage outcome for every discovered or considered 
 
 Every persisted source file SHALL retain the indexed textual content used for analysis. Every emitted symbol SHALL carry its parser-derived complete construct range and declared-name selection range through chunking, semantic reconstruction, backend persistence, and structured query results without recomputing ranges from neighboring symbols.
 
-Relation construction SHALL build reusable declaration, logical-symbol, import, and public-binding lookup indexes once per indexing session. Resolving an individual call, dependency, import, or re-export MUST NOT scan the complete logical declaration or symbol collection. Persistence SHALL retain bounded chunk/batch writes so the work of building relations grows with the processed relation facts rather than multiplying them by the full graph size.
+Relation construction SHALL build reusable declaration, logical-symbol, import, and public-binding lookup indexes once per indexing session. Resolving an individual call, dependency, import, or re-export MUST NOT scan the complete logical declaration or symbol collection. Persistence SHALL retain bounded chunk and batch writes so the work of building relations grows with the processed relation facts rather than multiplying them by the full graph size. Adapter-emitted reference facts SHALL be stored before spec-coverage projection.
 
 ### Requirement: Incompatible derivation rebuild
 
@@ -321,6 +346,7 @@ await store.close()
 - [`code-graph:language-adapter`](../language-adapter/spec.md) — adapter extraction and resolution capabilities
 - [`code-graph:symbol-model`](../symbol-model/spec.md) — files, symbols, specs, relations, and result types
 - [`code-graph:workspace-integration`](../workspace-integration/spec.md) — workspace-prefixed path and spec identity rules
+- [`code-graph:sqlite-graph-store`](../sqlite-graph-store/spec.md) — persisted graph identity must survive SQLite storage
 - [`core:config`](../../core/config/spec.md) — graph discovery config and config-derived graph/temp directories
 - [`core:spec-repository-port`](../../core/spec-repository-port/spec.md) — semantic spec repository contract consumed during spec indexing
 - [`core:list-workspaces`](../../core/list-workspaces/spec.md) — orchestrated workspace and repository source for indexing

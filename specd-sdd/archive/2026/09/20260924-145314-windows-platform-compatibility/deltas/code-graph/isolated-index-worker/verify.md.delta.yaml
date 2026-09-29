@@ -1,0 +1,23 @@
+- op: added
+  description: 'The index lease is released on exit and on SIGBREAK.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: 'Requirement: Signal forwarding and cleanup'
+  content: |
+    ### Requirement: Index lease release on exit
+
+    #### Scenario: Process exit releases the lease
+
+    - **GIVEN** the worker holds the index lease
+    - **WHEN** the process exits
+    - **THEN** the lease is released
+
+    #### Scenario: SIGBREAK releases the lease on Windows
+
+    - **GIVEN** the worker is running on Windows and holds the index lease
+    - **WHEN** the process receives `SIGBREAK`
+    - **THEN** the lease is released

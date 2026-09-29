@@ -110,14 +110,14 @@ export class GraphIndexWorkerSignalError extends SpecdCodeGraphError {
     return 'GRAPH_INDEX_WORKER_SIGNAL'
   }
   /** Returns the signal forwarded by the parent. */
-  get signal(): 'SIGINT' | 'SIGTERM' {
+  get signal(): 'SIGINT' | 'SIGTERM' | 'SIGBREAK' {
     return this.forwardedSignal
   }
   /** Returns the child exit code, when available. */
   get exitCode(): number | null {
     return this.childExitCode
   }
-  private readonly forwardedSignal: 'SIGINT' | 'SIGTERM'
+  private readonly forwardedSignal: 'SIGINT' | 'SIGTERM' | 'SIGBREAK'
   private readonly childExitCode: number | null
   /**
    * Creates a signal failure.
@@ -125,7 +125,11 @@ export class GraphIndexWorkerSignalError extends SpecdCodeGraphError {
    * @param signal - Forwarded signal.
    * @param exitCode - Child exit code.
    */
-  constructor(message: string, signal: 'SIGINT' | 'SIGTERM', exitCode: number | null = null) {
+  constructor(
+    message: string,
+    signal: 'SIGINT' | 'SIGTERM' | 'SIGBREAK',
+    exitCode: number | null = null,
+  ) {
     super(message)
     this.forwardedSignal = signal
     this.childExitCode = exitCode

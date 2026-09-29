@@ -1,0 +1,23 @@
+- op: added
+  description: 'Locked WAL deletion retries, and a live index lock is kept.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: 'Requirement: Destructive recreation'
+  content: |
+    ### Requirement: Locked recreation preserves the index lease
+
+    #### Scenario: A locked WAL file surfaces the original error after retries
+
+    - **GIVEN** deleting a WAL sidecar keeps failing with `EBUSY`
+    - **WHEN** `recreate()` exhausts its bounded retries
+    - **THEN** the original error is surfaced
+
+    #### Scenario: A live index lock is not deleted
+
+    - **GIVEN** an index process holds `index.lock`
+    - **WHEN** `recreate()` removes the database files
+    - **THEN** `index.lock` is still present

@@ -1,0 +1,28 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "guide:conventions",
+    "guide:guide-model",
+    "guide:errors",
+    "guide:list-guides",
+    "guide:get-guide",
+    "guide:get-guide-outline",
+    "guide:slice-guide-content",
+    "guide:search-guides"
+  ],
+  "implementation": [
+    {
+      "file": "guide:src/composition/guide-engine.ts",
+      "symbols": ["GuideEngine", "createGuideEngine", "GuideEngineOptions"]
+    },
+    {
+      "file": "guide:src/index.ts"
+    },
+    {
+      "file": "guide:test/integration/guide-engine.test.ts"
+    }
+  ]
+}

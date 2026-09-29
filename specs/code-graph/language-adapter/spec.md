@@ -12,6 +12,7 @@ Different programming languages have fundamentally different syntax for function
 
 - **`languages(): string[]`** — returns the language identifiers this adapter handles (e.g. `['typescript', 'tsx', 'javascript', 'jsx']`)
 - **`extensions(): Record<string, string>`** — returns the file extension to language ID mapping (e.g. `{ '.ts': 'typescript', '.tsx': 'tsx' }`). The adapter registry uses this to resolve files to adapters — no hardcoded extension map.
+- **`resolutionManifests(): readonly string[]`** — returns the exact basenames of the manifests this adapter reads for package identity or import resolution. The method is required, synchronous, and MUST NOT perform I/O. An adapter that reads no resolution manifest MUST return an empty array. Values MUST be exact filenames, not globs or directory paths.
 - **`analyzeFile(filePath: string, content: string, context: AdapterAnalyzeContext): FileAnalysisDraft`** — parses the file content once and returns the complete compact analysis required by indexing for that file, including symbols, imports, deterministic binding facts, deterministic call facts, namespace data when relevant, and optional compact parser-specific state.
 - **`resolveImports(analysis: FileAnalysis, context: ImportResolutionContext): ResolvedImports`** — resolves the file's previously extracted import declarations, qualified names, aliases, and deterministic file targets using the shared session lookups instead of re-reading or re-parsing file content.
 - **`buildRelations(analysis: FileAnalysis, context: RelationBuildContext): readonly Relation[]`** — builds deterministic graph relations for the file from the stored analysis facts and resolved import information. For code-file dependencies, adapters SHOULD emit concrete relations (`IMPORTS`, `CALLS`, `CONSTRUCTS`, `USES_TYPE`, hierarchy relations) when targets are resolvable; `DEPENDS_ON` remains reserved for spec-level dependency edges.
@@ -20,6 +21,8 @@ Different programming languages have fundamentally different syntax for function
 - **`resolveQualifiedNameToPath?(qualifiedName: string, codeRoot: string, repoRoot?: string): string | undefined`** — optionally maps a qualified name to a source file path for languages that support deterministic namespace resolution.
 
 All adapter methods MUST be synchronous and deterministic with respect to the provided arguments and shared session context. They receive content as a string during analysis, not a file path to read, and they MUST NOT perform side effects outside the indexing session. Adapters MAY read and update compact run-scoped adapter cache state only through the `IndexSession` API exposed by the provided contexts.
+
+The default TypeScript adapter MUST return `['package.json']` from `resolutionManifests()`.
 
 ### Requirement: Full-file analysis contract
 
@@ -138,11 +141,15 @@ Each adapter reads its language's package manifest:
 | Go         | `go.mod`         | `module`         |
 | PHP        | `composer.json`  | `name`           |
 
+Every manifest basename in that table MUST appear in the corresponding adapter's `resolutionManifests()` result. `resolutionManifests()` MUST NOT name a file the adapter does not read for package identity or import resolution.
+
+For Python, the identity field is the `name` key inside the `[project]` table only. A `name` key in any other table, including `[tool.poetry]`, MUST NOT be used. Double-quoted and single-quoted TOML strings MUST both match. When `[project].name` is absent, that file MUST NOT yield an identity and the search MUST continue to the next manifest on the walk.
+
 The `repoRoot` parameter is resolved by the CLI/MCP layer using the VCS adapter (`VcsAdapter.rootDir()`), making it VCS-agnostic (git, hg, svn). When not provided, the search walks up to the filesystem root.
 
 The indexer calls this method for each workspace's `codeRoot` to build a `packageName → workspaceName` map. This enables cross-workspace import resolution without coupling the indexer to any language's package system.
 
-Unlike extraction methods, `getPackageIdentity` performs I/O (reads a manifest file from disk). It is optional — adapters that do not implement it simply return `undefined`, and cross-workspace resolution for that language falls back to unresolved.
+Unlike extraction methods, `getPackageIdentity` performs I/O (reads a manifest file from disk). It is optional — adapters that do not implement it simply return `undefined`, and cross-workspace resolution for that language falls back to unresolved. `resolutionManifests()` MUST NOT perform that I/O.
 
 ### Requirement: Import specifier resolution
 
@@ -192,6 +199,28 @@ A specific adapter spec MAY impose stricter language semantics than this general
 
 An adapter that advertises member support SHALL derive a member's declaring owner from language syntax and map it to a logical owner identity before constructing the member identity. Raw parser-node identifiers and optional syntax-level parent fields MUST NOT be used as logical owner identities. Top-level declarations SHALL have no owner, and same-name members under different logical owners MUST remain distinct.
 
+### Requirement: Member semantics and declaration parent
+
+An adapter that proves a member SHALL emit `MemberSemantics` (`kind`, `dispatch`, `accessor`, and `nativeKind` only when the grammar proves it) on the logical member. It MUST NOT emit the retired single-axis member form.
+
+The same adapter SHALL set `parentId` on declaration occurrences whose syntax has a declaring owner. The indexer MUST NOT recompute that parent from a language name list. A top-level declaration SHALL omit `parentId`.
+
+### Requirement: Human reference parse and render
+
+`LanguageAdapter` SHALL parse supported human and native member-reference syntax into structured owner-then-member selectors, and SHALL render a generic spelling plus an optional language-native spelling from a structured logical member. Parsing MUST return zero, one, or many explicit candidates. Dynamic or ambiguous syntax MUST stay unresolved.
+
+Canonical and already-structured requests MUST NOT be parsed as human text. The adapter MUST NOT split a reference on `.` inside the shared domain. `resolutionManifests()` MUST remain the adapter-sourced fingerprint input and MUST NOT perform I/O.
+
+### Requirement: Re-export public bindings
+
+The adapter SHALL resolve each re-export specifier and emit the public bindings and resolution steps that are stored.
+
+A relative specifier SHALL resolve to a source file in the importing workspace. A non-relative package specifier SHALL resolve through that language's package identity and public entry map. For TypeScript, `package.json` `name` plus `exports` or `main`, including `.js` to the indexed source extension, is that map. `@specd/code-graph` MUST resolve through `exports["."]` to the indexed source of `dist/public.js`. `@specd/code-graph/internal` MUST resolve through the `./internal` export to the indexed source of `dist/index.js`.
+
+The emitted binding SHALL use the re-exporting file as `surface` and the logical id already published by the entry file as `targetId`, including when that id belongs to another workspace. The adapter MUST NOT choose the first symbol of that name anywhere in the target workspace. A specifier that does not resolve to exactly one indexed entry file MUST NOT produce a guessed binding.
+
+The indexer SHALL persist those facts. It MUST NOT read `package.json`, `exports`, `main`, or a TypeScript re-export route, and it MUST NOT copy bindings itself.
+
 ### Requirement: Hierarchy evidence consistency
 
 An adapter that advertises `hierarchy: true` SHALL emit shared hierarchy facts and ordered provenance steps sufficient for `ResolveSymbolReference` to traverse from a child owner to an ancestor, embedded, composed, or contract owner and subsequently query a requested member under that owner. It SHALL keep those facts semantically consistent with persisted `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES` relations.
@@ -210,6 +239,7 @@ Adapters SHALL derive these ranges from parsed syntax before parser artifacts ar
 - `analyzeFile`, `resolveImports`, and `buildRelations` are synchronous and deterministic
 - `analyzeFile` receives content, not file handles, and emits a complete `FileAnalysisDraft`
 - Per-file parser state and run-scoped adapter cache state MUST remain compact plain data
+- `resolutionManifests()` MUST NOT perform I/O
 - getPackageIdentity and resolveQualifiedNameToPath? are the only methods that may perform I/O, and Pass 2 import resolution must not probe the filesystem per candidate
 - Resolution methods (resolvePackageFromSpecifier, resolveQualifiedNameToPath, resolveImports) are synchronous and deterministic
 - resolveQualifiedNameToPath? SHOULD cache parsed autoloader/manifest metadata per codeRoot or session to avoid repeated disk reads during a single indexing run

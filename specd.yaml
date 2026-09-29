@@ -121,6 +121,15 @@ workspaces:
     codeRoot: packages/skills
     ownership: owned
 
+  guide:
+    specs:
+      adapter:
+        type: fs
+        config:
+          path: specs/guide
+    codeRoot: packages/guide
+    ownership: owned
+
   plugin-manager:
     specs:
       adapter:

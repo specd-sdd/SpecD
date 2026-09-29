@@ -1,4 +1,5 @@
 import { VcsAdapter, type VcsIdentity } from '../../application/ports/vcs-adapter.js'
+import { normalizeVcsRoot, toPortablePath } from '../fs/path-platform.js'
 import { git, gitSync } from './exec.js'
 
 /**
@@ -19,7 +20,7 @@ export class GitVcsAdapter extends VcsAdapter {
    */
   constructor(cwd: string = process.cwd(), rootDir?: string) {
     super(cwd)
-    this._rootDir = rootDir ?? null
+    this._rootDir = rootDir === undefined ? null : normalizeVcsRoot(rootDir)
   }
 
   /**
@@ -39,7 +40,7 @@ export class GitVcsAdapter extends VcsAdapter {
 
   /** @inheritdoc */
   rootDir(): string {
-    return this._rootDir ?? gitSync(this.cwd, 'rev-parse', '--show-toplevel')
+    return this._rootDir ?? normalizeVcsRoot(gitSync(this.cwd, 'rev-parse', '--show-toplevel'))
   }
 
   /** @inheritdoc */
@@ -168,7 +169,7 @@ function normalizeGitPaths(diffOutput: string, untrackedOutput: string): readonl
  * @param filePath - Repository-relative path emitted by Git
  */
 function addPortablePath(files: Set<string>, filePath: string): void {
-  const normalized = filePath.replaceAll('\\', '/')
+  const normalized = toPortablePath(filePath)
   if (normalized.length > 0) {
     files.add(normalized)
   }

@@ -65,7 +65,7 @@
 
 - **GIVEN** symbol `packages/core/src/auth.ts:function:validate` is indexed
 - **WHEN** `specd graph impact --symbol packages/core/src/auth.ts:function:validate` is run
-- **THEN** the command resolves the symbol through `resolveSymbolSelector`
+- **THEN** the command resolves the symbol through the provider's shared symbol resolver
 - **AND** analyzes impact for that exact symbol
 
 #### Scenario: Multiple symbol matches
@@ -87,6 +87,43 @@
 - **WHEN** `specd graph impact --symbol createKernel --depth 5` is run
 - **THEN** the analysis includes dependents up to depth 5
 - **AND** each affected symbol in the text output shows `(d=N)` with its depth
+
+#### Scenario: Ambiguous owner-qualified selector lists every match
+
+- **GIVEN** two logical symbols store `qualified_name` `Owner.execute`
+- **WHEN** `specd graph impact --symbol Owner.execute` is run
+- **THEN** the command lists both candidates
+- **AND** it does not analyze a guessed member
+- **AND** the CLI does not split the selector itself
+
+#### Scenario: Unanchored owner-qualified selector analyzes the one member
+
+- **GIVEN** one logical symbol stores `qualified_name` `EditChange.execute`
+- **AND** the command supplies no file and no language
+- **WHEN** `specd graph impact --symbol EditChange.execute` is run
+- **THEN** the report is for that method
+- **AND** other symbols named `execute` are not analyzed
+- **AND** the process exits with code 0
+
+#### Scenario: File-anchored owner-qualified selector filters to one member
+
+- **GIVEN** the selector includes the indexed TypeScript file that declares `EditChange`
+- **AND** other types declare `execute`
+- **WHEN** impact is requested for `EditChange.execute` in that file
+- **THEN** the report is for that method only
+
+#### Scenario: Missing member exits cleanly
+
+- **GIVEN** `EditChange.missing` resolves as unresolved
+- **WHEN** `specd graph impact --symbol EditChange.missing` is run
+- **THEN** stdout shows `No symbol found matching "EditChange.missing".`
+- **AND** the process exits with code 0
+
+#### Scenario: CLI does not open the database
+
+- **WHEN** any `--symbol` impact command runs
+- **THEN** storage is reached only through the provider
+- **AND** the CLI does not read `package.json` or SQLite itself
 
 ### Requirement: Spec impact analysis
 
@@ -206,14 +243,14 @@
 
 #### Scenario: No selector provided
 
-- **WHEN** `specd graph impact` is run without `--file`, `--symbol`, or `--spec`
-- **THEN** stderr contains `error: provide exactly one of --file, --symbol, or --spec`
+- **WHEN** `specd graph impact` is run without `--file`, `--symbol`, `--spec`, or `--export`
+- **THEN** stderr contains `error: provide exactly one of --file, --symbol, --spec, or --export with --from`
 - **AND** the process exits with code 1
 
 #### Scenario: Multiple selectors provided
 
 - **WHEN** `specd graph impact --file core:src/auth.ts --spec core:change` is run
-- **THEN** stderr contains `error: provide exactly one of --file, --symbol, or --spec`
+- **THEN** stderr contains `error: provide exactly one of --file, --symbol, --spec, or --export with --from`
 - **AND** the process exits with code 1
 
 #### Scenario: Missing unprefixed selector reports normalized lookup
@@ -260,6 +297,38 @@
 - **WHEN** impact receives that name
 - **THEN** it returns a bounded deterministic ambiguity list and performs no traversal
 - **AND** prefix or textual candidates are never accepted as targets
+
+### Requirement: Provider-owned impact result filters
+
+#### Scenario: Repeated filters are delegated in one request
+
+- **GIVEN** a provider spy for a valid impact target
+- **WHEN** `graph impact` receives comma-separated types and kinds plus repeated `--workspace` and `--exclude-workspace` options
+- **THEN** the CLI calls the selected provider impact operation once with the normalized ordered filter sets
+- **AND** it renders the provider result without removing any returned category entry
+
+#### Scenario: Unsupported result type fails before provider open
+
+- **WHEN** `graph impact` receives `--type documents`
+- **THEN** it reports a usage error naming `files`, `symbols`, and `specs` as the supported values
+- **AND** it does not open the provider
+
+#### Scenario: Symbol kind requires symbol results
+
+- **WHEN** `graph impact` receives `--type files,specs --kind function`
+- **THEN** it reports a usage error before provider open
+
+#### Scenario: Workspace exclusion takes precedence
+
+- **WHEN** the same canonical workspace is present in both repeated inclusion and exclusion options
+- **THEN** the delegated filter retains exclusion precedence using the same normalization as `graph search`
+
+#### Scenario: Symbol target renders affected specs
+
+- **GIVEN** `SpecRepository` has admitted impacted symbols or files with indexed spec coverage
+- **WHEN** `graph impact --symbol SpecRepository --type specs` executes
+- **THEN** the command renders the provider's non-empty `affectedSpecs` collection
+- **AND** it does not reconstruct spec coverage in the CLI
 
 ### Requirement: Public export impact analysis
 

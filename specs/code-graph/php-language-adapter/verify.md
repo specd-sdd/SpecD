@@ -39,6 +39,13 @@
 - **THEN** `Svc` is a namespace-scoped local binding to the canonical target
 - **AND** no public binding or hierarchy edge is created by the import
 
+### Requirement: Resolution manifests
+
+#### Scenario: PHP declares only composer.json
+
+- **WHEN** the PHP adapter reports `resolutionManifests()`
+- **THEN** the result is exactly `['composer.json']`
+
 ### Requirement: Static and framework dependency facts
 
 #### Scenario: Literal loader stays scoped while dynamic loader is dropped

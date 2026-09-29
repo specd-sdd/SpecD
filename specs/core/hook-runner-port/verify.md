@@ -20,9 +20,10 @@
 
 #### Scenario: Nested variable paths are resolved
 
-- **GIVEN** a command `"echo {{change.name}}"` and variables `{ change: { name: "add-login", workspace: "auth", path: "/x" }, project: { root: "/app" } }`
+- **GIVEN** a command `"echo {{change.name}}"` and variables `{ change: { name: "add-login", path: "/x" }, project: { root: "/app" } }`
 - **WHEN** `run` is called
 - **THEN** the shell receives a command with `add-login` substituted for `{{change.name}}`
+- **AND** the variable map does not include `change.workspace`
 
 #### Scenario: Unknown variables are left unexpanded
 
@@ -32,11 +33,42 @@
 
 ### Requirement: Shell escaping
 
-#### Scenario: Values with special characters are escaped
+#### Scenario: A developer-quoted value is not quoted again
 
-- **GIVEN** a command `"echo {{change.name}}"` and a change name containing shell metacharacters (e.g. `"; rm -rf /"`)
+- **GIVEN** a command `printf %s "{{change.name}}"` and a value `a b %PATH% &`
 - **WHEN** `run` is called
-- **THEN** the substituted value is shell-escaped and does not cause injection
+- **THEN** the shell receives the value inside the quotes the developer wrote
+- **AND** SpecD has not wrapped that value in another pair of quotes
+
+#### Scenario: Windows turns developer single quotes into cmd quotes
+
+- **GIVEN** the host is Windows
+- **AND** the command after substitution is `mkdir 'C:\Users\Ada Lovelace\repo'`
+- **WHEN** the runner prepares the command
+- **THEN** `cmd.exe` receives `mkdir "C:\Users\Ada Lovelace\repo"`
+- **AND** the spawn uses verbatim arguments
+- **AND** the console window is hidden
+
+#### Scenario: A quote inside single quotes is doubled for cmd
+
+- **GIVEN** the host is Windows
+- **AND** the command contains `echo 'say "hi"'`
+- **WHEN** the runner prepares the command
+- **THEN** the command is `echo "say ""hi"""`
+
+#### Scenario: POSIX turns a cmd literal quote into an escaped quote
+
+- **GIVEN** the host is not Windows
+- **AND** the command contains `echo "Resultado: ""listo"""`
+- **WHEN** the runner prepares the command
+- **THEN** the command is `echo "Resultado: \"listo\""`
+- **AND** an empty `echo ""` stays `echo ""`
+
+#### Scenario: Percent signs stay literal
+
+- **GIVEN** a command `echo "100%"`
+- **WHEN** the runner prepares the command on either host
+- **THEN** the percent sign is still a single `%`
 
 #### Scenario: Non-primitive values are not substituted
 

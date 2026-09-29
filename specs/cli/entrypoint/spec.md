@@ -113,6 +113,18 @@ This behaviour makes `specd` act as a project landing page when a project is pre
 
 `specd init` SHALL be available as a top-level command that delegates to the same handler as `specd project init`. Both invocation forms MUST produce identical behaviour — same flags, interactive wizard, exit codes, and output formats. The top-level `init` command SHALL appear in the output of `specd --help` alongside other top-level commands.
 
+### Requirement: Terminal-aware table rendering
+
+The CLI table helper (`renderTable` and `fitColumnsToTerminal`) SHALL dynamically adapt table column widths to the interactive terminal width (`process.stdout.columns` or an explicit `terminalWidth` override).
+
+When the total column width plus inter-column spacing exceeds the available terminal width, column widths SHALL be reduced in a right-to-left cascade down to a configurable minimum column width (defaulting to 10 characters). If a column is already narrower than the threshold, its width SHALL NOT be expanded. Content in narrowed columns SHALL be wrapped across physical lines when `overflow: 'wrap'` is configured, or truncated with `…` when `overflow: 'truncate'` is configured.
+
+When running in non-TTY environments (such as pipes or automated test runners without defined columns), the table SHALL retain its natural unconstrained column widths.
+
+### Requirement: Decoupled program instantiation
+
+The CLI program configuration and command registrations SHALL be encapsulated in a reusable factory function (`createProgram(): Command`) separate from process execution. This SHALL enable programmatic inspection, command tree traversal, and documentation coverage verification without triggering argument parsing.
+
 ## Constraints
 
 - Every leaf command must call `.allowExcessArguments(false)` so Commander rejects extra positional arguments

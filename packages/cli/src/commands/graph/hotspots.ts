@@ -4,7 +4,7 @@ import { output, parseFormat } from '../../formatter.js'
 import { cliError } from '../../handle-error.js'
 import { parseGraphKinds } from './parse-graph-kinds.js'
 import { resolveGraphCliContext } from './resolve-graph-cli-context.js'
-import { toGraphDisplayPath } from './resolve-impact-file-selectors.js'
+import { splitWorkspaceIdentity, toGraphDisplayPath } from './resolve-impact-file-selectors.js'
 import { withProvider } from './with-provider.js'
 import { warnGraphStale } from './warn-graph-staleness.js'
 
@@ -193,8 +193,7 @@ Exclude examples:
               lines.push('─'.repeat(90))
 
               for (const entry of result.entries) {
-                const sepIndex = entry.symbol.filePath.indexOf(':')
-                const ws = sepIndex !== -1 ? entry.symbol.filePath.substring(0, sepIndex) : ''
+                const ws = splitWorkspaceIdentity(entry.symbol.filePath)?.workspace ?? ''
                 const displayPath = toDisplayPath(entry.symbol.filePath)
                 lines.push(
                   `${String(entry.score).padStart(6)}  ${entry.riskLevel.padEnd(8)}  ${String(entry.crossWorkspaceCallers).padStart(3)}  ${entry.symbol.kind.padEnd(9)}  ${entry.symbol.name.padEnd(30)}  [${ws}] ${displayPath}:${String(entry.symbol.line)}`,
@@ -213,9 +212,7 @@ Exclude examples:
                     crossWorkspaceCallers: e.crossWorkspaceCallers,
                     fileImporters: e.fileImporters,
                     riskLevel: e.riskLevel,
-                    workspace: e.symbol.filePath.includes(':')
-                      ? e.symbol.filePath.substring(0, e.symbol.filePath.indexOf(':'))
-                      : '',
+                    workspace: splitWorkspaceIdentity(e.symbol.filePath)?.workspace ?? '',
                     displayPath: toGraphDisplayPath(config, e.symbol.filePath),
                   })),
                 },

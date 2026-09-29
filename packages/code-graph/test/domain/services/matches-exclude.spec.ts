@@ -49,6 +49,8 @@ describe('matchesExclude', () => {
   })
 
   it('handles paths without colons (single-segment workspace)', () => {
+    expect(matchesExclude('C:/repo/src/a.ts', undefined, ['C'])).toBe(false)
+    expect(matchesExclude('C:', undefined, ['C'])).toBe(false)
     expect(matchesExclude('standalone', undefined, ['standalone'])).toBe(true)
     expect(matchesExclude('standalone', undefined, ['other'])).toBe(false)
   })

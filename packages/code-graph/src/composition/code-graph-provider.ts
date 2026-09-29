@@ -1,4 +1,5 @@
 import { type GraphStore, type StorageGenerationSnapshot } from '../domain/ports/graph-store.js'
+import { type AdapterRegistryPort } from '../domain/ports/adapter-registry-port.js'
 import { type IndexCodeGraph } from '../application/use-cases/index-code-graph.js'
 import { type IndexOptions } from '../domain/value-objects/index-options.js'
 import { type IndexResult } from '../domain/value-objects/index-result.js'
@@ -14,6 +15,7 @@ import { type TraversalResult } from '../domain/value-objects/traversal-result.j
 import {
   type ImpactResult,
   type FileImpactResult,
+  type ImpactResultFilter,
   type SpecImpactResult,
 } from '../domain/value-objects/impact-result.js'
 import { type ChangeDetectionResult } from '../domain/value-objects/change-detection-result.js'
@@ -141,26 +143,31 @@ export interface CodeGraphProvider {
     target: string,
     direction: 'upstream' | 'downstream' | 'both',
     maxDepth?: number,
+    filter?: ImpactResultFilter,
   ): Promise<ImpactResult>
   analyzePublicBindingImpact(
     input: ResolvedPublicBindingImpactInput,
     direction: 'upstream' | 'downstream' | 'both',
     maxDepth?: number,
+    filter?: ImpactResultFilter,
   ): Promise<PublicBindingImpactResult>
   analyzeFileImpact(
     filePath: string,
     direction: 'upstream' | 'downstream' | 'both',
     maxDepth?: number,
+    filter?: ImpactResultFilter,
   ): Promise<FileImpactResult>
   analyzeFilesImpact(
     filePaths: string[],
     direction: 'upstream' | 'downstream' | 'both',
     maxDepth?: number,
+    filter?: ImpactResultFilter,
   ): Promise<FileImpactResult>
   analyzeSpecImpact(
     specId: string,
     direction: 'upstream' | 'downstream' | 'both',
     maxDepth?: number,
+    filter?: ImpactResultFilter,
   ): Promise<SpecImpactResult>
   clear(): Promise<void>
   detectChanges(changedFiles: string[], maxDepth?: number): Promise<ChangeDetectionResult>
@@ -209,6 +216,7 @@ export class CodeGraphProviderImpl implements CodeGraphProvider {
    * @param graphHealth - Optional provider-owned graph-health composition.
    * @param graphHealth.useCase - Canonical health use case.
    * @param graphHealth.input - Config-bound health input excluding the provider.
+   * @param registry - Adapter registry shared by indexing and resolution.
    */
   constructor(
     private readonly store: GraphStore,
@@ -218,11 +226,13 @@ export class CodeGraphProviderImpl implements CodeGraphProvider {
       readonly useCase: GetGraphHealth
       readonly input: Omit<GetGraphHealthInput, 'provider'>
     },
+    private readonly registry?: AdapterRegistryPort,
   ) {
     this.resolver = new ResolveSymbolReference(
       store,
       async () => this.toResolutionHealth(await this.getGraphHealth()),
       (resources) => this.assessExactResources(resources),
+      this.registry,
     )
     this.referenceSearch = new SearchCodeGraph(store)
   }
@@ -505,6 +515,7 @@ export class CodeGraphProviderImpl implements CodeGraphProvider {
     return resolveSymbolSelector(input, {
       store: this.store,
       ...(this.projectRoot !== undefined ? { projectRoot: this.projectRoot } : {}),
+      resolveReference: (request) => this.resolver.execute(request),
     })
   }
 
@@ -644,6 +655,7 @@ export class CodeGraphProviderImpl implements CodeGraphProvider {
         this.store,
         () => Promise.resolve(this.toResolutionHealth(health)),
         (resources) => this.assessExactResources(resources),
+        this.registry,
       ).execute(normalizedInput!)
     }
     return this.resolver.execute(normalizedInput!)
@@ -686,6 +698,7 @@ export class CodeGraphProviderImpl implements CodeGraphProvider {
         this.store,
         () => Promise.resolve(this.toResolutionHealth(health)),
         (resources) => this.assessExactResources(resources),
+        this.registry,
       ).executeBatch(normalizedInputs)
     }
     return this.resolver.executeBatch(normalizedInputs)
@@ -744,15 +757,17 @@ export class CodeGraphProviderImpl implements CodeGraphProvider {
    * @param target - The symbol identifier to analyze.
    * @param direction - Direction of impact analysis.
    * @param maxDepth - Maximum traversal depth.
+   * @param filter - Optional result membership filter applied by the graph store.
    * @returns The impact result with affected symbols and risk levels.
    */
   async analyzeImpact(
     target: string,
     direction: 'upstream' | 'downstream' | 'both',
     maxDepth?: number,
+    filter?: ImpactResultFilter,
   ): Promise<ImpactResult> {
     await this.assertAvailable()
-    return analyzeImpact(this.store, target, direction, maxDepth)
+    return analyzeImpact(this.store, target, direction, maxDepth, undefined, filter)
   }
 
   /**
@@ -760,15 +775,17 @@ export class CodeGraphProviderImpl implements CodeGraphProvider {
    * @param input - Proven public binding and logical target evidence.
    * @param direction - Direction of impact analysis.
    * @param maxDepth - Maximum traversal depth.
+   * @param filter - Optional result membership filter applied by the graph store.
    * @returns Exact-binding and canonical impact projections.
    */
   async analyzePublicBindingImpact(
     input: ResolvedPublicBindingImpactInput,
     direction: 'upstream' | 'downstream' | 'both',
     maxDepth?: number,
+    filter?: ImpactResultFilter,
   ): Promise<PublicBindingImpactResult> {
     await this.assertAvailable()
-    return analyzePublicBindingImpact(this.store, input, direction, maxDepth)
+    return analyzePublicBindingImpact(this.store, input, direction, maxDepth, filter)
   }
 
   /**
@@ -776,15 +793,17 @@ export class CodeGraphProviderImpl implements CodeGraphProvider {
    * @param filePath - The file path to analyze.
    * @param direction - Direction of impact analysis.
    * @param maxDepth - Maximum traversal depth.
+   * @param filter - Optional result membership filter applied by the graph store.
    * @returns The file impact result with affected files and risk levels.
    */
   async analyzeFileImpact(
     filePath: string,
     direction: 'upstream' | 'downstream' | 'both',
     maxDepth?: number,
+    filter?: ImpactResultFilter,
   ): Promise<FileImpactResult> {
     await this.assertAvailable()
-    return analyzeFileImpact(this.store, filePath, direction, maxDepth)
+    return analyzeFileImpact(this.store, filePath, direction, maxDepth, undefined, filter)
   }
 
   /**
@@ -792,15 +811,17 @@ export class CodeGraphProviderImpl implements CodeGraphProvider {
    * @param filePaths - The file paths to analyze.
    * @param direction - Direction of impact analysis.
    * @param maxDepth - Maximum traversal depth.
+   * @param filter - Optional result membership filter applied by the graph store.
    * @returns The combined files impact result.
    */
   async analyzeFilesImpact(
     filePaths: string[],
     direction: 'upstream' | 'downstream' | 'both',
     maxDepth?: number,
+    filter?: ImpactResultFilter,
   ): Promise<FileImpactResult> {
     await this.assertAvailable()
-    return analyzeFilesImpact(this.store, filePaths, direction, maxDepth)
+    return analyzeFilesImpact(this.store, filePaths, direction, maxDepth, undefined, filter)
   }
 
   /**
@@ -808,15 +829,17 @@ export class CodeGraphProviderImpl implements CodeGraphProvider {
    * @param specId - Spec identifier to analyze.
    * @param direction - Direction of impact analysis.
    * @param maxDepth - Maximum traversal depth.
+   * @param filter - Optional result membership filter applied by the graph store.
    * @returns Requirement-aware spec impact result.
    */
   async analyzeSpecImpact(
     specId: string,
     direction: 'upstream' | 'downstream' | 'both',
     maxDepth?: number,
+    filter?: ImpactResultFilter,
   ): Promise<SpecImpactResult> {
     await this.assertAvailable()
-    return analyzeSpecImpact(this.store, specId, direction, maxDepth)
+    return analyzeSpecImpact(this.store, specId, direction, maxDepth, undefined, filter)
   }
 
   /**

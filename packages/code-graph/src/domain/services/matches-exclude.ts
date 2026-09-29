@@ -11,11 +11,14 @@ function globToRegExp(pattern: string): RegExp {
 /**
  * Extracts the workspace prefix from a colon-separated file path (workspace:relative-path).
  * @param filePath - A workspace-prefixed file path (e.g. "core:src/foo.ts").
- * @returns The workspace name, or the entire path if no colon is present.
+ * @returns The workspace name, the whole path when it has no colon, or null for a drive-letter path.
  */
-function extractWorkspace(filePath: string): string {
+function extractWorkspace(filePath: string): string | null {
+  if (/^[A-Za-z]:(?:[/\\]|$)/.test(filePath)) return null
   const idx = filePath.indexOf(':')
-  return idx === -1 ? filePath : filePath.substring(0, idx)
+  if (idx === -1) return filePath
+  if (idx === 0) return null
+  return filePath.slice(0, idx)
 }
 
 /**
@@ -32,7 +35,7 @@ export function matchesExclude(
 ): boolean {
   if (excludeWorkspaces && excludeWorkspaces.length > 0) {
     const ws = extractWorkspace(filePath)
-    if (excludeWorkspaces.includes(ws)) return true
+    if (ws !== null && excludeWorkspaces.includes(ws)) return true
   }
 
   if (excludePaths && excludePaths.length > 0) {

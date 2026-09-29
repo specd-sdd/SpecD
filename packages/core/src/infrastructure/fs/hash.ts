@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { normalizeNewlines } from '../../domain/services/normalize-newlines.js'
 
 /**
  * Computes a `sha256:<hex>` hash of the given UTF-8 string content.
@@ -7,5 +8,5 @@ import { createHash } from 'node:crypto'
  * @returns A `sha256:<hex>` formatted hash string
  */
 export function sha256(content: string): string {
-  return 'sha256:' + createHash('sha256').update(content, 'utf8').digest('hex')
+  return 'sha256:' + createHash('sha256').update(normalizeNewlines(content), 'utf8').digest('hex')
 }

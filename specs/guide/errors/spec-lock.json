@@ -1,0 +1,31 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["guide:conventions", "default:_global/error-handling-conventions"],
+  "implementation": [
+    {
+      "file": "guide:src/domain/errors/specd-guide-error.ts",
+      "symbols": ["SpecdGuideError"]
+    },
+    {
+      "file": "guide:src/domain/errors/guide-topic-not-found-error.ts",
+      "symbols": ["GuideTopicNotFoundError"]
+    },
+    {
+      "file": "guide:src/domain/errors/guide-section-not-found-error.ts",
+      "symbols": ["GuideSectionNotFoundError"]
+    },
+    {
+      "file": "guide:src/domain/errors/index.ts"
+    },
+    {
+      "file": "guide:src/domain/errors/guide-section-ambiguous-error.ts",
+      "symbols": ["GuideSectionAmbiguousError"]
+    },
+    {
+      "file": "guide:test/unit/domain/errors.test.ts"
+    }
+  ]
+}

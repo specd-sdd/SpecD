@@ -1,0 +1,188 @@
+- op: modified
+  description: 'Cover resolver-backed coverage and public bindings on the anchored file'
+  selector:
+    type: section
+    matches: 'Requirement: Deterministic implementation coverage projection'
+  content: |
+    #### Scenario: Clean generation projects file and logical-symbol coverage
+
+    - **GIVEN** a real persisted spec state links one existing file directly and names one uniquely resolvable symbol in another existing file
+    - **WHEN** the project is indexed into an empty store
+    - **THEN** the spec has one `COVERS_FILE` relation to the direct file
+    - **AND** one `COVERS_SYMBOL` relation targets the resolved logical symbol ID
+    - **AND** neither relation targets a missing endpoint
+
+    #### Scenario: Implementation-only change reprojects coverage without code analysis
+
+    - **GIVEN** code files and their logical symbols are unchanged in the persisted graph
+    - **AND** a spec's persisted implementation links change without changing code content
+    - **WHEN** an incremental index runs
+    - **THEN** semantic state needed for symbol resolution is available to spec indexing
+    - **AND** obsolete coverage is removed and the new file and symbol coverage is persisted
+
+    #### Scenario: Changed declaration reprojects canonical coverage
+
+    - **GIVEN** a spec covers a logical symbol declared in a changed file
+    - **WHEN** the file is reanalyzed and its declarations are replaced
+    - **THEN** coverage is recomputed from the spec's canonical persisted implementation links
+    - **AND** valid coverage targets the refreshed logical symbol
+    - **AND** no stale declaration-occurrence target is retained
+
+    #### Scenario: Unresolved and ambiguous symbol links are diagnostic
+
+    - **GIVEN** one implementation link names a missing symbol and another resolves to multiple logical symbols in its linked file
+    - **WHEN** spec coverage is projected
+    - **THEN** neither link creates `COVERS_SYMBOL` or fallback `COVERS_FILE`
+    - **AND** the index result reports one stable diagnostic per link with spec ID, file, symbol name, and resolution reason
+    - **AND** unrelated inputs still commit successfully
+
+    #### Scenario: Qualified member resolves inside the anchored file
+
+    - **GIVEN** `EditChange.execute` is linked on the file that declares `EditChange`
+    - **AND** other types also declare `execute`
+    - **WHEN** coverage is projected
+    - **THEN** `COVERS_SYMBOL` targets `EditChange`'s `execute` logical id
+    - **AND** the proof is not raw equality with the stored string `EditChange.execute`
+
+    #### Scenario: Re-export binding is visible before coverage
+
+    - **GIVEN** `sdk:src/index.ts` re-exports `runIsolatedGraphIndex` and a spec links that name on that file
+    - **WHEN** coverage is projected
+    - **THEN** the adapter binding on `sdk:src/index.ts` already exists
+    - **AND** `COVERS_SYMBOL` targets the published logical id
+    - **AND** the link is not moved to the declaring file by qualified-name parsing
+
+    #### Scenario: Label text stays a diagnostic
+
+    - **GIVEN** a link stores `Integration (real kernel)` on an indexed file that does not declare or export it
+    - **WHEN** coverage is projected
+    - **THEN** the result is `SYMBOL_NOT_FOUND`
+    - **AND** no `COVERS_SYMBOL` relation is written
+
+    #### Scenario: Value and type pair stays ambiguous
+
+    - **GIVEN** the anchored file declares `MemberForm` as both a value and a type
+    - **WHEN** coverage is projected for the simple name `MemberForm`
+    - **THEN** the diagnostic is `SYMBOL_AMBIGUOUS`
+    - **AND** replacing member form with member semantics does not pick one of them
+
+    #### Scenario: Unindexed file stays out of symbol coverage
+
+    - **GIVEN** a link points at a markdown or `package.json` path
+    - **WHEN** coverage is projected
+    - **THEN** the diagnostic is `FILE_NOT_INDEXED`
+    - **AND** no language adapter is asked to invent a symbol
+
+- op: modified
+  description: 'Indexer persists adapter facts and does not hardcode a language linker'
+  selector:
+    type: section
+    matches: 'Requirement: Reference fact indexing'
+  content: |
+    #### Scenario: Index run persists reference and coverage evidence
+
+    - **GIVEN** files contain overloads, reexports, shadowed aliases, hierarchy, parse failure, and ambiguous coverage links
+    - **WHEN** two-pass indexing completes
+    - **THEN** proven logical/binding/hierarchy facts and per-file outcomes are atomic
+    - **AND** guessed `COVERS_SYMBOL` relations are absent
+
+    #### Scenario: High-cardinality relation construction remains bounded
+
+    - **GIVEN** an indexing session with thousands of declarations, imports, calls, and re-export routes
+    - **WHEN** Pass 2 builds dependency and public-binding relations
+    - **THEN** declaration, logical-symbol, import, symbol, and binding indexes are built once for the session or file
+    - **AND** resolving each relation uses indexed lookup instead of scanning all declarations, logical symbols, or public bindings
+    - **AND** relation persistence remains chunked and deduplicated
+
+    #### Scenario: Source content and symbol ranges are indexed atomically
+
+    - **GIVEN** a source file contains multi-line named declarations and searchable body text
+    - **WHEN** indexing completes
+    - **THEN** FileNode content, complete construct ranges, declared-name selection ranges, and semantic facts are committed in the same generation
+    - **AND** source-content candidates are available without reading the live filesystem
+
+    #### Scenario: Language-specific linking stays in the adapter
+
+    - **GIVEN** a TypeScript file re-exports a package specifier and a Go file declares a method
+    - **WHEN** reference facts are persisted
+    - **THEN** both bindings and `parentId` values come from the adapter payload
+    - **AND** the indexer has no TypeScript re-export pass and no hardcoded language allowlist for parents
+
+    #### Scenario: Owned members store a qualified name
+
+    - **GIVEN** `EditChange` owns `execute` and a top-level function has no owner
+    - **WHEN** reference facts are persisted
+    - **THEN** the member's `qualified_name` is `EditChange.execute`
+    - **AND** the top-level function has no `qualified_name`
+    - **AND** full-text search text is not the only copy of that spelling
+
+    #### Scenario: Relative re-export inside one workspace is kept
+
+    - **GIVEN** `code-graph:src/index.ts` re-exports a name from a relative specifier
+    - **WHEN** reference facts are persisted
+    - **THEN** the public binding surface is `code-graph:src/index.ts`
+    - **AND** the target is the logical id published by the relative source file
+
+    #### Scenario: Facts are stored before coverage reads them
+
+    - **GIVEN** a generation contains a new package re-export
+    - **WHEN** the index run reaches spec coverage
+    - **THEN** that generation's public bindings are already stored
+    - **AND** coverage does not read the pre-re-export declaration list only
+
+- op: modified
+  description: 'Package map stays adapter-owned and re-exports are not first-hit'
+  selector:
+    type: section
+    matches: 'Requirement: Cross-workspace package resolution'
+  content: |
+    #### Scenario: Package identity built from adapter
+
+    - **GIVEN** workspace `core` with `codeRoot` containing `package.json` with `name: '@specd/core'`
+    - **AND** the TypeScript adapter implements `getPackageIdentity`
+    - **WHEN** the indexer builds the `packageName → workspaceName` map
+    - **THEN** `'@specd/core'` maps to workspace `'core'`
+    - **AND** the indexer did not parse `package.json` itself
+
+    #### Scenario: Cross-workspace import resolved via package identity
+
+    - **GIVEN** workspace `core` with package identity `@specd/core` defining `createUser`
+    - **AND** workspace `cli` has a file importing `createUser` from `@specd/core`
+    - **WHEN** Pass 2 resolves imports
+    - **THEN** an `IMPORTS` relation is created from the cli file to the core file
+    - **AND** a `CALLS` relation is created from the calling symbol to `createUser`
+
+    #### Scenario: Multirepo cross-workspace resolution
+
+    - **GIVEN** two workspaces from separate repos configured in `specd.yaml`
+    - **AND** each has a `package.json` with distinct package names
+    - **AND** workspace B imports a symbol from workspace A's package
+    - **WHEN** Pass 2 resolves imports
+    - **THEN** the import resolves across repos via the `packageName → workspaceName` map
+
+    #### Scenario: Adapter without getPackageIdentity skips resolution
+
+    - **GIVEN** an adapter that does not implement `getPackageIdentity`
+    - **WHEN** the indexer queries it for a workspace's package identity
+    - **THEN** non-relative imports for that language remain unresolved
+
+    #### Scenario: Package re-export does not take the first workspace symbol
+
+    - **GIVEN** `@specd/code-graph` publishes `runIsolatedGraphIndex` from its public entry
+    - **AND** another symbol with the same name exists elsewhere in that workspace
+    - **WHEN** the SDK barrel re-exports that name
+    - **THEN** the stored binding targets the entry file's published logical id
+    - **AND** the indexer did not select the other symbol by scanning the workspace
+
+    #### Scenario: Unknown package stays unresolved
+
+    - **GIVEN** a specifier names a package that no adapter identity maps to a workspace
+    - **WHEN** the indexer builds the package map and the adapter resolves the re-export
+    - **THEN** no cross-workspace binding is stored
+
+    #### Scenario: First adapter identity wins once
+
+    - **GIVEN** two adapters could answer for the same workspace and only the first returns a package name
+    - **WHEN** the map is built
+    - **THEN** that first non-empty identity is stored
+    - **AND** the indexer still does not open either manifest itself

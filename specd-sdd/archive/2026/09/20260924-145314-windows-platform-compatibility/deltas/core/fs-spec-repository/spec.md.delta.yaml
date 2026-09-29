@@ -1,0 +1,15 @@
+- op: added
+  description: 'Spec publication retries locked renames, and the tmp gitignore compare ignores newline spelling.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: 'Requirement: Reject publication of empty spec directories'
+  content: |
+    ### Requirement: Publication rename recovery
+
+    Spec publication renames that fail with `EPERM`, `EBUSY`, or `EACCES` MUST be retried a bounded number of times and then MUST surface the original error.
+
+    The temporary `.gitignore` equality check MUST treat `\r\n` and `\r` as `\n`. Identical normalized content MUST count as success for that file only. Differing artifact bytes MUST NOT count as success.

@@ -1,0 +1,13 @@
+- op: added
+  description: 'Archive path confinement uses the shared inside-root check.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: 'Requirement: Archive pattern expansion has no workspace token'
+  content: |
+    ### Requirement: Archive paths stay inside the repository root
+
+    Resolved archive paths MUST be confined with the inside-root rule: after both paths are resolved, the candidate is inside when the relative path from the root is empty, or it does not start with `..` and is not absolute. Drive-letter case MUST NOT make an inside path look outside.

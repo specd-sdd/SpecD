@@ -1,4 +1,6 @@
 import { type SpecRepository } from '@specd/core'
+import { splitWorkspaceIdentity } from '../../domain/services/split-workspace-identity.js'
+import { type SymbolResolutionResult } from '../../domain/value-objects/symbol-reference.js'
 import { createRelation, type Relation } from '../../domain/value-objects/relation.js'
 import { RelationType } from '../../domain/value-objects/relation-type.js'
 import { type SymbolNode } from '../../domain/value-objects/symbol-node.js'
@@ -22,6 +24,12 @@ export interface ProjectSpecCoverageInput {
   readonly indexedFilePaths: ReadonlySet<string>
   readonly symbolsByFile: (filePath: string) => readonly SymbolNode[]
   readonly logicalIdByDeclarationSymbolId: ReadonlyMap<string, string>
+  readonly resolveSymbol?: (request: {
+    readonly workspace: string
+    readonly requested: string
+    readonly filePath: string
+    readonly publicSurface: string
+  }) => Promise<SymbolResolutionResult>
 }
 
 /** Relations and diagnostics produced by one deterministic coverage projection. */
@@ -35,7 +43,9 @@ export interface ProjectSpecCoverageResult {
  * @param input - Prepared specs and complete in-memory semantic lookup state.
  * @returns Deterministically sorted coverage relations and diagnostics.
  */
-export function projectSpecCoverage(input: ProjectSpecCoverageInput): ProjectSpecCoverageResult {
+export async function projectSpecCoverage(
+  input: ProjectSpecCoverageInput,
+): Promise<ProjectSpecCoverageResult> {
   const relations = new Map<string, Relation>()
   const diagnostics: IndexCoverageDiagnostic[] = []
 
@@ -77,6 +87,31 @@ export function projectSpecCoverage(input: ProjectSpecCoverageInput): ProjectSpe
       }
 
       for (const symbolName of link.symbols) {
+        if (input.resolveSymbol !== undefined) {
+          const workspace = splitWorkspaceIdentity(link.file)?.workspace ?? ''
+          const resolved = await input.resolveSymbol({
+            workspace,
+            requested: symbolName,
+            filePath: link.file,
+            publicSurface: link.file,
+          })
+          if (resolved.status === 'resolved' && resolved.target !== null) {
+            const relation = createRelation({
+              source: spec.specId,
+              target: resolved.target.id,
+              type: RelationType.CoversSymbol,
+            })
+            relations.set(`${relation.source}:${relation.type}:${relation.target}`, relation)
+          } else {
+            addDiagnostic(
+              spec.specId,
+              link.file,
+              symbolName,
+              resolved.status === 'ambiguous' ? 'SYMBOL_AMBIGUOUS' : 'SYMBOL_NOT_FOUND',
+            )
+          }
+          continue
+        }
         const logicalIds = new Set(
           input
             .symbolsByFile(link.file)

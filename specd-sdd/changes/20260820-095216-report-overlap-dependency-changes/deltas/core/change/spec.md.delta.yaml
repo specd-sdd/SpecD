@@ -1,0 +1,25 @@
+- op: added
+  description: 'Define structured, backward-compatible overlap invalidation evidence'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: History and event sourcing'
+  content: |
+    ### Requirement: Structured overlap invalidation evidence
+
+    In addition to the common `invalidated` fields, every newly appended event with `cause: 'spec-overlap-conflict'` MUST carry an `overlapDetail` object containing:
+
+    - `archivedChangeName` — the archived change that caused invalidation.
+    - `overlappingSpecIds` — the complete, deduplicated, lexicographically sorted set of overlapping spec IDs for this peer.
+    - `dependencyChanges` — a lexicographically `specId`-sorted array of meaningful direct dependency changes. Each entry contains `specId`, deduplicated and sorted `added`, and deduplicated and sorted `removed` arrays.
+
+    Every `dependencyChanges.specId` MUST be present in `overlappingSpecIds`. An entry MUST be omitted when both `added` and `removed` are empty. The same dependency ID MUST NOT appear in both arrays of one entry.
+
+    `Change.invalidate()` MUST accept the structured overlap detail as typed invalidation evidence and copy it into the append-only event without deriving dependency semantics itself. New `spec-overlap-conflict` invalidations MUST provide this evidence; other invalidation causes MUST NOT attach it.
+
+    Existing persisted `spec-overlap-conflict` events without `overlapDetail` remain valid legacy history and MUST be loadable. Their `message` remains available for backward-compatible read projections. New overlap messages MUST remain human-readable and MUST mention dependency additions and removals when `dependencyChanges` is non-empty, but consumers MUST treat `overlapDetail` rather than message parsing as authoritative when it is present.
+
+    Overlap invalidation evidence is informational. Appending it MUST NOT rewrite `specDependsOn`, automatically reconcile change intent, or broaden overlap beyond the recorded `overlappingSpecIds`.

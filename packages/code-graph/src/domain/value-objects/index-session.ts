@@ -3,7 +3,13 @@ import { type SpecNode } from './spec-node.js'
 import { type DocumentNode } from './document-node.js'
 import { type Relation } from './relation.js'
 import { type FileAnalysis, type FileAnalysisDraft } from './file-analysis.js'
-import { type DeclarationOccurrence } from './symbol-reference.js'
+import {
+  type DeclarationOccurrence,
+  type LocalBinding,
+  type LogicalSymbol,
+  type PublicBinding,
+  type ResolutionStep,
+} from './symbol-reference.js'
 
 /** The evidence state recorded for every source target considered by an index run. */
 export const IndexCoverageStatus = {
@@ -142,4 +148,27 @@ export interface IndexSession {
 
   /** Returns declaration occurrences grouped by their logical identity. */
   getDeclarationsByLogicalId(): ReadonlyMap<string, readonly DeclarationOccurrence[]>
+
+  /** Returns logical symbols recorded for this session. */
+  getLogicalSymbols(): readonly LogicalSymbol[]
+
+  /** Returns public bindings recorded for this session. */
+  getPublicBindings(): readonly PublicBinding[]
+
+  /** Returns lexical bindings recorded for this session. */
+  getLocalBindings(): readonly LocalBinding[]
+
+  /** Returns resolution steps recorded for this session. */
+  getResolutionSteps(): readonly ResolutionStep[]
+
+  /**
+   * Merges adapter-emitted re-export bindings and steps into the session.
+   * @param facts - Bindings and steps to add.
+   * @param facts.publicBindings - Public bindings emitted by an adapter.
+   * @param facts.steps - Resolution steps emitted by an adapter.
+   */
+  addReferenceFacts(facts: {
+    readonly publicBindings: readonly PublicBinding[]
+    readonly steps: readonly ResolutionStep[]
+  }): void
 }

@@ -13,12 +13,18 @@ import { makeMockSpecRepository } from '../helpers/make-mock-spec-repository.js'
 import { SQLiteWorkerClient } from '../../src/infrastructure/sqlite/sqlite-worker-client.js'
 import { createFileNode } from '../../src/domain/value-objects/file-node.js'
 import { createSymbolNode } from '../../src/domain/value-objects/symbol-node.js'
+import { createRelation } from '../../src/domain/value-objects/relation.js'
+import { RelationType } from '../../src/domain/value-objects/relation-type.js'
+import { createSpecNode } from '../../src/domain/value-objects/spec-node.js'
+import { type ImpactResultFilter } from '../../src/domain/value-objects/impact-result.js'
 import {
   createLogicalSymbol,
   createPublicBinding,
   SymbolSpace,
 } from '../../src/domain/value-objects/symbol-reference.js'
 import { SymbolKind } from '../../src/domain/value-objects/symbol-kind.js'
+import { PhpLanguageAdapter } from '../../src/infrastructure/tree-sitter/php-language-adapter.js'
+import { readInstalledCodeGraphVersion } from '../../src/application/use-cases/_shared/installed-code-graph-version.js'
 import { acquireGraphIndexLockByStoragePath } from '../../src/infrastructure/index-lock.js'
 import { GraphBusyError } from '../../src/domain/errors/graph-busy-error.js'
 import { GraphStorageRecoveryRequiredError } from '../../src/domain/errors/graph-storage-recovery-required-error.js'
@@ -93,7 +99,7 @@ describe('CodeGraphProvider', () => {
 
   it('allows providing a custom store factory', async () => {
     tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-custom-'))
-    const customStore = new InMemoryGraphStore()
+    const customStore = new InMemoryGraphStore(tempDir)
 
     const provider = await createCodeGraphProvider({
       storagePath: tempDir,
@@ -112,7 +118,7 @@ describe('CodeGraphProvider', () => {
 
   it('selects an additive external factory and forwards its storage root', async () => {
     tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-external-'))
-    const externalStore = new InMemoryGraphStore()
+    const externalStore = new InMemoryGraphStore(tempDir)
     const create = vi.fn(() => externalStore)
 
     const provider = createCodeGraphProvider({
@@ -129,7 +135,7 @@ describe('CodeGraphProvider', () => {
 
   it('rejects an external collision with the sqlite built-in before store construction', () => {
     tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-collision-'))
-    const create = vi.fn(() => new InMemoryGraphStore())
+    const create = vi.fn(() => new InMemoryGraphStore(tempDir))
 
     expect(() =>
       createCodeGraphProvider({
@@ -193,7 +199,7 @@ describe('CodeGraphProvider', () => {
     const codeRoot = join(tempDir, 'workspace')
     mkdirSync(codeRoot, { recursive: true })
     writeFileSync(join(codeRoot, 'entry.ts'), 'export const forced = 1\n')
-    const store = new InMemoryGraphStore()
+    const store = new InMemoryGraphStore(tempDir)
     const clear = vi.spyOn(store, 'clear')
     const recreate = vi.spyOn(store, 'recreate')
     const provider = createCodeGraphProvider({
@@ -267,7 +273,7 @@ describe('CodeGraphProvider', () => {
     writeFileSync(lockPath, JSON.stringify({ ...lock, pid: process.ppid }))
     process.env['SPECD_GRAPH_INDEX_LOCK_ROOT'] = tempDir
     process.env['SPECD_GRAPH_INDEX_LOCK_TOKEN'] = lock.token
-    const store = new InMemoryGraphStore()
+    const store = new InMemoryGraphStore(tempDir)
     const provider = createCodeGraphProvider({
       storagePath: tempDir,
       projectRoot: tempDir,
@@ -295,8 +301,10 @@ describe('CodeGraphProvider', () => {
           graphConfig: { includePaths: [], workspaces: new Map() },
         }),
       ).resolves.toBeDefined()
-      // Indexing consumes the matching handoff, while the separate SQLite-backed
-      // reader-lock regression above proves reads never consume it.
+      // Indexing accepts the matching handoff; reads still honor the held lock
+      // (they never treat the handoff as a reader lease).
+      await expect(provider.getStatistics()).rejects.toBeInstanceOf(GraphBusyError)
+      release()
       await expect(provider.getStatistics()).resolves.toBeDefined()
     } finally {
       await provider.close()
@@ -322,7 +330,7 @@ describe('CodeGraphProvider', () => {
 
   it('clear on an open provider keeps the store ready for subsequent operations', async () => {
     tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-clear-open-'))
-    const customStore = new InMemoryGraphStore()
+    const customStore = new InMemoryGraphStore(tempDir)
     const provider = await createCodeGraphProvider({
       storagePath: tempDir,
       projectRoot: tempDir,
@@ -344,7 +352,7 @@ describe('CodeGraphProvider', () => {
 
   it('requires a provider to be closed before physical recreation', async () => {
     tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-stale-'))
-    const customStore = new InMemoryGraphStore()
+    const customStore = new InMemoryGraphStore(tempDir)
     const provider = await createCodeGraphProvider({
       storagePath: tempDir,
       projectRoot: tempDir,
@@ -403,7 +411,7 @@ describe('CodeGraphProvider', () => {
 
   it('resolves a config-relative file selector to the canonical workspace path', async () => {
     tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-file-resolve-'))
-    const store = new InMemoryGraphStore()
+    const store = new InMemoryGraphStore(tempDir)
     const provider = createCodeGraphProvider({
       storagePath: tempDir,
       projectRoot: tempDir,
@@ -440,7 +448,7 @@ describe('CodeGraphProvider', () => {
       projectRoot: tempDir,
       graphStoreFactories: {
         custom: {
-          create: () => new InMemoryGraphStore(),
+          create: () => new InMemoryGraphStore(tempDir),
         },
       },
       graphStoreId: 'custom',
@@ -456,7 +464,7 @@ describe('CodeGraphProvider', () => {
 
   it('retrieves an exact public binding without ranked search pagination', async () => {
     tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-exact-binding-'))
-    const store = new InMemoryGraphStore()
+    const store = new InMemoryGraphStore(tempDir)
     const provider = createCodeGraphProvider({
       storagePath: tempDir,
       projectRoot: tempDir,
@@ -473,7 +481,7 @@ describe('CodeGraphProvider', () => {
         name: `run${index}`,
         space: SymbolSpace.Value,
         ownerId: undefined,
-        memberForm: undefined,
+        memberSemantics: undefined,
       })
       const symbol = createSymbolNode({
         name: logical.name,
@@ -533,7 +541,7 @@ describe('CodeGraphProvider', () => {
 
   it('exposes one unified Code Graph-owned search operation', async () => {
     tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-search-'))
-    const store = new InMemoryGraphStore()
+    const store = new InMemoryGraphStore(tempDir)
     const provider = createCodeGraphProvider({
       storagePath: tempDir,
       projectRoot: tempDir,
@@ -570,7 +578,7 @@ describe('CodeGraphProvider', () => {
 
   it('normalizes an exact config-relative search file and keeps every occurrence', async () => {
     tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-file-search-'))
-    const store = new InMemoryGraphStore()
+    const store = new InMemoryGraphStore(tempDir)
     const provider = createCodeGraphProvider({
       storagePath: tempDir,
       projectRoot: tempDir,
@@ -626,7 +634,7 @@ describe('CodeGraphProvider', () => {
         await super.recreate()
       }
     }
-    const store = new IncompatibleStore()
+    const store = new IncompatibleStore(tempDir)
     const createProvider = () =>
       createCodeGraphProvider({
         storagePath: tempDir,
@@ -702,6 +710,182 @@ describe('CodeGraphProvider', () => {
     }
   })
 
+  it('forwards one exact filter through every impact facade under one availability check', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-impact-filter-'))
+    const store = new InMemoryGraphStore(tempDir)
+    const provider = createCodeGraphProvider({
+      storagePath: tempDir,
+      projectRoot: tempDir,
+      graphStoreFactories: { custom: { create: () => store } },
+      graphStoreId: 'custom',
+    })
+    await provider.open()
+
+    const target = createSymbolNode({
+      name: 'target',
+      kind: SymbolKind.Function,
+      filePath: 'fixture:src/target.ts',
+      line: 1,
+      column: 0,
+    })
+    const consumer = createSymbolNode({
+      name: 'consumer',
+      kind: SymbolKind.Function,
+      filePath: 'fixture:src/consumer.ts',
+      line: 1,
+      column: 0,
+    })
+    await store.upsertFile(
+      createFileNode({
+        path: target.filePath,
+        configRelativePath: 'src/target.ts',
+        language: 'typescript',
+        contentHash: 'target',
+        workspace: 'fixture',
+      }),
+      [target],
+      [],
+    )
+    await store.upsertFile(
+      createFileNode({
+        path: consumer.filePath,
+        configRelativePath: 'src/consumer.ts',
+        language: 'typescript',
+        contentHash: 'consumer',
+        workspace: 'fixture',
+      }),
+      [consumer],
+      [createRelation({ source: consumer.id, target: target.id, type: RelationType.Calls })],
+    )
+    await store.upsertSpec(
+      createSpecNode({
+        specId: 'fixture:target',
+        path: 'specs/target',
+        title: 'Target',
+        contentHash: 'target',
+        workspace: 'fixture',
+      }),
+      [
+        createRelation({
+          source: 'fixture:target',
+          target: 'fixture:dependent',
+          type: RelationType.DependsOn,
+        }),
+        createRelation({
+          source: 'fixture:target',
+          target: target.filePath,
+          type: RelationType.CoversFile,
+        }),
+      ],
+    )
+    await store.upsertSpec(
+      createSpecNode({
+        specId: 'fixture:dependent',
+        path: 'specs/dependent',
+        title: 'Dependent',
+        contentHash: 'dependent',
+        workspace: 'fixture',
+      }),
+      [],
+    )
+
+    const logical = createLogicalSymbol({
+      workspace: 'fixture',
+      surface: 'fixture:src/target.ts',
+      name: 'target',
+      space: SymbolSpace.Value,
+      ownerId: undefined,
+      memberSemantics: undefined,
+    })
+    const binding = createPublicBinding({
+      surface: logical.surface,
+      exportedName: logical.name,
+      space: logical.space,
+      targetId: logical.id,
+    })
+    const filter: ImpactResultFilter = {
+      types: ['files'],
+      kinds: [SymbolKind.Function],
+      workspaces: ['fixture'],
+      excludeWorkspaces: ['excluded'],
+    }
+    const frontier = vi.spyOn(store, 'queryImpactFrontier')
+    const generation = vi.spyOn(store, 'getStorageGeneration')
+    const assertDelegation = (): void => {
+      expect(generation).toHaveBeenCalledOnce()
+      expect(frontier).toHaveBeenCalled()
+      expect(frontier.mock.calls.every(([input]) => input.filter === filter)).toBe(true)
+      frontier.mockClear()
+      generation.mockClear()
+    }
+
+    await provider.analyzeImpact(target.id, 'upstream', 2, filter)
+    assertDelegation()
+    await provider.analyzePublicBindingImpact(
+      {
+        binding,
+        target: logical,
+        declarations: [
+          {
+            logicalId: logical.id,
+            symbolId: target.id,
+            location: {
+              filePath: target.filePath,
+              line: target.line,
+              column: target.column,
+              endLine: target.endLine,
+              endColumn: target.endColumn,
+            },
+            kind: target.kind,
+          },
+        ],
+        path: [],
+      },
+      'upstream',
+      2,
+      filter,
+    )
+    assertDelegation()
+    await provider.analyzeFileImpact(target.filePath, 'upstream', 2, filter)
+    assertDelegation()
+    await provider.analyzeFilesImpact([target.filePath], 'upstream', 2, filter)
+    assertDelegation()
+    await provider.analyzeSpecImpact('fixture:target', 'downstream', 2, filter)
+    assertDelegation()
+
+    const specFilter: ImpactResultFilter = { types: ['specs'] }
+    const symbolSpecs = await provider.analyzeImpact(target.id, 'upstream', 2, specFilter)
+    expect(symbolSpecs.affectedSpecs).toEqual(['fixture:target'])
+
+    const bindingSpecs = await provider.analyzePublicBindingImpact(
+      {
+        binding,
+        target: logical,
+        declarations: [
+          {
+            logicalId: logical.id,
+            symbolId: target.id,
+            location: {
+              filePath: target.filePath,
+              line: target.line,
+              column: target.column,
+              endLine: target.endLine,
+              endColumn: target.endColumn,
+            },
+            kind: target.kind,
+          },
+        ],
+        path: [],
+      },
+      'upstream',
+      2,
+      specFilter,
+    )
+    expect(bindingSpecs.canonicalImpact.affectedSpecs).toEqual(['fixture:target'])
+
+    await provider.close()
+  })
+
   it('rejects empty selectors with the typed graph selector error', async () => {
     tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-selector-error-'))
     const provider = await createCodeGraphProvider({
@@ -721,6 +905,70 @@ describe('CodeGraphProvider', () => {
       expect(symbolError).toBeInstanceOf(InvalidGraphSelectorError)
       expect((symbolError as InvalidGraphSelectorError).code).toBe('INVALID_GRAPH_SELECTOR')
       expect((symbolError as InvalidGraphSelectorError).message).toBe('empty symbol selector')
+    } finally {
+      await provider.close()
+    }
+  })
+
+  it('shares one adapter registry between indexing and resolution', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-shared-registry-'))
+    const codeRoot = join(tempDir, 'app')
+    mkdirSync(codeRoot, { recursive: true })
+    writeFileSync(
+      join(codeRoot, 'archive.php'),
+      '<?php\nclass ArchiveChange { function execute() {} }\n',
+    )
+    const custom = new PhpLanguageAdapter()
+    const analyze = vi.spyOn(custom, 'analyzeFile')
+    const parse = vi.spyOn(custom, 'parseSymbolReference')
+    const provider = await createCodeGraphProvider({
+      storagePath: tempDir,
+      projectRoot: tempDir,
+      adapters: [custom],
+    })
+    await provider.open()
+
+    try {
+      await expect(provider.getGraphHealth()).resolves.toEqual(
+        expect.objectContaining({ reasonCodes: ['GRAPH_HEALTH_UNAVAILABLE'] }),
+      )
+      const unanchored = await provider.resolveSymbolReference({
+        workspace: 'app',
+        requested: 'EditChange.execute',
+      })
+      expect(unanchored.status).toBe('unresolved')
+
+      await provider.index({
+        projectRoot: tempDir,
+        vcsRoot: null,
+        workspaces: [
+          {
+            name: 'app',
+            prefix: null,
+            codeRoot,
+            specRepo: makeMockRepo(),
+            ownership: 'owned',
+            isExternal: false,
+          },
+        ],
+        graphConfig: { includePaths: [], excludePaths: [], workspaces: new Map() },
+        codeGraphVersion: readInstalledCodeGraphVersion(),
+      })
+      expect(analyze).toHaveBeenCalled()
+
+      const resolved = await provider.resolveSymbolReference({
+        workspace: 'app',
+        requested: 'ArchiveChange::execute',
+      })
+      expect(resolved.status).toBe('resolved')
+      expect(parse).not.toHaveBeenCalled()
+      await provider.resolveSymbolReference({
+        workspace: 'app',
+        requested: 'ArchiveChange::execute()',
+        language: 'php',
+      })
+      expect(parse).toHaveBeenCalledWith('ArchiveChange::execute()')
+      expect(parse.mock.instances.every((instance) => instance === custom)).toBe(true)
     } finally {
       await provider.close()
     }

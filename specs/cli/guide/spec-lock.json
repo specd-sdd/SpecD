@@ -1,0 +1,24 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["cli:entrypoint", "default:_global/docs", "guide:composition"],
+  "implementation": [
+    {
+      "file": "cli:test/commands/guide/guide.test.ts"
+    },
+    {
+      "file": "cli:src/program.ts"
+    },
+    {
+      "file": "cli:test/documentation-coverage.spec.ts"
+    },
+    {
+      "file": "cli:src/commands/guide/formatters.ts"
+    },
+    {
+      "file": "cli:src/commands/guide/index.ts"
+    }
+  ]
+}

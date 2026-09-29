@@ -14,36 +14,36 @@
   "implementation": [],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Governed specd changes transition lifecycle moves: Core-resolved next, checks, hooks, progress, repair diagnostics.",
+      "value": "Governed CLI lifecycle transitions with Core-resolved routing, validity recovery, hooks, progress, and repair diagnostics.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:3d85aead1b7ce674b762086c58188cbd6afb7fa3109a293ea58121a0864269d4",
-          "lastModified": "2026-08-29T22:56:09.884Z"
+          "hash": "sha256:536aec77f7347e02c2ec4372763a1b8b4f67f2f9e72300c972aab522a567de9e",
+          "lastModified": "2026-09-28T06:29:51.815Z"
         },
         "verify.md": {
-          "hash": "sha256:ecf3a59f030b391114ace1bcd317259371f67854ed3c0045882364715d34005e",
-          "lastModified": "2026-08-29T22:53:45.810Z"
+          "hash": "sha256:8e1d86dbcdee0758375f3ed046172194f3495dd0f30d688bdddefa182b65eadf",
+          "lastModified": "2026-09-28T06:29:51.819Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# Change Transition\n\n## Rules\n\n- Commands: `specd changes transition <name> <step> [--skip-hooks <phases>] [--allow-out-of-scope] [--format text|json|toon]`; alias `specd change transition ...`; or `--next`. `<name>` required; `<step>` required unless `--next`; mutually exclusive.\n- `--next`: pass `to: 'next'` to `TransitionChange.execute`; Core resolves happy-path state. CLI MUST NOT keep routing table or use `GetStatus.nextAction` as resolver. Core rejection (including `pending-spec-approval`, `pending-signoff`, `archivable`, `archiving`): exit 1, stderr `error:` explaining no auto-advance.\n- `--skip-hooks`: comma-separated `source.pre`, `source.post`, `target.pre`, `target.post`, `all`; map to `skipHookPhases`. Omit: all applicable hooks. `all`: caller runs `specd change run-hooks`.\n- `--allow-out-of-scope`: set `allowOutOfScope: true`; affects only `impl.linksInScope`, never `impl.filesResolved`. Omit: do not set input. `--format` default `text`.\n- Do not call `RefreshImplementationTracking` or `ImplementationDetector`. Pre-transition and repair `GetStatus`: `refreshImplementationTracking: false`; `TransitionChange` owns default refresh.\n- No approval flags to `TransitionChange.execute`; kernel uses `config.approvals`. Do not rewrite logical target for approval/signoff; failures remain `ready`/`done`.\n- Default hooks: source.post → target.pre → transition; fail-fast. Hook fail: exit 2, stderr `error:`, no Repair Guide.\n- Pass `onProgress`: text generic check bus (`check-start`, optional `check-progress`, `check-done`); hooks same bus (`Running pre hooks`/`Running post hooks`), no `Executing:`. Render `<label> (<id>)`, optional lines, then `✓ <label>` or `✗ <label>: <reason>`.\n- Transition hooks MUST stay observable in-flight, including later failures. Use generic check-progress presenter; `change run-hooks` MAY retain hook-progress presenter. Do not share public JSON stream name.\n- `json`/`toon`: stdout NDJSON, all progress/events `stream: \"change-transition\"`; terminal `event.type: \"complete\"`, `event.result` success=`result`, `name`, `from`, `to`; failure=`result: \"failure\"`, `name`, `from`, `to`, `blockers`, `nextAction`.\n- Text success: final confirmation stdout after stderr progress. Invalid/requires/incomplete-task failures: exit 1, stderr `error:`; incomplete tasks name blocking artifact.\n- Text `InvalidStateTransitionError`/repair-guide errors: stderr Repair Guide from `GetStatus` transition-check `blockers`/`nextAction`; line `! <CODE> — <label>: <message>` or no-label `! <CODE>: <message>`. Surface approval/signoff reason.\n\n## Constraints\n\n- Help exposes logical target, never routing.\n- Repair diagnostics projected from Core, never recomputed by CLI.\n- Text: progress stderr, confirmation stdout. `json`/`toon`: stream stdout; stderr only non-structured diagnostics.",
+      "value": "# Change Transition\n## Rules\n- Commands: `specd changes transition <name> <step> ...` or `--next`; alias `specd change transition`. `<name>` required; `<step>` required unless mutually exclusive `--next`. Options: `--skip-hooks <source.pre,source.post,target.pre,target.post,all>`, `--allow-out-of-scope`, `--format text|json|toon`.\n- `--next` passes `to: 'next'`; Core resolves happy-path state. CLI never keeps routing table or uses `GetStatus.nextAction` as resolver. Core rejection from no-auto-hop states exits 1 with explanatory stderr `error:`.\n- Consume canonical `GetStatus`/`TransitionChange` validity results before `next` and after reconciled failure. Automatic recovery output shows actual state, invalidated evidence, reason, next action: stale required spec approval routes through `designing`/`ready`; stale sign-off alone to `done`; stale verification recommends in-place verification only at required boundary. Never retry, select alternate transition, expose attempt restart, accept `verifying → verifying`, or claim attempt completion. Entry to `verifying` reports readiness; exit to `done` reports `verification.current`.\n- Never call `RefreshImplementationTracking`/`ImplementationDetector`. Pre-transition and repair `GetStatus` use `refreshImplementationTracking: false`; `TransitionChange` retains default refresh.\n- No approval flags to `TransitionChange.execute`; kernel uses `config.approvals`. Never rewrite logical target for approval/sign-off; failed gates stay `ready`/`done`.\n- `--allow-out-of-scope` sets `allowOutOfScope: true` only for `impl.linksInScope`, never `impl.filesResolved`; omission leaves field unset. `--skip-hooks` maps to `skipHookPhases`; `all` delegates manual `change run-hooks`.\n- Default effects: source.post hooks → target.pre hooks → transition; fail-fast. Hook failure exits 2, stderr `error:`, no Repair Guide.\n- Pass `onProgress`. Text uses generic check bus: `check-start`, optional `check-progress`, `check-done`; hooks appear as `Running pre hooks`/`Running post hooks`; render `<label> (<id>)`, lines, then `✓ <label>` or `✗ <label>: <reason>`; never `Executing:`. Keep in-flight hook output visible even on failure. `change transition` never emits public `hook-progress`; `run-hooks` may retain its presenter.\n- JSON/TOON emit stdout NDJSON records, all `stream: \"change-transition\"`; terminal `event.type: \"complete\"`. Success result: `result`, `name`, `from`, `to`; failure: `result: \"failure\"`, `name`, `from`, `to`, `blockers`, `nextAction`.\n- Text success prints final confirmation stdout after stderr progress. Invalid transition, unsatisfied requires, incomplete tasks, or rejected `next`: exit 1, stderr `error:`; incomplete tasks name artifact.\n- Text repair-guide errors use canonical `GetStatus` transition-check blockers/nextAction on stderr: `! <CODE> — <label>: <message>` or unlabeled `! <CODE>: <message>` plus target/command/reason. Surface human-gate reason. Never recompute diagnostics in CLI.\n## Constraints\n- Help exposes logical target, never routing.\n- `HookFailedError` is not repair-guide error.\n- Text: progress stderr, confirmation stdout. JSON/TOON: structured stream stdout; stderr only non-structured diagnostics.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:3d85aead1b7ce674b762086c58188cbd6afb7fa3109a293ea58121a0864269d4",
-          "lastModified": "2026-08-29T22:56:09.884Z"
+          "hash": "sha256:536aec77f7347e02c2ec4372763a1b8b4f67f2f9e72300c972aab522a567de9e",
+          "lastModified": "2026-09-28T06:29:51.815Z"
         },
         "verify.md": {
-          "hash": "sha256:ecf3a59f030b391114ace1bcd317259371f67854ed3c0045882364715d34005e",
-          "lastModified": "2026-08-29T22:53:45.810Z"
+          "hash": "sha256:8e1d86dbcdee0758375f3ed046172194f3495dd0f30d688bdddefa182b65eadf",
+          "lastModified": "2026-09-28T06:29:51.819Z"
         }
       }
     }

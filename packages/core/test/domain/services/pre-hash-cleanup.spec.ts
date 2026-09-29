@@ -31,15 +31,41 @@ describe('applyPreHashCleanup', () => {
     expect(applyPreHashCleanup('aaa', cleanups)).toBe('aaa')
   })
 
-  it('applies ^ anchored patterns to every line (multiline)', () => {
+  it('applies ^ anchored patterns to every line (multiline) and normalizes whitespace', () => {
     const cleanups = [{ pattern: '^\\s*-\\s+\\[x\\]', replacement: '- [ ]' }]
     const input = '- [x] task one\n- [ ] task two\n- [x] task three'
-    const expected = '- [ ] task one\n- [ ] task two\n- [ ] task three'
+    const expected = '- [ ] task one - [ ] task two - [ ] task three'
     expect(applyPreHashCleanup(input, cleanups)).toBe(expected)
   })
 
   it('supports capture group references in replacement', () => {
     const cleanups = [{ pattern: '(\\w+)@(\\w+)', replacement: '$1 at $2' }]
     expect(applyPreHashCleanup('user@host', cleanups)).toBe('user at host')
+  })
+
+  it('normalizes spaces, tabs, and newlines to a single space even without cleanups', () => {
+    const input1 = '# Title\n\nSome paragraph with   multiple   spaces.\n\n- item 1\n- item 2\n'
+    const input2 = '# Title \n Some paragraph with multiple spaces. \n - item 1 \n - item 2'
+    expect(applyPreHashCleanup(input1, [])).toBe(
+      '# Title Some paragraph with multiple spaces. - item 1 - item 2',
+    )
+    expect(applyPreHashCleanup(input1, [])).toBe(applyPreHashCleanup(input2, []))
+  })
+
+  it('trims leading and trailing whitespace', () => {
+    expect(applyPreHashCleanup('\n\n  hello world  \n\t', [])).toBe('hello world')
+  })
+
+  it('normalizes \\r\\n, \\r, tabs, and multiple mixed whitespace characters to single spaces', () => {
+    const unix = 'Line 1\nLine 2\n\nLine 3'
+    const windows = 'Line 1\r\nLine 2\r\n\r\nLine 3'
+    const macClassic = 'Line 1\rLine 2\r\rLine 3'
+    const mixedTabsAndSpaces = '\tLine 1\t \r\n \t Line 2\r\n\t\tLine 3 \t'
+
+    const expected = 'Line 1 Line 2 Line 3'
+    expect(applyPreHashCleanup(unix, [])).toBe(expected)
+    expect(applyPreHashCleanup(windows, [])).toBe(expected)
+    expect(applyPreHashCleanup(macClassic, [])).toBe(expected)
+    expect(applyPreHashCleanup(mixedTabsAndSpaces, [])).toBe(expected)
   })
 })

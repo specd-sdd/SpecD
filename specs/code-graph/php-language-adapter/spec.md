@@ -32,6 +32,12 @@ Package identity SHALL come from the nearest bounded Composer `name`. Qualified 
 
 Composer classmap/files, runtime autoloader mutation, and ambiguous case-sensitive filesystem alternatives SHALL remain unsupported until explicitly modeled.
 
+### Requirement: Resolution manifests
+
+`resolutionManifests()` SHALL return exactly `['composer.json']`.
+
+That basename covers both the Composer package `name` and the PSR-4 map the adapter reads. The adapter MUST NOT declare any other resolution manifest.
+
 ### Requirement: Static and framework dependency facts
 
 The adapter SHALL extract literal `require`, `require_once`, `include`, and `include_once` dependencies and SHALL drop variable or concatenated expressions unless a registered deterministic rule proves a concrete path. It SHALL retain the current registry-based framework loader support, including the statically recognized CakePHP, CodeIgniter, Yii, Laravel, Symfony, Zend, and equivalent configured class-literal or loader patterns.

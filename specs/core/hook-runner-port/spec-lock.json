@@ -3,56 +3,62 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": ["default:_global/architecture"],
+  "dependsOn": ["default:_global/architecture", "core:template-variables"],
   "implementation": [
     {
-      "file": "core:src/application/ports/hook-runner.ts",
-      "symbols": ["HookRunnerProgressEvent", "OnHookRunnerProgress", "HookRunner"]
+      "file": "core:src/infrastructure/node/translate-hook-command.ts",
+      "symbols": ["translateHookCommand"]
     },
     {
       "file": "core:src/infrastructure/node/hook-runner.ts",
       "symbols": ["NodeHookRunner"]
     },
     {
-      "file": "core:test/application/use-cases/helpers.ts",
-      "symbols": ["makeHookRunner"]
+      "file": "core:test/infrastructure/node/hook-runner-spawn.spec.ts"
     },
     {
       "file": "core:test/infrastructure/node/hook-runner.spec.ts"
+    },
+    {
+      "file": "core:src/application/ports/hook-runner.ts",
+      "symbols": ["HookRunner"]
+    },
+    {
+      "file": "core:test/infrastructure/node/translate-hook-command.spec.ts"
     }
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Application port safely executes shell hooks with live progress and complete non-throwing results.",
+      "value": "Application port runs shell hooks with portable quoting, live progress, template expansion, and non-throwing complete results.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:c34382072dcd74d3f625d5e7f5bd12c7d6f2f8ea1a40e2871ee8fd3f69fb7910",
-          "lastModified": "2026-07-15T11:13:32.599Z"
+          "hash": "sha256:d42f386b8f899bab1d4c85190e739e72bfad1391bb3585c2e446ebae5ac8f51c",
+          "lastModified": "2026-09-28T11:19:59.158Z"
         },
         "verify.md": {
-          "hash": "sha256:6da47a39add774257d6dcc395ab2ff5c0799ffcce38258dd01f0903413916fa9",
-          "lastModified": "2026-07-15T11:13:32.600Z"
+          "hash": "sha256:e70ca0d15e204747c36c7d534bbeee043a60e64c0d63a37cc8a0222e78ed308c",
+          "lastModified": "2026-09-28T11:19:59.159Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# HookRunner Port\n\n## Rules\n\n- Declare TypeScript `interface HookRunner`; single `run` method. No abstract class.\n- `run(command: string, variables: HookVariables, progressCallback?)` MUST return `Promise<HookResult>`.\n- With callback, report progress before subprocess exits: stdout activity, stderr activity, and liveness during output silence. Preserve stdout/stderr identity. Multiple updates allowed; final result unchanged.\n- Before execution, expand every `{{key.path}}` by dot-path traversal of `variables`. Preserve token when path unknown, value complex, or unsupported.\n- Substitute only string, number, boolean values; shell-escape every substituted value.\n- `run` MUST always resolve, never reject. `HookResult`: `exitCode()`, complete `stdout()`, complete `stderr()`, `isSuccess()` true iff exit code 0. Progress MUST NOT replace/weaken captured final result.\n- `HookVariables.change?`: `{ name: string; workspace: string; path: string }`; absent without active change. `HookVariables.project`: `{ root: string }`, absolute git-root path.\n- Execute deterministic shell `run:` hooks only. MUST NOT handle/interpret `instruction:` hooks or externally dispatched hook backends; external hooks use separate runner abstraction, dispatch rules, accepted-type declaration.\n- Caller lifecycle guarantees: non-zero `pre-*` aborts operation; CLI-owned operations run `post-*` before return; agent-driven `post-*` unsupported through `run:` and use `instruction:`.\n\n## Constraints\n\n- Port lives under `application/ports/`; no `child_process`, shell detection, platform process streaming, or I/O dependency.\n- Port module re-exports domain value objects `HookResult` and `HookVariables`.\n- Subprocess failures become `HookResult`, never thrown exceptions.\n- Progress callbacks observational only; MUST NOT alter success/failure semantics or final captured results.",
+      "value": "# HookRunner Port\n\n## Rules\n- Declare TypeScript `interface HookRunner` in `application/ports/`; single `run` method, no abstract class.\n- `run(command: string, variables: HookVariables, progressCallback?)` returns `Promise<HookResult>`.\n- Progress callback reports pre-exit stdout, stderr, and silent-process liveness; preserves stream identity. Multiple updates allowed; final result unchanged.\n- Expand every `{{key.path}}` by dot-path lookup before execution. Preserve token for unknown paths or complex values. Substitute only string, number, boolean; add no quotes.\n- Host-shell translation:\n  - Windows: convert single-quoted spans, including POSIX `'\\''`, to double-quoted spans; `\"` inside becomes `\"\"`; POSIX `\\\"` inside existing double quotes becomes `\"\"`; preserve other double quotes and `%`; spawn `cmd.exe /d /s /c` with verbatim arguments, hidden console.\n  - Other platforms: inside double-quoted span, convert `\"\"` to `\\\"` when later closing quote exists; preserve empty `\"\"` argument and single quotes; spawn POSIX shell with `-c`.\n- Command remains developer-authored: never translate programs, flags, pipes; never bypass shell via `execFile`.\n- `run` always resolves. `HookResult`: `exitCode()`, complete `stdout()`, complete `stderr()`, `isSuccess()` iff exit code 0. Progress cannot weaken final capture.\n- `HookVariables` aliases `TemplateVariables`, not domain value object. Caller may omit `project`; `TemplateExpander` merges builtin `project.root`. Effective map must contain it. Optional `change`: `{ name: string; path: string }`, never `workspace`; absent without active change.\n- Execute built-in deterministic `run:` hooks only. Never interpret `instruction:` or external hook backends; those use separate mechanisms.\n- Caller semantics: non-zero `pre-*` aborts; CLI-owned operations run `post-*` before return; agent-driven `post-*` unsupported via `run:`, use `instruction:`.\n\n## Constraints\n- No `child_process`, shell detection, platform streaming, or I/O dependency at port level.\n- Re-export domain `HookResult`; `HookVariables` remains `TemplateVariables` alias.\n- Subprocess failures become `HookResult`, never rejection.\n- Progress callbacks observational only; never alter success/failure or final captured results.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:c34382072dcd74d3f625d5e7f5bd12c7d6f2f8ea1a40e2871ee8fd3f69fb7910",
-          "lastModified": "2026-07-15T11:13:32.599Z"
+          "hash": "sha256:d42f386b8f899bab1d4c85190e739e72bfad1391bb3585c2e446ebae5ac8f51c",
+          "lastModified": "2026-09-28T11:19:59.158Z"
         },
         "verify.md": {
-          "hash": "sha256:6da47a39add774257d6dcc395ab2ff5c0799ffcce38258dd01f0903413916fa9",
-          "lastModified": "2026-07-15T11:13:32.600Z"
+          "hash": "sha256:e70ca0d15e204747c36c7d534bbeee043a60e64c0d63a37cc8a0222e78ed308c",
+          "lastModified": "2026-09-28T11:19:59.159Z"
         }
       }
     }

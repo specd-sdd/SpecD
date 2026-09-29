@@ -14,6 +14,8 @@ Define the shared agent instruction prompt template (`agent-instruction.md.tpl`)
 - The template MUST define a mandatory Code Graph research protocol (`specd graph`) as the primary research tool, explicitly instructing agents that generic search tools (`grep`, `glob`, file reads) are legacy fallbacks.
 - The template MUST instruct agents to check index freshness (`stale: true`) and immediately run `specd graph index --format toon` if the index is out of date.
 - The template MUST include concrete CLI examples for symbol search, blast-radius impact analysis, dependency tracing, hotspots, and spec search using `--format toon`.
+- The template MUST instruct agents to consult `specd guide` for on-demand documentation regarding configuration, schemas, deltas, workflow lifecycle, and CLI commands rather than guessing or assuming contracts.
+- The template MUST include concrete CLI examples for querying guides: `specd guide [topic] --format toon`, `specd guide <topic> --meta --format toon`, `specd guide <topic> --section <name> --format toon`, and `specd guide search "<query>" --format toon`.
 - The template MUST include strict workflow rules, skill stop rules, and the explicit user escape hatch (override rule).
 - The template MUST support an optional `extraInstructions` slot rendered inside the base `<!-- <specd> -->` block when provided.
 

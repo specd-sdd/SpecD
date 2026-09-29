@@ -46,7 +46,16 @@
 - **WHEN** `IndexCodeGraph.execute()` is called
 - **THEN** the run behaves as a full rebuild instead of skipping unchanged files
 - **AND** every discovered file is re-extracted
-- **AND** `fullRebuildReason` explains that the code-graph version or resolved workspace configuration changed
+- **AND** `fullRebuildReason` is `Graph derivation fingerprint mismatch — code-graph version, workspace configuration, or resolution manifest content changed`
+
+#### Scenario: Newline-only manifest change stays incremental
+
+- **GIVEN** a persisted fingerprint computed from an LF `package.json`
+- **AND** the working copy differs only by CRLF in that same manifest
+- **WHEN** the indexer compares fingerprints and runs `IndexCodeGraph.execute()` without force
+- **THEN** the resolution-manifest digest matches
+- **AND** the newline-only change does not by itself escalate the run to a full rebuild
+- **AND** `fullRebuildReason` is null
 
 #### Scenario: Deleted file removal remains scoped to indexed workspaces
 
@@ -107,6 +116,43 @@
 - **AND** the index result reports one stable diagnostic per link with spec ID, file, symbol name, and resolution reason
 - **AND** unrelated inputs still commit successfully
 
+#### Scenario: Qualified member resolves inside the anchored file
+
+- **GIVEN** `EditChange.execute` is linked on the file that declares `EditChange`
+- **AND** other types also declare `execute`
+- **WHEN** coverage is projected
+- **THEN** `COVERS_SYMBOL` targets `EditChange`'s `execute` logical id
+- **AND** the proof is not raw equality with the stored string `EditChange.execute`
+
+#### Scenario: Re-export binding is visible before coverage
+
+- **GIVEN** `sdk:src/index.ts` re-exports `runIsolatedGraphIndex` and a spec links that name on that file
+- **WHEN** coverage is projected
+- **THEN** the adapter binding on `sdk:src/index.ts` already exists
+- **AND** `COVERS_SYMBOL` targets the published logical id
+- **AND** the link is not moved to the declaring file by qualified-name parsing
+
+#### Scenario: Label text stays a diagnostic
+
+- **GIVEN** a link stores `Integration (real kernel)` on an indexed file that does not declare or export it
+- **WHEN** coverage is projected
+- **THEN** the result is `SYMBOL_NOT_FOUND`
+- **AND** no `COVERS_SYMBOL` relation is written
+
+#### Scenario: Value and type pair stays ambiguous
+
+- **GIVEN** the anchored file declares `MemberForm` as both a value and a type
+- **WHEN** coverage is projected for the simple name `MemberForm`
+- **THEN** the diagnostic is `SYMBOL_AMBIGUOUS`
+- **AND** replacing member form with member semantics does not pick one of them
+
+#### Scenario: Unindexed file stays out of symbol coverage
+
+- **GIVEN** a link points at a markdown or `package.json` path
+- **WHEN** coverage is projected
+- **THEN** the diagnostic is `FILE_NOT_INDEXED`
+- **AND** no language adapter is asked to invent a symbol
+
 ### Requirement: Multi-workspace file discovery
 
 #### Scenario: node_modules excluded
@@ -134,6 +180,33 @@
 - **THEN** `FileNode.configRelativePath` is `../../packages/core/src/index.ts`
 - **AND** it has forward slashes and no leading `./`
 
+### Requirement: Portable graph paths
+
+#### Scenario: A drive letter is not a workspace prefix
+
+- **GIVEN** a path key `C:/repo/src/a.ts`
+- **WHEN** the indexer splits a workspace identity
+- **THEN** `C` is not the workspace name
+
+#### Scenario: Persisted separators are slashes and parents stay
+
+- **GIVEN** a relative path `src\..\secret`
+- **WHEN** it is persisted
+- **THEN** the stored path is `src/../secret`
+
+#### Scenario: Adapter splits keep a drive letter in the path
+
+- **GIVEN** a relative import key `C:/repo/src/a.ts`
+- **WHEN** a language adapter splits the workspace prefix
+- **THEN** the workspace name is not `C`
+
+#### Scenario: A file at the drive root is not workspace C
+
+- **GIVEN** a Go file `C:/a.go`
+- **WHEN** the package surface is split as a graph identity
+- **THEN** the surface is `C:`
+- **AND** the workspace name is not `C`
+
 ### Requirement: Binary file filtering
 
 #### Scenario: Known binary extensions are skipped before decoding
@@ -159,6 +232,51 @@
 - **GIVEN** a filesystem-backed repository exposes a `specsPath`
 - **WHEN** the indexer computes the current graph fingerprint
 - **THEN** the synthetic exclusion derived from that spec root contributes to the fingerprint payload
+
+#### Scenario: Undeclared build files are not fingerprint inputs
+
+- **GIVEN** a workspace contains `tsconfig.json`, `jsconfig.json`, `setup.cfg`, `setup.py`, and `go.work`
+- **AND** no registered adapter declares those basenames
+- **WHEN** the discovery fingerprint is computed
+- **THEN** those files do not change the digest
+- **AND** changing any one of them, while declared manifests stay unchanged, leaves the digest unchanged
+
+### Requirement: Adapter-sourced resolution fingerprint
+
+#### Scenario: Manifest membership comes from adapters
+
+- **GIVEN** registered adapters declare `package.json`, `go.mod`, `composer.json`, and `pyproject.toml`
+- **WHEN** resolution inputs are discovered
+- **THEN** only files with those basenames are candidates
+- **AND** the fingerprint module does not apply its own manifest allow-list
+
+#### Scenario: Walk includes manifests between codeRoot and the repository root
+
+- **GIVEN** `composer.json` exists in a parent of `codeRoot` that is still inside the repository root
+- **AND** the PHP adapter declares `composer.json`
+- **WHEN** resolution inputs are discovered for that workspace
+- **THEN** that parent manifest is included
+
+#### Scenario: Walk stops at the repository root
+
+- **GIVEN** a declared manifest exists above the repository root
+- **WHEN** resolution inputs are discovered
+- **THEN** that file is omitted
+- **AND** when no repository root is available the walk stops at the project root
+
+#### Scenario: CRLF and LF manifests hash the same
+
+- **GIVEN** two copies of the same manifest whose only difference is CRLF versus LF
+- **WHEN** each copy is hashed for the fingerprint
+- **THEN** both digests are equal
+- **AND** each stored manifest `contentHash` is SHA-256 hex of the newline-normalized UTF-8 text
+- **AND** that `contentHash` has no `sha256:` prefix
+
+#### Scenario: Manifest discovery does not import the filesystem from application code
+
+- **WHEN** the application fingerprint module discovers resolution inputs
+- **THEN** it reads existence and text only through an application port
+- **AND** that module does not import `node:fs` or `node:fs/promises`
 
 ### Requirement: Two-pass extraction with in-memory index
 
@@ -312,6 +430,7 @@
 - **AND** the TypeScript adapter implements `getPackageIdentity`
 - **WHEN** the indexer builds the `packageName → workspaceName` map
 - **THEN** `'@specd/core'` maps to workspace `'core'`
+- **AND** the indexer did not parse `package.json` itself
 
 #### Scenario: Cross-workspace import resolved via package identity
 
@@ -334,6 +453,27 @@
 - **GIVEN** an adapter that does not implement `getPackageIdentity`
 - **WHEN** the indexer queries it for a workspace's package identity
 - **THEN** non-relative imports for that language remain unresolved
+
+#### Scenario: Package re-export does not take the first workspace symbol
+
+- **GIVEN** `@specd/code-graph` publishes `runIsolatedGraphIndex` from its public entry
+- **AND** another symbol with the same name exists elsewhere in that workspace
+- **WHEN** the SDK barrel re-exports that name
+- **THEN** the stored binding targets the entry file's published logical id
+- **AND** the indexer did not select the other symbol by scanning the workspace
+
+#### Scenario: Unknown package stays unresolved
+
+- **GIVEN** a specifier names a package that no adapter identity maps to a workspace
+- **WHEN** the indexer builds the package map and the adapter resolves the re-export
+- **THEN** no cross-workspace binding is stored
+
+#### Scenario: First adapter identity wins once
+
+- **GIVEN** two adapters could answer for the same workspace and only the first returns a package name
+- **WHEN** the map is built
+- **THEN** that first non-empty identity is stored
+- **AND** the indexer still does not open either manifest itself
 
 ### Requirement: Spec dependency indexing
 
@@ -513,6 +653,35 @@
 - **WHEN** indexing completes
 - **THEN** FileNode content, complete construct ranges, declared-name selection ranges, and semantic facts are committed in the same generation
 - **AND** source-content candidates are available without reading the live filesystem
+
+#### Scenario: Language-specific linking stays in the adapter
+
+- **GIVEN** a TypeScript file re-exports a package specifier and a Go file declares a method
+- **WHEN** reference facts are persisted
+- **THEN** both bindings and `parentId` values come from the adapter payload
+- **AND** the indexer has no TypeScript re-export pass and no hardcoded language allowlist for parents
+
+#### Scenario: Owned members store a qualified name
+
+- **GIVEN** `EditChange` owns `execute` and a top-level function has no owner
+- **WHEN** reference facts are persisted
+- **THEN** the member's `qualified_name` is `EditChange.execute`
+- **AND** the top-level function has no `qualified_name`
+- **AND** full-text search text is not the only copy of that spelling
+
+#### Scenario: Relative re-export inside one workspace is kept
+
+- **GIVEN** `code-graph:src/index.ts` re-exports a name from a relative specifier
+- **WHEN** reference facts are persisted
+- **THEN** the public binding surface is `code-graph:src/index.ts`
+- **AND** the target is the logical id published by the relative source file
+
+#### Scenario: Facts are stored before coverage reads them
+
+- **GIVEN** a generation contains a new package re-export
+- **WHEN** the index run reaches spec coverage
+- **THEN** that generation's public bindings are already stored
+- **AND** coverage does not read the pre-re-export declaration list only
 
 ### Requirement: Incompatible derivation rebuild
 

@@ -273,6 +273,27 @@
 - **WHEN** `load()` is called
 - **THEN** no containment error is thrown
 
+#### Scenario: Drive-letter case does not push storage outside the root
+
+- **GIVEN** `rootPath` is `c:/repo`
+- **AND** a storage path resolves to `C:/repo/changes`
+- **WHEN** `load()` checks containment
+- **THEN** the storage path is accepted
+
+#### Scenario: A longer prefix is still outside
+
+- **GIVEN** `rootPath` is `C:/repo`
+- **AND** a storage path resolves to `C:/repository/changes`
+- **WHEN** `load()` checks containment
+- **THEN** it throws `ConfigValidationError` for that storage key
+
+#### Scenario: A non-fs storage binding skips the inside-root check
+
+- **GIVEN** `rootPath` is non-null
+- **AND** a storage binding adapter is not `fs`
+- **WHEN** `load()` checks containment
+- **THEN** that binding is not tested with the inside-root rule
+
 ### Requirement: isExternal inference for workspaces
 
 #### Scenario: Workspace specsPath inside VCS root
@@ -293,6 +314,20 @@
 - **AND** `createDefaultConfigLoader()` normalizes `NullVcsAdapter.rootDir()` throwing into `rootPath = null`
 - **WHEN** `load()` is called
 - **THEN** all workspaces have `isExternal` set to `false`
+
+#### Scenario: Specs inside the root are not external
+
+- **GIVEN** `rootPath` is `C:/repo`
+- **AND** a workspace `specsPath` resolves to `c:/repo/specs`
+- **WHEN** the loader infers `isExternal`
+- **THEN** `isExternal` is false
+
+#### Scenario: A non-fs specs adapter is not external
+
+- **GIVEN** `rootPath` is non-null
+- **AND** a workspace specs adapter is not `fs`
+- **WHEN** the loader infers `isExternal`
+- **THEN** `isExternal` is false
 
 ### Requirement: Default values for workspace fields
 
@@ -424,3 +459,19 @@
 - **GIVEN** an explicit `extends` target points outside the applicable chain
 - **WHEN** `load()` is called
 - **THEN** the thrown error is `ConfigValidationError`
+
+### Requirement: Config file stays inside the repository root
+
+#### Scenario: Git-style separators do not reject an inside config
+
+- **GIVEN** the normalized root is `C:\repo`
+- **AND** the config file resolves to `C:/repo/specd.yaml`
+- **WHEN** `load()` checks the config path
+- **THEN** the config is accepted
+
+#### Scenario: A config outside the root is rejected
+
+- **GIVEN** the normalized root is `C:/repo`
+- **AND** the config file resolves to `C:/other/specd.yaml`
+- **WHEN** `load()` checks the config path
+- **THEN** it throws `ConfigValidationError`

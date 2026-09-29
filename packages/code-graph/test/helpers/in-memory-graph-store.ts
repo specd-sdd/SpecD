@@ -1,5 +1,10 @@
+import { mkdtempSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import {
   GraphStore,
+  type ImpactFrontierQuery,
+  type ImpactFrontierResult,
   type LocalBindingLookup,
   type LogicalDeclaration,
   type LogicalSymbolLookup,
@@ -22,6 +27,7 @@ import { expandSearchQuery } from '../../src/domain/services/expand-search-query
 import { expandSymbolName } from '../../src/domain/services/expand-symbol-name.js'
 import { matchesExclude } from '../../src/domain/services/matches-exclude.js'
 import {
+  deriveQualifiedName,
   type LocalBinding,
   type LogicalSymbol,
   type PublicBinding,
@@ -113,8 +119,13 @@ export class InMemoryGraphStore extends GraphStore {
   private _lastIndexedRef: string | null = null
   private _graphFingerprint: string | null = null
 
-  constructor() {
-    super(':memory:')
+  /**
+   * @param storagePath - Real filesystem root for lock and index staging.
+   *   Graph payload stays in memory; this path must not be a sentinel like `:memory:`.
+   *   Defaults to a unique directory under `os.tmpdir()`.
+   */
+  constructor(storagePath: string = mkdtempSync(join(tmpdir(), 'specd-inmem-graph-'))) {
+    super(storagePath)
   }
 
   /**
@@ -376,6 +387,20 @@ export class InMemoryGraphStore extends GraphStore {
       .sort(compareLogicalSymbols)
   }
 
+  async findLogicalSymbolsByQualifiedNames(
+    qualifiedNames: readonly string[],
+  ): Promise<LogicalSymbol[]> {
+    this.ensureOpen()
+    const names = new Set(qualifiedNames)
+    return [...this.logicalSymbols.values()]
+      .flatMap((symbol) => {
+        const spelling = symbol.qualifiedName ?? deriveQualifiedName(symbol, this.logicalSymbols)
+        if (spelling === undefined || !names.has(spelling)) return []
+        return [symbol.qualifiedName === spelling ? symbol : { ...symbol, qualifiedName: spelling }]
+      })
+      .sort(compareLogicalSymbols)
+  }
+
   async findDeclarations(logicalSymbolIds: readonly string[]): Promise<LogicalDeclaration[]> {
     this.ensureOpen()
     const results: LogicalDeclaration[] = []
@@ -514,6 +539,123 @@ export class InMemoryGraphStore extends GraphStore {
       if (symbol !== undefined) results.push(symbol)
     }
     return results
+  }
+
+  /**
+   * Selects one filtered, deterministic impact frontier from the in-memory graph.
+   *
+   * This test-double implementation mirrors the graph-store contract in memory:
+   * relation admission is constrained by the neighboring resource, while result
+   * types control only which admitted resource rows are materialized.
+   * @param input - The current traversal frontier and optional impact filter.
+   * @returns Admitted relations and the requested, hydrated neighboring resources.
+   */
+  async queryImpactFrontier(input: ImpactFrontierQuery): Promise<ImpactFrontierResult> {
+    this.ensureOpen()
+    if (input.frontier.length === 0 || input.relationTypes.length === 0) {
+      return { relations: [], symbols: [], files: [], specs: [] }
+    }
+
+    const frontier = new Set(input.frontier)
+    const relationTypes = new Set(input.relationTypes)
+    const admittedRelations = new Map<string, Relation>()
+    const neighboringIds = new Set<string>()
+
+    for (const relation of this.relations) {
+      if (!relationTypes.has(relation.type)) continue
+
+      const neighbors: string[] = []
+      if (
+        (input.direction === 'upstream' || input.direction === 'both') &&
+        frontier.has(relation.target)
+      ) {
+        neighbors.push(relation.source)
+      }
+      if (
+        (input.direction === 'downstream' || input.direction === 'both') &&
+        frontier.has(relation.source)
+      ) {
+        neighbors.push(relation.target)
+      }
+
+      for (const neighbor of neighbors) {
+        if (!this.matchesImpactResource(input, neighbor)) continue
+        admittedRelations.set(
+          `${relation.source}\u0000${relation.type}\u0000${relation.target}`,
+          relation,
+        )
+        neighboringIds.add(neighbor)
+      }
+    }
+
+    const types = input.filter?.types
+    const materializes = (type: 'files' | 'symbols' | 'specs'): boolean =>
+      types === undefined || types.length === 0 || types.includes(type)
+
+    return {
+      relations: [...admittedRelations.values()].sort(compareRelations),
+      symbols: materializes('symbols')
+        ? [...neighboringIds]
+            .map((id) => this.symbols.get(id))
+            .filter((symbol): symbol is SymbolNode => symbol !== undefined)
+            .sort((left, right) => left.id.localeCompare(right.id))
+        : [],
+      files: materializes('files')
+        ? [...neighboringIds]
+            .map((id) => this.files.get(id))
+            .filter((file): file is FileNode => file !== undefined)
+            .sort((left, right) => left.path.localeCompare(right.path))
+        : [],
+      specs: materializes('specs')
+        ? [...neighboringIds]
+            .map((id) => this.specs.get(id))
+            .filter((spec): spec is SpecNode => spec !== undefined)
+            .sort((left, right) => left.specId.localeCompare(right.specId))
+        : [],
+    }
+  }
+
+  /**
+   * Checks whether one neighboring identifier belongs to the requested resource
+   * category and satisfies the filter predicates that admit traversal.
+   * @param input - The frontier request carrying category and filter constraints.
+   * @param id - Canonical neighboring resource identifier.
+   * @returns Whether the resource admits its relation into the frontier result.
+   */
+  private matchesImpactResource(input: ImpactFrontierQuery, id: string): boolean {
+    const filter = input.filter
+    let workspace: string | undefined
+
+    if (input.resource === 'symbol') {
+      const symbol = this.symbols.get(id)
+      if (symbol === undefined) return false
+      if (
+        filter?.kinds !== undefined &&
+        filter.kinds.length > 0 &&
+        !filter.kinds.includes(symbol.kind)
+      ) {
+        return false
+      }
+      workspace = this.files.get(symbol.filePath)?.workspace
+    } else if (input.resource === 'file') {
+      const file = this.files.get(id)
+      if (file === undefined) return false
+      workspace = file.workspace
+    } else {
+      const spec = this.specs.get(id)
+      if (spec === undefined) return false
+      workspace = spec.workspace
+    }
+
+    const excluded = new Set(filter?.excludeWorkspaces ?? [])
+    if (workspace !== undefined && excluded.has(workspace)) return false
+
+    const included = filter?.workspaces
+    return (
+      included === undefined ||
+      included.length === 0 ||
+      (workspace !== undefined && included.includes(workspace))
+    )
   }
 
   async getIncomingSymbolRelations(
@@ -1169,7 +1311,12 @@ function matchesLogicalSymbolLookup(symbol: LogicalSymbol, lookup: LogicalSymbol
     (lookup.surface === undefined || symbol.surface === lookup.surface) &&
     (lookup.space === undefined || symbol.space === lookup.space) &&
     (lookup.ownerId === undefined || symbol.ownerId === lookup.ownerId) &&
-    (lookup.memberForm === undefined || symbol.memberForm === lookup.memberForm)
+    (lookup.memberKind === undefined || symbol.memberSemantics?.kind === lookup.memberKind) &&
+    (lookup.memberDispatch === undefined ||
+      symbol.memberSemantics?.dispatch === lookup.memberDispatch) &&
+    (lookup.memberAccessor === undefined ||
+      symbol.memberSemantics?.accessor === lookup.memberAccessor) &&
+    (lookup.nativeKind === undefined || symbol.memberSemantics?.nativeKind === lookup.nativeKind)
   )
 }
 
@@ -1198,7 +1345,10 @@ function compareLogicalSymbols(left: LogicalSymbol, right: LogicalSymbol): numbe
       left.ownerId ?? '',
       left.space,
       left.name,
-      left.memberForm ?? '',
+      left.memberSemantics?.kind ?? '',
+      left.memberSemantics?.dispatch ?? '',
+      left.memberSemantics?.accessor ?? '',
+      left.memberSemantics?.nativeKind ?? '',
       left.id,
     ],
     [
@@ -1207,7 +1357,10 @@ function compareLogicalSymbols(left: LogicalSymbol, right: LogicalSymbol): numbe
       right.ownerId ?? '',
       right.space,
       right.name,
-      right.memberForm ?? '',
+      right.memberSemantics?.kind ?? '',
+      right.memberSemantics?.dispatch ?? '',
+      right.memberSemantics?.accessor ?? '',
+      right.memberSemantics?.nativeKind ?? '',
       right.id,
     ],
   )

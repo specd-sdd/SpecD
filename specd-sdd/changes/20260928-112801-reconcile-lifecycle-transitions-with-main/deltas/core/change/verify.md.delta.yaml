@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'Existing lifecycle, approval, verification, and validity scenarios remain authoritative.'

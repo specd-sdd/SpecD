@@ -98,6 +98,12 @@ After the successful internal manifest write inside `mutate` or `mutateDraft`, `
 
 On success it MUST write file bytes only (honouring `originalHash` / `force`). It MUST NOT call `setFileStatus`, MUST NOT alter validated hashes or history on the supplied `Change`, and MUST NOT write `manifest.json`.
 
+### Requirement: Windows path containment and rename recovery
+
+Path confinement inside this repository MUST use the inside-root rule: after both paths are resolved, the candidate is inside when the relative path from the root is empty, or it does not start with `..` and is not absolute. Drive-letter case MUST NOT make an inside path look outside.
+
+A directory move that fails with `EPERM` or `EXDEV` MUST fall back to copy. A rename onto an existing or locked destination that fails with `EPERM`, `EBUSY`, or `EACCES` MUST be retried a bounded number of times and then MUST surface the original error. Identical destination bytes MUST NOT be treated as success for change artifacts.
+
 ## Constraints
 
 - `FsChangeRepository` is infrastructure-level and lives in `infrastructure/fs/`

@@ -1,0 +1,61 @@
+- op: modified
+  description: 'Verify archive displays dependency changes in all formats'
+  selector:
+    type: section
+    matches: 'Requirement: Output on success \(extended\)'
+  content: |
+    #### Scenario: Text output shows dependency additions and removals
+
+    - **GIVEN** `ArchiveChange` returns an invalidated peer with overlapping specs and one dependency change
+    - **WHEN** `changes archive <name> --allow-overlap` succeeds in text mode
+    - **THEN** stdout includes the archive path and invalidated changes section
+    - **AND** it visibly lists the dependency-change `specId`, added dependencies, and removed dependencies
+
+    #### Scenario: Text output labels an empty dependency side
+
+    - **GIVEN** an invalidated peer has dependency additions but no removals
+    - **WHEN** archive text output is rendered
+    - **THEN** additions are listed and removals render as `(none)`
+
+    #### Scenario: Text output keeps unchanged invalidation concise
+
+    - **GIVEN** an invalidated peer has an empty `dependencyChanges` array
+    - **WHEN** archive text output is rendered
+    - **THEN** its name and overlapping specs are listed
+    - **AND** no empty dependency-change subsection is printed
+
+    #### Scenario: Text output omits invalidated section when no peers were invalidated
+
+    - **GIVEN** `ArchiveChange` returns an empty `invalidatedChanges` array
+    - **WHEN** `changes archive <name>` succeeds in text mode
+    - **THEN** stdout includes only the normal archive success information
+    - **AND** no invalidated changes section is shown
+
+    #### Scenario: JSON and TOON include dependency changes
+
+    - **GIVEN** `ArchiveChange` returns normalized invalidated peer entries
+    - **WHEN** archive succeeds with JSON or TOON output
+    - **THEN** every entry contains `name`, `specIds`, and `dependencyChanges`
+    - **AND** every dependency change contains `specId`, `added`, and `removed`
+    - **AND** Core ordering and empty arrays are preserved without recomputation
+
+- op: added
+  description: 'Verify durable archive is reported accurately if peer invalidation fails'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Output on success \(extended\)'
+  content: |
+    ### Requirement: Post-commit overlap invalidation failure
+
+    #### Scenario: CLI distinguishes peer invalidation failure from archive rollback
+
+    - **GIVEN** `ArchiveChange` reports that `alpha` was durably archived but peer `beta` could not be invalidated
+    - **WHEN** the archive command handles the post-commit error
+    - **THEN** stderr states that `alpha` was archived successfully
+    - **AND** it identifies `beta` as requiring repair
+    - **AND** stdout does not contain a normal successful invalidated-changes result
+    - **AND** the message does not claim that the archive was rolled back

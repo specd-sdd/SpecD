@@ -36,36 +36,36 @@
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Atomic manifest.json stores Change identity, scope, artifact state, implementation links, and append-only lifecycle history.",
+      "value": "Atomic manifest.json v2 persists change identity, scope, lifecycle evidence, artifacts, consent, verification, and implementation links.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:3ce9dfb41ca5c5efe0e08acdb2a617da850c329a1cc9c51fe7e793ec6ff12945",
-          "lastModified": "2026-08-30T09:18:36.424Z"
+          "hash": "sha256:e7d4eef7256c8a0b3474bda84712796f7db2a651a53cdc7bb78b28de3be136d4",
+          "lastModified": "2026-09-28T06:29:51.851Z"
         },
         "verify.md": {
-          "hash": "sha256:24c45adc37c3ff635108de735823314d66da9e3a119ef336393bc2f199b307fa",
-          "lastModified": "2026-08-30T09:18:36.424Z"
+          "hash": "sha256:bdad3abb2d73d6b34a9e15552b02653f844bfa35ef6e0aca841a61e583937a7b",
+          "lastModified": "2026-09-28T06:29:51.852Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# Change Manifest\n\n## Rules\n- Persist each Change only as change-directory `manifest.json`; `FsChangeRepository` exclusively reads/writes.\n- Store immutable `name`, `createdAt`; optional ISO 8601 `updatedAt`; write-once `schema{name,version}`; mutable `specIds`, `invalidationPolicy` (`none`, `surgical`, `downstream`, `global`), optional implementation tracking, `specDependsOn`, artifacts, append-only `history`.\n- Load legacy `workspaces`; never save. Derive active workspaces with `parseSpecId(specIds)`. Missing `implementationTrackingStartedAt` hydrates first `implementing` transition timestamp or `null`.\n- `trackedImplementationFiles`: raw project-relative `file`, `state` (`open`, `resolved`, `ignored`, `removed`). `implementationLinks`: `specId`, raw project-relative `file`, `fileLinkExplicit`, optional `symbols`; `fileLinkExplicit: false` requires non-empty `symbols`.\n- Existing spec entering scope seeds `specDependsOn` from `spec-lock.json`, then legacy `metadata.json.dependsOn`, else empty. Archive-time sidecar/metadata input only.\n- Artifacts: `type`, `optional`, `requires`, aggregate `state`, files. Files: `key`, `filename`, canonical `state`, `validatedHash`, `hasDrift`; file state source truth.\n- `validatedHash`: `null`, SHA-256, or `\"**skipped**\"`; last validation baseline only, never proof of presence/completeness. `hasDrift` = baseline difference.\n- Derive lifecycle from latest `transitioned`; events retain `type`, `at`, `by` (`ActorIdentity`).\n- Append `archive-failed` after archive starts but before successful commit; include `step`, `message`, `commitStarted`. Success trace only archived metadata (`archivedAt`, `archivedBy`, location); failed pre-commit means no completion/partial permanent acceptance.\n- Every `ManifestArtifactFile.filename` follows `core:change-layout`: existing delta-capable spec → `deltas/<workspace>/<capability-path>/<artifact-filename>.delta.yaml`; new → `specs/<workspace>/<capability-path>/<artifact-filename>`.\n- Normalize stale direct path only preserving state, baseline, tracked representation, exact semantics. Partial materialization or `validatedHash: null` never changes representation class; reject unproven class changes.\n- Schema version mismatch warns, stays usable/archiveable; schema name mismatch throws `SchemaMismatchError`.\n- Atomic write: temporary file then rename.\n\n## Constraints\n- Persist artifact/file state; never derive steady state from `validatedHash` alone. Check presence + canonical state first.\n- Missing legacy artifact/file `state` defaults `missing`; accept legacy `invalidated` cause `\"artifact-change\"`, normalize artifact-drift semantics.\n- No top-level lifecycle state; never modify/remove history. Never update persisted `schema`.",
+      "value": "# Change Manifest\n\n## Rules\n- Persist each active change only as change-directory `manifest.json`; `FsChangeRepository` exclusively reads/writes. New manifests use top-level `manifestVersion: 2`, independent of schema identity.\n- V2 stores immutable `name`, `createdAt`; optional ISO `updatedAt`; write-once `schema{name,version}`; mutable `specIds`, optional `specDependsOn`; structured `invalidation{artifacts,workflow}`; artifacts/files; implementation tracking/links; current optional `specApproval`, `signoff`, `verification`; append-only `history`.\n- Approval projections persist `valid|stale|revoked`, actor, reason, time, invalidation metadata. Spec approval fingerprint includes exact sorted/deduplicated canonical `specIds` and artifact fingerprint. Signoff/verification include artifact and known implementation fingerprints. Fingerprints record algorithms and deterministically ordered complete-key hash maps. Empty implementation map is observed evidence; missing/null permitted only for adapted legacy unknown evidence.\n- Verification persists active attempt baseline separately from completed evidence and completion actor/time. Events serialize attempt identity, actor, timestamp, lifecycle state, algorithm identifiers; completion/invalidation retain fingerprint and history. Never serialize source content or encode `verifying → verifying`.\n- Missing `manifestVersion` means v1: validate, preserve full history, adapt in memory. Legacy `invalidationPolicy` maps to `{artifacts: value, workflow: redesign}`; absent value defaults downstream/redesign. Derive best legacy projections without inventing fingerprints/scope. Plain/archive reads never rewrite v1; next real mutation may write v2. Future unsupported version fails typed before hydration.\n- Legacy `workspaces` loads but never saves; derive via `parseSpecId(specIds)`. Missing `implementationTrackingStartedAt` hydrates first implementing transition or null.\n- Tracked files store project-relative `file` and `open|resolved|ignored|removed`. Links store `specId`, project-relative `file`, `fileLinkExplicit`, optional symbols; container-only link requires symbols.\n- Artifacts persist `type`, `optional`, ordered `requires`, aggregate state, files. Files persist `key`, expected `filename`, canonical state, `validatedHash`, `hasDrift`. Existing delta-capable spec paths use `deltas/<workspace>/<capability-path>/<artifact-filename>.delta.yaml`; new specs use `specs/<workspace>/<capability-path>/<artifact-filename>`.\n- Initial creation/scope edits resolve representation before write. Legacy stale paths may normalize only with proof of exact semantic preservation; partial materialization or failed-archive side effects never justify direct↔delta reinterpretation. Preserve state, baseline, tracked intent.\n- `validatedHash` is null, SHA-256, or `\"**skipped**\"`; baseline only, never completeness proof. Presence plus canonical state precede interpretation. Missing legacy state defaults `missing`; accept legacy invalidation cause `artifact-change` and normalize.\n- Lifecycle derives latest `transitioned`; no top-level state. Projection updates and all mutations preserve/reorder-never append-only history.\n- Archive failures append `archive-failed{step,message,commitStarted}` after execution begins and before successful commit. Successful outcome lives in archived metadata (`archivedAt`, `archivedBy`, location), not post-removal active history. Pre-commit failure never implies completion/partial acceptance.\n- Schema version mismatch warns but remains usable/archiveable. Schema name mismatch throws `SchemaMismatchError`. Persisted schema identity never updates.\n- Writes atomic: temporary file then rename.\n\n## Constraints\n- Explicit artifact/file state and `hasDrift` authoritative; never reconstruct steady state from `validatedHash`.\n- Canonical scope/path/hash maps deterministically sorted and deduplicated; equality includes complete key sets. Restored bytes never heal `stale|revoked`.\n- Missing legacy state defaults `missing`; legacy unknown consent/verification cannot authorize gated progress.\n- History immutable and append-only; schema identity write-once; lifecycle state derived only from history.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:3ce9dfb41ca5c5efe0e08acdb2a617da850c329a1cc9c51fe7e793ec6ff12945",
-          "lastModified": "2026-08-30T09:18:36.424Z"
+          "hash": "sha256:e7d4eef7256c8a0b3474bda84712796f7db2a651a53cdc7bb78b28de3be136d4",
+          "lastModified": "2026-09-28T06:29:51.851Z"
         },
         "verify.md": {
-          "hash": "sha256:24c45adc37c3ff635108de735823314d66da9e3a119ef336393bc2f199b307fa",
-          "lastModified": "2026-08-30T09:18:36.424Z"
+          "hash": "sha256:bdad3abb2d73d6b34a9e15552b02653f844bfa35ef6e0aca841a61e583937a7b",
+          "lastModified": "2026-09-28T06:29:51.852Z"
         }
       }
     }

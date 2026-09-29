@@ -3,47 +3,55 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": [],
+  "dependsOn": ["code-graph:sqlite-graph-store"],
   "implementation": [
     {
-      "file": "code-graph:test/infrastructure/isolated-index-worker/dist.spec.ts"
+      "file": "code-graph:src/infrastructure/isolated-index-worker/supervisor.ts",
+      "symbols": ["runIsolatedGraphIndexWithRuntime"]
     },
     {
-      "file": "code-graph:test/fixtures/isolated-index-worker/built-napi-teardown-task.mjs"
+      "file": "code-graph:src/domain/errors/isolated-graph-index-errors.ts",
+      "symbols": ["GraphIndexWorkerStartError"]
+    },
+    {
+      "file": "code-graph:test/infrastructure/isolated-index-worker/signals.spec.ts"
+    },
+    {
+      "file": "code-graph:test/infrastructure/isolated-index-worker/supervisor.spec.ts"
     }
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Runs trusted graph-index tasks in a lock-owning child process with validated IPC, crash containment, and typed failures.",
+      "value": "Run trusted graph indexing in lock-owning child process with validated IPC, signal-safe lease cleanup, crash containment, and typed failures.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:247df625491e38495d709239819931f8b9dac6b1dd36b23cbbbf023bd323f016",
-          "lastModified": "2026-08-25T14:41:04.161Z"
+          "hash": "sha256:b89375482f863820d4d924aa094c6c24acf6f638545deec0f82718f26cb243dd",
+          "lastModified": "2026-09-28T11:19:59.064Z"
         },
         "verify.md": {
-          "hash": "sha256:80321503e0176e908cd032ce6b5819bdc7a2c434046b7d593f5e41b8d0b78c05",
-          "lastModified": "2026-08-25T14:41:04.161Z"
+          "hash": "sha256:3010452f5eb6d5a1015fd304fd457500d57dfc819144c930b4ebb0167a6f6d58",
+          "lastModified": "2026-09-28T11:19:59.066Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# Isolated Index Worker\n\n## Rules\n\n- Public `runIsolatedGraphIndex` accepts graph storage root, trusted installed task-module URL/absolute path, JSON-serializable input, optional progress callback; resolves JSON-serializable terminal result. No rendering, CLI formatting, host exit mutation, or `process.exit()`.\n- Acquire shared storage-root index lock before fork. Concurrent same-root run fails typed busy error before second child. Supervisor owns lease for entire child lifetime; releases exactly once after success, task failure, startup/send/IPC failure, invalid/duplicate terminal message, early/non-zero/signal exit, or native crash.\n- Startup failure is bounded even without child `exit`: detach owned listeners, tear down IPC, best-effort terminate, release once, reject typed startup failure.\n- Production uses `node:child_process.fork` with package-shipped worker. Child contains task, parsers, provider native code, synchronous store work. Native crash cannot terminate host. Success requires terminal result, task cleanup, then exit code 0; post-result crash/signal remains failure.\n- Worker imports exactly host-selected trusted module. Async entrypoint receives serializable input and progress emitter, returns one serializable result or throws. Missing/non-callable entrypoint or non-serializable input/progress/result yields typed task/protocol failure. Module selection is never end-user CLI input or untrusted sandbox.\n- Tagged runtime-validated IPC permits progress then exactly one terminal result/failure. Malformed, unsupported, late, duplicate, or missing terminal state is protocol failure; never double-settle, signal, or release. Raw envelopes/bootstrap commands internal.\n- Forward valid progress in arrival order unchanged. Missing callback does not alter execution.\n- Typed `SpecdCodeGraphError` failures with stable upper-snake-case codes distinguish busy, startup/IPC creation, invalid module/contract, task failure, malformed/late/duplicate IPC, abnormal/early exit, signal termination; include exit/signal details.\n- During child activity install parent `SIGINT`/`SIGTERM` handlers, forward same signal, wait for child, clean up, reject typed signal failure. Remove only installed handlers; never exit/re-signal host.\n- Child receives internal storage-root-scoped indication that supervisor owns lock; provider avoids reacquisition only for matching child/run. No public caller-managed token.\n- Build emits stable ESM child under published `dist/`; supervisor resolves relative to installed package. Verification forks publish-shaped worker/task and includes forced project index reaching result, cleanup, clean exit 0.\n- Cleanup of listeners, child reference, IPC, lock is idempotent and completes before returned promise settles. Tests may inject launcher/protocol seam; production offers no worker-thread/in-process mode.\n\n## Constraints\n\n- Child process mandatory for native-crash containment.\n- No queueing, waiting, retry, stale-lock PID recovery, scheduling, or background indexing.\n- No dependency on `@specd/sdk`, `@specd/cli`, Commander, or delivery formatter.\n- All boundary values runtime-validated JSON-serializable.\n- Raw locks and IPC DTOs remain internal.",
+      "value": "# Isolated Index Worker\n## Rules\n- Public `runIsolatedGraphIndex` accepts storage root, trusted installed task-module URL/absolute path, JSON-serializable input, optional progress callback; resolves serializable result. Never renders, interprets CLI formats, mutates host exit state, or calls `process.exit()`.\n- Acquire shared root-scoped index lock before fork; same-root concurrency fails typed busy before second child. Supervisor owns lease for full child lifetime and releases exactly once after success, task failure, creation/IPC/send failure, invalid/duplicate terminal IPC, early/non-zero/signal exit, or native crash.\n- Startup failure is bounded even without `exit`: detach owned listeners, tear down IPC, best-effort terminate, release once, reject typed startup failure. Lock acquire/release/path/assertion internals; callers never handle tokens.\n- Production uses `node:child_process.fork` with package-shipped worker containing task, parsers, native provider/store work. Child native crash cannot terminate host. Success requires terminal result, task cleanup, then exit 0; post-result crash/signal remains failure. No `process.exit()` masking. Tests may inject launcher/protocol seam; no production worker-thread/in-process mode.\n- Worker imports exactly host-selected trusted module; async entrypoint receives serializable input + progress emitter, returns one serializable result or throws once. Missing/non-callable entrypoint or non-serializable input/progress/result => typed task/protocol failure. Module choice never end-user CLI input; not untrusted-code sandbox.\n- Runtime-validated tagged IPC: zero-or-more progress then exactly one terminal result/failure. Malformed/unsupported/late/duplicate/missing terminal => protocol failure. Never double-settle, signal, or release. Raw envelopes/bootstrap commands internal.\n- Forward valid progress unchanged and ordered; callback absence changes nothing. Child/supervisor emit no CLI text/JSON/TOON presentation; hosts render.\n- Typed `SpecdCodeGraphError` subclasses with stable upper-snake-case codes distinguish busy, fork/IPC startup, invalid module/contract, task failure, malformed/unsupported/late/duplicate IPC, abnormal/early exit, signal termination; actionable messages and structured exit/signal details, no stderr parsing.\n- During activity install parent `SIGINT`/`SIGTERM` handlers, forward same signal, await child, clean, reject typed signal failure. Remove only installed handlers; never exit/re-signal host.\n- Lease-holding process releases on process exit; on Windows also `SIGBREAK`; retain `SIGTERM` release where delivered. Missing `SIGTERM` delivery cannot leave lease after process exit.\n- Child receives internal code-graph-owned indication supervisor owns lock; provider skips reacquisition only for matching child/root. No public caller token or unrelated root/process bypass.\n- Build stable ESM worker under published `dist/`; resolve relative to installed package. Verify public supervisor forks publish-shaped worker/task; built integration forces project index, receives terminal result, finishes cleanup, exits 0.\n- Listener removal, child cleanup, IPC teardown, lock release idempotent and complete before promise settlement. Remove only owned listeners; leave no lock file/live child/open IPC.\n## Constraints\n- Child process mandatory for native-crash containment.\n- No queueing, waiting, retry, stale-lock PID recovery, scheduling, background indexing.\n- No `@specd/sdk`, `@specd/cli`, Commander, delivery formatter dependency.\n- Inputs/progress/results/IPC JSON-serializable and runtime-validated at boundary.\n- Direct lock helpers/raw IPC DTOs internal.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:247df625491e38495d709239819931f8b9dac6b1dd36b23cbbbf023bd323f016",
-          "lastModified": "2026-08-25T14:41:04.161Z"
+          "hash": "sha256:b89375482f863820d4d924aa094c6c24acf6f638545deec0f82718f26cb243dd",
+          "lastModified": "2026-09-28T11:19:59.064Z"
         },
         "verify.md": {
-          "hash": "sha256:80321503e0176e908cd032ce6b5819bdc7a2c434046b7d593f5e41b8d0b78c05",
-          "lastModified": "2026-08-25T14:41:04.161Z"
+          "hash": "sha256:3010452f5eb6d5a1015fd304fd457500d57dfc819144c930b4ebb0167a6f6d58",
+          "lastModified": "2026-09-28T11:19:59.066Z"
         }
       }
     }

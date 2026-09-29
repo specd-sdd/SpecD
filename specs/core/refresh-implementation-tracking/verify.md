@@ -162,3 +162,27 @@
   - `projectRoot: string`
   - `specRepositories?: ReadonlyMap<string, SpecRepository>`
 - **AND** the factory delegates to canonical `createRefreshImplementationTracking(deps)`
+
+### Requirement: Project-relative paths keep a separator boundary
+
+#### Scenario: A longer directory name is not inside the project
+
+- **GIVEN** the project root is `C:/work/app`
+- **AND** a candidate is `C:/work/application/file.ts`
+- **WHEN** the path is classified
+- **THEN** it is not project-relative
+
+#### Scenario: Drive-letter case does not hide a descendant
+
+- **GIVEN** the project root is `c:/work/app`
+- **AND** a candidate is `C:/work/app/src/file.ts`
+- **WHEN** the path is classified
+- **THEN** it is project-relative
+
+#### Scenario: The project root is inside and is not an exclusion prefix
+
+- **GIVEN** the project root is `C:/work/app`
+- **AND** an internal path equals that root
+- **WHEN** exclusions are collected
+- **THEN** the root is project-relative
+- **AND** the exclusion list does not contain the empty string

@@ -1,9 +1,21 @@
 import { createHash } from 'node:crypto'
-import { existsSync, readFileSync, readdirSync } from 'node:fs'
-import { isAbsolute, join, relative, resolve } from 'node:path'
+import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { type ProjectWorkspace } from '@specd/core'
 import { type ProjectGraphConfig } from '../../../domain/value-objects/index-options.js'
+import { type LanguageAdapter } from '../../../domain/value-objects/language-adapter.js'
+import {
+  emptyResolutionManifestSource,
+  type ResolutionManifestSource,
+} from '../../ports/resolution-manifest-source.js'
 import { resolveEffectiveGraphConfig } from './resolve-effective-graph-config.js'
+
+/** Visible full-rebuild reason when the derivation fingerprint differs. */
+export const FULL_REBUILD_FINGERPRINT_REASON =
+  'Graph derivation fingerprint mismatch — code-graph version, workspace configuration, or resolution manifest content changed'
+
+/** Text warning appended by graph stats when a derivation mismatch is known. */
+export const GRAPH_STATS_FINGERPRINT_WARNING =
+  '⚠ Derivation fingerprint mismatch — code-graph version, workspace configuration, or resolution manifest content changed'
 
 /** Input for computing a graph fingerprint. */
 export interface GraphFingerprintInput {
@@ -11,6 +23,9 @@ export interface GraphFingerprintInput {
   readonly projectRoot: string
   readonly workspaces: readonly ProjectWorkspace[]
   readonly graphConfig: ProjectGraphConfig
+  readonly adapters: readonly LanguageAdapter[]
+  readonly repoRoot: string | null
+  readonly source?: ResolutionManifestSource
 }
 
 /** Normalized workspace representation for fingerprint computation. */
@@ -24,7 +39,7 @@ interface NormalizedWorkspaceFingerprint {
 }
 
 /** Content identity for a deterministic package or build-resolution input. */
-interface ResolutionInputFingerprint {
+export interface ResolutionInputFingerprint {
   readonly path: string
   readonly contentHash: string
 }
@@ -34,12 +49,18 @@ interface ResolutionInputFingerprint {
  * @param projectRoot - Absolute project root used to resolve effective graph config.
  * @param workspaces - The workspace targets to normalize.
  * @param graphConfig - The project graph configuration.
+ * @param adapters - Registered language adapters supply resolution-manifest basenames.
+ * @param repoRoot - Repository root that bounds the resolution-manifest walk, or null.
+ * @param source - Port that reads manifest existence and text.
  * @returns Normalized workspace representations.
  */
 function normalizeWorkspaceFingerprintInput(
   projectRoot: string,
   workspaces: readonly ProjectWorkspace[],
   graphConfig: ProjectGraphConfig,
+  adapters: readonly LanguageAdapter[],
+  repoRoot: string | null,
+  source: ResolutionManifestSource,
 ): readonly NormalizedWorkspaceFingerprint[] {
   const effectiveGraphConfig = resolveEffectiveGraphConfig(projectRoot, workspaces, graphConfig)
   return workspaces.map((ws) => {
@@ -50,7 +71,13 @@ function normalizeWorkspaceFingerprintInput(
       allowedPaths: wsGraph?.allowedPaths ? [...wsGraph.allowedPaths] : [],
       excludePaths: wsGraph?.excludePaths ? [...wsGraph.excludePaths] : [],
       respectGitignore: wsGraph?.respectGitignore ?? true,
-      resolutionInputs: discoverResolutionInputs(projectRoot, ws.codeRoot),
+      resolutionInputs: discoverResolutionInputs(
+        projectRoot,
+        ws.codeRoot,
+        adapters,
+        repoRoot,
+        source,
+      ),
     }
   })
 }
@@ -70,6 +97,9 @@ export function computeGraphFingerprint(input: GraphFingerprintInput): string {
     input.projectRoot,
     input.workspaces,
     input.graphConfig,
+    input.adapters,
+    input.repoRoot,
+    input.source ?? emptyResolutionManifestSource,
   )
   const payload = JSON.stringify({
     v: input.codeGraphVersion,
@@ -90,6 +120,9 @@ export function computeGraphFingerprint(input: GraphFingerprintInput): string {
  * @param workspace - The workspace target.
  * @param workspaces - All workspace targets in the current project.
  * @param graphConfig - The project graph configuration.
+ * @param adapters - Registered language adapters supply resolution-manifest basenames.
+ * @param repoRoot - Repository root that bounds the resolution-manifest walk, or null.
+ * @param source - Port that reads manifest existence and text.
  * @returns A SHA-256 hex digest.
  */
 export function computeWorkspaceFingerprint(
@@ -98,6 +131,9 @@ export function computeWorkspaceFingerprint(
   workspace: ProjectWorkspace,
   workspaces: readonly ProjectWorkspace[],
   graphConfig: ProjectGraphConfig,
+  adapters: readonly LanguageAdapter[] = [],
+  repoRoot: string | null = null,
+  source: ResolutionManifestSource = emptyResolutionManifestSource,
 ): string {
   const effectiveGraphConfig = resolveEffectiveGraphConfig(projectRoot, workspaces, graphConfig)
   const wsGraph = effectiveGraphConfig.workspaces.get(workspace.name)
@@ -107,7 +143,13 @@ export function computeWorkspaceFingerprint(
     allowedPaths: wsGraph?.allowedPaths ? [...wsGraph.allowedPaths] : [],
     excludePaths: wsGraph?.excludePaths ? [...wsGraph.excludePaths] : [],
     respectGitignore: wsGraph?.respectGitignore ?? true,
-    resolutionInputs: discoverResolutionInputs(projectRoot, workspace.codeRoot),
+    resolutionInputs: discoverResolutionInputs(
+      projectRoot,
+      workspace.codeRoot,
+      adapters,
+      repoRoot,
+      source,
+    ),
   }
   const payload = JSON.stringify({ v: codeGraphVersion, w: [normalized] })
   return createHash('sha256').update(payload).digest('hex')
@@ -119,6 +161,9 @@ export function computeWorkspaceFingerprint(
  * @param projectRoot - Absolute project root used for discovery.
  * @param workspaces - The current workspace targets.
  * @param graphConfig - The project graph configuration.
+ * @param adapters - Registered language adapters supply resolution-manifest basenames.
+ * @param repoRoot - Repository root that bounds the resolution-manifest walk, or null.
+ * @param source - Port that reads manifest existence and text.
  * @returns A SHA-256 hex digest.
  */
 export function computeRootFingerprint(
@@ -126,6 +171,9 @@ export function computeRootFingerprint(
   projectRoot: string,
   workspaces: readonly ProjectWorkspace[],
   graphConfig: ProjectGraphConfig,
+  adapters: readonly LanguageAdapter[] = [],
+  repoRoot: string | null = null,
+  source: ResolutionManifestSource = emptyResolutionManifestSource,
 ): string {
   const effectiveGraphConfig = resolveEffectiveGraphConfig(projectRoot, workspaces, graphConfig)
   const payload = JSON.stringify({
@@ -137,52 +185,132 @@ export function computeRootFingerprint(
     workspaces: workspaces.map((workspace) => ({
       name: workspace.name,
       codeRoot: normalizeRelativePath(projectRoot, workspace.codeRoot),
-      resolutionInputs: discoverResolutionInputs(projectRoot, workspace.codeRoot),
+      resolutionInputs: discoverResolutionInputs(
+        projectRoot,
+        workspace.codeRoot,
+        adapters,
+        repoRoot,
+        source,
+      ),
     })),
   })
   return createHash('sha256').update(payload).digest('hex')
 }
 
-const RESOLUTION_MANIFESTS = new Set([
-  'package.json',
-  'pyproject.toml',
-  'setup.cfg',
-  'setup.py',
-  'go.mod',
-  'go.work',
-  'composer.json',
-])
+/**
+ * Rewrites CRLF and lone CR line endings to LF for manifest digests.
+ * @param text - Manifest text whose newline spelling must not affect the digest.
+ * @returns The same text with LF line endings.
+ */
+function normalizeNewlines(text: string): string {
+  return text.replaceAll('\r\n', '\n').replaceAll('\r', '\n')
+}
 
 /**
- * Discovers and hashes deterministic package/build inputs without persisting roots.
+ * Hashes a resolution manifest as newline-normalized UTF-8 text.
+ * @param source - Port that reads manifest text.
+ * @param filePath - Absolute path to the manifest file.
+ * @returns SHA-256 hex digest, or undefined when the file cannot be read.
+ */
+function hashManifestText(source: ResolutionManifestSource, filePath: string): string | undefined {
+  const content = source.readText(filePath)
+  if (content === undefined) return undefined
+  return createHash('sha256').update(normalizeNewlines(content), 'utf8').digest('hex')
+}
+
+/**
+ * Collects exact basenames declared by registered adapters.
+ * @param adapters - Registered language adapters.
+ * @returns Deduplicated exact filenames, excluding empties and path/glob tokens.
+ */
+function collectResolutionBasenames(adapters: readonly LanguageAdapter[]): readonly string[] {
+  const names = new Set<string>()
+  for (const adapter of adapters ?? []) {
+    for (const name of adapter.resolutionManifests()) {
+      if (name === '' || name.includes('/') || name.includes('\\') || name.includes('*')) {
+        continue
+      }
+      names.add(name)
+    }
+  }
+  return [...names]
+}
+
+/**
+ * Discovers and hashes adapter-declared resolution manifests for one workspace.
  * @param projectRoot - Absolute project root used as the stable relative-path base.
- * @param codeRoot - Workspace code root to inspect for resolution manifests.
+ * @param codeRoot - Workspace code root to start the upward walk from.
+ * @param adapters - Registered language adapters supply basenames.
+ * @param repoRoot - Repository root that bounds the walk, or null to use projectRoot.
+ * @param source - Port that reads manifest existence and text.
  * @returns Deterministically ordered relative paths and content hashes.
  */
-function discoverResolutionInputs(
+export function discoverResolutionInputs(
   projectRoot: string,
   codeRoot: string,
+  adapters: readonly LanguageAdapter[],
+  repoRoot: string | null,
+  source: ResolutionManifestSource = emptyResolutionManifestSource,
 ): readonly ResolutionInputFingerprint[] {
-  const roots = [...new Set([resolve(projectRoot), resolve(codeRoot)])]
+  const basenames = collectResolutionBasenames(adapters)
+  if (basenames.length === 0) return []
+
+  const start = resolve(codeRoot)
+  const bound = resolve(repoRoot ?? projectRoot)
+  const directories = collectWalkDirectories(start, bound)
   const files = new Set<string>()
-  for (const root of roots) {
-    if (!existsSync(root)) continue
-    for (const entry of readdirSync(root, { withFileTypes: true })) {
-      if (!entry.isFile()) continue
-      if (
-        RESOLUTION_MANIFESTS.has(entry.name) ||
-        /^(?:tsconfig|jsconfig)(?:\.[^.]+)?\.json$/u.test(entry.name)
-      ) {
-        files.add(join(root, entry.name))
+
+  for (const dir of directories) {
+    if (!source.directoryExists(dir)) continue
+    for (const basename of basenames) {
+      const candidate = join(dir, basename)
+      if (source.isRegularFile(candidate)) {
+        files.add(candidate)
       }
     }
   }
+
   return [...files]
-    .map((filePath) => ({
-      path: normalizeRelativePath(projectRoot, filePath),
-      contentHash: createHash('sha256').update(readFileSync(filePath)).digest('hex'),
-    }))
+    .flatMap((filePath) => {
+      const contentHash = hashManifestText(source, filePath)
+      if (contentHash === undefined) return []
+      return [
+        {
+          path: normalizeRelativePath(projectRoot, filePath),
+          contentHash,
+        },
+      ]
+    })
     .sort((left, right) => left.path.localeCompare(right.path))
+}
+
+/**
+ * Builds the directory walk from codeRoot toward the bound.
+ * @param start - Absolute workspace code root.
+ * @param bound - Absolute repository or project root.
+ * @returns Directories to inspect, start-first.
+ */
+function collectWalkDirectories(start: string, bound: string): readonly string[] {
+  if (start === bound) return [start]
+
+  const relativeToBound = relative(bound, start)
+  const startInsideBound =
+    relativeToBound === '' || (!relativeToBound.startsWith('..') && !isAbsolute(relativeToBound))
+
+  if (!startInsideBound) {
+    return [start]
+  }
+
+  const directories: string[] = []
+  let current = start
+  while (true) {
+    directories.push(current)
+    if (current === bound) break
+    const parent = dirname(current)
+    if (parent === current) break
+    current = parent
+  }
+  return directories
 }
 
 /**
@@ -228,6 +356,9 @@ export function serializeFingerprintMap(map: Map<string, string>): string {
  * @param projectRoot - Absolute project root used to resolve effective graph config.
  * @param workspaces - The current workspace targets.
  * @param graphConfig - The project graph configuration.
+ * @param adapters - Registered language adapters supply resolution-manifest basenames.
+ * @param repoRoot - Repository root that bounds the resolution-manifest walk, or null.
+ * @param source - Port that reads manifest existence and text.
  * @returns True if any mismatch is detected.
  */
 export function detectFingerprintMismatch(
@@ -236,6 +367,9 @@ export function detectFingerprintMismatch(
   projectRoot: string,
   workspaces: readonly ProjectWorkspace[],
   graphConfig: ProjectGraphConfig,
+  adapters: readonly LanguageAdapter[] = [],
+  repoRoot: string | null = null,
+  source: ResolutionManifestSource = emptyResolutionManifestSource,
 ): boolean {
   if (storedMap.size === 0) {
     return false
@@ -248,6 +382,9 @@ export function detectFingerprintMismatch(
       ws,
       workspaces,
       graphConfig,
+      adapters,
+      repoRoot,
+      source,
     )
     const storedFp = storedMap.get(ws.name)
     if (storedFp !== currentFp) {
@@ -260,6 +397,9 @@ export function detectFingerprintMismatch(
     projectRoot,
     workspaces,
     graphConfig,
+    adapters,
+    repoRoot,
+    source,
   )
   if (storedMap.get('root') !== rootFingerprint) {
     return true

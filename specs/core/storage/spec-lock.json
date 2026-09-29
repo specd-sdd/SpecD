@@ -22,36 +22,36 @@
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Storage ports and fs adapters govern atomic, confined persistence, artifact drift, indexes, archives, locks, and runtime caches.",
+      "value": "Storage ports and fs adapters enforce atomic confined persistence, drift detection, indexes, archives, locks, and runtime caches.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:4a709a63c12b8faba402d4545b394bf13a9517964d2c817586019a6ae1892e16",
-          "lastModified": "2026-08-29T22:53:46.301Z"
+          "hash": "sha256:b5b1500e43d8a05b74a2a424d78652587ad4fa97e6653ea25f89930d50c93aed",
+          "lastModified": "2026-09-28T11:19:59.180Z"
         },
         "verify.md": {
-          "hash": "sha256:a788882619b1248a72904bc637ea9fa96827a0086c5019bef9cc4012b3b31d6d",
-          "lastModified": "2026-09-23T05:56:39.374Z"
+          "hash": "sha256:68b7acc3de7a329903a51d4c87a214cfd4c349ec0c1998e4f40dc45fae17a514",
+          "lastModified": "2026-09-28T11:19:59.181Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# Storage\n## Rules\n- Active directories: `YYYYMMDD-HHmmss-<name>` from `createdAt`; timestamp filesystem-only. `FsChangeRepository` resolves `*-<name>`. `ChangeRepository.list()` returns `createdAt` ascending via `{configPath}/tmp/fs-cache/changes/` index.\n- Load derives artifact status from `validatedHash`: `__skipped__` → `skipped`; absent file → `missing`; cleaned SHA-256 match → `complete`; otherwise `in-progress`. Apply artifact-type `preHashCleanup` before hashing. Bypass derivation/drift when `artifactTypes.length === 0`.\n- With resolved types, load detects baseline drift and calls `Change.invalidate(\"artifact-drift\", SYSTEM_ACTOR, ...)` once with focused grouped payload; never use `ActorResolver`. Skip sentinel/already-reviewing files. Adapter persists resulting history when load path writes manifest. `ValidateArtifacts` handles consent-hash drift only.\n- `projectArtifacts`/`effectiveStatus` own recursive `requires`: parent review may yield `pending-parent-artifact-review`; incomplete parent yields `in-progress`; skipped optional parent satisfies dependency. Rewrite persisted legacy `pending-parent-artifact-review` to `in-progress`; `ArtifactFile` rejects token. No `Change.effectiveStatus()`.\n- Only `ValidateArtifacts` calls `Artifact.markComplete(hash)`; only skip use case calls `Artifact.markSkipped()` and writes `__skipped__`.\n- `storage.archive.pattern` supports `{{year}}`, `{{month}}`, `{{day}}`, `{{change.name}}`, `{{change.archivedName}}`; default `{{change.archivedName}}`. Reject `{{change.scope}}`/`{{change.workspace}}` with `UnsupportedPatternError`; year four digits, month/day zero-padded.\n- Archive listing index lives only at `{configPath}/tmp/fs-cache/archive/`: `.specd-index.jsonl` rows `{ entry, sourceMtime?, sourceFiles? }`; `.specd-index-meta.json` `{ totalCount, generatedAt, isInvalidated }`. `reindex()` rebuilds from manifests and removes legacy root index; normal cache hits neither scan nor delete root files. `get(name)` never requires root JSONL.\n- Archive root `.gitignore` always ignores `.staging`; never restore obsolete index lines. Runtime creation, rebuild, staged-commit paths preserve hygiene. Named storage factories select adapters; workspace VCS/null-VCS decisions remain inside factory.\n- `core:change-manifest` defines manifest/version/events. Writes atomic temp+rename. Reject root escapes and arbitrary untracked paths. Multi-update archive uses staged commit. Change locks: `{configPath}/tmp/change-locks`.\n- Fs list caches: `{configPath}/tmp/fs-cache/{archive,changes,drafts,discarded,specs/<workspace>,validate-specs/<workspace>}/`; access through `FsChangeIndexCache`/`FsSpecIndexCache`; `include*` only projects response. Validation bucket meta extends shared shape with `schemaFingerprint`, `engineVersion`; rows `{ entry, stamps, cacheFingerprint }`; hosts expose no validate-cache reindex surface.\n- First tmp use and project init idempotently create `{configPath}/tmp/.gitignore` containing `*` and `!.gitignore`.\n## Constraints\n- Manifest writes atomic; serialized fs-cache paths use forward slashes on every OS.\n- Directory timestamp comes from `change.createdAt`.\n- `{configPath}/tmp/fs-cache/` runtime-only; never commit.",
+      "value": "# Storage\n\n## Rules\n- Active directories use `YYYYMMDD-HHmmss-<name>` from `createdAt`; prefix is filesystem-only. `FsChangeRepository` resolves `*-<name>`. `ChangeRepository.list()` returns `createdAt` ascending through `{configPath}/tmp/fs-cache/changes/` index.\n- Load derives artifact status from `validatedHash`: `__skipped__` to skipped; absent file to missing; cleaned SHA-256 match to complete; otherwise in-progress. Cleaning applies artifact `preHashCleanup`, collapses whitespace, trims, hashes. Bypass status derivation and drift when `artifactTypes.length === 0`.\n- With resolved types, load detects validated baseline drift and calls `Change.invalidate(\"artifact-drift\", SYSTEM_ACTOR, ...)` once with focused grouped payload; skip sentinel and already-reviewing files. Persist resulting history when load path writes manifest. `ValidateArtifacts` owns consent-hash drift only.\n- `projectArtifacts` and `effectiveStatus` own recursive requires cascade: parent review may yield pending-parent review; incomplete parent yields in-progress; skipped optional parent satisfies dependency. Rewrite persisted legacy `pending-parent-artifact-review` to in-progress; `ArtifactFile` rejects token. No `Change.effectiveStatus()`.\n- Only `ValidateArtifacts` calls `Artifact.markComplete(hash)`; only skip use case calls `Artifact.markSkipped()` and writes sentinel.\n- `storage.archive.pattern` supports `{{year}}`, `{{month}}`, `{{day}}`, `{{change.name}}`, `{{change.archivedName}}`; default `{{change.archivedName}}`. Reject scope or workspace tokens with `UnsupportedPatternError`; year four digits, month and day zero-padded.\n- Archive list index lives at `{configPath}/tmp/fs-cache/archive/`: `.specd-index.jsonl` rows `{ entry, sourceMtime?, sourceFiles? }`; meta `{ totalCount, generatedAt, isInvalidated }`. `reindex()` rebuilds from manifests and removes legacy root index. Normal cache hits neither scan nor delete root files. `get(name)` never requires root JSONL.\n- Archive root `.gitignore` always ignores `.staging`; runtime creation and staged-commit paths preserve hygiene and never restore obsolete index lines.\n- Named storage factories select adapters; workspace VCS or null-VCS decisions remain inside factory.\n- `core:change-manifest` defines manifest format. Writes use atomic temp plus rename. Fs repositories reject root escapes and arbitrary untracked paths. Multi-update archive prepares full result then commits. Debug logs cover artifact resolution, confinement rejection, staged commit progress, failure diagnostics.\n- Change locks live at `{configPath}/tmp/change-locks`, derived from repository config.\n- Fs list caches live under `{configPath}/tmp/fs-cache/{archive,changes,drafts,discarded,specs/<workspace>,validate-specs/<workspace>}/`; repositories access via `FsChangeIndexCache` or `FsSpecIndexCache`; `include*` only projects responses.\n- Validation bucket meta extends shared shape with `schemaFingerprint`, `engineVersion`; rows `{ entry, stamps, cacheFingerprint }` where fingerprint hashes sorted spec fingerprint plus metadata content hash or `__absent__`. Delivery hosts expose no validate-cache-specific surface.\n- First tmp use and project initialization idempotently create `{configPath}/tmp/.gitignore` containing `*` and `!.gitignore`.\n\n## Constraints\n- Manifest writes atomic; staged archives never expose partial permanent state.\n- Serialized fs-cache paths use forward slashes on every OS.\n- Directory timestamp comes from `change.createdAt`.\n- `{configPath}/tmp/fs-cache/` is runtime-only and never committed.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:4a709a63c12b8faba402d4545b394bf13a9517964d2c817586019a6ae1892e16",
-          "lastModified": "2026-08-29T22:53:46.301Z"
+          "hash": "sha256:b5b1500e43d8a05b74a2a424d78652587ad4fa97e6653ea25f89930d50c93aed",
+          "lastModified": "2026-09-28T11:19:59.180Z"
         },
         "verify.md": {
-          "hash": "sha256:a788882619b1248a72904bc637ea9fa96827a0086c5019bef9cc4012b3b31d6d",
-          "lastModified": "2026-09-23T05:56:39.374Z"
+          "hash": "sha256:68b7acc3de7a329903a51d4c87a214cfd4c349ec0c1998e4f40dc45fae17a514",
+          "lastModified": "2026-09-28T11:19:59.181Z"
         }
       }
     }

@@ -13,6 +13,14 @@ import {
   projectImplementationTracking,
 } from './_shared/implementation-tracking.js'
 
+/** Filesystem helpers the refresh use case needs for project-relative paths. */
+export interface ProjectPathHelpers {
+  /** Reports whether `candidate` stays inside `root`. */
+  isPathInside(root: string, candidate: string): boolean
+  /** Normalizes a VCS root the same way the adapters do. */
+  normalizeVcsRoot(value: string): string
+}
+
 /** Input for the {@link RefreshImplementationTracking} use case. */
 export interface RefreshImplementationTrackingInput {
   /** The change name to refresh. */
@@ -51,6 +59,7 @@ export class RefreshImplementationTracking {
   private readonly _implementationDetector: ImplementationDetector
   private readonly _files: FileReader
   private readonly _projectRoot: string
+  private readonly _paths: ProjectPathHelpers
   private readonly _specRepositories?: ReadonlyMap<string, SpecRepository> | undefined
 
   /**
@@ -61,6 +70,7 @@ export class RefreshImplementationTracking {
    * @param implementationDetector - Detector for targeted candidate discovery
    * @param files - File reader for existence checks during the sweep phase
    * @param projectRoot - Absolute path to the project root directory
+   * @param paths - Path containment and VCS-root helpers supplied by composition
    * @param specRepositories - Optional spec repositories keyed by workspace name
    */
   constructor(
@@ -69,6 +79,7 @@ export class RefreshImplementationTracking {
     implementationDetector: ImplementationDetector,
     files: FileReader,
     projectRoot: string,
+    paths: ProjectPathHelpers,
     specRepositories?: ReadonlyMap<string, SpecRepository>,
   ) {
     this._changes = changes
@@ -76,6 +87,7 @@ export class RefreshImplementationTracking {
     this._implementationDetector = implementationDetector
     this._files = files
     this._projectRoot = projectRoot
+    this._paths = paths
     this._specRepositories = specRepositories
   }
 
@@ -124,7 +136,7 @@ export class RefreshImplementationTracking {
     const portable = new Set<string>()
     for (const abs of allAbsolute) {
       const rel = this._toPortableProjectRelativePath(abs)
-      if (rel !== null) portable.add(rel)
+      if (rel !== null && rel.length > 0) portable.add(rel)
     }
     return [...portable].sort()
   }
@@ -210,15 +222,17 @@ export class RefreshImplementationTracking {
    * Converts an absolute filesystem path into a portable project-relative path.
    *
    * @param absolutePath - Absolute filesystem path to convert
-   * @returns Portable project-relative path, or `null` when outside `projectRoot`
+   * @returns Portable project-relative path, `''` for the project root, or `null` when outside
    */
   private _toPortableProjectRelativePath(absolutePath: string): string | null {
-    const normalizedProject = this._projectRoot.replace(/\\/g, '/')
-    const normalizedAbs = absolutePath.replace(/\\/g, '/')
-    if (!normalizedAbs.startsWith(normalizedProject)) return null
-    let rel = normalizedAbs.slice(normalizedProject.length)
-    if (rel.startsWith('/')) rel = rel.slice(1)
-    return rel.length > 0 ? rel : null
+    if (!this._paths.isPathInside(this._projectRoot, absolutePath)) return null
+    const root = this._paths.normalizeVcsRoot(this._projectRoot)
+    const candidate = this._paths.normalizeVcsRoot(absolutePath)
+    const relative =
+      /^[A-Za-z]:/.test(root) || root.includes('\\')
+        ? path.win32.relative(root, candidate)
+        : path.relative(root, candidate)
+    return relative.replaceAll('\\', '/')
   }
 
   /**

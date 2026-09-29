@@ -23,6 +23,10 @@ Each node MUST also store its `configRelativePath` (relative to the directory co
 
 This ensures that two workspaces with identical relative paths produce distinct `FileNode.path` values while still allowing CLI users to resolve file arguments using repository-style paths relative to the active config. The workspace name is the `SpecdWorkspaceConfig.name` from the specd configuration.
 
+### Requirement: Drive letters are not workspace names
+
+Parsing a graph identity MUST NOT treat a Windows drive letter as a workspace name. A string that matches `^[A-Za-z]:[/\\]` or `^[A-Za-z]:$` is a drive-letter path. The character before the first `:` in that string MUST NOT become `{workspaceName}`. This applies to exclusion, hotspot classification, SQLite workspace inclusion, package surfaces, and CLI graph display. A workspace filter of `C` MUST NOT match a drive-letter path or the bare drive letter `C:`.
+
 ### Requirement: SymbolNode ID includes workspace
 
 `SymbolNode.id` SHALL include the workspace-prefixed path:

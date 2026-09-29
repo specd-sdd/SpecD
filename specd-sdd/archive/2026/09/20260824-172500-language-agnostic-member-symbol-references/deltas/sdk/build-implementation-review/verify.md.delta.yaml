@@ -1,0 +1,46 @@
+- op: added
+  description: 'SDK forwards stored symbol text without parsing'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: One health snapshot and batch resolution'
+  content: |
+    ### Requirement: Unparsed stored symbol text
+
+    #### Scenario: Qualified link text reaches the provider unchanged
+
+    - **GIVEN** a spec link stores `EditChange.execute` on a file
+    - **WHEN** implementation review builds the resolution batch
+    - **THEN** the provider request contains that exact string and the link file
+    - **AND** the SDK did not split the owner from the member
+
+    #### Scenario: Ambiguous provider result stays ambiguous
+
+    - **GIVEN** the provider returns ambiguous for a stored symbol
+    - **WHEN** the review projection is built
+    - **THEN** that link stays ambiguous
+
+    #### Scenario: Batch order matches stored links
+
+    - **GIVEN** three stored links in a fixed order
+    - **WHEN** the resolution batch returns
+    - **THEN** the review projection keeps that order
+    - **AND** the SDK made one batch call
+
+    #### Scenario: Link without a file is still unparsed
+
+    - **GIVEN** a stored symbol string has no file
+    - **WHEN** the request is built
+    - **THEN** the provider receives the original string
+    - **AND** the file field is empty
+    - **AND** the SDK does not choose a language
+
+    #### Scenario: Unresolved barrel label stays unresolved
+
+    - **GIVEN** the stored text is `@specd/sdk barrel` and the provider returns unresolved
+    - **WHEN** the review projection is built
+    - **THEN** that link stays unresolved
+    - **AND** the SDK does not turn it into a package lookup

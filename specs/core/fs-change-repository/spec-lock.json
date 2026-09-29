@@ -12,8 +12,19 @@
   ],
   "implementation": [
     {
+      "file": "core:src/infrastructure/fs/path-platform.ts",
+      "symbols": ["isPathInside", "retryOnLock"]
+    },
+    {
+      "file": "core:src/infrastructure/fs/move-dir.ts",
+      "symbols": ["moveDir"]
+    },
+    {
       "file": "core:src/infrastructure/fs/change-repository.ts",
-      "symbols": ["FsChangeRepository", "deriveManifestUpdatedAt", "changeToManifest"]
+      "symbols": ["FsChangeRepository"]
+    },
+    {
+      "file": "core:test/infrastructure/fs/move-dir.spec.ts"
     }
   ],
   "optimizations": {

@@ -83,3 +83,39 @@
 - **GIVEN** `createVcsAdapter(cwd)` resolves to a concrete adapter
 - **WHEN** implementation detection later calls `modifiedFiles(baseRef)` on that adapter
 - **THEN** the adapter satisfies the full current `VcsAdapter` port contract
+
+### Requirement: Built-in adapters normalize repository roots
+
+#### Scenario: Git for Windows root uppercases the drive letter
+
+- **GIVEN** `git rev-parse --show-toplevel` prints `c:/repo`
+- **WHEN** the git adapter returns `rootDir()`
+- **THEN** the path is absolute
+- **AND** the drive letter is `C`
+- **AND** the adapter does not call `realpath`
+
+#### Scenario: Mercurial and Subversion roots share that normalization
+
+- **GIVEN** `hg root` or `svn info --show-item wc-root` prints `c:\repo`
+- **WHEN** that adapter returns `rootDir()`
+- **THEN** the drive letter is `C`
+- **AND** the value is still a valid working directory for a later CLI call
+
+#### Scenario: Null adapter still has no root
+
+- **WHEN** `NullVcsAdapter.rootDir()` is called
+- **THEN** it throws
+- **AND** it does not invent a root
+
+#### Scenario: Modified-file separators become slashes without collapsing parents
+
+- **GIVEN** a built-in adapter reports `src\..\secret` and `src\a.ts`
+- **WHEN** modified files are returned
+- **THEN** the paths use `/`
+- **AND** `src/../secret` is not collapsed to `secret`
+
+#### Scenario: Windows VCS spawns hide the console
+
+- **GIVEN** the process is running on Windows
+- **WHEN** the adapter spawns `git`, `hg`, or `svn`
+- **THEN** the console window is hidden

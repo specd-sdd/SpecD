@@ -68,8 +68,8 @@
 
 #### Scenario: commitlint rejects unknown scope
 
-- **WHEN** a commit message reads `feat(sdk): add client`
-- **THEN** the `commit-msg` hook must reject it — `sdk` is not a known scope
+- **WHEN** a commit message reads `feat(not-a-package): add client`
+- **THEN** the `commit-msg` hook must reject it — `not-a-package` is not a known scope
 
 #### Scenario: commitlint rejects AI co-author
 

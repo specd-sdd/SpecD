@@ -54,6 +54,10 @@ After `archive(change)`, the helper MUST upsert/append the archive list entry an
 
 If the configured pattern contains the literal token `{{change.workspace}}`, the constructor MUST throw `UnsupportedPatternError` (the same error type already thrown for `{{change.scope}}`), with a reason explaining that a change has no single primary workspace. Implementations MUST NOT silently leave the token unexpanded and MUST NOT fall back to `'default'`.
 
+### Requirement: Archive paths stay inside the repository root
+
+Resolved archive paths MUST be confined with the inside-root rule: after both paths are resolved, the candidate is inside when the relative path from the root is empty, or it does not start with `..` and is not absolute. Drive-letter case MUST NOT make an inside path look outside.
+
 ## Constraints
 
 - `FsArchiveRepository` is infrastructure-level and lives in `infrastructure/fs/`

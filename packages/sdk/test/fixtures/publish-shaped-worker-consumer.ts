@@ -1,3 +1,6 @@
+import { join } from 'node:path'
+import { tmpdir } from 'node:os'
+import { pathToFileURL } from 'node:url'
 import {
   GraphIndexProgressHandlerError,
   GraphIndexTaskContractError,
@@ -43,8 +46,8 @@ const task: GraphIndexTask<GraphIndexJsonValue, GraphIndexJsonValue, GraphIndexJ
   return input
 }
 const input: RunIsolatedGraphIndexInput<GraphIndexJsonValue, GraphIndexJsonValue> = {
-  storageRoot: '/tmp/specd-sdk-worker-contract',
-  taskModule: new URL('file:///tmp/specd-sdk-worker-task.js'),
+  storageRoot: join(tmpdir(), 'specd-sdk-worker-contract'),
+  taskModule: pathToFileURL(join(tmpdir(), 'specd-sdk-worker-task.js')),
   taskInput: value,
   onProgress: emitProgress,
 }

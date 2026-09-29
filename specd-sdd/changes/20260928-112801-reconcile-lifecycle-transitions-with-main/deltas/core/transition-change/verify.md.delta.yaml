@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'Existing transition and hook-selection scenarios remain valid.'

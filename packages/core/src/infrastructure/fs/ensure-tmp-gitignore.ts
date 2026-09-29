@@ -1,6 +1,7 @@
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
 import { isEnoent } from './is-enoent.js'
+import { normalizeNewlines } from './path-platform.js'
 import { writeFileAtomic } from './write-atomic.js'
 
 /** Canonical content ensured at `{configPath}/tmp/.gitignore`. */
@@ -27,7 +28,12 @@ export async function ensureTmpGitignore(configPath: string): Promise<void> {
     if (!isEnoent(err)) throw err
   }
 
-  if (existing === TMP_GITIGNORE_CONTENT) return
+  if (
+    existing !== null &&
+    normalizeNewlines(existing) === normalizeNewlines(TMP_GITIGNORE_CONTENT)
+  ) {
+    return
+  }
 
   await fs.mkdir(tmpDir, { recursive: true })
   await writeFileAtomic(gitignorePath, TMP_GITIGNORE_CONTENT)

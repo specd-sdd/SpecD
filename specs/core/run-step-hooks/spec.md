@@ -22,7 +22,7 @@ class RunStepHooks {
 }
 ```
 
-`HookRunner` uses `TemplateExpander.expandForShell()` internally — `RunStepHooks` does not call the expander directly. It builds the `TemplateVariables` map and passes it to `HookRunner.run()`.
+`HookRunner` expands developer `run:` commands with `TemplateExpander.expand()` and then translates quote syntax for the host shell. `RunStepHooks` does not call the expander directly. It builds the `TemplateVariables` map and passes it to `HookRunner.run()`.
 
 The external hook runner registry is indexed by accepted external type and is used only for explicit `external` hook entries.
 
@@ -132,7 +132,7 @@ When `phase` is `'post'`, `RunStepHooks` MUST execute all hooks sequentially in 
 
 - `hooks` — array of per-hook results, each with:
   - `id` (string) — the hook's `id` from the schema or project config
-  - `command` (string) — the expanded command string (after template variable substitution)
+  - `command` (string) — the schema `run:` command, still containing the developer's `{{...}}` tokens. `HookRunner` expands and translates that string. The result MUST NOT record a second expansion performed by `RunStepHooks`. An external hook records `external:<type>`.
   - `exitCode` (number) — the process exit code
   - `stdout` (string) — captured stdout
   - `stderr` (string) — captured stderr

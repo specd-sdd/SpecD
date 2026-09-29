@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'Existing repository scenarios remain valid; portable fixture changes are implementation-level.'

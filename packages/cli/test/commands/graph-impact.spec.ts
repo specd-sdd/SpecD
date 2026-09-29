@@ -105,6 +105,8 @@ function setup() {
           riskLevel: overallRisk,
           affectedFiles: [...affectedFileSet],
           affectedSymbols: rawAffectedSymbols,
+          affectedSpecs: [],
+
           affectedProcesses: [],
           symbols: results,
         }
@@ -188,6 +190,8 @@ describe('graph impact', () => {
         riskLevel: 'LOW',
         affectedFiles: [],
         affectedSymbols: [],
+        affectedSpecs: [],
+
         affectedProcesses: [],
         symbols: [],
       })
@@ -216,6 +220,8 @@ describe('graph impact', () => {
         riskLevel: 'LOW',
         affectedFiles: [],
         affectedSymbols: [],
+        affectedSpecs: [],
+
         affectedProcesses: [],
         symbols: [],
       })
@@ -248,6 +254,8 @@ describe('graph impact', () => {
         riskLevel: 'LOW',
         affectedFiles: [],
         affectedSymbols: [],
+        affectedSpecs: [],
+
         affectedProcesses: [],
         symbols: [],
       })
@@ -324,6 +332,8 @@ describe('graph impact', () => {
         riskLevel: 'LOW',
         affectedFiles: [],
         affectedSymbols: [],
+        affectedSpecs: [],
+
         affectedProcesses: [],
         symbols: [],
       })
@@ -344,6 +354,8 @@ describe('graph impact', () => {
         riskLevel: 'LOW',
         affectedFiles: [],
         affectedSymbols: [],
+        affectedSpecs: [],
+
         affectedProcesses: [],
         symbols: [],
       })
@@ -389,6 +401,8 @@ describe('graph impact', () => {
         riskLevel: 'LOW',
         affectedFiles: [],
         affectedSymbols: [],
+        affectedSpecs: [],
+
         affectedProcesses: [],
       })
 
@@ -419,6 +433,8 @@ describe('graph impact', () => {
         riskLevel: 'LOW',
         affectedFiles: [],
         affectedSymbols: [],
+        affectedSpecs: [],
+
         affectedProcesses: [],
         symbols: [],
       })
@@ -451,6 +467,8 @@ describe('graph impact', () => {
         riskLevel: 'LOW',
         affectedFiles: [],
         affectedSymbols: [],
+        affectedSpecs: [],
+
         affectedProcesses: [],
         symbols: [],
       })
@@ -487,6 +505,8 @@ describe('graph impact', () => {
         affectedSymbols: [
           { id: 'sym1', name: 'handleLogin', filePath: 'src/login.ts', line: 12, depth: 1 },
         ],
+        affectedSpecs: [],
+
         affectedProcesses: [],
         symbols: [],
       })
@@ -518,6 +538,8 @@ describe('graph impact', () => {
         riskLevel: 'LOW',
         affectedFiles: [],
         affectedSymbols: [],
+        affectedSpecs: [],
+
         affectedProcesses: [],
         symbols: [],
       })
@@ -541,6 +563,8 @@ describe('graph impact', () => {
         affectedSymbols: [
           { id: 'sym1', name: 'handleLogin', filePath: 'core:src/login.ts', line: 12, depth: 1 },
         ],
+        affectedSpecs: [],
+
         affectedProcesses: [],
         symbols: [],
       })
@@ -738,6 +762,8 @@ describe('graph impact', () => {
         riskLevel: 'MEDIUM',
         affectedFiles: ['f1.ts', 'f2.ts'],
         affectedSymbols: [],
+        affectedSpecs: [],
+
         affectedProcesses: [],
         symbols: [],
       })
@@ -790,6 +816,8 @@ describe('graph impact', () => {
         riskLevel: 'MEDIUM',
         affectedFiles: ['core:src/login.ts'],
         affectedSymbols: [],
+        affectedSpecs: [],
+
         affectedProcesses: [],
       })
 
@@ -804,6 +832,52 @@ describe('graph impact', () => {
 
       const out = getStdout()
       expect(out).toContain('Impact analysis for function validate (packages/core/src/auth.ts:10)')
+    })
+
+    it('renders provider-derived specs for SpecRepository without CLI reconstruction', async () => {
+      const { mockProvider, getStdout } = setup()
+      const symbolId = 'core:src/spec-repository.ts:interface:SpecRepository:10:0'
+      mockProvider.resolveSymbolSelector.mockResolvedValue({
+        status: 'resolved',
+        match: { symbolId, filePath: 'core:src/spec-repository.ts', matchKind: 'qualified' },
+      })
+      mockProvider.analyzeImpact.mockResolvedValue({
+        target: symbolId,
+        directDependents: 0,
+        indirectDependents: 0,
+        transitiveDependents: 0,
+        riskLevel: 'LOW',
+        affectedFiles: [],
+        affectedSymbols: [],
+        affectedSpecs: ['core:spec-repository'],
+        affectedProcesses: [],
+      })
+
+      await makeImpactProgram().parseAsync([
+        'node',
+        'specd',
+        'graph',
+        'impact',
+        '--symbol',
+        'SpecRepository',
+        '--type',
+        'specs',
+        '--format',
+        'json',
+      ])
+
+      expect(JSON.parse(getStdout())).toMatchObject({
+        impact: {
+          affectedFiles: [],
+          affectedSymbols: [],
+          affectedSpecs: ['core:spec-repository'],
+        },
+      })
+      expect(mockProvider.analyzeImpact).toHaveBeenCalledWith(symbolId, 'upstream', 3, {
+        types: ['specs'],
+        workspaces: [],
+        excludeWorkspaces: [],
+      })
     })
 
     it('reports multiple matching symbols', async () => {
@@ -852,6 +926,8 @@ describe('graph impact', () => {
         riskLevel: 'LOW',
         affectedFiles: [],
         affectedSymbols: [],
+        affectedSpecs: [],
+
         affectedProcesses: [],
       })
 
@@ -889,6 +965,117 @@ describe('graph impact', () => {
       expect(out).toContain('No symbol found matching "nonexistent".')
       expect(process.exit).not.toHaveBeenCalledWith(1)
     })
+
+    it('analyzes one unanchored EditChange.execute and does not open storage itself', async () => {
+      const { mockProvider, getStdout } = setup()
+      const sym = {
+        id: 'core:src/edit.ts:method:execute:2:2',
+        name: 'execute',
+        kind: 'method',
+        filePath: 'core:src/edit.ts',
+        line: 2,
+        column: 2,
+      }
+      mockProvider.resolveSymbolSelector.mockResolvedValue({
+        status: 'resolved',
+        match: { symbolId: sym.id, filePath: sym.filePath, matchKind: 'qualified' },
+      })
+      mockProvider.analyzeImpact.mockResolvedValue({
+        target: sym.id,
+        directDependents: 0,
+        indirectDependents: 0,
+        transitiveDependents: 0,
+        riskLevel: 'LOW',
+        affectedFiles: [],
+        affectedSymbols: [],
+        affectedSpecs: [],
+        affectedProcesses: [],
+      })
+
+      await makeImpactProgram().parseAsync([
+        'node',
+        'specd',
+        'graph',
+        'impact',
+        '--symbol',
+        'EditChange.execute',
+      ])
+
+      expect(getStdout()).not.toContain('No symbol found matching "EditChange.execute".')
+      expect(process.exit).not.toHaveBeenCalledWith(1)
+      expect(mockProvider.analyzeImpact).toHaveBeenCalledWith(sym.id, 'upstream', 3)
+      expect(mockProvider.resolveSymbolSelector).toHaveBeenCalledWith('EditChange.execute')
+      expect(mockProvider).not.toHaveProperty('database')
+      expect(JSON.stringify(mockProvider.resolveSymbolSelector.mock.calls)).not.toContain(
+        'package.json',
+      )
+    })
+
+    it('reports ambiguous owner-qualified text without guessing a target', async () => {
+      const { mockProvider, getStdout } = setup()
+      mockProvider.resolveSymbolSelector.mockResolvedValue({
+        status: 'ambiguous',
+        candidates: [
+          { symbolId: 'a', filePath: 'core:src/a.ts', matchKind: 'name' },
+          { symbolId: 'b', filePath: 'core:src/b.ts', matchKind: 'name' },
+        ],
+        totalCandidates: 2,
+      })
+      mockProvider.getSymbolsByIds.mockResolvedValue([
+        { id: 'a', name: 'execute', kind: 'method', filePath: 'core:src/a.ts', line: 1, column: 0 },
+        { id: 'b', name: 'execute', kind: 'method', filePath: 'core:src/b.ts', line: 1, column: 0 },
+      ])
+
+      await makeImpactProgram().parseAsync([
+        'node',
+        'specd',
+        'graph',
+        'impact',
+        '--symbol',
+        'Owner.execute',
+      ])
+
+      expect(getStdout()).toContain('2 symbols exactly match "Owner.execute"')
+      expect(mockProvider.analyzeImpact).not.toHaveBeenCalled()
+    })
+
+    it('still reports every bare validate match', async () => {
+      const { mockProvider, getStdout } = setup()
+      const symbols = ['src/a.ts', 'src/b.ts', 'src/c.ts'].map((filePath, index) => ({
+        id: `${filePath}:function:validate:${String(index)}:0`,
+        name: 'validate',
+        kind: 'function',
+        filePath,
+        line: index + 1,
+        column: 0,
+      }))
+      mockProvider.resolveSymbolSelector.mockResolvedValue({
+        status: 'ambiguous',
+        candidates: symbols.map((symbol) => ({
+          symbolId: symbol.id,
+          filePath: symbol.filePath,
+          matchKind: 'name' as const,
+        })),
+        totalCandidates: symbols.length,
+      })
+      mockProvider.getSymbolsByIds.mockResolvedValue(symbols)
+
+      await makeImpactProgram().parseAsync([
+        'node',
+        'specd',
+        'graph',
+        'impact',
+        '--symbol',
+        'validate',
+      ])
+
+      const out = getStdout()
+      expect(out).toContain('3 symbols exactly match "validate"')
+      expect(out).toContain('src/a.ts')
+      expect(out).toContain('src/b.ts')
+      expect(out).toContain('src/c.ts')
+      expect(mockProvider.analyzeImpact).not.toHaveBeenCalled()
+    })
   })
 
   describe('multi-file aggregation', () => {
@@ -920,6 +1107,8 @@ describe('graph impact', () => {
             riskLevel: 'MEDIUM',
             affectedFiles: ['src/login.ts', 'src/session.ts'],
             affectedSymbols: [],
+            affectedSpecs: [],
+
             affectedProcesses: [],
             symbols: [
               {
@@ -938,6 +1127,8 @@ describe('graph impact', () => {
           riskLevel: 'LOW',
           affectedFiles: ['src/store.ts'],
           affectedSymbols: [],
+          affectedSpecs: [],
+
           affectedProcesses: [],
           symbols: [
             {
@@ -994,6 +1185,8 @@ describe('graph impact', () => {
             riskLevel: 'LOW',
             affectedFiles: ['src/x.ts'],
             affectedSymbols: [],
+            affectedSpecs: [],
+
             affectedProcesses: [],
             symbols: [],
           }
@@ -1006,6 +1199,8 @@ describe('graph impact', () => {
           riskLevel: 'LOW',
           affectedFiles: ['src/y.ts'],
           affectedSymbols: [],
+          affectedSpecs: [],
+
           affectedProcesses: [],
           symbols: [],
         }
@@ -1040,6 +1235,8 @@ describe('graph impact', () => {
         riskLevel: 'LOW',
         affectedFiles: ['src/login.ts'],
         affectedSymbols: [{ id: 'sym1', name: 'handleLogin', filePath: 'src/login.ts' }],
+        affectedSpecs: [],
+
         affectedProcesses: [],
         symbols: [],
       })
@@ -1096,6 +1293,8 @@ describe('graph impact', () => {
             riskLevel: 'LOW',
             affectedFiles: ['core:src/x.ts'],
             affectedSymbols: [],
+            affectedSpecs: [],
+
             affectedProcesses: [],
             symbols: [],
           }
@@ -1108,6 +1307,8 @@ describe('graph impact', () => {
           riskLevel: 'LOW',
           affectedFiles: [],
           affectedSymbols: [],
+          affectedSpecs: [],
+
           affectedProcesses: [],
           symbols: [],
         }
@@ -1162,6 +1363,8 @@ describe('graph impact', () => {
         riskLevel: 'LOW',
         affectedFiles: [],
         affectedSymbols: [],
+        affectedSpecs: [],
+
         affectedProcesses: [],
       })
 
@@ -1208,7 +1411,7 @@ describe('graph impact', () => {
         name: 'createApi',
         space: 'value',
         ownerId: undefined,
-        memberForm: undefined,
+        memberSemantics: undefined,
       }
       const binding = {
         id: 'public-api',
@@ -1257,6 +1460,8 @@ describe('graph impact', () => {
         riskLevel: 'LOW',
         affectedFiles: [],
         affectedSymbols: [],
+        affectedSpecs: [],
+
         affectedProcesses: [],
       }
       mockProvider.analyzePublicBindingImpact.mockResolvedValue({
@@ -1301,6 +1506,8 @@ describe('graph impact', () => {
         riskLevel: 'LOW',
         affectedFiles: [],
         affectedSymbols: [],
+        affectedSpecs: [],
+
         affectedProcesses: [],
         symbols: [],
         coveringSpecs: [
@@ -1358,6 +1565,8 @@ describe('graph impact', () => {
         riskLevel: 'LOW',
         affectedFiles: [],
         affectedSymbols: [],
+        affectedSpecs: [],
+
         affectedProcesses: [],
         symbols: [],
         coveringSpecs,
@@ -1376,6 +1585,358 @@ describe('graph impact', () => {
 
       expect(JSON.parse(getStdout()).coveringSpecs).toEqual(coveringSpecs)
       expect(mockProvider).not.toHaveProperty('getCoveringSpecsForFile')
+    })
+  })
+
+  describe('impact result filters', () => {
+    it('normalizes comma-separated types and kinds plus repeatable workspaces once', async () => {
+      const { mockProvider } = setup()
+      mockProvider.analyzeFileImpact.mockResolvedValue({
+        target: 'core:src/auth.ts',
+        directDependents: 0,
+        indirectDependents: 0,
+        transitiveDependents: 0,
+        riskLevel: 'LOW',
+        affectedFiles: [],
+        affectedSymbols: [],
+        affectedSpecs: [],
+
+        affectedProcesses: [],
+        symbols: [],
+        coveringSpecs: [],
+      })
+
+      await makeImpactProgram().parseAsync([
+        'node',
+        'specd',
+        'graph',
+        'impact',
+        '--file',
+        'src/auth.ts',
+        '--type',
+        ' files, symbols,files ',
+        '--kind',
+        'function,method,function',
+        '--workspace',
+        ' core ',
+        '--workspace',
+        'cli',
+        '--workspace',
+        'core',
+        '--exclude-workspace',
+        'cli',
+        '--exclude-workspace',
+        ' cli ',
+      ])
+
+      expect(mockProvider.analyzeFileImpact).toHaveBeenCalledWith(
+        'core:src/auth.ts',
+        'upstream',
+        3,
+        {
+          types: ['files', 'symbols'],
+          kinds: ['function', 'method'],
+          workspaces: ['core', 'cli'],
+          excludeWorkspaces: ['cli'],
+        },
+      )
+    })
+
+    it('rejects invalid types before resolving context or opening the provider', async () => {
+      const { getStderr } = setup()
+
+      try {
+        await makeImpactProgram().parseAsync([
+          'node',
+          'specd',
+          'graph',
+          'impact',
+          '--file',
+          'src/auth.ts',
+          '--type',
+          'files,documents',
+        ])
+      } catch {
+        /* ExitSentinel from process.exit(1) */
+      }
+
+      expect(getStderr()).toContain(
+        'invalid impact type "documents". Expected one or more of: files, symbols, specs',
+      )
+      expect(process.exit).toHaveBeenCalledWith(1)
+      expect(resolveGraphCliContext).not.toHaveBeenCalled()
+      expect(withProvider).not.toHaveBeenCalled()
+    })
+
+    it('rejects --kind when explicit result types omit symbols before provider access', async () => {
+      const { getStderr } = setup()
+
+      try {
+        await makeImpactProgram().parseAsync([
+          'node',
+          'specd',
+          'graph',
+          'impact',
+          '--file',
+          'src/auth.ts',
+          '--type',
+          'files',
+          '--kind',
+          'function',
+        ])
+      } catch {
+        /* ExitSentinel from process.exit(1) */
+      }
+
+      expect(getStderr()).toContain('--kind requires --type to include symbols')
+      expect(process.exit).toHaveBeenCalledWith(1)
+      expect(resolveGraphCliContext).not.toHaveBeenCalled()
+      expect(withProvider).not.toHaveBeenCalled()
+    })
+
+    it('delegates the exact filter to symbol, spec, and multiple-file target branches', async () => {
+      const { mockProvider } = setup()
+      const filter = {
+        types: ['files'] as const,
+        kinds: undefined,
+        workspaces: ['core'],
+        excludeWorkspaces: [],
+      }
+      const impact = {
+        target: 'target',
+        directDependents: 0,
+        indirectDependents: 0,
+        transitiveDependents: 0,
+        riskLevel: 'LOW',
+        affectedFiles: [],
+        affectedSymbols: [],
+        affectedSpecs: [],
+
+        affectedProcesses: [],
+      }
+      mockProvider.resolveSymbolSelector.mockResolvedValue({
+        status: 'resolved',
+        match: {
+          symbolId: 'core:src/auth.ts:function:validate:10:0',
+          filePath: 'core:src/auth.ts',
+          matchKind: 'full-id',
+        },
+      })
+      mockProvider.analyzeImpact.mockResolvedValue(impact)
+      mockProvider.getSpec.mockResolvedValue({ specId: 'core:change' })
+      mockProvider.analyzeSpecImpact.mockResolvedValue({ ...impact, affectedSpecs: [] })
+      mockProvider.resolveFileSelector.mockResolvedValueOnce([
+        {
+          canonicalPath: 'core:src/a.ts',
+          configRelativePath: 'packages/core/src/a.ts',
+          workspace: 'core',
+          kind: 'file',
+        },
+      ])
+      mockProvider.resolveFileSelector.mockResolvedValueOnce([
+        {
+          canonicalPath: 'core:src/b.ts',
+          configRelativePath: 'packages/core/src/b.ts',
+          workspace: 'core',
+          kind: 'file',
+        },
+      ])
+      mockProvider.analyzeFilesImpact.mockResolvedValue({
+        ...impact,
+        symbols: [
+          { ...impact, target: 'core:src/a.ts', symbols: [], coveringSpecs: [] },
+          { ...impact, target: 'core:src/b.ts', symbols: [], coveringSpecs: [] },
+        ],
+        coveringSpecs: [],
+      })
+
+      await makeImpactProgram().parseAsync([
+        'node',
+        'specd',
+        'graph',
+        'impact',
+        '--symbol',
+        'validate',
+        '--type',
+        'files',
+        '--workspace',
+        'core',
+      ])
+      await makeImpactProgram().parseAsync([
+        'node',
+        'specd',
+        'graph',
+        'impact',
+        '--spec',
+        'core:change',
+        '--type',
+        'files',
+        '--workspace',
+        'core',
+      ])
+      await makeImpactProgram().parseAsync([
+        'node',
+        'specd',
+        'graph',
+        'impact',
+        '--file',
+        'src/a.ts',
+        '--file',
+        'src/b.ts',
+        '--type',
+        'files',
+        '--workspace',
+        'core',
+      ])
+
+      expect(mockProvider.analyzeImpact).toHaveBeenCalledWith(
+        'core:src/auth.ts:function:validate:10:0',
+        'upstream',
+        3,
+        filter,
+      )
+      expect(mockProvider.analyzeSpecImpact).toHaveBeenCalledWith(
+        'core:change',
+        'upstream',
+        3,
+        filter,
+      )
+      expect(mockProvider.analyzeFilesImpact).toHaveBeenCalledWith(
+        ['core:src/a.ts', 'core:src/b.ts'],
+        'upstream',
+        3,
+        filter,
+      )
+    })
+
+    it('delegates filters for public exports and preserves provider membership in JSON output', async () => {
+      const { mockProvider, getStdout } = setup()
+      const target = {
+        id: 'logical-api',
+        workspace: 'core',
+        surface: 'core:src/api.ts',
+        name: 'createApi',
+        space: 'value',
+      }
+      const binding = {
+        id: 'public-api',
+        surface: 'core:src/index.ts',
+        exportedName: 'createApi',
+        space: 'value',
+        targetId: target.id,
+      }
+      mockProvider.resolveSymbolReference.mockResolvedValue({
+        request: { workspace: 'core', requested: 'createApi', publicSurface: 'core:src/index.ts' },
+        status: 'resolved',
+        reasonCode: null,
+        health: { fresh: true, complete: true, reasonCodes: [] },
+        target,
+        candidates: [],
+        path: [],
+      })
+      mockProvider.getExactPublicBinding.mockResolvedValue({ binding, declarations: [] })
+      const providerImpact = {
+        target: binding.id,
+        directDependents: 1,
+        indirectDependents: 0,
+        transitiveDependents: 0,
+        riskLevel: 'LOW',
+        affectedFiles: ['core:src/kept.ts'],
+        affectedSymbols: [
+          {
+            id: 'unexpected-but-provider-owned',
+            name: 'kept',
+            filePath: 'core:src/kept.ts',
+            line: 1,
+            depth: 1,
+          },
+        ],
+        affectedSpecs: [],
+
+        affectedProcesses: [],
+      }
+      mockProvider.analyzePublicBindingImpact.mockResolvedValue({
+        binding,
+        target,
+        path: [],
+        bindingImpact: providerImpact,
+        canonicalImpact: providerImpact,
+      })
+
+      await makeImpactProgram().parseAsync([
+        'node',
+        'specd',
+        'graph',
+        'impact',
+        '--export',
+        'createApi',
+        '--from',
+        'core:src/index.ts',
+        '--type',
+        'files',
+        '--workspace',
+        'core',
+        '--format',
+        'json',
+      ])
+
+      expect(mockProvider.analyzePublicBindingImpact).toHaveBeenCalledWith(
+        expect.any(Object),
+        'upstream',
+        3,
+        { types: ['files'], kinds: undefined, workspaces: ['core'], excludeWorkspaces: [] },
+      )
+      const rendered = JSON.parse(getStdout())
+      expect(rendered.bindingImpact.affectedSymbols).toEqual(providerImpact.affectedSymbols)
+      expect(rendered.bindingImpact.affectedFiles).toEqual(['core:src/kept.ts'])
+    })
+
+    it('renders affectedSpecs in text format for symbol and public-binding targets (D-1)', async () => {
+      const { mockProvider, getStdout } = setup()
+      mockProvider.resolveSymbolSelector.mockResolvedValue({
+        status: 'resolved',
+        match: {
+          symbolId: 'core:src/auth.ts:function:validate:10:0',
+          filePath: 'core:src/auth.ts',
+          matchKind: 'full-id',
+        },
+      })
+      mockProvider.getSymbol.mockResolvedValue({
+        id: 'core:src/auth.ts:function:validate:10:0',
+        name: 'validate',
+        kind: 'function',
+        filePath: 'core:src/auth.ts',
+        line: 10,
+        character: 0,
+      })
+      mockProvider.analyzeImpact.mockResolvedValue({
+        target: 'core:src/auth.ts:function:validate:10:0',
+        directDependents: 1,
+        indirectDependents: 0,
+        transitiveDependents: 0,
+        riskLevel: 'LOW',
+        affectedFiles: ['core:src/auth.ts'],
+        affectedSymbols: [],
+        affectedSpecs: ['core:auth-spec', 'core:session-spec'],
+        affectedProcesses: [],
+      })
+
+      await makeImpactProgram().parseAsync([
+        'node',
+        'specd',
+        'graph',
+        'impact',
+        '--symbol',
+        'validate',
+        '--format',
+        'text',
+      ])
+
+      const stdout = getStdout()
+      expect(stdout).toContain('Affected specs:   2')
+      expect(stdout).toContain('Affected specs:')
+      expect(stdout).toContain('  core:auth-spec')
+      expect(stdout).toContain('  core:session-spec')
     })
   })
 })

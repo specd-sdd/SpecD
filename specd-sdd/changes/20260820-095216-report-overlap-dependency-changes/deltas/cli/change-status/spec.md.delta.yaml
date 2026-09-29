@@ -1,0 +1,19 @@
+- op: added
+  description: 'Render overlap dependency additions and removals in every status format'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Specs and dependencies section'
+  content: |
+    ### Requirement: Overlap dependency-change display
+
+    When `review.reason` is `spec-overlap-conflict`, text output MUST render every `review.overlapDetail` entry with its archived change name and overlapping spec IDs.
+
+    For every non-empty `dependencyChanges` entry, text output MUST visibly render the affected `specId` and separate `added` and `removed` dependency lists. When either side is empty, it MUST render `(none)` for that side rather than omit the meaning. An overlap entry with no dependency changes MUST retain the existing concise archived-change/spec display and MUST NOT print an empty dependency-change section.
+
+    JSON and TOON output MUST serialize `dependencyChanges` inside each `review.overlapDetail` entry without recomputing or parsing it. The structured output MUST preserve the normalized ordering returned by Core and MUST include an empty array for legacy or unchanged overlap entries.
+
+    Status presentation MUST treat this detail as informational review evidence. It MUST NOT mutate `specDependsOn` or suggest that dependency reconciliation occurred automatically.

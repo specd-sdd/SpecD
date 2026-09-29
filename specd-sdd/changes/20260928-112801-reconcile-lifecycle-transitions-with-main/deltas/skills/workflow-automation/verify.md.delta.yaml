@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'Existing workflow sequencing scenarios remain valid.'

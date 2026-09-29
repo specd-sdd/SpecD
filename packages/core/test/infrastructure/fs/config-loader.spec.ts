@@ -103,6 +103,117 @@ function createLoader(options: FsConfigLoaderOptions): FsConfigLoader {
 // ---------------------------------------------------------------------------
 
 describe('FsConfigLoader', () => {
+  it('rejects a workspace named like a Windows device', async () => {
+    const configPath = await writeConfig(`
+schema: "@specd/schema-std"
+workspaces:
+  default:
+    specs:
+      adapter: fs
+      fs:
+        path: specs
+  con:
+    specs:
+      adapter: fs
+      fs:
+        path: con-specs
+storage:
+  changes:
+    adapter: fs
+    fs:
+      path: .specd/changes
+  drafts:
+    adapter: fs
+    fs:
+      path: .specd/drafts
+  discarded:
+    adapter: fs
+    fs:
+      path: .specd/discarded
+  archive:
+    adapter: fs
+    fs:
+      path: .specd/archive
+`)
+    const loader = createLoader({ configPath })
+    await expect(loader.load()).rejects.toThrow(/Windows device name/)
+  })
+
+  it('rejects workspaces named prn and aux', async () => {
+    for (const name of ['prn', 'aux']) {
+      const configPath = await writeConfig(`
+schema: "@specd/schema-std"
+workspaces:
+  default:
+    specs:
+      adapter: fs
+      fs:
+        path: specs
+  ${name}:
+    specs:
+      adapter: fs
+      fs:
+        path: ${name}-specs
+storage:
+  changes:
+    adapter: fs
+    fs:
+      path: .specd/changes
+  drafts:
+    adapter: fs
+    fs:
+      path: .specd/drafts
+  discarded:
+    adapter: fs
+    fs:
+      path: .specd/discarded
+  archive:
+    adapter: fs
+    fs:
+      path: .specd/archive
+`)
+      const loader = createLoader({ configPath })
+      await expect(loader.load()).rejects.toThrow(/Windows device name/)
+    }
+  })
+
+  it('accepts a workspace whose name only starts like a Windows device', async () => {
+    const configPath = await writeConfig(`
+schema: "@specd/schema-std"
+workspaces:
+  default:
+    specs:
+      adapter: fs
+      fs:
+        path: specs
+  con-foo:
+    codeRoot: .
+    specs:
+      adapter: fs
+      fs:
+        path: con-foo-specs
+storage:
+  changes:
+    adapter: fs
+    fs:
+      path: .specd/changes
+  drafts:
+    adapter: fs
+    fs:
+      path: .specd/drafts
+  discarded:
+    adapter: fs
+    fs:
+      path: .specd/discarded
+  archive:
+    adapter: fs
+    fs:
+      path: .specd/archive
+`)
+    const loader = createLoader({ configPath })
+    await expect(loader.load()).resolves.toBeDefined()
+  })
+
   describe('Requirement: Logging configuration', () => {
     it('defaults logging level to info when logging section is absent', async () => {
       const configPath = await writeConfig(minimalYaml())
@@ -215,6 +326,50 @@ storage:
       const config = await loader.load()
 
       expect(config.workspaces[0]?.specsAdapter).toEqual({
+        adapter: 'git',
+        config: { remote: 'origin' },
+      })
+    })
+
+    it('skips the inside-root check for non-fs storage and specs bindings', async () => {
+      execSync('git init', { cwd: tmpDir, stdio: 'ignore' })
+      const outside = path.resolve(tmpDir, '..', `specd-outside-${path.basename(tmpDir)}`)
+      const configPath = await writeConfig(
+        `
+schema: "@specd/schema-std"
+specdPath: ${JSON.stringify(outside)}
+configPath: .specd/config
+workspaces:
+  default:
+    specs:
+      adapter: git
+      git:
+        remote: origin
+storage:
+  changes:
+    adapter: git
+    git:
+      remote: origin
+  drafts:
+    adapter: fs
+    fs:
+      path: .specd/drafts
+  discarded:
+    adapter: fs
+    fs:
+      path: .specd/discarded
+  archive:
+    adapter: fs
+    fs:
+      path: .specd/archive
+`.trim(),
+      )
+
+      const loader = createLoader({ configPath })
+      const config = await loader.load()
+
+      expect(config.workspaces[0]?.isExternal).toBe(false)
+      expect(config.storage.changesAdapter).toEqual({
         adapter: 'git',
         config: { remote: 'origin' },
       })

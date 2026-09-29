@@ -12,27 +12,10 @@
     "core:spec-repository-port",
     "core:list-workspaces",
     "code-graph:document-model",
-    "core:get-spec-metadata"
+    "core:get-spec-metadata",
+    "code-graph:sqlite-graph-store"
   ],
   "implementation": [
-    {
-      "file": "code-graph:src/public.ts"
-    },
-    {
-      "file": "code-graph:src/domain/value-objects/index.ts"
-    },
-    {
-      "file": "code-graph:src/domain/value-objects/index-result.ts",
-      "symbols": [
-        "IndexCoverageDiagnosticReason",
-        "IndexCoverageDiagnostic",
-        "IndexRunCoverageSummary",
-        "IndexResult"
-      ]
-    },
-    {
-      "file": "code-graph:src/index.ts"
-    },
     {
       "file": "code-graph:src/application/use-cases/index-code-graph.ts",
       "symbols": ["IndexCodeGraph"]
@@ -42,51 +25,42 @@
       "symbols": ["projectSpecCoverage"]
     },
     {
-      "file": "code-graph:src/composition/code-graph-provider.ts",
-      "symbols": ["CodeGraphProviderImpl"]
-    },
-    {
-      "file": "code-graph:test/application/services/project-spec-coverage.spec.ts"
-    },
-    {
-      "file": "code-graph:test/application/use-cases/workspace-indexing.spec.ts"
-    },
-    {
-      "file": "code-graph:test/application/use-cases/index-project-graph-integration.spec.ts"
+      "file": "code-graph:src/application/use-cases/in-memory-index-session.ts",
+      "symbols": ["InMemoryIndexSession"]
     }
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "IndexCodeGraph extrae en dos pases, detecta incompatibilidades y persiste código, documentos y specs en bulk.",
+      "value": "IndexCodeGraph discovers, diffs, extracts, indexes specs, and persists graph incrementally or via fingerprint full rebuild.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:c33d4c342751510911da9e93208700b42adec1e156ea771716bba85d69a322d3",
-          "lastModified": "2026-08-16T10:48:01.560Z"
+          "hash": "sha256:c800e87999d9a4d8be03c29699402fe97d335fddde87b906666753ae75f06bf8",
+          "lastModified": "2026-09-25T16:15:32.704Z"
         },
         "verify.md": {
-          "hash": "sha256:c56966849ab60e45ae5022dc06588c68828227776a57a199a355d439c6cb2ece",
-          "lastModified": "2026-08-16T10:48:01.592Z"
+          "hash": "sha256:b37c79385a324654e47ea47090a12ead4eda2093e01a05bd25f47da0f96a6744",
+          "lastModified": "2026-09-25T16:15:32.746Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# Indexer\n\n## Rules\n\n- IndexCodeGraph discovers workspaces/resources, diffs hashes/fingerprints, extracts Pass 1, resolves Pass 2, indexes specs with SpecRepository/GetSpecMetadata, bulk persists and records ref/observations.\n- Fingerprint: code-graph version + canonical workspace hash. Fingerprint/backend mismatch causes provider recreate() full rebuild with reason.\n- Discovery merges include/exclude/allowed paths/gitignore and excludes spec root from docs. Decode UTF-8/UTF-16LE/UTF-16BE/Windows-1252 sans NUL; filter binaries.\n- Pass 1 all workspaces: FileAnalysis, DEFINES/EXPORTS. Then Pass 2 from in-memory facts only: IMPORTS, CALLS, CONSTRUCTS, USES_TYPE, EXTENDS, IMPLEMENTS, OVERRIDES; deterministic, no self/unresolved/store queries.\n- Specs: repo.list(), metadata fingerprint, optimizedDescription-preferred title/description, coverage/DEPENDS_ON. One bulkLoad(), then rebuildFtsIndexes().\n- Package resolution via LanguageAdapter.getPackageIdentity. onProgress 0–100; per-file errors collected, infrastructure faults abort. IndexResult returns counts/errors/duration/workspaces/ref/fingerprint/rebuild fields.\n\n## Constraints\n\n- Store pre-opened; indexer no lifecycle/backend ownership.\n- Forward-slash paths; supplied excludePaths replaces defaults; gitignore priority.\n- No language rules here; specs exclusively SpecRepository.",
+      "value": "# Indexer\n\n## Rules\n\n- `IndexCodeGraph`: app entry; Discover → Diff → Extract → Spec Index → Store → Clean → Persist `lastIndexedRef`. Includes `EXTENDS`/`IMPLEMENTS`/`OVERRIDES`. Consumes `SpecRepository` (`list`, `artifact`, `readPersistedState`) + `GetSpecMetadata`; no raw sidecars/metadata snapshots when materialized projection available.\n- Fingerprint = effective `@specd/code-graph` version + canonical workspace-object hash + effective discovery config (`graph.includePaths`/`excludePaths`, workspace `allowedPaths`/`excludePaths`/`respectGitignore`, synthetic `specsPath` exclusions). Mismatch → full rebuild (recreate store preferred; unsafe backend MAY fail-fast needing force). Derivation/schema incompatible → visible destructive rebuild + generation rotate; read paths MUST NOT silent-repair/empty-serve.\n- Incremental (fingerprint match, non-force): process New/Changed/Deleted only; hash-match + needed persisted resource exists → skip. Delete scoped to indexed workspaces. Force: no skip from any persisted artifact; full reconsideration. Changed removed before `bulkLoad()` (COPY insert-only).\n- Discovery: workspace (`codeRoot`, allowed, global+spec-root+ws excludes, prefix `{workspace}:`) + global (`includePaths`, prefix `root:`, only outside all `codeRoot`). Adapter → `FileNode`; text → `DocumentNode`; specs via spec indexing only (synthetic exclude `specsPath`). Paths `/` (no collapse `.`/`..`). Drive keys `^[A-Za-z]:[/\\\\]` or `^[A-Za-z]:$` are path not workspace; PHP `\\` not graph identity.\n- `discoverFiles`: `respectGitignore` default true absolute priority; `excludePaths` default `.git/`/`.hg/`/`.svn/`; `vcsRoot` from `VcsAdapter.rootDir()` or explicit `null` — never probe. Binary-ext filter before decode. Decode: BOM utf-8/16le/16be → utf-8 → utf-16 by NUL layout → windows-1252 if no NUL → skip.\n- Two-pass + run-scoped `IndexSession`: Pass 1 per-ws `FileAnalysis`, register facts, `DEFINES`/`EXPORTS`; Pass 2 global resolve `IMPORTS`/`CALLS`/`CONSTRUCTS`/`USES_TYPE`/hierarchy from session — no reparse/store queries. Then once `GraphStore.bulkLoad()`, then `rebuildFtsIndexes()`.\n- Session: compact IDs/facts for files, analyses, symbols, documents, specs, lookups, deduped relations; common adapter API + compact caches OK; never raw maps/store schema/persisted IDs/final semantics. No retained ASTs across run.\n- Scoped env (shared, not adapter-local): scopes, shadowing, bindings, receivers, call candidates; persist only deterministic relations. No language rules in `IndexCodeGraph`; self-relations dropped; unresolved/ambiguous → no relation (optional diagnostic).\n- Coverage: project canonical `readPersistedState` against commit generation. File link → `COVERS_FILE` if target exists; symbol link → `COVERS_SYMBOL` only unique logical-symbol resolve (not occurrence ID). Reproject on code/spec change; never guess/`COVERS_FILE` fallback. Stable per-link diagnostic. Persist coverage outcomes (hash/excluded/unsupported/parse-fail/partial) beyond transient `IndexResult`.\n- Specs: `count`/`list`; `GetSpecMetadata` + `metadataFingerprint` for skip; title/description from materialization; one `readPersistedState` for coverage/deps. Prefer non-empty `optimizedDescription` for BM25/display.\n- Packages: `adapter.getPackageIdentity(codeRoot)` per ws, first identity wins; non-relative imports → package→workspace map + session.\n- Memory: chunks `IndexOptions.chunkBytes` default 20MB; optional staging under graph temp, run-scoped, clean success (+ preferably failure). Build declaration/logical-symbol/import/public-binding indexes once; bounded batches; no full scans/N+1. Retain indexed text + construct/name ranges through persistence.\n- Observations: success atomically replaces file/doc/spec observations (`stale: false`), VCS-scope evidence; clear stale latches only on full commit. Fail/partial MUST NOT clear stale. Prune removed/obsolete in same generation.\n- Incremental facts: mtime/size fast-path; hash authoritative. Re-extract new/changed + transitive importer/relation/hierarchy/public-route closure. Addition-only may re-extract unresolved-import candidates without content-indexed classify. Unchanged gen: keep ref facts, update metadata/freshness, no FTS rebuild. Force / incompatible / empty-graph only for full corpus replace. Equivalent source → equivalent graph.\n- Progress `onProgress(percent, phase)`: 0–5 discovery/hash, 5–7 diff/cleanup, 7–50 Pass1, 50–80 Pass2, 80–83 specs, 83–95 bulk, 100 done; per-item detail; fire on phase close. Debug phase timings + separate relation/persist/search timings.\n- Per-file errors collect+continue; infra aborts. `IndexResult`: counters, errors, duration, workspace breakdown, `vcsRef`, `graphFingerprint`, `fullRebuild`, `fullRebuildReason`.\n\n## Constraints\n\n- Store opened by caller; indexer owns no lifecycle/backend.\n- Default excludes if no `excludePaths`: `node_modules/`, `.git/`, `.specd/`, `dist/`, `build/`, `coverage/`, `.next/`, `.nuxt/`; provided option replaces entirely.\n- `respectGitignore` true → gitignore absolute over `excludePaths`.\n- Pass 2 after Pass 1 all files/all workspaces; no interleave. Specs via `workspace.specs()` only; no FS fallback.\n- Scoped env: in-memory pass/adapter facts only — never store during analysis. Unresolved/self relations not persisted.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:c33d4c342751510911da9e93208700b42adec1e156ea771716bba85d69a322d3",
-          "lastModified": "2026-08-16T10:48:01.560Z"
+          "hash": "sha256:c800e87999d9a4d8be03c29699402fe97d335fddde87b906666753ae75f06bf8",
+          "lastModified": "2026-09-25T16:15:32.704Z"
         },
         "verify.md": {
-          "hash": "sha256:c56966849ab60e45ae5022dc06588c68828227776a57a199a355d439c6cb2ece",
-          "lastModified": "2026-08-16T10:48:01.592Z"
+          "hash": "sha256:b37c79385a324654e47ea47090a12ead4eda2093e01a05bd25f47da0f96a6744",
+          "lastModified": "2026-09-25T16:15:32.746Z"
         }
       }
     }

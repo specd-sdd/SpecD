@@ -4,9 +4,11 @@ import { setImmediate } from 'node:timers'
 import { performance } from 'node:perf_hooks'
 import { type Spec, SpecPath, Logger } from '@specd/core'
 import { type GraphStore, type ReferenceFactsWrite } from '../../domain/ports/graph-store.js'
+import { ResolveSymbolReference } from './resolve-symbol-reference.js'
+import { asGraphStore, SessionReferenceStore } from '../services/session-reference-store.js'
 import { type FileNode, createFileNode } from '../../domain/value-objects/file-node.js'
 import { type DocumentNode, createDocumentNode } from '../../domain/value-objects/document-node.js'
-import { type SymbolNode, createSymbolNode } from '../../domain/value-objects/symbol-node.js'
+import { type SymbolNode } from '../../domain/value-objects/symbol-node.js'
 import { SymbolKind } from '../../domain/value-objects/symbol-kind.js'
 import { type SpecNode, createSpecNode } from '../../domain/value-objects/spec-node.js'
 import { type Relation, createRelation } from '../../domain/value-objects/relation.js'
@@ -19,6 +21,10 @@ import {
   type WorkspaceIndexBreakdown,
 } from '../../domain/value-objects/index-result.js'
 import { type AdapterRegistryPort } from '../../domain/ports/adapter-registry-port.js'
+import {
+  emptyResolutionManifestSource,
+  type ResolutionManifestSource,
+} from '../ports/resolution-manifest-source.js'
 import { type ResolvedImports } from '../../domain/value-objects/language-adapter.js'
 import { mapWithConcurrency } from '../../domain/services/map-with-concurrency.js'
 import {
@@ -27,17 +33,15 @@ import {
   type IndexSession,
 } from '../../domain/value-objects/index-session.js'
 import {
-  createPublicBinding,
-  type LogicalSymbol,
-  type PublicBinding,
-  type ResolutionStep,
-} from '../../domain/value-objects/symbol-reference.js'
-import {
   buildScopedBindingEnvironment,
   resolveDependencyFacts,
   type SymbolLookup,
 } from '../../domain/services/index.js'
 import { discoverFiles } from './discover-files.js'
+import {
+  splitWorkspaceIdentity,
+  toPortableGraphPath,
+} from '../../domain/services/split-workspace-identity.js'
 import { computeContentHash } from './compute-content-hash.js'
 import { InMemoryIndexSession } from './in-memory-index-session.js'
 import {
@@ -50,6 +54,7 @@ import {
   parseFingerprintMap,
   serializeFingerprintMap,
   detectFingerprintMismatch,
+  FULL_REBUILD_FINGERPRINT_REASON,
 } from './_shared/compute-graph-fingerprint.js'
 import { resolveEffectiveGraphConfig } from './_shared/resolve-effective-graph-config.js'
 import { readInstalledCodeGraphVersion } from './_shared/installed-code-graph-version.js'
@@ -84,6 +89,26 @@ interface PreparedSpecProjection {
   readonly dependsOn: readonly string[]
   readonly implementation: readonly PersistedImplementationLink[]
   readonly changed: boolean
+}
+
+/**
+ * Returns the path after the workspace prefix.
+ *
+ * @param filePath - Canonical graph identity
+ * @returns The relative path, or the original string when there is no workspace prefix
+ */
+function relativeIdentityPath(filePath: string): string {
+  return splitWorkspaceIdentity(filePath)?.relativePath ?? filePath
+}
+
+/**
+ * Returns the workspace prefix of a graph identity.
+ *
+ * @param filePath - Canonical graph identity
+ * @returns The workspace name, or an empty string when the path is not a workspace identity
+ */
+function workspaceIdentityName(filePath: string): string {
+  return splitWorkspaceIdentity(filePath)?.workspace ?? ''
 }
 
 /**
@@ -185,19 +210,6 @@ interface FilesAndSymbolsStageChunk {
  */
 interface RelationsStageChunk {
   readonly relations: Relation[]
-}
-
-/** TypeScript re-export metadata retained by the adapter for pass-2 linking. */
-interface TypeScriptReExport {
-  readonly specifier: string
-  readonly importedName: string
-  readonly exportedName: string
-}
-
-/** Minimal parser-state shape needed to link TypeScript re-exports. */
-interface TypeScriptReExportState {
-  readonly kind: 'typescript'
-  readonly reExports?: readonly TypeScriptReExport[]
 }
 
 /**
@@ -400,7 +412,7 @@ function groupIntoChunks(
  * @returns True when the file is inside the workspace tree.
  */
 function isWithinCodeRoot(filePath: string, codeRoot: string): boolean {
-  const codeRelativePath = relative(codeRoot, filePath).replaceAll('\\', '/')
+  const codeRelativePath = toPortableGraphPath(relative(codeRoot, filePath))
   return (
     codeRelativePath === '' || (codeRelativePath !== '..' && !codeRelativePath.startsWith('../'))
   )
@@ -423,211 +435,13 @@ export class IndexCodeGraph {
    * Creates a new IndexCodeGraph use case.
    * @param store - The graph store to persist indexed data into.
    * @param registry - The adapter registry for resolving language adapters.
+   * @param manifestSource - Port that reads resolution-manifest existence and text.
    */
   constructor(
     private readonly store: GraphStore,
     private readonly registry: AdapterRegistryPort,
+    private readonly manifestSource: ResolutionManifestSource = emptyResolutionManifestSource,
   ) {}
-
-  /**
-   * Links TypeScript named and star re-exports after every declaration is available.
-   * @param session - Completed pass-1 indexing session.
-   * @returns Resolved public bindings and their provenance steps.
-   */
-  private linkTypeScriptReExports(session: InMemoryIndexSession): {
-    publicBindings: readonly PublicBinding[]
-    steps: readonly ResolutionStep[]
-    relations: readonly Relation[]
-  } {
-    const logicalSymbols = session.getLogicalSymbols()
-    const logicalById = new Map(logicalSymbols.map((symbol) => [symbol.id, symbol]))
-    const logicalIdByDeclaration = new Map<string, string>()
-    for (const [logicalId, declarations] of session.getDeclarationsByLogicalId()) {
-      for (const declaration of declarations) {
-        logicalIdByDeclaration.set(declaration.symbolId, logicalId)
-      }
-    }
-
-    const bindingsById = new Map(
-      session.getPublicBindings().map((binding) => [binding.id, binding]),
-    )
-    const bindingsBySurface = new Map<string, Map<string, PublicBinding>>()
-    const bindingsByRoute = new Map<string, Map<string, PublicBinding>>()
-    const routeKey = (surface: string, exportedName: string): string =>
-      `${surface}\u0000${exportedName}`
-    const indexBinding = (binding: PublicBinding): void => {
-      bindingsById.set(binding.id, binding)
-      const surfaceBindings =
-        bindingsBySurface.get(binding.surface) ?? new Map<string, PublicBinding>()
-      surfaceBindings.set(binding.id, binding)
-      bindingsBySurface.set(binding.surface, surfaceBindings)
-      const routeBindings =
-        bindingsByRoute.get(routeKey(binding.surface, binding.exportedName)) ??
-        new Map<string, PublicBinding>()
-      routeBindings.set(binding.id, binding)
-      bindingsByRoute.set(routeKey(binding.surface, binding.exportedName), routeBindings)
-    }
-    const replaceUnresolvedRoute = (binding: PublicBinding): void => {
-      const key = routeKey(binding.surface, binding.exportedName)
-      const routeBindings = bindingsByRoute.get(key)
-      if (routeBindings !== undefined) {
-        for (const [bindingId, candidate] of routeBindings) {
-          if (
-            candidate.space !== binding.space ||
-            candidate.targetId !== undefined ||
-            bindingId === binding.id
-          ) {
-            continue
-          }
-          bindingsById.delete(bindingId)
-          bindingsBySurface.get(candidate.surface)?.delete(bindingId)
-          routeBindings.delete(bindingId)
-        }
-      }
-      indexBinding(binding)
-    }
-    for (const binding of bindingsById.values()) indexBinding(binding)
-
-    const stepsByKey = new Map(
-      session
-        .getResolutionSteps()
-        .map((step) => [JSON.stringify([step.fromId, step.toId, step.kind]), step]),
-    )
-
-    const maxPasses = Math.max(session.getAllFilePaths().size, 1)
-    for (let pass = 0; pass < maxPasses; pass++) {
-      let changed = false
-      for (const filePath of session.getAllFilePaths()) {
-        const analysis = session.getAnalysis(filePath)
-        const state = analysis?.parserState as TypeScriptReExportState | undefined
-        if (state?.kind !== 'typescript' || !state.reExports?.length) continue
-
-        const relPath = filePath.substring(filePath.indexOf(':') + 1)
-        const adapter = this.registry.getAdapterForFile(relPath)
-        if (!adapter?.resolveRelativeImportPath) continue
-
-        for (const reExport of state.reExports) {
-          const resolved = adapter.resolveRelativeImportPath(filePath, reExport.specifier)
-          const candidates = Array.isArray(resolved) ? resolved : [resolved]
-          const sourcePath = candidates.find(
-            (candidate) => session.getFileId(candidate) !== undefined,
-          )
-          if (!sourcePath) continue
-
-          const sourceBindings = [...(bindingsBySurface.get(sourcePath)?.values() ?? [])].filter(
-            (binding) => binding.targetId !== undefined && logicalById.has(binding.targetId),
-          )
-          const routes =
-            reExport.importedName === '*'
-              ? sourceBindings.filter((binding) => binding.exportedName !== 'default')
-              : [
-                  ...(bindingsByRoute.get(routeKey(sourcePath, reExport.importedName))?.values() ??
-                    []),
-                ].filter(
-                  (binding) => binding.targetId !== undefined && logicalById.has(binding.targetId),
-                )
-
-          for (const route of routes) {
-            const exportedName =
-              reExport.exportedName === '*' ? route.exportedName : reExport.exportedName
-            const binding = createPublicBinding({
-              surface: filePath,
-              exportedName,
-              space: route.space,
-              targetId: route.targetId,
-            })
-            const previous = bindingsById.get(binding.id)
-            if (previous?.targetId !== binding.targetId) changed = true
-            replaceUnresolvedRoute(binding)
-            const step: ResolutionStep = {
-              fromId: binding.id,
-              toId: route.targetId!,
-              kind: reExport.importedName === '*' ? 're-export:star' : 're-export:named',
-            }
-            stepsByKey.set(JSON.stringify([step.fromId, step.toId, step.kind]), step)
-          }
-
-          if (reExport.importedName !== '*' && routes.length === 0) {
-            const target = session
-              .findSymbolsByFile(sourcePath)
-              .find((symbol) => symbol.name === reExport.importedName)
-            const logicalId = target && logicalIdByDeclaration.get(target.id)
-            const logical: LogicalSymbol | undefined =
-              logicalId === undefined ? undefined : logicalById.get(logicalId)
-            if (!logical) continue
-            const binding = createPublicBinding({
-              surface: filePath,
-              exportedName: reExport.exportedName,
-              space: logical.space,
-              targetId: logical.id,
-            })
-            const previous = bindingsById.get(binding.id)
-            if (previous?.targetId !== binding.targetId) changed = true
-            replaceUnresolvedRoute(binding)
-            const step: ResolutionStep = {
-              fromId: binding.id,
-              toId: logical.id,
-              kind: 're-export:named',
-            }
-            stepsByKey.set(JSON.stringify([step.fromId, step.toId, step.kind]), step)
-          }
-        }
-      }
-      if (!changed) break
-    }
-
-    const publicBindings = [...bindingsById.values()]
-    const relations: Relation[] = []
-    for (const filePath of session.getAllFilePaths()) {
-      const analysis = session.getAnalysis(filePath)
-      if (!analysis) continue
-      const relPath = filePath.substring(filePath.indexOf(':') + 1)
-      const adapter = this.registry.getAdapterForFile(relPath)
-      if (!adapter?.resolveRelativeImportPath) continue
-      const importsByLocalName = new Map(
-        analysis.imports.filter((item) => item.isRelative).map((item) => [item.localName, item]),
-      )
-      const symbolsById = new Map(analysis.symbols.map((symbol) => [symbol.id, symbol]))
-      const symbolsByDescendingLine = [...analysis.symbols].sort(
-        (left, right) => right.line - left.line,
-      )
-      for (const call of analysis.callFacts) {
-        const imported = importsByLocalName.get(call.targetName ?? call.name)
-        if (!imported) continue
-        const resolved = adapter.resolveRelativeImportPath(filePath, imported.specifier)
-        const candidates = Array.isArray(resolved) ? resolved : [resolved]
-        const surface = candidates.find((candidate) => session.getFileId(candidate) !== undefined)
-        const binding =
-          surface === undefined
-            ? undefined
-            : [
-                ...(bindingsByRoute.get(routeKey(surface, imported.originalName))?.values() ?? []),
-              ].find((candidate) => candidate.targetId !== undefined)
-        const source =
-          (call.callerSymbolId && symbolsById.get(call.callerSymbolId)) ??
-          symbolsByDescendingLine.find((symbol) => symbol.line <= call.location.line)
-        if (!binding || !source) continue
-        relations.push(
-          createRelation({
-            source: source.id,
-            target: binding.id,
-            type: call.form === 'constructor' ? RelationType.Constructs : RelationType.Calls,
-            metadata: {
-              reason: 'public binding route',
-              line: call.location.line,
-              column: call.location.column,
-            },
-          }),
-        )
-      }
-    }
-
-    return {
-      publicBindings,
-      steps: [...stepsByKey.values()],
-      relations,
-    }
-  }
 
   /**
    * Executes the indexing pipeline for the given project workspaces and graph config.
@@ -699,7 +513,7 @@ export class IndexCodeGraph {
         for (const relPath of discovered) {
           const prefixed = `${ws.name}:${relPath}`
           const absPath = join(ws.codeRoot, relPath)
-          const configRel = relative(options.projectRoot, absPath).replaceAll('\\', '/')
+          const configRel = toPortableGraphPath(relative(options.projectRoot, absPath))
 
           allDiscoveredPaths.push(prefixed)
           absolutePaths.set(prefixed, absPath)
@@ -741,7 +555,7 @@ export class IndexCodeGraph {
           const absPath = join(options.projectRoot, relPath)
           allDiscoveredPaths.push(prefixed)
           absolutePaths.set(prefixed, absPath)
-          configRelativePaths.set(prefixed, relPath.replaceAll('\\', '/'))
+          configRelativePaths.set(prefixed, toPortableGraphPath(relPath))
         }
       }
 
@@ -767,6 +581,7 @@ export class IndexCodeGraph {
 
       // ── Fingerprint comparison ──
       const version = options.codeGraphVersion ?? readInstalledCodeGraphVersion()
+      const adapters = this.registry.getAdapters()
       const currentFingerprintMap = new Map<string, string>()
       for (const ws of options.workspaces) {
         currentFingerprintMap.set(
@@ -777,6 +592,9 @@ export class IndexCodeGraph {
             ws,
             options.workspaces,
             options.graphConfig,
+            adapters,
+            options.vcsRoot,
+            this.manifestSource,
           ),
         )
       }
@@ -787,6 +605,9 @@ export class IndexCodeGraph {
           options.projectRoot,
           options.workspaces,
           options.graphConfig,
+          adapters,
+          options.vcsRoot,
+          this.manifestSource,
         ),
       )
       const stats = await this.store.getStatistics()
@@ -797,6 +618,9 @@ export class IndexCodeGraph {
         options.projectRoot,
         options.workspaces,
         options.graphConfig,
+        adapters,
+        options.vcsRoot,
+        this.manifestSource,
       )
 
       // Merge stored fingerprints for workspaces NOT being indexed into the current map
@@ -820,8 +644,7 @@ export class IndexCodeGraph {
         if (options.force === true) {
           progress(5, 'Forced reindex', 'Reconsidering every selected input')
         } else {
-          fullRebuildReason =
-            'Graph derivation fingerprint mismatch — code-graph version or workspace configuration changed since last index'
+          fullRebuildReason = FULL_REBUILD_FINGERPRINT_REASON
           progress(5, 'Fingerprint mismatch', 'Forcing re-index of mismatched workspaces')
           // Remove all files from mismatched workspaces so they get re-processed
           // but do NOT recreate the store — other workspaces are unaffected
@@ -916,7 +739,7 @@ export class IndexCodeGraph {
           ...existingCoverage.map((coverage) => coverage.filePath),
         ])
         for (const existingPath of existingPaths) {
-          const workspace = existingPath.slice(0, existingPath.indexOf(':'))
+          const workspace = workspaceIdentityName(existingPath)
           if (!discoveredSet.has(existingPath) && indexedWorkspaceNames.has(workspace)) {
             deletedFiles.push(existingPath)
           }
@@ -965,7 +788,7 @@ export class IndexCodeGraph {
       for (const filePath of toRemove) {
         if (deletedSet.has(filePath)) {
           filesRemovedCount++
-          const wsName = filePath.substring(0, filePath.indexOf(':'))
+          const wsName = workspaceIdentityName(filePath)
           const breakdown = wsBreakdowns.get(wsName)
           if (breakdown) breakdown.filesRemoved++
         }
@@ -1008,7 +831,6 @@ export class IndexCodeGraph {
 
       // Build package-name → workspace-name map for cross-workspace import resolution.
       const packageToWorkspace = new Map<string, string>()
-      const adapters = this.registry.getAdapters()
       for (const ws of options.workspaces) {
         for (const adapter of adapters) {
           if (adapter.getPackageIdentity) {
@@ -1059,7 +881,7 @@ export class IndexCodeGraph {
             const contentBuffer = readFileSync(absPath)
             const decodedContent = decodeTextualContent(contentBuffer)
             // Use the relative-to-codeRoot path for adapter matching (extension-based)
-            const relPath = prefixedPath.substring(prefixedPath.indexOf(':') + 1)
+            const relPath = relativeIdentityPath(prefixedPath)
             const adapter = this.registry.getAdapterForFile(relPath)
             if (!adapter) {
               if (decodedContent === null) {
@@ -1078,7 +900,7 @@ export class IndexCodeGraph {
                 }
                 continue
               }
-              const wsName = prefixedPath.substring(0, prefixedPath.indexOf(':'))
+              const wsName = workspaceIdentityName(prefixedPath)
               const hash = fileHashes.get(prefixedPath) ?? computeContentHash(decodedContent)
               const document = createDocumentNode({
                 path: prefixedPath,
@@ -1117,7 +939,7 @@ export class IndexCodeGraph {
             const language = this.registry.getLanguageForFile(relPath) ?? 'unknown'
             const content = contentBuffer.toString('utf-8')
             const hash = fileHashes.get(prefixedPath) ?? computeContentHash(content)
-            const wsName = prefixedPath.substring(0, prefixedPath.indexOf(':'))
+            const wsName = workspaceIdentityName(prefixedPath)
             const ws = options.workspaces.find((w) => w.name === wsName)
 
             const draft = adapter.analyzeFile(prefixedPath, content, {
@@ -1127,8 +949,7 @@ export class IndexCodeGraph {
               repoRoot: options.projectRoot,
             })
 
-            const symbols = this.assignParentIds(draft.symbols, language)
-            const finalDraft = { ...draft, symbols }
+            const finalDraft = draft
 
             session.registerFile({
               filePath: prefixedPath,
@@ -1174,7 +995,7 @@ export class IndexCodeGraph {
             )
             indexedResourceKinds.set(prefixedPath, IndexedResourceKind.File)
             fileLanguages.set(prefixedPath, language)
-            chunkSymbols.push(...symbols)
+            chunkSymbols.push(...finalDraft.symbols)
             if (contentChangedPaths.has(prefixedPath)) {
               filesIndexed++
               const breakdown = wsBreakdowns.get(wsName)
@@ -1226,7 +1047,7 @@ export class IndexCodeGraph {
             configRelativePath: configRelativePaths.get(prefixedPath) ?? '',
             language: fileLanguages.get(prefixedPath) ?? 'unknown',
             contentHash: existingArtifactHashes.get(prefixedPath) ?? '',
-            workspace: prefixedPath.substring(0, prefixedPath.indexOf(':')),
+            workspace: workspaceIdentityName(prefixedPath),
           })
           session.registerAnalysis({
             filePath: prefixedPath,
@@ -1274,11 +1095,11 @@ export class IndexCodeGraph {
             )
           }
           try {
-            const relPath = prefixedPath.substring(prefixedPath.indexOf(':') + 1)
+            const relPath = relativeIdentityPath(prefixedPath)
             const adapter = this.registry.getAdapterForFile(relPath)
             if (!adapter) continue
 
-            const wsName = prefixedPath.substring(0, prefixedPath.indexOf(':'))
+            const wsName = workspaceIdentityName(prefixedPath)
             const ws = options.workspaces.find((w) => w.name === wsName)
 
             const analysis = session.getAnalysis(prefixedPath)
@@ -1310,11 +1131,11 @@ export class IndexCodeGraph {
             )
           }
           try {
-            const relPath = prefixedPath.substring(prefixedPath.indexOf(':') + 1)
+            const relPath = relativeIdentityPath(prefixedPath)
             const adapter = this.registry.getAdapterForFile(relPath)
             if (!adapter) continue
 
-            const wsName = prefixedPath.substring(0, prefixedPath.indexOf(':'))
+            const wsName = workspaceIdentityName(prefixedPath)
             const ws = options.workspaces.find((w) => w.name === wsName)
 
             const analysis = session.getAnalysis(prefixedPath)
@@ -1666,8 +1487,24 @@ export class IndexCodeGraph {
           logicalIdByDeclarationSymbolId.set(declaration.symbolId, logicalId)
         }
       }
+      const reexportStart = performance.now()
+      let reexportCount = 0
+      for (const adapter of this.registry.getAdapters()) {
+        const linked = adapter.linkReExports?.(session, packageToWorkspace)
+        if (linked === undefined) continue
+        session.addReferenceFacts(linked)
+        reexportCount += linked.publicBindings.length + linked.steps.length
+      }
+      phaseMetrics.reexports.durationMs += performance.now() - reexportStart
+      phaseMetrics.reexports.count = reexportCount
+      const coverageResolver = new ResolveSymbolReference(
+        asGraphStore(new SessionReferenceStore(session)),
+        () => Promise.resolve({ fresh: true, complete: true, reasonCodes: [] }),
+        undefined,
+        this.registry,
+      )
       const coverageProjection = coverageProjectionRequired
-        ? projectSpecCoverage({
+        ? await projectSpecCoverage({
             specs: preparedSpecs.map((prepared) => ({
               specId: prepared.specNode.specId,
               implementation: prepared.implementation,
@@ -1675,12 +1512,13 @@ export class IndexCodeGraph {
             indexedFilePaths: session.getAllFilePaths(),
             symbolsByFile: (filePath) => session.findSymbolsByFile(filePath),
             logicalIdByDeclarationSymbolId,
+            resolveSymbol: (request) => coverageResolver.execute(request),
           })
         : { relations: [], diagnostics: [] }
 
       // Compute per-workspace skipped counts
       for (const filePath of skippedFiles) {
-        const wsName = filePath.substring(0, filePath.indexOf(':'))
+        const wsName = workspaceIdentityName(filePath)
         const breakdown = wsBreakdowns.get(wsName)
         if (breakdown) breakdown.filesSkipped++
       }
@@ -1724,7 +1562,7 @@ export class IndexCodeGraph {
           }
           const stat = statSync(absolutePath)
           observations.push({
-            workspace: resourceId.slice(0, resourceId.indexOf(':')),
+            workspace: workspaceIdentityName(resourceId),
             resourceKind,
             resourceId,
             inputKind: IndexedInputKind.Filesystem,
@@ -1748,12 +1586,7 @@ export class IndexCodeGraph {
 
       const logicalSymbols = session.getLogicalSymbols()
       const logicalIds = new Set(logicalSymbols.map((symbol) => symbol.id))
-      const reexportStart = performance.now()
-      const linkedReferences = this.linkTypeScriptReExports(session)
-      phaseMetrics.reexports.durationMs += performance.now() - reexportStart
-      phaseMetrics.reexports.count =
-        linkedReferences.relations.length + linkedReferences.steps.length
-      const publicBindings = linkedReferences.publicBindings.map((binding) => ({
+      const publicBindings = session.getPublicBindings().map((binding) => ({
         ...binding,
         targetId:
           binding.targetId !== undefined && logicalIds.has(binding.targetId)
@@ -1780,9 +1613,9 @@ export class IndexCodeGraph {
         ),
         publicBindings,
         localBindings,
-        steps: linkedReferences.steps.filter(
-          (step) => knownReferenceIds.has(step.fromId) && knownReferenceIds.has(step.toId),
-        ),
+        steps: session
+          .getResolutionSteps()
+          .filter((step) => knownReferenceIds.has(step.fromId) && knownReferenceIds.has(step.toId)),
         coverage: allDiscoveredPaths.map(
           (filePath): IndexCoverage =>
             coverageByFilePath.get(filePath) ?? {
@@ -1848,7 +1681,6 @@ export class IndexCodeGraph {
           ...specDependencyRelations,
           ...coverageProjection.relations,
           ...crossFileOverrides,
-          ...linkedReferences.relations,
         ])
         phaseMetrics.persistence.durationMs += performance.now() - persistenceStart
         phaseMetrics.persistence.count =
@@ -2062,46 +1894,6 @@ export class IndexCodeGraph {
     }
 
     return relations
-  }
-
-  /**
-   * Assigns parentId to symbols within a file based on line/column range.
-   * @param symbols - The symbols to process.
-   * @param language - The language of the file.
-   * @returns A new array of symbols with parentId set where applicable.
-   */
-  private assignParentIds(symbols: readonly SymbolNode[], language: string): SymbolNode[] {
-    const supportedLanguages = new Set(['typescript', 'tsx', 'javascript', 'jsx', 'python', 'php'])
-    if (!supportedLanguages.has(language)) return [...symbols]
-
-    const sortedSymbols = [...symbols].sort((left, right) => {
-      if (left.line !== right.line) return left.line - right.line
-      return left.column - right.column
-    })
-
-    const results: SymbolNode[] = []
-    let currentOwnerId: string | undefined
-
-    for (const symbol of sortedSymbols) {
-      if (symbol.kind === SymbolKind.Class || symbol.kind === SymbolKind.Interface) {
-        currentOwnerId = symbol.id
-        results.push(symbol)
-        continue
-      }
-
-      if (symbol.kind === SymbolKind.Method && currentOwnerId) {
-        results.push(
-          createSymbolNode({
-            ...symbol,
-            parentId: currentOwnerId,
-          }),
-        )
-      } else {
-        results.push(symbol)
-      }
-    }
-
-    return results
   }
 }
 

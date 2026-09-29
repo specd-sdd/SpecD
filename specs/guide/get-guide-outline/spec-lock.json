@@ -1,0 +1,13 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["guide:conventions", "guide:guide-model"],
+  "implementation": [
+    {
+      "file": "guide:src/application/queries/get-guide-outline-query.ts",
+      "symbols": ["GetGuideOutlineQuery", "GetGuideOutlineInput"]
+    }
+  ]
+}

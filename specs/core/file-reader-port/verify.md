@@ -54,6 +54,20 @@
 - **WHEN** `read` is called with any absolute path
 - **THEN** no traversal check is performed
 
+#### Scenario: Drive-letter case is still inside the base
+
+- **GIVEN** `basePath` is `c:/repo`
+- **AND** the resolved file is `C:/repo/spec.md`
+- **WHEN** the reader checks confinement
+- **THEN** it does not throw `PathTraversalError`
+
+#### Scenario: A sibling prefix is a traversal
+
+- **GIVEN** `basePath` is `C:/repo`
+- **AND** the resolved file is `C:/repository/spec.md`
+- **WHEN** the reader checks confinement
+- **THEN** it throws `PathTraversalError`
+
 ### Requirement: Path resolution
 
 #### Scenario: Relative components are normalised

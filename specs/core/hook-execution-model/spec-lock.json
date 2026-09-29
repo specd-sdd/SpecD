@@ -16,39 +16,47 @@
     "cli:change-archive",
     "core:transition-checks"
   ],
-  "implementation": [],
+  "implementation": [
+    {
+      "file": "core:src/infrastructure/node/hook-runner.ts",
+      "symbols": ["NodeHookRunner"]
+    },
+    {
+      "file": "core:test/infrastructure/node/hook-runner-spawn.spec.ts"
+    }
+  ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Defines passive, shell, and external workflow hooks plus binding-driven timing, failure, ordering, skipping, and progress.",
+      "value": "Defines instruction, shell, and external hooks, lifecycle phases, failure semantics, and unresolved execution constraints.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:0bf018a02c9a37ded09f605ffa1ad6071fc83f7c2af7e50478586ab6485e6c11",
-          "lastModified": "2026-09-19T19:11:11.479Z"
+          "hash": "sha256:70671a102914d6308e20e0ba36be48b0709469100291cee6cb2c1ca482cd8173",
+          "lastModified": "2026-09-28T11:19:59.153Z"
         },
         "verify.md": {
-          "hash": "sha256:33b807c144f6541ef66d2247cbd1ce750e93f98fc732108869ce976e0d2e22a9",
-          "lastModified": "2026-09-19T19:11:11.484Z"
+          "hash": "sha256:fd1d18b6f03a1862ef89439b662ea0ba3551b706ff8409992701301952aec2f9",
+          "lastModified": "2026-09-28T11:19:59.154Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# Hook Execution Model\n\n## Rules\n- Hook entry has id + exactly one `instruction:`, `run:`, or `external:{type,config}`; invalid combination → `SchemaValidationError`. Every workflow step supports all forms.\n- `instruction:` is passive text returned only by `GetHookInstructions(step, phase, hookId?)`; never process/check/effect/`CompileContext`. `run:` executes only through `HookRunner`; never agent context. External dispatches only to runner supporting `external.type`; missing runner fails clearly.\n- `TransitionChange` / `ArchiveChange` execute matching run/external effects after predicates pass. Matcher, slot, failure come from binding, never check ID/private hook path. Hook check owns `RunStepHooks` dependency.\n- Transition defaults: `hook.pre` any except recovery, `hook.post` forward only; both `before-persist`, `abort`. Archive: pre `before-persist`/abort; post `after-persist`/collect. Before-persist abort throws `HookFailedError` and preserves prior state/files; collect records and continues.\n- Standalone `RunStepHooks`: pre fail-fast; post continues/collects; CLI exits 2 on failure. It is sole hook execution engine for checks and CLI. `Change` executes nothing.\n- Ordering per phase: schema hooks declaration order, then matching project `schemaOverrides` declaration order.\n- Transition `skipHookPhases`: source.pre/source.post/target.pre/target.post/all; archive: pre/post/all. Skip only effects, never predicates. Since transition pre/post share before-persist, selection uses binding phase plus pre/post selector identity. Manual callers preserve `along` filtering.\n- Manual sequence: hook instruction pre → run-hooks pre → lifecycle command with skip selector → run-hooks post → hook instruction post.\n- `HookRunner` expands and shell-escapes `{{change.name}}`, `{{change.path}}`, `{{project.root}}`; unknown token preserved. No `{{change.workspace}}`; derive touched workspaces from specIds.\n\n## Constraints\n- Pre hooks always fail-fast. Transition source.post is forward-only and aborts before persist. Archive post is collect after persist.\n- Use cases select effects by binding phase/onFailure and never launch `RunStepHooks` by ID.\n- `--skip-hooks` skips effects only.",
+      "value": "# Hook Execution Model\n\n## Rules\n- Hook entry: `id` + exactly one `instruction:`, `run:`, or `external: { type, config }`; otherwise `SchemaValidationError`. Every workflow step supports all forms.\n- `instruction:`: passive query-time text, consumed only by `GetHookInstructions(step, phase, hookId?)`; never process, side effect, predicate, effect, runtime execution, or `CompileContext` content.\n- `run:`: shell command executed only by `HookRunner`; returns exit code/stdout/stderr; never agent context.\n- `external:`: explicit dispatch to registered runner accepting `external.type`; no accepting runner MUST fail clearly. `HookRunner` remains shell-only.\n- External hooks use same lifecycle semantics as shell hooks: pre failure fail-fast; post failure reported without rollback.\n- `TransitionChange` and `ArchiveChange` auto-execute matching `run:` effects after predicates pass. Binding supplies slot/failure policy; check id does not.\n- `TransitionChange`: match effects by same `from`/`to`/`along`; execute `phase = before-persist` effects (`hook.post` and `hook.pre`); `onFailure = abort`; hook checks own `RunStepHooks` dependency.\n- `ArchiveChange`: execute operation-`archive` effects with `phase = before-persist` before commit and `phase = after-persist` after commit. Defaults: `hook.pre` abort/before-persist; `hook.post` collect/after-persist.\n\n## Constraints\n- `instruction:` never executes and MUST NOT enter transition predicates/effects.\n- `run:` never enters agent context. All workflow steps may contain both `instruction:` and `run:`.\n- Pre hooks: always fail-fast, `onFailure = abort`.\n- Transition `source.post`: forward-only, `phase = before-persist`, `onFailure = abort`.\n- Archive post hooks: fail-soft, `phase = after-persist`, `onFailure = collect`.\n- Schema hooks precede project hooks within phase.\n- Unresolved source conflict preserved:\n  - `HEAD`: `TransitionChange` and `ArchiveChange` MUST select effects by binding `phase`/`onFailure`, not check id; hook execute SHALL call `RunStepHooks`; use cases MUST NOT launch it by check id; `RunStepHooks` serves hook checks + CLI; `HookRunner` handles expansion and shell escaping; `--skip-hooks` skips effects only.\n  - Incoming: `TransitionChange` and `ArchiveChange` delegate hook execution to `RunStepHooks`; `RunStepHooks` serves all use cases + CLI; developer `run:` template expansion is verbatim, then `HookRunner` translates only unsupported quote syntax; callers do not shell-escape values.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:0bf018a02c9a37ded09f605ffa1ad6071fc83f7c2af7e50478586ab6485e6c11",
-          "lastModified": "2026-09-19T19:11:11.479Z"
+          "hash": "sha256:70671a102914d6308e20e0ba36be48b0709469100291cee6cb2c1ca482cd8173",
+          "lastModified": "2026-09-28T11:19:59.153Z"
         },
         "verify.md": {
-          "hash": "sha256:33b807c144f6541ef66d2247cbd1ce750e93f98fc732108869ce976e0d2e22a9",
-          "lastModified": "2026-09-19T19:11:11.484Z"
+          "hash": "sha256:fd1d18b6f03a1862ef89439b662ea0ba3551b706ff8409992701301952aec2f9",
+          "lastModified": "2026-09-28T11:19:59.154Z"
         }
       }
     }

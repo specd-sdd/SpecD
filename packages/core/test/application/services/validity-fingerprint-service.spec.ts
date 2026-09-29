@@ -122,7 +122,7 @@ describe('ValidityFingerprintService', () => {
     const result = await service.completeFingerprint(change)
     expect(result.failures).toEqual([])
     expect(result.fingerprint?.artifacts.files).toEqual({
-      'proposal:proposal': hasher.hash('hello\n'),
+      'proposal:proposal': hasher.hash('hello'),
     })
     expect(result.fingerprint?.implementation.files['src/a.ts']).toEqual(
       expect.objectContaining({ content: 'text', normalization: 'text-v1' }),
@@ -161,7 +161,7 @@ describe('ValidityFingerprintService', () => {
     const result = await service.completeFingerprint(change)
     expect(result.failures).toEqual([])
     expect(result.fingerprint?.artifacts.files).toEqual({
-      'proposal:proposal': hasher.hash('hello\n'),
+      'proposal:proposal': hasher.hash('hello'),
     })
     expect(result.fingerprint?.artifacts.files).not.toHaveProperty('checklist:checklist')
   })

@@ -13,22 +13,11 @@
   "implementation": [
     {
       "file": "sdk:src/orchestration/build-implementation-review.ts",
-      "symbols": [
-        "buildImplementationReview",
-        "BuildImplementationReviewInput",
-        "ReviewedImplementationSymbol",
-        "ReviewedImplementationLink",
-        "BuildImplementationReviewResult"
-      ]
+      "symbols": ["buildImplementationReview"]
     },
     {
-      "file": "sdk:src/orchestration/index.ts"
-    },
-    {
-      "file": "sdk:src/index.ts"
-    },
-    {
-      "file": "sdk:test/orchestration/build-implementation-review.spec.ts"
+      "file": "sdk:src/orchestration/run-index-project-graph.ts",
+      "symbols": ["runIndexProjectGraph"]
     }
   ],
   "optimizations": {

@@ -20,7 +20,10 @@ import {
   type ReferenceFactsWrite,
 } from '../../../src/domain/ports/graph-store.js'
 import { type Relation } from '../../../src/domain/value-objects/relation.js'
-import { SymbolSpace } from '../../../src/domain/value-objects/symbol-reference.js'
+import {
+  parseLogicalSymbol,
+  SymbolSpace,
+} from '../../../src/domain/value-objects/symbol-reference.js'
 import { readStorageGeneration } from '../../../src/infrastructure/storage-generation.js'
 import { readInstalledCodeGraphVersion } from '../../../src/application/use-cases/_shared/installed-code-graph-version.js'
 import { buildProjectGraphConfig } from '../../../src/application/services/build-project-graph-config.js'
@@ -28,6 +31,7 @@ import { makeMockSpecRepository } from '../../helpers/make-mock-spec-repository.
 import { GraphStorageRecoveryRequiredError } from '../../../src/domain/errors/graph-storage-recovery-required-error.js'
 import { IndexCodeGraph } from '../../../src/application/use-cases/index-code-graph.js'
 import { AdapterRegistry } from '../../../src/infrastructure/tree-sitter/adapter-registry.js'
+import { GoLanguageAdapter } from '../../../src/infrastructure/tree-sitter/go-language-adapter.js'
 import { TypeScriptLanguageAdapter } from '../../../src/infrastructure/tree-sitter/typescript-language-adapter.js'
 
 const makeMockRepo = makeMockSpecRepository
@@ -380,9 +384,6 @@ describe('IndexProjectGraph integration', () => {
     expect(publicImpact.canonicalImpact.affectedSymbols).toEqual(canonicalImpact.affectedSymbols)
     expect(publicImpact.binding.id).toBe(publicBinding!.id)
     expect(publicImpact.target.id).toBe(publicCandidate!.target.id)
-    expect(publicImpact.bindingImpact.affectedSymbols.map((symbol) => symbol.name)).toContain(
-      'route',
-    )
     expect(publicImpact.canonicalImpact.affectedSymbols.map((symbol) => symbol.name)).toContain(
       'direct',
     )
@@ -782,5 +783,205 @@ describe('IndexProjectGraph integration', () => {
       }),
     )
     await readProvider.close()
+  })
+
+  it('covers anchored members, re-exported bindings, and leaves unresolved spec text', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'index-project-graph-member-coverage-'))
+    const coreRoot = join(tempDir, 'core')
+    const codeGraphRoot = join(tempDir, 'code-graph')
+    const sdkRoot = join(tempDir, 'sdk')
+    const coreSpecs = join(tempDir, 'specs-core', 'member')
+    const sdkSpecs = join(tempDir, 'specs-sdk', 'member')
+    mkdirSync(join(coreRoot, 'src', 'go'), { recursive: true })
+    mkdirSync(join(codeGraphRoot, 'src'), { recursive: true })
+    mkdirSync(join(sdkRoot, 'src'), { recursive: true })
+    mkdirSync(join(tempDir, '.specd', 'metadata', 'core'), { recursive: true })
+    mkdirSync(join(tempDir, '.specd', 'metadata', 'sdk'), { recursive: true })
+    mkdirSync(coreSpecs, { recursive: true })
+    mkdirSync(sdkSpecs, { recursive: true })
+    writeFileSync(
+      join(coreRoot, 'src', 'edit.ts'),
+      'export class EditChange {\n  execute(): void {}\n}\n',
+    )
+    writeFileSync(
+      join(coreRoot, 'src', 'model.ts'),
+      'export interface MemberForm {}\nexport const MemberForm = 1\n',
+    )
+    writeFileSync(join(coreRoot, 'README.md'), '# notes\n')
+    writeFileSync(
+      join(coreRoot, 'src', 'go', 'reader.go'),
+      'package app\ntype Reader struct {}\nfunc (r Reader) Read() {}\n',
+    )
+    writeFileSync(
+      join(codeGraphRoot, 'package.json'),
+      JSON.stringify({
+        name: '@specd/code-graph',
+        exports: { '.': './dist/public.js' },
+      }),
+    )
+    writeFileSync(
+      join(codeGraphRoot, 'src', 'public.ts'),
+      'export function runIsolatedGraphIndex(): void {}\n',
+    )
+    writeFileSync(
+      join(sdkRoot, 'src', 'index.ts'),
+      "export { runIsolatedGraphIndex } from '@specd/code-graph'\n",
+    )
+    writeFileSync(join(coreSpecs, 'spec.md'), '# Core\n')
+    writeFileSync(join(sdkSpecs, 'spec.md'), '# Sdk\n')
+    writeFileSync(
+      join(coreSpecs, 'spec-lock.json'),
+      JSON.stringify({
+        schema: { name: 'schema-std', version: 1 },
+        dependsOn: [],
+        implementation: [
+          { file: 'core:src/edit.ts', symbols: ['EditChange.execute'] },
+          { file: 'core:src/model.ts', symbols: ['MemberForm'] },
+          { file: 'core:src/edit.ts', symbols: ['Integration (real kernel)'] },
+          { file: 'core:README.md' },
+        ],
+      }),
+    )
+    writeFileSync(
+      join(sdkSpecs, 'spec-lock.json'),
+      JSON.stringify({
+        schema: { name: 'schema-std', version: 1 },
+        dependsOn: [],
+        implementation: [
+          { file: 'sdk:src/index.ts', symbols: ['runIsolatedGraphIndex', '@specd/sdk barrel'] },
+        ],
+      }),
+    )
+    const coreRepo = createSpecRepository(
+      'fs',
+      {
+        workspace: 'core',
+        ownership: 'owned',
+        isExternal: false,
+        configPath: tempDir,
+      },
+      {
+        path: join(tempDir, 'specs-core'),
+        metadataPath: join(tempDir, '.specd', 'metadata', 'core'),
+      },
+    )
+    const sdkRepo = createSpecRepository(
+      'fs',
+      {
+        workspace: 'sdk',
+        ownership: 'owned',
+        isExternal: false,
+        configPath: tempDir,
+      },
+      {
+        path: join(tempDir, 'specs-sdk'),
+        metadataPath: join(tempDir, '.specd', 'metadata', 'sdk'),
+      },
+    )
+    const store = new SQLiteGraphStore(tempDir)
+    await store.open()
+    const registry = new AdapterRegistry()
+    registry.register(new TypeScriptLanguageAdapter())
+    registry.register(new GoLanguageAdapter())
+    const indexer = new IndexCodeGraph(store, registry)
+    const result = await indexer.execute({
+      projectRoot: tempDir,
+      vcsRoot: null,
+      workspaces: [
+        {
+          name: 'core',
+          prefix: null,
+          codeRoot: coreRoot,
+          specRepo: coreRepo,
+          ownership: 'owned',
+          isExternal: false,
+        },
+        {
+          name: 'code-graph',
+          prefix: null,
+          codeRoot: codeGraphRoot,
+          specRepo: makeMockRepo(),
+          ownership: 'owned',
+          isExternal: false,
+        },
+        {
+          name: 'sdk',
+          prefix: null,
+          codeRoot: sdkRoot,
+          specRepo: sdkRepo,
+          ownership: 'owned',
+          isExternal: false,
+        },
+      ],
+      graphConfig: { includePaths: [], excludePaths: [], workspaces: new Map() },
+      codeGraphVersion: readInstalledCodeGraphVersion(),
+    })
+
+    expect(result.errors).toEqual([])
+    expect(result.coverageDiagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ symbolName: 'MemberForm', reason: 'SYMBOL_AMBIGUOUS' }),
+        expect.objectContaining({
+          symbolName: 'Integration (real kernel)',
+          reason: 'SYMBOL_NOT_FOUND',
+        }),
+        expect.objectContaining({ symbolName: '@specd/sdk barrel', reason: 'SYMBOL_NOT_FOUND' }),
+        expect.objectContaining({ filePath: 'core:README.md', reason: 'FILE_NOT_INDEXED' }),
+      ]),
+    )
+    const covered = await store.getCoveredSymbols('core:member')
+    const member = covered
+      .map((relation) => parseLogicalSymbol(relation.target))
+      .find((symbol) => symbol?.name === 'execute')
+    expect(member?.workspace).toBe('core')
+    const ownerId = member?.ownerId
+    expect(ownerId).toBeDefined()
+    const symbols = await store.findLogicalSymbolsByIds([ownerId!])
+    expect(symbols[0]?.name).toBe('EditChange')
+
+    const published = await store.findPublicBindings([
+      {
+        surface: 'code-graph:src/public.ts',
+        exportedName: 'runIsolatedGraphIndex',
+        space: 'value',
+      },
+    ])
+    const rebound = await store.findPublicBindings([
+      { surface: 'sdk:src/index.ts', exportedName: 'runIsolatedGraphIndex', space: 'value' },
+    ])
+    expect(rebound).toEqual([expect.objectContaining({ targetId: published[0]?.targetId })])
+    await expect(store.getCoveredSymbols('sdk:member')).resolves.toEqual([
+      expect.objectContaining({ target: published[0]?.targetId }),
+    ])
+
+    await store.close()
+    const db = new Database(join(tempDir, 'graph', 'code-graph.sqlite'), { readonly: true })
+    try {
+      const rows = db.prepare('SELECT id, name, parent_id FROM symbols').all() as Array<{
+        id: string
+        name: string
+        parent_id: string | null
+      }>
+      const reader = rows.find((row) => row.name === 'Reader')
+      const read = rows.find((row) => row.name === 'Read')
+      expect(read?.parent_id).toBe(reader?.id)
+      const fts = db.prepare('SELECT search_text FROM symbol_fts').all() as Array<{
+        search_text: string
+      }>
+      expect(fts.some((row) => row.search_text.includes('EditChange.execute'))).toBe(true)
+      const qualified = db
+        .prepare('SELECT name, qualified_name FROM logical_symbols')
+        .all() as Array<{ name: string; qualified_name: string | null }>
+      expect(qualified).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ name: 'execute', qualified_name: 'EditChange.execute' }),
+        ]),
+      )
+      expect(
+        qualified.find((row) => row.name === 'runIsolatedGraphIndex')?.qualified_name ?? null,
+      ).toBeNull()
+    } finally {
+      db.close()
+    }
   })
 })

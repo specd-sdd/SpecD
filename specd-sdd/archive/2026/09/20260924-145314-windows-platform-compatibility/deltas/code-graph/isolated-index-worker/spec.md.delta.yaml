@@ -1,0 +1,21 @@
+- op: added
+  description: 'The index lease is released on process exit and on SIGBREAK.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: 'Requirement: Signal forwarding and cleanup'
+  content: |
+    ### Requirement: Index lease release on exit
+
+    The process that holds the index lease MUST release it on process exit. On Windows it MUST also release the lease on `SIGBREAK`. Releasing the lease on `SIGTERM` remains required where that signal is delivered. Failure to deliver `SIGTERM` MUST NOT leave the lease held after the process has exited.
+
+- op: modified
+  description: 'The worker lease is part of the SQLite graph store layout.'
+  selector:
+    type: section
+    matches: '^Spec Dependencies$'
+  content: |
+    - [`code-graph:sqlite-graph-store`](../sqlite-graph-store/spec.md) — index lease and graph persistence layout that the worker must release

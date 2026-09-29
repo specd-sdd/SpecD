@@ -1,4 +1,5 @@
 import { VcsAdapter, type VcsIdentity } from '../../application/ports/vcs-adapter.js'
+import { normalizeVcsRoot, toPortablePath } from '../fs/path-platform.js'
 import { svn, svnSync } from './exec.js'
 
 /**
@@ -19,7 +20,7 @@ export class SvnVcsAdapter extends VcsAdapter {
    */
   constructor(cwd: string = process.cwd(), rootDir?: string) {
     super(cwd)
-    this._rootDir = rootDir ?? null
+    this._rootDir = rootDir === undefined ? null : normalizeVcsRoot(rootDir)
   }
 
   /**
@@ -39,7 +40,7 @@ export class SvnVcsAdapter extends VcsAdapter {
 
   /** @inheritdoc */
   rootDir(): string {
-    return this._rootDir ?? svnSync(this.cwd, 'info', '--show-item', 'wc-root')
+    return this._rootDir ?? normalizeVcsRoot(svnSync(this.cwd, 'info', '--show-item', 'wc-root'))
   }
 
   /** @inheritdoc */
@@ -147,7 +148,7 @@ function normalizeSvnPaths(diffOutput: string, statusOutput: string): readonly s
  */
 function addSvnStatusPath(files: Set<string>, line: string): void {
   if (line.length <= 8) return
-  const filePath = line.slice(8).trimEnd().replaceAll('\\', '/')
+  const filePath = toPortablePath(line.slice(8).trimEnd())
   if (filePath.length > 0) {
     files.add(filePath)
   }

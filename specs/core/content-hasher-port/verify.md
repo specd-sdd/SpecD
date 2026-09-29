@@ -56,6 +56,20 @@
 - **THEN** no observable state changes occur between calls
 - **AND** the return value is identical each time
 
+### Requirement: Text newline normalization
+
+#### Scenario: CRLF text matches LF text
+
+- **GIVEN** one string uses `\r\n` and another uses `\n` for the same lines
+- **WHEN** both are hashed as text
+- **THEN** the digests are equal
+
+#### Scenario: A lone CR is also normalized
+
+- **GIVEN** a string whose only newline is `\r`
+- **WHEN** it is hashed as text
+- **THEN** the digest matches the same text with `\n`
+
 ### Requirement: Hash input
 
 #### Scenario: Hash accepts string content

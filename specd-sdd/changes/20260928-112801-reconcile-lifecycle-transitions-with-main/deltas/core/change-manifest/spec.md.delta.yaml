@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'The persisted manifest contract already requires append-only history and current projections; this change reconciles existing records without changing that contract.'
