@@ -335,6 +335,10 @@ See the [configuration guide](docs/guide/configuration.md) for all available opt
 
 This repository follows a spec-driven workflow: each significant area of behavior is specified in `specs/` before implementation begins.
 
+## Ecosystem
+
+For collaborative, web-based PRD authoring and cloud specification management alongside SpecD CLI workflows, see [MySpec](https://myspec.dev?utm_source=github&utm_medium=referral&utm_campaign=specd).
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
