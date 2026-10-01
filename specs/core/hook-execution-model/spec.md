@@ -85,24 +85,32 @@ Skills and shared templates that skip hooks and run them manually MUST apply the
 
 The `--skip-hooks` CLI flag maps to the `skipHookPhases` selector set in the corresponding use case input. The agent is responsible for invoking hooks at the appropriate time.
 
+### Requirement: Resilient hook failure policy
+
+Executable hooks (`type: 'run'` and `type: 'external'`) MAY declare an `onFailure` policy:
+
+```typescript
+export type HookFailurePolicy = 'abort' | 'warn'
+```
+
+- `onFailure: 'abort'` (default): A non-zero exit code halts execution immediately and marks the hook execution result as failed (`success: false`).
+- `onFailure: 'warn'`: A non-zero exit code SHALL NOT halt execution. The orchestrator captures the process's real exit code, stdout, and stderr into a `warnings` collection, reports the advisory failure in telemetry, and proceeds with the remaining hooks.
+
 ### Requirement: Pre-hook failure semantics
 
-When a `run:` pre-hook exits with a non-zero code:
+When executing `pre` hooks via `RunStepHooks`:
 
-- **`TransitionChange`** — throws `HookFailedError`. No state transition occurs.
-- **`ArchiveChange`** — throws `HookFailedError`. No files are modified.
-- **`RunStepHooks` (standalone)** — returns immediately with the failure result. The CLI exits with code 2. The agent SHOULD NOT proceed with the step's work and SHOULD offer to fix the problem before retrying.
-
-In all cases, pre-hooks use **fail-fast** semantics: execution stops at the first failure, and subsequent hooks in the list are not run.
+- If any hook configured with `onFailure: 'abort'` fails, the runner MUST halt execution immediately. The overall phase result SHALL have `success: false`.
+- If a hook fails with `onFailure: 'warn'`, execution MUST continue. If all failed hooks in the phase were configured with `onFailure: 'warn'`, the overall phase result SHALL report `success: true` with a populated `warnings` collection.
+- The internal `hook.pre` effect check evaluated during transitions MUST evaluate to `pass` when `RunStepHooksResult.success` is true, allowing the domain state transition to proceed. If `success: false`, it evaluates to `fail`, blocking the transition.
 
 ### Requirement: Post-hook failure semantics
 
-When a `run:` effect exits with a non-zero code, the use case MUST apply the binding’s `onFailure`:
+When executing `post` hooks via `RunStepHooks`:
 
-- `abort` — throw `HookFailedError`. If the binding `phase` is `before-persist`, no state change is persisted.
-- `collect` — record the failure and continue remaining effects in that slot.
-
-Default bindings: transition `hook.pre` / `hook.post` are `abort` and `before-persist`. Archive `hook.pre` is `abort` / `before-persist`. Archive `hook.post` is `collect` / `after-persist`. `RunStepHooks` (standalone) continues executing remaining post-hooks and the CLI exits with code 2 if any post-hook failed.
+- Because the domain state mutation has already been committed, a failure in a `post` hook does not roll back the state transition.
+- If any `post` hook configured with `onFailure: 'abort'` fails, the runner halts and reports the failure.
+- If a `post` hook fails with `onFailure: 'warn'`, execution continues, logging the non-fatal failure in `warnings` and completing successfully.
 
 ### Requirement: Hook ordering
 

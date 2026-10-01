@@ -1,3 +1,13 @@
+import { type ChangeState } from './change-state.js'
+import { type TransitionAlong } from '../services/transition-checks.js'
+
+/**
+ * Failure policy for hook execution.
+ * - 'abort' (default): Halt execution immediately and fail phase.
+ * - 'warn': Capture failure as warning and proceed with remaining hooks.
+ */
+export type HookFailurePolicy = 'abort' | 'warn'
+
 /**
  * A single hook entry within a workflow step's `pre` or `post` array.
  *
@@ -16,6 +26,8 @@ export type HookEntry =
        * `{{change.name}}`, `{{change.path}}`, `{{project.root}}`.
        */
       readonly command: string
+      /** Hook failure policy ('abort' or 'warn'). Defaults to 'abort'. */
+      readonly onFailure?: HookFailurePolicy
     }
   | {
       /** Unique identifier for this hook entry within its array. */
@@ -34,11 +46,33 @@ export type HookEntry =
       readonly externalType: string
       /** Runner-owned opaque config payload declared in workflow YAML. */
       readonly config: Record<string, unknown>
+      /** Hook failure policy ('abort' or 'warn'). Defaults to 'abort'. */
+      readonly onFailure?: HookFailurePolicy
     }
 
 /**
+ * Declaration associating a transition check with a workflow step in schema.yaml.
+ */
+export interface WorkflowStepCheckDeclaration {
+  /** Check identifier (must be registered in CheckRegistry). */
+  readonly id: string
+  /** Source state filter (defaults to '*'). */
+  readonly from?: ChangeState | '*'
+  /** Transition direction filter ('forward', 'backward', 'recovery', 'redesign', or '*'). Defaults to 'forward'. */
+  readonly along?: TransitionAlong | '*'
+  /** Failure policy ('abort' or 'collect'). Defaults to 'abort'. */
+  readonly onFailure?: 'abort' | 'collect'
+  /** Permission to bypass via `--skip-checks`, subject to governance locks. */
+  readonly skippable?: boolean
+  /** Whether this check is disabled for this workflow step, subject to governance locks. */
+  readonly disabled?: boolean
+  /** Step-specific configuration merged over check defaults. */
+  readonly config?: Readonly<Record<string, unknown>>
+}
+
+/**
  * A lookup row in schema `workflow[]`. `step` names an existing `ChangeState`;
- * the row attaches extras (`requires`, `requiresTaskCompletion`, `hooks`).
+ * the row attaches extras (`requires`, `requiresTaskCompletion`, `hooks`, `checks`).
  * It does not define protocol membership or legal hops.
  */
 export interface WorkflowStep {
@@ -68,4 +102,7 @@ export interface WorkflowStep {
     /** Hooks that fire after the step completes. */
     readonly post: readonly HookEntry[]
   }
+
+  /** Checks declared for this workflow step. */
+  readonly checks?: readonly WorkflowStepCheckDeclaration[]
 }

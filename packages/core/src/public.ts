@@ -2,6 +2,8 @@ import { createRequire } from 'module'
 
 // Bootstrap
 export { createKernel, type Kernel, type KernelOptions } from './composition/kernel.js'
+export { createKernelBuilder, type KernelBuilder } from './composition/kernel-builder.js'
+export { type PluginCheckRegistration } from './composition/composition-registries.js'
 export {
   createDefaultConfigLoader,
   type FsConfigLoaderOptions,
@@ -573,6 +575,17 @@ export {
   InvalidInputError,
   DraftedChangeReadOnlyError,
   UnsupportedManifestVersionError,
+  InvalidPluginNameError,
+  DuplicateCheckError,
+  DuplicateCheckBindingError,
+  InvalidCheckKindError,
+  CheckEmbeddingForbiddenError,
+  CheckBindingOverrideForbiddenError,
+  CheckConfigOverrideForbiddenError,
+  CheckNotSkippableError,
+  CheckDisableForbiddenError,
+  UnknownCheckError,
+  CheckPredicateFailedError,
 } from './domain/errors/index.js'
 
 export {
@@ -717,7 +730,22 @@ export {
   type CheckResult,
   type CheckProgressEvent,
   type OnCheckProgress,
+  type Check,
+  type CustomCheckDefinition,
+  type CheckBindingSpec,
+  type CheckBinding,
+  type CheckExecutionContext,
 } from './domain/services/transition-checks.js'
+export {
+  CheckRegistry,
+  type CheckGovernance,
+  type PluginCheckRegistrationOptions,
+} from './domain/services/check-registry.js'
+export {
+  deepMergeConfig,
+  isRecord,
+  type DeepMergeConfigOptions,
+} from './domain/services/deep-merge-config.js'
 
 const _require = createRequire(import.meta.url)
 /** Installed version of `@specd/core`. */

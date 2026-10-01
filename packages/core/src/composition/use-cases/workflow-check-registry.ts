@@ -62,11 +62,26 @@ export function resolveWorkflowCheckRegistry(
     }
   }
 
-  return createWorkflowCheckRegistry({
+  const builtins = createWorkflowCheckRegistry({
     countTasks,
     runStepHooks: resolver.getRunStepHooks(),
     readyFacts,
     detectImplLinksInScope,
     ...(detectOverlap !== undefined ? { detectSpecOverlap: detectOverlap } : {}),
   })
+
+  const customBindings = resolver.registry?.checks
+    ? resolver.registry.checks.bindings().filter((b) => b.check.id.startsWith('@'))
+    : []
+  const customTransition = customBindings.filter((b) =>
+    b.applicability.some((a) => a.scope === 'transition'),
+  )
+  const customArchive = customBindings.filter((b) =>
+    b.applicability.some((a) => a.scope === 'archive'),
+  )
+
+  return {
+    transitionBindings: [...builtins.transitionBindings, ...customTransition],
+    archiveBindings: [...builtins.archiveBindings, ...customArchive],
+  }
 }

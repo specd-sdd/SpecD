@@ -132,6 +132,26 @@
 - **THEN** `workflow.taskCompletion.execute` uses `CountTasks`
 - **AND** `evaluateLifecycleVerdict` does not read the tasks file itself
 
+### Requirement: Step check declarations
+
+#### Scenario: Workflow step accepts check declarations
+
+- **GIVEN** a workflow step schema definition with `checks` array
+- **WHEN** loading the workflow model
+- **THEN** each step exposes its declared `checks` with `id`, `along`, `onFailure`, `skippable`, `disabled`, and `config`
+
+#### Scenario: Step check declaration defaults along to forward
+
+- **GIVEN** a check declaration `{ id: '@qa.coverage' }` without an explicit `along`
+- **WHEN** reading the normalized step check declaration
+- **THEN** `along` defaults to `'forward'`
+
+#### Scenario: Step check declaration preserves disabled property
+
+- **GIVEN** a check declaration `{ id: '@qa.coverage', disabled: true }`
+- **WHEN** reading the normalized step check declaration
+- **THEN** `disabled` is true
+
 ### Requirement: Step availability evaluation
 
 #### Scenario: Availability reads persisted artifact state

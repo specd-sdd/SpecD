@@ -13,7 +13,12 @@
     "core:archive-change",
     "core:hook-execution-model"
   ],
-  "implementation": [],
+  "implementation": [
+    {
+      "file": "core:src/domain/value-objects/workflow-step.ts",
+      "symbols": ["WorkflowStep", "WorkflowStepCheckDeclaration", "HookFailurePolicy", "HookEntry"]
+    }
+  ],
   "optimizations": {
     "optimizedDescription": {
       "value": "Workflow maps schema rows onto fixed lifecycle states, evaluating artifact/task gates, progress axis, and bound hook effects.",

@@ -2,29 +2,24 @@ import {
   CHECK_LABELS,
   fail,
   pass,
-  skip,
   type Check,
-  type CheckExecutionContext,
   type CheckResult,
 } from '../services/transition-checks.js'
 
 /** Facts for `impl.linksInScope`. */
 export interface ImplLinksInScopeFacts {
-  readonly allowOutOfScope: boolean
   readonly linksInScopeBlocked: boolean
   readonly linksInScopeMessage?: string
 }
 
 /**
  * Shared `impl.linksInScope` runner (exit-implementing and archive via registry bindings).
+ * Evaluates purely whether domain invariant holds.
  *
- * @param facts - Scope detector + skip flag
+ * @param facts - Scope detector facts
  * @returns Check result
  */
 export function runImplLinksInScope(facts: ImplLinksInScopeFacts): CheckResult {
-  if (facts.allowOutOfScope) {
-    return skip('impl.linksInScope')
-  }
   if (!facts.linksInScopeBlocked) {
     return pass('impl.linksInScope')
   }
@@ -38,7 +33,7 @@ export function runImplLinksInScope(facts: ImplLinksInScopeFacts): CheckResult {
 /**
  * Predicate body.
  *
- * @param facts - Scope detector + skip flag
+ * @param facts - Scope detector facts
  * @returns Check result
  */
 export function run(facts: ImplLinksInScopeFacts): CheckResult {
@@ -48,13 +43,11 @@ export function run(facts: ImplLinksInScopeFacts): CheckResult {
 /**
  * Domain stub execute. Application `create*` owns I/O.
  *
- * @param ctx - Host attempt context
  * @returns Check result
  */
-function execute(ctx: CheckExecutionContext): Promise<CheckResult> {
+function execute(): Promise<CheckResult> {
   return Promise.resolve(
     run({
-      allowOutOfScope: ctx.allowOutOfScope,
       linksInScopeBlocked: false,
     }),
   )

@@ -806,7 +806,7 @@ describe('evaluateLifecycle', () => {
 
     const blocker = verdict.blockers.find((entry) => entry.code === 'IMPLEMENTATION_STATE')
     expect(blocker).toBeDefined()
-    expect(blocker?.bypassFlag).toBe('--allow-out-of-scope')
+    expect(blocker?.bypassFlag).toBe('--skip-checks impl.linksInScope')
     expect(blocker?.isSkippable).toBe(true)
     expect(blocker?.checkId).toBe('impl.linksInScope')
   })

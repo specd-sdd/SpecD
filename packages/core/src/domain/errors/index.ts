@@ -50,3 +50,16 @@ export { SpecMetadataParseError } from './spec-metadata-parse-error.js'
 export { ImplementationFileNotFoundError } from './implementation-file-not-found-error.js'
 export { ImplementationWorkspaceBoundaryError } from './implementation-workspace-boundary-error.js'
 export { UnsupportedManifestVersionError } from './unsupported-manifest-version-error.js'
+export {
+  InvalidPluginNameError,
+  DuplicateCheckError,
+  DuplicateCheckBindingError,
+  InvalidCheckKindError,
+  CheckEmbeddingForbiddenError,
+  CheckBindingOverrideForbiddenError,
+  CheckConfigOverrideForbiddenError,
+  CheckNotSkippableError,
+  CheckDisableForbiddenError,
+  UnknownCheckError,
+} from './check-registry-errors.js'
+export { CheckPredicateFailedError } from './check-predicate-failed-error.js'

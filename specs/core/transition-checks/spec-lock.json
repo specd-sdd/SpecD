@@ -7,40 +7,60 @@
     "core:change",
     "core:workflow-model",
     "core:schema-format",
-    "default:_global/architecture"
+    "default:_global/architecture",
+    "core:check-registry"
   ],
   "implementation": [
     {
-      "file": "core:src/domain/services/change-validity.ts",
-      "symbols": ["evaluateChangeValidity", "selectAutomaticRecovery"]
-    },
-    {
-      "file": "core:src/application/use-cases/reconcile-change-validity.ts",
-      "symbols": ["ReconcileChangeValidity"]
-    },
-    {
-      "file": "core:src/application/services/validity-fingerprint-service.ts",
-      "symbols": ["ValidityFingerprintService"]
-    },
-    {
-      "file": "core:src/application/ports/binary-content-hasher.ts",
-      "symbols": ["BinaryContentHasher"]
-    },
-    {
-      "file": "core:src/domain/services/lifecycle-verdict.ts",
-      "symbols": ["evaluateLifecycleVerdict"]
-    },
-    {
-      "file": "core:src/application/services/execute-matching-predicates.ts",
-      "symbols": ["buildCheckExecutionContext"]
-    },
-    {
-      "file": "core:src/application/checks/verification-current.ts",
-      "symbols": ["createVerificationCurrent"]
+      "file": "core:src/domain/services/transition-checks.ts",
+      "symbols": [
+        "Check",
+        "CheckResult",
+        "CheckExecutionContext",
+        "CustomCheckDefinition",
+        "CheckBindingSpec",
+        "CheckBinding",
+        "applyBindingSpecs",
+        "pass",
+        "skip",
+        "fail"
+      ]
     },
     {
       "file": "core:src/domain/services/check-bindings.ts",
-      "symbols": ["TRANSITION_BINDING_SPECS"]
+      "symbols": ["TRANSITION_BINDING_SPECS", "ARCHIVE_BINDING_SPECS", "DOMAIN_CHECKS"]
+    },
+    {
+      "file": "core:src/domain/checks/impl-links-in-scope.ts",
+      "symbols": ["runImplLinksInScope", "implLinksInScope"]
+    },
+    {
+      "file": "core:src/domain/checks/spec-overlap.ts",
+      "symbols": ["runSpecOverlap", "specOverlap"]
+    },
+    {
+      "file": "core:src/application/checks/impl-links-in-scope.ts",
+      "symbols": ["createImplLinksInScope"]
+    },
+    {
+      "file": "core:src/application/checks/spec-overlap.ts",
+      "symbols": ["createSpecOverlap"]
+    },
+    {
+      "file": "core:src/domain/errors/check-predicate-failed-error.ts",
+      "symbols": ["CheckPredicateFailedError"]
+    },
+    {
+      "file": "core:src/application/services/execute-matching-predicates.ts",
+      "symbols": ["executeMatchingPredicates"]
+    },
+    {
+      "file": "core:src/application/use-cases/transition-change.ts",
+      "symbols": ["TransitionChange"]
+    },
+    {
+      "file": "core:src/application/use-cases/get-status.ts",
+      "symbols": ["GetStatus"]
     }
   ],
   "optimizations": {

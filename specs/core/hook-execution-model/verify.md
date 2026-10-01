@@ -111,57 +111,37 @@
 
 ### Requirement: Pre-hook failure semantics
 
-#### Scenario: Deterministic pre-hook failure aborts archive
+#### Scenario: Pre-hook with onFailure abort halts transition
 
-- **GIVEN** the archiving step with pre-hooks `[{ id: "test", run: "pnpm test" }, { id: "lint", run: "pnpm lint" }]`
-- **AND** `pnpm test` exits with code 1
-- **WHEN** `ArchiveChange` executes pre-hooks
-- **THEN** `HookFailedError` is thrown with command `pnpm test`, exit code 1, and stderr
-- **AND** `pnpm lint` is never executed
-- **AND** no files are modified
+- **GIVEN** a pre-hook configured with `onFailure: 'abort'` that exits with code 1
+- **WHEN** `RunStepHooks.execute` runs for the pre phase
+- **THEN** execution halts immediately
+- **AND** `RunStepHooksResult.success` is false
+- **AND** the state transition is blocked
 
-#### Scenario: Agent-driven pre-hook failure exits code 2
+#### Scenario: Pre-hook with onFailure warn records telemetry and permits transition
 
-- **GIVEN** the implementing step with pre-hooks `[{ id: "check", run: "pnpm typecheck" }]`
-- **AND** `pnpm typecheck` exits with code 1
-- **WHEN** the agent runs `specd change run-hooks <name> implementing --phase pre`
-- **THEN** the CLI exits with code 2
-- **AND** the result includes the failed hook details
+- **GIVEN** a pre-hook configured with `onFailure: 'warn'` that exits with code 1
+- **WHEN** `RunStepHooks.execute` runs for the pre phase
+- **THEN** execution captures the exit code, stdout, and stderr into `warnings`
+- **AND** `RunStepHooksResult.success` is true
+- **AND** the state transition proceeds successfully
 
 ### Requirement: Post-hook failure semantics
 
-#### Scenario: Deterministic post-hook failure does not rollback
+#### Scenario: Post-hook failure with abort halts execution
 
-- **GIVEN** the archiving step with post-hooks `[{ id: "branch", run: "git checkout -b x" }, { id: "notify", run: "curl webhook" }]`
-- **AND** `git checkout -b x` exits with code 1
-- **WHEN** `ArchiveChange` executes post-hooks
-- **THEN** `curl webhook` is still executed
-- **AND** both results are collected
-- **AND** `postHookFailures` includes the `branch` hook failure
-- **AND** the archive is NOT rolled back
+- **GIVEN** a post-hook configured with `onFailure: 'abort'` that exits with code 1
+- **WHEN** `RunStepHooks.execute` runs for the post phase
+- **THEN** execution halts and reports failure
+- **AND** `RunStepHooksResult.success` is false
 
-#### Scenario: Agent-driven post-hook failure continues execution
+#### Scenario: Post-hook failure with warn logs warning without error
 
-- **GIVEN** the implementing step with post-hooks `[{ id: "test", run: "pnpm test" }, { id: "lint", run: "pnpm lint" }]`
-- **AND** `pnpm test` exits with code 1
-- **WHEN** the agent runs `specd change run-hooks <name> implementing --phase post`
-- **THEN** `pnpm lint` is still executed
-- **AND** the CLI exits with code 2 (at least one hook failed)
-- **AND** results for both hooks are returned
-
-#### Scenario: Transition source.post failure does not persist
-
-- **GIVEN** `implementing.hooks.post` exits non-zero on `implementing → verifying`
-- **WHEN** `TransitionChange` executes
-- **THEN** `HookFailedError` is thrown
-- **AND** the change remains in `implementing`
-
-#### Scenario: Archive post collect is binding policy
-
-- **GIVEN** archive `hook.post` is bound with `onFailure = collect`
-- **WHEN** that effect exits non-zero after persist
-- **THEN** `ArchiveChange` continues
-- **AND** the same check id on a transition binding with `onFailure = abort` still throws
+- **GIVEN** a post-hook configured with `onFailure: 'warn'` that exits with code 1
+- **WHEN** `RunStepHooks.execute` runs for the post phase
+- **THEN** `RunStepHooksResult.warnings` contains the failed hook record
+- **AND** `RunStepHooksResult.success` is true
 
 ### Requirement: Hook ordering
 
@@ -270,6 +250,14 @@
 - **GIVEN** `skipHookPhases` contains `target.post`
 - **WHEN** `TransitionChange.execute` runs a forward hop
 - **THEN** matching `hook.pre` / `hook.post` still execute unless another selector skips them
+
+### Requirement: Resilient hook failure policy
+
+#### Scenario: Hook entry parses onFailure warn policy
+
+- **GIVEN** a workflow hook declaration with `onFailure: 'warn'`
+- **WHEN** loading the hook entry
+- **THEN** `entry.onFailure` is `'warn'`
 
 ### Requirement: Template variable expansion
 

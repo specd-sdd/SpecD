@@ -44,7 +44,7 @@ class WorkflowRequiresCheck extends WorkflowCheck {
       runWorkflowRequires({
         schema: ctx.schema,
         target: ctx.attempt.to,
-        effectiveStatusByArtifact: ctx.effectiveStatusByArtifact,
+        effectiveStatusByArtifact: ctx.effectiveStatusByArtifact ?? new Map(),
       }),
     )
   }

@@ -28,6 +28,7 @@ import {
   type CheckResult,
   type TaskCompletionCounts,
 } from '../../domain/services/transition-checks.js'
+import { type CheckRegistry } from '../../domain/services/check-registry.js'
 import { Logger } from '../logger.js'
 import {
   buildCheckExecutionContext,
@@ -383,6 +384,7 @@ export class GetStatus {
   private readonly _transitionBindings: readonly CheckBinding[]
   private readonly _archiveBindings: readonly CheckBinding[]
   private readonly _reconcile: ReconcileChangeValidity
+  private readonly _checkRegistry?: CheckRegistry
 
   /**
    * Creates a new `GetStatus` use case instance.
@@ -396,6 +398,7 @@ export class GetStatus {
    * @param transitionBindings - Composed transition check bindings
    * @param archiveBindings - Composed archive check bindings (status in `archivable`)
    * @param reconcile - Optional validity reconciler applied before projection
+   * @param checkRegistry - Optional CheckRegistry for open check catalog and bindings
    */
   constructor(
     changes: ChangeRepository,
@@ -405,6 +408,7 @@ export class GetStatus {
     transitionBindings: readonly CheckBinding[],
     archiveBindings: readonly CheckBinding[],
     reconcile?: ReconcileChangeValidity,
+    checkRegistry?: CheckRegistry,
   ) {
     this._changes = changes
     this._schemaProvider = schemaProvider
@@ -416,6 +420,9 @@ export class GetStatus {
       throw new InvalidCompositionFactoryArgumentsError('GetStatus', 'reconcile is required')
     }
     this._reconcile = reconcile
+    if (checkRegistry !== undefined) {
+      this._checkRegistry = checkRegistry
+    }
   }
 
   /**
@@ -560,6 +567,7 @@ export class GetStatus {
       approvals: this._approvals,
       effectiveStatusByArtifact,
       passMemo,
+      ...(this._checkRegistry !== undefined ? { checkRegistry: this._checkRegistry } : {}),
       ...(validity !== undefined ? { validity } : {}),
     })
     let archiveChecks: readonly CheckResult[] = []
@@ -571,10 +579,9 @@ export class GetStatus {
           schema,
           attempt: { scope: 'archive' },
           approvals: this._approvals,
-          allowOverlap: false,
-          allowOutOfScope: false,
           effectiveStatusByArtifact,
           passMemo,
+          ...(this._checkRegistry !== undefined ? { checkRegistry: this._checkRegistry } : {}),
           ...(validity !== undefined ? { validity } : {}),
         }),
       )
@@ -629,6 +636,19 @@ export class GetStatus {
     nextArtifact = verdict.nextArtifact
     checksByTarget = verdict.checksByTarget
     checks = verdict.checks
+
+    // If nextAction has no command, project remediation command from failing check if present
+    if (nextAction.command === null) {
+      const failingCheckWithCommand = checks.find(
+        (c) => c.outcome === 'fail' && c.command !== undefined,
+      )
+      if (failingCheckWithCommand?.command) {
+        nextAction = {
+          ...nextAction,
+          command: failingCheckWithCommand.command,
+        }
+      }
+    }
 
     Logger.debug('GetStatus projected evaluateLifecycle verdict', {
       change: change.name,
@@ -846,6 +866,10 @@ export class GetStatus {
       })
     }
 
+    const allBindings = this._checkRegistry
+      ? this._checkRegistry.bindings()
+      : [...this._transitionBindings, ...this._archiveBindings]
+
     const checks = [
       ...Object.values(checksByTarget).flatMap((rows) => rows ?? []),
       ...archiveChecks,
@@ -856,16 +880,14 @@ export class GetStatus {
       const message = check.message ?? `Check '${check.id}' failed`
       const key = `${check.code}:${message}`
       if (merged.has(key)) continue
-      const linksInScopeSkippable =
-        check.code === 'IMPLEMENTATION_STATE' && check.id === 'impl.linksInScope'
-      const overlapSkippable = check.code === 'OVERLAP_CONFLICT'
+      const matchingBinding = allBindings.find((b) => b.check.id === check.id)
+      const isSkippable = matchingBinding?.skippable === true
       merged.set(key, {
         code: check.code,
         message,
         label: check.label,
         checkId: check.id,
-        ...(linksInScopeSkippable ? { bypassFlag: '--allow-out-of-scope' } : {}),
-        ...(overlapSkippable ? { bypassFlag: '--allow-overlap' } : {}),
+        ...(isSkippable ? { bypassFlag: `--skip-checks ${check.id}` } : {}),
       })
     }
 
@@ -888,7 +910,7 @@ export class GetStatus {
     if (overlap === undefined) {
       return nextAction
     }
-    const bypass = overlap.bypassFlag ?? '--allow-overlap'
+    const bypass = overlap.bypassFlag ?? '--skip-checks spec.overlap'
     const reason = overlap.message.includes(bypass)
       ? overlap.message
       : `${overlap.message} Use ${bypass} to archive anyway.`

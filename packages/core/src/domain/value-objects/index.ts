@@ -68,7 +68,12 @@ export {
   type PreHashCleanup,
   type TaskCompletionCheck,
 } from './validation-rule.js'
-export { type HookEntry, type WorkflowStep } from './workflow-step.js'
+export {
+  type HookEntry,
+  type HookFailurePolicy,
+  type WorkflowStep,
+  type WorkflowStepCheckDeclaration,
+} from './workflow-step.js'
 export { HookResult } from './hook-result.js'
 export {
   ArtifactType,

@@ -10,24 +10,17 @@ Because transitions may trigger long-running hooks, the command must also keep h
 
 ### Requirement: Command signature
 
-```
-specd changes transition <name> <step> [--skip-hooks <phases>] [--allow-out-of-scope] [--format text|json|toon]
-specd changes transition <name> --next [--skip-hooks <phases>] [--allow-out-of-scope] [--format text|json|toon]
-```
+The command SHALL be invoked as `specd change transition [name] [target]`.
+If `name` is omitted, it defaults to the active workspace change.
+If `target` is omitted, it attempts to resolve the next logical transition.
 
-Alias:
+The command MUST accept a `--skip-checks <ids>` option accepting a comma-separated list of check IDs.
+The command MUST maintain backward compatibility with legacy flags by translating them into `skipChecks`:
 
-```
-specd change transition <name> <step> [--skip-hooks <phases>] [--allow-out-of-scope] [--format text|json|toon]
-specd change transition <name> --next [--skip-hooks <phases>] [--allow-out-of-scope] [--format text|json|toon]
-```
+- `--allow-out-of-scope` appends `impl.linksInScope` to `skipChecks`.
+- `--allow-overlap` appends `spec.overlap` to `skipChecks`.
 
-- `<name>` — required positional; the name of the change to transition
-- `<step>` — required positional when `--next` is not used; the target lifecycle state (e.g. `designing`, `ready`, `implementing`, `verifying`, `done`, `archivable`, `pending-spec-approval`, `spec-approved`, `pending-signoff`, `signed-off`)
-- `--next` — optional flag; the CLI MUST pass `to: 'next'` to `TransitionChange.execute`. Mutually exclusive with `<step>`
-- `--skip-hooks <phases>` — optional; comma-separated list of hook phases to skip. Valid values: `source.pre`, `source.post`, `target.pre`, `target.post`, `all`. When `all` is specified, all hook phases are skipped. When omitted, all applicable hooks execute. Skip applies to effects only.
-- `--allow-out-of-scope` — optional flag; when set, the CLI MUST pass `allowOutOfScope: true` to `TransitionChange.execute`. That skippable flag applies only to `impl.linksInScope`. It MUST NOT bypass `impl.filesResolved`. When the flag is omitted, the CLI MUST NOT set `allowOutOfScope` on the execute input
-- `--format text|json|toon` — optional; output format, defaults to `text`
+The CLI adapter MUST pass the compiled `skipChecks` array directly to `TransitionChangeInput.skipChecks`.
 
 ### Requirement: Next-transition resolution
 
@@ -107,31 +100,13 @@ If hook progress was rendered before the failure, the failure output MUST still 
 
 ### Requirement: Invalid transition error
 
-If the transition is not valid from the current state, the command exits with code 1 and prints an `error:` message to stderr.
+The command MUST catch `CheckPredicateFailedError` and map it onto the CLI Text Repair Guide.
+When this error is caught:
 
-When the transition fails with `InvalidStateTransitionError` (or another repair-guide error), the command MUST render a **Repair Guide** in text mode **on stderr** (not stdout):
-
-```
-error: cannot transition to <step>
-! <CODE> — <label>: <message>
-
-repair guide:
-  target:  <targetStep>
-  command: <command>
-  reason:  <reason>
-```
-
-When a blocker has no check `label`, the line is `! <CODE>: <message>`.
-
-The repair guide uses the `nextAction` data from the `GetStatusResult`. Those values MUST reflect transition-check evaluation (for example `implementing` with complete tasks recommends the verify skill, not `/specd-implement`). The `! <CODE>` line uses the blocker codes identified in the `GetStatus` spec (e.g., `INCOMPLETE_ARTIFACT`, `ARTIFACT_DRIFT`, `INCOMPLETE_TASKS`, `DEPS_INCONSISTENT`) and, when present, the check gerund `label`.
-
-`HookFailedError` MUST NOT render a Repair Guide. It MUST exit with code 2 after the check bus shows `✗` for the failing effect.
-
-When `format` is `json` or `toon`, the command MUST keep failure reporting on stdout as part of the structured stream by emitting a terminal `stream: "change-transition"` record with `event.type: "complete"` and `event.result` containing `result: "failure"`, `name`, `from`, `to`, `blockers`, and `nextAction`.
-
-When the underlying `InvalidStateTransitionError` carries a structured reason explaining that the change is blocked on human approval or signoff, the command MUST surface that explanation in the stderr message rather than collapsing it to a generic invalid-transition message.
-
-When `--next` is invoked from a state where Core rejects `to: 'next'`, the stderr message MUST explain why the command cannot advance automatically from that state.
+- The CLI SHALL render the failure message, diagnostic code, and the check's gerund label.
+- If the check definition or result specifies a remediation `command`, the Repair Guide MUST present it under the `command:` field.
+- If the failed check allows bypass (`skippable: true`), the Repair Guide MUST suggest the exact bypass syntax: `Retry with --skip-checks <id> if an exception is granted`.
+- If the check is mandatory (`skippable: false`), no bypass option SHALL be offered.
 
 ### Requirement: Incomplete tasks error
 

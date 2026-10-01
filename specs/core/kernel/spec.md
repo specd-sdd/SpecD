@@ -93,17 +93,29 @@ The kernel must expose the underlying `ChangeRepository` as `changes.repo` and t
 
 ### Requirement: KernelOptions supports additive registries
 
-`KernelOptions` SHALL support additive registration of external capabilities before kernel construction. At minimum, it SHALL include extension points for:
+`KernelOptions` and `CompositionRegistryInput` MUST accept arrays of additive registry items:
 
-- storage factories
-- VCS providers
-- actor providers
-- artifact parsers
-- external hook runners
+- `schemas`: Array of `PluginSchemaDistribution` objects.
+- `tasks`: Array of `PluginTaskDistribution` objects.
+- `checks`: Array of `PluginCheckRegistration` objects.
 
-These registrations SHALL extend the built-in capability set rather than replacing it.
+Each `PluginCheckRegistration` entry MUST provide:
 
-Code-graph graph-store registration is not part of the core kernel contract.
+- `pluginName`: Mandatory non-empty string.
+- `check`: The `CustomCheckDefinition` implementation.
+- `defaultConfig`: Optional check-level baseline configuration.
+- `allowConfigOverride`: Optional boolean lock governing schema overrides.
+- `allowBindingOverride`: Optional boolean lock governing step embedding.
+- `allowDisable`: Optional boolean lock governing step disablement.
+- `defaultBindings`: Optional array of `CheckBindingSpec` associations.
+
+### Requirement: Check Registration and KernelBuilder Extension
+
+The kernel composition layer MUST wire built-in checks and external plugin registrations into a unified `CheckRegistry`:
+
+- The fluent `KernelBuilder` interface in `@specd/core/extensions` MUST expose:
+- The builder MUST delegate check registration to the underlying `CheckRegistry`, ensuring strict `@pluginName.id` namespacing and setting `kind: 'predicate'`.
+- The resulting `Kernel` instance MUST expose the active check registry view under `kernel.registry.checks` for observability and tooling.
 
 ### Requirement: Kernel exposes merged registries
 
@@ -337,3 +349,4 @@ await writer.initProject({
 - [`core:spec-overlap`](../spec-overlap/spec.md)
 - [`core:get-specs-health`](../get-specs-health/spec.md)
 - [`core:count-tasks`](../count-tasks/spec.md) — shared task-completion query exposed by the kernel.
+- [`core:check-registry`](../check-registry/spec.md) — Dynamic check catalog, namespacing, and governance.

@@ -4,27 +4,24 @@
 
 ### Requirement: Check identity and result
 
-#### Scenario: Failed predicate carries existing error code
+#### Scenario: Check result carries remediation command
 
-- **GIVEN** a transition attempt whose `workflow.taskCompletion` predicate fails
-- **WHEN** the evaluation is returned
-- **THEN** the failing check has `id` `workflow.taskCompletion`
-- **AND** `label` is `Checking task completion`
-- **AND** `kind` is `predicate`
-- **AND** `outcome` is `fail`
-- **AND** `code` is `INCOMPLETE_TASKS`
+- **GIVEN** a check returning `outcome: 'fail'` with `command: 'pnpm audit:fix'`
+- **WHEN** evaluating check results
+- **THEN** the `CheckResult` preserves the `command` string for CLI reporting
 
-#### Scenario: Every registered check declares a gerund label
+#### Scenario: Check with skippable binding bypassed by user injects synthetic skip
 
-- **WHEN** the built-in check registry is inspected
-- **THEN** each check has a non-empty `label`
-- **AND** no label starts with `Executing:`
+- **GIVEN** a transition step whose binding declares `skippable: true`
+- **WHEN** the user supplies its check ID to `--skip-checks`
+- **THEN** the check is not executed
+- **AND** a synthetic `{ outcome: 'skip', details: { bypassedByUser: true } }` is recorded
 
-#### Scenario: Instruction hooks are not checks
+#### Scenario: Self-discarding check returns skip outcome
 
-- **GIVEN** a workflow step with only `instruction:` entries
-- **WHEN** a transition attempt is evaluated
-- **THEN** no check row is emitted for those instructions
+- **GIVEN** a check whose preconditions do not match active change scope
+- **WHEN** `check.execute(ctx)` runs
+- **THEN** it returns `{ outcome: 'skip', message: 'Not applicable to current workspace' }`
 
 ### Requirement: Check ABI create and WorkflowCheck
 
@@ -48,6 +45,20 @@
 - **WHEN** each pass creates a fresh `passMemo` on `CheckExecutionContext`
 - **THEN** `CountTasks` may run at most once per pass
 - **AND** the second pass recounts even if the instance is the same
+
+### Requirement: Public CustomCheckDefinition contract
+
+#### Scenario: Public check definition omits kind property
+
+- **GIVEN** an author implementing `CustomCheckDefinition`
+- **WHEN** compiling the TypeScript definition without `kind`
+- **THEN** type checking succeeds and passes to `registry.register`
+
+#### Scenario: Executing custom check receives isolated config
+
+- **GIVEN** a custom check registered with effective config `{ severity: 'high' }`
+- **WHEN** the orchestrator evaluates the check
+- **THEN** `ctx.config` contains `{ severity: 'high' }`
 
 ### Requirement: One implementation file per check
 
@@ -193,49 +204,29 @@
 
 ### Requirement: Registry bindings for this capability
 
-Scenarios:
+#### Scenario: impl.linksInScope step binding is explicitly skippable
 
-#### Scenario: Verification exit uses a non-mutating registered check
+- **GIVEN** the standard workflow step binding for `impl.linksInScope`
+- **WHEN** inspecting the binding's `skippable` property
+- **THEN** `skippable` is true
 
-- **GIVEN** `verifying → done` is evaluated with only an active attempt
-- **WHEN** `verification.current` executes
-- **THEN** it fails with actionable structured detail
-- **AND** it neither completes the attempt nor changes projections
+#### Scenario: spec.overlap step binding is explicitly skippable
 
-#### Scenario: Fresh completed evidence passes through shared evaluation
+- **GIVEN** the standard archive check binding for `spec.overlap`
+- **WHEN** inspecting the binding's `skippable` property
+- **THEN** `skippable` is true
 
-- **GIVEN** completed evidence matches fresh resolved inputs
-- **WHEN** both `CompleteVerification` freshness evaluation and `verification.current` evaluate that snapshot
-- **THEN** both produce the same freshness verdict
-- **AND** only explicit completion is allowed to persist success
+#### Scenario: Core workflow and protocol check bindings are non-skippable
 
-#### Scenario: Missing verification verdict fails closed
+- **GIVEN** step bindings for `protocol.edge`, `workflow.requires`, and `workflow.taskCompletion`
+- **WHEN** inspecting their `skippable` properties
+- **THEN** all report `skippable: false`
 
-- **GIVEN** a verification-requiring boundary has no canonical verification verdict
-- **WHEN** `verification.current` executes
-- **THEN** it fails with unavailable-validity guidance rather than skipping
+#### Scenario: Core protocol invariants enforce allowDisable false
 
-#### Scenario: Explicit not-required verdict skips
-
-- **WHEN** the canonical verdict explicitly marks verification `not-required`
-- **THEN** `verification.current` skips without fabricating completed evidence
-
-#### Scenario: Overlapping implementation bindings are deduplicated
-
-- **GIVEN** `implementing → verifying` matches forward-exit and verifying-entry applicability
-- **WHEN** registered checks are evaluated
-- **THEN** `impl.filesResolved` and `impl.linksInScope` each execute exactly once
-
-#### Scenario: Each implementation boundary remains independently guarded
-
-- **WHEN** a permitted transition enters `verifying` from another state or exits `implementing` forward to another state
-- **THEN** both implementation readiness checks execute for the applicable boundary
-
-#### Scenario: Verification start uses operation context
-
-- **WHEN** explicit start runs outside `verifying`
-- **THEN** it executes the registered implementation checks through operation context
-- **AND** does not fabricate a lifecycle edge or self-transition
+- **GIVEN** built-in check bindings for `protocol.edge`, `verification.current`, `archive.archivable`, and `schema.nameMatch`
+- **WHEN** inspecting their `allowDisable` properties
+- **THEN** all report `allowDisable: false`
 
 ### Requirement: Projections
 

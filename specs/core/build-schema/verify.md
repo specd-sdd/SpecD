@@ -270,6 +270,74 @@
 - **WHEN** `buildSchema` is called
 - **THEN** the returned `Schema` has `name() === "test"`, `version() === 1`, two artifacts accessible via `artifact(id)`, workflow steps accessible via `workflowStep(name)`, and metadata extraction defined
 
+### Requirement: Check declarations and governance validation
+
+#### Scenario: Unknown check ID throws UnknownCheckError
+
+- **GIVEN** a schema defining a step with `checks: [{ id: '@missing.check' }]`
+- **WHEN** `buildSchema` executes against a registry without `@missing.check`
+- **THEN** it throws `UnknownCheckError`
+
+#### Scenario: Duplicate check coordinate throws DuplicateCheckBindingError
+
+- **GIVEN** a schema defining two checks with identical `{ id: '@sec.scan', along: 'forward' }` on the same step
+- **WHEN** `buildSchema` executes
+- **THEN** it throws `DuplicateCheckBindingError`
+
+#### Scenario: Locked check embedding throws CheckEmbeddingForbiddenError
+
+- **GIVEN** a check registered with check-level `allowBindingOverride: false`
+- **WHEN** `buildSchema` compiles a schema embedding this check in an undeclared step
+- **THEN** it throws `CheckEmbeddingForbiddenError`
+
+#### Scenario: Embedding Category A built-in check in schema throws CheckEmbeddingForbiddenError
+
+- **GIVEN** a built-in Category A check `protocol.edge`
+- **WHEN** `buildSchema` compiles a schema declaring `checks: [{ id: 'protocol.edge' }]`
+- **THEN** it throws `CheckEmbeddingForbiddenError`
+
+#### Scenario: Embedding Category C built-in check in schema step succeeds
+
+- **GIVEN** a built-in Category C check `impl.linksInScope`
+- **WHEN** `buildSchema` compiles a schema declaring `checks: [{ id: 'impl.linksInScope', disabled: true }]`
+- **THEN** compilation succeeds and the check is recognized with `disabled: true`
+
+#### Scenario: Locked binding policy throws CheckBindingOverrideForbiddenError
+
+- **GIVEN** a check binding coordinate with `allowBindingOverride: false`
+- **WHEN** `buildSchema` compiles a schema altering `skippable: true` on that coordinate
+- **THEN** it throws `CheckBindingOverrideForbiddenError`
+
+#### Scenario: Locked config throws CheckConfigOverrideForbiddenError
+
+- **GIVEN** a check with `allowConfigOverride: false`
+- **WHEN** `buildSchema` compiles a schema providing step `config`
+- **THEN** it throws `CheckConfigOverrideForbiddenError`
+
+#### Scenario: Invalid hook onFailure value throws schema error
+
+- **GIVEN** a schema defining a hook with `onFailure: 'invalid'`
+- **WHEN** `buildSchema` validates the hook
+- **THEN** it throws a validation error rejecting the unsupported failure policy
+
+#### Scenario: Declaring disabled true on check with allowDisable false throws CheckDisableForbiddenError
+
+- **GIVEN** a check with check-level or binding-level `allowDisable: false`
+- **WHEN** `buildSchema` compiles a schema step with `checks: [{ id: '<locked-check>', disabled: true }]`
+- **THEN** it throws `CheckDisableForbiddenError`
+
+#### Scenario: Schema cannot relax existing binding allowDisable lock
+
+- **GIVEN** an existing binding coordinate with `allowDisable: false`
+- **WHEN** a schema re-declares the check on that step attempting `disabled: true`
+- **THEN** the existing binding's allowDisable lock enforces rejection and throws `CheckDisableForbiddenError`
+
+#### Scenario: Monotonic governance preserved across layer mergers
+
+- **GIVEN** a workflow step defining checks with governance locks in a base schema
+- **WHEN** an extending layer is merged via `mergeSchemaLayers` and compiled via `buildSchema`
+- **THEN** existing governance locks are preserved and cannot be relaxed or erased by the extending layer
+
 ### Requirement: buildMetadataExtractorEntry sub-function
 
 #### Scenario: Convert raw metadata extractor entry

@@ -116,6 +116,8 @@ export {
   CHECK_LABELS,
   checkLabel,
   type CheckId,
+  type BuiltinCheckId,
+  type CustomCheckDefinition,
   type CheckKind,
   type CheckResult,
   type CheckApplicability,
@@ -148,3 +150,9 @@ export {
   runImplFilesResolved,
   runImplLinksInScope,
 } from './evaluate-transition-predicates.js'
+export { deepMergeConfig, type DeepMergeConfigOptions } from './deep-merge-config.js'
+export {
+  CheckRegistry,
+  type CheckGovernance,
+  type PluginCheckRegistrationOptions,
+} from './check-registry.js'

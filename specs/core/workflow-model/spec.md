@@ -60,6 +60,31 @@ Application use cases MUST NOT duplicate file walks in `evaluateLifecycleVerdict
 
 When `requiresTaskCompletion` is absent or empty on a workflow step, no task completion gating applies — even if the step requires artifacts that declare `taskCompletionCheck`. The `taskCompletionCheck` on the artifact type defines _what_ pattern to check; the workflow step's `requiresTaskCompletion` controls _when_ it applies.
 
+### Requirement: Step check declarations
+
+A `WorkflowStep` in `schema.yaml` MAY declare a `checks` array (`readonly WorkflowStepCheckDeclaration[]`).
+Each entry associates a transition check with that workflow step:
+
+```typescript
+export interface WorkflowStepCheckDeclaration {
+  readonly id: string
+  readonly from?: ChangeState | '*'
+  readonly along?: TransitionAlong | '*'
+  readonly onFailure?: 'abort' | 'collect'
+  readonly skippable?: boolean
+  readonly disabled?: boolean
+  readonly config?: Readonly<Record<string, unknown>>
+}
+```
+
+The step declaration delegates execution to the orchestrator while allowing declarative specialization of:
+
+- `along`: The transition direction (`forward`, `backward`, `recovery`, `redesign`, or `*`) when the check applies. Defaults to `forward`.
+- `onFailure`: Whether a failure aborts immediately (`'abort'`, default) or accumulates with other failures (`'collect'`).
+- `skippable`: Permission to bypass via `--skip-checks`, subject to kernel governance locks.
+- `disabled`: Whether the check is declaratively disabled and omitted from execution on this step, subject to `allowDisable` governance locks.
+- `config`: Step-specific configuration merged over check-level defaults.
+
 ### Requirement: Step availability evaluation
 
 Step availability for hops MUST come from `evaluateLifecycleVerdict` projections of predicate `CheckResult`s (`availableTransitions` / `isReady` from `workflow.requires` when those results are present). `GetStatus` reports that projection. `CompileContext` MUST NOT evaluate step availability and MUST NOT call `evaluateLifecycleVerdict`.

@@ -55,7 +55,7 @@ export function run(facts: ApprovalSpecFacts): CheckResult {
 function execute(ctx: CheckExecutionContext): Promise<CheckResult> {
   return Promise.resolve(
     run({
-      specGateEnabled: ctx.approvals.spec,
+      specGateEnabled: ctx.approvals?.spec ?? false,
       change: ctx.change,
       ...(ctx.validity !== undefined ? { validity: ctx.validity } : {}),
     }),

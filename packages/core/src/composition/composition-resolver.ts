@@ -559,6 +559,7 @@ export function createCompositionResolver(
         config.schemaRef,
         config.schemaPlugins ?? [],
         config.schemaOverrides,
+        resolver.registry.checks,
       )
       return resolveSchema
     },
@@ -568,7 +569,7 @@ export function createCompositionResolver(
       getActiveSchema = new GetActiveSchema(
         resolver.getResolveSchema(),
         resolver.getSchemaRegistry(),
-        buildSchema,
+        (ref, data, templates) => buildSchema(ref, data, templates, resolver.registry.checks),
         config.schemaRef,
       )
       return getActiveSchema

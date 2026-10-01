@@ -4,6 +4,7 @@ import { GetStatus } from '../../application/use-cases/get-status.js'
 import { type RefreshImplementationTracking } from '../../application/use-cases/refresh-implementation-tracking.js'
 import { type SpecdConfig } from '../../application/specd-config.js'
 import { type CheckBinding } from '../../domain/services/transition-checks.js'
+import { type CheckRegistry } from '../../domain/services/check-registry.js'
 import {
   createCompositionResolver,
   type CompositionResolver,
@@ -30,6 +31,8 @@ export interface GetStatusDeps {
   readonly archiveBindings: readonly CheckBinding[]
   /** Canonical reconciler. Config resolution always supplies the shared instance. */
   readonly reconcile: import('../../application/use-cases/reconcile-change-validity.js').ReconcileChangeValidity
+  /** Check registry for open check resolution and governance. */
+  readonly checkRegistry?: CheckRegistry
 }
 
 /**
@@ -50,6 +53,7 @@ export function resolveGetStatusDeps(resolver: CompositionResolver): GetStatusDe
     transitionBindings: registry.transitionBindings,
     archiveBindings: registry.archiveBindings,
     reconcile: resolver.getReconcileChangeValidity(),
+    checkRegistry: resolver.registry?.checks,
   }
 }
 
@@ -109,6 +113,7 @@ function createGetStatusFromNormalized(
       transitionBindings,
       archiveBindings,
       reconcile,
+      checkRegistry,
     } = input.deps
     return new GetStatus(
       changes,
@@ -118,6 +123,7 @@ function createGetStatusFromNormalized(
       transitionBindings,
       archiveBindings,
       reconcile,
+      checkRegistry,
     )
   }
 

@@ -207,17 +207,23 @@ It supports five operations:
 | `set`     | Replaces scalar fields or whole array entries by identity.                               |
 | `remove`  | Removes entries from arrays by identity (`id` for artifacts, `step` for workflow steps). |
 
-**Example: add a post-implementing hook that runs your test suite**
+**Example: add a post-implementing hook with onFailure policy and transition checks**
 
 ```yaml
 schemaOverrides:
   append:
     workflow:
       - step: implementing
+        checks:
+          - id: '@security.code-scan'
+            skippable: true
+            config:
+              minSeverity: critical
         hooks:
           post:
             - id: run-tests
               run: 'pnpm test'
+              onFailure: warn
 ```
 
 **Example: add a rule to an existing artifact**

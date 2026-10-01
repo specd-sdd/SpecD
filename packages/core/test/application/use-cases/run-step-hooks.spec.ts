@@ -123,7 +123,7 @@ describe('RunStepHooks', () => {
       })
 
       const result = await uc.execute({ name: 'my-change', step: 'archiving', phase: 'pre' })
-      expect(result).toEqual({ hooks: [], success: true, failedHooks: [] })
+      expect(result).toEqual({ hooks: [], success: true, failedHooks: [], warnings: [] })
     })
 
     it('returns empty result when step is valid but schema has no workflowStep', async () => {
@@ -137,7 +137,7 @@ describe('RunStepHooks', () => {
 
       const result = await uc.execute({ name: 'my-change', step: 'implementing', phase: 'pre' })
 
-      expect(result).toEqual({ hooks: [], success: true, failedHooks: [] })
+      expect(result).toEqual({ hooks: [], success: true, failedHooks: [], warnings: [] })
     })
   })
 
@@ -334,7 +334,7 @@ describe('RunStepHooks', () => {
 
       const result = await uc.execute({ name: 'my-change', step: 'implementing', phase: 'pre' })
 
-      expect(result).toEqual({ hooks: [], success: true, failedHooks: [] })
+      expect(result).toEqual({ hooks: [], success: true, failedHooks: [], warnings: [] })
     })
   })
 
@@ -834,6 +834,81 @@ describe('RunStepHooks', () => {
       expect((capturedVars as { change: Record<string, unknown> }).change).not.toHaveProperty(
         'workspace',
       )
+    })
+  })
+
+  describe('resilient hook execution with onFailure: warn', () => {
+    it('pre-phase: does not halt execution on failure when onFailure is warn', async () => {
+      const change = makeChange('my-change')
+      const failingWarnHook: HookEntry = {
+        id: 'warn-lint',
+        type: 'run',
+        command: 'exit 1',
+        onFailure: 'warn',
+      }
+      const secondHook: HookEntry = {
+        id: 'build-step',
+        type: 'run',
+        command: 'echo ok',
+      }
+      const hookRunner = {
+        async run(command: string): Promise<HookResult> {
+          if (command === 'exit 1') {
+            return new HookResult(1, '', 'Warning: lint failure')
+          }
+          return new HookResult(0, 'ok', '')
+        },
+      }
+
+      const uc = makeUseCase({
+        changes: makeChangeRepository([change]),
+        schema: makeSchemaWithHooks([failingWarnHook, secondHook]),
+        hookRunner,
+      })
+
+      const result = await uc.execute({ name: 'my-change', step: 'implementing', phase: 'pre' })
+
+      expect(result.success).toBe(true)
+      expect(result.failedHooks).toHaveLength(0)
+      expect(result.hooks).toHaveLength(2)
+      expect(result.warnings).toHaveLength(1)
+      expect(result.warnings[0]).toEqual({
+        id: 'warn-lint',
+        command: 'exit 1',
+        exitCode: 1,
+        stdout: '',
+        stderr: 'Warning: lint failure',
+        success: false,
+      })
+    })
+
+    it('post-phase: records warnings and returns success true on non-blocking failure', async () => {
+      const change = makeChange('my-change')
+      const failingWarnHook: HookEntry = {
+        id: 'warn-analytics',
+        type: 'run',
+        command: 'send-analytics',
+        onFailure: 'warn',
+      }
+      const hookRunner = {
+        async run(): Promise<HookResult> {
+          return new HookResult(2, '', 'Network timeout')
+        },
+      }
+
+      const uc = makeUseCase({
+        changes: makeChangeRepository([change]),
+        schema: makeSchemaWithHooks([], [failingWarnHook]),
+        hookRunner,
+      })
+
+      const result = await uc.execute({ name: 'my-change', step: 'implementing', phase: 'post' })
+
+      expect(result.success).toBe(true)
+      expect(result.failedHooks).toHaveLength(0)
+      expect(result.warnings).toHaveLength(1)
+      expect(result.warnings[0]?.id).toBe('warn-analytics')
+      expect(result.warnings[0]?.stderr).toBe('Network timeout')
     })
   })
 })

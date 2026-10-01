@@ -16,7 +16,26 @@ import { Logger } from '../../observability/logger.js'
 function isBypassFlagActive(bypassFlag: string | undefined, flags: ReadonlySet<string>): boolean {
   if (bypassFlag === undefined) return false
   const trimmed = bypassFlag.replace(/^--/, '')
-  return flags.has(bypassFlag) || flags.has(trimmed) || flags.has(`--${trimmed}`)
+  if (flags.has(bypassFlag) || flags.has(trimmed) || flags.has(`--${trimmed}`)) {
+    return true
+  }
+  if (bypassFlag === '--skip-checks spec.overlap') {
+    return (
+      flags.has('allow-overlap') ||
+      flags.has('--allow-overlap') ||
+      flags.has('spec.overlap') ||
+      flags.has('skip-checks spec.overlap')
+    )
+  }
+  if (bypassFlag === '--skip-checks impl.linksInScope') {
+    return (
+      flags.has('allow-out-of-scope') ||
+      flags.has('--allow-out-of-scope') ||
+      flags.has('impl.linksInScope') ||
+      flags.has('skip-checks impl.linksInScope')
+    )
+  }
+  return false
 }
 
 function reviewMessage(
@@ -832,8 +851,8 @@ function blockersFromFailedChecks(
         isSkippable: skippable,
         label: check.label,
         checkId: check.id,
-        ...(code === 'OVERLAP_CONFLICT' ? { bypassFlag: '--allow-overlap' } : {}),
-        ...(linksInScopeSkippable ? { bypassFlag: '--allow-out-of-scope' } : {}),
+        ...(code === 'OVERLAP_CONFLICT' ? { bypassFlag: '--skip-checks spec.overlap' } : {}),
+        ...(linksInScopeSkippable ? { bypassFlag: '--skip-checks impl.linksInScope' } : {}),
       }
       if (skippable && isBypassFlagActive(blocker.bypassFlag, bypassFlags)) {
         return []

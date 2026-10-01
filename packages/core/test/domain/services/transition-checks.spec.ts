@@ -17,6 +17,7 @@ import {
   checkMatches,
   classifyAlong,
   applyBindingSpecs,
+  type BuiltinCheckId,
 } from '../../../src/domain/services/transition-checks.js'
 import { InvalidInputError } from '../../../src/domain/errors/invalid-input-error.js'
 import { VALID_TRANSITIONS } from '../../../src/domain/value-objects/change-state.js'
@@ -206,7 +207,7 @@ describe('check registry bindings', () => {
 
   it('given every registered check, when inspected, then label is the canonical gerund', () => {
     for (const binding of [...TRANSITION_BINDINGS, ...ARCHIVE_BINDINGS]) {
-      expect(binding.check.label).toBe(CHECK_LABELS[binding.check.id])
+      expect(binding.check.label).toBe(CHECK_LABELS[binding.check.id as BuiltinCheckId])
       expect(binding.check.label.startsWith('Executing:')).toBe(false)
     }
   })
@@ -359,7 +360,6 @@ describe('runWorkspaceReadOnly', () => {
 describe('runSpecOverlap', () => {
   it('given named peers, when the check fails, then message lists peers and spec ids', () => {
     const result = runSpecOverlap({
-      allowOverlap: false,
       specOverlapBlocked: true,
       specOverlapPeers: [
         { changeName: 'beta', overlappingSpecIds: ['core:config'] },

@@ -370,8 +370,25 @@ Hooks let you attach automated actions or AI guidance to lifecycle transitions. 
 
 ### Pre and post hooks
 
-- **Pre hooks** run before the change enters a step (`to` = that step). If a pre hook fails, the transition is blocked. Pre `run:` hooks apply for any `along` classification, including redesign into `designing`.
+- **Pre hooks** run before the change enters a step (`to` = that step). If a pre hook fails with `onFailure: abort` (the default), the transition is blocked. When `onFailure: warn` is configured, non-zero exits are captured as non-fatal warnings without halting the transition. Pre `run:` hooks apply for any `along` classification, including redesign into `designing`.
 - **Post hooks** on the **source** step run only when the transition is classified as **forward** (`along = forward`) — leaving a step toward a later delivery state. Backward hops, redesign, and archive recovery do not run source `post` `run:` hooks. If a post hook fails after a forward persist, the transition is not rolled back.
+
+### Hook failure policies (`onFailure`)
+
+Every `run:` and `external:` hook supports an optional `onFailure` policy:
+
+- **`abort` (default):** Any non-zero exit code halts hook execution immediately, prevents the state transition, and logs the process failure.
+- **`warn`:** Non-zero exit codes emit non-blocking warning diagnostics (`warnings[]`) and allow the transition pipeline to complete successfully.
+
+```yaml
+workflow:
+  - step: implementing
+    hooks:
+      pre:
+        - id: optional-lint
+          run: pnpm lint
+          onFailure: warn
+```
 
 When shell hooks are long-running, SpecD keeps them observable while they are
 in flight. In human-facing `text` output, completed hooks remain visible,
@@ -385,21 +402,25 @@ progress, the transition Repair Guide, and non-structured diagnostics.
 
 ### Hook types
 
-| Type           | Description                                                                              |
-| -------------- | ---------------------------------------------------------------------------------------- |
-| `run:`         | A shell command executed in the project root. Non-zero exit code blocks a pre hook.      |
-| `instruction:` | An AI context block injected into the agent context for the step. Not directly runnable. |
-| `external:`    | An explicit external hook dispatched to a registered external hook runner by `type`.     |
+| Type           | Description                                                                               |
+| -------------- | ----------------------------------------------------------------------------------------- |
+| `run:`         | A shell command executed in the project root. Exit code behavior governed by `onFailure`. |
+| `instruction:` | An AI context block injected into the agent context for the step. Not directly runnable.  |
+| `external:`    | An explicit external hook dispatched to a registered external hook runner by `type`.      |
 
 An `instruction:` hook provides guidance to an AI agent about what to do in that step. It is informational — it does not execute code. A `run:` hook executes a shell command through the internal `HookRunner`. An `external:` hook is routed to a separate `ExternalHookRunner` selected by `external.type`.
 
 ```yaml
 workflow:
   - step: implementing
+    checks:
+      - id: '@security.code-scan'
+        skippable: true
     hooks:
       pre:
         - id: run-lint
           run: pnpm lint
+          onFailure: warn
         - id: docker-test
           external:
             type: docker

@@ -28,6 +28,16 @@ import {
   type MetadataExtractorEntry,
 } from '../value-objects/metadata-extraction.js'
 import { SchemaValidationError } from '../errors/schema-validation-error.js'
+import {
+  CheckEmbeddingForbiddenError,
+  CheckBindingOverrideForbiddenError,
+  CheckConfigOverrideForbiddenError,
+  CheckDisableForbiddenError,
+  DuplicateCheckBindingError,
+  UnknownCheckError,
+} from '../errors/check-registry-errors.js'
+import { CheckRegistry } from './check-registry.js'
+import { DOMAIN_CHECKS, TRANSITION_BINDINGS } from './check-bindings.js'
 
 // ---------------------------------------------------------------------------
 // Raw input types (plain interfaces, no Zod dependency)
@@ -641,6 +651,7 @@ function validateArtifactGraph(ref: string, artifacts: readonly ArtifactType[]):
  * @param ref - The schema reference for error messages
  * @param data - The validated intermediate data from YAML parsing
  * @param templates - Map from template relative path to file content
+ * @param registry - Optional CheckRegistry used to validate custom checks and governance constraints
  * @returns A fully-constructed Schema instance
  * @throws {@link SchemaValidationError} When semantic validation fails
  */
@@ -648,6 +659,7 @@ export function buildSchema(
   ref: string,
   data: SchemaYamlData,
   templates: ReadonlyMap<string, string>,
+  registry?: CheckRegistry,
 ): Schema {
   const idSet = new Set<string>()
   const idPattern = /^[a-z][a-z0-9-]*$/
@@ -719,6 +731,106 @@ export function buildSchema(
         ref,
         `duplicate hook id '${hookId}' in workflow steps '${steps.join("' and '")}'`,
       )
+    }
+  }
+
+  // Semantic validation: hook onFailure property must be 'abort' or 'warn'
+  for (const step of workflow) {
+    const allHooks = [...(step.hooks?.pre ?? []), ...(step.hooks?.post ?? [])]
+    for (const hook of allHooks) {
+      if (hook.type === 'run' || hook.type === 'external') {
+        if (
+          hook.onFailure !== undefined &&
+          hook.onFailure !== 'abort' &&
+          hook.onFailure !== 'warn'
+        ) {
+          throw new SchemaValidationError(
+            ref,
+            `workflow step '${step.step}': hook '${hook.id}' has invalid onFailure '${String(hook.onFailure)}'. Must be 'abort' or 'warn'.`,
+          )
+        }
+      }
+    }
+  }
+
+  // Semantic validation: check declarations and governance locks
+  const activeRegistry =
+    registry ?? new CheckRegistry(Object.values(DOMAIN_CHECKS), TRANSITION_BINDINGS)
+
+  const checkCoordinateSet = new Set<string>()
+  for (const step of workflow) {
+    for (const chk of step.checks ?? []) {
+      if (!activeRegistry.has(chk.id)) {
+        throw new UnknownCheckError(chk.id)
+      }
+
+      const along = chk.along ?? 'forward'
+      const coordKey = `${chk.id}::transition::${step.step}::${along}`
+      if (checkCoordinateSet.has(coordKey)) {
+        throw new DuplicateCheckBindingError(
+          chk.id,
+          `scope: transition, to: ${step.step}, along: ${along}`,
+        )
+      }
+      checkCoordinateSet.add(coordKey)
+
+      const governance = activeRegistry.getGovernance(chk.id)
+      const matchingBinding = activeRegistry
+        .bindings()
+        .find(
+          (b) =>
+            b.check.id === chk.id &&
+            b.applicability.some(
+              (a) =>
+                a.scope === 'transition' &&
+                (a.to === undefined || a.to === '*' || a.to === step.step) &&
+                (a.along === undefined ||
+                  a.along === '*' ||
+                  a.along === 'any' ||
+                  a.along === along),
+            ),
+        )
+
+      const isPluginCheck = chk.id.startsWith('@')
+      if (governance?.allowBindingOverride === false && (!isPluginCheck || !matchingBinding)) {
+        throw new CheckEmbeddingForbiddenError(chk.id, step.step)
+      }
+
+      if (
+        (governance?.allowBindingOverride === false ||
+          matchingBinding?.allowBindingOverride === false) &&
+        (chk.onFailure !== undefined || chk.skippable !== undefined)
+      ) {
+        if (chk.onFailure !== undefined && chk.onFailure !== matchingBinding?.onFailure) {
+          throw new CheckBindingOverrideForbiddenError(
+            chk.id,
+            'onFailure',
+            `scope: transition, to: ${step.step}, along: ${along}`,
+          )
+        }
+        if (chk.skippable !== undefined && chk.skippable !== matchingBinding?.skippable) {
+          throw new CheckBindingOverrideForbiddenError(
+            chk.id,
+            'skippable',
+            `scope: transition, to: ${step.step}, along: ${along}`,
+          )
+        }
+      }
+
+      if (chk.disabled === true) {
+        if (governance?.allowDisable === false || matchingBinding?.allowDisable === false) {
+          throw new CheckDisableForbiddenError(chk.id, step.step)
+        }
+      }
+
+      if (chk.config !== undefined && Object.keys(chk.config).length > 0) {
+        if (governance?.allowConfigOverride === false) {
+          throw new CheckConfigOverrideForbiddenError(chk.id, `workflow step '${step.step}'`)
+        }
+        if (matchingBinding && matchingBinding.allowConfigOverride === false) {
+          throw new CheckConfigOverrideForbiddenError(chk.id, `workflow step '${step.step}'`)
+        }
+      }
     }
   }
 

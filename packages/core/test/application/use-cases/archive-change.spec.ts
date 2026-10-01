@@ -1613,7 +1613,7 @@ describe('ArchiveChange', () => {
           if (input.phase === 'pre') {
             callOrder.push('pnpm test')
           }
-          return { hooks: [], success: true, failedHooks: [] }
+          return { hooks: [], success: true, failedHooks: [], warnings: [] }
         },
       })
 
@@ -1661,9 +1661,10 @@ describe('ArchiveChange', () => {
                   success: false,
                 },
               ],
+              warnings: [],
             }
           }
-          return { hooks: [], success: true, failedHooks: [] }
+          return { hooks: [], success: true, failedHooks: [], warnings: [] }
         },
       })
 
@@ -1709,9 +1710,10 @@ describe('ArchiveChange', () => {
                   success: false,
                 },
               ],
+              warnings: [],
             }
           }
-          return { hooks: [], success: true, failedHooks: [] }
+          return { hooks: [], success: true, failedHooks: [], warnings: [] }
         },
       })
 
@@ -1739,7 +1741,7 @@ describe('ArchiveChange', () => {
           if (input.phase === 'pre') {
             callOrder.push('schema-pre', 'project-pre')
           }
-          return { hooks: [], success: true, failedHooks: [] }
+          return { hooks: [], success: true, failedHooks: [], warnings: [] }
         },
       })
 
@@ -1766,7 +1768,7 @@ describe('ArchiveChange', () => {
           if (input.phase === 'post') {
             callOrder.push('schema-post', 'project-post')
           }
-          return { hooks: [], success: true, failedHooks: [] }
+          return { hooks: [], success: true, failedHooks: [], warnings: [] }
         },
       })
 
@@ -1811,9 +1813,10 @@ describe('ArchiveChange', () => {
                   success: false,
                 },
               ],
+              warnings: [],
             }
           }
-          return { hooks: [], success: true, failedHooks: [] }
+          return { hooks: [], success: true, failedHooks: [], warnings: [] }
         },
       })
 
@@ -1857,9 +1860,10 @@ describe('ArchiveChange', () => {
                   success: false,
                 },
               ],
+              warnings: [],
             }
           }
-          return { hooks: [], success: true, failedHooks: [] }
+          return { hooks: [], success: true, failedHooks: [], warnings: [] }
         },
       })
 
@@ -2015,9 +2019,10 @@ describe('ArchiveChange', () => {
                   success: false,
                 },
               ],
+              warnings: [],
             }
           }
-          return { hooks: [], success: true, failedHooks: [] }
+          return { hooks: [], success: true, failedHooks: [], warnings: [] }
         },
       })
 
@@ -2042,7 +2047,7 @@ describe('ArchiveChange', () => {
       const runStepHooks = makeRunStepHooks({
         execute: async (input: RunStepHooksInput): Promise<RunStepHooksResult> => {
           executeSpy(input)
-          return { hooks: [], success: true, failedHooks: [] }
+          return { hooks: [], success: true, failedHooks: [], warnings: [] }
         },
       })
 
@@ -2069,7 +2074,7 @@ describe('ArchiveChange', () => {
       const runStepHooks = makeRunStepHooks({
         execute: async (input: RunStepHooksInput): Promise<RunStepHooksResult> => {
           executeSpy(input)
-          return { hooks: [], success: true, failedHooks: [] }
+          return { hooks: [], success: true, failedHooks: [], warnings: [] }
         },
       })
 
@@ -2100,7 +2105,7 @@ describe('ArchiveChange', () => {
       const runStepHooks = makeRunStepHooks({
         execute: async (input: RunStepHooksInput): Promise<RunStepHooksResult> => {
           executeSpy(input)
-          return { hooks: [], success: true, failedHooks: [] }
+          return { hooks: [], success: true, failedHooks: [], warnings: [] }
         },
       })
 
@@ -2815,7 +2820,7 @@ describe('ArchiveChange', () => {
           if (input.phase === 'post') {
             callOrder.push('git commit -m archive')
           }
-          return { hooks: [], success: true, failedHooks: [] }
+          return { hooks: [], success: true, failedHooks: [], warnings: [] }
         },
       })
 
@@ -2869,9 +2874,10 @@ describe('ArchiveChange', () => {
                   success: false,
                 },
               ],
+              warnings: [],
             }
           }
-          return { hooks: [], success: true, failedHooks: [] }
+          return { hooks: [], success: true, failedHooks: [], warnings: [] }
         },
       })
 
@@ -2898,7 +2904,7 @@ describe('ArchiveChange', () => {
       const runStepHooks = makeRunStepHooks({
         execute: async (input: RunStepHooksInput): Promise<RunStepHooksResult> => {
           calls.push({ name: input.name, step: input.step, phase: input.phase })
-          return { hooks: [], success: true, failedHooks: [] }
+          return { hooks: [], success: true, failedHooks: [], warnings: [] }
         },
       })
 
@@ -2922,7 +2928,7 @@ describe('ArchiveChange', () => {
       const runStepHooks = makeRunStepHooks({
         execute: async (input: RunStepHooksInput): Promise<RunStepHooksResult> => {
           calls.push({ name: input.name, step: input.step, phase: input.phase })
-          return { hooks: [], success: true, failedHooks: [] }
+          return { hooks: [], success: true, failedHooks: [], warnings: [] }
         },
       })
 
@@ -2985,9 +2991,10 @@ describe('ArchiveChange', () => {
                   success: false,
                 },
               ],
+              warnings: [],
             }
           }
-          return { hooks: [], success: true, failedHooks: [] }
+          return { hooks: [], success: true, failedHooks: [], warnings: [] }
         },
       })
 
@@ -3043,9 +3050,10 @@ describe('ArchiveChange', () => {
                   success: false,
                 },
               ],
+              warnings: [],
             }
           }
-          return { hooks: [], success: true, failedHooks: [] }
+          return { hooks: [], success: true, failedHooks: [], warnings: [] }
         },
       })
 
@@ -3075,7 +3083,7 @@ describe('ArchiveChange', () => {
           if (input.phase === 'pre') {
             stateAtHookTime = repo.store.get('my-change')?.state
           }
-          return { hooks: [], success: true, failedHooks: [] }
+          return { hooks: [], success: true, failedHooks: [], warnings: [] }
         },
       })
 

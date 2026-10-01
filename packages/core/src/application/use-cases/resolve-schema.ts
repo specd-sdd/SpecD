@@ -6,6 +6,7 @@ import {
   type SchemaLayer,
 } from '../../domain/services/merge-schema-layers.js'
 import { buildSchema, type SchemaYamlData } from '../../domain/services/build-schema.js'
+import { type CheckRegistry } from '../../domain/services/check-registry.js'
 import { SchemaNotFoundError } from '../errors/schema-not-found-error.js'
 import { SchemaValidationError } from '../../domain/errors/schema-validation-error.js'
 import { resolveExtendsChain } from './resolve-extends-chain.js'
@@ -20,6 +21,7 @@ export class ResolveSchema {
   private readonly _schemaRef: string
   private readonly _schemaPlugins: readonly string[]
   private readonly _schemaOverrides: SchemaOperations | undefined
+  private readonly _checkRegistry?: CheckRegistry
 
   /**
    * Creates a new ResolveSchema use case.
@@ -27,17 +29,22 @@ export class ResolveSchema {
    * @param schemaRef - Reference identifier for the base schema to resolve
    * @param schemaPlugins - Ordered list of plugin references to apply
    * @param schemaOverrides - Optional override operations to apply last
+   * @param checkRegistry - Optional check registry for check validation
    */
   constructor(
     schemas: SchemaRegistry,
     schemaRef: string,
     schemaPlugins: readonly string[],
     schemaOverrides: SchemaOperations | undefined,
+    checkRegistry?: CheckRegistry,
   ) {
     this._schemas = schemas
     this._schemaRef = schemaRef
     this._schemaPlugins = schemaPlugins
     this._schemaOverrides = schemaOverrides
+    if (checkRegistry !== undefined) {
+      this._checkRegistry = checkRegistry
+    }
   }
 
   /**
@@ -79,10 +86,15 @@ export class ResolveSchema {
 
     // 6. Build domain Schema — validate base first, then merged if layers applied
     if (allLayers.length > 0) {
-      buildSchema(this._schemaRef, inheritedData, finalTemplates)
-      return buildSchema(`${this._schemaRef} (resolved)`, mergedData, finalTemplates)
+      buildSchema(this._schemaRef, inheritedData, finalTemplates, this._checkRegistry)
+      return buildSchema(
+        `${this._schemaRef} (resolved)`,
+        mergedData,
+        finalTemplates,
+        this._checkRegistry,
+      )
     }
-    return buildSchema(this._schemaRef, mergedData, finalTemplates)
+    return buildSchema(this._schemaRef, mergedData, finalTemplates, this._checkRegistry)
   }
 
   // ---------------------------------------------------------------------------

@@ -36,8 +36,6 @@ function makeCtx(onCheckProgress?: (event: CheckProgressEvent) => void): CheckEx
       along: 'forward',
     },
     approvals: { spec: false, signoff: false },
-    allowOverlap: false,
-    allowOutOfScope: false,
     effectiveStatusByArtifact: new Map(),
     ...(onCheckProgress !== undefined ? { onCheckProgress } : {}),
   }

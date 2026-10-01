@@ -3,7 +3,6 @@ import { type Change } from '../../domain/entities/change.js'
 import {
   type Check,
   type CheckExecutionContext,
-  type CheckId,
   type CheckKind,
 } from '../../domain/services/transition-checks.js'
 import { type ImplLinksInScopeDetection } from '../services/detect-impl-links-in-scope.js'
@@ -26,7 +25,7 @@ class ImplLinksInScopeCheck extends WorkflowCheck {
    *
    * @returns Check id
    */
-  override get id(): CheckId {
+  override get id(): string {
     return 'impl.linksInScope'
   }
 
@@ -59,7 +58,6 @@ class ImplLinksInScopeCheck extends WorkflowCheck {
     const detection = this._detect(ctx.change)
     return Promise.resolve(
       runImplLinksInScope({
-        allowOutOfScope: ctx.allowOutOfScope,
         linksInScopeBlocked: detection.blocked,
         ...(detection.message !== undefined ? { linksInScopeMessage: detection.message } : {}),
       }),

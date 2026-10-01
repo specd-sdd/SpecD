@@ -31,6 +31,14 @@ export type HookPresenterEvent =
       success: boolean
       exitCode: number
     }
+  | {
+      type: 'hook-warning'
+      phase?: 'pre' | 'post'
+      hookId: string
+      command: string
+      exitCode: number
+      stderr: string
+    }
 
 /** Shared presenter contract used by hook-aware CLI commands. */
 export interface HookProgressPresenter {
@@ -226,6 +234,14 @@ export function createHookProgressPresenter(options: {
             )
             state.renderedFinal = true
           }
+          return
+        }
+        case 'hook-warning': {
+          const state = states.get(key)
+          if (options.format !== 'text') return
+          options.stream.write(`[warn] ${state ? labelFor(state) : event.hookId}\n`)
+          options.stream.write(`  command: ${event.command}\n`)
+          options.stream.write(`  exit: ${event.exitCode}\n`)
           return
         }
       }

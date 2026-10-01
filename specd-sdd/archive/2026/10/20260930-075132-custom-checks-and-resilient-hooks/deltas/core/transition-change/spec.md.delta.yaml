@@ -1,0 +1,43 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Input contract'
+  content: |
+    The Use Case MUST accept `TransitionChangeInput` containing:
+    - `name`: Change identifier (`string`).
+    - `to`: Target lifecycle state enum or `'next'`.
+    - `skipChecks`: Optional array of check IDs to bypass (`readonly string[]`).
+    - `skipHookPhases`: Optional array of hook phases to skip (`readonly HookPhase[]`).
+    - `onProgress`: Optional progress callback for streaming telemetry.
+
+    The Use Case MUST NOT accept ad-hoc check bypass booleans (`allowOutOfScope`, `allowOverlap`). Check bypasses SHALL be supplied uniformly through `skipChecks`.
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Canonical pre-transition validity reconciliation'
+  content: |
+    Before attempting state mutation, the Use Case MUST reconcile and evaluate all checks applicable to the target state:
+    1. **Active Check Resolution**: Query `CheckRegistry` and active schema step declarations to determine all applicable checks for `attempt.to` and classified `attempt.along`. Checks declared with `disabled: true` on the step declaration (permitted only when `allowDisable !== false`) MUST be cleanly omitted from predicate execution for that coordinate.
+    2. **Bypass Verification**: For each check identifier present in `skipChecks`:
+       - If the check is unregistered, the orchestrator MUST throw an `UnknownCheckError`.
+       - If the check is an effect (`kind: 'effect'`), the orchestrator MUST reject the bypass with a `CheckNotSkippableError`, because effect checks (hooks) are governed exclusively by `skipHookPhases`.
+       - If the check declares `skippable !== true`, the orchestrator MUST throw a `CheckNotSkippableError`.
+       - If the check is skippable, the orchestrator MUST bypass calling `check.execute()` and inject a synthetic `{ outcome: 'skip', details: { bypassedByUser: true } }`.
+    3. **Check Execution**: For all non-bypassed checks, invoke `check.execute(ctx)` passing the active change aggregate, resolved schema, attempt coordinates, and isolated effective `ctx.config`.
+    4. **Failure Abort**: If any evaluated check returns `outcome: 'fail'`, the transition MUST be aborted immediately. The Use Case MUST throw a unified `CheckPredicateFailedError` containing the failed check's `checkId`, `label`, `code`, `message`, `command`, and `details`.
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Shared runner errors propagate on transition'
+  content: |
+    All lifecycle predicate check failures SHALL throw the unified domain error `CheckPredicateFailedError`.
+    Duplicated, check-specific error classes (including `ArchiveImplementationStateError` and `ArchiveDependencyMismatchError`) SHALL be retired from `_mapFailedPredicate`.
+    The `CheckPredicateFailedError` MUST encapsulate:
+    - `checkId`: The canonical identifier of the failed check.
+    - `label`: Human-readable gerund phrase describing the check.
+    - `code`: Diagnostic error code.
+    - `message`: Diagnostic error message explaining the failure.
+    - `command`: Optional suggested remediation CLI command.
+    - `details`: Optional structured details from the check result.

@@ -1,0 +1,51 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Manual hook control with skipHooks'
+  content: |
+    ### Requirement: Resilient hook failure policy
+
+    #### Scenario: Hook entry parses onFailure warn policy
+    - **GIVEN** a workflow hook declaration with `onFailure: 'warn'`
+    - **WHEN** loading the hook entry
+    - **THEN** `entry.onFailure` is `'warn'`
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Pre-hook failure semantics'
+  content: |
+    #### Scenario: Pre-hook with onFailure abort halts transition
+    - **GIVEN** a pre-hook configured with `onFailure: 'abort'` that exits with code 1
+    - **WHEN** `RunStepHooks.execute` runs for the pre phase
+    - **THEN** execution halts immediately
+    - **AND** `RunStepHooksResult.success` is false
+    - **AND** the state transition is blocked
+
+    #### Scenario: Pre-hook with onFailure warn records telemetry and permits transition
+    - **GIVEN** a pre-hook configured with `onFailure: 'warn'` that exits with code 1
+    - **WHEN** `RunStepHooks.execute` runs for the pre phase
+    - **THEN** execution captures the exit code, stdout, and stderr into `warnings`
+    - **AND** `RunStepHooksResult.success` is true
+    - **AND** the state transition proceeds successfully
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Post-hook failure semantics'
+  content: |
+    #### Scenario: Post-hook failure with abort halts execution
+    - **GIVEN** a post-hook configured with `onFailure: 'abort'` that exits with code 1
+    - **WHEN** `RunStepHooks.execute` runs for the post phase
+    - **THEN** execution halts and reports failure
+    - **AND** `RunStepHooksResult.success` is false
+
+    #### Scenario: Post-hook failure with warn logs warning without error
+    - **GIVEN** a post-hook configured with `onFailure: 'warn'` that exits with code 1
+    - **WHEN** `RunStepHooks.execute` runs for the post phase
+    - **THEN** `RunStepHooksResult.warnings` contains the failed hook record
+    - **AND** `RunStepHooksResult.success` is true

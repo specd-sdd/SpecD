@@ -150,6 +150,13 @@
 - **WHEN** the chain is merged
 - **THEN** both keys are present in the merged object
 
+#### Scenario: Nested record of records deep merge preserves untouched leaves
+
+- **GIVEN** a base layer defining `{ options: { strict: true, timeout: 5000 }, mode: 'fast' }`
+- **AND** a later layer defining `{ options: { timeout: 10000 } }`
+- **WHEN** the chain is merged via `deepMergeConfig`
+- **THEN** the merged object contains `options.strict: true`, `options.timeout: 10000`, and `mode: 'fast'`
+
 #### Scenario: Inherited arrays append by default
 
 - **GIVEN** a base layer defines `context: [{ instruction: 'base' }]`

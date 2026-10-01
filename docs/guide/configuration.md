@@ -822,19 +822,25 @@ Each operation targets one or more schema sections: `artifacts`, `workflow`, or 
 
 ### Common uses
 
-**Adding shell hooks to lifecycle steps:**
+**Adding shell hooks and transition checks to lifecycle steps:**
 
 ```yaml
 schemaOverrides:
   append:
     workflow:
       - step: implementing
+        checks:
+          - id: '@security.code-scan'
+            skippable: true
+            config:
+              minSeverity: high
         hooks:
           post:
             - id: run-tests
               run: 'pnpm test'
             - id: run-lint
               run: 'pnpm lint'
+              onFailure: warn
       - step: archiving
         hooks:
           pre:
@@ -842,7 +848,7 @@ schemaOverrides:
               run: 'pnpm test'
 ```
 
-This runs tests and lint after each implementing step, and runs tests again before archiving. If a `run:` hook exits non-zero, the transition is aborted.
+This runs tests and lint after each implementing step, capturing lint issues as non-blocking warnings while requiring tests to pass. It also runs security checks before advancing from implementing, and runs tests again before archiving. If a `run:` hook exits non-zero with `onFailure: abort` (the default), the transition is aborted; with `onFailure: warn`, non-fatal diagnostics are collected and the transition proceeds.
 
 **Adding instruction hooks:**
 

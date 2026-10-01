@@ -149,4 +149,66 @@ describe('createHookProgressPresenter', () => {
     expect(output).not.toContain('\u001B[31m')
     expect(output).not.toContain('\u0007')
   })
+
+  it('renders hook-warning events in text format without aborting', () => {
+    const stderr = captureStderr()
+    const presenter = createHookProgressPresenter({
+      format: 'text',
+      stream: process.stderr,
+    })
+
+    presenter.onEvent({
+      type: 'hook-start',
+      phase: 'pre',
+      hookId: 'optional-check',
+      command: 'run-optional',
+    })
+    presenter.onEvent({
+      type: 'hook-warning',
+      phase: 'pre',
+      hookId: 'optional-check',
+      command: 'run-optional',
+      exitCode: 1,
+      stderr: 'Warning: non-critical failure',
+    })
+
+    const output = stderr()
+    expect(output).toContain('[warn] pre › optional-check')
+    expect(output).toContain('  command: run-optional')
+    expect(output).toContain('  exit: 1')
+  })
+
+  it('emits structured hook-warning events to stream in json format', () => {
+    const stderr = captureStderr()
+    const presenter = createHookProgressPresenter({
+      format: 'json',
+      stream: process.stderr,
+    })
+
+    presenter.onEvent({
+      type: 'hook-warning',
+      phase: 'post',
+      hookId: 'analytics',
+      command: 'send-metrics',
+      exitCode: 2,
+      stderr: 'Timeout',
+    })
+
+    const lines = stderr()
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line) as { stream: string; event: Record<string, unknown> })
+
+    expect(lines[0]).toEqual({
+      stream: 'hook-progress',
+      event: {
+        type: 'hook-warning',
+        phase: 'post',
+        hookId: 'analytics',
+        command: 'send-metrics',
+        exitCode: 2,
+        stderr: 'Timeout',
+      },
+    })
+  })
 })

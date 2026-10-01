@@ -536,6 +536,17 @@ export {
   type GuardedChangeOperation,
   InvalidInputError,
   DraftedChangeReadOnlyError,
+  InvalidPluginNameError,
+  DuplicateCheckError,
+  DuplicateCheckBindingError,
+  InvalidCheckKindError,
+  CheckEmbeddingForbiddenError,
+  CheckBindingOverrideForbiddenError,
+  CheckConfigOverrideForbiddenError,
+  CheckNotSkippableError,
+  CheckDisableForbiddenError,
+  UnknownCheckError,
+  CheckPredicateFailedError,
 } from '@specd/core'
 
 export {
@@ -661,11 +672,19 @@ export {
   classifyAlong,
   checkLabel,
   CHECK_LABELS,
+  CheckRegistry,
+  deepMergeConfig,
   type CheckId,
   type CheckKind,
   type CheckResult,
   type CheckProgressEvent,
   type OnCheckProgress,
+  type Check,
+  type CheckExecutionContext,
+  type CustomCheckDefinition,
+  type PluginCheckRegistration,
+  type CheckGovernance,
+  type DeepMergeConfigOptions,
 } from '@specd/core'
 
 export { CORE_VERSION } from '@specd/core'

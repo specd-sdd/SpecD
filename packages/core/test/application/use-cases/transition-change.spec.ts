@@ -16,6 +16,16 @@ import { SpecArtifact } from '../../../src/domain/value-objects/spec-artifact.js
 import { evaluateLifecycle } from '../../../src/application/services/lifecycle-evaluation.js'
 import { ArchiveImplementationStateError } from '../../../src/domain/errors/archive-implementation-state-error.js'
 import { ReadOnlyWorkspaceError } from '../../../src/domain/errors/read-only-workspace-error.js'
+import { CheckPredicateFailedError } from '../../../src/domain/errors/check-predicate-failed-error.js'
+import { CheckRegistry } from '../../../src/domain/services/check-registry.js'
+import {
+  UnknownCheckError,
+  CheckNotSkippableError,
+} from '../../../src/domain/errors/check-registry-errors.js'
+import {
+  type CustomCheckDefinition,
+  type CheckBinding,
+} from '../../../src/domain/services/transition-checks.js'
 import { Logger } from '../../../src/application/logger.js'
 import { createWorkflowCheckRegistry } from '../../../src/application/checks/workflow-check-registry.js'
 import { detectImplLinksInScope } from '../../../src/application/services/detect-impl-links-in-scope.js'
@@ -75,6 +85,8 @@ function makeUseCase(
     approvals?: { spec: boolean; signoff: boolean }
     countTasks?: CountTasks
     reconcile?: ReconcileChangeValidity
+    transitionBindings?: readonly CheckBinding[]
+    checkRegistry?: CheckRegistry
   },
 ): TransitionChange {
   const refresh =
@@ -105,8 +117,9 @@ function makeUseCase(
     schemaProvider,
     refresh,
     overrides?.approvals ?? { spec: false, signoff: false },
-    registry.transitionBindings,
+    overrides?.transitionBindings ?? registry.transitionBindings,
     overrides?.reconcile ?? makeObservingReconcile(repo, undefined, refresh),
+    overrides?.checkRegistry,
   )
 }
 
@@ -1281,7 +1294,7 @@ describe('TransitionChange', () => {
       const runStepHooks = makeRunStepHooks({
         execute: async (input) => {
           calls.push({ name: input.name, step: input.step, phase: input.phase })
-          return { hooks: [], success: true, failedHooks: [] }
+          return { hooks: [], success: true, failedHooks: [], warnings: [] }
         },
       })
       const uc = makeUseCase(makeChangeRepository([change]), { schema: hookSchema, runStepHooks })
@@ -1322,9 +1335,10 @@ describe('TransitionChange', () => {
                   success: false,
                 },
               ],
+              warnings: [],
             }
           }
-          return { hooks: [], success: true, failedHooks: [] }
+          return { hooks: [], success: true, failedHooks: [], warnings: [] }
         },
       })
       const uc = makeUseCase(makeChangeRepository([change]), { schema: hookSchema, runStepHooks })
@@ -1365,9 +1379,10 @@ describe('TransitionChange', () => {
                   success: false,
                 },
               ],
+              warnings: [],
             }
           }
-          return { hooks: [], success: true, failedHooks: [] }
+          return { hooks: [], success: true, failedHooks: [], warnings: [] }
         },
       })
       const uc = makeUseCase(repo, { schema: hookSchema, runStepHooks })
@@ -1378,6 +1393,161 @@ describe('TransitionChange', () => {
           to: 'implementing',
         })
         .catch(() => {})
+
+      expect(repo.store.get('my-change')?.state).toBe('ready')
+    })
+
+    it('allows transition to proceed when a pre-hook fails but has onFailure: "warn"', async () => {
+      const change = makeReadyChange('my-change')
+      const repo = makeChangeRepository([change])
+      const runStepHooks = makeRunStepHooks({
+        execute: async (input) => {
+          if (input.phase === 'pre') {
+            return {
+              hooks: [
+                {
+                  id: 'non-blocking-lint',
+                  command: 'npm run lint:warn',
+                  exitCode: 1,
+                  stdout: '',
+                  stderr: 'Warning: lint issues found',
+                  success: false,
+                },
+              ],
+              success: true, // onFailure: 'warn' preserves success: true
+              failedHooks: [],
+              warnings: [
+                {
+                  id: 'non-blocking-lint',
+                  command: 'npm run lint:warn',
+                  exitCode: 1,
+                  stdout: '',
+                  stderr: 'Warning: lint issues found',
+                  success: false,
+                },
+              ],
+            }
+          }
+          return { hooks: [], success: true, failedHooks: [], warnings: [] }
+        },
+      })
+      const uc = makeUseCase(repo, { schema: hookSchema, runStepHooks })
+
+      const result = await uc.execute({
+        name: 'my-change',
+        to: 'implementing',
+      })
+
+      expect(result.change.state).toBe('implementing')
+      expect(repo.store.get('my-change')?.state).toBe('implementing')
+    })
+
+    it('allows transition to proceed when a post-hook fails but has onFailure: "warn"', async () => {
+      const change = makeChangeInState('my-change', [
+        { type: 'transitioned', from: 'drafting', to: 'implementing', at: new Date(), by: actor },
+      ])
+      const repo = makeChangeRepository([change])
+      const runStepHooks = makeRunStepHooks({
+        execute: async (input) => {
+          if (input.phase === 'post') {
+            return {
+              hooks: [
+                {
+                  id: 'telemetry',
+                  command: 'send-telemetry',
+                  exitCode: 2,
+                  stdout: '',
+                  stderr: 'Network unreachable',
+                  success: false,
+                },
+              ],
+              success: true,
+              failedHooks: [],
+              warnings: [
+                {
+                  id: 'telemetry',
+                  command: 'send-telemetry',
+                  exitCode: 2,
+                  stdout: '',
+                  stderr: 'Network unreachable',
+                  success: false,
+                },
+              ],
+            }
+          }
+          return { hooks: [], success: true, failedHooks: [], warnings: [] }
+        },
+      })
+      const uc = makeUseCase(repo, { schema: hookSchema, runStepHooks })
+
+      const result = await uc.execute({
+        name: 'my-change',
+        to: 'verifying',
+      })
+
+      expect(result.change.state).toBe('verifying')
+      expect(repo.store.get('my-change')?.state).toBe('verifying')
+    })
+
+    it('aborts transition when a hook phase contains both a warn failure and an abort failure', async () => {
+      const change = makeReadyChange('my-change')
+      const repo = makeChangeRepository([change])
+      const runStepHooks = makeRunStepHooks({
+        execute: async (input) => {
+          if (input.phase === 'pre') {
+            return {
+              hooks: [
+                {
+                  id: 'warn-check',
+                  command: 'check-warn',
+                  exitCode: 1,
+                  stdout: '',
+                  stderr: 'warn',
+                  success: false,
+                },
+                {
+                  id: 'critical-build',
+                  command: 'pnpm build',
+                  exitCode: 1,
+                  stdout: '',
+                  stderr: 'build failed',
+                  success: false,
+                },
+              ],
+              success: false,
+              failedHooks: [
+                {
+                  id: 'critical-build',
+                  command: 'pnpm build',
+                  exitCode: 1,
+                  stdout: '',
+                  stderr: 'build failed',
+                  success: false,
+                },
+              ],
+              warnings: [
+                {
+                  id: 'warn-check',
+                  command: 'check-warn',
+                  exitCode: 1,
+                  stdout: '',
+                  stderr: 'warn',
+                  success: false,
+                },
+              ],
+            }
+          }
+          return { hooks: [], success: true, failedHooks: [], warnings: [] }
+        },
+      })
+      const uc = makeUseCase(repo, { schema: hookSchema, runStepHooks })
+
+      await expect(
+        uc.execute({
+          name: 'my-change',
+          to: 'implementing',
+        }),
+      ).rejects.toThrow(HookFailedError)
 
       expect(repo.store.get('my-change')?.state).toBe('ready')
     })
@@ -1411,9 +1581,10 @@ describe('TransitionChange', () => {
                   success: false,
                 },
               ],
+              warnings: [],
             }
           }
-          return { hooks: [], success: true, failedHooks: [] }
+          return { hooks: [], success: true, failedHooks: [], warnings: [] }
         },
       })
       const uc = makeUseCase(makeChangeRepository([change]), { schema: hookSchema, runStepHooks })
@@ -1470,7 +1641,7 @@ describe('TransitionChange', () => {
       const runStepHooks = makeRunStepHooks({
         execute: async (input) => {
           calls.push({ step: input.step, phase: input.phase })
-          return { hooks: [], success: true, failedHooks: [] }
+          return { hooks: [], success: true, failedHooks: [], warnings: [] }
         },
       })
       const uc = makeUseCase(makeChangeRepository([change]), {
@@ -1495,7 +1666,7 @@ describe('TransitionChange', () => {
       const runStepHooks = makeRunStepHooks({
         execute: async (input) => {
           calls.push({ step: input.step, phase: input.phase })
-          return { hooks: [], success: true, failedHooks: [] }
+          return { hooks: [], success: true, failedHooks: [], warnings: [] }
         },
       })
       const uc = makeUseCase(makeChangeRepository([change]), { schema: hookSchema, runStepHooks })
@@ -1517,7 +1688,7 @@ describe('TransitionChange', () => {
       const runStepHooks = makeRunStepHooks({
         execute: async (input) => {
           calls.push({ step: input.step, phase: input.phase })
-          return { hooks: [], success: true, failedHooks: [] }
+          return { hooks: [], success: true, failedHooks: [], warnings: [] }
         },
       })
       const designingSchema = makeSchema({
@@ -1571,7 +1742,7 @@ describe('TransitionChange', () => {
       const runStepHooks = makeRunStepHooks({
         execute: async (input) => {
           order.push(`${input.step}.${input.phase}`)
-          return { hooks: [], success: true, failedHooks: [] }
+          return { hooks: [], success: true, failedHooks: [], warnings: [] }
         },
       })
       const uc = makeUseCase(makeChangeRepository([change]), {
@@ -1625,9 +1796,10 @@ describe('TransitionChange', () => {
                   success: false,
                 },
               ],
+              warnings: [],
             }
           }
-          return { hooks: [], success: true, failedHooks: [] }
+          return { hooks: [], success: true, failedHooks: [], warnings: [] }
         },
       })
       const repo = makeChangeRepository([change])
@@ -1671,7 +1843,7 @@ describe('TransitionChange', () => {
       const runStepHooks = makeRunStepHooks({
         execute: async (input) => {
           calls.push({ step: input.step, phase: input.phase })
-          return { hooks: [], success: true, failedHooks: [] }
+          return { hooks: [], success: true, failedHooks: [], warnings: [] }
         },
       })
       const uc = makeUseCase(makeChangeRepository([change]), {
@@ -1714,7 +1886,7 @@ describe('TransitionChange', () => {
       const runStepHooks = makeRunStepHooks({
         execute: async (input) => {
           calls.push({ step: input.step, phase: input.phase })
-          return { hooks: [], success: true, failedHooks: [] }
+          return { hooks: [], success: true, failedHooks: [], warnings: [] }
         },
       })
       const uc = makeUseCase(makeChangeRepository([change]), {
@@ -1760,7 +1932,7 @@ describe('TransitionChange', () => {
       const runStepHooks = makeRunStepHooks({
         execute: async (input) => {
           calls.push({ step: input.step, phase: input.phase })
-          return { hooks: [], success: true, failedHooks: [] }
+          return { hooks: [], success: true, failedHooks: [], warnings: [] }
         },
       })
       const uc = makeUseCase(makeChangeRepository([change]), {
@@ -1806,7 +1978,7 @@ describe('TransitionChange', () => {
       const runStepHooks = makeRunStepHooks({
         execute: async (input) => {
           calls.push({ step: input.step, phase: input.phase })
-          return { hooks: [], success: true, failedHooks: [] }
+          return { hooks: [], success: true, failedHooks: [], warnings: [] }
         },
       })
       const uc = makeUseCase(makeChangeRepository([change]), {
@@ -1851,7 +2023,7 @@ describe('TransitionChange', () => {
             onProgress?.({ type: 'hook-start', hookId: 'lint', command: 'pnpm lint' })
             onProgress?.({ type: 'hook-done', hookId: 'lint', success: true, exitCode: 0 })
           }
-          return { hooks: [], success: true, failedHooks: [] }
+          return { hooks: [], success: true, failedHooks: [], warnings: [] }
         },
       })
       const uc = makeUseCase(makeChangeRepository([change]), { schema: hookSchema, runStepHooks })
@@ -1902,7 +2074,7 @@ describe('TransitionChange', () => {
             onProgress?.({ type: 'hook-heartbeat', hookId: 'lint', elapsedMs: 5000 })
             onProgress?.({ type: 'hook-done', hookId: 'lint', success: true, exitCode: 0 })
           }
-          return { hooks: [], success: true, failedHooks: [] }
+          return { hooks: [], success: true, failedHooks: [], warnings: [] }
         },
       })
       const uc = makeUseCase(makeChangeRepository([change]), { schema: hookSchema, runStepHooks })
@@ -1958,7 +2130,7 @@ describe('TransitionChange', () => {
             onProgress?.({ type: 'hook-start', hookId: 'notify', command: 'notify-slack' })
             onProgress?.({ type: 'hook-done', hookId: 'notify', success: true, exitCode: 0 })
           }
-          return { hooks: [], success: true, failedHooks: [] }
+          return { hooks: [], success: true, failedHooks: [], warnings: [] }
         },
       })
       const uc = makeUseCase(makeChangeRepository([change]), { schema: postSchema, runStepHooks })
@@ -2017,7 +2189,7 @@ describe('TransitionChange', () => {
             onProgress?.({ type: 'hook-start', hookId: 'lint', command: 'pnpm lint' })
             onProgress?.({ type: 'hook-done', hookId: 'lint', success: true, exitCode: 0 })
           }
-          return { hooks: [], success: true, failedHooks: [] }
+          return { hooks: [], success: true, failedHooks: [], warnings: [] }
         },
       })
       const uc = makeUseCase(makeChangeRepository([change]), { schema, runStepHooks })
@@ -2124,7 +2296,9 @@ describe('TransitionChange', () => {
         { type: 'transitioned', from: 'drafting', to: 'designing', at: new Date(), by: actor },
         { type: 'transitioned', from: 'designing', to: 'ready', at: new Date(), by: actor },
       ])
-      const executeSpy = vi.fn().mockResolvedValue({ hooks: [], success: true, failedHooks: [] })
+      const executeSpy = vi
+        .fn()
+        .mockResolvedValue({ hooks: [], success: true, failedHooks: [], warnings: [] })
       const runStepHooks = makeRunStepHooks({ execute: executeSpy })
       const schema = makeSchema({ workflow: [] })
       const uc = makeUseCase(makeChangeRepository([change]), { schema, runStepHooks })
@@ -2393,7 +2567,9 @@ describe('TransitionChange', () => {
         { type: 'transitioned', from: 'archivable', to: 'archiving', at: createdAt, by: actor },
       ])
       const hooks = makeRunStepHooks({
-        execute: vi.fn().mockResolvedValue({ hooks: [], success: true, failedHooks: [] }),
+        execute: vi
+          .fn()
+          .mockResolvedValue({ hooks: [], success: true, failedHooks: [], warnings: [] }),
       })
       const uc = makeUseCase(makeChangeRepository([change]), { runStepHooks: hooks })
 
@@ -2558,7 +2734,9 @@ describe('TransitionChange', () => {
         { type: 'transitioned', from: 'designing', to: 'ready', at: new Date(), by: actor },
         { type: 'transitioned', from: 'ready', to: 'implementing', at: new Date(), by: actor },
       ])
-      const executeSpy = vi.fn().mockResolvedValue({ hooks: [], success: true, failedHooks: [] })
+      const executeSpy = vi
+        .fn()
+        .mockResolvedValue({ hooks: [], success: true, failedHooks: [], warnings: [] })
       const uc = makeUseCase(makeChangeRepository([change]), {
         schema: makeSchema({
           workflow: [
@@ -2669,7 +2847,7 @@ describe('TransitionChange', () => {
       )
 
       await expect(uc.execute({ name: 'my-change', to: 'ready' })).rejects.toThrow(
-        ReadOnlyWorkspaceError,
+        CheckPredicateFailedError,
       )
     })
   })
@@ -2702,7 +2880,7 @@ describe('TransitionChange', () => {
       const uc = makeUseCase(repo, { schema: verifyingSchema, refreshExecute })
 
       await expect(uc.execute({ name: 'my-change', to: 'verifying' })).rejects.toThrow(
-        ArchiveImplementationStateError,
+        CheckPredicateFailedError,
       )
     })
 
@@ -2731,7 +2909,7 @@ describe('TransitionChange', () => {
 
       await expect(
         uc.execute({ name: 'my-change', to: 'verifying', allowOutOfScope: true }),
-      ).rejects.toThrow(ArchiveImplementationStateError)
+      ).rejects.toThrow(CheckPredicateFailedError)
     })
 
     it('fails impl.linksInScope without allowOutOfScope', async () => {
@@ -2744,7 +2922,7 @@ describe('TransitionChange', () => {
       const uc = makeUseCase(makeChangeRepository([change]), { schema: verifyingSchema })
 
       await expect(uc.execute({ name: 'my-change', to: 'verifying' })).rejects.toThrow(
-        ArchiveImplementationStateError,
+        CheckPredicateFailedError,
       )
     })
   })
@@ -2985,6 +3163,374 @@ describe('TransitionChange', () => {
       expect(forward.change.history.some((event) => event.type === 'verification-completed')).toBe(
         false,
       )
+    })
+  })
+
+  describe('Custom checks, skipChecks validation, and edge cases', () => {
+    it('throws UnknownCheckError when an unregistered check is passed to skipChecks', async () => {
+      const change = makeChangeInState('my-change', [
+        { type: 'transitioned', from: 'drafting', to: 'designing', at: new Date(), by: actor },
+      ])
+      const repo = makeChangeRepository([change])
+      const uc = makeUseCase(repo)
+
+      await expect(
+        uc.execute({
+          name: 'my-change',
+          to: 'ready',
+          skipChecks: ['@security.nonexistent'],
+        }),
+      ).rejects.toThrow(UnknownCheckError)
+    })
+
+    it('throws CheckNotSkippableError when a non-skippable check is passed to skipChecks', async () => {
+      const change = makeChangeInState('my-change', [
+        { type: 'transitioned', from: 'drafting', to: 'designing', at: new Date(), by: actor },
+      ])
+      const repo = makeChangeRepository([change])
+      const uc = makeUseCase(repo)
+
+      await expect(
+        uc.execute({
+          name: 'my-change',
+          to: 'ready',
+          skipChecks: ['protocol.edge'],
+        }),
+      ).rejects.toThrow(CheckNotSkippableError)
+    })
+
+    it('throws CheckNotSkippableError when an effect check (hook) is passed to skipChecks', async () => {
+      const change = makeChangeInState('my-change', [
+        { type: 'transitioned', from: 'drafting', to: 'designing', at: new Date(), by: actor },
+      ])
+      const repo = makeChangeRepository([change])
+      const uc = makeUseCase(repo)
+
+      await expect(
+        uc.execute({
+          name: 'my-change',
+          to: 'ready',
+          skipChecks: ['hook.pre'],
+        }),
+      ).rejects.toThrow(CheckNotSkippableError)
+    })
+
+    it('executes a custom registered check and allows transition when it passes', async () => {
+      const change = makeChangeInState('my-change', [
+        { type: 'transitioned', from: 'drafting', to: 'designing', at: new Date(), by: actor },
+      ])
+      const repo = makeChangeRepository([change])
+      const registry = new CheckRegistry()
+      const customCheck: CustomCheckDefinition = {
+        id: 'code-audit',
+        label: 'Code Audit',
+        execute: async () => ({
+          id: '@security.code-audit',
+          label: 'Code Audit',
+          kind: 'predicate',
+          outcome: 'pass',
+        }),
+      }
+      registry.register('security', customCheck, [
+        { scope: 'transition', from: 'designing', to: 'ready', skippable: true },
+      ])
+
+      const transitionBindings = registry
+        .bindings()
+        .filter((b) => b.applicability.some((a) => a.scope === 'transition'))
+      const uc = makeUseCase(repo, { checkRegistry: registry, transitionBindings })
+
+      const result = await uc.execute({
+        name: 'my-change',
+        to: 'ready',
+      })
+
+      expect(result.change.state).toBe('ready')
+    })
+
+    it('executes a custom registered check and aborts transition with CheckPredicateFailedError when it fails', async () => {
+      const change = makeChangeInState('my-change', [
+        { type: 'transitioned', from: 'drafting', to: 'designing', at: new Date(), by: actor },
+      ])
+      const repo = makeChangeRepository([change])
+      const registry = new CheckRegistry()
+      const customCheck: CustomCheckDefinition = {
+        id: 'code-audit',
+        label: 'Code Audit',
+        execute: async () => ({
+          id: '@security.code-audit',
+          label: 'Code Audit',
+          kind: 'predicate',
+          outcome: 'fail',
+          code: 'AUDIT_VULNERABILITY_FOUND',
+          message: 'Found high severity vulnerability',
+          command: 'npm audit fix',
+        }),
+      }
+      registry.register('security', customCheck, [
+        { scope: 'transition', from: 'designing', to: 'ready', skippable: true },
+      ])
+
+      const transitionBindings = registry
+        .bindings()
+        .filter((b) => b.applicability.some((a) => a.scope === 'transition'))
+      const uc = makeUseCase(repo, { checkRegistry: registry, transitionBindings })
+
+      await expect(
+        uc.execute({
+          name: 'my-change',
+          to: 'ready',
+        }),
+      ).rejects.toThrow(CheckPredicateFailedError)
+
+      try {
+        await uc.execute({ name: 'my-change', to: 'ready' })
+      } catch (err) {
+        expect(err).toBeInstanceOf(CheckPredicateFailedError)
+        const checkErr = err as CheckPredicateFailedError
+        expect(checkErr.checkId).toBe('@security.code-audit')
+        expect(checkErr.label).toBe('Code Audit')
+        expect(checkErr.code).toBe('AUDIT_VULNERABILITY_FOUND')
+        expect(checkErr.message).toContain('Found high severity vulnerability')
+        expect(checkErr.command).toBe('npm audit fix')
+      }
+    })
+
+    it('bypasses a failing custom check when explicitly supplied in skipChecks', async () => {
+      const change = makeChangeInState('my-change', [
+        { type: 'transitioned', from: 'drafting', to: 'designing', at: new Date(), by: actor },
+      ])
+      const repo = makeChangeRepository([change])
+      const registry = new CheckRegistry()
+      const customCheck: CustomCheckDefinition = {
+        id: 'code-audit',
+        label: 'Code Audit',
+        execute: async () => ({
+          id: '@security.code-audit',
+          label: 'Code Audit',
+          kind: 'predicate',
+          outcome: 'fail',
+          code: 'AUDIT_VULNERABILITY_FOUND',
+          message: 'Found high severity vulnerability',
+        }),
+      }
+      registry.register('security', customCheck, [
+        { scope: 'transition', from: 'designing', to: 'ready', skippable: true },
+      ])
+
+      const transitionBindings = registry
+        .bindings()
+        .filter((b) => b.applicability.some((a) => a.scope === 'transition'))
+      const uc = makeUseCase(repo, { checkRegistry: registry, transitionBindings })
+
+      const result = await uc.execute({
+        name: 'my-change',
+        to: 'ready',
+        skipChecks: ['@security.code-audit'],
+      })
+
+      expect(result.change.state).toBe('ready')
+    })
+
+    it('rejects skipping any non-skippable built-in check in skipChecks with CheckNotSkippableError', async () => {
+      const change = makeChangeInState('my-change', [
+        { type: 'transitioned', from: 'drafting', to: 'designing', at: new Date(), by: actor },
+      ])
+      const repo = makeChangeRepository([change])
+      const uc = makeUseCase(repo)
+
+      const nonSkippableBuiltinChecks = [
+        'protocol.edge',
+        'workflow.requires',
+        'workflow.taskCompletion',
+        'deps.consistent',
+        'workspace.readOnly',
+        'impl.filesResolved',
+        'approval.spec',
+        'approval.signoff',
+        'verification.current',
+        'hook.pre',
+        'hook.post',
+      ]
+
+      for (const checkId of nonSkippableBuiltinChecks) {
+        await expect(
+          uc.execute({
+            name: 'my-change',
+            to: 'ready',
+            skipChecks: [checkId],
+          }),
+        ).rejects.toThrow(CheckNotSkippableError)
+      }
+    })
+
+    it('rejects skipping a custom check registered with skippable: false', async () => {
+      const change = makeChangeInState('my-change', [
+        { type: 'transitioned', from: 'drafting', to: 'designing', at: new Date(), by: actor },
+      ])
+      const repo = makeChangeRepository([change])
+      const registry = new CheckRegistry()
+      registry.register(
+        'security',
+        {
+          id: 'mandatory-audit',
+          label: 'Mandatory Security Audit',
+          execute: async () => ({
+            id: '@security.mandatory-audit',
+            label: 'Audit',
+            kind: 'predicate',
+            outcome: 'pass',
+          }),
+        },
+        [{ scope: 'transition', from: 'designing', to: 'ready', skippable: false }],
+      )
+
+      const transitionBindings = registry
+        .bindings()
+        .filter((b) => b.applicability.some((a) => a.scope === 'transition'))
+      const uc = makeUseCase(repo, { checkRegistry: registry, transitionBindings })
+
+      await expect(
+        uc.execute({
+          name: 'my-change',
+          to: 'ready',
+          skipChecks: ['@security.mandatory-audit'],
+        }),
+      ).rejects.toThrow(CheckNotSkippableError)
+    })
+
+    it('propagates unexpected errors thrown by a custom check and prevents transition', async () => {
+      const change = makeChangeInState('my-change', [
+        { type: 'transitioned', from: 'drafting', to: 'designing', at: new Date(), by: actor },
+      ])
+      const repo = makeChangeRepository([change])
+      const registry = new CheckRegistry()
+      registry.register(
+        'db',
+        {
+          id: 'health',
+          label: 'Database Health',
+          execute: async () => {
+            throw new Error('Database connection crashed unexpectedly')
+          },
+        },
+        [{ scope: 'transition', from: 'designing', to: 'ready', skippable: true }],
+      )
+
+      const transitionBindings = registry
+        .bindings()
+        .filter((b) => b.applicability.some((a) => a.scope === 'transition'))
+      const uc = makeUseCase(repo, { checkRegistry: registry, transitionBindings })
+
+      await expect(
+        uc.execute({
+          name: 'my-change',
+          to: 'ready',
+        }),
+      ).rejects.toThrow('Database connection crashed unexpectedly')
+
+      // Ensure change remains in 'designing' state, not mutated
+      const reloaded = await repo.get('my-change')
+      expect(reloaded?.state).toBe('designing')
+    })
+
+    it('aborts transition when multiple custom checks run and the second fails', async () => {
+      const change = makeChangeInState('my-change', [
+        { type: 'transitioned', from: 'drafting', to: 'designing', at: new Date(), by: actor },
+      ])
+      const repo = makeChangeRepository([change])
+      const registry = new CheckRegistry()
+      registry.register(
+        'check',
+        {
+          id: 'first',
+          label: 'First Check',
+          execute: async () => ({
+            id: '@check.first',
+            label: 'First Check',
+            kind: 'predicate',
+            outcome: 'pass',
+          }),
+        },
+        [{ scope: 'transition', from: 'designing', to: 'ready', skippable: true }],
+      )
+
+      registry.register(
+        'check',
+        {
+          id: 'second',
+          label: 'Second Check',
+          execute: async () => ({
+            id: '@check.second',
+            label: 'Second Check',
+            kind: 'predicate',
+            outcome: 'fail',
+            code: 'SECOND_CHECK_FAILED',
+            message: 'Second check blocked the transition',
+          }),
+        },
+        [{ scope: 'transition', from: 'designing', to: 'ready', skippable: true }],
+      )
+
+      const transitionBindings = registry
+        .bindings()
+        .filter((b) => b.applicability.some((a) => a.scope === 'transition'))
+      const uc = makeUseCase(repo, { checkRegistry: registry, transitionBindings })
+
+      await expect(
+        uc.execute({
+          name: 'my-change',
+          to: 'ready',
+        }),
+      ).rejects.toThrow(CheckPredicateFailedError)
+
+      try {
+        await uc.execute({ name: 'my-change', to: 'ready' })
+      } catch (err) {
+        expect(err).toBeInstanceOf(CheckPredicateFailedError)
+        const checkErr = err as CheckPredicateFailedError
+        expect(checkErr.checkId).toBe('@check.second')
+        expect(checkErr.code).toBe('SECOND_CHECK_FAILED')
+      }
+
+      const reloaded = await repo.get('my-change')
+      expect(reloaded?.state).toBe('designing')
+    })
+
+    it('handles duplicate check IDs in skipChecks cleanly without duplicate execution or errors', async () => {
+      const change = makeChangeInState('my-change', [
+        { type: 'transitioned', from: 'drafting', to: 'designing', at: new Date(), by: actor },
+      ])
+      const repo = makeChangeRepository([change])
+      const registry = new CheckRegistry()
+      registry.register(
+        'qa',
+        {
+          id: 'flake',
+          label: 'Flaky QA Check',
+          execute: async () => ({
+            id: '@qa.flake',
+            label: 'Flaky QA Check',
+            kind: 'predicate',
+            outcome: 'fail',
+            code: 'FLAKE',
+          }),
+        },
+        [{ scope: 'transition', from: 'designing', to: 'ready', skippable: true }],
+      )
+
+      const transitionBindings = registry
+        .bindings()
+        .filter((b) => b.applicability.some((a) => a.scope === 'transition'))
+      const uc = makeUseCase(repo, { checkRegistry: registry, transitionBindings })
+
+      const result = await uc.execute({
+        name: 'my-change',
+        to: 'ready',
+        skipChecks: ['@qa.flake', '@qa.flake', '@qa.flake'],
+      })
+
+      expect(result.change.state).toBe('ready')
     })
   })
 })

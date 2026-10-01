@@ -73,12 +73,12 @@ If the entry file or any file in its `extends` chain does not exist, `load()` MU
 
 ### Requirement: Layer merge semantics
 
-After resolving the active config chain, the loader MUST merge layers in chain order from lowest to highest precedence.
+After resolving the active config chain, the loader MUST merge layers in chain order from lowest to highest precedence using the core `deepMergeConfig` service.
 
 Merge rules are:
 
 - scalars: later active layer wins
-- objects: deep merge by key
+- objects: deep merge by key (recursively across arbitrary nested records of records)
 - arrays: append by default
 - `remove.root`: delete optional top-level fields from the accumulated config
 - `remove.<mapName>`: delete named keys from keyed object maps such as `workspaces` and `storage`

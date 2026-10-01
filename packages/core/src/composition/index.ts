@@ -12,6 +12,7 @@ export {
   type ChangeStorageFactory,
   type CompositionRegistryInput,
   type CompositionRegistryView,
+  type PluginCheckRegistration,
   type SchemaStorageFactory,
   type SpecStorageFactory,
   type VcsProvider,

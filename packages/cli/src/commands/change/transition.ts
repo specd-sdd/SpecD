@@ -8,6 +8,9 @@ import {
   ReadOnlyWorkspaceError,
   ArchiveDependencyMismatchError,
   ArchiveImplementationStateError,
+  CheckPredicateFailedError,
+  CheckNotSkippableError,
+  UnknownCheckError,
 } from '@specd/sdk'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat, serializeOutput, type OutputFormat } from '../../formatter.js'
@@ -76,20 +79,28 @@ type TransitionFailureStatus = Awaited<
  * @returns Whether the CLI should exit 1 with a repair guide
  */
 function isRepairGuideError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') {
+    return false
+  }
+  const name = (err as Error).name
   return (
     err instanceof InvalidStateTransitionError ||
     err instanceof ReadOnlyWorkspaceError ||
     err instanceof ArchiveDependencyMismatchError ||
-    err instanceof ArchiveImplementationStateError
+    err instanceof ArchiveImplementationStateError ||
+    err instanceof CheckPredicateFailedError ||
+    err instanceof CheckNotSkippableError ||
+    err instanceof UnknownCheckError ||
+    name === 'InvalidStateTransitionError' ||
+    name === 'ReadOnlyWorkspaceError' ||
+    name === 'ArchiveDependencyMismatchError' ||
+    name === 'ArchiveImplementationStateError' ||
+    name === 'CheckPredicateFailedError' ||
+    name === 'CheckNotSkippableError' ||
+    name === 'UnknownCheckError'
   )
 }
 
-/**
- * Writes the text-mode Repair Guide from a GetStatus projection.
- *
- * @param err - The typed failure whose message is shown first
- * @param status - Fresh GetStatus result after the failed transition
- */
 /**
  * Copies hash-free validity fields from a fresh status result.
  *
@@ -117,12 +128,14 @@ function repairValidityFields(status: TransitionFailureStatus): {
  */
 function writeTextRepairGuide(err: Error, status: TransitionFailureStatus): void {
   process.stderr.write(`error: ${err.message}\n`)
-  for (const b of status.blockers) {
-    process.stderr.write(
-      b.label !== undefined
-        ? `! ${b.code} — ${b.label}: ${b.message}\n`
-        : `! ${b.code}: ${b.message}\n`,
-    )
+  if (status.blockers) {
+    for (const b of status.blockers) {
+      process.stderr.write(
+        b.label !== undefined
+          ? `! ${b.code} — ${b.label}: ${b.message}\n`
+          : `! ${b.code}: ${b.message}\n`,
+      )
+    }
   }
   process.stderr.write('\n')
   process.stderr.write('repair guide:\n')
@@ -135,9 +148,36 @@ function writeTextRepairGuide(err: Error, status: TransitionFailureStatus): void
   for (const line of validityTextLines(validity, evidence)) {
     process.stderr.write(`  ${line}\n`)
   }
-  process.stderr.write(`  target:  ${status.nextAction.targetStep}\n`)
-  process.stderr.write(`  command: ${status.nextAction.command ?? '(none)'}\n`)
-  process.stderr.write(`  reason:  ${status.nextAction.reason}\n`)
+  if (status.nextAction?.targetStep) {
+    process.stderr.write(`  target:  ${status.nextAction.targetStep}\n`)
+  }
+  if (err.name === 'CheckPredicateFailedError' || err instanceof CheckPredicateFailedError) {
+    const cpErr = err as CheckPredicateFailedError
+    process.stderr.write(`  check:   ${cpErr.label} (${cpErr.checkId})\n`)
+    if (cpErr.command) {
+      process.stderr.write(`  command: ${cpErr.command}\n`)
+    } else if (status.nextAction?.command) {
+      process.stderr.write(`  command: ${status.nextAction.command}\n`)
+    }
+    if (cpErr.skippable) {
+      process.stderr.write(
+        `  bypass:  Retry with --skip-checks ${cpErr.checkId} if an exception is granted\n`,
+      )
+    }
+  } else {
+    if (status.nextAction?.command) {
+      process.stderr.write(`  command: ${status.nextAction.command}\n`)
+    }
+    const skippableBlocker = status.blockers?.find((b) => b.bypassFlag)
+    if (skippableBlocker) {
+      process.stderr.write(
+        `  bypass:  Retry with ${skippableBlocker.bypassFlag} if an exception is granted\n`,
+      )
+    }
+  }
+  if (status.nextAction?.reason) {
+    process.stderr.write(`  reason:  ${status.nextAction.reason}\n`)
+  }
 }
 
 /**
@@ -241,8 +281,16 @@ export function registerChangeTransition(parent: Command): void {
     )
     .option('--next', 'transition to the next logical lifecycle step')
     .option(
+      '--skip-checks <ids>',
+      'comma-separated check identifiers to bypass (e.g. impl.linksInScope,spec.overlap)',
+    )
+    .option(
       '--allow-out-of-scope',
-      'permit the hop when implementation links resolve outside the change scope (impl.linksInScope)',
+      'permit the hop when implementation links resolve outside the change scope (impl.linksInScope) [deprecated alias]',
+    )
+    .option(
+      '--allow-overlap',
+      'permit the archive hop when spec overlaps exist (spec.overlap) [deprecated alias]',
     )
     .option(
       '--skip-hooks <phases>',
@@ -269,7 +317,9 @@ JSON/TOON output schema:
           config?: string
           next?: boolean
           skipHooks?: string
+          skipChecks?: string
           allowOutOfScope?: true
+          allowOverlap?: true
         },
       ) => {
         const fmt = parseFormat(opts.format)
@@ -280,6 +330,22 @@ JSON/TOON output schema:
             opts.skipHooks !== undefined
               ? parseCommaSeparatedValues(opts.skipHooks, VALID_HOOK_PHASES, '--skip-hooks')
               : new Set<HookPhaseSelector>()
+
+          const skipChecks = new Set<string>()
+          if (opts.skipChecks) {
+            for (const id of opts.skipChecks
+              .split(',')
+              .map((s) => s.trim())
+              .filter(Boolean)) {
+              skipChecks.add(id)
+            }
+          }
+          if (opts.allowOutOfScope === true) {
+            skipChecks.add('impl.linksInScope')
+          }
+          if (opts.allowOverlap === true) {
+            skipChecks.add('spec.overlap')
+          }
 
           const { kernel } = await resolveCliContext({ configPath: opts.config })
 
@@ -303,7 +369,7 @@ JSON/TOON output schema:
                 name,
                 to: requestedTarget,
                 skipHookPhases,
-                ...(opts.allowOutOfScope === true ? { allowOutOfScope: true } : {}),
+                skipChecks: Array.from(skipChecks),
               },
               progressRenderer.onProgress,
             )

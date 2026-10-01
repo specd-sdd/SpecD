@@ -1,0 +1,27 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Command signature'
+  content: |
+    The command SHALL be invoked as `specd change transition [name] [target]`.
+    If `name` is omitted, it defaults to the active workspace change.
+    If `target` is omitted, it attempts to resolve the next logical transition.
+
+    The command MUST accept a `--skip-checks <ids>` option accepting a comma-separated list of check IDs.
+    The command MUST maintain backward compatibility with legacy flags by translating them into `skipChecks`:
+    - `--allow-out-of-scope` appends `impl.linksInScope` to `skipChecks`.
+    - `--allow-overlap` appends `spec.overlap` to `skipChecks`.
+
+    The CLI adapter MUST pass the compiled `skipChecks` array directly to `TransitionChangeInput.skipChecks`.
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Invalid transition error'
+  content: |
+    The command MUST catch `CheckPredicateFailedError` and map it onto the CLI Text Repair Guide.
+    When this error is caught:
+    - The CLI SHALL render the failure message, diagnostic code, and the check's gerund label.
+    - If the check definition or result specifies a remediation `command`, the Repair Guide MUST present it under the `command:` field.
+    - If the failed check allows bypass (`skippable: true`), the Repair Guide MUST suggest the exact bypass syntax: `Retry with --skip-checks <id> if an exception is granted`.
+    - If the check is mandatory (`skippable: false`), no bypass option SHALL be offered.

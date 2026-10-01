@@ -1,5 +1,5 @@
 import {
-  CHECK_LABELS,
+  checkLabel,
   fail,
   pass,
   skip,
@@ -28,7 +28,7 @@ export abstract class WorkflowCheck implements Check {
    * @returns Canonical label from {@link CHECK_LABELS}
    */
   get label(): string {
-    return CHECK_LABELS[this.id]
+    return checkLabel(this.id)
   }
 
   /**

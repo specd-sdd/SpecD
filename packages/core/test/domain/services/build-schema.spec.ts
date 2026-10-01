@@ -1,30 +1,32 @@
 import { describe, it, expect } from 'vitest'
-import { buildSchema } from '../../../src/domain/services/build-schema.js'
+import { buildSchema, type SchemaYamlData } from '../../../src/domain/services/build-schema.js'
 import { SchemaValidationError } from '../../../src/domain/errors/schema-validation-error.js'
+import { CheckRegistry } from '../../../src/domain/services/check-registry.js'
+import {
+  CheckBindingOverrideForbiddenError,
+  CheckConfigOverrideForbiddenError,
+  CheckDisableForbiddenError,
+  CheckEmbeddingForbiddenError,
+  DuplicateCheckBindingError,
+  UnknownCheckError,
+} from '../../../src/domain/errors/check-registry-errors.js'
 
-function minimalData(
-  workflow?: Array<{
-    step: string
-    requires: string[]
-    requiresTaskCompletion: string[]
-    hooks: { pre: never[]; post: never[] }
-  }>,
-) {
+function minimalData(workflow?: Array<Record<string, unknown>>): SchemaYamlData {
   return {
-    kind: 'schema' as const,
+    kind: 'schema',
     name: 'test',
     version: 1,
-    artifacts: [{ id: 'spec', scope: 'spec' as const, output: 'spec.md' }],
-    workflow,
+    artifacts: [{ id: 'spec', scope: 'spec', output: 'spec.md' }],
+    workflow: workflow as unknown as SchemaYamlData['workflow'],
   }
 }
 
-function step(name: string) {
+function step(name: string): Record<string, unknown> {
   return {
     step: name,
     requires: [],
     requiresTaskCompletion: [],
-    hooks: { pre: [] as never[], post: [] as never[] },
+    hooks: { pre: [], post: [] },
   }
 }
 
@@ -816,5 +818,429 @@ describe('buildSchema', () => {
       ],
     }
     expect(() => buildSchema('#test', data, new Map())).toThrow(SchemaValidationError)
+  })
+
+  describe('workflow checks validation and governance', () => {
+    it('accepts valid custom checks registered in CheckRegistry', () => {
+      const registry = new CheckRegistry()
+      registry.register('my-plugin', {
+        id: 'linter',
+        label: 'Linter',
+        execute: async () => ({
+          id: 'test',
+          label: 'Test',
+          kind: 'predicate',
+          outcome: 'pass',
+          details: {},
+        }),
+      })
+
+      const data = {
+        ...minimalData([
+          {
+            ...step('implementing'),
+            checks: [{ id: '@my-plugin.linter', config: { strict: true } }],
+          },
+        ]),
+      }
+
+      const schema = buildSchema('#test', data, new Map(), registry)
+      const stepObj = schema.workflowStep('implementing')
+      expect(stepObj?.checks).toBeDefined()
+      expect(stepObj?.checks?.[0]?.id).toBe('@my-plugin.linter')
+      expect(stepObj?.checks?.[0]?.config).toEqual({ strict: true })
+    })
+
+    it('rejects unknown check IDs with UnknownCheckError', () => {
+      const registry = new CheckRegistry()
+      const data = {
+        ...minimalData([
+          {
+            ...step('implementing'),
+            checks: [{ id: '@unknown.check' }],
+          },
+        ]),
+      }
+
+      expect(() => buildSchema('#test', data, new Map(), registry)).toThrow(UnknownCheckError)
+    })
+
+    it('rejects duplicate check IDs in the same workflow step with DuplicateCheckBindingError', () => {
+      const registry = new CheckRegistry()
+      registry.register('my-plugin', {
+        id: 'linter',
+        label: 'Linter',
+        execute: async () => ({
+          id: 'test',
+          label: 'Test',
+          kind: 'predicate',
+          outcome: 'pass',
+          details: {},
+        }),
+      })
+
+      const data = {
+        ...minimalData([
+          {
+            ...step('implementing'),
+            checks: [{ id: '@my-plugin.linter' }, { id: '@my-plugin.linter' }],
+          },
+        ]),
+      }
+
+      expect(() => buildSchema('#test', data, new Map(), registry)).toThrow(
+        DuplicateCheckBindingError,
+      )
+    })
+
+    it('rejects embedding Category A protocol invariants and Category B native attributes in schema workflow steps', () => {
+      const registry = new CheckRegistry()
+      const lockedBuiltinIds = [
+        // Category A: Protocol & State Invariants
+        'protocol.edge',
+        'verification.current',
+        'archive.archivable',
+        'schema.nameMatch',
+        'hook.pre',
+        'hook.post',
+        // Category B: Native Step Attributes
+        'workflow.requires',
+        'workflow.taskCompletion',
+        'approval.spec',
+        'approval.signoff',
+      ]
+
+      for (const id of lockedBuiltinIds) {
+        const data = {
+          ...minimalData([
+            {
+              ...step('verifying'),
+              checks: [{ id }],
+            },
+          ]),
+        }
+        expect(() => buildSchema('#test', data, new Map(), registry)).toThrow(
+          CheckEmbeddingForbiddenError,
+        )
+      }
+    })
+
+    it('allows embedding and configuring Category C built-in checks in schema workflow steps', () => {
+      const registry = new CheckRegistry()
+      const categoryCIds = [
+        'impl.linksInScope',
+        'spec.overlap',
+        'deps.consistent',
+        'impl.filesResolved',
+        'workspace.readOnly',
+      ]
+
+      for (const id of categoryCIds) {
+        const data = {
+          ...minimalData([
+            {
+              ...step('verifying'),
+              checks: [{ id, config: { maxScopeDiff: 10 } }],
+            },
+          ]),
+        }
+        const schema = buildSchema('#test', data, new Map(), registry)
+        const verifyingStep = schema.workflowStep('verifying')
+        const declaredCheck = verifyingStep?.checks?.find((c) => c.id === id)
+        expect(declaredCheck).toBeDefined()
+        expect(declaredCheck?.config).toEqual({ maxScopeDiff: 10 })
+      }
+    })
+
+    it('allows Category C built-in checks to be declaratively disabled with disabled: true', () => {
+      const registry = new CheckRegistry()
+      const categoryCIds = [
+        'impl.linksInScope',
+        'spec.overlap',
+        'deps.consistent',
+        'impl.filesResolved',
+        'workspace.readOnly',
+      ]
+
+      for (const id of categoryCIds) {
+        const data = {
+          ...minimalData([
+            {
+              ...step('verifying'),
+              checks: [{ id, disabled: true }],
+            },
+          ]),
+        }
+        const schema = buildSchema('#test', data, new Map(), registry)
+        const verifyingStep = schema.workflowStep('verifying')
+        const declaredCheck = verifyingStep?.checks?.find((c) => c.id === id)
+        expect(declaredCheck).toBeDefined()
+        expect(declaredCheck?.disabled).toBe(true)
+      }
+    })
+
+    it('rejects binding override when allowBindingOverride is false with CheckBindingOverrideForbiddenError', () => {
+      const registry = new CheckRegistry()
+      registry.register(
+        'my-plugin',
+        {
+          id: 'locked-binding',
+          label: 'Locked Binding',
+          execute: async () => ({
+            id: 'test',
+            label: 'Test',
+            kind: 'predicate',
+            outcome: 'pass',
+            details: {},
+          }),
+        },
+        [
+          {
+            scope: 'transition',
+            to: 'implementing',
+            skippable: false,
+          },
+        ],
+        { allowBindingOverride: false },
+      )
+
+      const data = {
+        ...minimalData([
+          {
+            ...step('implementing'),
+            checks: [{ id: '@my-plugin.locked-binding', skippable: true }],
+          },
+        ]),
+      }
+
+      expect(() => buildSchema('#test', data, new Map(), registry)).toThrow(
+        CheckBindingOverrideForbiddenError,
+      )
+    })
+
+    it('rejects config override when allowConfigOverride is false with CheckConfigOverrideForbiddenError', () => {
+      const registry = new CheckRegistry()
+      registry.register(
+        'my-plugin',
+        {
+          id: 'locked-config',
+          label: 'Locked Config',
+          execute: async () => ({
+            id: 'test',
+            label: 'Test',
+            kind: 'predicate',
+            outcome: 'pass',
+            details: {},
+          }),
+        },
+        [],
+        { allowConfigOverride: false },
+      )
+
+      const data = {
+        ...minimalData([
+          {
+            ...step('implementing'),
+            checks: [{ id: '@my-plugin.locked-config', config: { override: true } }],
+          },
+        ]),
+      }
+
+      expect(() => buildSchema('#test', data, new Map(), registry)).toThrow(
+        CheckConfigOverrideForbiddenError,
+      )
+    })
+
+    it('rejects disabled: true when check has allowDisable: false with CheckDisableForbiddenError', () => {
+      const registry = new CheckRegistry()
+      registry.register(
+        'my-plugin',
+        {
+          id: 'non-disableable',
+          label: 'Non Disableable',
+          execute: async () => ({
+            id: 'test',
+            label: 'Test',
+            kind: 'predicate',
+            outcome: 'pass',
+            details: {},
+          }),
+        },
+        [],
+        { allowDisable: false },
+      )
+
+      const data = {
+        ...minimalData([
+          {
+            ...step('implementing'),
+            checks: [{ id: '@my-plugin.non-disableable', disabled: true }],
+          },
+        ]),
+      }
+
+      expect(() => buildSchema('#test', data, new Map(), registry)).toThrow(
+        CheckDisableForbiddenError,
+      )
+    })
+
+    it('rejects disabled: true when binding has allowDisable: false with CheckDisableForbiddenError', () => {
+      const registry = new CheckRegistry()
+      registry.register(
+        'my-plugin',
+        {
+          id: 'binding-locked',
+          label: 'Binding Locked',
+          execute: async () => ({
+            id: 'test',
+            label: 'Test',
+            kind: 'predicate',
+            outcome: 'pass',
+            details: {},
+          }),
+        },
+        [
+          {
+            scope: 'transition',
+            to: 'implementing',
+            allowDisable: false,
+          },
+        ],
+        { allowDisable: true }, // check allows it, but binding locks it
+      )
+
+      const data = {
+        ...minimalData([
+          {
+            ...step('implementing'),
+            checks: [{ id: '@my-plugin.binding-locked', disabled: true }],
+          },
+        ]),
+      }
+
+      expect(() => buildSchema('#test', data, new Map(), registry)).toThrow(
+        CheckDisableForbiddenError,
+      )
+    })
+
+    it('preserves existing binding allowDisable lock when an identical binding is redeclared in schema', () => {
+      const registry = new CheckRegistry()
+      registry.register(
+        'compliance',
+        {
+          id: 'audit',
+          label: 'Audit Check',
+          execute: async () => ({
+            id: 'test',
+            label: 'Test',
+            kind: 'predicate',
+            outcome: 'pass',
+            details: {},
+          }),
+        },
+        [
+          {
+            scope: 'transition',
+            to: 'verifying',
+            along: 'forward',
+            allowDisable: false,
+          },
+        ],
+      )
+
+      // Schema redeclares the exact same check coordinate attempting to disable it
+      const data = {
+        ...minimalData([
+          {
+            ...step('verifying'),
+            checks: [
+              {
+                id: '@compliance.audit',
+                along: 'forward',
+                disabled: true,
+              },
+            ],
+          },
+        ]),
+      }
+
+      // Pre-existing binding lock must NOT be overwritten or erased
+      expect(() => buildSchema('#test', data, new Map(), registry)).toThrow(
+        CheckDisableForbiddenError,
+      )
+    })
+
+    it('allows disabled: true when allowDisable is true', () => {
+      const registry = new CheckRegistry()
+      registry.register(
+        'my-plugin',
+        {
+          id: 'optional-check',
+          label: 'Optional Check',
+          execute: async () => ({
+            id: 'test',
+            label: 'Test',
+            kind: 'predicate',
+            outcome: 'pass',
+            details: {},
+          }),
+        },
+        [],
+        { allowDisable: true },
+      )
+
+      const data = {
+        ...minimalData([
+          {
+            ...step('implementing'),
+            checks: [{ id: '@my-plugin.optional-check', disabled: true }],
+          },
+        ]),
+      }
+
+      const schema = buildSchema('#test', data, new Map(), registry)
+      const stepObj = schema.workflowStep('implementing')
+      expect(stepObj?.checks?.[0]?.disabled).toBe(true)
+    })
+  })
+
+  describe('hook onFailure policy', () => {
+    it('parses onFailure: "warn" and "abort" correctly', () => {
+      const data = {
+        ...minimalData([
+          {
+            ...step('implementing'),
+            hooks: {
+              pre: [
+                { id: 'h1', type: 'run', command: 'echo 1', onFailure: 'warn' },
+                { id: 'h2', type: 'run', command: 'echo 2', onFailure: 'abort' },
+              ],
+              post: [],
+            },
+          },
+        ]),
+      }
+
+      const schema = buildSchema('#test', data, new Map())
+      const stepObj = schema.workflowStep('implementing')
+      expect((stepObj?.hooks.pre[0] as any)?.onFailure).toBe('warn')
+      expect((stepObj?.hooks.pre[1] as any)?.onFailure).toBe('abort')
+    })
+
+    it('rejects invalid hook onFailure values with SchemaValidationError', () => {
+      const data = {
+        ...minimalData([
+          {
+            ...step('implementing'),
+            hooks: {
+              pre: [{ id: 'h1', type: 'run', command: 'echo 1', onFailure: 'invalid' as any }],
+              post: [],
+            },
+          },
+        ]),
+      }
+
+      expect(() => buildSchema('#test', data, new Map())).toThrow(SchemaValidationError)
+    })
   })
 })

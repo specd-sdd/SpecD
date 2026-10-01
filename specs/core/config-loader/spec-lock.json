@@ -7,27 +7,18 @@
     "core:config",
     "core:composition",
     "core:schema-merge",
-    "default:_global/architecture",
     "core:vcs-adapter-port",
-    "core:vcs-adapter"
+    "core:vcs-adapter",
+    "default:_global/architecture"
   ],
   "implementation": [
     {
-      "file": "core:src/infrastructure/fs/path-platform.ts",
-      "symbols": ["isPathInside"]
+      "file": "core:src/domain/services/deep-merge-config.ts",
+      "symbols": ["deepMergeConfig", "isRecord"]
     },
     {
-      "file": "core:src/infrastructure/fs/config-loader.ts",
-      "symbols": ["FsConfigLoader"]
-    },
-    {
-      "file": "core:test/infrastructure/fs/config-loader-root-containment.spec.ts"
-    },
-    {
-      "file": "core:test/infrastructure/fs/config-loader.spec.ts"
-    },
-    {
-      "file": "core:test/infrastructure/fs/windows-containment.spec.ts"
+      "file": "core:src/application/ports/config-schema.ts",
+      "symbols": ["deepMergeRawConfig"]
     }
   ]
 }

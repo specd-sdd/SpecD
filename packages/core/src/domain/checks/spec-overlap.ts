@@ -2,9 +2,7 @@ import {
   CHECK_LABELS,
   fail,
   pass,
-  skip,
   type Check,
-  type CheckExecutionContext,
   type CheckResult,
 } from '../services/transition-checks.js'
 
@@ -18,7 +16,6 @@ export interface SpecOverlapPeerDetail {
 
 /** Facts for `spec.overlap`. */
 export interface SpecOverlapFacts {
-  readonly allowOverlap: boolean
   readonly specOverlapBlocked: boolean
   readonly specOverlapMessage?: string
   readonly specOverlapPeers?: readonly SpecOverlapPeerDetail[]
@@ -44,15 +41,12 @@ function formatOverlapMessage(peers: readonly SpecOverlapPeerDetail[], fallback:
 
 /**
  * `spec.overlap` (detection only; invalidation stays in ArchiveChange).
- * Operation `archive` is a registry binding.
+ * Evaluates purely whether domain invariant holds.
  *
- * @param facts - Overlap flag + skip
+ * @param facts - Overlap facts
  * @returns Check result
  */
 export function runSpecOverlap(facts: SpecOverlapFacts): CheckResult {
-  if (facts.allowOverlap) {
-    return skip('spec.overlap')
-  }
   if (!facts.specOverlapBlocked) {
     return pass('spec.overlap')
   }
@@ -67,7 +61,7 @@ export function runSpecOverlap(facts: SpecOverlapFacts): CheckResult {
 /**
  * Predicate body.
  *
- * @param facts - Overlap flag + skip
+ * @param facts - Overlap facts
  * @returns Check result
  */
 export function run(facts: SpecOverlapFacts): CheckResult {
@@ -77,13 +71,11 @@ export function run(facts: SpecOverlapFacts): CheckResult {
 /**
  * Domain stub execute. Application `create*` owns I/O.
  *
- * @param ctx - Host attempt context
  * @returns Check result
  */
-function execute(ctx: CheckExecutionContext): Promise<CheckResult> {
+function execute(): Promise<CheckResult> {
   return Promise.resolve(
     run({
-      allowOverlap: ctx.allowOverlap,
       specOverlapBlocked: false,
     }),
   )

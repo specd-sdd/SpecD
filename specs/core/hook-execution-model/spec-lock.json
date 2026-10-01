@@ -18,24 +18,12 @@
   ],
   "implementation": [
     {
-      "file": "core:src/application/use-cases/transition-change.ts",
-      "symbols": ["TransitionChange"]
+      "file": "core:src/domain/value-objects/workflow-step.ts",
+      "symbols": ["HookFailurePolicy", "HookEntry"]
     },
     {
       "file": "core:src/application/use-cases/run-step-hooks.ts",
       "symbols": ["RunStepHooks"]
-    },
-    {
-      "file": "core:src/application/template-expander.ts",
-      "symbols": ["TemplateExpander"]
-    },
-    {
-      "file": "core:src/infrastructure/node/hook-runner.ts",
-      "symbols": ["NodeHookRunner"]
-    },
-    {
-      "file": "core:src/infrastructure/node/translate-hook-command.ts",
-      "symbols": ["translateHookCommand"]
     }
   ],
   "optimizations": {

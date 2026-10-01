@@ -25,6 +25,7 @@ export type HookProgressEvent =
   | { type: 'hook-output'; hookId: string; stream: 'stdout' | 'stderr'; line: string }
   | { type: 'hook-heartbeat'; hookId: string; elapsedMs: number }
   | { type: 'hook-done'; hookId: string; success: boolean; exitCode: number }
+  | { type: 'hook-warning'; hookId: string; command: string; exitCode: number; stderr: string }
 
 /** Callback for receiving hook execution progress events. */
 export type OnHookProgress = (event: HookProgressEvent) => void
@@ -52,6 +53,7 @@ export interface RunStepHooksResult {
   readonly hooks: readonly RunStepHookEntry[]
   readonly success: boolean
   readonly failedHooks: readonly RunStepHookEntry[]
+  readonly warnings: readonly RunStepHookEntry[]
 }
 
 /**
@@ -59,7 +61,7 @@ export interface RunStepHooksResult {
  *
  * Resolves hooks from the schema, builds template variables from the
  * active change, and executes them via `HookRunner` with fail-fast
- * (pre) or fail-soft (post) semantics.
+ * (pre) or fail-soft (post) semantics, respecting `onFailure: 'warn'`.
  */
 export class RunStepHooks {
   private readonly _changes: ChangeRepository
@@ -96,7 +98,7 @@ export class RunStepHooks {
    *
    * @param input - The step name, phase, and optional hook filter
    * @param onProgress - Optional callback for hook execution progress events
-   * @returns Per-hook execution results with overall success status
+   * @returns Per-hook execution results with overall success status and warnings
    */
   async execute(
     input: RunStepHooksInput,
@@ -122,7 +124,7 @@ export class RunStepHooks {
 
         const workflowStep = schema.workflowStep(input.step)
         if (workflowStep === null) {
-          return { hooks: [], success: true, failedHooks: [] }
+          return { hooks: [], success: true, failedHooks: [], warnings: [] }
         }
 
         let runHooks = this._collectHooks(workflowStep.hooks[input.phase])
@@ -140,7 +142,7 @@ export class RunStepHooks {
         }
 
         if (runHooks.length === 0) {
-          return { hooks: [], success: true, failedHooks: [] }
+          return { hooks: [], success: true, failedHooks: [], warnings: [] }
         }
 
         const variables: TemplateVariables = {
@@ -170,7 +172,7 @@ export class RunStepHooks {
 
     const workflowStep = schema.workflowStep(input.step)
     if (workflowStep === null) {
-      return { hooks: [], success: true, failedHooks: [] }
+      return { hooks: [], success: true, failedHooks: [], warnings: [] }
     }
 
     // Collect executable hooks from schema
@@ -190,7 +192,7 @@ export class RunStepHooks {
     }
 
     if (runHooks.length === 0) {
-      return { hooks: [], success: true, failedHooks: [] }
+      return { hooks: [], success: true, failedHooks: [], warnings: [] }
     }
 
     const variables: TemplateVariables = {
@@ -222,7 +224,7 @@ export class RunStepHooks {
    * @param variables - Template variables for command expansion
    * @param phase - The phase ('pre' for fail-fast, 'post' for fail-soft)
    * @param onProgress - Optional callback for hook execution progress events
-   * @returns Per-hook execution results with overall success status
+   * @returns Per-hook execution results with overall success status and warnings
    */
   private async _executeHooks(
     runHooks: readonly Extract<HookEntry, { type: 'run' | 'external' }>[],
@@ -232,6 +234,7 @@ export class RunStepHooks {
   ): Promise<RunStepHooksResult> {
     const results: RunStepHookEntry[] = []
     const failedHooks: RunStepHookEntry[] = []
+    const warnings: RunStepHookEntry[] = []
 
     for (const hook of runHooks) {
       const command = hook.type === 'run' ? hook.command : `external:${hook.externalType}`
@@ -276,17 +279,29 @@ export class RunStepHooks {
       })
 
       if (!result.isSuccess()) {
-        failedHooks.push(entry)
-        if (phase === 'pre') {
-          return { hooks: results, success: false, failedHooks }
+        if (hook.onFailure === 'warn') {
+          warnings.push(entry)
+          onProgress?.({
+            type: 'hook-warning',
+            hookId: hook.id,
+            command,
+            exitCode: result.exitCode(),
+            stderr: result.stderr(),
+          })
+        } else {
+          failedHooks.push(entry)
+          if (phase === 'pre') {
+            return { hooks: results, success: false, failedHooks, warnings }
+          }
         }
       }
     }
 
     return {
       hooks: results,
-      success: results.every((r) => r.success),
+      success: failedHooks.length === 0,
       failedHooks,
+      warnings,
     }
   }
 

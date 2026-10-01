@@ -19,7 +19,6 @@ import {
   type Check,
   type CheckBinding,
   type CheckBindingSpec,
-  type CheckId,
 } from './transition-checks.js'
 
 /**
@@ -31,26 +30,32 @@ export const TRANSITION_BINDING_SPECS: readonly CheckBindingSpec[] = [
     id: 'protocol.edge',
     applicability: [{ scope: 'transition', from: '*', to: '*', along: '*' }],
     reportSkipWhenUnmatched: true,
+    skippable: false,
+    allowDisable: false,
   },
   {
     id: 'workflow.requires',
     applicability: [{ scope: 'transition', from: '*', to: '*', along: '*' }],
     reportSkipWhenUnmatched: true,
     exceptAlong: ['recovery'],
+    skippable: false,
   },
   {
     id: 'workflow.taskCompletion',
     applicability: [{ scope: 'transition', from: '*', to: '*', along: '*' }],
     reportSkipWhenUnmatched: true,
     exceptAlong: ['recovery'],
+    skippable: false,
   },
   {
     id: 'deps.consistent',
     applicability: [{ scope: 'transition', from: '*', to: 'ready', along: 'any' }],
+    skippable: false,
   },
   {
     id: 'workspace.readOnly',
     applicability: [{ scope: 'transition', from: '*', to: 'ready', along: 'any' }],
+    skippable: false,
   },
   {
     id: 'impl.filesResolved',
@@ -59,6 +64,7 @@ export const TRANSITION_BINDING_SPECS: readonly CheckBindingSpec[] = [
       { scope: 'transition', from: '*', to: 'verifying', along: '*' },
       { scope: 'operation', operation: 'verification-start' },
     ],
+    skippable: false,
   },
   {
     id: 'impl.linksInScope',
@@ -67,27 +73,33 @@ export const TRANSITION_BINDING_SPECS: readonly CheckBindingSpec[] = [
       { scope: 'transition', from: '*', to: 'verifying', along: '*' },
       { scope: 'operation', operation: 'verification-start' },
     ],
+    skippable: true,
   },
   {
     id: 'approval.spec',
     applicability: [{ scope: 'transition', from: 'ready', to: '*', along: 'forward' }],
     reportSkipWhenUnmatched: true,
+    skippable: false,
   },
   {
     id: 'approval.signoff',
     applicability: [{ scope: 'transition', from: 'done', to: 'archivable', along: 'forward' }],
     reportSkipWhenUnmatched: true,
+    skippable: false,
   },
   {
     id: 'verification.current',
     applicability: [{ scope: 'transition', from: 'verifying', to: 'done', along: 'forward' }],
     reportSkipWhenUnmatched: true,
+    skippable: false,
+    allowDisable: false,
   },
   {
     id: 'hook.post',
     applicability: [{ scope: 'transition', from: '*', to: '*', along: 'forward' }],
     phase: 'before-persist',
     onFailure: 'abort',
+    allowDisable: false,
   },
   {
     id: 'hook.pre',
@@ -95,6 +107,7 @@ export const TRANSITION_BINDING_SPECS: readonly CheckBindingSpec[] = [
     exceptAlong: ['recovery'],
     phase: 'before-persist',
     onFailure: 'abort',
+    allowDisable: false,
   },
 ]
 
@@ -102,31 +115,48 @@ export const TRANSITION_BINDING_SPECS: readonly CheckBindingSpec[] = [
  * Archive applicability in registry order. Publication is not a check.
  */
 export const ARCHIVE_BINDING_SPECS: readonly CheckBindingSpec[] = [
-  { id: 'schema.nameMatch', applicability: [{ scope: 'archive' }] },
-  { id: 'archive.archivable', applicability: [{ scope: 'archive' }] },
-  { id: 'spec.overlap', applicability: [{ scope: 'archive' }] },
-  { id: 'workspace.readOnly', applicability: [{ scope: 'archive' }] },
-  { id: 'deps.consistent', applicability: [{ scope: 'archive' }] },
-  { id: 'impl.filesResolved', applicability: [{ scope: 'archive' }] },
-  { id: 'impl.linksInScope', applicability: [{ scope: 'archive' }] },
-  { id: 'workflow.taskCompletion', applicability: [{ scope: 'archive' }] },
-  { id: 'verification.current', applicability: [{ scope: 'archive' }] },
+  {
+    id: 'schema.nameMatch',
+    applicability: [{ scope: 'archive' }],
+    skippable: false,
+    allowDisable: false,
+  },
+  {
+    id: 'archive.archivable',
+    applicability: [{ scope: 'archive' }],
+    skippable: false,
+    allowDisable: false,
+  },
+  { id: 'spec.overlap', applicability: [{ scope: 'archive' }], skippable: true },
+  { id: 'workspace.readOnly', applicability: [{ scope: 'archive' }], skippable: false },
+  { id: 'deps.consistent', applicability: [{ scope: 'archive' }], skippable: false },
+  { id: 'impl.filesResolved', applicability: [{ scope: 'archive' }], skippable: false },
+  { id: 'impl.linksInScope', applicability: [{ scope: 'archive' }], skippable: true },
+  { id: 'workflow.taskCompletion', applicability: [{ scope: 'archive' }], skippable: false },
+  {
+    id: 'verification.current',
+    applicability: [{ scope: 'archive' }],
+    skippable: false,
+    allowDisable: false,
+  },
   {
     id: 'hook.pre',
     applicability: [{ scope: 'archive' }],
     phase: 'before-persist',
     onFailure: 'abort',
+    allowDisable: false,
   },
   {
     id: 'hook.post',
     applicability: [{ scope: 'archive' }],
     phase: 'after-persist',
     onFailure: 'collect',
+    allowDisable: false,
   },
 ]
 
 /** Domain check instances for matcher tests (no application I/O). */
-const DOMAIN_CHECKS: Readonly<Partial<Record<CheckId, Check>>> = {
+export const DOMAIN_CHECKS: Readonly<Record<string, Check>> = {
   'protocol.edge': protocolEdge,
   'workflow.requires': workflowRequires,
   'workflow.taskCompletion': workflowTaskCompletion,
@@ -168,7 +198,7 @@ export const ARCHIVE_BINDINGS: readonly CheckBinding[] = applyBindingSpecs(
  * @param field - `from` or `to` side of the binding
  * @returns Distinct states (wildcards omitted)
  */
-function boundStates(checkId: CheckId, field: 'from' | 'to'): readonly ChangeState[] {
+function boundStates(checkId: string, field: 'from' | 'to'): readonly ChangeState[] {
   const states: ChangeState[] = []
   for (const spec of TRANSITION_BINDING_SPECS) {
     if (spec.id !== checkId) {
@@ -197,7 +227,7 @@ function boundStates(checkId: CheckId, field: 'from' | 'to'): readonly ChangeSta
  * @param checkId - Check whose transition bindings to read
  * @returns Distinct `from` states (wildcards omitted)
  */
-export function boundFromStates(checkId: CheckId): readonly ChangeState[] {
+export function boundFromStates(checkId: string): readonly ChangeState[] {
   return boundStates(checkId, 'from')
 }
 
@@ -207,6 +237,6 @@ export function boundFromStates(checkId: CheckId): readonly ChangeState[] {
  * @param checkId - Check whose transition bindings to read
  * @returns Distinct `to` states (wildcards omitted)
  */
-export function boundToStates(checkId: CheckId): readonly ChangeState[] {
+export function boundToStates(checkId: string): readonly ChangeState[] {
   return boundStates(checkId, 'to')
 }

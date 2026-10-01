@@ -12,6 +12,8 @@ import {
   type OnCheckProgress,
   type TransitionAlong,
 } from '../../domain/services/transition-checks.js'
+import { deepMergeConfig } from '../../domain/services/deep-merge-config.js'
+import { type CheckRegistry } from '../../domain/services/check-registry.js'
 import { type ChangeState, VALID_TRANSITIONS } from '../../domain/value-objects/change-state.js'
 import { type Schema } from '../../domain/value-objects/schema.js'
 import { type Change } from '../../domain/entities/change.js'
@@ -35,13 +37,18 @@ export interface BuildCheckExecutionContextInput {
   readonly schema: Schema
   readonly attempt: CheckAttempt
   readonly approvals: { readonly spec: boolean; readonly signoff: boolean }
-  readonly allowOverlap?: boolean
-  readonly allowOutOfScope?: boolean
+  readonly skipChecks?: readonly string[]
   readonly skipHookPhases?: readonly string[]
   readonly effectiveStatusByArtifact?: ReadonlyMap<string, ArtifactStatus>
   readonly onCheckProgress?: OnCheckProgress
   readonly passMemo?: Map<string, unknown>
   readonly validity?: import('../../domain/services/change-validity.js').ChangeValidityVerdict
+  readonly checkRegistry?: CheckRegistry
+  readonly config?: Readonly<Record<string, unknown>>
+  /** @deprecated Kept for transition compatibility */
+  readonly allowOverlap?: boolean
+  /** @deprecated Kept for transition compatibility */
+  readonly allowOutOfScope?: boolean
 }
 
 /**
@@ -52,19 +59,23 @@ export interface BuildCheckExecutionContextInput {
  */
 export function buildCheckExecutionContext(
   input: BuildCheckExecutionContextInput,
-): CheckExecutionContext {
+): CheckExecutionContext & {
+  readonly skipChecks?: readonly string[]
+  readonly checkRegistry?: CheckRegistry
+} {
   return {
     change: input.change,
     schema: input.schema,
     attempt: input.attempt,
     approvals: input.approvals,
-    allowOverlap: input.allowOverlap === true,
-    allowOutOfScope: input.allowOutOfScope === true,
     effectiveStatusByArtifact: input.effectiveStatusByArtifact ?? new Map(),
+    ...(input.skipChecks !== undefined ? { skipChecks: input.skipChecks } : {}),
     ...(input.skipHookPhases !== undefined ? { skipHookPhases: input.skipHookPhases } : {}),
     ...(input.onCheckProgress !== undefined ? { onCheckProgress: input.onCheckProgress } : {}),
     ...(input.passMemo !== undefined ? { passMemo: input.passMemo } : {}),
     ...(input.validity !== undefined ? { validity: input.validity } : {}),
+    ...(input.checkRegistry !== undefined ? { checkRegistry: input.checkRegistry } : {}),
+    ...(input.config !== undefined ? { config: input.config } : {}),
   }
 }
 
@@ -117,30 +128,90 @@ export function matchingPredicates(bindings: readonly CheckBinding[]): readonly 
 }
 
 /**
- * Runs matching predicates via `check.execute(ctx)` in binding order.
+ * Runs matching predicates via `check.execute(ctx)` in binding order,
+ * with cascading configuration resolution and orchestrator bypass handling.
  *
  * @param bindings - Full binding table
  * @param ctx - Host attempt context
  * @param options - Evaluation options
  * @param options.failFast - Stop after any fail
  * @param options.failFastOn - Stop only when this check id fails
+ * @param options.skipChecks - Optional array of check IDs to bypass
+ * @param options.checkRegistry - Optional CheckRegistry for config resolution
  * @returns Allowed flag and ordered results
  */
 export async function executeMatchingPredicates(
   bindings: readonly CheckBinding[],
-  ctx: CheckExecutionContext,
-  options: { readonly failFast?: boolean; readonly failFastOn?: CheckId } = {},
+  ctx: CheckExecutionContext & {
+    readonly skipChecks?: readonly string[]
+    readonly checkRegistry?: CheckRegistry
+  },
+  options: {
+    readonly failFast?: boolean
+    readonly failFastOn?: CheckId
+    readonly skipChecks?: readonly string[]
+    readonly checkRegistry?: CheckRegistry
+  } = {},
 ): Promise<PredicateExecutionResult> {
   const along = ctx.attempt.scope === 'transition' ? ctx.attempt.along : undefined
   const checks: CheckResult[] = []
-  const seen = new Set<CheckId>()
+  const seen = new Set<string>()
+  const skipChecksSet = new Set<string>(options.skipChecks ?? ctx.skipChecks ?? [])
+  const registry = options.checkRegistry ?? ctx.checkRegistry
+
+  const targetStepName = ctx.attempt.scope === 'transition' ? ctx.attempt.to : undefined
+  const workflowStep = targetStepName ? ctx.schema.workflowStep(targetStepName) : null
+
+  // Collect step-declared checks that might not be in default bindings
+  const stepCheckDecls = workflowStep?.checks ?? []
 
   for (const binding of matchingPredicates(bindings)) {
     const matches = bindingMatches(binding, ctx.attempt, along)
     if (matches) {
       if (seen.has(binding.check.id)) continue
       seen.add(binding.check.id)
-      const result = await executeCheckWithProgress(binding.check, ctx)
+
+      const stepDecl = stepCheckDecls.find((c) => c.id === binding.check.id)
+      if (stepDecl?.disabled === true) {
+        continue
+      }
+
+      if (skipChecksSet.has(binding.check.id)) {
+        ctx.onCheckProgress?.({
+          type: 'check-done',
+          id: binding.check.id,
+          label: binding.check.label,
+          outcome: 'skip',
+        })
+        checks.push({
+          id: binding.check.id,
+          label: binding.check.label,
+          kind: binding.check.kind,
+          outcome: 'skip',
+          details: { bypassedByUser: true },
+        })
+        continue
+      }
+
+      // Compute cascading config
+      const gov = registry?.getGovernance(binding.check.id)
+      let effectiveConfig: Record<string, unknown> = {}
+      if (gov?.defaultConfig) {
+        effectiveConfig = deepMergeConfig(effectiveConfig, gov.defaultConfig)
+      }
+      if (binding.config) {
+        effectiveConfig = deepMergeConfig(effectiveConfig, binding.config)
+      }
+      if (stepDecl?.config) {
+        effectiveConfig = deepMergeConfig(effectiveConfig, stepDecl.config)
+      }
+
+      const checkCtx: CheckExecutionContext = {
+        ...ctx,
+        config: effectiveConfig,
+      }
+
+      const result = await executeCheckWithProgress(binding.check, checkCtx)
       checks.push(result)
       if (
         result.outcome === 'fail' &&
@@ -152,6 +223,51 @@ export async function executeMatchingPredicates(
     }
     if (binding.reportSkipWhenUnmatched === true) {
       checks.push(skip(binding.check.id, binding.check.kind, binding.check.label))
+    }
+  }
+
+  // Also execute any step-declared checks not present in static bindings
+  if (registry) {
+    for (const stepDecl of stepCheckDecls) {
+      if (seen.has(stepDecl.id)) continue
+      if (stepDecl.disabled === true) continue
+      const check = registry.get(stepDecl.id)
+      if (!check || isEffectCheck(check)) continue
+      seen.add(stepDecl.id)
+
+      if (skipChecksSet.has(stepDecl.id)) {
+        checks.push({
+          id: check.id,
+          label: check.label,
+          kind: check.kind,
+          outcome: 'skip',
+          details: { bypassedByUser: true },
+        })
+        continue
+      }
+
+      const gov = registry.getGovernance(stepDecl.id)
+      let effectiveConfig: Record<string, unknown> = {}
+      if (gov?.defaultConfig) {
+        effectiveConfig = deepMergeConfig(effectiveConfig, gov.defaultConfig)
+      }
+      if (stepDecl.config) {
+        effectiveConfig = deepMergeConfig(effectiveConfig, stepDecl.config)
+      }
+
+      const checkCtx: CheckExecutionContext = {
+        ...ctx,
+        config: effectiveConfig,
+      }
+
+      const result = await executeCheckWithProgress(check, checkCtx)
+      checks.push(result)
+      if (
+        result.outcome === 'fail' &&
+        (options.failFast === true || options.failFastOn === result.id)
+      ) {
+        break
+      }
     }
   }
 
@@ -200,10 +316,10 @@ export function transitionAttemptFor(
  * @param input.approvals.spec - Spec-approval gate
  * @param input.approvals.signoff - Signoff gate
  * @param input.effectiveStatusByArtifact - DAG effective statuses
- * @param input.allowOverlap - Optional overlap bypass
- * @param input.allowOutOfScope - Optional impl-scope bypass
  * @param input.passMemo - Shared memo for this GetStatus/TransitionChange pass
  * @param input.validity - Reconciled validity verdict for this pass
+ * @param input.checkRegistry - Optional CheckRegistry
+ * @param input.skipChecks - Optional list of check IDs to bypass
  * @returns Predicate results keyed by target
  */
 export async function executeChecksByLegalTargets(
@@ -213,10 +329,10 @@ export async function executeChecksByLegalTargets(
     readonly schema: Schema
     readonly approvals: { readonly spec: boolean; readonly signoff: boolean }
     readonly effectiveStatusByArtifact: ReadonlyMap<string, ArtifactStatus>
-    readonly allowOverlap?: boolean
-    readonly allowOutOfScope?: boolean
     readonly passMemo?: Map<string, unknown>
     readonly validity?: import('../../domain/services/change-validity.js').ChangeValidityVerdict
+    readonly checkRegistry?: CheckRegistry
+    readonly skipChecks?: readonly string[]
   },
 ): Promise<Partial<Record<ChangeState, readonly CheckResult[]>>> {
   const passMemo = input.passMemo ?? new Map<string, unknown>()
@@ -232,9 +348,9 @@ export async function executeChecksByLegalTargets(
         approvals: input.approvals,
         effectiveStatusByArtifact: input.effectiveStatusByArtifact,
         passMemo,
-        ...(input.allowOverlap !== undefined ? { allowOverlap: input.allowOverlap } : {}),
-        ...(input.allowOutOfScope !== undefined ? { allowOutOfScope: input.allowOutOfScope } : {}),
         ...(input.validity !== undefined ? { validity: input.validity } : {}),
+        ...(input.checkRegistry !== undefined ? { checkRegistry: input.checkRegistry } : {}),
+        ...(input.skipChecks !== undefined ? { skipChecks: input.skipChecks } : {}),
       }),
     )
     checksByTarget[target] = evaluation.checks

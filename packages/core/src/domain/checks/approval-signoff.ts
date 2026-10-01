@@ -75,7 +75,7 @@ export function run(facts: ApprovalSignoffFacts): CheckResult {
 function execute(ctx: CheckExecutionContext): Promise<CheckResult> {
   return Promise.resolve(
     run({
-      signoffGateEnabled: ctx.approvals.signoff,
+      signoffGateEnabled: ctx.approvals?.signoff ?? false,
       change: ctx.change,
       ...(ctx.validity !== undefined ? { validity: ctx.validity } : {}),
     }),

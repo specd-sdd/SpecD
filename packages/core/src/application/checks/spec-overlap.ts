@@ -3,7 +3,6 @@ import { type Change } from '../../domain/entities/change.js'
 import {
   type Check,
   type CheckExecutionContext,
-  type CheckId,
   type CheckKind,
 } from '../../domain/services/transition-checks.js'
 import { WorkflowCheck } from './workflow-check.js'
@@ -40,7 +39,7 @@ class SpecOverlapCheck extends WorkflowCheck {
    *
    * @returns Check id
    */
-  override get id(): CheckId {
+  override get id(): string {
     return 'spec.overlap'
   }
 
@@ -72,7 +71,6 @@ class SpecOverlapCheck extends WorkflowCheck {
   override async execute(ctx: CheckExecutionContext) {
     const detection = await this._detect(ctx.change)
     return runSpecOverlap({
-      allowOverlap: ctx.allowOverlap,
       specOverlapBlocked: detection.blocked,
       ...(detection.message !== undefined ? { specOverlapMessage: detection.message } : {}),
       ...(detection.peers !== undefined && detection.peers.length > 0

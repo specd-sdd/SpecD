@@ -7,6 +7,8 @@ import { type ChangeRepository } from '../application/ports/change-repository.js
 import { type ArchiveRepository } from '../application/ports/archive-repository.js'
 import { type SpecRepository } from '../application/ports/spec-repository.js'
 import { type SchemaRepository } from '../application/ports/schema-repository.js'
+import { type CustomCheckDefinition } from '../domain/services/transition-checks.js'
+import { type PluginCheckRegistrationOptions } from '../domain/services/check-registry.js'
 import {
   createBuiltinCompositionRegistry,
   createCompositionRegistryView,
@@ -16,6 +18,8 @@ import {
   type SchemaStorageFactory,
   type SpecStorageFactory,
   type VcsProvider,
+  type PluginCheckRegistration,
+  type PluginCheckDefaultBinding,
 } from './composition-registries.js'
 import { createKernel, type Kernel, type KernelOptions } from './kernel.js'
 
@@ -33,6 +37,7 @@ interface KernelBuilderState {
   readonly vcsProviders: VcsProvider[]
   readonly actorProviders: ActorProvider[]
   readonly externalHookRunners: ExternalHookRunner[]
+  readonly checks: PluginCheckRegistration[]
   readonly repositories: {
     changes?: ChangeRepository
     archive?: ArchiveRepository
@@ -164,6 +169,22 @@ export interface KernelBuilder {
   registerExternalHookRunner(name: string, runner: ExternalHookRunner): this
 
   /**
+   * Registers a custom transition check with the builder.
+   *
+   * @param pluginName - Plugin namespace matching ^[a-zA-Z0-9_-]+$
+   * @param check - Custom check definition
+   * @param defaultBindings - Optional default bindings for this check
+   * @param options - Check-level governance and configuration options
+   * @returns The same builder for fluent chaining
+   */
+  registerCheck(
+    pluginName: string,
+    check: CustomCheckDefinition,
+    defaultBindings?: readonly PluginCheckDefaultBinding[],
+    options?: PluginCheckRegistrationOptions,
+  ): this
+
+  /**
    * Builds the final kernel using the accumulated additive registrations.
    *
    * @returns A kernel equivalent to `createKernel(config, accumulatedOptions)`
@@ -219,6 +240,7 @@ function cloneOptions(base?: Partial<KernelOptions>): KernelBuilderState {
     vcsProviders: [...(base?.vcsProviders ?? [])],
     actorProviders: [...(base?.actorProviders ?? [])],
     externalHookRunners: [...(base?.externalHookRunners ?? [])],
+    checks: [...(base?.checks ?? [])],
     repositories: {
       ...(base?.repositories ?? {}),
     },
@@ -257,6 +279,7 @@ function toKernelOptions(state: KernelBuilderState): KernelOptions {
     ...(state.externalHookRunners.length > 0
       ? { externalHookRunners: [...state.externalHookRunners] }
       : {}),
+    ...(state.checks.length > 0 ? { checks: [...state.checks] } : {}),
     ...(state.repositories && Object.keys(state.repositories).length > 0
       ? { repositories: { ...state.repositories } }
       : {}),
@@ -373,6 +396,21 @@ export function createKernelBuilder(
         }
       }
       options.externalHookRunners.push(runner)
+      return builder
+    },
+
+    registerCheck(
+      pluginName: string,
+      check: CustomCheckDefinition,
+      defaultBindings?: readonly PluginCheckDefaultBinding[],
+      checkOptions?: PluginCheckRegistrationOptions,
+    ): KernelBuilder {
+      options.checks.push({
+        pluginName,
+        check,
+        ...(defaultBindings !== undefined ? { defaultBindings } : {}),
+        ...(checkOptions !== undefined ? { options: checkOptions } : {}),
+      })
       return builder
     },
 

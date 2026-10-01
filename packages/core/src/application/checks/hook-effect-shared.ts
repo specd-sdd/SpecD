@@ -87,7 +87,7 @@ export function emitHookAsCheckProgress(
  * Shared `hook.pre` / `hook.post` effect.
  */
 export class HookEffectCheck extends WorkflowCheck {
-  private readonly _id: Extract<CheckId, 'hook.pre' | 'hook.post'>
+  private readonly _id: 'hook.pre' | 'hook.post'
   private readonly _phase: 'pre' | 'post'
   private readonly _runStepHooks: RunStepHooks
 
@@ -116,11 +116,7 @@ export class HookEffectCheck extends WorkflowCheck {
    * @param phase - RunStepHooks phase
    * @param runStepHooks - Hook runner port
    */
-  constructor(
-    id: Extract<CheckId, 'hook.pre' | 'hook.post'>,
-    phase: 'pre' | 'post',
-    runStepHooks: RunStepHooks,
-  ) {
+  constructor(id: 'hook.pre' | 'hook.post', phase: 'pre' | 'post', runStepHooks: RunStepHooks) {
     super()
     this._id = id
     this._phase = phase

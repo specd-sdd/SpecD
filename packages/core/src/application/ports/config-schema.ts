@@ -297,15 +297,8 @@ export const SpecdYamlZodSchema = z
 // Utility functions needed by cascade code
 // ---------------------------------------------------------------------------
 
-/**
- * Returns `true` when `value` is a non-array object.
- *
- * @param value - The value to test
- * @returns `true` for plain object-like records
- */
-export function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value)
-}
+import { deepMergeConfig, isRecord } from '../../domain/services/deep-merge-config.js'
+export { isRecord }
 
 /**
  * Formats a Zod error path for use in {@link ConfigValidationError} messages.
@@ -331,18 +324,5 @@ export function deepMergeRawConfig(
   base: Record<string, unknown>,
   overlay: Record<string, unknown>,
 ): Record<string, unknown> {
-  const result: Record<string, unknown> = {}
-  for (const [key, value] of Object.entries(base)) result[key] = value
-  for (const [key, value] of Object.entries(overlay)) {
-    if (key === 'extends' || key === 'remove') continue
-    const existing = result[key]
-    if (existing !== undefined && isRecord(existing) && isRecord(value)) {
-      result[key] = deepMergeRawConfig(existing, value)
-    } else if (Array.isArray(existing) && Array.isArray(value)) {
-      result[key] = [...(existing as unknown[]), ...(value as unknown[])]
-    } else {
-      result[key] = value
-    }
-  }
-  return result
+  return deepMergeConfig(base, overlay, { ignoredKeys: ['extends', 'remove'] })
 }

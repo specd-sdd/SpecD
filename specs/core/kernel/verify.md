@@ -252,10 +252,36 @@
 
 #### Scenario: External registrations extend built-ins
 
-- **GIVEN** built-in storages, parsers, VCS providers, actor providers, and external hook runners are available
-- **WHEN** `createKernel(config, options)` is called with additional registrations in one or more categories
-- **THEN** the built kernel uses a merged capability set that includes both the built-ins and the newly registered entries
-- **AND** omitting a category from `KernelOptions` leaves that built-in category unchanged
+- **GIVEN** external registrations provided in `KernelOptions`
+- **WHEN** `createKernel(config, options)` processes options
+- **THEN** external registrations extend rather than replace built-ins
+
+#### Scenario: KernelOptions accepts checks array
+
+- **GIVEN** a `KernelOptions` object containing `checks: [pluginCheckRegistration]`
+- **WHEN** `createKernel` initializes
+- **THEN** the custom checks are registered into the unified `CheckRegistry`
+
+### Requirement: Check Registration and KernelBuilder Extension
+
+#### Scenario: KernelBuilder registers custom check fluently
+
+- **GIVEN** a `KernelBuilder` instance
+- **WHEN** invoking `.registerCheck('acme', customCheck, defaultBindings)`
+- **THEN** the builder records the check under `'@acme.customCheck'`
+- **AND** returns `this` for chaining
+
+#### Scenario: KernelBuilder records governance options including allowDisable
+
+- **GIVEN** a `KernelBuilder` instance
+- **WHEN** invoking `.registerCheck('acme', customCheck, defaultBindings, { allowDisable: false })`
+- **THEN** the registered check governance records `allowDisable: false`
+
+#### Scenario: Built kernel exposes active check registry view
+
+- **GIVEN** a kernel built with custom checks
+- **WHEN** reading `kernel.registry.checks`
+- **THEN** it exposes the registered checks and active bindings
 
 ### Requirement: Kernel exposes merged registries
 

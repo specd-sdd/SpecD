@@ -359,11 +359,40 @@ describe('mergeSchemaLayers — immutability', () => {
 // Edge cases
 // ---------------------------------------------------------------------------
 
-describe('mergeSchemaLayers — empty layers', () => {
-  it('returns equivalent data with no layers', () => {
+describe('mergeSchemaLayers — workflow step checks', () => {
+  it('appends checks to an existing workflow step and rejects duplicate check identities', () => {
     const b = base()
-    const result = mergeSchemaLayers(b, [])
-    expect(result.name).toBe(b.name)
-    expect(result.artifacts!.length).toBe(b.artifacts!.length)
+    const result = mergeSchemaLayers(b, [
+      layer('plugin', {
+        append: {
+          workflow: [
+            {
+              step: 'designing',
+              checks: [{ id: '@security.scan' }] as any,
+            },
+          ],
+        },
+      }),
+    ])
+
+    const designing = result.workflow!.find((w) => w.step === 'designing')
+    expect(designing?.checks).toHaveLength(1)
+    expect(designing?.checks?.[0]?.id).toBe('@security.scan')
+
+    // Merging duplicate check identity throws SchemaValidationError
+    expect(() =>
+      mergeSchemaLayers(result, [
+        layer('override', {
+          append: {
+            workflow: [
+              {
+                step: 'designing',
+                checks: [{ id: '@security.scan' }] as any,
+              },
+            ],
+          },
+        }),
+      ]),
+    ).toThrow(SchemaValidationError)
   })
 })

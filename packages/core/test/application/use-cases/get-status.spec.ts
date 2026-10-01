@@ -660,7 +660,7 @@ describe('GetStatus', () => {
 
     const blocker = result.blockers.find((entry) => entry.code === 'IMPLEMENTATION_STATE')
     expect(blocker).toBeDefined()
-    expect(blocker?.bypassFlag).toBe('--allow-out-of-scope')
+    expect(blocker?.bypassFlag).toBe('--skip-checks impl.linksInScope')
     expect(blocker?.checkId).toBe('impl.linksInScope')
     expect(blocker?.label).toBe('Checking implementation links')
   })
@@ -1103,7 +1103,13 @@ describe('GetStatus', () => {
         fail('spec.overlap', 'OVERLAP_CONFLICT', 'Specs overlap with other active changes'),
     }
     const archiveBindings: CheckBinding[] = [
-      { check: overlapCheck, applicability: [{ scope: 'archive' }] },
+      {
+        check: overlapCheck,
+        applicability: [{ scope: 'archive' }],
+        skippable: true,
+        allowBindingOverride: true,
+        allowConfigOverride: true,
+      },
     ]
     const uc = makeGetStatus(makeChangeRepository([change]), { archiveBindings })
 
@@ -1111,13 +1117,13 @@ describe('GetStatus', () => {
 
     const overlap = result.blockers.find((blocker) => blocker.code === 'OVERLAP_CONFLICT')
     expect(overlap).toBeDefined()
-    expect(overlap?.bypassFlag).toBe('--allow-overlap')
+    expect(overlap?.bypassFlag).toBe('--skip-checks spec.overlap')
     expect(overlap?.checkId).toBe('spec.overlap')
     expect(result.nextAction.command).toBe('/specd-archive')
     expect(result.nextAction.targetStep).toBe('archivable')
     expect(result.nextAction.reason).not.toBe('Ready to archive')
     expect(result.nextAction.reason).toMatch(/overlap/i)
-    expect(result.nextAction.reason).toContain('--allow-overlap')
+    expect(result.nextAction.reason).toContain('--skip-checks spec.overlap')
   })
 
   it('does not run archive overlap I/O or emit OVERLAP_CONFLICT when not archivable', async () => {
@@ -1154,7 +1160,7 @@ describe('GetStatus', () => {
     expect(detectSpecOverlap).toHaveBeenCalled()
     const overlap = result.blockers.find((blocker) => blocker.code === 'OVERLAP_CONFLICT')
     expect(overlap).toBeDefined()
-    expect(overlap?.bypassFlag).toBe('--allow-overlap')
+    expect(overlap?.bypassFlag).toBe('--skip-checks spec.overlap')
   })
 
   describe('reconciled validity projection', () => {
@@ -1310,6 +1316,34 @@ describe('GetStatus', () => {
       expect(calls).toEqual([])
       expect(result.draftView?.name).toBe('my-change')
       expect(result.validity).toBeUndefined()
+    })
+  })
+
+  describe('dynamic check blocker projection', () => {
+    it('projects bypassFlag: "--skip-checks <id>" for failing skippable checks', async () => {
+      const change = makeChange('my-change')
+      change.transition('designing', testActor)
+      change.transition('ready', testActor)
+      change.transition('implementing', testActor)
+      change.addImplementationLink({
+        specId: 'auth/external',
+        file: 'src/external.ts',
+        fileLinkExplicit: true,
+      })
+
+      const repo = makeChangeRepository([change])
+      const uc = makeGetStatus(repo, {
+        schema: makeSchema([
+          makeArtifactType('proposal'),
+          makeArtifactType('specs', { scope: 'spec' }),
+        ]),
+      })
+
+      const result = await uc.execute({ name: 'my-change' })
+      const blocker = result.blockers.find((b) => b.checkId === 'impl.linksInScope')
+
+      expect(blocker).toBeDefined()
+      expect(blocker?.bypassFlag).toBe('--skip-checks impl.linksInScope')
     })
   })
 })

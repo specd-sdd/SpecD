@@ -7,17 +7,21 @@ import { type SchemaProvider } from '../ports/schema-provider.js'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 import { HappyPathNextUnavailableError } from '../../domain/errors/happy-path-next-unavailable-error.js'
 import { InvalidStateTransitionError } from '../../domain/errors/invalid-state-transition-error.js'
-import { ReadOnlyWorkspaceError } from '../../domain/errors/read-only-workspace-error.js'
-import { ArchiveDependencyMismatchError } from '../../domain/errors/archive-dependency-mismatch-error.js'
-import { ArchiveImplementationStateError } from '../../domain/errors/archive-implementation-state-error.js'
+import { CheckPredicateFailedError } from '../../domain/errors/check-predicate-failed-error.js'
+import {
+  CheckNotSkippableError,
+  UnknownCheckError,
+} from '../../domain/errors/check-registry-errors.js'
 import { findBlockingParent, projectArtifacts } from '../../domain/services/lifecycle-verdict.js'
 import { evaluateLifecycle } from '../services/lifecycle-evaluation.js'
 import {
+  isEffectCheck,
   type CheckBinding,
   type CheckProgressEvent,
   type CheckResult,
   type OnCheckProgress,
 } from '../../domain/services/transition-checks.js'
+import { type CheckRegistry } from '../../domain/services/check-registry.js'
 import { hookFailureMode, matchingEffects } from '../services/execute-hook-effect.js'
 import {
   buildCheckExecutionContext,
@@ -63,15 +67,22 @@ export interface TransitionChangeInput {
    */
   readonly skipHookPhases?: ReadonlySet<HookPhaseSelector>
   /**
+   * Check identifiers to bypass. Must declare `skippable: true` in matching binding.
+   */
+  readonly skipChecks?: readonly string[]
+  /**
    * When omitted or `true`, refresh tracked implementation files before
    * transition for active changes only. When `false`, skip refresh.
    */
   readonly refreshImplementationTrackingBefore?: boolean
   /**
-   * When `true`, `impl.linksInScope` is skippable (same semantics as archive).
-   * Defaults to `false`.
+   * @deprecated Legacy alias mapped by CLI to skipChecks: ['impl.linksInScope'].
    */
   readonly allowOutOfScope?: boolean
+  /**
+   * @deprecated Legacy alias mapped by CLI to skipChecks: ['spec.overlap'].
+   */
+  readonly allowOverlap?: boolean
 }
 
 /** Progress event emitted during a transition. */
@@ -119,6 +130,7 @@ export class TransitionChange {
   private readonly _approvals: ApprovalGates
   private readonly _transitionBindings: readonly CheckBinding[]
   private readonly _reconcile: ReconcileChangeValidity
+  private readonly _checkRegistry?: CheckRegistry
 
   /**
    * Creates a new `TransitionChange` use case instance.
@@ -130,6 +142,7 @@ export class TransitionChange {
    * @param approvals - Whether approval gates are active in the project configuration
    * @param transitionBindings - Composed transition check bindings
    * @param reconcile - Canonical reconciler. When supplied, recovery is committed before checks and the designing hop does not broadly invalidate artifacts.
+   * @param checkRegistry - Optional CheckRegistry for open check catalog and governance resolution.
    */
   constructor(
     changes: ChangeRepository,
@@ -139,6 +152,7 @@ export class TransitionChange {
     approvals: ApprovalGates,
     transitionBindings: readonly CheckBinding[],
     reconcile?: ReconcileChangeValidity,
+    checkRegistry?: CheckRegistry,
   ) {
     this._changes = changes
     this._actor = actor
@@ -150,6 +164,9 @@ export class TransitionChange {
       throw new InvalidCompositionFactoryArgumentsError('TransitionChange', 'reconcile is required')
     }
     this._reconcile = reconcile
+    if (checkRegistry !== undefined) {
+      this._checkRegistry = checkRegistry
+    }
   }
 
   /**
@@ -163,9 +180,9 @@ export class TransitionChange {
    * @returns The transition result with the updated change
    * @throws {ChangeNotFoundError} If no change with the given name exists
    * @throws {InvalidStateTransitionError} If the transition is not permitted, requires are unsatisfied, or incomplete tasks remain
-   * @throws {ReadOnlyWorkspaceError} If enter-ready fails `workspace.readOnly`
-   * @throws {ArchiveDependencyMismatchError} If enter-ready fails `deps.consistent`
-   * @throws {ArchiveImplementationStateError} If exit-implementing fails `impl.*`
+   * @throws {CheckNotSkippableError} If an unskippable or effect check is supplied to skipChecks
+   * @throws {UnknownCheckError} If an unregistered check is supplied to skipChecks
+   * @throws {CheckPredicateFailedError} If a predicate check fails
    * @throws {HookFailedError} If a source.post or target.pre hook exits with a non-zero code
    * @throws {ReconciledOperationBlockedError} If validity reconciliation already committed a recovery
    */
@@ -218,7 +235,39 @@ export class TransitionChange {
     }
 
     const actor = await this._actor.identity()
-    const allowOutOfScope = input.allowOutOfScope === true
+
+    // Compile skipChecks, translating legacy flags if present
+    const skipChecksList = [...(input.skipChecks ?? [])]
+    if (input.allowOutOfScope === true && !skipChecksList.includes('impl.linksInScope')) {
+      skipChecksList.push('impl.linksInScope')
+    }
+    if (input.allowOverlap === true && !skipChecksList.includes('spec.overlap')) {
+      skipChecksList.push('spec.overlap')
+    }
+
+    // Validate skipChecks against registry and skippability permissions
+    const allBindings = this._checkRegistry
+      ? this._checkRegistry.bindings()
+      : this._transitionBindings
+
+    for (const checkId of skipChecksList) {
+      const hasCheck = this._checkRegistry
+        ? this._checkRegistry.has(checkId)
+        : allBindings.some((b) => b.check.id === checkId)
+      if (!hasCheck) {
+        throw new UnknownCheckError(checkId)
+      }
+      const binding = allBindings.find((b) => b.check.id === checkId)
+      if (binding && isEffectCheck(binding.check)) {
+        throw new CheckNotSkippableError(
+          checkId,
+          'Effect checks (hooks) are governed exclusively by skipHookPhases',
+        )
+      }
+      if (binding && !binding.skippable) {
+        throw new CheckNotSkippableError(checkId)
+      }
+    }
 
     this._assertDrainAndGateTargets(fromState, requestedTarget)
 
@@ -238,14 +287,19 @@ export class TransitionChange {
         schema,
         attempt,
         approvals: this._approvals,
-        allowOutOfScope,
+        skipChecks: skipChecksList,
         skipHookPhases,
         effectiveStatusByArtifact,
         passMemo,
+        ...(this._checkRegistry !== undefined ? { checkRegistry: this._checkRegistry } : {}),
         ...(validity !== undefined ? { validity } : {}),
         ...(onCheckProgress !== undefined ? { onCheckProgress } : {}),
       }),
-      { failFastOn: 'protocol.edge' },
+      {
+        failFastOn: 'protocol.edge',
+        skipChecks: skipChecksList,
+        ...(this._checkRegistry !== undefined ? { checkRegistry: this._checkRegistry } : {}),
+      },
     )
     const effectiveTarget = requestedTarget
     const workflowStep = schema.workflowStep(effectiveTarget) ?? null
@@ -323,14 +377,19 @@ export class TransitionChange {
           schema,
           attempt,
           approvals: this._approvals,
-          allowOutOfScope,
+          skipChecks: skipChecksList,
           skipHookPhases,
           effectiveStatusByArtifact,
           passMemo: new Map(),
           validity,
+          ...(this._checkRegistry !== undefined ? { checkRegistry: this._checkRegistry } : {}),
           ...(onCheckProgress !== undefined ? { onCheckProgress } : {}),
         }),
-        { failFastOn: 'protocol.edge' },
+        {
+          failFastOn: 'protocol.edge',
+          skipChecks: skipChecksList,
+          ...(this._checkRegistry !== undefined ? { checkRegistry: this._checkRegistry } : {}),
+        },
       )
       if (!rerun.allowed) {
         const failed = rerun.checks.find((check) => check.outcome === 'fail')
@@ -386,6 +445,7 @@ export class TransitionChange {
       attempt,
       approvals: this._approvals,
       skipHookPhases,
+      ...(this._checkRegistry !== undefined ? { checkRegistry: this._checkRegistry } : {}),
       ...(validity !== undefined ? { validity } : {}),
       ...(onCheckProgress !== undefined ? { onCheckProgress } : {}),
     })
@@ -448,14 +508,14 @@ export class TransitionChange {
   }
 
   /**
-   * Maps the first failed predicate to the existing typed error.
+   * Maps the first failed predicate to the unified CheckPredicateFailedError or structural protocol errors.
    *
    * @param failed - Failed check
    * @param fromState - Source state
    * @param effectiveTarget - Persist target
    * @param change - Change under evaluation
    * @param schema - Active schema
-   * @throws SpecdError mapped from the failed check id
+   * @throws SpecdError mapped from the failed check
    * @returns Never; always throws
    */
   private _mapFailedPredicate(
@@ -508,42 +568,19 @@ export class TransitionChange {
           gate,
         })
       }
-      case 'deps.consistent': {
-        const mismatches = Array.isArray(failed.details?.mismatches)
-          ? (failed.details.mismatches as readonly {
-              readonly specId: string
-              readonly extracted: readonly string[]
-              readonly persisted: readonly string[]
-            }[])
-          : []
-        const first = mismatches[0]
-        if (first !== undefined) {
-          throw new ArchiveDependencyMismatchError(
-            first.specId,
-            [...first.persisted],
-            [...first.extracted],
-          )
-        }
-        const specIds = detailStringArray(failed.details, 'specIds')
-        const specId = specIds[0] ?? 'unknown'
-        throw new ArchiveDependencyMismatchError(specId, [], [])
-      }
-      case 'workspace.readOnly':
-        throw new ReadOnlyWorkspaceError(
-          failed.message ?? `Change contains specs from readOnly workspaces`,
-        )
-      case 'impl.filesResolved':
-      case 'impl.linksInScope': {
-        const files = detailStringArray(failed.details, 'files')
-        throw new ArchiveImplementationStateError(
-          [...files],
-          failed.message ?? 'Implementation state invalid',
+      default: {
+        const matchingBinding = this._transitionBindings.find((b) => b.check.id === failed.id)
+        const skippable = matchingBinding?.skippable === true
+        throw new CheckPredicateFailedError(
+          failed.id,
+          failed.label,
+          failed.code ?? 'CHECK_FAILED',
+          failed.message ?? `Check '${failed.id}' failed`,
+          failed.command,
+          failed.details,
+          skippable,
         )
       }
-      default:
-        throw new InvalidStateTransitionError(fromState, effectiveTarget, {
-          type: 'invalid-transition',
-        })
     }
   }
 
@@ -679,22 +716,4 @@ function detailNumber(
 ): number | undefined {
   const value = details?.[key]
   return typeof value === 'number' ? value : undefined
-}
-
-/**
- * Reads a string-array detail from a check result.
- *
- * @param details - Check details
- * @param key - Detail key
- * @returns String array
- */
-function detailStringArray(
-  details: Readonly<Record<string, unknown>> | undefined,
-  key: string,
-): readonly string[] {
-  const value = details?.[key]
-  if (!Array.isArray(value)) {
-    return []
-  }
-  return value.filter((entry): entry is string => typeof entry === 'string')
 }

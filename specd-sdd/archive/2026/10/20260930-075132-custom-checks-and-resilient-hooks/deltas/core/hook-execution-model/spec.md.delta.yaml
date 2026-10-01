@@ -1,0 +1,37 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Manual hook control with skipHooks'
+  content: |
+    ### Requirement: Resilient hook failure policy
+
+    Executable hooks (`type: 'run'` and `type: 'external'`) MAY declare an `onFailure` policy:
+    ```typescript
+    export type HookFailurePolicy = 'abort' | 'warn'
+    ```
+    - `onFailure: 'abort'` (default): A non-zero exit code halts execution immediately and marks the hook execution result as failed (`success: false`).
+    - `onFailure: 'warn'`: A non-zero exit code SHALL NOT halt execution. The orchestrator captures the process's real exit code, stdout, and stderr into a `warnings` collection, reports the advisory failure in telemetry, and proceeds with the remaining hooks.
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Pre-hook failure semantics'
+  content: |
+    When executing `pre` hooks via `RunStepHooks`:
+    - If any hook configured with `onFailure: 'abort'` fails, the runner MUST halt execution immediately. The overall phase result SHALL have `success: false`.
+    - If a hook fails with `onFailure: 'warn'`, execution MUST continue. If all failed hooks in the phase were configured with `onFailure: 'warn'`, the overall phase result SHALL report `success: true` with a populated `warnings` collection.
+    - The internal `hook.pre` effect check evaluated during transitions MUST evaluate to `pass` when `RunStepHooksResult.success` is true, allowing the domain state transition to proceed. If `success: false`, it evaluates to `fail`, blocking the transition.
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Post-hook failure semantics'
+  content: |
+    When executing `post` hooks via `RunStepHooks`:
+    - Because the domain state mutation has already been committed, a failure in a `post` hook does not roll back the state transition.
+    - If any `post` hook configured with `onFailure: 'abort'` fails, the runner halts and reports the failure.
+    - If a `post` hook fails with `onFailure: 'warn'`, execution continues, logging the non-fatal failure in `warnings` and completing successfully.

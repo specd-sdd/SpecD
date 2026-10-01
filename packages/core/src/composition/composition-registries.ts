@@ -9,6 +9,19 @@ import {
   type ExtractorTransform,
   type ExtractorTransformRegistry,
 } from '../domain/services/content-extraction.js'
+import {
+  CheckRegistry,
+  type PluginCheckRegistrationOptions,
+} from '../domain/services/check-registry.js'
+import {
+  type CustomCheckDefinition,
+  type CheckBindingSpec,
+} from '../domain/services/transition-checks.js'
+import {
+  DOMAIN_CHECKS,
+  TRANSITION_BINDINGS,
+  ARCHIVE_BINDINGS,
+} from '../domain/services/check-bindings.js'
 import { createArtifactParserRegistry } from '../infrastructure/artifact-parser/registry.js'
 import { type ActorProvider } from './actor-provider.js'
 import { BUILTIN_ACTOR_PROVIDERS } from './actor-resolver.js'
@@ -30,6 +43,42 @@ export type { SpecStorageFactory } from './spec-storage-factory.js'
 export type { SchemaStorageFactory } from './schema-storage-factory.js'
 export type { ChangeStorageFactory } from './change-storage-factory.js'
 export type { ArchiveStorageFactory } from './archive-storage-factory.js'
+
+/**
+ * Default binding input accepted for plugin check registration (spec or shorthand coordinate).
+ */
+export type PluginCheckDefaultBinding =
+  | CheckBindingSpec
+  | (Record<string, unknown> & {
+      readonly scope: string
+      readonly from?: string
+      readonly to?: string
+      readonly along?: string
+      readonly skippable?: boolean
+      readonly allowDisable?: boolean
+      readonly allowBindingOverride?: boolean
+      readonly allowConfigOverride?: boolean
+    })
+
+/**
+ * Registration descriptor for a custom transition check.
+ */
+export interface PluginCheckRegistration {
+  /** Plugin namespace matching ^[a-zA-Z0-9_-]+$ */
+  readonly pluginName: string
+  /** Custom check implementation */
+  readonly check: CustomCheckDefinition
+  /** Optional default binding specifications */
+  readonly defaultBindings?: readonly PluginCheckDefaultBinding[]
+  /** Optional default configuration */
+  readonly defaultConfig?: Readonly<Record<string, unknown>>
+  /** Whether workflow schema can override config (default: true) */
+  readonly allowConfigOverride?: boolean
+  /** Whether workflow schema can override bindings (default: false when defaultBindings given, else true) */
+  readonly allowBindingOverride?: boolean
+  /** Alternative options bundle */
+  readonly options?: PluginCheckRegistrationOptions
+}
 
 /**
  * Additive registry inputs accepted by the composition layer.
@@ -55,6 +104,8 @@ export interface CompositionRegistryInput {
   readonly actorProviders?: readonly ActorProvider[]
   /** Additional external hook runners indexed by accepted type. */
   readonly externalHookRunners?: readonly ExternalHookRunner[]
+  /** Additional transition checks registered by plugins or extensions. */
+  readonly checks?: readonly PluginCheckRegistration[]
 }
 
 /**
@@ -82,6 +133,8 @@ export interface CompositionRegistryView {
   readonly actorProviders: readonly ActorProvider[]
   /** External hook runners keyed by accepted hook type. */
   readonly externalHookRunners: ReadonlyMap<string, ExternalHookRunner>
+  /** Transition check registry managing open check catalog and bindings. */
+  readonly checks: CheckRegistry
 }
 
 /**
@@ -100,6 +153,7 @@ export function createBuiltinCompositionRegistry(): CompositionRegistryInput {
     vcsProviders: BUILTIN_VCS_PROVIDERS,
     actorProviders: BUILTIN_ACTOR_PROVIDERS,
     externalHookRunners: [],
+    checks: [],
   }
 }
 
@@ -161,6 +215,22 @@ export function createCompositionRegistryView(
   base: CompositionRegistryInput,
   extra?: CompositionRegistryInput,
 ): CompositionRegistryView {
+  const checkRegistry = new CheckRegistry(Object.values(DOMAIN_CHECKS), [
+    ...TRANSITION_BINDINGS,
+    ...ARCHIVE_BINDINGS,
+  ])
+  for (const reg of [...(base.checks ?? []), ...(extra?.checks ?? [])]) {
+    const defaultConfig = reg.defaultConfig ?? reg.options?.defaultConfig
+    const allowConfigOverride = reg.allowConfigOverride ?? reg.options?.allowConfigOverride
+    const allowBindingOverride = reg.allowBindingOverride ?? reg.options?.allowBindingOverride
+    const opts: PluginCheckRegistrationOptions = {
+      ...(defaultConfig !== undefined ? { defaultConfig } : {}),
+      ...(allowConfigOverride !== undefined ? { allowConfigOverride } : {}),
+      ...(allowBindingOverride !== undefined ? { allowBindingOverride } : {}),
+    }
+    checkRegistry.register(reg.pluginName, reg.check, reg.defaultBindings, opts)
+  }
+
   return {
     storages: {
       specs: mergeNamedRegistry(
@@ -196,6 +266,7 @@ export function createCompositionRegistryView(
       ...(base.externalHookRunners ?? []),
       ...(extra?.externalHookRunners ?? []),
     ]),
+    checks: checkRegistry,
   }
 }
 

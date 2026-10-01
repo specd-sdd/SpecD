@@ -38,6 +38,7 @@ function sanitizeHookOutput(text: string): string[] {
  * @param result - Aggregated hook execution result returned by the kernel.
  * @param result.success - Whether all hooks completed successfully.
  * @param result.hooks - Hooks executed for the requested lifecycle phase.
+ * @param result.warnings - Array of non-fatal hook warning entries.
  * @returns Append-only text summary for human readers.
  */
 function renderTextSummary(result: {
@@ -50,9 +51,17 @@ function renderTextSummary(result: {
     stderr: string
     success: boolean
   }>
+  warnings?: ReadonlyArray<{
+    id: string
+    command: string
+    exitCode: number
+    stdout: string
+    stderr: string
+  }>
 }): string {
   const completedHooks = result.hooks.filter((hook) => hook.success).length
   const failedHooks = result.hooks.length - completedHooks
+  const warningSet = new Set((result.warnings ?? []).map((w) => w.id))
   const lines = [
     'Hook summary',
     `result: ${result.success ? 'ok' : 'error'}`,
@@ -60,15 +69,25 @@ function renderTextSummary(result: {
     `done: ${completedHooks}`,
     `failed: ${failedHooks}`,
   ]
+  if (warningSet.size > 0) {
+    lines.push(`warnings: ${warningSet.size}`)
+  }
   for (const hook of result.hooks) {
     lines.push('')
-    lines.push(`[${hook.success ? 'done' : 'failed'}] ${hook.id}`)
+    const tag = !hook.success ? 'failed' : warningSet.has(hook.id) ? 'warning' : 'done'
+    lines.push(`[${tag}] ${hook.id}`)
     lines.push(`command: ${hook.command}`)
     lines.push(`exit: ${hook.exitCode}`)
     const outputLines = sanitizeHookOutput(`${hook.stdout}${hook.stderr}`)
-    const label = hook.success ? `last ${TEXT_SUMMARY_TAIL_LINES} lines` : 'full output'
+    const label =
+      hook.success && !warningSet.has(hook.id)
+        ? `last ${TEXT_SUMMARY_TAIL_LINES} lines`
+        : 'full output'
     lines.push(`${label}:`)
-    const renderedLines = hook.success ? outputLines.slice(-TEXT_SUMMARY_TAIL_LINES) : outputLines
+    const renderedLines =
+      hook.success && !warningSet.has(hook.id)
+        ? outputLines.slice(-TEXT_SUMMARY_TAIL_LINES)
+        : outputLines
     if (renderedLines.length === 0) {
       lines.push('  (no output)')
       continue
@@ -197,6 +216,16 @@ JSON/TOON output schema:
                   success: false,
                   stderr: hook.stderr,
                 })),
+                ...((result.warnings ?? []).length > 0
+                  ? {
+                      warnings: (result.warnings ?? []).map((hook) => ({
+                        id: hook.id,
+                        command: hook.command,
+                        exitCode: hook.exitCode,
+                        stderr: hook.stderr,
+                      })),
+                    }
+                  : {}),
               }
               writeStructuredRecord(fmt, {
                 stream: 'run-hooks',
@@ -221,6 +250,16 @@ JSON/TOON output schema:
                     exitCode: h.exitCode,
                     success: true,
                   })),
+                  ...((result.warnings ?? []).length > 0
+                    ? {
+                        warnings: (result.warnings ?? []).map((hook) => ({
+                          id: hook.id,
+                          command: hook.command,
+                          exitCode: hook.exitCode,
+                          stderr: hook.stderr,
+                        })),
+                      }
+                    : {}),
                 },
               },
             })

@@ -10,36 +10,69 @@ Human approval gates are checks on the delivery edge. They MUST NOT be implement
 
 ### Requirement: Check identity and result
 
-Every check SHALL have a stable `id` (for example `protocol.edge`, `workflow.requires`, `workflow.taskCompletion`, `deps.consistent`, `workspace.readOnly`, `impl.filesResolved`, `impl.linksInScope`, `approval.spec`, `approval.signoff`, `schema.nameMatch`, `archive.archivable`, `spec.overlap`, `hook.pre`, `hook.post`). `archive.publication` MUST NOT be a `CheckId` and MUST NOT be a registered check.
+Every check SHALL have a stable identifier. The `CheckId` type MUST be an open `string` rather than a closed union to support dynamic plugin checks alongside built-in core invariants. Built-in check identifiers SHALL NOT contain an `@` prefix (e.g. `protocol.edge`, `workflow.requires`), whereas custom plugin check identifiers SHALL be canonically namespaced as `@${pluginName}.${id}`.
 
-Every check SHALL also declare a mandatory human-readable `label`: a short **gerund** phrase describing the work in progress (for example `Checking implementation links`, `Running post hooks`, `Checking workspace ownership`). The `label` MUST NOT use an `Executing:` prefix. The `id` remains the machine key; the `label` is for progress UI and human diagnostics.
+Every check SHALL also declare a mandatory human-readable `label`: a short gerund phrase suitable for UI logs and progress rendering (e.g. `"Checking required artifacts"`).
 
-A check result SHALL include:
+A check result (`CheckResult`) SHALL include:
 
-- `id`
-- `label` (same value as the check’s declared label)
-- `kind`: `predicate` or `effect`
-- `outcome`: `pass`, `fail`, or `skip`
-- `code` and `message` when `fail` (reuse existing codes where they exist: `INVALID_TRANSITION`, `INCOMPLETE_TASKS`, `INCOMPLETE_ARTIFACT`, `APPROVAL_REQUIRED`, and the archive typed-error codes)
-- optional `details` (artifact ids, task counts, resolve command, skippable/`bypassFlag`)
+- `id`: The canonical check identifier string.
+- `label`: Human-readable gerund phrase matching the check definition.
+- `kind`: `predicate` or `effect`.
+- `outcome`: `pass`, `fail`, or `skip`.
+- `code`: Diagnostic error code when `outcome === 'fail'`.
+- `message`: Diagnostic message when `outcome === 'fail'`.
+- `command`: Optional CLI remediation command suggested to resolve a failure.
+- `details`: Optional structured payload (e.g. counts, identifiers, metadata).
 
-`instruction:` workflow hooks MUST NOT appear as checks.
+The `skip` outcome SHALL originate from exactly two canonical sources:
+
+1. **Check Self-Discard**: A check inspects its `CheckExecutionContext` (such as active schema, step config, or change scope) and determines that its invariant does not apply, returning `{ outcome: 'skip', message: '...' }`.
+2. **Orchestrator Bypass (`--skip-checks`)**: The user explicitly requests a bypass for a check whose active binding declares `skippable: true`. The orchestrator skips `check.execute()` and injects a synthetic `{ outcome: 'skip', details: { bypassedByUser: true } }`.
+
+instruction: workflow hooks MUST NOT appear as user-defined checks.
 
 ### Requirement: Check ABI create and WorkflowCheck
 
-The public ABI of a check SHALL be:
+Every check implementation MUST implement the `Check` domain interface:
 
-- `Check` — `id`, `label`, `kind` (`predicate` or `effect`), `execute(ctx): Promise<CheckResult>`
-- `WorkflowCheck` — abstract application class implementing `Check`. It SHALL provide `pass` / `fail` / `skip` helpers. It MUST NOT take a shared snapshot bag, `needs`, or `RunStepHooks` on the base.
-- `create<Name>(deps)` — named factory that returns a `Check` compatible with `WorkflowCheck` (application core checks SHALL `extend WorkflowCheck`). Domain modules MAY export a pure `run(facts)` plus a stub `Check` object; they MUST NOT be the production `execute` path. Each factory’s `deps` SHALL be only the ports that **that** check’s `execute` uses.
+```typescript
+export interface Check {
+  readonly id: string
+  readonly label: string
+  readonly kind: CheckKind // 'predicate' | 'effect'
+  readonly command?: string
+  execute(ctx: CheckExecutionContext): Promise<CheckResult>
+}
+```
 
-`execute` SHALL be self-sufficient: it obtains any I/O it needs through the instance’s constructor deps. A domain `run` helper, if present, SHALL accept **only that check’s facts** (plus Change/Schema already in `ctx`). There SHALL be no `PredicateSnapshots` type (exported or internal), no `emptyPredicateSnapshots`, and no `gatherPredicateSnapshots`. Checks MUST NOT declare a `needs` catalog.
+Bypassability (`skippable: boolean`), disablement governance (`allowDisable: boolean`), and routing policies live on `CheckBindingSpec`, `CheckBinding`, and `WorkflowStepCheckDeclaration`, keeping `Check` strictly focused on invariant evaluation.
 
-`CheckExecutionContext` SHALL be the host of the attempt only: `change`, `schema`, `attempt` (`transition` triple or `archive`), baked `approvals` (`spec` / `signoff`), `skipHookPhases`, skippable flags (`allowOverlap`, `allowOutOfScope`), optional DAG `effectiveStatusByArtifact` from a **pure** lifecycle helper (`projectArtifacts` or equivalent), an optional **`onCheckProgress`** sink for the generic progress bus, and an optional **`passMemo`** (ephemeral map created once per `executeChecksByLegalTargets` / `TransitionChange` predicate pass). `workflow.taskCompletion` MUST memoize `CountTasks` on `passMemo`, not on the Kernel-lived check instance. It MUST NOT list task counts, deps extracts, or other check-specific facts as durable context fields. `skipHookPhases` matching SHALL use binding `phase` plus skip selectors (`target.pre`, `source.post`, archive `pre`/`post`), not `check.id === 'hook.pre'|'hook.post'` in the use-case loop. Transition `hook.pre` and `hook.post` both bind `phase = before-persist`, so skip MUST also use the effect’s pre/post identity (or equivalent selector), not `binding.phase` alone.
+The `CheckExecutionContext` passed to `execute` MUST contain strictly contextual evaluation facts:
 
-Applicability, `phase`, and `onFailure` SHALL live on the **binding row**, not on `WorkflowCheck`.
+- `change`: Active change aggregate.
+- `schema`: Active workflow schema.
+- `attempt`: Transition attempt target (`from`, `to`, `along`).
+- `config`: Effective cascading configuration (`Readonly<Record<string, unknown>>`) resolved for this check instance.
+- `validity`: Reconciled change validity verdict.
+- `onCheckProgress`: Optional callback for streaming diagnostic progress events.
 
-A later plugin SHALL register the same `Check` ABI (factory + instance). Core use cases MUST NOT `switch` on `CheckId` to gather facts, map `skipHookPhases`, or launch hooks. Mapping a **failed predicate** `id` to an existing typed error SHALL be allowed. Shipping plugins is out of this spec. Built-in ids MAY be a closed TypeScript union of the ids listed in this spec; that union MUST NOT be treated as the plugin ABI. Runtime ids are stable strings.
+The execution context MUST NOT contain ad-hoc bypass booleans (such as `allowOutOfScope` or `allowOverlap`). Pure check functions SHALL evaluate strictly whether the domain invariant holds.
+
+### Requirement: Public CustomCheckDefinition contract
+
+The public authoring contract for external plugins SHALL be `CustomCheckDefinition`:
+
+```typescript
+export interface CustomCheckDefinition {
+  readonly id: string
+  readonly label: string
+  readonly command?: string
+  execute(ctx: CheckExecutionContext): Promise<CheckResult>
+}
+```
+
+The public contract MUST NOT expose the engine-internal `kind` property or lifecycle routing bypass flags (`skippable`). The engine automatically sets `kind: 'predicate'` upon registration, while skippability is configured on bindings.
 
 ### Requirement: One implementation file per check
 
@@ -131,23 +164,14 @@ Every mutating use-case dependency path SHALL provide this reconciler. A direct 
 
 ### Requirement: Registry bindings for this capability
 
-The following predicate bindings SHALL remain registered with stable ids:
+The system SHALL maintain explicit governance and skippability permissions across all built-in check bindings in `CheckBindingSpec` and `CheckBinding`:
 
-- `protocol.edge` for every normal transition attempt
-- `workflow.requires` for the requested target's schema step
-- `workflow.taskCompletion` from `requiresTaskCompletion`
-- `deps.consistent` and `workspace.readOnly` for entry to `ready` and archive
-- `impl.filesResolved` and `impl.linksInScope` for every transition whose target is `verifying`, every forward transition whose source is `implementing`, and archive; both are blocking predicates evaluated before the requested operation, and existing archive bypass rules remain unchanged. Explicit verification start reuses these checks through an operation-specific context before capturing its baseline, regardless of lifecycle state, without fabricating a self-transition
-- `verification.current` for `verifying → done`: a blocking predicate requiring already-completed successful evidence with a current fingerprint; an active attempt alone cannot pass. It uses the same freshness evaluator as `CompleteVerification`, without invoking completion or mutating evidence. Missing, unavailable, stale, legacy-unknown, mismatched, and unresolved inputs produce structured actionable failures. It skips only when the canonical verdict explicitly reports `not-required`; an absent verdict fails closed
-- `approval.spec` from `ready` along forward edges: skip when disabled; pass only when the reconciled materialized spec-approval projection is `valid` for current inputs; otherwise fail with `APPROVAL_REQUIRED` and an absent/stale/revoked reason; never route to a pending state
-- `approval.signoff` for `done → archivable`: skip when disabled; pass only when reconciled sign-off and verification evidence are current and `valid`; otherwise return actionable approval or verification recovery
-- archive-operation predicates `schema.nameMatch`, `archive.archivable`, `spec.overlap`, and the shared workspace, dependency, implementation, validity, task, and freshness checks required by archive preflight
-
-Validity application and automatic returns occur in the central reconciler before predicates authorize progress. Checks consume its verdict and MUST NOT append invalidation or recovery events themselves. A transition or operation matching multiple applicability bindings SHALL execute each stable check ID at most once. When pre-persist effects may mutate files or links, the caller SHALL reacquire fresh facts and rerun applicable readiness and verification predicates before persistence. Protocol validation always rejects `verifying → verifying`; explicit start and completion are application operations independent of transitions.
-
-`verification.current` SHALL follow the existing check ABI, module/factory conventions, and generic progress bus, with label `Checking verification freshness`. `GetStatus` projects the same predicate without completing an attempt. Shared fingerprint evaluation is pure; application dependencies obtain fresh input facts. Sign-off and archive consume the canonical evidence requirement and freshness verdict. Phase skipping remains deferred; future legitimate skips must distinguish evidence not required from completed valid evidence rather than manufacture a verification record. Compiled transition metadata for future skipped phases SHALL preserve applicable crossed-boundary guards before such a route can be enabled.
-
-Existing compact diagnostic rules remain: implementation-state text reports counts plus at most three labeled examples, full inventories remain structured, and dependency/read-only failures retain their complete small identifier sets.
+- **Category A (Protocol & State Invariants)** (`protocol.edge`, `verification.current`, `archive.archivable`, `schema.nameMatch`, `hook.pre`, `hook.post`): MUST explicitly declare `allowBindingOverride: false`, `allowDisable: false`, and `skippable: false`. Cannot be embedded into steps or disabled in `schema.yaml`. Hook effects (`hook.pre`, `hook.post`) are bypassed via `--skip-hooks`, never `--skip-checks`.
+- **Category B (Native Step Attributes)** (`workflow.requires`, `workflow.taskCompletion`, `approval.spec`, `approval.signoff`): Governed natively via dedicated step and workspace schema configurations (`requires: []`, `requiresTaskCompletion`, `approvals`). Declares `skippable: false`.
+- **Category C (Policy & Consistency Checks)**: Declares `allowBindingOverride: true` and `allowDisable: true`, permitting project schemas to bind them to workflow steps or declaratively disable them (`disabled: true`).
+  - `impl.linksInScope`: Declares `skippable: true`. Bypassed via `--skip-checks impl.linksInScope` (or legacy alias `--allow-out-of-scope`).
+  - `spec.overlap`: Declares `skippable: true`. Bypassed via `--skip-checks spec.overlap` (or legacy alias `--allow-overlap`).
+  - `deps.consistent`, `impl.filesResolved`, `workspace.readOnly`: Declare `skippable: false`. Cannot be bypassed via CLI flag.
 
 ### Requirement: Actionable fail diagnostics
 
@@ -248,7 +272,8 @@ Transition evaluation for historic parked approval states MUST preserve the appr
 
 ## Spec Dependencies
 
-- [`core:change`](../change/spec.md) — lifecycle states, approval records, and `VALID_TRANSITIONS`
-- [`core:workflow-model`](../workflow-model/spec.md) — `workflow[]` lookup rows, progress axis, requires, taskCompletion, hook declarations
+- [`core:change`](../change/spec.md) — lifecycle states, approval records, and VALID_TRANSITIONS
+- [`core:workflow-model`](../workflow-model/spec.md) — workflow\[] lookup rows, progress axis, requires, taskCompletion, hook declarations
 - [`core:schema-format`](../schema-format/spec.md) — workflow step YAML shape
 - [`default:_global/architecture`](../../../_global/architecture/spec.md) — domain purity vs application I/O
+- [`core:check-registry`](../check-registry/spec.md) — Dynamic check resolution, namespacing, and two-tier governance.

@@ -23,6 +23,9 @@ import {
   ArchiveDependencyMismatchError,
   ArchiveImplementationStateError,
   HappyPathNextUnavailableError,
+  CheckPredicateFailedError,
+  CheckNotSkippableError,
+  UnknownCheckError,
 } from '@specd/sdk'
 
 function setup(configOverrides: Record<string, unknown> = {}) {
@@ -111,7 +114,7 @@ describe('Command signature', () => {
     ])
 
     const call = kernel.changes.transition.execute.mock.calls[0]![0]
-    expect(call.allowOutOfScope).toBe(true)
+    expect(call.skipChecks).toContain('impl.linksInScope')
   })
 
   it('Allow-out-of-scope is omitted by default', async () => {
@@ -129,7 +132,7 @@ describe('Command signature', () => {
     await program.parseAsync(['node', 'specd', 'change', 'transition', 'my-change', 'designing'])
 
     const call = kernel.changes.transition.execute.mock.calls[0]![0]
-    expect(call.allowOutOfScope).toBeUndefined()
+    expect(call.skipChecks).toEqual([])
   })
 
   it('Transition execute omits approval flags', async () => {
@@ -1347,5 +1350,270 @@ describe('validity-aware transition guidance', () => {
     expect(err).toContain('recovery:      verifying → designing (spec-approval)')
     expect(err).toContain('command: /specd-design')
     expect(err).not.toContain('restart')
+  })
+
+  describe('--skip-checks and CheckPredicateFailedError Repair Guide', () => {
+    it('forwards comma-separated --skip-checks to transition execute', async () => {
+      const { kernel } = setup()
+      kernel.changes.status.execute.mockResolvedValue({
+        change: makeMockChange({ name: 'my-change', state: 'implementing' }),
+        artifactStatuses: [],
+      })
+      kernel.changes.transition.execute.mockResolvedValue({
+        change: makeMockChange({ name: 'my-change', state: 'verifying' }),
+      })
+
+      const program = makeProgram()
+      registerChangeTransition(program.command('change'))
+      await program.parseAsync([
+        'node',
+        'specd',
+        'change',
+        'transition',
+        'my-change',
+        'verifying',
+        '--skip-checks',
+        'impl.linksInScope,spec.overlap',
+      ])
+
+      const call = kernel.changes.transition.execute.mock.calls[0]![0]
+      expect(call.skipChecks).toEqual(['impl.linksInScope', 'spec.overlap'])
+    })
+
+    it('translates --allow-overlap into skipChecks: ["spec.overlap"]', async () => {
+      const { kernel } = setup()
+      kernel.changes.status.execute.mockResolvedValue({
+        change: makeMockChange({ name: 'my-change', state: 'done' }),
+        artifactStatuses: [],
+      })
+      kernel.changes.transition.execute.mockResolvedValue({
+        change: makeMockChange({ name: 'my-change', state: 'archivable' }),
+      })
+
+      const program = makeProgram()
+      registerChangeTransition(program.command('change'))
+      await program.parseAsync([
+        'node',
+        'specd',
+        'change',
+        'transition',
+        'my-change',
+        'archivable',
+        '--allow-overlap',
+      ])
+
+      const call = kernel.changes.transition.execute.mock.calls[0]![0]
+      expect(call.skipChecks).toContain('spec.overlap')
+    })
+
+    it('deduplicates repeated checks in --skip-checks, trimming whitespace and ignoring empty elements', async () => {
+      const { kernel } = setup()
+      kernel.changes.status.execute.mockResolvedValue({
+        change: makeMockChange({ name: 'my-change', state: 'implementing' }),
+        artifactStatuses: [],
+      })
+      kernel.changes.transition.execute.mockResolvedValue({
+        change: makeMockChange({ name: 'my-change', state: 'verifying' }),
+      })
+
+      const program = makeProgram()
+      registerChangeTransition(program.command('change'))
+      await program.parseAsync([
+        'node',
+        'specd',
+        'change',
+        'transition',
+        'my-change',
+        'verifying',
+        '--skip-checks',
+        '  impl.linksInScope , impl.linksInScope , ,  spec.overlap , spec.overlap  ',
+      ])
+
+      const call = kernel.changes.transition.execute.mock.calls[0]![0]
+      expect(call.skipChecks).toEqual(['impl.linksInScope', 'spec.overlap'])
+    })
+
+    it('deduplicates alias flags (--allow-out-of-scope, --allow-overlap) when combined with --skip-checks', async () => {
+      const { kernel } = setup()
+      kernel.changes.status.execute.mockResolvedValue({
+        change: makeMockChange({ name: 'my-change', state: 'implementing' }),
+        artifactStatuses: [],
+      })
+      kernel.changes.transition.execute.mockResolvedValue({
+        change: makeMockChange({ name: 'my-change', state: 'verifying' }),
+      })
+
+      const program = makeProgram()
+      registerChangeTransition(program.command('change'))
+      await program.parseAsync([
+        'node',
+        'specd',
+        'change',
+        'transition',
+        'my-change',
+        'verifying',
+        '--allow-out-of-scope',
+        '--allow-overlap',
+        '--skip-checks',
+        'impl.linksInScope,spec.overlap',
+      ])
+
+      const call = kernel.changes.transition.execute.mock.calls[0]![0]
+      expect(call.skipChecks).toEqual(['impl.linksInScope', 'spec.overlap'])
+    })
+
+    it('renders Repair Guide with check label, command, and bypass for CheckPredicateFailedError', async () => {
+      const { kernel, stderr } = setup()
+      kernel.changes.status.execute.mockResolvedValue({
+        change: makeMockChange({ name: 'my-change', state: 'implementing' }),
+        artifactStatuses: [],
+      })
+      kernel.changes.transition.execute.mockRejectedValue(
+        new CheckPredicateFailedError(
+          'impl.linksInScope',
+          'Checking implementation links',
+          'Links out of scope',
+          'IMPL_LINKS_OUT_OF_SCOPE',
+          '/specd-implement my-change',
+          undefined,
+          true,
+        ),
+      )
+
+      const program = makeProgram()
+      registerChangeTransition(program.command('change'))
+      await program
+        .parseAsync(['node', 'specd', 'change', 'transition', 'my-change', 'verifying'])
+        .catch(() => {})
+
+      expect(process.exit).toHaveBeenCalledWith(1)
+      const err = stderr()
+      expect(err).toContain('repair guide:')
+      expect(err).toContain('check:   Checking implementation links (impl.linksInScope)')
+      expect(err).toContain('command: /specd-implement my-change')
+      expect(err).toContain('bypass:  Retry with --skip-checks impl.linksInScope')
+    })
+
+    it('omits bypass guidance in Repair Guide when failed check is mandatory (skippable: false)', async () => {
+      const { kernel, stderr } = setup()
+      kernel.changes.status.execute.mockResolvedValue({
+        change: makeMockChange({ name: 'my-change', state: 'implementing' }),
+        artifactStatuses: [],
+      })
+      kernel.changes.transition.execute.mockRejectedValue(
+        new CheckPredicateFailedError(
+          'impl.filesResolved',
+          'Checking implementation file resolution',
+          'Open files remain',
+          'IMPL_FILES_UNRESOLVED',
+          '/specd-implement my-change',
+          undefined,
+          false, // skippable: false
+        ),
+      )
+
+      const program = makeProgram()
+      registerChangeTransition(program.command('change'))
+      await program
+        .parseAsync(['node', 'specd', 'change', 'transition', 'my-change', 'verifying'])
+        .catch(() => {})
+
+      expect(process.exit).toHaveBeenCalledWith(1)
+      const err = stderr()
+      expect(err).toContain('repair guide:')
+      expect(err).toContain('check:   Checking implementation file resolution (impl.filesResolved)')
+      expect(err).toContain('command: /specd-implement my-change')
+      expect(err).not.toContain('bypass:')
+    })
+
+    it('handles UnknownCheckError when unregistered check is passed to --skip-checks', async () => {
+      const { kernel, stderr } = setup()
+      kernel.changes.status.execute.mockResolvedValue({
+        change: makeMockChange({ name: 'my-change', state: 'implementing' }),
+        artifactStatuses: [],
+      })
+      kernel.changes.transition.execute.mockRejectedValue(new UnknownCheckError('@security.fake'))
+
+      const program = makeProgram()
+      registerChangeTransition(program.command('change'))
+      await program
+        .parseAsync([
+          'node',
+          'specd',
+          'change',
+          'transition',
+          'my-change',
+          'verifying',
+          '--skip-checks',
+          '@security.fake',
+        ])
+        .catch(() => {})
+
+      expect(process.exit).toHaveBeenCalledWith(1)
+      expect(stderr()).toContain("Check '@security.fake' is not registered in the check registry")
+    })
+
+    it('handles CheckNotSkippableError when non-skippable check is passed to --skip-checks', async () => {
+      const { kernel, stderr } = setup()
+      kernel.changes.status.execute.mockResolvedValue({
+        change: makeMockChange({ name: 'my-change', state: 'implementing' }),
+        artifactStatuses: [],
+      })
+      kernel.changes.transition.execute.mockRejectedValue(
+        new CheckNotSkippableError('protocol.edge', 'predicate'),
+      )
+
+      const program = makeProgram()
+      registerChangeTransition(program.command('change'))
+      await program
+        .parseAsync([
+          'node',
+          'specd',
+          'change',
+          'transition',
+          'my-change',
+          'verifying',
+          '--skip-checks',
+          'protocol.edge',
+        ])
+        .catch(() => {})
+
+      expect(process.exit).toHaveBeenCalledWith(1)
+      expect(stderr()).toContain("Check 'protocol.edge' cannot be skipped")
+    })
+
+    it('renders Repair Guide for custom check failure with command and bypass', async () => {
+      const { kernel, stderr } = setup()
+      kernel.changes.status.execute.mockResolvedValue({
+        change: makeMockChange({ name: 'my-change', state: 'drafting' }),
+        artifactStatuses: [],
+      })
+      kernel.changes.transition.execute.mockRejectedValue(
+        new CheckPredicateFailedError(
+          '@qa.smoke',
+          'QA Smoke Test',
+          'Smoke assertions failed',
+          'QA_SMOKE_FAILED',
+          'pnpm test:smoke',
+          undefined,
+          true,
+        ),
+      )
+
+      const program = makeProgram()
+      registerChangeTransition(program.command('change'))
+      await program
+        .parseAsync(['node', 'specd', 'change', 'transition', 'my-change', 'designing'])
+        .catch(() => {})
+
+      expect(process.exit).toHaveBeenCalledWith(1)
+      const err = stderr()
+      expect(err).toContain('repair guide:')
+      expect(err).toContain('check:   QA Smoke Test (@qa.smoke)')
+      expect(err).toContain('command: pnpm test:smoke')
+      expect(err).toContain(
+        'bypass:  Retry with --skip-checks @qa.smoke if an exception is granted',
+      )
+    })
   })
 })

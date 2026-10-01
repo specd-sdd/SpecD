@@ -53,8 +53,6 @@ function archiveCtx(change: Change): CheckExecutionContext {
     schema: makeSchema(),
     attempt: { scope: 'archive' },
     approvals: { spec: false, signoff: false },
-    allowOverlap: false,
-    allowOutOfScope: false,
     effectiveStatusByArtifact: new Map(),
   }
 }
@@ -216,6 +214,7 @@ describe('resolveWorkflowCheckRegistry', () => {
                 stderr: 'drift',
               },
             ],
+            warnings: [],
           }),
         }),
     })
@@ -226,5 +225,64 @@ describe('resolveWorkflowCheckRegistry', () => {
     if (result.outcome !== 'fail') return
     expect(result.code).toBe('HOOK_FAILED')
     expect(result.message).toContain('echo drift')
+  })
+
+  it('filters out non-@ checks from custom registry to guarantee internal checks are never clobbered or shadowed', () => {
+    const resolver = makeResolver([])
+    const rogueBinding = {
+      check: {
+        id: 'protocol.edge',
+        label: 'Rogue Clobbered Protocol Edge',
+        kind: 'predicate' as const,
+        execute: async () => ({
+          id: 'protocol.edge',
+          label: 'Rogue',
+          kind: 'predicate' as const,
+          outcome: 'pass' as const,
+        }),
+      },
+      applicability: [
+        { scope: 'transition' as const, from: '*' as const, to: '*' as const, along: '*' as const },
+      ],
+      skippable: true,
+    }
+    const legitCustomBinding = {
+      check: {
+        id: '@security.audit',
+        label: 'Legitimate Security Audit',
+        kind: 'predicate' as const,
+        execute: async () => ({
+          id: '@security.audit',
+          label: 'Security Audit',
+          kind: 'predicate' as const,
+          outcome: 'pass' as const,
+        }),
+      },
+      applicability: [
+        { scope: 'transition' as const, from: '*' as const, to: '*' as const, along: '*' as const },
+      ],
+      skippable: true,
+    }
+
+    Object.assign(resolver, {
+      registry: {
+        checks: {
+          bindings: () => [rogueBinding, legitCustomBinding],
+        },
+      },
+    })
+
+    const registry = resolveWorkflowCheckRegistry(resolver)
+
+    const protocolBindings = registry.transitionBindings.filter(
+      (b) => b.check.id === 'protocol.edge',
+    )
+    expect(protocolBindings).toHaveLength(1)
+    expect(protocolBindings[0]!.check.label).not.toBe('Rogue Clobbered Protocol Edge')
+    expect(protocolBindings[0]!.skippable).toBe(false)
+
+    const custom = registry.transitionBindings.find((b) => b.check.id === '@security.audit')
+    expect(custom).toBeDefined()
+    expect(custom!.check.label).toBe('Legitimate Security Audit')
   })
 })

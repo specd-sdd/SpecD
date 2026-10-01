@@ -1,0 +1,66 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Check ABI create and WorkflowCheck'
+  content: |
+    ### Requirement: Public CustomCheckDefinition contract
+
+    #### Scenario: Public check definition omits kind property
+    - **GIVEN** an author implementing `CustomCheckDefinition`
+    - **WHEN** compiling the TypeScript definition without `kind`
+    - **THEN** type checking succeeds and passes to `registry.register`
+
+    #### Scenario: Executing custom check receives isolated config
+    - **GIVEN** a custom check registered with effective config `{ severity: 'high' }`
+    - **WHEN** the orchestrator evaluates the check
+    - **THEN** `ctx.config` contains `{ severity: 'high' }`
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Check identity and result'
+  content: |
+    #### Scenario: Check result carries remediation command
+    - **GIVEN** a check returning `outcome: 'fail'` with `command: 'pnpm audit:fix'`
+    - **WHEN** evaluating check results
+    - **THEN** the `CheckResult` preserves the `command` string for CLI reporting
+
+    #### Scenario: Check with skippable binding bypassed by user injects synthetic skip
+    - **GIVEN** a transition step whose binding declares `skippable: true`
+    - **WHEN** the user supplies its check ID to `--skip-checks`
+    - **THEN** the check is not executed
+    - **AND** a synthetic `{ outcome: 'skip', details: { bypassedByUser: true } }` is recorded
+
+    #### Scenario: Self-discarding check returns skip outcome
+    - **GIVEN** a check whose preconditions do not match active change scope
+    - **WHEN** `check.execute(ctx)` runs
+    - **THEN** it returns `{ outcome: 'skip', message: 'Not applicable to current workspace' }`
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Registry bindings for this capability'
+  content: |
+    #### Scenario: impl.linksInScope step binding is explicitly skippable
+    - **GIVEN** the standard workflow step binding for `impl.linksInScope`
+    - **WHEN** inspecting the binding's `skippable` property
+    - **THEN** `skippable` is true
+
+    #### Scenario: spec.overlap step binding is explicitly skippable
+    - **GIVEN** the standard archive check binding for `spec.overlap`
+    - **WHEN** inspecting the binding's `skippable` property
+    - **THEN** `skippable` is true
+
+    #### Scenario: Core workflow and protocol check bindings are non-skippable
+    - **GIVEN** step bindings for `protocol.edge`, `workflow.requires`, and `workflow.taskCompletion`
+    - **WHEN** inspecting their `skippable` properties
+    - **THEN** all report `skippable: false`
+
+    #### Scenario: Core protocol invariants enforce allowDisable false
+    - **GIVEN** built-in check bindings for `protocol.edge`, `verification.current`, `archive.archivable`, and `schema.nameMatch`
+    - **WHEN** inspecting their `allowDisable` properties
+    - **THEN** all report `allowDisable: false`

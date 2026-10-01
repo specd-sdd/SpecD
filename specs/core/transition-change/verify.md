@@ -137,19 +137,29 @@ Scenarios:
 
 ### Requirement: Canonical pre-transition validity reconciliation
 
-#### Scenario: Committed recovery survives failed requested transition
+#### Scenario: Unauthorized bypass of mandatory check throws CheckNotSkippableError
 
-- **GIVEN** fresh reconciliation invalidates required consent and returns the change to `designing`
-- **WHEN** the original forward transition becomes inapplicable
-- **THEN** it fails with the committed state, blockers, and next action
-- **AND** does not undo recovery
+- **GIVEN** a mandatory check `protocol.edge` with `skippable: false`
+- **WHEN** attempting transition with `skipChecks: ['protocol.edge']`
+- **THEN** it throws `CheckNotSkippableError` and state remains unchanged
 
-#### Scenario: Recovery failure uses the canonical diagnostic contract
+#### Scenario: Bypassing hook effect check with skipChecks throws CheckNotSkippableError
 
-- **GIVEN** reconciliation changes the lifecycle state before the requested edge is evaluated
-- **WHEN** the requested transition is no longer applicable
-- **THEN** the typed failure exposes committed state, automatic return, canonical blockers, and next action
-- **AND** it is not reduced to an invalid-state message without recovery context
+- **GIVEN** an effect check `hook.pre`
+- **WHEN** attempting transition with `skipChecks: ['hook.pre']`
+- **THEN** it throws `CheckNotSkippableError` enforcing that effects must be skipped via `skipHookPhases`
+
+#### Scenario: Authorized bypass of skippable check succeeds
+
+- **GIVEN** a skippable check `impl.linksInScope` with out-of-scope files present
+- **WHEN** attempting transition with `skipChecks: ['impl.linksInScope']`
+- **THEN** `impl.linksInScope` is bypassed and the transition succeeds
+
+#### Scenario: Disabled step check is omitted from execution
+
+- **GIVEN** a step schema declaring a custom check with `disabled: true` (where `allowDisable !== false`)
+- **WHEN** executing transition to that step
+- **THEN** the check is omitted from predicate evaluation and does not block the transition
 
 ### Requirement: Workflow requires enforcement
 
@@ -369,24 +379,16 @@ Scenarios:
 
 ### Requirement: Input contract
 
-#### Scenario: Input accepts transition controls without approval flags
+#### Scenario: Input accepts skipChecks array
 
-- **WHEN** `TransitionChange.execute` is called
-- **THEN** its input accepts `name`, `to` (`ChangeState` or `'next'`), and optional `skipHookPhases`, `refreshImplementationTrackingBefore`, and `allowOutOfScope`
-- **AND** its input does not accept `approvalsSpec` or `approvalsSignoff`
+- **GIVEN** a transition execution request
+- **WHEN** passing `TransitionChangeInput` with `skipChecks: ['impl.linksInScope', 'spec.overlap']`
+- **THEN** the orchestrator receives the bypass list without legacy boolean flags
 
-#### Scenario: allowOutOfScope omitted keeps strict impl.linksInScope
+#### Scenario: Legacy boolean flags omitted from input
 
-- **GIVEN** a forward exit from `implementing` where `impl.linksInScope` would fail
-- **WHEN** `execute` is called without `allowOutOfScope` (or with `allowOutOfScope: false`)
-- **THEN** `impl.linksInScope` is evaluated and not skipped
-- **AND** the transition fails with `ArchiveImplementationStateError` when the predicate fails
-
-#### Scenario: Approval gates are fixed at construction
-
-- **GIVEN** `TransitionChange` is constructed with `approvals: { spec: true, signoff: false }`
-- **WHEN** `execute` is called with `to: 'implementing'` from `ready`
-- **THEN** routing uses the constructor-provided `approvals.spec` value
+- **WHEN** inspecting `TransitionChangeInput` type contract
+- **THEN** `allowOutOfScope` and `allowOverlap` are not present on the input interface
 
 ### Requirement: Approval gates baked at construction
 
@@ -473,25 +475,18 @@ Scenarios:
 
 ### Requirement: Shared runner errors propagate on transition
 
-#### Scenario: Enter ready readOnly failure throws ReadOnlyWorkspaceError
+#### Scenario: Failed predicate check throws unified CheckPredicateFailedError
 
-- **GIVEN** a change in `designing` with a read-only spec in scope
-- **WHEN** `execute` is called with `to: 'ready'`
-- **THEN** `ReadOnlyWorkspaceError` is thrown
-- **AND** the change remains in `designing`
+- **GIVEN** an active check returning `outcome: 'fail'` with code `'SPEC_OVERLAP'`
+- **WHEN** `TransitionChange.execute` evaluates transition preflight
+- **THEN** it throws `CheckPredicateFailedError` containing the check's `checkId`, `label`, `code`, `message`, and `command`
+- **AND** legacy error classes like `ArchiveImplementationStateError` are not thrown
 
-#### Scenario: Enter ready deps failure throws ArchiveDependencyMismatchError
+#### Scenario: Multiple failed checks with collect policy populate details
 
-- **GIVEN** a change in `designing` whose publication-plan `dependsOn` disagrees with extracted metadata
-- **WHEN** `execute` is called with `to: 'ready'`
-- **THEN** `ArchiveDependencyMismatchError` is thrown
-
-#### Scenario: Forward exit implementing impl failure throws ArchiveImplementationStateError
-
-- **GIVEN** a change in `implementing` with an open tracked implementation file
-- **WHEN** `execute` is called with `to: 'verifying'`
-- **THEN** `ArchiveImplementationStateError` is thrown
-- **AND** the change remains in `implementing`
+- **GIVEN** multiple checks failing under `onFailure: 'collect'`
+- **WHEN** transition preflight completes
+- **THEN** `CheckPredicateFailedError` contains structured diagnostic details for all failed checks
 
 ### Requirement: Dependencies
 

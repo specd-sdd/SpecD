@@ -4,34 +4,23 @@
 
 ### Requirement: Command signature
 
-#### Scenario: Missing arguments
+#### Scenario: CLI accepts --skip-checks with comma-separated list
 
-- **WHEN** `specd change transition my-change` is run without the target state
-- **THEN** the command exits with code 1 and prints a usage error to stderr
+- **GIVEN** a user invoking `specd change transition ready --skip-checks impl.linksInScope,spec.overlap`
+- **WHEN** parsing command options
+- **THEN** `TransitionChangeInput.skipChecks` receives `['impl.linksInScope', 'spec.overlap']`
 
-#### Scenario: Next flag resolves a transition target without a positional step
+#### Scenario: CLI translates legacy --allow-out-of-scope to skipChecks
 
-- **GIVEN** the change is in `drafting` state
-- **WHEN** `specd change transition my-change --next` is run
-- **THEN** the command resolves `designing` as the target state
-- **AND** executes the normal transition flow
+- **GIVEN** a user invoking `specd change transition ready --allow-out-of-scope`
+- **WHEN** parsing command options
+- **THEN** `TransitionChangeInput.skipChecks` includes `'impl.linksInScope'`
 
-#### Scenario: Next flag cannot be combined with an explicit step
+#### Scenario: CLI translates legacy --allow-overlap to skipChecks
 
-- **WHEN** `specd change transition my-change designing --next` is run
-- **THEN** the command exits with code 1
-- **AND** stderr contains an `error:` message explaining that `<step>` and `--next` are mutually exclusive
-
-#### Scenario: Allow-out-of-scope is forwarded to execute
-
-- **GIVEN** the change is in `implementing` state
-- **WHEN** `specd change transition my-change verifying --allow-out-of-scope` is run
-- **THEN** `TransitionChange.execute` is called with `allowOutOfScope: true`
-
-#### Scenario: Allow-out-of-scope is omitted by default
-
-- **WHEN** `specd change transition my-change designing` is run without `--allow-out-of-scope`
-- **THEN** `TransitionChange.execute` is called without `allowOutOfScope` on the input
+- **GIVEN** a user invoking `specd change transition archivable --allow-overlap`
+- **WHEN** parsing command options
+- **THEN** `TransitionChangeInput.skipChecks` includes `'spec.overlap'`
 
 ### Requirement: Next-transition resolution
 
@@ -188,44 +177,19 @@
 
 ### Requirement: Invalid transition error
 
-#### Scenario: Illegal state transition
+#### Scenario: CheckPredicateFailedError renders Repair Guide with command and bypass
 
-- **GIVEN** the change is in `drafting` state
-- **WHEN** `specd change transition my-change done` is run
-- **THEN** the command exits with code 1
-- **AND** stderr contains an `error:` message
+- **GIVEN** a failed skippable check `@security.code-scan` with command `'pnpm audit:fix'`
+- **WHEN** the command exits with failure
+- **THEN** the CLI Repair Guide renders the check label and error code
+- **AND** displays `command: pnpm audit:fix`
+- **AND** displays `bypass: Retry with --skip-checks @security.code-scan if an exception is granted`
 
-#### Scenario: Approval-required reason is surfaced in stderr
+#### Scenario: Mandatory check failure does not offer bypass in Repair Guide
 
-- **GIVEN** the change is in `pending-signoff` state
-- **WHEN** `specd change transition my-change signed-off` is run
-- **THEN** the command exits with code 1
-- **AND** stderr contains an `error:` message explaining that the change is waiting for human signoff
-
-#### Scenario: Transition failure renders Repair Guide
-
-- **GIVEN** a transition to `ready` fails because an artifact is missing
-- **WHEN** the command is run in text mode
-- **THEN** it prints an error message to stderr
-- **AND** it renders a `repair guide:` section to stderr
-- **AND** the guide includes the blocker code (e.g., `! INCOMPLETE_ARTIFACT`) and the recommended command
-- **AND** stdout does not contain the repair guide
-
-#### Scenario: HookFailedError is exit 2 without repair guide
-
-- **GIVEN** a matching `hook.post` effect fails before persist
-- **WHEN** the command is run in text mode
-- **THEN** the process exits with code 2
-- **AND** the check bus shows `✗` for `Running post hooks`
-- **AND** stderr does not contain a `repair guide:` section
-
-#### Scenario: Repair guide recommends verify when tasks are complete
-
-- **GIVEN** a failed transition from `implementing` while tasks are complete
-- **AND** `GetStatus.nextAction` recommends `/specd-verify`
-- **WHEN** the command is run in text mode
-- **THEN** the repair guide command is the verify skill
-- **AND** it is not `/specd-implement`
+- **GIVEN** a failed mandatory check `protocol.edge`
+- **WHEN** the command renders the Repair Guide
+- **THEN** no `bypass:` line is printed
 
 ### Requirement: Incomplete tasks error
 

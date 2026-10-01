@@ -8,15 +8,15 @@ Changes must advance through a strict lifecycle, and the rules for doing so — 
 
 ### Requirement: Input contract
 
-`TransitionChange.execute` SHALL accept a `TransitionChangeInput` with:
+The Use Case MUST accept `TransitionChangeInput` containing:
 
-- `name` (required string): the change name
-- `to` (required `ChangeState | 'next'`): a legal explicit target or the current happy-path next sentinel
-- `skipHookPhases` (optional `ReadonlySet<HookPhaseSelector>`): `source.pre`, `source.post`, `target.pre`, `target.post`, or `all`; empty means no phase is skipped
-- `refreshImplementationTrackingBefore` (optional boolean): defaults to true for active changes
-- `allowOutOfScope` (optional boolean): permits the registered `impl.linksInScope` skip where supported but never skips `impl.filesResolved`
+- `name`: Change identifier (`string`).
+- `to`: Target lifecycle state enum or `'next'`.
+- `skipChecks`: Optional array of check IDs to bypass (`readonly string[]`).
+- `skipHookPhases`: Optional array of hook phases to skip (`readonly HookPhase[]`).
+- `onProgress`: Optional progress callback for streaming telemetry.
 
-Approval gates are constructor configuration, not per-call flags. The removed `implementingTaskChecks` and `implementingRequires` inputs MUST NOT be accepted; task checks derive from the active schema. An implementation-only `verifying → implementing` retry MUST preserve unchanged validated artifacts rather than clear them from `implementing.requires`.
+The Use Case MUST NOT accept ad-hoc check bypass booleans (`allowOutOfScope`, `allowOverlap`). Check bypasses SHALL be supplied uniformly through `skipChecks`.
 
 ### Requirement: Approval gates baked at construction
 
@@ -68,11 +68,16 @@ When the change is in `ready` waiting on spec approval, callers MUST use `Approv
 
 ### Requirement: Canonical pre-transition validity reconciliation
 
-After pre-hooks that may modify files and before authorizing the requested hop, `TransitionChange` SHALL invoke the single application reconciler on fresh artifact, implementation, approval, and verification facts. It MUST consume the canonical verdict and MUST NOT independently infer invalidation or recovery.
+Before attempting state mutation, the Use Case MUST reconcile and evaluate all checks applicable to the target state:
 
-If reconciliation commits an automatic return that makes the requested transition inapplicable, the use case SHALL stop, preserve the committed recovery, and return a typed failure containing the reconciled state, blockers, reasons, and next action. A failed transition MUST NOT undo the recovery.
-
-Forward transitions SHALL fail while any non-task artifact has drift or pending review. Backward and recovery transitions remain available subject to their existing topology.
+1. **Active Check Resolution**: Query `CheckRegistry` and active schema step declarations to determine all applicable checks for `attempt.to` and classified `attempt.along`. Checks declared with `disabled: true` on the step declaration (permitted only when `allowDisable !== false`) MUST be cleanly omitted from predicate execution for that coordinate.
+2. **Bypass Verification**: For each check identifier present in `skipChecks`:
+   - If the check is unregistered, the orchestrator MUST throw an `UnknownCheckError`.
+   - If the check is an effect (`kind: 'effect'`), the orchestrator MUST reject the bypass with a `CheckNotSkippableError`, because effect checks (hooks) are governed exclusively by `skipHookPhases`.
+   - If the check declares `skippable !== true`, the orchestrator MUST throw a `CheckNotSkippableError`.
+   - If the check is skippable, the orchestrator MUST bypass calling `check.execute()` and inject a synthetic `{ outcome: 'skip', details: { bypassedByUser: true } }`.
+3. **Check Execution**: For all non-bypassed checks, invoke `check.execute(ctx)` passing the active change aggregate, resolved schema, attempt coordinates, and isolated effective `ctx.config`.
+4. **Failure Abort**: If any evaluated check returns `outcome: 'fail'`, the transition MUST be aborted immediately. The Use Case MUST throw a unified `CheckPredicateFailedError` containing the failed check's `checkId`, `label`, `code`, `message`, `command`, and `details`.
 
 ### Requirement: Workflow requires enforcement
 
@@ -221,7 +226,16 @@ Predicate `protocol.edge` fail-fast applies to this execute path. GetStatus MUST
 
 ### Requirement: Shared runner errors propagate on transition
 
-When a matching predicate or effect check throws during `execute`, `TransitionChange` MUST propagate the typed error from the shared runner (for example `ReadOnlyWorkspaceError`, `ArchiveDependencyMismatchError`, `ArchiveImplementationStateError`) and MUST NOT leave the change in a partially transitioned state.
+All lifecycle predicate check failures SHALL throw the unified domain error `CheckPredicateFailedError`.
+Duplicated, check-specific error classes (including `ArchiveImplementationStateError` and `ArchiveDependencyMismatchError`) SHALL be retired from `_mapFailedPredicate`.
+The `CheckPredicateFailedError` MUST encapsulate:
+
+- `checkId`: The canonical identifier of the failed check.
+- `label`: Human-readable gerund phrase describing the check.
+- `code`: Diagnostic error code.
+- `message`: Diagnostic error message explaining the failure.
+- `command`: Optional suggested remediation CLI command.
+- `details`: Optional structured details from the check result.
 
 ### Requirement: Config-based factory delegates through resolveTransitionChangeDeps
 

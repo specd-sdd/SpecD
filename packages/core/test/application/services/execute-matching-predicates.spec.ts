@@ -10,6 +10,7 @@ import {
   type CheckBinding,
 } from '../../../src/domain/services/transition-checks.js'
 import { Change } from '../../../src/domain/entities/change.js'
+import { CheckRegistry } from '../../../src/domain/services/check-registry.js'
 import { makeSchema, testActor } from '../use-cases/helpers.js'
 
 function makeChange(): Change {
@@ -39,6 +40,21 @@ function makeFailingCheck(id: 'protocol.edge' | 'workflow.requires'): Check {
   }
 }
 
+function makeBinding(
+  check: Check,
+  applicability: CheckBinding['applicability'],
+  overrides?: Partial<CheckBinding>,
+): CheckBinding {
+  return {
+    check,
+    applicability,
+    skippable: true,
+    allowBindingOverride: true,
+    allowConfigOverride: true,
+    ...overrides,
+  }
+}
+
 describe('executeMatchingPredicates', () => {
   it('executes one stable check ID once when exit and entry bindings overlap', async () => {
     const execute = vi.fn(async () => ({
@@ -54,14 +70,10 @@ describe('executeMatchingPredicates', () => {
       execute,
     }
     const bindings: CheckBinding[] = [
-      {
-        check,
-        applicability: [{ scope: 'transition', from: 'implementing', to: '*', along: 'forward' }],
-      },
-      {
-        check,
-        applicability: [{ scope: 'transition', from: '*', to: 'verifying', along: '*' }],
-      },
+      makeBinding(check, [
+        { scope: 'transition', from: 'implementing', to: '*', along: 'forward' },
+      ]),
+      makeBinding(check, [{ scope: 'transition', from: '*', to: 'verifying', along: '*' }]),
     ]
     const ctx = buildCheckExecutionContext({
       change: makeChange(),
@@ -81,19 +93,18 @@ describe('executeMatchingPredicates', () => {
       fail('workflow.requires', 'CHECK_FAILED', 'workflow.requires failed'),
     )
     const bindings: CheckBinding[] = [
-      {
-        check: makeFailingCheck('protocol.edge'),
-        applicability: [{ scope: 'transition', from: '*', to: '*', along: '*' }],
-      },
-      {
-        check: {
+      makeBinding(makeFailingCheck('protocol.edge'), [
+        { scope: 'transition', from: '*', to: '*', along: '*' },
+      ]),
+      makeBinding(
+        {
           id: 'workflow.requires',
           label: CHECK_LABELS['workflow.requires'],
           kind: 'predicate',
           execute: later,
         },
-        applicability: [{ scope: 'transition', from: '*', to: '*', along: '*' }],
-      },
+        [{ scope: 'transition', from: '*', to: '*', along: '*' }],
+      ),
     ]
     const ctx = buildCheckExecutionContext({
       change: makeChange(),
@@ -114,19 +125,18 @@ describe('executeMatchingPredicates', () => {
       fail('workflow.requires', 'CHECK_FAILED', 'workflow.requires failed'),
     )
     const bindings: CheckBinding[] = [
-      {
-        check: makeFailingCheck('protocol.edge'),
-        applicability: [{ scope: 'transition', from: '*', to: '*', along: '*' }],
-      },
-      {
-        check: {
+      makeBinding(makeFailingCheck('protocol.edge'), [
+        { scope: 'transition', from: '*', to: '*', along: '*' },
+      ]),
+      makeBinding(
+        {
           id: 'workflow.requires',
           label: CHECK_LABELS['workflow.requires'],
           kind: 'predicate',
           execute: later,
         },
-        applicability: [{ scope: 'transition', from: '*', to: '*', along: '*' }],
-      },
+        [{ scope: 'transition', from: '*', to: '*', along: '*' }],
+      ),
     ]
     const ctx = buildCheckExecutionContext({
       change: makeChange(),
@@ -147,24 +157,24 @@ describe('executeMatchingPredicates', () => {
       fail('archive.archivable', 'CHECK_FAILED', 'archive.archivable failed'),
     )
     const bindings: CheckBinding[] = [
-      {
-        check: {
+      makeBinding(
+        {
           id: 'schema.nameMatch',
           label: CHECK_LABELS['schema.nameMatch'],
           kind: 'predicate',
           execute: async () => fail('schema.nameMatch', 'CHECK_FAILED', 'schema.nameMatch failed'),
         },
-        applicability: [{ scope: 'archive' }],
-      },
-      {
-        check: {
+        [{ scope: 'archive' }],
+      ),
+      makeBinding(
+        {
           id: 'archive.archivable',
           label: CHECK_LABELS['archive.archivable'],
           kind: 'predicate',
           execute: later,
         },
-        applicability: [{ scope: 'archive' }],
-      },
+        [{ scope: 'archive' }],
+      ),
     ]
     const ctx = buildCheckExecutionContext({
       change: makeChange(),
@@ -195,8 +205,8 @@ describe('executeMatchingPredicates', () => {
       recovery: null,
     }
     const bindings: CheckBinding[] = [
-      {
-        check: {
+      makeBinding(
+        {
           id: 'protocol.edge',
           label: CHECK_LABELS['protocol.edge'],
           kind: 'predicate',
@@ -205,8 +215,8 @@ describe('executeMatchingPredicates', () => {
             return fail('protocol.edge', 'CHECK_FAILED', 'seen')
           },
         },
-        applicability: [{ scope: 'transition', from: '*', to: '*', along: '*' }],
-      },
+        [{ scope: 'transition', from: '*', to: '*', along: '*' }],
+      ),
     ]
     const ctx = buildCheckExecutionContext({
       change: makeChange(),
@@ -217,5 +227,183 @@ describe('executeMatchingPredicates', () => {
     })
     await executeMatchingPredicates(bindings, ctx)
     expect(seen).toEqual([validity])
+  })
+
+  it('cascades and deep-merges configuration across check-default, binding, and schema step levels', async () => {
+    let capturedConfig: Record<string, unknown> | undefined
+    const checkId = '@qa.matrix'
+    const customCheck: Check = {
+      id: checkId,
+      label: 'Matrix Check',
+      kind: 'predicate',
+      execute: async (ctx) => {
+        capturedConfig = ctx.config
+        return {
+          id: checkId,
+          label: 'Matrix Check',
+          kind: 'predicate',
+          outcome: 'pass',
+        }
+      },
+    }
+
+    const registry = new CheckRegistry()
+    registry.register(
+      'qa',
+      {
+        id: 'matrix',
+        label: 'Matrix Check',
+        execute: async () => ({ id: checkId, label: 'Matrix', kind: 'predicate', outcome: 'pass' }),
+      },
+      undefined,
+      {
+        defaultConfig: {
+          concurrency: 2,
+          tags: { smoke: true, performance: false },
+          timeout: 5000,
+        },
+      },
+    )
+
+    const binding = makeBinding(
+      customCheck,
+      [{ scope: 'transition', from: 'designing', to: 'ready', along: 'forward' }],
+      {
+        config: {
+          timeout: 10000, // Overrides check default
+          tags: { performance: true, regression: true }, // Deep-merged with check default
+        },
+      },
+    )
+
+    const schema = makeSchema({
+      workflow: [
+        {
+          step: 'ready',
+          requires: [],
+          requiresTaskCompletion: [],
+          hooks: { pre: [], post: [] },
+          checks: [
+            {
+              id: checkId,
+              config: {
+                timeout: 15000, // Overrides binding config
+                retries: 3, // Newly added at schema step level
+              },
+            },
+          ],
+        },
+      ],
+    })
+
+    const ctx = buildCheckExecutionContext({
+      change: makeChange(),
+      schema,
+      attempt: { scope: 'transition', from: 'designing', to: 'ready', along: 'forward' },
+      approvals: { spec: false, signoff: false },
+      checkRegistry: registry,
+    })
+
+    const result = await executeMatchingPredicates([binding], ctx, { checkRegistry: registry })
+
+    expect(result.allowed).toBe(true)
+    expect(capturedConfig).toEqual({
+      concurrency: 2, // From check-level defaultConfig
+      tags: { smoke: true, performance: true, regression: true }, // Deep merged across check & binding
+      timeout: 15000, // Overridden by schema step level
+      retries: 3, // From schema step level
+    })
+  })
+
+  it('supports check self-discard returning outcome: skip without bypassedByUser flag', async () => {
+    const checkId = '@env.cloud-only'
+    const selfDiscardCheck: Check = {
+      id: checkId,
+      label: 'Cloud-Only Verification',
+      kind: 'predicate',
+      execute: async () => ({
+        id: checkId,
+        label: 'Cloud-Only Verification',
+        kind: 'predicate',
+        outcome: 'skip',
+        message: 'Local runner detected; self-discarding check',
+      }),
+    }
+
+    const binding = makeBinding(selfDiscardCheck, [
+      { scope: 'transition', from: 'designing', to: 'ready', along: 'forward' },
+    ])
+
+    const ctx = buildCheckExecutionContext({
+      change: makeChange(),
+      schema: makeSchema(),
+      attempt: { scope: 'transition', from: 'designing', to: 'ready', along: 'forward' },
+      approvals: { spec: false, signoff: false },
+    })
+
+    const result = await executeMatchingPredicates([binding], ctx)
+
+    // Self-discard allows transition because it didn't return 'fail'
+    expect(result.allowed).toBe(true)
+    expect(result.checks).toHaveLength(1)
+    const checkResult = result.checks[0]!
+    expect(checkResult.outcome).toBe('skip')
+    expect(checkResult.message).toBe('Local runner detected; self-discarding check')
+    // bypassedByUser must NOT be set because the orchestrator didn't bypass it; it self-discarded
+    expect(checkResult.details?.bypassedByUser).toBeUndefined()
+  })
+
+  it('omits checks declared with disabled: true on the target workflow step from execution', async () => {
+    let executed = false
+    const checkId = '@qa.optional-check'
+    const optionalCheck: Check = {
+      id: checkId,
+      label: 'Optional QA Check',
+      kind: 'predicate',
+      execute: async () => {
+        executed = true
+        return {
+          id: checkId,
+          label: 'Optional QA Check',
+          kind: 'predicate',
+          outcome: 'fail', // Would fail if executed
+        }
+      },
+    }
+
+    const binding = makeBinding(optionalCheck, [
+      { scope: 'transition', from: 'implementing', to: 'verifying', along: 'forward' },
+    ])
+
+    const schemaWithDisabledCheck = makeSchema({
+      workflow: [
+        {
+          step: 'verifying',
+          requires: [],
+          requiresTaskCompletion: [],
+          hooks: { pre: [], post: [] },
+          checks: [
+            {
+              id: checkId,
+              disabled: true, // Disabled in schema
+            },
+          ],
+        },
+      ],
+    })
+
+    const ctx = buildCheckExecutionContext({
+      change: makeChange(),
+      schema: schemaWithDisabledCheck,
+      attempt: { scope: 'transition', from: 'implementing', to: 'verifying', along: 'forward' },
+      approvals: { spec: false, signoff: false },
+    })
+
+    const result = await executeMatchingPredicates([binding], ctx)
+
+    // Check should NOT have been executed
+    expect(executed).toBe(false)
+    expect(result.allowed).toBe(true)
+    expect(result.checks).toHaveLength(0)
   })
 })

@@ -10,7 +10,16 @@
     "core:selector-model",
     "core:schema-merge"
   ],
-  "implementation": [],
+  "implementation": [
+    {
+      "file": "core:src/domain/services/build-schema.ts",
+      "symbols": ["buildSchema"]
+    },
+    {
+      "file": "core:src/domain/services/merge-schema-layers.ts",
+      "symbols": ["mergeSchemaLayers"]
+    }
+  ],
   "optimizations": {
     "optimizedDescription": {
       "value": "Pure buildSchema: SchemaYamlData+templates → Schema with ID/DAG/template/workflow semantic validation.",

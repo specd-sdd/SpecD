@@ -620,6 +620,19 @@ function applyWorkflowMutations(
         },
       }
     }
+    if (entry.checks) {
+      step = {
+        ...step,
+        checks: addToArray(
+          step.checks ?? [],
+          entry.checks,
+          'id',
+          position,
+          layer,
+          `${opName}.workflow[${entry.step}].checks`,
+        ),
+      }
+    }
 
     result = [...result.slice(0, existingIdx), step, ...result.slice(existingIdx + 1)]
   }

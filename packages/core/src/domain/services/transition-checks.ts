@@ -17,8 +17,11 @@ export type TransitionAlong = 'forward' | 'backward' | 'redesign' | 'recovery' |
 /** Predicate versus side-effecting hook. */
 export type CheckKind = 'predicate' | 'effect'
 
-/** Stable check identifiers. */
-export type CheckId =
+/** Stable check identifiers. Open string supporting custom namespaced checks. */
+export type CheckId = string
+
+/** Built-in check identifier union. */
+export type BuiltinCheckId =
   | 'protocol.edge'
   | 'workflow.requires'
   | 'workflow.taskCompletion'
@@ -41,7 +44,7 @@ export type CheckOutcome = 'pass' | 'fail' | 'skip'
 /**
  * Canonical gerund labels for built-in checks. No `Executing:` prefix.
  */
-export const CHECK_LABELS: Readonly<Record<CheckId, string>> = {
+export const CHECK_LABELS: Readonly<Record<BuiltinCheckId, string>> = {
   'protocol.edge': 'Validating transition edge',
   'workflow.requires': 'Checking required artifacts',
   'workflow.taskCompletion': 'Checking task completion',
@@ -60,19 +63,19 @@ export const CHECK_LABELS: Readonly<Record<CheckId, string>> = {
 }
 
 /**
- * Resolves the gerund label for a built-in check id.
+ * Resolves the gerund label for a check id (built-in or fallback).
  *
  * @param id - Check identifier
  * @returns Canonical progress label
  */
-export function checkLabel(id: CheckId): string {
-  return CHECK_LABELS[id]
+export function checkLabel(id: string): string {
+  return CHECK_LABELS[id as BuiltinCheckId] ?? id
 }
 
 /** Result of one check on an attempt. */
 export interface CheckResult {
   /** Registry identifier of the check that produced this result. */
-  readonly id: CheckId
+  readonly id: string
   /** Gerund progress label (same as the check’s declared `label`). */
   readonly label: string
   /** Whether the check is a predicate or a side-effecting hook. */
@@ -83,6 +86,8 @@ export interface CheckResult {
   readonly code?: string
   /** Human-readable failure summary when `outcome` is `fail`. */
   readonly message?: string
+  /** Suggested CLI remediation command on failure. */
+  readonly command?: string
   /** Structured extras for diagnostics (spec ids, files, artifact ids). */
   readonly details?: Readonly<Record<string, unknown>>
 }
@@ -253,9 +258,9 @@ export function checkMatches(applicability: CheckApplicability, attempt: CheckAt
  * @returns Result with `outcome` `pass`
  */
 export function pass(
-  id: CheckId,
+  id: string,
   kind: CheckKind = 'predicate',
-  label: string = CHECK_LABELS[id],
+  label: string = CHECK_LABELS[id as BuiltinCheckId] ?? id,
 ): CheckResult {
   return { id, label, kind, outcome: 'pass' }
 }
@@ -266,14 +271,25 @@ export function pass(
  * @param id - Check identifier
  * @param kind - Predicate or effect; defaults to `predicate`
  * @param label - Gerund label; defaults to {@link CHECK_LABELS}`[id]`
+ * @param message - Optional skip message
+ * @param details - Optional details
  * @returns Result with `outcome` `skip`
  */
 export function skip(
-  id: CheckId,
+  id: string,
   kind: CheckKind = 'predicate',
-  label: string = CHECK_LABELS[id],
+  label: string = CHECK_LABELS[id as BuiltinCheckId] ?? id,
+  message?: string,
+  details?: Readonly<Record<string, unknown>>,
 ): CheckResult {
-  return { id, label, kind, outcome: 'skip' }
+  return {
+    id,
+    label,
+    kind,
+    outcome: 'skip',
+    ...(message !== undefined ? { message } : {}),
+    ...(details !== undefined ? { details } : {}),
+  }
 }
 
 /**
@@ -285,15 +301,17 @@ export function skip(
  * @param details - Optional structured diagnostics
  * @param kind - Predicate or effect; defaults to `predicate`
  * @param label - Gerund label; defaults to {@link CHECK_LABELS}`[id]`
+ * @param command - Optional CLI remediation command
  * @returns Result with `outcome` `fail`
  */
 export function fail(
-  id: CheckId,
+  id: string,
   code: string,
   message: string,
   details?: Readonly<Record<string, unknown>>,
   kind: CheckKind = 'predicate',
-  label: string = CHECK_LABELS[id],
+  label: string = CHECK_LABELS[id as BuiltinCheckId] ?? id,
+  command?: string,
 ): CheckResult {
   return {
     id,
@@ -302,6 +320,7 @@ export function fail(
     outcome: 'fail',
     code,
     message,
+    ...(command !== undefined ? { command } : {}),
     ...(details !== undefined ? { details } : {}),
   }
 }
@@ -312,10 +331,10 @@ export function fail(
  * while running (hooks map `RunStepHooks` onto this kind).
  */
 export type CheckProgressEvent =
-  | { type: 'check-start'; id: CheckId; label: string }
+  | { type: 'check-start'; id: string; label: string }
   | {
       type: 'check-progress'
-      id: CheckId
+      id: string
       label: string
       message?: string
       stream?: 'stdout' | 'stderr'
@@ -329,7 +348,7 @@ export type CheckProgressEvent =
     }
   | {
       type: 'check-done'
-      id: CheckId
+      id: string
       label: string
       outcome: CheckOutcome
       reason?: string
@@ -349,24 +368,22 @@ export interface CheckExecutionContext {
   readonly schema: Schema
   /** Transition triple or archive operation. */
   readonly attempt: CheckAttempt
-  /** `--skip-hooks` selectors; effects only. */
-  readonly skipHookPhases?: readonly string[]
-  /** Archive/status overlap skip flag. */
-  readonly allowOverlap: boolean
-  /** Out-of-scope implementation-link skip flag. */
-  readonly allowOutOfScope: boolean
-  /** Config approval gates. */
-  readonly approvals: { readonly spec: boolean; readonly signoff: boolean }
+  /** Effective cascading check configuration. */
+  readonly config?: Readonly<Record<string, unknown>>
   /**
    * Reconciled validity snapshot for this evaluation.
    *
    * Checks read it and must not mutate projections or read files to recompute it.
    */
   readonly validity?: ChangeValidityVerdict
-  /** Effective artifact statuses for `workflow.requires`. */
-  readonly effectiveStatusByArtifact: ReadonlyMap<string, ArtifactStatus>
   /** Optional sink for `check-progress` while a check’s `execute` runs. */
   readonly onCheckProgress?: OnCheckProgress
+  /** `--skip-hooks` selectors; effects only. */
+  readonly skipHookPhases?: readonly string[]
+  /** Effective artifact statuses for `workflow.requires`. */
+  readonly effectiveStatusByArtifact?: ReadonlyMap<string, ArtifactStatus>
+  /** Config approval gates. */
+  readonly approvals?: { readonly spec: boolean; readonly signoff: boolean }
   /**
    * Ephemeral memo for the current evaluation pass (`executeChecksByLegalTargets`
    * or one `TransitionChange` predicate pass). MUST NOT be reused across executes.
@@ -375,12 +392,27 @@ export interface CheckExecutionContext {
 }
 
 /**
+ * Public authoring contract for custom checks implemented by external plugins.
+ * Engine internals (`kind`) and lifecycle routing policies (`skippable`) are omitted.
+ */
+export interface CustomCheckDefinition {
+  /** Local check identifier (e.g. 'code-scan'); namespaced by registry to '@plugin.code-scan'. */
+  readonly id: string
+  /** Canonical gerund label for diagnostics and UI logs. */
+  readonly label: string
+  /** Default CLI remediation command suggested on failure. */
+  readonly command?: string
+  /** Pure evaluation function. */
+  execute(ctx: CheckExecutionContext): Promise<CheckResult>
+}
+
+/**
  * Applicability and pipeline policy without a check instance.
  * {@link createWorkflowCheckRegistry} materializes these rows with `create*` checks.
  */
 export interface CheckBindingSpec {
   /** Stable check id. */
-  readonly id: CheckId
+  readonly id: string
   /** When this check applies (transition triple or operation `archive`). */
   readonly applicability: readonly CheckApplicability[]
   /** When unmatched, emit `skip` instead of omitting the row. */
@@ -391,6 +423,16 @@ export interface CheckBindingSpec {
   readonly phase?: EffectPipelinePhase
   /** Effect failure policy. Predicates omit this. */
   readonly onFailure?: EffectOnFailure
+  /** Whether the orchestrator allows bypassing this check via `--skip-checks`. */
+  readonly skippable?: boolean
+  /** Whether schema.yaml is allowed to override onFailure or skippable on this binding. */
+  readonly allowBindingOverride?: boolean
+  /** Whether schema.yaml is allowed to override configuration for this binding. */
+  readonly allowConfigOverride?: boolean
+  /** Whether schema.yaml is allowed to disable this check on this binding. */
+  readonly allowDisable?: boolean
+  /** Default binding-level configuration. */
+  readonly config?: Readonly<Record<string, unknown>>
 }
 
 /**
@@ -398,7 +440,7 @@ export interface CheckBindingSpec {
  */
 export interface Check {
   /** Stable check id. */
-  readonly id: CheckId
+  readonly id: string
   /**
    * Mandatory gerund progress label (no `Executing:` prefix).
    * Built-ins use {@link CHECK_LABELS}.
@@ -408,6 +450,10 @@ export interface Check {
    * Predicate vs `run:` hook. Required on every check — do not infer from `id`.
    */
   readonly kind: CheckKind
+  /**
+   * Suggested CLI remediation command on failure.
+   */
+  readonly command?: string
   /**
    * Self-sufficient evaluation. Ports live on the instance (`create*`), not on `ctx`.
    *
@@ -449,6 +495,16 @@ export interface CheckBinding {
   readonly phase?: EffectPipelinePhase
   /** Effect failure policy. Predicates omit this. */
   readonly onFailure?: EffectOnFailure
+  /** Whether the orchestrator allows bypassing this check via `--skip-checks`. */
+  readonly skippable: boolean
+  /** Whether schema.yaml is allowed to override onFailure or skippable on this binding. */
+  readonly allowBindingOverride: boolean
+  /** Whether schema.yaml is allowed to override configuration for this binding. */
+  readonly allowConfigOverride: boolean
+  /** Whether schema.yaml is allowed to disable this check on this binding. */
+  readonly allowDisable?: boolean
+  /** Default binding-level configuration. */
+  readonly config?: Readonly<Record<string, unknown>>
 }
 
 /**
@@ -460,7 +516,7 @@ export interface CheckBinding {
  */
 export function applyBindingSpecs(
   specs: readonly CheckBindingSpec[],
-  checks: Readonly<Partial<Record<CheckId, Check>>>,
+  checks: Readonly<Partial<Record<string, Check>>>,
 ): readonly CheckBinding[] {
   return specs.map((spec) => {
     const check = checks[spec.id]
@@ -470,6 +526,11 @@ export function applyBindingSpecs(
     return {
       check,
       applicability: spec.applicability,
+      skippable: spec.skippable ?? false,
+      allowBindingOverride: spec.allowBindingOverride ?? true,
+      allowConfigOverride: spec.allowConfigOverride ?? true,
+      ...(spec.allowDisable !== undefined ? { allowDisable: spec.allowDisable } : {}),
+      ...(spec.config !== undefined ? { config: spec.config } : {}),
       ...(spec.reportSkipWhenUnmatched === true ? { reportSkipWhenUnmatched: true } : {}),
       ...(spec.exceptAlong !== undefined ? { exceptAlong: spec.exceptAlong } : {}),
       ...(spec.phase !== undefined ? { phase: spec.phase } : {}),

@@ -4,6 +4,12 @@ import * as path from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { HookResult } from '../../src/domain/value-objects/hook-result.js'
 import { RegistryConflictError } from '../../src/application/errors/registry-conflict-error.js'
+import { CheckPredicateFailedError } from '../../src/domain/errors/check-predicate-failed-error.js'
+import {
+  UnknownCheckError,
+  CheckNotSkippableError,
+} from '../../src/domain/errors/check-registry-errors.js'
+import { InvalidStateTransitionError } from '../../src/domain/errors/invalid-state-transition-error.js'
 import { createKernel } from '../../src/composition/kernel.js'
 import { NullActorResolver } from '../../src/infrastructure/null/actor-resolver.js'
 import { GetSpecsHealth } from '../../src/application/use-cases/get-specs-health.js'
@@ -214,5 +220,252 @@ describe('createKernel', () => {
     expect('saveMetadata' in kernel.specs).toBe(false)
     expect('updateMetadata' in kernel.specs).toBe(false)
     expect('invalidateMetadata' in kernel.specs).toBe(false)
+  })
+
+  describe('Kernel custom checks end-to-end', () => {
+    const fixtureProvider: ActorProvider = {
+      name: 'fixture',
+      create: async () => ({
+        identity: async () => ({ name: 'Test Actor', email: 'test@example.com' }),
+      }),
+    }
+
+    async function makeTestKernel(
+      checks: import('../../src/composition/composition-registries.js').PluginCheckRegistration[],
+    ) {
+      const base = await makeConfig()
+      const config: SpecdConfig = {
+        ...base,
+        actorProvider: 'fixture',
+      }
+      return createKernel(config, {
+        actorProviders: [fixtureProvider],
+        checks,
+      })
+    }
+
+    it('executes custom check during transition and succeeds when it passes', async () => {
+      const kernel = await makeTestKernel([
+        {
+          pluginName: 'qa',
+          check: {
+            id: 'smoke',
+            label: 'QA Smoke Test',
+            execute: async () => ({
+              id: '@qa.smoke',
+              label: 'QA Smoke Test',
+              kind: 'predicate',
+              outcome: 'pass',
+            }),
+          },
+          defaultBindings: [
+            { scope: 'transition', from: 'drafting', to: 'designing', skippable: true },
+          ],
+        },
+      ])
+
+      await kernel.changes.create.execute({
+        name: 'custom-check-change',
+        specIds: [],
+        schemaName: 'schema-std',
+        schemaVersion: 1,
+      })
+
+      const result = await kernel.changes.transition.execute({
+        name: 'custom-check-change',
+        to: 'designing',
+      })
+
+      expect(result.change.state).toBe('designing')
+    })
+
+    it('aborts transition with CheckPredicateFailedError when custom check fails', async () => {
+      const kernel = await makeTestKernel([
+        {
+          pluginName: 'qa',
+          check: {
+            id: 'smoke',
+            label: 'QA Smoke Test',
+            execute: async () => ({
+              id: '@qa.smoke',
+              label: 'QA Smoke Test',
+              kind: 'predicate',
+              outcome: 'fail',
+              code: 'QA_SMOKE_FAILED',
+              message: 'Smoke test assertions failed',
+            }),
+          },
+          defaultBindings: [
+            { scope: 'transition', from: 'drafting', to: 'designing', skippable: true },
+          ],
+        },
+      ])
+
+      await kernel.changes.create.execute({
+        name: 'failing-check-change',
+        specIds: [],
+        schemaName: 'schema-std',
+        schemaVersion: 1,
+      })
+
+      await expect(
+        kernel.changes.transition.execute({
+          name: 'failing-check-change',
+          to: 'designing',
+        }),
+      ).rejects.toThrow(CheckPredicateFailedError)
+
+      try {
+        await kernel.changes.transition.execute({
+          name: 'failing-check-change',
+          to: 'designing',
+        })
+      } catch (err) {
+        expect(err).toBeInstanceOf(CheckPredicateFailedError)
+        const checkErr = err as CheckPredicateFailedError
+        expect(checkErr.checkId).toBe('@qa.smoke')
+        expect(checkErr.label).toBe('QA Smoke Test')
+        expect(checkErr.code).toBe('QA_SMOKE_FAILED')
+        expect(checkErr.message).toContain('Smoke test assertions failed')
+      }
+    })
+
+    it('bypasses a failing custom check via skipChecks', async () => {
+      const kernel = await makeTestKernel([
+        {
+          pluginName: 'qa',
+          check: {
+            id: 'smoke',
+            label: 'QA Smoke Test',
+            execute: async () => ({
+              id: '@qa.smoke',
+              label: 'QA Smoke Test',
+              kind: 'predicate',
+              outcome: 'fail',
+              code: 'QA_SMOKE_FAILED',
+              message: 'Smoke test assertions failed',
+            }),
+          },
+          defaultBindings: [
+            { scope: 'transition', from: 'drafting', to: 'designing', skippable: true },
+          ],
+        },
+      ])
+
+      await kernel.changes.create.execute({
+        name: 'bypass-check-change',
+        specIds: [],
+        schemaName: 'schema-std',
+        schemaVersion: 1,
+      })
+
+      const result = await kernel.changes.transition.execute({
+        name: 'bypass-check-change',
+        to: 'designing',
+        skipChecks: ['@qa.smoke'],
+      })
+
+      expect(result.change.state).toBe('designing')
+    })
+
+    it('rejects transition with UnknownCheckError when non-existent check is passed in skipChecks', async () => {
+      const kernel = await makeTestKernel([])
+
+      await kernel.changes.create.execute({
+        name: 'unknown-check-change',
+        specIds: [],
+        schemaName: 'schema-std',
+        schemaVersion: 1,
+      })
+
+      await expect(
+        kernel.changes.transition.execute({
+          name: 'unknown-check-change',
+          to: 'designing',
+          skipChecks: ['@nonexistent.check'],
+        }),
+      ).rejects.toThrow(UnknownCheckError)
+    })
+
+    it('rejects transition with CheckNotSkippableError when non-skippable check is passed in skipChecks', async () => {
+      const kernel = await makeTestKernel([])
+
+      await kernel.changes.create.execute({
+        name: 'non-skippable-change',
+        specIds: [],
+        schemaName: 'schema-std',
+        schemaVersion: 1,
+      })
+
+      await expect(
+        kernel.changes.transition.execute({
+          name: 'non-skippable-change',
+          to: 'designing',
+          skipChecks: ['protocol.edge'],
+        }),
+      ).rejects.toThrow(CheckNotSkippableError)
+    })
+
+    it('rejects transition with CheckNotSkippableError when hook effect check is passed in skipChecks', async () => {
+      const kernel = await makeTestKernel([])
+
+      await kernel.changes.create.execute({
+        name: 'hook-skip-change',
+        specIds: [],
+        schemaName: 'schema-std',
+        schemaVersion: 1,
+      })
+
+      await expect(
+        kernel.changes.transition.execute({
+          name: 'hook-skip-change',
+          to: 'designing',
+          skipChecks: ['hook.pre'],
+        }),
+      ).rejects.toThrow(CheckNotSkippableError)
+    })
+
+    it('fails fast on internal protocol.edge before executing custom checks on illegal transitions', async () => {
+      let customCheckExecuted = false
+      const kernel = await makeTestKernel([
+        {
+          pluginName: 'qa',
+          check: {
+            id: 'always-pass',
+            label: 'Always Pass',
+            execute: async () => {
+              customCheckExecuted = true
+              return {
+                id: '@qa.always-pass',
+                label: 'Always Pass',
+                kind: 'predicate',
+                outcome: 'pass',
+              }
+            },
+          },
+          defaultBindings: [
+            { scope: 'transition', from: '*', to: '*', along: '*', skippable: true },
+          ],
+        },
+      ])
+
+      await kernel.changes.create.execute({
+        name: 'illegal-transition-change',
+        specIds: [],
+        schemaName: 'schema-std',
+        schemaVersion: 1,
+      })
+
+      // Attempting illegal transition directly from drafting to done
+      await expect(
+        kernel.changes.transition.execute({
+          name: 'illegal-transition-change',
+          to: 'done',
+        }),
+      ).rejects.toThrow(InvalidStateTransitionError)
+
+      // Internal check protocol.edge runs first and fails fast, so custom check should NOT run
+      expect(customCheckExecuted).toBe(false)
+    })
   })
 })

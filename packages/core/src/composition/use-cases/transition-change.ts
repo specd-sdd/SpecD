@@ -6,6 +6,7 @@ import { type RefreshImplementationTracking } from '../../application/use-cases/
 import { type SpecdConfig } from '../../application/specd-config.js'
 import { type ApprovalGates } from '../../application/use-cases/transition-change.js'
 import { type CheckBinding } from '../../domain/services/transition-checks.js'
+import { type CheckRegistry } from '../../domain/services/check-registry.js'
 import {
   createCompositionResolver,
   type CompositionResolver,
@@ -32,6 +33,8 @@ export interface TransitionChangeDeps {
   readonly transitionBindings: readonly CheckBinding[]
   /** Canonical reconciler. Config resolution always supplies the shared instance. */
   readonly reconcile: import('../../application/use-cases/reconcile-change-validity.js').ReconcileChangeValidity
+  /** Check registry for open check resolution and governance. */
+  readonly checkRegistry?: CheckRegistry
 }
 
 /**
@@ -50,6 +53,7 @@ export function resolveTransitionChangeDeps(resolver: CompositionResolver): Tran
     approvals: resolver.config.approvals,
     transitionBindings: registry.transitionBindings,
     reconcile: resolver.getReconcileChangeValidity(),
+    checkRegistry: resolver.registry?.checks,
   }
 }
 
@@ -109,6 +113,7 @@ function createTransitionChangeFromNormalized(
       approvals,
       transitionBindings,
       reconcile,
+      checkRegistry,
     } = input.deps
     return new TransitionChange(
       changes,
@@ -118,6 +123,7 @@ function createTransitionChangeFromNormalized(
       approvals,
       transitionBindings,
       reconcile,
+      checkRegistry,
     )
   }
 

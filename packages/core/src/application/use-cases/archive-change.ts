@@ -303,6 +303,15 @@ export class ArchiveChange {
     const archiveAttempt = { scope: 'archive' as const }
     const onCheckProgress: OnCheckProgress | undefined =
       onProgress === undefined ? undefined : (event) => onProgress(event)
+
+    const effectiveSkipChecks: string[] = []
+    if (input.allowOverlap === true) {
+      effectiveSkipChecks.push('spec.overlap')
+    }
+    if (input.allowOutOfScope === true) {
+      effectiveSkipChecks.push('impl.linksInScope')
+    }
+
     const archivePredicates = await executeMatchingPredicates(
       this._archiveBindings,
       buildCheckExecutionContext({
@@ -310,12 +319,11 @@ export class ArchiveChange {
         schema,
         attempt: archiveAttempt,
         approvals: { spec: false, signoff: false },
-        allowOverlap: input.allowOverlap === true,
-        allowOutOfScope: input.allowOutOfScope === true,
+        skipChecks: effectiveSkipChecks,
         ...(validity !== undefined ? { validity } : {}),
         ...(onCheckProgress !== undefined ? { onCheckProgress } : {}),
       }),
-      { failFastOn: 'schema.nameMatch' },
+      { failFastOn: 'schema.nameMatch', skipChecks: effectiveSkipChecks },
     )
     const failedPredicates = archivePredicates.checks.filter((check) => check.outcome === 'fail')
     const needsOverlapScan =
@@ -404,12 +412,11 @@ export class ArchiveChange {
         schema,
         attempt: archiveAttempt,
         approvals: { spec: false, signoff: false },
-        allowOverlap: input.allowOverlap === true,
-        allowOutOfScope: input.allowOutOfScope === true,
+        skipChecks: effectiveSkipChecks,
         validity,
         ...(onCheckProgress !== undefined ? { onCheckProgress } : {}),
       }),
-      { failFastOn: 'schema.nameMatch' },
+      { failFastOn: 'schema.nameMatch', skipChecks: effectiveSkipChecks },
     )
     const rerunFailed = rerun.checks.filter((check) => check.outcome === 'fail')
     if (rerunFailed.length > 0) {

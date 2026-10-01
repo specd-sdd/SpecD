@@ -898,6 +898,7 @@ export function makeRunStepHooks(
         success: true,
         hooks: [],
         failedHooks: [],
+        warnings: [],
       })),
   } as unknown as RunStepHooks
 }

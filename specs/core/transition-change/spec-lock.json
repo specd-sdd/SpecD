@@ -15,12 +15,7 @@
     "core:count-tasks",
     "core:transition-checks"
   ],
-  "implementation": [
-    {
-      "file": "core:src/application/use-cases/transition-change.ts",
-      "symbols": ["TransitionChange"]
-    }
-  ],
+  "implementation": [],
   "optimizations": {
     "optimizedDescription": {
       "value": "Centralizes schema-bound lifecycle transitions, reconciliation, checks, approvals, hooks, verification evidence, and atomic persistence.",
