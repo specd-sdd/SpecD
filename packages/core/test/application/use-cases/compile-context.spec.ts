@@ -82,6 +82,8 @@ function makeChange(
     name,
     createdAt,
     specIds,
+    schemaName: opts.schemaName ?? '@specd/schema-std',
+    schemaVersion: 1,
     history: events,
   })
   for (const artifact of artifacts) {
@@ -1831,6 +1833,8 @@ describe('CompileContext', () => {
         name: 'my-change',
         createdAt: new Date(),
         specIds: ['billing/payments'], // first segment is 'billing', but workspace is 'default' (no colon)
+        schemaName: '@specd/schema-std',
+        schemaVersion: 1,
         history: [
           {
             type: 'created',

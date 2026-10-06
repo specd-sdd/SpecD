@@ -168,7 +168,7 @@ export function registerGuideCommand(program: Command, engineOverride?: GuideEng
         // 3. Section extraction
         if (options.section !== undefined) {
           const section = await engine.getGuideSection(topic, options.section)
-          let content = section.content
+          let content = section.content ?? ''
 
           if (options.startLine !== undefined || options.lines !== undefined) {
             content = engine.sliceGuideLines(content, options.startLine, options.lines)

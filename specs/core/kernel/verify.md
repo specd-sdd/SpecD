@@ -7,19 +7,21 @@
 #### Scenario: Use cases are nested under domain groups
 
 - **WHEN** `createKernel(config)` is called with a valid `SpecdConfig`
-- **THEN** the returned object has exactly three top-level keys: `changes`, `specs`, `project`
-- **AND** each key contains an object with use case entries — not use cases at the root level
+- **THEN** the returned object has top-level keys `registry`, `schemas`, `changes`, `specs`, and `project`
+- **AND** `changes`, `specs`, and `project` contain use case entries
+- **AND** use cases do not appear at the root
+- **AND** `registry` and `schemas` are not use cases
 
 #### Scenario: Changes group contains all change use cases
 
 - **WHEN** `kernel.changes` is inspected
-- **THEN** it contains entries for: `create`, `status`, `transition`, `approveSpec`, `approveSignoff`, `draft`, `restore`, `discard`, `archive`, `validate`, `compile`, `list`, `listDrafts`, `listDiscarded`, `edit`, `skipArtifact`, `updateSpecDeps`, `listArchived`, `getArchived`, `detectOverlap`
+- **THEN** it contains entries for: `archiveRepo`, `create`, `status`, `countTasks`, `transition`, `approveSpec`, `approveSignoff`, `draft`, `restore`, `discard`, `archive`, `validate`, `compile`, `list`, `listDrafts`, `getDraft`, `listDiscarded`, `getDiscarded`, `edit`, `invalidate`, `skipArtifact`, `updateSpecDeps`, `listArchived`, `getArchived`, `runStepHooks`, `getHookInstructions`, `getArtifactInstruction`, `updateImplementationTracking`, `refreshImplementationTracking`, `getImplementationReview`, `detectOverlap`, `preview`
 - **AND** it contains `repo` as the underlying `ChangeRepository`
 
 #### Scenario: Specs group contains all spec use cases
 
 - **WHEN** `kernel.specs` is inspected
-- **THEN** it contains entries for: `list`, `search`, `get`, `getActiveSchema`, `validate`, `generateMetadata`, `materializeMetadata`, `getMetadata`, `regenerateMetadata`, `initializePersistedState`, `getPersistedSchema`, `updatePersistedSchema`, `getPersistedDeps`, `updatePersistedDeps`, `getPersistedImplementation`, `updatePersistedImplementation`, `getPersistedOptimizations`, `updatePersistedOptimizations`, `getContext`, `resolveSchema`, `getHealth`
+- **THEN** it contains entries for: `list`, `search`, `get`, `getOutline`, `getActiveSchema`, `validate`, `validateSchema`, `generateMetadata`, `materializeMetadata`, `getMetadata`, `regenerateMetadata`, `initializePersistedState`, `getPersistedSchema`, `updatePersistedSchema`, `getPersistedDeps`, `updatePersistedDeps`, `getPersistedImplementation`, `updatePersistedImplementation`, `getPersistedOptimizations`, `updatePersistedOptimizations`, `getContext`, `resolve`, `getHealth`
 - **AND** it does not contain `approveSpec` or `approveSignoff`
 - **AND** it does not contain `saveMetadata` or `invalidateMetadata`
 - **AND** it contains `repos` as the `ReadonlyMap<string, SpecRepository>`
@@ -27,7 +29,7 @@
 #### Scenario: Project group contains query use cases only
 
 - **WHEN** `kernel.project` is inspected
-- **THEN** it contains entries for: `listWorkspaces`, `getProjectContext`, `getConfig`, `getMetadata`, `updateMetadata`
+- **THEN** it contains entries for: `listWorkspaces`, `getProjectSummary`, `getProjectContext`, `resolveContextSpecs`, `getConfig`, `getMetadata`, `updateMetadata`
 - **AND** it does not contain `init`, `addPlugin`, `removePlugin`, `listPlugins`, `recordSkillInstall`, or `getSkillsManifest`
 
 ### Requirement: Every exported use case must have a kernel entry
@@ -73,7 +75,7 @@
 
 - **WHEN** the entry mapping table for `kernel.specs` is reviewed
 - **THEN** it does not include `saveMetadata` or `invalidateMetadata` paths
-- **AND** it includes `materializeMetadata`, `getMetadata`, `regenerateMetadata`, `initializePersistedState`, `getPersistedSchema`, `updatePersistedSchema`, `getPersistedDeps`, `updatePersistedDeps`, `getPersistedImplementation`, `updatePersistedImplementation`, `getPersistedOptimizations`, `updatePersistedOptimizations`, `search`, and `resolveSchema` paths
+- **AND** it includes `materializeMetadata`, `getMetadata`, `regenerateMetadata`, `initializePersistedState`, `getPersistedSchema`, `updatePersistedSchema`, `getPersistedDeps`, `updatePersistedDeps`, `getPersistedImplementation`, `updatePersistedImplementation`, `getPersistedOptimizations`, `updatePersistedOptimizations`, `search`, `getOutline`, `validateSchema`, and `resolve` paths
 
 ### Requirement: Plugin declarations are not a kernel use case
 
@@ -180,25 +182,30 @@
 
 #### Scenario: Kernel internals use auto-detect for project VCS
 
-- **WHEN** `createKernelInternals` constructs the project-level `VcsAdapter`
-- **THEN** it calls `createVcsAdapter(config.projectRoot)` instead of constructing a specific implementation directly
+- **WHEN** `CompositionResolver.getVcsAdapter()` resolves the project adapter
+- **THEN** it calls `createVcsAdapter(config.projectRoot, registry.vcsProviders)`
+- **AND** it does not construct `GitVcsAdapter` directly
 
 #### Scenario: Kernel internals use auto-detect for project actor
 
-- **WHEN** `createKernelInternals` constructs the project-level `ActorResolver`
-- **THEN** it calls `createVcsActorResolver(config.projectRoot)` instead of constructing a specific implementation directly
+- **GIVEN** `config.actorProvider` is omitted
+- **WHEN** `CompositionResolver.getActorResolver()` resolves the project actor
+- **THEN** it uses `createLazyVcsActorResolver(() => getVcsAdapter())`
+- **AND** it does not call `createVcsActorResolver(config.projectRoot)`
+- **AND** it does not construct `GitActorResolver` directly
 
 #### Scenario: Standalone use-case factories use auto-detect for actor
 
-- **WHEN** any standalone use-case factory in `composition/use-cases/` needs an `ActorResolver`
-- **THEN** it calls `createVcsActorResolver()` instead of `new GitActorResolver()`
+- **WHEN** a standalone use-case factory in `composition/use-cases/` needs an `ActorResolver`
+- **THEN** it obtains that actor through the composition resolver
+- **AND** it does not call `new GitActorResolver()`
 
 #### Scenario: Non-git project gets correct adapters
 
 - **GIVEN** a project directory that is not a git repository
-- **WHEN** `createKernelInternals` is called
-- **THEN** the `vcs` field is a `NullVcsAdapter` (or the detected VCS adapter)
-- **AND** the `actor` field is a `NullActorResolver` (or the detected actor resolver)
+- **WHEN** `createKernel(config)` resolves VCS and actor adapters through `CompositionResolver`
+- **THEN** the VCS adapter is a `NullVcsAdapter` or the detected VCS adapter
+- **AND** the actor resolver is a `NullActorResolver` or the detected actor resolver
 - **AND** no git-specific errors are thrown
 
 ### Requirement: Auto-invalidation on get when artifact files drift

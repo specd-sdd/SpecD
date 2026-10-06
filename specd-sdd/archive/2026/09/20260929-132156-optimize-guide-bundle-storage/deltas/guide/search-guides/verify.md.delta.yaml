@@ -1,0 +1,46 @@
+- op: modified
+  description: 'Verify in-memory search engine adapter indexes sections with dynamically extracted content'
+  selector:
+    type: section
+    matches: 'Requirement: In-Memory Search Engine Adapter'
+  content: |
+    #### Scenario: Field boosting prioritizes title and heading matches over body text
+
+    - **GIVEN** Section A with heading `"Delta Operations"` and Section B where `"delta operations"` only appears in the body paragraph
+    - **WHEN** searching for `"delta operations"`
+    - **THEN** Section A has a significantly higher BM25 score than Section B
+    - **AND** Section A appears before Section B in the search results
+
+    #### Scenario: Section content is dynamically extracted and indexed for full-text search
+
+    - **GIVEN** guide topics with lightweight outline structures
+    - **WHEN** the search index is initialized
+    - **THEN** section content extracted on the fly via character offsets is indexed correctly
+    - **AND** searches matching words in section bodies return valid hits
+
+    #### Scenario: Fuzzy matching resolves typographical errors
+
+    - **GIVEN** guide sections mentioning `"configuration"` and `"lifecycle"`
+    - **WHEN** searching for typos such as `"configuraton"` or `"lifecicle"`
+    - **THEN** the search engine matches the intended sections with non-zero scores
+    - **AND** returns relevant hits
+
+    #### Scenario: Query with punctuation, symbols, and regex metacharacters does not crash
+
+    - **GIVEN** search queries containing special characters: `"${change.workspace}"`, `"specd.yaml"`, `"[✓]"`, or `"(scope: spec)*"`
+    - **WHEN** executing the search
+    - **THEN** the search engine processes the query safely without throwing syntax errors, escaping failures, or regex crashes
+    - **AND** matches relevant tokens
+
+    #### Scenario: English stop-words only query
+
+    - **GIVEN** a query consisting solely of stop-words: `"the is at which and"`
+    - **WHEN** the search engine runs
+    - **THEN** it completes without throwing unhandled exceptions
+    - **AND** returns either graceful empty results or lowest-tier fallback matches
+
+    #### Scenario: Emojis and Unicode characters in query
+
+    - **GIVEN** a query with Unicode symbols (e.g. `"árbol"`, `"🚀"`)
+    - **WHEN** the search is executed
+    - **THEN** the engine processes the search without buffer corruption or errors

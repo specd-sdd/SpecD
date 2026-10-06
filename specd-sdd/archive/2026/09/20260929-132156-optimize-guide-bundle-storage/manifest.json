@@ -1,0 +1,373 @@
+{
+  "name": "optimize-guide-bundle-storage",
+  "createdAt": "2026-09-29T13:21:56.050Z",
+  "updatedAt": "2026-09-29T14:17:06.063Z",
+  "description": "Optimize generated guides bundle size by storing section offsets instead of duplicated content",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "guide:bundle-guides",
+    "guide:guide-model",
+    "guide:slice-guide-content",
+    "guide:search-guides"
+  ],
+  "specDependsOn": {
+    "guide:bundle-guides": ["guide:conventions", "guide:guide-model"],
+    "guide:guide-model": ["guide:conventions"],
+    "guide:slice-guide-content": ["guide:conventions", "guide:guide-model", "guide:errors"],
+    "guide:search-guides": ["guide:conventions", "guide:guide-model"]
+  },
+  "invalidationPolicy": "downstream",
+  "implementationTrackingStartedAt": "2026-09-29T13:55:43.032Z",
+  "trackedImplementationFiles": [
+    {
+      "file": "dev/scripts/spec-completeness-poc.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "dev/scripts/universal-spec-completeness-codegraph-ontology.md",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/guide/src/infrastructure/generated/guides.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/src/domain/models/guide-section.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/scripts/bundle-guides.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/src/application/queries/get-guide-section-query.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/src/infrastructure/adapters/minisearch-guide-engine-adapter.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/guide/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/test/unit/application/queries.test.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/test/unit/domain/models.test.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/test/unit/infrastructure/bundle.test.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/test/unit/infrastructure/search.test.ts",
+      "state": "resolved"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "guide:guide-model",
+      "file": "packages/guide/src/domain/models/guide-section.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["GuideSection"]
+    },
+    {
+      "specId": "guide:bundle-guides",
+      "file": "packages/guide/scripts/bundle-guides.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["extractSections", "compileGuide", "bundleGuides"]
+    },
+    {
+      "specId": "guide:slice-guide-content",
+      "file": "packages/guide/src/application/queries/get-guide-section-query.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["GetGuideSectionQuery"]
+    },
+    {
+      "specId": "guide:search-guides",
+      "file": "packages/guide/src/infrastructure/adapters/minisearch-guide-engine-adapter.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["MiniSearchGuideEngineAdapter"]
+    },
+    {
+      "specId": "guide:bundle-guides",
+      "file": "packages/guide/src/infrastructure/generated/guides.ts",
+      "fileLinkExplicit": true
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:fa12f0ae4548eab33923392ebb22e202a5ecd88c35479d2e1649eccee6bce302"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "guide:bundle-guides",
+          "filename": "deltas/guide/bundle-guides/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:531ddf3f9506f6976bf1eb9a4003dd86ab80f9972250dec385e7f8f9defc8231"
+        },
+        {
+          "key": "guide:guide-model",
+          "filename": "deltas/guide/guide-model/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:1f410cb8ee3244457bfabbe3b69490a00ccafdef47c92630ae60dc0b48933239"
+        },
+        {
+          "key": "guide:slice-guide-content",
+          "filename": "deltas/guide/slice-guide-content/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:261a4fb116a79a03fb46dfcc6d092c69eba653fe92aaf84ad5175410e808702f"
+        },
+        {
+          "key": "guide:search-guides",
+          "filename": "deltas/guide/search-guides/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:ad6e49423f6074f65bdc6f0bf3b62ec573520b312faf07746e9bb14cf006dd9e"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "guide:bundle-guides",
+          "filename": "deltas/guide/bundle-guides/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:384975d402941f54968cf1ed595021769d2caa92dfa9447dc868450b547223ba"
+        },
+        {
+          "key": "guide:guide-model",
+          "filename": "deltas/guide/guide-model/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:cfa805d72080f491f88107b2b05b60c4e34bfe55bfb0b28da87bcfa54ffdc370"
+        },
+        {
+          "key": "guide:slice-guide-content",
+          "filename": "deltas/guide/slice-guide-content/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:0affb22f4a98ff0cc682c238a8ef0383ef80b28647a13b0707f47c777d40c4ad"
+        },
+        {
+          "key": "guide:search-guides",
+          "filename": "deltas/guide/search-guides/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:1ec9ce0b80821051ad78daedb7ff4aa97cd56e0884f432a7f8e798d3ddbd0b7c"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:b1049888cc4bd42c96014d88804cdafd9b094620178e87c5e22cce07cb6cf3db"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "verify", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:1cf1b8dd19f3ea13447385e6ff476ad9427ec9fdda3caa0a8b5ec827b617e5fe"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-09-29T13:21:56.050Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": [
+        "guide:bundle-guides",
+        "guide:guide-model",
+        "guide:slice-guide-content",
+        "guide:search-guides"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-09-29T13:21:56.070Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "guide:bundle-guides"
+        },
+        {
+          "type": "specs",
+          "key": "guide:guide-model"
+        },
+        {
+          "type": "specs",
+          "key": "guide:slice-guide-content"
+        },
+        {
+          "type": "specs",
+          "key": "guide:search-guides"
+        },
+        {
+          "type": "verify",
+          "key": "guide:bundle-guides"
+        },
+        {
+          "type": "verify",
+          "key": "guide:guide-model"
+        },
+        {
+          "type": "verify",
+          "key": "guide:slice-guide-content"
+        },
+        {
+          "type": "verify",
+          "key": "guide:search-guides"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-29T13:24:25.442Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-29T13:27:43.683Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-29T13:55:43.032Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-29T14:06:08.282Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-29T14:10:45.011Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-29T14:11:23.493Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-29T14:17:06.061Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-09-29T14:17:06.145Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

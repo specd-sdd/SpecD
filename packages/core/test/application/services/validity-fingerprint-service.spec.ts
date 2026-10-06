@@ -23,6 +23,8 @@ function changeWithProposal(content: string): Change {
     name: 'c1',
     createdAt: at,
     specIds: ['core:change'],
+    schemaName: 'test-schema',
+    schemaVersion: 1,
     history: [
       {
         type: 'created',

@@ -16,6 +16,10 @@
   ],
   "implementation": [
     {
+      "file": "core:src/domain/entities/change.ts",
+      "symbols": ["ChangeProps", "Change"]
+    },
+    {
       "file": "core:test/infrastructure/fs/change-repository.spec.ts"
     }
   ],

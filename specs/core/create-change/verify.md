@@ -235,3 +235,31 @@ Scenarios:
 
 - **WHEN** `createCreateChange(deps)` receives no injected default and execute supplies no policy
 - **THEN** it persists `{ artifacts: downstream, workflow: preserve }`
+
+### Requirement: Schema compatibility guardrail
+
+#### Scenario: Uninitialized spec fallback allows addition if global schema matches change
+
+- **GIVEN** a spec with no persisted semantic state
+- **WHEN** the spec is added to a change initialized with the global project schema
+- **THEN** creation succeeds (fallback assumption applies)
+
+#### Scenario: Adding a spec with identical schema succeeds
+
+- **GIVEN** a spec whose persisted schema identity matches the Change's schema name
+- **WHEN** it is included in `specIds`
+- **THEN** creation succeeds
+
+#### Scenario: Adding a spec with a different but compatible schema succeeds
+
+- **GIVEN** a spec whose persisted schema name is `schema-ui`
+- **AND** the Change uses `schema-fullstack` which declares `compat` with `schema-ui`
+- **WHEN** the spec is included in `specIds`
+- **THEN** creation succeeds
+
+#### Scenario: Adding a spec with an incompatible schema throws IncompatibleSchemaError
+
+- **GIVEN** a spec whose persisted schema is `schema-api`
+- **AND** the Change uses `schema-ui` (no compat mapping to `schema-api`)
+- **WHEN** the spec is included in `specIds`
+- **THEN** the use case throws `IncompatibleSchemaError` and creation is aborted

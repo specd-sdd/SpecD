@@ -29,7 +29,9 @@ The domain layer MUST define the `GuideSection` value object representing a disc
 - `startLine`: 1-indexed line number where the heading begins.
 - `endLine`: 1-indexed line number where the section content concludes.
 - `lines`: Line span of the section, equal to `endLine - startLine + 1`.
-- `content`: Full text of the section starting with the heading line up to `endLine`.
+- `startOffset`: 0-indexed character start offset within the parent topic's `content` where the section begins.
+- `endOffset`: 0-indexed character end offset within the parent topic's `content` where the section concludes.
+- `content`: Optional or dynamically populated full text of the section starting with the heading line up to `endLine`.
 
 ### Requirement: GuideSummary Value Object
 

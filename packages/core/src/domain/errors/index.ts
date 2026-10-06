@@ -63,3 +63,4 @@ export {
   UnknownCheckError,
 } from './check-registry-errors.js'
 export { CheckPredicateFailedError } from './check-predicate-failed-error.js'
+export { IncompatibleSchemaError } from './incompatible-schema-error.js'

@@ -40,6 +40,8 @@ function startedChange(): Change {
     name: 'c1',
     createdAt: new Date('2026-01-01T00:00:00.000Z'),
     specIds: ['core:change'],
+    schemaName: 'test-schema',
+    schemaVersion: 1,
     history: [
       {
         type: 'created',
@@ -114,6 +116,8 @@ describe('CompleteVerification', () => {
       name: 'c1',
       createdAt: new Date('2026-01-01T00:00:00.000Z'),
       specIds: ['core:change'],
+      schemaName: 'test-schema',
+      schemaVersion: 1,
       history: [
         {
           type: 'created',

@@ -864,4 +864,4 @@ Scenarios:
 #### Scenario: ConfigWriter port defines listPlugins method
 
 - **WHEN** `ConfigWriter` interface is inspected
-- **THEN** it declares `listPlugins(configPath, type): Promise<Array<{ name: string; config?: Record<string, unknown> }>>`
+- **THEN** it declares `listPlugins(configPath, type?): Promise<Array<{ name: string; config?: Record<string, unknown> }>>`

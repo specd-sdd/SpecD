@@ -1,0 +1,97 @@
+- op: modified
+  description: Root also exposes registry and schemas
+  selector:
+    type: section
+    matches: 'Scenario: Use cases are nested under domain groups'
+  content: |
+    - **WHEN** `createKernel(config)` is called with a valid `SpecdConfig`
+    - **THEN** the returned object has top-level keys `registry`, `schemas`, `changes`, `specs`, and `project`
+    - **AND** `changes`, `specs`, and `project` contain use case entries
+    - **AND** use cases do not appear at the root
+    - **AND** `registry` and `schemas` are not use cases
+
+- op: modified
+  description: Changes group lists every mounted key
+  selector:
+    type: section
+    matches: 'Scenario: Changes group contains all change use cases'
+  content: |
+    - **WHEN** `kernel.changes` is inspected
+    - **THEN** it contains entries for: `archiveRepo`, `create`, `status`, `countTasks`, `transition`, `approveSpec`, `approveSignoff`, `draft`, `restore`, `discard`, `archive`, `validate`, `compile`, `list`, `listDrafts`, `getDraft`, `listDiscarded`, `getDiscarded`, `edit`, `invalidate`, `skipArtifact`, `updateSpecDeps`, `listArchived`, `getArchived`, `runStepHooks`, `getHookInstructions`, `getArtifactInstruction`, `updateImplementationTracking`, `refreshImplementationTracking`, `getImplementationReview`, `detectOverlap`, `preview`
+    - **AND** it contains `repo` as the underlying `ChangeRepository`
+
+- op: modified
+  description: Specs group uses resolve and includes outline and schema validation
+  selector:
+    type: section
+    matches: 'Scenario: Specs group contains all spec use cases'
+  content: |
+    - **WHEN** `kernel.specs` is inspected
+    - **THEN** it contains entries for: `list`, `search`, `get`, `getOutline`, `getActiveSchema`, `validate`, `validateSchema`, `generateMetadata`, `materializeMetadata`, `getMetadata`, `regenerateMetadata`, `initializePersistedState`, `getPersistedSchema`, `updatePersistedSchema`, `getPersistedDeps`, `updatePersistedDeps`, `getPersistedImplementation`, `updatePersistedImplementation`, `getPersistedOptimizations`, `updatePersistedOptimizations`, `getContext`, `resolve`, `getHealth`
+    - **AND** it does not contain `approveSpec` or `approveSignoff`
+    - **AND** it does not contain `saveMetadata` or `invalidateMetadata`
+    - **AND** it contains `repos` as the `ReadonlyMap<string, SpecRepository>`
+
+- op: modified
+  description: Specs mapping names the resolve key
+  selector:
+    type: section
+    matches: 'Scenario: Specs entry mapping excludes saveMetadata/invalidateMetadata and includes the materialization/persisted-state surface'
+  content: |
+    - **WHEN** the entry mapping table for `kernel.specs` is reviewed
+    - **THEN** it does not include `saveMetadata` or `invalidateMetadata` paths
+    - **AND** it includes `materializeMetadata`, `getMetadata`, `regenerateMetadata`, `initializePersistedState`, `getPersistedSchema`, `updatePersistedSchema`, `getPersistedDeps`, `updatePersistedDeps`, `getPersistedImplementation`, `updatePersistedImplementation`, `getPersistedOptimizations`, `updatePersistedOptimizations`, `search`, `getOutline`, `validateSchema`, and `resolve` paths
+
+- op: modified
+  description: Project group contains summary and context spec resolution
+  selector:
+    type: section
+    matches: 'Scenario: Project group contains query use cases only'
+  content: |
+    - **WHEN** `kernel.project` is inspected
+    - **THEN** it contains entries for: `listWorkspaces`, `getProjectSummary`, `getProjectContext`, `resolveContextSpecs`, `getConfig`, `getMetadata`, `updateMetadata`
+    - **AND** it does not contain `init`, `addPlugin`, `removePlugin`, `listPlugins`, `recordSkillInstall`, or `getSkillsManifest`
+
+- op: modified
+  description: VCS adapter comes from the composition resolver
+  selector:
+    type: section
+    matches: 'Scenario: Kernel internals use auto-detect for project VCS'
+  content: |
+    - **WHEN** `CompositionResolver.getVcsAdapter()` resolves the project adapter
+    - **THEN** it calls `createVcsAdapter(config.projectRoot, registry.vcsProviders)`
+    - **AND** it does not construct `GitVcsAdapter` directly
+
+- op: modified
+  description: Actor resolver is lazy over the VCS adapter
+  selector:
+    type: section
+    matches: 'Scenario: Kernel internals use auto-detect for project actor'
+  content: |
+    - **GIVEN** `config.actorProvider` is omitted
+    - **WHEN** `CompositionResolver.getActorResolver()` resolves the project actor
+    - **THEN** it uses `createLazyVcsActorResolver(() => getVcsAdapter())`
+    - **AND** it does not call `createVcsActorResolver(config.projectRoot)`
+    - **AND** it does not construct `GitActorResolver` directly
+
+- op: modified
+  description: Factories do not construct a git actor resolver
+  selector:
+    type: section
+    matches: 'Scenario: Standalone use-case factories use auto-detect for actor'
+  content: |
+    - **WHEN** a standalone use-case factory in `composition/use-cases/` needs an `ActorResolver`
+    - **THEN** it obtains that actor through the composition resolver
+    - **AND** it does not call `new GitActorResolver()`
+
+- op: modified
+  description: Non-git projects resolve null adapters
+  selector:
+    type: section
+    matches: 'Scenario: Non-git project gets correct adapters'
+  content: |
+    - **GIVEN** a project directory that is not a git repository
+    - **WHEN** `createKernel(config)` resolves VCS and actor adapters through `CompositionResolver`
+    - **THEN** the VCS adapter is a `NullVcsAdapter` or the detected VCS adapter
+    - **AND** the actor resolver is a `NullActorResolver` or the detected actor resolver
+    - **AND** no git-specific errors are thrown

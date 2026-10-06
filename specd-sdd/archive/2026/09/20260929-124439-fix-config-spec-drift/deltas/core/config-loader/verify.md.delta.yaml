@@ -1,0 +1,19 @@
+- op: modified
+  description: 'Rename requirement heading and remove obsolete hook mapping scenarios'
+  selector:
+    type: section
+    matches: 'Requirement: Workflow and context entry mapping'
+  rename: 'Requirement: Schema plugins, schema overrides, and context entry mapping'
+  content: |
+    #### Scenario: Context entry with id is preserved
+
+    - **GIVEN** the config declares `context: [{ id: bootstrap, file: specd-bootstrap.md }]`
+    - **WHEN** `load()` is called
+    - **THEN** the mapped context entry preserves both `id` and `file`
+
+    #### Scenario: Agent plugin identity is name
+
+    - **GIVEN** the config declares `plugins.agents: [{ name: '@specd/plugin-agent-codex', config: { commandsDir: '.codex/commands' } }]`
+    - **WHEN** `load()` is called
+    - **THEN** the mapped plugin entry preserves `name` and `config`
+    - **AND** inherited removal resolves that entry by `name`

@@ -20,6 +20,8 @@ function makeChange(name: string, specIds: readonly string[]): Change {
     name,
     createdAt: new Date('2024-01-01T00:00:00Z'),
     specIds: [...specIds],
+    schemaName: '@specd/schema-std',
+    schemaVersion: 1,
     history: [
       {
         type: 'created',

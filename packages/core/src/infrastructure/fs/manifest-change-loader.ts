@@ -88,6 +88,8 @@ function loadV2Manifest(manifest: ChangeManifestV2): Change {
     updatedAt: new Date(manifest.updatedAt),
     ...(manifest.description !== undefined ? { description: manifest.description } : {}),
     specIds: [...manifest.specIds],
+    schemaName: manifest.schema.name,
+    schemaVersion: manifest.schema.version,
     ...(manifest.trackedImplementationFiles !== undefined
       ? { trackedImplementationFiles: manifest.trackedImplementationFiles }
       : {}),
@@ -271,6 +273,8 @@ function adaptV1Manifest(manifest: LegacyChangeManifestV1): Change {
     ...(manifest.updatedAt !== undefined ? { updatedAt: new Date(manifest.updatedAt) } : {}),
     ...(manifest.description !== undefined ? { description: manifest.description } : {}),
     specIds: [...manifest.specIds],
+    schemaName: manifest.schema.name,
+    schemaVersion: manifest.schema.version,
     ...(manifest.trackedImplementationFiles !== undefined
       ? { trackedImplementationFiles: manifest.trackedImplementationFiles }
       : {}),

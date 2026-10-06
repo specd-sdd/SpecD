@@ -15,6 +15,8 @@ function makeChangeWithArtifact(name: string, artifact: ChangeArtifact): Change 
     name,
     createdAt: new Date('2024-01-01T00:00:00Z'),
     specIds: ['auth/login'],
+    schemaName: '@specd/schema-std',
+    schemaVersion: 1,
     history: [],
     artifacts,
   })
@@ -143,6 +145,8 @@ describe('SkipArtifact', () => {
         name: 'my-change',
         createdAt: new Date('2024-01-01T00:00:00Z'),
         specIds: ['auth/login'],
+        schemaName: '@specd/schema-std',
+        schemaVersion: 1,
         history: [],
       })
       const repo = makeChangeRepository([change])

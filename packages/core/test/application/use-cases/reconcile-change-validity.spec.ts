@@ -25,6 +25,8 @@ function implementingChange(validatedHash: string): Change {
     name: 'c1',
     createdAt: at,
     specIds: ['core:change'],
+    schemaName: 'test-schema',
+    schemaVersion: 1,
     history: [
       {
         type: 'created',
@@ -108,6 +110,8 @@ function signedOffChange(state: 'signed-off' | 'archivable' | 'archiving'): Chan
     name: `recover-${state}`,
     createdAt: at,
     specIds: ['core:change'],
+    schemaName: 'test-schema',
+    schemaVersion: 1,
     history,
     artifacts: new Map([
       [

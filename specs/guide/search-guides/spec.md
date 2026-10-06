@@ -22,6 +22,7 @@ The application layer MUST declare a driven port `GuideSearchPort`:
 The infrastructure layer MUST implement `GuideSearchPort` using `minisearch`:
 
 - The adapter MUST index every discrete `GuideSection` across all guides.
+- Section content for search documents MUST be extracted on the fly from the parent `GuideTopic.content` using `startOffset` and `endOffset` (or line range).
 - Search documents in the index MUST include fields: `id` (e.g. `${topic}#${section.index}`), `topic`, `title`, `heading`, `sectionIndex`, and `content`.
 - Field boosting weights MUST be applied:
   - `title`: 5

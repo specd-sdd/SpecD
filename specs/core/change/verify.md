@@ -562,7 +562,7 @@ Scenarios:
 
 #### Scenario: Schema version mismatch warns
 
-- **WHEN** a Change is loaded and the active schema's version differs from the `schemaVersion` recorded in the `created` event
+- **WHEN** a Change is loaded and the active schema's version differs from the `schemaVersion` initialized from the root schema properties
 - **THEN** specd emits a warning but the change remains fully usable
 
 #### Scenario: Schema mismatch does not block archive

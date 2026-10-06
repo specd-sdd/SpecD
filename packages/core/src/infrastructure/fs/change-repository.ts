@@ -1449,6 +1449,8 @@ export class FsChangeRepository extends ChangeRepository {
       updatedAt: deriveManifestUpdatedAt(manifest),
       ...(hydrated.description !== undefined ? { description: hydrated.description } : {}),
       specIds: [...hydrated.specIds],
+      schemaName: manifest.schema.name,
+      schemaVersion: manifest.schema.version,
       ...(hydrated.trackedImplementationFiles.length > 0
         ? { trackedImplementationFiles: hydrated.trackedImplementationFiles }
         : {}),
@@ -1634,11 +1636,7 @@ function deriveManifestUpdatedAt(manifest: ChangeManifest): Date {
  * @returns The manifest JSON structure
  */
 function changeToManifest(change: Change): ChangeManifestV2 {
-  const createdEvent = change.history.find((e) => e.type === 'created')
-  const schema =
-    createdEvent?.type === 'created'
-      ? { name: createdEvent.schemaName, version: createdEvent.schemaVersion }
-      : { name: '', version: 0 }
+  const schema = { name: change.schemaName, version: change.schemaVersion }
 
   const specDependsOn: Record<string, string[]> = {}
   for (const [key, deps] of change.specDependsOn) {

@@ -42,5 +42,41 @@
     {
       "file": "core:src/public.ts"
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "ResolveContextSpecs resolves contextIncludeSpecs/contextExcludeSpecs into provenance-partitioned canonical spec IDs, content-free.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:714d2a0ffb6e6640a2bed9fe1d2f6c15b93491e1ad708477e1df07f45438aa93",
+          "lastModified": "2026-08-27T13:02:37.250Z"
+        },
+        "verify.md": {
+          "hash": "sha256:1c6eb1f8e91ac4ca21b6ea38405316e38fcb393443d6927453fa1d1aee482264",
+          "lastModified": "2026-08-27T13:02:37.251Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# ResolveContextSpecs\n\n## Rules\n\n- `execute(input?)` MUST accept optional `ResolveContextSpecsInput`:\n  - `workspaces` (`readonly string[]`, optional) — names of workspaces whose workspace-level patterns are active. Omitted or empty MUST mean all configured workspaces. Values MUST be deduplicated before resolution.\n  - `workspacesOnly` (boolean, optional) — when `true`, project-level include/exclude patterns MUST NOT run; result `project` MUST be empty.\n- `ResolveContextSpecsInput` MUST NOT accept change identity, rendering mode, section filters, dependency-traversal flags, fingerprints, or yaml `config` overrides. Yaml-derived context pattern configuration baked at construction via `CompileContextConfig`.\n- `execute` MUST return `ResolveContextSpecsResult`:\n  - `project` (`readonly string[]`) — canonical spec IDs included by project-level patterns remaining after all excludes\n  - `workspaces` (`Readonly<Record<string, readonly string[]>>`) — per active workspace name, canonical IDs included by that workspace patterns remaining after all excludes\n- Every active workspace name MUST appear as key in `workspaces`, even when array empty.\n- Same ID included by project-level patterns and a workspace patterns, surviving excludes, MUST appear in both `project` and `workspaces[<workspace>]`. Exclude clears ID from effective set entirely (every partition). Surviving IDs MUST retain every include source that contributed them.\n- Core MUST provide content-free helper `resolveConfiguredContextSpecs` applying patterns in fixed order:\n  1. project-level `contextIncludeSpecs`\n  2. project-level `contextExcludeSpecs`\n  3. active-workspace `contextIncludeSpecs` (skip inactive workspaces)\n  4. active-workspace `contextExcludeSpecs` (skip inactive workspaces)\n- Callers MUST supply effective-set `collector` with `include(spec)` / `exclude(spec)` (no provenance arguments). Callers MAY supply optional `onOperation(op, spec, source)` listener for provenance; listener MUST NOT replace or alter collector semantics.\n- Helper MUST NOT render content, read metadata, seed change `specIds` / `specDependsOn`, protect keys, or perform `dependsOn` traversal. Pattern-matcher warnings MAY be discarded by ID-only callers.\n- `ResolveContextSpecs` and `CompileContext` MUST both invoke helper for steps 1–4 so include/exclude order and glob semantics cannot drift.\n- `GetProjectContext` MUST invoke same helper for project-level include/exclude with empty `activeWorkspaces` so workspace-level patterns never run, while sharing project glob semantics with `CompileContext` and `ResolveContextSpecs`.\n- `workspaces` listing one or more names: only those workspaces active for workspace-level patterns and keys under `workspaces`.\n- Unknown workspace names MUST throw `InvalidInputError` (`SpecdError` code `INVALID_INPUT`). Message MUST be:\n  - one unknown → `Unknown workspace '<name>'`\n  - several unknown → `Unknown workspaces: '<a>', '<b>', …` (each unknown name quoted, comma-separated)\n- Unknown names MUST NOT be silently ignored. Generic `Error` MUST NOT be used for this expected validation failure.\n- `workspacesOnly` `true`: use case MUST empty project-level include/exclude arrays before calling helper so only workspace-level patterns run. `project` MUST be `[]`.\n- `ResolveContextSpecs` MUST be constructed with `ListWorkspaces` and yaml-derived `CompileContextConfig` snapshot. Composition MUST expose `createResolveContextSpecs` (explicit deps and config factory forms) and mount use case at `kernel.project.resolveContextSpecs`.\n- Core public barrel MUST export `ResolveContextSpecs`, `ResolveContextSpecsInput`, `ResolveContextSpecsResult`, `createResolveContextSpecs`, and `ResolveContextSpecsDeps`. Hosts consuming `@specd/sdk` MAY obtain these via SDK core re-exports. MUST NOT exist dedicated SDK orchestration wrapper whose only behaviour is forwarding `kernel.project.resolveContextSpecs.execute`.\n\n## Constraints\n\n- ID-only: no project context: entry rendering, no spec content, no metadata materialization, no warning array in result.\n- Does not apply change-scoped seeds, protection, optimized-project-context skipping, or followDeps (those remain CompileContext responsibilities).\n- Dedup key for effective set is `${workspace}:${capPath}`.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:714d2a0ffb6e6640a2bed9fe1d2f6c15b93491e1ad708477e1df07f45438aa93",
+          "lastModified": "2026-08-27T13:02:37.250Z"
+        },
+        "verify.md": {
+          "hash": "sha256:1c6eb1f8e91ac4ca21b6ea38405316e38fcb393443d6927453fa1d1aee482264",
+          "lastModified": "2026-08-27T13:02:37.251Z"
+        }
+      }
+    }
+  }
 }

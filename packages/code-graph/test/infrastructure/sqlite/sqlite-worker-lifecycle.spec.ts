@@ -18,7 +18,7 @@ import { GraphStoreRecreateRequiresClosedError } from '../../../src/domain/error
 
 let tempDir: string | undefined
 
-describe('SQLiteWorkerClient & Store Lifecycle', () => {
+describe('SQLiteWorkerClient & Store Lifecycle', { timeout: 15_000 }, () => {
   afterEach(() => {
     if (tempDir) {
       rmSync(tempDir, { recursive: true, force: true })

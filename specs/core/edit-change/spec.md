@@ -119,6 +119,17 @@ The config-based `createEditChange(config, options?)` form MUST derive `EditChan
 
 The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
 
+### Requirement: Schema compatibility guardrail
+
+When `addSpecIds` is provided, the system MUST verify that every new spec is compatible with the Change's schema. For every added spec:
+
+1. If the spec has no persisted semantic state (uninitialized) or its persisted state lacks a schema definition, the system assumes it uses the project's active global schema (`GetActiveSchema`).
+2. Otherwise, it extracts the spec's persisted schema identity (`name` and `version`).
+
+A spec is considered compatible if its schema name matches the Change's schema name, or if the Change's schema explicitly declares a `compat` property matching the spec's schema name.
+
+If any added spec is found to be incompatible, the use case MUST throw an `IncompatibleSchemaError` and abort the edit operation without mutating the change.
+
 ## Constraints
 
 - The use case MUST NOT modify workspaces directly — they are always derived from `specIds`

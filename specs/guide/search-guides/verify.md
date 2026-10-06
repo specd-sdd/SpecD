@@ -27,6 +27,13 @@
 - **THEN** Section A has a significantly higher BM25 score than Section B
 - **AND** Section A appears before Section B in the search results
 
+#### Scenario: Section content is dynamically extracted and indexed for full-text search
+
+- **GIVEN** guide topics with lightweight outline structures
+- **WHEN** the search index is initialized
+- **THEN** section content extracted on the fly via character offsets is indexed correctly
+- **AND** searches matching words in section bodies return valid hits
+
 #### Scenario: Fuzzy matching resolves typographical errors
 
 - **GIVEN** guide sections mentioning `"configuration"` and `"lifecycle"`

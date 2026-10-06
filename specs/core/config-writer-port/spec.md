@@ -73,6 +73,15 @@ The `removePlugin` method accepts three parameters:
 
 It MUST return `Promise<void>`. The method MUST remove the named plugin from `plugins.<type>` in `specd.yaml`.
 
+### Requirement: ListPlugins
+
+The `listPlugins` method accepts two parameters:
+
+1. `configPath: string` — absolute path to the `specd.yaml` to read
+2. `type?: string` — optional plugin type filter (e.g. `"agents"`)
+
+It MUST return `Promise<Array<{ name: string; config?: Record<string, unknown> }>>`. When `type` is specified, it returns entries under `plugins.<type>`. When `type` is omitted, it returns all declared plugins across all plugin categories. If `specd.yaml` does not exist or declares no plugins, it MUST return an empty array.
+
 ### Requirement: Delivery access via createConfigWriter
 
 Delivery mechanisms (CLI, MCP, plugins) MUST obtain a `ConfigWriter` instance through `createConfigWriter()` exported from `@specd/core`. They MAY call `initProject`, `addPlugin`, and `removePlugin` on that instance. They MUST NOT import `FsConfigWriter` or construct port implementations directly.

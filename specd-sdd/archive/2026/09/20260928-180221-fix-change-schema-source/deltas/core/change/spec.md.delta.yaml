@@ -1,0 +1,11 @@
+- op: modified
+  description: 'Update Schema version requirement to use root properties instead of created event'
+  selector:
+    type: section
+    matches: 'Requirement: Schema version'
+  content: |
+    The `Change` entity is initialized with `schemaName` and `schemaVersion` as top-level properties hydrated at creation time. These properties are the definitive source of truth, decoupled from the `created` event in the history.
+
+    A **`schemaName` mismatch** (e.g. `schema-std` → `custom-schema`) indicates structural incompatibility. When a use case detects that `schema.name() !== change.schemaName`, it MUST throw `SchemaMismatchError` before performing any work.
+
+    A **`schemaVersion` mismatch** within the same schema name is advisory. When a change is loaded and the active schema version differs from the one recorded in the change, the system MUST emit a warning. The change remains fully usable. Archiving with a `schemaVersion` mismatch is allowed.

@@ -68,6 +68,15 @@ export class MiniSearchGuideEngineAdapter implements GuideSearchPort {
     for (const guide of guides) {
       this.topicLines.set(guide.topic, guide.content.split(/\r?\n/))
       for (const section of guide.outline) {
+        const sectionContent =
+          section.content ??
+          (section.startOffset !== undefined && section.endOffset !== undefined
+            ? guide.content.slice(section.startOffset, section.endOffset)
+            : guide.content
+                .split(/\r?\n/)
+                .slice(section.startLine - 1, section.endLine)
+                .join('\n'))
+
         const doc: SectionDocument = {
           id: `${guide.topic}#${section.index}`,
           topic: guide.topic,
@@ -77,7 +86,7 @@ export class MiniSearchGuideEngineAdapter implements GuideSearchPort {
           level: section.level,
           startLine: section.startLine,
           endLine: section.endLine,
-          content: section.content,
+          content: sectionContent,
         }
         docs.push(doc)
         this.documents.set(doc.id, doc)

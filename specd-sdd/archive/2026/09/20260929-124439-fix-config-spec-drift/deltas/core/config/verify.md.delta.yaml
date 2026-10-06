@@ -1,0 +1,25 @@
+- op: modified
+  description: 'Update listPlugins scenario in ConfigWriter port requirement to reflect optional type'
+  selector:
+    type: section
+    matches: 'Requirement: Config writer port'
+  content: |
+    #### Scenario: ConfigWriter port defines initProject method
+
+    - **WHEN** `ConfigWriter` interface is inspected
+    - **THEN** it declares `initProject(options: InitProjectOptions): Promise<InitProjectResult>`
+
+    #### Scenario: ConfigWriter port defines addPlugin method
+
+    - **WHEN** `ConfigWriter` interface is inspected
+    - **THEN** it declares `addPlugin(configPath, type, name, config?): Promise<void>`
+
+    #### Scenario: ConfigWriter port defines removePlugin method
+
+    - **WHEN** `ConfigWriter` interface is inspected
+    - **THEN** it declares `removePlugin(configPath, type, name): Promise<void>`
+
+    #### Scenario: ConfigWriter port defines listPlugins method
+
+    - **WHEN** `ConfigWriter` interface is inspected
+    - **THEN** it declares `listPlugins(configPath, type?): Promise<Array<{ name: string; config?: Record<string, unknown> }>>`

@@ -15,10 +15,12 @@ import {
   type ValidityBlocker,
 } from '../../domain/services/change-validity.js'
 import { type NextAction } from './get-status.js'
+import { IncompatibleSchemaError } from '../../domain/errors/incompatible-schema-error.js'
 import { parseSpecId } from '../../domain/services/parse-spec-id.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { type SchemaProvider } from '../ports/schema-provider.js'
 import { loadPersistedSpecDependsOn } from './_shared/load-persisted-spec-depends-on.js'
+import { loadPersistedSpecSchema } from './_shared/load-persisted-spec-schema.js'
 import { type ListWorkspaces, type ProjectWorkspace } from './list-workspaces.js'
 import { type RefreshImplementationTracking } from './refresh-implementation-tracking.js'
 import { type ReconcileChangeValidity } from './reconcile-change-validity.js'
@@ -132,6 +134,20 @@ export class EditChange {
     const actor = await this._actor.identity()
     const workspaces = await this._listWorkspaces.execute()
     const workspaceMap = new Map(workspaces.map((ws) => [ws.name, ws]))
+
+    if (input.addSpecIds !== undefined && input.addSpecIds.length > 0) {
+      const schema = await this._schemaProvider.get()
+      for (const specId of input.addSpecIds) {
+        const persisted = await loadPersistedSpecSchema(workspaceMap, specId)
+        const specSchemaName = persisted.schema !== null ? persisted.schema.name : schema.name()
+        const isCompatible =
+          specSchemaName === change.schemaName || schema.compat()?.name === specSchemaName
+
+        if (!isCompatible) {
+          throw new IncompatibleSchemaError(specId, specSchemaName, change.schemaName)
+        }
+      }
+    }
 
     if (hasSpecChanges) {
       return this._executeScopeEdit(

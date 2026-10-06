@@ -1,0 +1,4 @@
+releases:
+  core:config: patch
+  core:config-loader: patch
+  core:config-writer-port: patch

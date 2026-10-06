@@ -26,6 +26,8 @@ function makeChange(history: ChangeEvent[] = []) {
     name: 'add-oauth-login',
     createdAt: new Date('2024-01-01T00:00:00Z'),
     specIds: ['auth/login'],
+    schemaName: '@specd/schema-std',
+    schemaVersion: 1,
     history,
   })
 }
@@ -83,6 +85,8 @@ describe('Change', () => {
         name: 'multi-ws',
         createdAt: new Date('2024-01-01T00:00:00Z'),
         specIds: ['billing:invoices/create', 'auth/login'],
+        schemaName: '@specd/schema-std',
+        schemaVersion: 1,
         history: [],
       })
       expect(c.workspaces).toContain('billing')
@@ -94,6 +98,8 @@ describe('Change', () => {
         name: 'bootstrap',
         createdAt: new Date(),
         specIds: [],
+        schemaName: '@specd/schema-std',
+        schemaVersion: 1,
         history: [],
       })
       expect(c.specIds).toEqual([])
@@ -107,6 +113,8 @@ describe('Change', () => {
             name: 'Add_OAuth',
             createdAt: new Date(),
             specIds: [],
+            schemaName: '@specd/schema-std',
+            schemaVersion: 1,
             history: [],
           }),
       ).toThrow(InvalidChangeError)
@@ -119,6 +127,8 @@ describe('Change', () => {
             name: 'AddOAuth',
             createdAt: new Date(),
             specIds: [],
+            schemaName: '@specd/schema-std',
+            schemaVersion: 1,
             history: [],
           }),
       ).toThrow(InvalidChangeError)
@@ -131,6 +141,8 @@ describe('Change', () => {
             name: '-add-oauth',
             createdAt: new Date(),
             specIds: [],
+            schemaName: '@specd/schema-std',
+            schemaVersion: 1,
             history: [],
           }),
       ).toThrow(InvalidChangeError)
@@ -143,6 +155,8 @@ describe('Change', () => {
             name: '',
             createdAt: new Date(),
             specIds: [],
+            schemaName: '@specd/schema-std',
+            schemaVersion: 1,
             history: [],
           }),
       ).toThrow(InvalidChangeError)
@@ -153,6 +167,8 @@ describe('Change', () => {
         name: 'dedup-test',
         createdAt: new Date(),
         specIds: ['auth/login', 'auth/login', 'billing:invoices'],
+        schemaName: '@specd/schema-std',
+        schemaVersion: 1,
         history: [],
       })
       expect(c.specIds).toEqual(['auth/login', 'billing:invoices'])
@@ -611,6 +627,8 @@ describe('Change', () => {
         name: 'test',
         createdAt: new Date('2024-01-15'),
         specIds: [],
+        schemaName: '@specd/schema-std',
+        schemaVersion: 1,
         history: [
           {
             type: 'created',
@@ -1163,6 +1181,8 @@ describe('Change', () => {
           name: 'x',
           createdAt: new Date(),
           specIds: ['auth/login'],
+          schemaName: '@specd/schema-std',
+          schemaVersion: 1,
           history:
             state === 'drafting'
               ? []
@@ -1214,6 +1234,8 @@ describe('Change', () => {
         name: 'sync-artifacts',
         createdAt: new Date('2024-01-01T00:00:00Z'),
         specIds: ['default:auth/login', 'default:auth/register'],
+        schemaName: '@specd/schema-std',
+        schemaVersion: 1,
         history: [],
         artifacts: new Map([
           [
@@ -1261,6 +1283,8 @@ describe('Change', () => {
         name: 'sync-artifacts-no-existence',
         createdAt: new Date('2024-01-01T00:00:00Z'),
         specIds: ['default:auth/login'],
+        schemaName: '@specd/schema-std',
+        schemaVersion: 1,
         history: [],
         artifacts: new Map([
           [
@@ -1336,6 +1360,8 @@ describe('Change', () => {
         name: 'test-deps',
         createdAt: new Date('2024-01-01T00:00:00Z'),
         specIds: ['auth/login'],
+        schemaName: '@specd/schema-std',
+        schemaVersion: 1,
         history: [],
         specDependsOn: new Map([['auth/login', ['auth/shared', 'auth/jwt']]]),
       })
@@ -1377,6 +1403,8 @@ describe('Change', () => {
         name: 'test-orphan',
         createdAt: new Date('2024-01-01T00:00:00Z'),
         specIds: ['auth/login', 'auth/session'],
+        schemaName: '@specd/schema-std',
+        schemaVersion: 1,
         history: [],
         specDependsOn: new Map([
           ['auth/login', ['auth/shared']],
@@ -1393,6 +1421,8 @@ describe('Change', () => {
         name: 'test-clear',
         createdAt: new Date('2024-01-01T00:00:00Z'),
         specIds: ['auth/login'],
+        schemaName: '@specd/schema-std',
+        schemaVersion: 1,
         history: [],
         specDependsOn: new Map([['auth/login', ['auth/shared']]]),
       })
@@ -1405,6 +1435,8 @@ describe('Change', () => {
         name: 'test-preserve',
         createdAt: new Date('2024-01-01T00:00:00Z'),
         specIds: ['auth/login', 'auth/session'],
+        schemaName: '@specd/schema-std',
+        schemaVersion: 1,
         history: [],
         specDependsOn: new Map([['auth/login', ['auth/shared']]]),
       })
@@ -1429,6 +1461,8 @@ describe('Change', () => {
             createdAt: new Date('2024-01-02T00:00:00Z'),
             updatedAt: new Date('2024-01-01T00:00:00Z'),
             specIds: ['auth/login'],
+            schemaName: '@specd/schema-std',
+            schemaVersion: 1,
             history: [],
           }),
       ).toThrow(InvalidChangeError)
@@ -1485,6 +1519,8 @@ describe('Change', () => {
         name: 'legacy-change',
         createdAt: new Date('2024-01-01T00:00:00Z'),
         specIds: ['auth/login'],
+        schemaName: '@specd/schema-std',
+        schemaVersion: 1,
         history: [
           { type: 'transitioned', from: 'ready', to: 'implementing', at: histDate, by: actor },
         ],
@@ -1499,6 +1535,8 @@ describe('Change', () => {
         name: 'explicit-null',
         createdAt: new Date('2024-01-01T00:00:00Z'),
         specIds: ['auth/login'],
+        schemaName: '@specd/schema-std',
+        schemaVersion: 1,
         history: [
           { type: 'transitioned', from: 'ready', to: 'implementing', at: histDate, by: actor },
         ],
@@ -1735,6 +1773,21 @@ describe('Change', () => {
       const invalChangedAgain = c.invalidateVerification(inval)
       expect(invalChangedAgain).toBe(false)
       expect(c.history.length).toBe(count)
+    })
+  })
+
+  describe('schema properties', () => {
+    it('returns schemaName and schemaVersion from ChangeProps', () => {
+      const c = new Change({
+        name: 'schema-test',
+        createdAt: new Date('2024-01-01T00:00:00Z'),
+        specIds: ['auth/login'],
+        schemaName: 'custom-schema',
+        schemaVersion: 42,
+        history: [],
+      })
+      expect(c.schemaName).toBe('custom-schema')
+      expect(c.schemaVersion).toBe(42)
     })
   })
 })

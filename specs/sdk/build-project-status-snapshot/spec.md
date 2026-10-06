@@ -13,13 +13,16 @@
 1. Call `ctx.kernel.project.getProjectSummary.execute(summaryInput)` for workspace counts, change/draft/discarded/archive totals, and spec counts per workspace, where `summaryInput` is derived from snapshot options:
    - `includeChanges` — forwarded when `options.includeChanges` is `true`
    - `includeSpecsHealth` — forwarded when `options.includeSpecsHealth` is `true`
-   - When both are omitted/false, call `execute()` / `execute({})` so the summary stays count-only
-2. When `options.includeGraph` is `true` (default `false`), call `withOpenGraphProvider(ctx, async (provider) => { ... })`, construct `createGetGraphHealth()` from `@specd/code-graph`, and run `getGraphHealth.execute({ config, provider, codeGraphVersion, workspaces, assertUnlocked: false })` where `config` comes from `ctx.kernel.project.getConfig.execute()` and `workspaces` from `ctx.kernel.project.listWorkspaces.execute()`
+   - `includeOverlaps` — forwarded when `options.includeOverlaps` is `true`
+   - When `includeChanges`, `includeSpecsHealth`, and `includeOverlaps` are all omitted or `false`, call `execute()` / `execute({})` so the summary stays count-only
+2. When `options.includeGraph` is `true` (default `false`), call `withOpenGraphProvider(ctx, async (provider) => { ... })`, construct `createGetGraphHealth()` from `@specd/code-graph`, and run `getGraphHealth.execute({ config, provider, codeGraphVersion, workspaces })` where `config` comes from `ctx.kernel.project.getConfig.execute()` and `workspaces` from `ctx.kernel.project.listWorkspaces.execute()`
 3. Return a merged result object containing summary fields plus optional `graphHealth` and `hotspots` when graph data was requested
 
 When graph loading fails (provider open, health query, or hotspots), the function MUST return `graphHealth: null` (and `hotspots: null` when requested) without throwing — hosts treat null as unavailable graph data.
 
 When `includeGraph` is `false`, the function MUST NOT open a graph provider.
+
+The snapshot MUST NOT call `DetectOverlap` itself. Overlap detection happens only inside `GetProjectSummary` when `includeOverlaps` is forwarded.
 
 ### Requirement: Result shape stability
 
@@ -29,17 +32,18 @@ When `includeGraph` is `false`, the function MUST NOT open a graph provider.
 - `includeHotspots?: boolean`
 - `includeChanges?: boolean` (default `false`) — forwarded to `GetProjectSummary`
 - `includeSpecsHealth?: boolean` (default `false`) — forwarded to `GetProjectSummary`
+- `includeOverlaps?: boolean` (default `false`) — forwarded to `GetProjectSummary`
 
 `BuildProjectStatusSnapshotResult` MUST expose:
 
-- `summary` — the `GetProjectSummaryResult` from core (including optional `active` / `drafts` / `specsHealth` when requested)
+- `summary` — the `GetProjectSummaryResult` from core (including optional `active` / `drafts` / `specsHealth` / `overlaps` when requested)
 - `graphHealth` — `GetGraphHealthResult | null` (null when graph not requested or unavailable)
 - `approvals` — `{ specEnabled: boolean; signoffEnabled: boolean }` derived from `ctx.kernel.project.getConfig.execute()`
 - `llmOptimizedContext` — boolean from config
 
 Hotspots MAY be included when `options.includeHotspots` is true and graph is loaded; otherwise omitted or null.
 
-The snapshot MUST NOT duplicate enriched listing/health fields outside `summary`; hosts read them from `summary`.
+The snapshot MUST NOT duplicate enriched listing, health, or overlap fields outside `summary`; hosts read them from `summary`.
 
 ### Requirement: No presenter formatting
 
@@ -54,5 +58,5 @@ The orchestration MUST NOT construct `ChangeRepository` or `SpecRepository` inst
 ## Spec Dependencies
 
 - [`sdk:host-context`](../host-context/spec.md) — host context for kernel and provider access
-- [`core:get-project-summary`](../../../../specs/core/get-project-summary/spec.md) — project summary use case
+- [`core:get-project-summary`](../../../../specs/core/get-project-summary/spec.md) — project summary use case, including optional `includeOverlaps`
 - [`code-graph:get-graph-health`](../../../../specs/code-graph/get-graph-health/spec.md) — graph health use case

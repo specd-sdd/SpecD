@@ -3974,6 +3974,35 @@
           "files": ["design"]
         }
       ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-09-29T10:29:37.717Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'fix-change-schema-source' was archived with overlapping specs: core:change",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:change"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:change"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
     }
   ]
 }

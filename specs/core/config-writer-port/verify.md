@@ -104,6 +104,16 @@
 - **WHEN** `removePlugin(configPath, 'agents', '@specd/plugin-agent-claude')` is called
 - **THEN** the plugin is removed from `plugins.agents`
 
+### Requirement: ListPlugins
+
+#### Scenario: ListPlugins filters by type or returns all plugins
+
+- **GIVEN** a config with declared plugins
+- **WHEN** `listPlugins(configPath, type)` is called with a specific type
+- **THEN** it returns only plugins declared under that type
+- **WHEN** `listPlugins(configPath)` is called without a type filter
+- **THEN** it returns all declared plugins across all types
+
 ### Requirement: Delivery access via createConfigWriter
 
 #### Scenario: Delivery obtains writer via composition factory

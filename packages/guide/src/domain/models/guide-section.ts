@@ -33,7 +33,17 @@ export interface GuideSection {
   readonly lines: number
 
   /**
-   * Complete text content of the section, from the heading line up to endLine.
+   * 0-indexed character start offset within the parent topic's content where the section begins.
    */
-  readonly content: string
+  readonly startOffset: number
+
+  /**
+   * 0-indexed character end offset within the parent topic's content where the section concludes.
+   */
+  readonly endOffset: number
+
+  /**
+   * Text content of the section, from the heading line up to endLine (optional or populated on-demand).
+   */
+  readonly content?: string
 }

@@ -7,18 +7,14 @@
     "core:config",
     "core:composition",
     "core:schema-merge",
+    "default:_global/architecture",
     "core:vcs-adapter-port",
-    "core:vcs-adapter",
-    "default:_global/architecture"
+    "core:vcs-adapter"
   ],
   "implementation": [
     {
-      "file": "core:src/domain/services/deep-merge-config.ts",
-      "symbols": ["deepMergeConfig", "isRecord"]
-    },
-    {
-      "file": "core:src/application/ports/config-schema.ts",
-      "symbols": ["deepMergeRawConfig"]
+      "file": "core:src/infrastructure/fs/config-loader.ts",
+      "symbols": ["FsConfigLoader"]
     }
   ]
 }

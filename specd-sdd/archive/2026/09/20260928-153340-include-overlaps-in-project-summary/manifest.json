@@ -1,0 +1,1110 @@
+{
+  "name": "include-overlaps-in-project-summary",
+  "createdAt": "2026-09-28T15:33:40.444Z",
+  "updatedAt": "2026-09-29T08:18:42.516Z",
+  "description": "Add opt-in overlap enrichment to GetProjectSummary so hosts can read project spec-validation health and active-change overlaps from one aggregate.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "core:get-project-summary",
+    "cli:project-status",
+    "sdk:build-project-status-snapshot",
+    "core:kernel"
+  ],
+  "specDependsOn": {
+    "core:get-project-summary": [
+      "core:list-workspaces",
+      "core:list-changes",
+      "core:list-drafts",
+      "core:list-discarded",
+      "core:list-archived",
+      "core:kernel",
+      "core:composition-resolver",
+      "core:get-specs-health",
+      "core:count-tasks",
+      "core:spec-overlap"
+    ],
+    "cli:project-status": [
+      "core:list-workspaces",
+      "core:get-project-summary",
+      "core:get-project-context",
+      "sdk:build-project-status-snapshot",
+      "sdk:host-context"
+    ],
+    "sdk:build-project-status-snapshot": [
+      "sdk:host-context",
+      "core:get-project-summary",
+      "code-graph:get-graph-health"
+    ],
+    "core:kernel": [
+      "default:_global/architecture",
+      "core:composition",
+      "core:create-change",
+      "core:get-status",
+      "core:transition-change",
+      "core:draft-change",
+      "core:restore-change",
+      "core:discard-change",
+      "core:archive-change",
+      "core:validate-artifacts",
+      "core:compile-context",
+      "core:list-changes",
+      "core:list-drafts",
+      "core:list-discarded",
+      "core:edit-change",
+      "core:skip-artifact",
+      "core:update-spec-deps",
+      "core:list-archived",
+      "core:get-archived-change",
+      "core:run-step-hooks",
+      "core:get-hook-instructions",
+      "core:get-artifact-instruction",
+      "core:approve-spec",
+      "core:approve-signoff",
+      "core:list-specs",
+      "core:get-spec",
+      "core:get-active-schema",
+      "core:validate-specs",
+      "core:get-spec-context",
+      "core:config-writer-port",
+      "core:list-workspaces",
+      "core:get-project-context",
+      "core:get-config",
+      "core:project-metadata",
+      "core:update-project-metadata",
+      "core:resolve-schema",
+      "core:spec-overlap",
+      "core:get-specs-health",
+      "core:count-tasks",
+      "core:regenerate-spec-metadata",
+      "core:get-spec-metadata",
+      "core:get-persisted-spec-deps",
+      "core:update-persisted-spec-deps",
+      "core:get-persisted-spec-implementation",
+      "core:update-persisted-spec-implementation",
+      "core:get-persisted-spec-optimizations",
+      "core:update-persisted-spec-optimizations",
+      "core:materialize-spec-metadata",
+      "core:get-persisted-spec-schema",
+      "core:update-persisted-spec-schema",
+      "core:initialize-persisted-spec-state",
+      "core:generate-metadata",
+      "core:get-project-summary",
+      "core:archive-repository-port",
+      "core:get-draft",
+      "core:get-discarded",
+      "core:invalidate-change",
+      "core:update-implementation-tracking",
+      "core:refresh-implementation-tracking",
+      "core:get-implementation-review",
+      "core:preview-spec",
+      "core:get-spec-outline",
+      "core:validate-schema",
+      "core:resolve-context-specs",
+      "core:actor-resolver"
+    ]
+  },
+  "invalidationPolicy": "downstream",
+  "implementationTrackingStartedAt": "2026-09-28T16:49:59.568Z",
+  "trackedImplementationFiles": [
+    {
+      "file": "dev/scripts/spec-completeness-poc.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "dev/scripts/universal-spec-completeness-codegraph-ontology.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/_global/continuous-integration/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/_global/docs/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/staleness-detection/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/workspace-integration/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/change/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-project-context/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/refresh-implementation-tracking/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/resolve-context-specs/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/spec-id-format/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/update-implementation-tracking/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/workspace/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/sdk/build-project-status-snapshot/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/get-project-summary.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/get-project-summary.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/orchestration/build-project-status-snapshot.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/project/status.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/project/status.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/get-project-summary.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/get-project-summary.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/test/orchestration/build-project-status-snapshot.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/cli/cli-reference.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/cli/project.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/code-graph/use-cases.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/core/use-cases.md",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/composition/kernel.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/core/ports.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/core/overview.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/guide/cli.md",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/guide/src/infrastructure/generated/guides.ts",
+      "state": "ignored"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "core:get-project-summary",
+      "file": "packages/core/src/application/use-cases/get-project-summary.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "GetProjectSummary",
+        "GetProjectSummaryInput",
+        "GetProjectSummaryResult",
+        "execute"
+      ]
+    },
+    {
+      "specId": "core:get-project-summary",
+      "file": "packages/core/src/composition/use-cases/get-project-summary.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "GetProjectSummaryDeps",
+        "resolveGetProjectSummaryDeps",
+        "createGetProjectSummary"
+      ]
+    },
+    {
+      "specId": "sdk:build-project-status-snapshot",
+      "file": "packages/sdk/src/orchestration/build-project-status-snapshot.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "buildProjectStatusSnapshot",
+        "BuildProjectStatusSnapshotOptions",
+        "BuildProjectStatusSnapshotResult"
+      ]
+    },
+    {
+      "specId": "cli:project-status",
+      "file": "packages/cli/src/commands/project/status.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["registerProjectStatus"]
+    },
+    {
+      "specId": "core:kernel",
+      "file": "packages/core/src/composition/kernel.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["getProjectSummary"]
+    },
+    {
+      "specId": "core:get-project-summary",
+      "file": "packages/core/test/application/use-cases/get-project-summary.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:project-status",
+      "file": "packages/cli/test/commands/project/status.spec.ts",
+      "fileLinkExplicit": true
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:f2da151098a80935f865e6b85c7bcd11c7566d47837a63e4a5c33337d6a3a05c"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:get-project-summary",
+          "filename": "deltas/core/get-project-summary/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:ab5ef8bcf04104d5bc645425d31e5ef54bd2430195d53a0366433d4a9473ad55"
+        },
+        {
+          "key": "cli:project-status",
+          "filename": "deltas/cli/project-status/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:ead369ce40414a0d664ef27690d102b205afba442c63c6c8bd076b08c46b5fbf"
+        },
+        {
+          "key": "sdk:build-project-status-snapshot",
+          "filename": "deltas/sdk/build-project-status-snapshot/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:49e158c85d863d2ee283c646a0600877cfded06be77ecd567de690b50a74f73f"
+        },
+        {
+          "key": "core:kernel",
+          "filename": "deltas/core/kernel/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:0b9a36c688ab457212de4140b7a152b2f74bb2b2e50142abe2526b2f3687a725"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:get-project-summary",
+          "filename": "deltas/core/get-project-summary/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:220e7e27f5f5c465cace0b16666d886a5f446a37e2c55bcb8c02cc0f8b738ce9"
+        },
+        {
+          "key": "cli:project-status",
+          "filename": "deltas/cli/project-status/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:56fbe4588197859c9c9925620175c5f4aaabd5c3142c0df03a21f209117fa271"
+        },
+        {
+          "key": "sdk:build-project-status-snapshot",
+          "filename": "deltas/sdk/build-project-status-snapshot/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:7ffc3043377ebbab0042519e60ce529fc84056fc552e444d5c926547bd956ac5"
+        },
+        {
+          "key": "core:kernel",
+          "filename": "deltas/core/kernel/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:0da33434991adea0977daecfc33ee05f0577b3fa3e0bbbb8a080dcdca788ee35"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:9dc04476f2b36da708ff9fb17cfdb91ce50b40eef08a101652442573299a1c19"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "verify", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:5a044748a161699db2866deb157daad16b8d9f0f83d1eac24851513e5d533214"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-09-28T15:33:40.444Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": ["core:get-project-summary", "cli:project-status"],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-09-28T15:33:40.476Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "core:get-project-summary"
+        },
+        {
+          "type": "specs",
+          "key": "cli:project-status"
+        },
+        {
+          "type": "verify",
+          "key": "core:get-project-summary"
+        },
+        {
+          "type": "verify",
+          "key": "cli:project-status"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-28T15:41:21.112Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-09-28T15:50:36.308Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["core:get-project-summary", "cli:project-status"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:get-project-summary", "cli:project-status"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-09-28T15:50:36.316Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "sdk:build-project-status-snapshot"
+        },
+        {
+          "type": "verify",
+          "key": "sdk:build-project-status-snapshot"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-28T16:40:06.785Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-28T16:49:59.568Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-28T17:16:57.000Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-09-28T17:40:28.800Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:get-project-summary",
+            "cli:project-status",
+            "sdk:build-project-status-snapshot"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:get-project-summary",
+            "cli:project-status",
+            "sdk:build-project-status-snapshot"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-28T17:40:28.800Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-28T17:46:06.618Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-28T17:53:09.511Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-28T18:03:40.448Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-09-28T18:22:35.918Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:get-project-summary",
+            "cli:project-status",
+            "sdk:build-project-status-snapshot"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:get-project-summary",
+            "cli:project-status",
+            "sdk:build-project-status-snapshot"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-28T18:22:35.918Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-09-28T18:37:23.429Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:get-project-summary",
+            "cli:project-status",
+            "sdk:build-project-status-snapshot"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:get-project-summary",
+            "cli:project-status",
+            "sdk:build-project-status-snapshot"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-09-28T18:37:23.436Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:kernel"
+        },
+        {
+          "type": "verify",
+          "key": "core:kernel"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-28T18:39:38.674Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-28T20:34:52.988Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-29T04:48:10.998Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-09-29T04:51:30.486Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:get-project-summary",
+            "cli:project-status",
+            "sdk:build-project-status-snapshot",
+            "core:kernel"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:get-project-summary",
+            "cli:project-status",
+            "sdk:build-project-status-snapshot",
+            "core:kernel"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-29T04:51:30.486Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-29T04:54:01.415Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-29T04:59:51.322Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-29T05:28:52.078Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-29T05:43:30.015Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-09-29T05:58:38.211Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:get-project-summary",
+            "cli:project-status",
+            "sdk:build-project-status-snapshot",
+            "core:kernel"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:get-project-summary",
+            "cli:project-status",
+            "sdk:build-project-status-snapshot",
+            "core:kernel"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-29T05:58:38.211Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-29T06:12:40.451Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-29T06:13:33.582Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-29T06:31:02.866Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-09-29T06:43:05.078Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:get-project-summary",
+            "cli:project-status",
+            "sdk:build-project-status-snapshot",
+            "core:kernel"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:get-project-summary",
+            "cli:project-status",
+            "sdk:build-project-status-snapshot",
+            "core:kernel"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-29T06:43:05.078Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-29T07:42:03.555Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-29T07:45:53.484Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-29T07:56:50.688Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-29T07:59:45.592Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-29T07:59:58.072Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-09-29T08:17:56.172Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Implementation link \"cli:project-status\" points outside workspace \"cli\" codeRoot.",
+      "commitStarted": false
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-29T08:18:42.515Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-09-29T08:18:42.737Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

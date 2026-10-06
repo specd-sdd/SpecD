@@ -2,6 +2,7 @@ import { GetProjectSummary } from '../../application/use-cases/get-project-summa
 import { type ChangeRepository } from '../../application/ports/change-repository.js'
 import { type ArchiveRepository } from '../../application/ports/archive-repository.js'
 import { type CountTasks } from '../../application/use-cases/count-tasks.js'
+import { type DetectOverlap } from '../../application/use-cases/detect-overlap.js'
 import { type GetSpecsHealth } from '../../application/use-cases/get-specs-health.js'
 import { type ListChanges } from '../../application/use-cases/list-changes.js'
 import { type ListDrafts } from '../../application/use-cases/list-drafts.js'
@@ -14,6 +15,7 @@ import {
 } from '../composition-resolver.js'
 import { normalizeCompositionFactoryArgs, type FactoryInput } from '../normalize-factory-args.js'
 import { createCountTasks, resolveCountTasksDeps } from './count-tasks.js'
+import { createDetectOverlap, resolveDetectOverlapDeps } from './detect-overlap.js'
 import { createGetSpecsHealth, resolveGetSpecsHealthDeps } from './get-specs-health.js'
 import { createListChanges, resolveListChangesDeps } from './list-changes.js'
 import { createListDrafts, resolveListDraftsDeps } from './list-drafts.js'
@@ -29,6 +31,7 @@ export interface GetProjectSummaryDeps {
   readonly listDrafts: ListDrafts
   readonly countTasks: CountTasks
   readonly getSpecsHealth: GetSpecsHealth
+  readonly detectOverlap: DetectOverlap
 }
 
 /**
@@ -46,6 +49,7 @@ export function resolveGetProjectSummaryDeps(resolver: CompositionResolver): Get
     listDrafts: createListDrafts(resolveListDraftsDeps(resolver)),
     countTasks: createCountTasks(resolveCountTasksDeps(resolver)),
     getSpecsHealth: createGetSpecsHealth(resolveGetSpecsHealthDeps(resolver)),
+    detectOverlap: createDetectOverlap(resolveDetectOverlapDeps(resolver)),
   }
 }
 
@@ -105,6 +109,7 @@ function createGetProjectSummaryFromNormalized(
       listDrafts,
       countTasks,
       getSpecsHealth,
+      detectOverlap,
     } = input.deps
     return new GetProjectSummary(
       changes,
@@ -114,6 +119,7 @@ function createGetProjectSummaryFromNormalized(
       listDrafts,
       countTasks,
       getSpecsHealth,
+      detectOverlap,
     )
   }
 
@@ -137,6 +143,7 @@ function isGetProjectSummaryDeps(
     'listChanges' in value &&
     'listDrafts' in value &&
     'countTasks' in value &&
-    'getSpecsHealth' in value
+    'getSpecsHealth' in value &&
+    'detectOverlap' in value
   )
 }

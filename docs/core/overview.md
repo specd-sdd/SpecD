@@ -167,41 +167,41 @@ Everything exported is a domain type (entity, value object, error, service), an 
 
 **From the application layer — use cases:**
 
-| Export                   | Kind | Description                                                                                  |
-| ------------------------ | ---- | -------------------------------------------------------------------------------------------- |
-| `CreateChange`           | type | Creates a new change.                                                                        |
-| `GetStatus`              | type | Reports change state and artifact statuses.                                                  |
-| `TransitionChange`       | type | Advances the change lifecycle and serializes the final manifest mutation.                    |
-| `DraftChange`            | type | Shelves a change to `drafts/` via serialized persistence.                                    |
-| `RestoreChange`          | type | Recovers a drafted change via serialized persistence.                                        |
-| `DiscardChange`          | type | Permanently abandons a change via serialized persistence.                                    |
-| `ApproveSpec`            | type | Records a spec approval through a serialized change mutation.                                |
-| `ApproveSignoff`         | type | Records a sign-off through a serialized change mutation.                                     |
-| `ArchiveChange`          | type | Finalises and archives a completed change after serializing `archiving`.                     |
-| `ValidateArtifacts`      | type | Validates artifact files and serializes completion/invalidation.                             |
-| `CompileContext`         | type | Assembles the AI instruction block for a lifecycle step.                                     |
-| `ListChanges`            | type | Lists all active changes.                                                                    |
-| `ListDrafts`             | type | Lists all drafted changes.                                                                   |
-| `ListDiscarded`          | type | Lists all discarded changes.                                                                 |
-| `ListArchived`           | type | Lists all archived changes.                                                                  |
-| `GetArchivedChange`      | type | Retrieves a single archived change.                                                          |
-| `EditChange`             | type | Edits change scope while serializing the persisted `specIds` update.                         |
-| `SkipArtifact`           | type | Explicitly skips an optional artifact on a change.                                           |
-| `UpdateSpecDeps`         | type | Updates declared spec dependencies within a change.                                          |
-| `ListSpecs`              | type | Lists all specs across all configured workspaces.                                            |
-| `GetSpec`                | type | Loads a spec and its artifact files.                                                         |
-| `SaveSpecMetadata`       | type | Writes validated metadata for a spec.                                                        |
-| `InvalidateSpecMetadata` | type | Removes content hashes from a spec's metadata.                                               |
-| `GetActiveSchema`        | type | Resolves and returns the active schema.                                                      |
-| `ValidateSchema`         | type | Validates a schema against structural rules.                                                 |
-| `ValidateSpecs`          | type | Validates spec artifacts against schema structural rules.                                    |
-| `GenerateSpecMetadata`   | type | Generates deterministic metadata from schema extraction rules.                               |
-| `GetSpecContext`         | type | Builds structured context entries for a spec.                                                |
-| `RunStepHooks`           | type | Executes built-in `run:` hooks and explicit `external:` hooks for a workflow step and phase. |
-| `GetHookInstructions`    | type | Returns `instruction:` hook text for a workflow step and phase.                              |
-| `GetArtifactInstruction` | type | Returns artifact-specific instructions, rules, and delta guidance.                           |
-| `GetProjectContext`      | type | Compiles project-level context without a specific change or step.                            |
-| `GetProjectSummary`      | type | Returns consolidated project-level change and spec counts without loading entities.          |
+| Export                   | Kind | Description                                                                                                                                              |
+| ------------------------ | ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CreateChange`           | type | Creates a new change.                                                                                                                                    |
+| `GetStatus`              | type | Reports change state and artifact statuses.                                                                                                              |
+| `TransitionChange`       | type | Advances the change lifecycle and serializes the final manifest mutation.                                                                                |
+| `DraftChange`            | type | Shelves a change to `drafts/` via serialized persistence.                                                                                                |
+| `RestoreChange`          | type | Recovers a drafted change via serialized persistence.                                                                                                    |
+| `DiscardChange`          | type | Permanently abandons a change via serialized persistence.                                                                                                |
+| `ApproveSpec`            | type | Records a spec approval through a serialized change mutation.                                                                                            |
+| `ApproveSignoff`         | type | Records a sign-off through a serialized change mutation.                                                                                                 |
+| `ArchiveChange`          | type | Finalises and archives a completed change after serializing `archiving`.                                                                                 |
+| `ValidateArtifacts`      | type | Validates artifact files and serializes completion/invalidation.                                                                                         |
+| `CompileContext`         | type | Assembles the AI instruction block for a lifecycle step.                                                                                                 |
+| `ListChanges`            | type | Lists all active changes.                                                                                                                                |
+| `ListDrafts`             | type | Lists all drafted changes.                                                                                                                               |
+| `ListDiscarded`          | type | Lists all discarded changes.                                                                                                                             |
+| `ListArchived`           | type | Lists all archived changes.                                                                                                                              |
+| `GetArchivedChange`      | type | Retrieves a single archived change.                                                                                                                      |
+| `EditChange`             | type | Edits change scope while serializing the persisted `specIds` update.                                                                                     |
+| `SkipArtifact`           | type | Explicitly skips an optional artifact on a change.                                                                                                       |
+| `UpdateSpecDeps`         | type | Updates declared spec dependencies within a change.                                                                                                      |
+| `ListSpecs`              | type | Lists all specs across all configured workspaces.                                                                                                        |
+| `GetSpec`                | type | Loads a spec and its artifact files.                                                                                                                     |
+| `SaveSpecMetadata`       | type | Writes validated metadata for a spec.                                                                                                                    |
+| `InvalidateSpecMetadata` | type | Removes content hashes from a spec's metadata.                                                                                                           |
+| `GetActiveSchema`        | type | Resolves and returns the active schema.                                                                                                                  |
+| `ValidateSchema`         | type | Validates a schema against structural rules.                                                                                                             |
+| `ValidateSpecs`          | type | Validates spec artifacts against schema structural rules.                                                                                                |
+| `GenerateSpecMetadata`   | type | Generates deterministic metadata from schema extraction rules.                                                                                           |
+| `GetSpecContext`         | type | Builds structured context entries for a spec.                                                                                                            |
+| `RunStepHooks`           | type | Executes built-in `run:` hooks and explicit `external:` hooks for a workflow step and phase.                                                             |
+| `GetHookInstructions`    | type | Returns `instruction:` hook text for a workflow step and phase.                                                                                          |
+| `GetArtifactInstruction` | type | Returns artifact-specific instructions, rules, and delta guidance.                                                                                       |
+| `GetProjectContext`      | type | Compiles project-level context without a specific change or step.                                                                                        |
+| `GetProjectSummary`      | type | Returns change and spec counts. The default path does not load entities. `includeOverlaps: true` loads active changes through `DetectOverlap.execute()`. |
 
 **From the application layer — config types:**
 

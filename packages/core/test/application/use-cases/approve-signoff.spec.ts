@@ -77,12 +77,14 @@ function buildApproveSignoff(
   return new ApproveSignoff(repo, actor, schemaProvider, approvals, reconcile, fingerprint, refresh)
 }
 
-function makeDoneWithoutVerification(name: string): Change {
-  const source = makeDoneChange(`${name}-source`)
+function makeDoneWithoutVerification(name: string, schemaName = 'test-schema'): Change {
+  const source = makeDoneChange(`${name}-source`, schemaName)
   return new Change({
     name,
     createdAt: source.createdAt,
     specIds: source.specIds,
+    schemaName,
+    schemaVersion: 1,
     history: source.history.filter(
       (event) =>
         event.type !== 'verification-attempt-started' && event.type !== 'verification-completed',
@@ -112,6 +114,8 @@ function makeDoneChange(name: string, schemaName = 'test-schema'): Change {
       name,
       createdAt,
       specIds: ['auth/login'],
+      schemaName,
+      schemaVersion: 1,
       history: events,
     }),
   )
@@ -140,6 +144,8 @@ function makePendingSignoffChange(name: string, schemaName = 'test-schema'): Cha
       name,
       createdAt: new Date('2024-01-01T00:00:00Z'),
       specIds: ['auth/login'],
+      schemaName,
+      schemaVersion: 1,
       history: events,
     }),
   )
@@ -207,6 +213,8 @@ describe('ApproveSignoff', () => {
         createdAt: current.createdAt,
         updatedAt: current.updatedAt,
         specIds: current.specIds,
+        schemaName: current.schemaName,
+        schemaVersion: current.schemaVersion,
         history: current.history,
         verification: {
           completed: {

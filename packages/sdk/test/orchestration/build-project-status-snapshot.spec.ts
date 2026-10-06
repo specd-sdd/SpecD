@@ -83,6 +83,7 @@ describe('buildProjectStatusSnapshot', () => {
     expect(getGraphHealth.execute).toHaveBeenCalledWith(
       expect.objectContaining({
         codeGraphVersion: codeGraphPackageJson.version,
+        workspaces: [{ name: 'core' }],
       }),
     )
     expect(result.graphHealth).toEqual({ fileCount: 10, stale: false })
@@ -162,6 +163,69 @@ describe('buildProjectStatusSnapshot', () => {
 
     expect(result.summary.active).toHaveLength(1)
     expect(result.summary.specsHealth?.passed).toBe(1)
+    expect(result).not.toHaveProperty('active')
+    expect(result).not.toHaveProperty('specsHealth')
+  })
+
+  it('given includeOverlaps is true, when the snapshot is built, then the flag is forwarded and overlaps stay under summary', async () => {
+    const overlaps = {
+      hasOverlap: false,
+      entries: [],
+    }
+    getProjectSummary.execute.mockResolvedValue({
+      activeCount: 1,
+      draftCount: 0,
+      discardedCount: 0,
+      archivedCount: 0,
+      specsByWorkspace: {},
+      workspaceCount: 0,
+      overlaps,
+    })
+
+    const result = await buildProjectStatusSnapshot(ctx, { includeOverlaps: true })
+
+    expect(getProjectSummary.execute).toHaveBeenCalledWith({ includeOverlaps: true })
+    expect(result.summary.overlaps).toBe(overlaps)
+    expect(result).not.toHaveProperty('overlaps')
+  })
+
+  it('given no summary flags, when the snapshot is built, then getProjectSummary stays count-only', async () => {
+    await buildProjectStatusSnapshot(ctx, {})
+
+    expect(getProjectSummary.execute).toHaveBeenCalledWith(undefined)
+  })
+
+  it('given all summary flags, when the snapshot is built, then enriched fields stay only under summary', async () => {
+    const overlaps = { hasOverlap: false, entries: [] }
+    getProjectSummary.execute.mockResolvedValue({
+      activeCount: 1,
+      draftCount: 0,
+      discardedCount: 0,
+      archivedCount: 0,
+      specsByWorkspace: {},
+      workspaceCount: 0,
+      active: [{ name: 'foo', state: 'ready', tasks: { incomplete: 1, total: 2 } }],
+      drafts: [],
+      specsHealth: { totalSpecs: 1, passed: 1, failed: 0, warned: 0, issues: [] },
+      overlaps,
+    })
+
+    const result = await buildProjectStatusSnapshot(ctx, {
+      includeChanges: true,
+      includeSpecsHealth: true,
+      includeOverlaps: true,
+    })
+
+    expect(getProjectSummary.execute).toHaveBeenCalledWith({
+      includeChanges: true,
+      includeSpecsHealth: true,
+      includeOverlaps: true,
+    })
+    expect(result.summary.active).toHaveLength(1)
+    expect(result.summary.drafts).toEqual([])
+    expect(result.summary.specsHealth?.passed).toBe(1)
+    expect(result.summary.overlaps).toBe(overlaps)
+    expect(result).not.toHaveProperty('overlaps')
     expect(result).not.toHaveProperty('active')
     expect(result).not.toHaveProperty('specsHealth')
   })

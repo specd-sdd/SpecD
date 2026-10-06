@@ -71,12 +71,21 @@
 - **AND** `Child Heading` has `startLine: 2`
 - **AND** boundaries do not overlap incorrectly
 
+#### Scenario: Section startOffset and endOffset characterize exact character bounds
+
+- **GIVEN** a document body where section 2 starts at character position 120 and ends at character position 450
+- **WHEN** section offsets are calculated
+- **THEN** `section.startOffset` equals 120
+- **AND** `section.endOffset` equals 450
+- **AND** `body.slice(section.startOffset, section.endOffset)` matches the section text exactly
+
 #### Scenario: Final section reaches exact end of file
 
 - **GIVEN** a document of 200 lines where the last heading begins on line 180
 - **WHEN** calculating the final section's boundary
 - **THEN** `section.startLine` is 180
 - **AND** `section.endLine` strictly equals 200
+- **AND** `section.endOffset` equals the total character length of the clean body
 - **AND** no lines are truncated
 
 #### Scenario: Windows CRLF and Unix LF line endings calculate identical line numbers
@@ -87,11 +96,13 @@
 
 ### Requirement: Static Catalog Artifact Generation
 
-#### Scenario: Generated TypeScript file exports typed catalog and index map
+#### Scenario: Generated TypeScript file exports typed catalog with lightweight outline entries
 
 - **GIVEN** successful compilation of 12 guides
 - **WHEN** `src/infrastructure/generated/guides.ts` is imported
 - **THEN** it exports `GUIDES_CATALOG` as an immutable array of length 12
+- **AND** outline section objects contain `startOffset` and `endOffset` numbers
+- **AND** outline section objects in `GUIDES_CATALOG` do not serialize duplicate `content` strings
 - **AND** exports `GUIDES_INDEX` mapping topic strings to array indices
 - **AND** `GUIDES_CATALOG[GUIDES_INDEX['workflow']]` directly returns the workflow guide topic
 

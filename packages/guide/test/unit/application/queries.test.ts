@@ -32,6 +32,8 @@ describe('Application Queries', () => {
       startLine: 1,
       endLine: 10,
       lines: 10,
+      startOffset: 0,
+      endOffset: 100,
       content: '# Introduction\nWelcome to SpecD',
     },
     {
@@ -41,6 +43,8 @@ describe('Application Queries', () => {
       startLine: 11,
       endLine: 20,
       lines: 10,
+      startOffset: 101,
+      endOffset: 200,
       content: '## Examples\nBasic examples',
     },
     {
@@ -50,6 +54,8 @@ describe('Application Queries', () => {
       startLine: 21,
       endLine: 35,
       lines: 15,
+      startOffset: 201,
+      endOffset: 350,
       content: '## Lifecycle States\nStates details',
     },
     {
@@ -59,6 +65,8 @@ describe('Application Queries', () => {
       startLine: 36,
       endLine: 50,
       lines: 15,
+      startOffset: 351,
+      endOffset: 500,
       content: '## Examples\nAdvanced examples',
     },
   ]

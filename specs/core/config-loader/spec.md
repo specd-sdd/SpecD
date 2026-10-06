@@ -150,7 +150,7 @@ The loader MUST validate all `contextIncludeSpecs` and `contextExcludeSpecs` pat
 
 Workspace qualifiers MUST match `/^[a-z][a-z0-9-]*$/`. Path segments MUST match `/^[a-z_][a-z0-9_-]*$/`. Invalid qualifiers or segments MUST produce `ConfigValidationError`.
 
-### Requirement: Workflow and context entry mapping
+### Requirement: Schema plugins, schema overrides, and context entry mapping
 
 The loader MUST map `schemaPlugins` as an array of strings and `schemaOverrides` as a typed operations object preserving the five operation keys (`create`, `remove`, `set`, `append`, `prepend`).
 

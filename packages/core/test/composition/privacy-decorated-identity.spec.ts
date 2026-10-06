@@ -105,7 +105,14 @@ function changeWith(
       }),
     ),
   ]
-  return new Change({ name, createdAt, specIds: ['auth/login'], history })
+  return new Change({
+    name,
+    createdAt,
+    specIds: ['auth/login'],
+    schemaName: 'test-schema',
+    schemaVersion: 1,
+    history,
+  })
 }
 
 const readyPath: ReadonlyArray<readonly [ChangeState, ChangeState]> = [

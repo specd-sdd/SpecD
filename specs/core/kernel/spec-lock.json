@@ -56,9 +56,27 @@
     "core:spec-overlap",
     "core:get-specs-health",
     "core:count-tasks",
-    "core:check-registry"
+    "core:check-registry",
+    "core:get-project-summary",
+    "core:archive-repository-port",
+    "core:get-draft",
+    "core:get-discarded",
+    "core:invalidate-change",
+    "core:update-implementation-tracking",
+    "core:refresh-implementation-tracking",
+    "core:get-implementation-review",
+    "core:preview-spec",
+    "core:get-spec-outline",
+    "core:validate-schema",
+    "core:resolve-context-specs",
+    "core:actor-resolver"
   ],
-  "implementation": [],
+  "implementation": [
+    {
+      "file": "core:src/composition/kernel.ts",
+      "symbols": ["getProjectSummary"]
+    }
+  ],
   "optimizations": {
     "optimizedDescription": {
       "value": "Facade wiring domain use cases from SpecdConfig into changes/specs/project groups; config mutation via createConfigWriter().",

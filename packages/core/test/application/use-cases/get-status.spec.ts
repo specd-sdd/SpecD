@@ -1052,6 +1052,8 @@ describe('GetStatus', () => {
       name: 'overlap-victim',
       createdAt,
       specIds: ['default:auth/login'],
+      schemaName: '@specd/schema-std',
+      schemaVersion: 1,
       history: [
         {
           type: 'created',

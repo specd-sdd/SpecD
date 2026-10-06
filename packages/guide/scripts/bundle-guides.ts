@@ -92,6 +92,23 @@ interface RawHeading {
  */
 export function extractSections(content: string): GuideSection[] {
   const lines = content.split(/\r?\n/)
+  const lineStarts: number[] = []
+  const lineEnds: number[] = []
+  let pos = 0
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!
+    lineStarts.push(pos)
+    lineEnds.push(pos + line.length)
+    pos += line.length
+    if (pos < content.length && content[pos] === '\r') {
+      pos++
+    }
+    if (pos < content.length && content[pos] === '\n') {
+      pos++
+    }
+  }
+
   const rawHeadings: RawHeading[] = []
   let inCodeBlock = false
 
@@ -138,8 +155,8 @@ export function extractSections(content: string): GuideSection[] {
       }
     }
 
-    const sectionLines = lines.slice(startLine - 1, endLine)
-    const sectionContent = sectionLines.join('\n')
+    const startOffset = lineStarts[startLine - 1] ?? 0
+    const endOffset = lineEnds[endLine - 1] ?? content.length
 
     sections.push({
       index: i + 1, // 1-indexed sequential index
@@ -148,7 +165,8 @@ export function extractSections(content: string): GuideSection[] {
       startLine,
       endLine,
       lines: endLine - startLine + 1,
-      content: sectionContent,
+      startOffset,
+      endOffset,
     })
   }
 

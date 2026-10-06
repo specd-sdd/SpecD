@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'Existing scenarios correctly refer to the manifest and do not mention the history event, thus remain valid.'

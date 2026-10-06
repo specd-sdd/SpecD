@@ -1,0 +1,23 @@
+- op: modified
+  description: 'Update initProject to single-parameter options and listPlugins to optional type'
+  selector:
+    type: section
+    matches: 'Requirement: Config writer port'
+  content: |
+    `ConfigWriter` is an application-layer port that defines the contract for writing to `specd.yaml`. It complements the read-only `ConfigLoader` with mutation operations for project initialisation and plugin management.
+
+    The port MUST define the following methods:
+
+    - `initProject(options: InitProjectOptions): Promise<InitProjectResult>` — creates a new `specd.yaml` with default content
+    - `addPlugin(configPath: string, type: string, name: string, config?: Record<string, unknown>): Promise<void>` — adds a plugin entry to `plugins.<type>`, with optional config
+    - `removePlugin(configPath: string, type: string, name: string): Promise<void>` — removes a plugin entry from `plugins.<type>`
+    - `listPlugins(configPath: string, type?: string): Promise<Array<{ name: string; config?: Record<string, unknown> }>>` — reads plugin entries from `plugins.<type>`, or all plugins if type is omitted
+
+    The `addPlugin` method accepts four parameters:
+
+    1. `configPath: string` — absolute path to the `specd.yaml` to update
+    2. `type: string` — the plugin type (e.g. `"agents"`)
+    3. `name: string` — the plugin package name (e.g. `"@specd/plugin-agent-claude"`)
+    4. `config?: Record<string, unknown>` — optional plugin configuration
+
+    It MUST return `Promise<void>`. The method MUST add the plugin to the `plugins.<type>` array in `specd.yaml`. If the plugin is already present, the method MUST NOT duplicate it.

@@ -12,6 +12,8 @@ describe('MiniSearchGuideEngineAdapter', () => {
       startLine: 1,
       endLine: 10,
       lines: 10,
+      startOffset: 0,
+      endOffset: 100,
       content: '# Introduction\nSpecD provides spec-driven development tooling.',
     },
     {
@@ -21,6 +23,8 @@ describe('MiniSearchGuideEngineAdapter', () => {
       startLine: 11,
       endLine: 30,
       lines: 20,
+      startOffset: 101,
+      endOffset: 300,
       content:
         '## Lifecycle States\nA change moves through drafting, designing, ready, implementing.',
     },
@@ -34,6 +38,8 @@ describe('MiniSearchGuideEngineAdapter', () => {
       startLine: 1,
       endLine: 25,
       lines: 25,
+      startOffset: 0,
+      endOffset: 250,
       content: '# Configuring Schemas\nSchemas govern workflow transitions and artifact rules.',
     },
     {
@@ -43,6 +49,8 @@ describe('MiniSearchGuideEngineAdapter', () => {
       startLine: 26,
       endLine: 50,
       lines: 25,
+      startOffset: 251,
+      endOffset: 500,
       content:
         '## Standard Schema\nThe standard schema defines proposal, specs, verify, design, tasks.',
     },

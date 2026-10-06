@@ -30,6 +30,8 @@ vi.mock('../../../src/helpers/cli-context.js', async () => {
 import {
   openSpecdHost,
   buildProjectStatusSnapshot,
+  OverlapEntry,
+  OverlapReport,
   type GetGraphHealthResult,
   type GetProjectSummaryResult,
 } from '@specd/sdk'
@@ -135,7 +137,10 @@ describe('project status', () => {
       includeHotspots: false,
       includeChanges: true,
       includeSpecsHealth: true,
+      includeOverlaps: true,
     })
+    expect(kernel.project.getProjectSummary.execute).not.toHaveBeenCalled()
+    expect(kernel.changes.detectOverlap.execute).not.toHaveBeenCalled()
 
     const out = stdout()
     expect(out).toContain('changes: 2 active, 1 drafts, 3 discarded, 4 archived')
@@ -209,6 +214,116 @@ describe('project status', () => {
     expect(parsed.active[0]?.name).toBe('only-active')
     expect(parsed.drafts).toEqual([])
     expect(parsed.specsHealth.passed).toBe(1)
+  })
+
+  it('given an empty overlap report, when project status runs in text mode, then it prints overlaps: (none)', async () => {
+    const { kernel, stdout } = setup()
+    stubSnapshot(kernel, {
+      ...emptySummary,
+      overlaps: new OverlapReport([]),
+    })
+
+    const program = makeProgram()
+    registerProjectStatus(program.command('project'))
+    await program.parseAsync(['node', 'specd', 'project', 'status'])
+
+    expect(stdout()).toContain('overlaps: (none)')
+  })
+
+  it('given an overlap for core:get-project-summary, when project status runs in text mode, then it lists the spec id and change names', async () => {
+    const { kernel, stdout } = setup()
+    stubSnapshot(kernel, {
+      ...emptySummary,
+      overlaps: new OverlapReport([
+        new OverlapEntry('core:get-project-summary', [
+          { name: 'alpha', state: 'designing' },
+          { name: 'beta', state: 'implementing' },
+        ]),
+      ]),
+    })
+
+    const program = makeProgram()
+    registerProjectStatus(program.command('project'))
+    await program.parseAsync(['node', 'specd', 'project', 'status'])
+
+    expect(stdout()).toContain('  core:get-project-summary: alpha [designing], beta [implementing]')
+  })
+
+  it('given a populated overlap report, when project status runs as json, then overlaps is on the command root', async () => {
+    const { kernel, stdout } = setup()
+    stubSnapshot(kernel, {
+      ...emptySummary,
+      overlaps: new OverlapReport([
+        new OverlapEntry('cli:project-status', [{ name: 'alpha', state: 'ready' }]),
+      ]),
+    })
+
+    const program = makeProgram()
+    registerProjectStatus(program.command('project'))
+    await program.parseAsync(['node', 'specd', 'project', 'status', '--format', 'json'])
+
+    const parsed = JSON.parse(stdout()) as {
+      overlaps: {
+        hasOverlap: boolean
+        entries: Array<{ specId: string; changes: Array<{ name: string; state: string }> }>
+      }
+    }
+    expect(parsed.overlaps).toEqual({
+      hasOverlap: true,
+      entries: [
+        {
+          specId: 'cli:project-status',
+          changes: [{ name: 'alpha', state: 'ready' }],
+        },
+      ],
+    })
+    expect(parsed).not.toHaveProperty('summary')
+  })
+
+  it('given an empty overlap report, when project status runs as json, then root overlaps has hasOverlap false', async () => {
+    const { kernel, stdout } = setup()
+    stubSnapshot(kernel, {
+      ...emptySummary,
+      overlaps: new OverlapReport([]),
+    })
+
+    const program = makeProgram()
+    registerProjectStatus(program.command('project'))
+    await program.parseAsync(['node', 'specd', 'project', 'status', '--format', 'json'])
+
+    const parsed = JSON.parse(stdout()) as { overlaps: { hasOverlap: boolean; entries: unknown[] } }
+    expect(parsed.overlaps).toEqual({ hasOverlap: false, entries: [] })
+  })
+
+  it('given the snapshot omits overlaps, when project status runs as json, then the root key is absent', async () => {
+    const { kernel, stdout } = setup()
+    stubSnapshot(kernel, emptySummary)
+
+    const program = makeProgram()
+    registerProjectStatus(program.command('project'))
+    await program.parseAsync(['node', 'specd', 'project', 'status', '--format', 'json'])
+
+    const parsed = JSON.parse(stdout()) as Record<string, unknown>
+    expect(parsed).not.toHaveProperty('overlaps')
+  })
+
+  it('given a populated overlap report, when project status runs as toon, then overlaps fields are present', async () => {
+    const { kernel, stdout } = setup()
+    stubSnapshot(kernel, {
+      ...emptySummary,
+      overlaps: new OverlapReport([
+        new OverlapEntry('cli:project-status', [{ name: 'alpha', state: 'ready' }]),
+      ]),
+    })
+
+    const program = makeProgram()
+    registerProjectStatus(program.command('project'))
+    await program.parseAsync(['node', 'specd', 'project', 'status', '--format', 'toon'])
+
+    const out = stdout()
+    expect(out).toContain('hasOverlap: true')
+    expect(out).toContain('specId: "cli:project-status"')
+    expect(out).toContain('alpha,ready')
   })
 
   it('includes archived count in JSON output', async () => {
@@ -452,6 +567,14 @@ describe('project status', () => {
     registerProjectStatus(program.command('project'))
     await program.parseAsync(['node', 'specd', 'project', 'status', '--graph'])
 
+    expect(buildProjectStatusSnapshot).toHaveBeenCalledWith(expect.objectContaining({ kernel }), {
+      includeGraph: true,
+      includeHotspots: true,
+      includeChanges: true,
+      includeSpecsHealth: true,
+      includeOverlaps: true,
+    })
+
     const out = stdout()
     expect(out).toContain('graph.files: 42')
     expect(out).toContain('graph.symbols: 99')
@@ -469,5 +592,23 @@ describe('project status', () => {
     const out = stdout()
     expect(out).not.toContain('graph.files:')
     expect(out).not.toContain('graph.symbols:')
+  })
+
+  it('given project status help, when the schema is shown, then overlaps and approvals match the payload', async () => {
+    const program = makeProgram()
+    registerProjectStatus(program.command('project'))
+    const stdout = captureStdout()
+
+    await program.parseAsync(['node', 'specd', 'project', 'status', '--help']).catch(() => {
+      // exitOverride throws on --help
+    })
+
+    const help = stdout()
+    expect(help).toContain('overlaps: { entries, hasOverlap }')
+    expect(help).not.toContain('overlaps?:')
+    expect(help).toContain('approvals: { specEnabled, signoffEnabled }')
+    expect(help).not.toContain('approvals: { spec, signoff }')
+    expect(help).toContain('isExternal')
+    expect(help).toContain('codeRoot')
   })
 })

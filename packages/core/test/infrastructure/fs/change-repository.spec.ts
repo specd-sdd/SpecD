@@ -102,6 +102,8 @@ function makeChange(name: string, createdAt?: Date): Change {
     name,
     createdAt: at,
     specIds: ['auth/login'],
+    schemaName: '@specd/schema-std',
+    schemaVersion: 1,
     history: [
       {
         type: 'created',
@@ -438,6 +440,8 @@ describe('FsChangeRepository', () => {
         name: 'add-auth',
         createdAt: at,
         specIds: ['auth/login'],
+        schemaName: '@specd/schema-std',
+        schemaVersion: 1,
         history: [
           {
             type: 'created',
@@ -1457,6 +1461,8 @@ describe('FsChangeRepository', () => {
         name,
         createdAt: at,
         specIds,
+        schemaName: '@specd/schema-std',
+        schemaVersion: 1,
         history: [
           {
             type: 'created',
@@ -1584,6 +1590,8 @@ describe('FsChangeRepository', () => {
         name,
         createdAt: at,
         specIds: ['auth/login'],
+        schemaName: '@specd/schema-std',
+        schemaVersion: 1,
         history: [
           {
             type: 'created',
@@ -1735,6 +1743,8 @@ describe('FsChangeRepository', () => {
         name: 'c1',
         createdAt: at,
         specIds: ['auth/login'],
+        schemaName: '@specd/schema-std',
+        schemaVersion: 1,
         history: [
           {
             type: 'created',
@@ -1837,6 +1847,8 @@ describe('FsChangeRepository', () => {
         name: 'c2',
         createdAt: at,
         specIds: ['auth/login'],
+        schemaName: '@specd/schema-std',
+        schemaVersion: 1,
         history: [
           {
             type: 'created',
@@ -1934,6 +1946,8 @@ describe('FsChangeRepository', () => {
         name: 'c3',
         createdAt: at,
         specIds: ['auth/login'],
+        schemaName: '@specd/schema-std',
+        schemaVersion: 1,
         history: [
           {
             type: 'created',
@@ -1989,6 +2003,8 @@ describe('FsChangeRepository', () => {
         name: 'drift-lock-test',
         createdAt: at,
         specIds: ['auth/login'],
+        schemaName: '@specd/schema-std',
+        schemaVersion: 1,
         history: [
           {
             type: 'created',
@@ -2167,6 +2183,8 @@ describe('FsChangeRepository', () => {
         name: 'c1',
         createdAt: new Date('2024-01-15T10:00:00.000Z'),
         specIds: ['auth/login'],
+        schemaName: '@specd/schema-std',
+        schemaVersion: 1,
         history: [
           {
             type: 'created',
@@ -2191,6 +2209,8 @@ describe('FsChangeRepository', () => {
         name: 'c1',
         createdAt: new Date('2024-01-15T10:00:00.000Z'),
         specIds: ['auth/login'],
+        schemaName: '@specd/schema-std',
+        schemaVersion: 1,
         history: [
           {
             type: 'created',
@@ -2215,6 +2235,8 @@ describe('FsChangeRepository', () => {
         name: 'c1',
         createdAt: new Date('2024-01-15T10:00:00.000Z'),
         specIds: ['auth/login'],
+        schemaName: '@specd/schema-std',
+        schemaVersion: 1,
         history: [
           {
             type: 'created',
@@ -2342,6 +2364,8 @@ describe('FsChangeRepository', () => {
         name: 'c1',
         createdAt: at,
         specIds: ['auth/login'],
+        schemaName: '@specd/schema-std',
+        schemaVersion: 1,
         history: [
           {
             type: 'created',
@@ -2399,6 +2423,8 @@ describe('FsChangeRepository', () => {
         name: 'c2',
         createdAt: at,
         specIds: ['auth/login'],
+        schemaName: '@specd/schema-std',
+        schemaVersion: 1,
         history: [
           {
             type: 'created',
@@ -2473,6 +2499,8 @@ describe('FsChangeRepository', () => {
         name: 'c3',
         createdAt: at,
         specIds: ['auth/login'],
+        schemaName: '@specd/schema-std',
+        schemaVersion: 1,
         history: [
           {
             type: 'created',
@@ -2557,6 +2585,8 @@ describe('FsChangeRepository', () => {
         name: 'uninit-drift-test',
         createdAt: at,
         specIds: ['auth/login'],
+        schemaName: '@specd/schema-std',
+        schemaVersion: 1,
         history: [
           {
             type: 'created',
@@ -2705,6 +2735,8 @@ describe('FsChangeRepository', () => {
         name: 'c-normalization',
         createdAt: new Date('2024-01-15T10:00:00.000Z'),
         specIds: ['core:auth'],
+        schemaName: '@specd/schema-std',
+        schemaVersion: 1,
         history: [
           {
             type: 'created',
@@ -2818,6 +2850,8 @@ describe('FsChangeRepository', () => {
         name: 'legacy-hydrate',
         createdAt: new Date('2024-01-15T10:00:00.000Z'),
         specIds: ['auth/login'],
+        schemaName: 'std',
+        schemaVersion: 1,
         history: [
           {
             type: 'created',
@@ -2984,6 +3018,24 @@ describe('FsChangeRepository', () => {
       expect((await repo.implementationFile(loaded!, '../outside.txt')).status).toBe(
         'outside-project',
       )
+    })
+  })
+
+  describe('schema persistence', () => {
+    it('serializes root schema directly from Change properties', async () => {
+      const change = new Change({
+        name: 'schema-source-test',
+        createdAt: new Date('2024-01-15T10:00:00.000Z'),
+        specIds: ['auth/login'],
+        schemaName: '@specd/schema-std',
+        schemaVersion: 1,
+        history: [],
+      })
+      await persistChange(ctx.repo, change)
+
+      const dir = path.join(ctx.changesPath, '20240115-100000-schema-source-test')
+      const raw = JSON.parse(await fs.readFile(path.join(dir, 'manifest.json'), 'utf8'))
+      expect(raw.schema).toEqual({ name: '@specd/schema-std', version: 1 })
     })
   })
 })

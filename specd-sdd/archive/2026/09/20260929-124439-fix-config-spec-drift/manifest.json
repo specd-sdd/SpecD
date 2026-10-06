@@ -1,0 +1,336 @@
+{
+  "name": "fix-config-spec-drift",
+  "createdAt": "2026-09-29T12:44:39.422Z",
+  "updatedAt": "2026-09-29T13:47:41.386Z",
+  "description": "Fix spec drift in core:config, core:config-loader, and core:config-writer-port to align normative specs with existing implementation. Resolves Issue #57 by correcting initProject and listPlugins signatures and removing obsolete hook mapping scenarios.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": ["core:config", "core:config-loader", "core:config-writer-port"],
+  "specDependsOn": {
+    "core:config": ["core:vcs-adapter-port", "default:_global/architecture"],
+    "core:config-loader": [
+      "core:config",
+      "core:composition",
+      "core:schema-merge",
+      "default:_global/architecture",
+      "core:vcs-adapter-port",
+      "core:vcs-adapter"
+    ],
+    "core:config-writer-port": ["default:_global/architecture", "core:config"]
+  },
+  "invalidationPolicy": "downstream",
+  "implementationTrackingStartedAt": "2026-09-29T13:23:43.383Z",
+  "trackedImplementationFiles": [
+    {
+      "file": "dev/scripts/spec-completeness-poc.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "dev/scripts/universal-spec-completeness-codegraph-ontology.md",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/guide/src/infrastructure/generated/guides.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/ports/config-writer.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/config-writer.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/config-loader.ts",
+      "state": "resolved"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "core:config-writer-port",
+      "file": "packages/core/src/application/ports/config-writer.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["ConfigWriter"]
+    },
+    {
+      "specId": "core:config",
+      "file": "packages/core/src/application/ports/config-writer.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["ConfigWriter"]
+    },
+    {
+      "specId": "core:config-writer-port",
+      "file": "packages/core/src/infrastructure/fs/config-writer.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["FsConfigWriter"]
+    },
+    {
+      "specId": "core:config",
+      "file": "packages/core/src/infrastructure/fs/config-writer.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["FsConfigWriter"]
+    },
+    {
+      "specId": "core:config-loader",
+      "file": "packages/core/src/infrastructure/fs/config-loader.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["FsConfigLoader"]
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:2ca997e4f0d2cd027874a83f38e4f081497681a2fb1b15678936504ebda9b361"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:config",
+          "filename": "deltas/core/config/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:a04453b989bd425056eeabc50a6ca70bcb9c8cec5b728535ab63d14740bf8d4d"
+        },
+        {
+          "key": "core:config-loader",
+          "filename": "deltas/core/config-loader/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b1e6b17b62cff29f395a9d81576d05f88b1ac731fd584a6e19c0205187ecd7f8"
+        },
+        {
+          "key": "core:config-writer-port",
+          "filename": "deltas/core/config-writer-port/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:1db005b45ae42fe547ff78a0e521a73b1feb84e81f43c7ffa05b5717cd82cbb7"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:config",
+          "filename": "deltas/core/config/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b3953c51c30390d0e166931e50ba8b9c89e308a51d90182df6e10bdb0abc1b1e"
+        },
+        {
+          "key": "core:config-loader",
+          "filename": "deltas/core/config-loader/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:a6360b086aef727267d8758c1070768b47a4cf2cbd07950854771c87e9fb5052"
+        },
+        {
+          "key": "core:config-writer-port",
+          "filename": "deltas/core/config-writer-port/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:ec92021e7044719de3dc4e32181afdef0925aee854ffc946462089ed01c0a517"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:3ce68e4acadeade8dbf3e1335838841d9bdede595cd13c804925018bb5d1e596"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "verify", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:bebe05573b5b77f5d64c0fabf621a5111f73ef4ce1001c5a9519f3155e59fe96"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-09-29T12:44:39.422Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": ["core:config", "core:config-loader", "core:config-writer-port"],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-09-29T12:44:39.452Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "core:config"
+        },
+        {
+          "type": "specs",
+          "key": "core:config-loader"
+        },
+        {
+          "type": "specs",
+          "key": "core:config-writer-port"
+        },
+        {
+          "type": "verify",
+          "key": "core:config"
+        },
+        {
+          "type": "verify",
+          "key": "core:config-loader"
+        },
+        {
+          "type": "verify",
+          "key": "core:config-writer-port"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-29T13:10:13.764Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-29T13:17:18.007Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-29T13:23:43.383Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-29T13:29:36.502Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-29T13:32:30.738Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-29T13:33:05.945Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-09-29T13:47:27.224Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "description": "Fix spec drift in core:config, core:config-loader, and core:config-writer-port to align normative specs with existing implementation. Resolves Issue #57 by correcting initProject and listPlugins signatures and removing obsolete hook mapping scenarios."
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-29T13:47:41.384Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-09-29T13:47:41.655Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

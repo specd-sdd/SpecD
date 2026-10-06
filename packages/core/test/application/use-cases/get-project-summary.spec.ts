@@ -3,14 +3,21 @@ import {
   type ActiveChangeListEntry,
   type DraftedChangeListEntry,
 } from '../../../src/domain/change-list-entry.js'
+import { OverlapEntry } from '../../../src/domain/value-objects/overlap-entry.js'
+import { OverlapReport } from '../../../src/domain/value-objects/overlap-report.js'
 import { GetProjectSummary } from '../../../src/application/use-cases/get-project-summary.js'
 import { type ArchiveRepository } from '../../../src/application/ports/archive-repository.js'
 import { type ChangeRepository } from '../../../src/application/ports/change-repository.js'
 import { type CountTasks } from '../../../src/application/use-cases/count-tasks.js'
+import { type DetectOverlap } from '../../../src/application/use-cases/detect-overlap.js'
 import { type GetSpecsHealth } from '../../../src/application/use-cases/get-specs-health.js'
 import { type ListChanges } from '../../../src/application/use-cases/list-changes.js'
 import { type ListDrafts } from '../../../src/application/use-cases/list-drafts.js'
-import { type ListWorkspaces } from '../../../src/application/use-cases/list-workspaces.js'
+import {
+  type ListWorkspaces,
+  type ProjectWorkspace,
+} from '../../../src/application/use-cases/list-workspaces.js'
+import { type SpecRepository } from '../../../src/application/ports/spec-repository.js'
 
 function makeEnrichmentDeps() {
   const listChanges = {
@@ -31,8 +38,11 @@ function makeEnrichmentDeps() {
       issues: [],
     }),
   } as unknown as GetSpecsHealth
+  const detectOverlap = {
+    execute: vi.fn().mockResolvedValue(new OverlapReport([])),
+  } as unknown as DetectOverlap
 
-  return { listChanges, listDrafts, countTasks, getSpecsHealth }
+  return { listChanges, listDrafts, countTasks, getSpecsHealth, detectOverlap }
 }
 
 function makeDeps(overrides: {
@@ -78,6 +88,7 @@ function createUseCase(deps: ReturnType<typeof makeDeps>): GetProjectSummary {
     deps.listDrafts,
     deps.countTasks,
     deps.getSpecsHealth,
+    deps.detectOverlap,
   )
 }
 
@@ -109,6 +120,40 @@ describe('GetProjectSummary', () => {
     expect(deps.listDrafts.execute).not.toHaveBeenCalled()
     expect(deps.countTasks.execute).not.toHaveBeenCalled()
     expect(deps.getSpecsHealth.execute).not.toHaveBeenCalled()
+  })
+
+  it('given change counts are still pending, when workspaces resolve, then spec counts start', async () => {
+    let releaseActiveCount: (value: number) => void = () => {
+      throw new Error('active count release was not installed')
+    }
+    const activeCount = new Promise<number>((resolve) => {
+      releaseActiveCount = resolve
+    })
+    const specCount = vi.fn().mockResolvedValue(2)
+    const deps = makeDeps({ workspaces: [{ name: 'core', count: 2 }] })
+    ;(deps.changes.count as unknown as ReturnType<typeof vi.fn>).mockReturnValue(activeCount)
+    ;(deps.listWorkspaces.execute as unknown as ReturnType<typeof vi.fn>).mockResolvedValue([
+      {
+        name: 'core',
+        prefix: null,
+        codeRoot: '/project/core',
+        isExternal: false,
+        ownership: 'owned',
+        specRepo: { count: specCount } as unknown as SpecRepository,
+      },
+    ] satisfies ProjectWorkspace[])
+
+    const pending = createUseCase(deps).execute()
+    await vi.waitFor(() => {
+      expect(specCount).toHaveBeenCalled()
+    })
+
+    releaseActiveCount(4)
+    await expect(pending).resolves.toMatchObject({
+      activeCount: 4,
+      specsByWorkspace: { core: 2 },
+      workspaceCount: 1,
+    })
   })
 
   it('uses archive count() instead of paginated list length', async () => {
@@ -187,6 +232,7 @@ describe('GetProjectSummary', () => {
       enrichment.listDrafts,
       enrichment.countTasks,
       enrichment.getSpecsHealth,
+      enrichment.detectOverlap,
     )
     await uc.execute()
 
@@ -274,5 +320,75 @@ describe('GetProjectSummary', () => {
     expect(result.active).toBeUndefined()
     expect(result.drafts).toBeUndefined()
     expect(deps.countTasks.execute).not.toHaveBeenCalled()
+  })
+
+  it('given two active changes share a spec, when includeOverlaps is true, then the unfiltered overlap report is returned', async () => {
+    const deps = makeDeps({ workspaces: [] })
+    const report = new OverlapReport([
+      new OverlapEntry('core:get-project-summary', [
+        { name: 'alpha', state: 'designing' },
+        { name: 'beta', state: 'implementing' },
+      ]),
+    ])
+    vi.mocked(deps.detectOverlap.execute).mockResolvedValue(report)
+
+    const result = await createUseCase(deps).execute({ includeOverlaps: true })
+
+    expect(deps.detectOverlap.execute).toHaveBeenCalledWith()
+    expect(result.overlaps).toBe(report)
+    expect(result.overlaps?.hasOverlap).toBe(true)
+  })
+
+  it('given includeOverlaps is false or omitted, when execute runs, then overlaps is absent and DetectOverlap is not called', async () => {
+    const deps = makeDeps({ workspaces: [] })
+
+    const omitted = await createUseCase(deps).execute()
+    const disabled = await createUseCase(deps).execute({ includeOverlaps: false })
+
+    expect(omitted).not.toHaveProperty('overlaps')
+    expect(disabled).not.toHaveProperty('overlaps')
+    expect(deps.detectOverlap.execute).not.toHaveBeenCalled()
+  })
+
+  it('given GetSpecsHealth reports a spec that is also in an active change, when includeSpecsHealth is true, then specsHealth still includes that spec', async () => {
+    const deps = makeDeps({ workspaces: [] })
+    const health = {
+      totalSpecs: 2,
+      passed: 1,
+      failed: 1,
+      warned: 0,
+      issues: [
+        {
+          spec: 'core:get-project-summary',
+          passed: false,
+          failures: [{ artifactId: 'spec', description: 'broken' }],
+          warnings: [],
+        },
+      ],
+    }
+    vi.mocked(deps.getSpecsHealth.execute).mockResolvedValue(health)
+
+    const result = await createUseCase(deps).execute({
+      includeSpecsHealth: true,
+      includeOverlaps: true,
+    })
+
+    expect(deps.getSpecsHealth.execute).toHaveBeenCalledWith({})
+    expect(result.specsHealth).toEqual(health)
+    expect(
+      result.specsHealth?.issues.some((issue) => issue.spec === 'core:get-project-summary'),
+    ).toBe(true)
+  })
+
+  it('given DetectOverlap returns an empty report, when includeOverlaps is true, then overlaps is present with hasOverlap false', async () => {
+    const deps = makeDeps({ workspaces: [] })
+    const report = new OverlapReport([])
+    vi.mocked(deps.detectOverlap.execute).mockResolvedValue(report)
+
+    const result = await createUseCase(deps).execute({ includeOverlaps: true })
+
+    expect(result.overlaps).toBe(report)
+    expect(result.overlaps?.entries).toEqual([])
+    expect(result.overlaps?.hasOverlap).toBe(false)
   })
 })

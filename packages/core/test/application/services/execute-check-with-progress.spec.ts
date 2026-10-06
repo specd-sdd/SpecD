@@ -15,6 +15,8 @@ function makeCtx(onCheckProgress?: (event: CheckProgressEvent) => void): CheckEx
     name: 'c',
     createdAt: new Date('2024-01-01T00:00:00Z'),
     specIds: ['default:auth/login'],
+    schemaName: '@specd/schema-std',
+    schemaVersion: 1,
     history: [
       {
         type: 'created',

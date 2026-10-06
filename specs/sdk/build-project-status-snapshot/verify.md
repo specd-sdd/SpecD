@@ -16,6 +16,17 @@
 - **WHEN** `buildProjectStatusSnapshot(ctx, { includeChanges: true, includeSpecsHealth: true })` is called
 - **THEN** `getProjectSummary.execute` is invoked with `includeChanges: true` and `includeSpecsHealth: true`
 
+#### Scenario: includeOverlaps forwarded to getProjectSummary
+
+- **WHEN** `buildProjectStatusSnapshot(ctx, { includeOverlaps: true })` is called
+- **THEN** `getProjectSummary.execute` is invoked with `includeOverlaps: true`
+- **AND** the snapshot does not call `DetectOverlap`
+
+#### Scenario: All summary flags omitted stay count-only
+
+- **WHEN** `buildProjectStatusSnapshot(ctx, {})` is called
+- **THEN** `getProjectSummary.execute` is invoked without `includeChanges`, `includeSpecsHealth`, or `includeOverlaps`
+
 #### Scenario: Graph health included when requested
 
 - **WHEN** `buildProjectStatusSnapshot(ctx, { includeGraph: true })` is called
@@ -58,8 +69,8 @@
 
 #### Scenario: Enriched fields live only under summary
 
-- **WHEN** snapshot is built with `includeChanges` and `includeSpecsHealth`
-- **THEN** `summary.active`, `summary.drafts`, and `summary.specsHealth` are present when the use case returns them
+- **WHEN** snapshot is built with `includeChanges`, `includeSpecsHealth`, and `includeOverlaps`
+- **THEN** `summary.active`, `summary.drafts`, `summary.specsHealth`, and `summary.overlaps` are present when the use case returns them
 - **AND** the snapshot root does not duplicate those fields outside `summary`
 
 ### Requirement: No presenter formatting

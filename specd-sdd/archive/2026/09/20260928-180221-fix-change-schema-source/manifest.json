@@ -1,0 +1,729 @@
+{
+  "name": "fix-change-schema-source",
+  "createdAt": "2026-09-28T18:02:21.334Z",
+  "updatedAt": "2026-09-29T10:29:38.003Z",
+  "description": "Make manifest root schema the single source of truth for Change entity instead of history events",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": ["core:change", "core:change-manifest", "core:create-change", "core:edit-change"],
+  "specDependsOn": {
+    "core:change": [
+      "core:change-manifest",
+      "core:workflow-model",
+      "core:spec-metadata",
+      "core:spec-id-format",
+      "default:_global/architecture",
+      "core:lifecycle-engine",
+      "default:_global/logging",
+      "core:implementation-detector-port"
+    ],
+    "core:change-manifest": [
+      "core:change",
+      "core:change-layout",
+      "core:storage",
+      "core:spec-metadata",
+      "core:spec-id-format",
+      "core:workspace"
+    ],
+    "core:create-change": [
+      "core:change",
+      "default:_global/architecture",
+      "core:get-active-schema",
+      "core:spec-overlap",
+      "core:composition-resolver"
+    ],
+    "core:edit-change": ["core:change", "core:composition", "core:composition-resolver"]
+  },
+  "invalidationPolicy": "downstream",
+  "implementationTrackingStartedAt": "2026-09-29T08:32:12.835Z",
+  "trackedImplementationFiles": [
+    {
+      "file": "dev/scripts/spec-completeness-poc.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "dev/scripts/universal-spec-completeness-codegraph-ontology.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/_global/continuous-integration/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/_global/docs/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/code-graph/staleness-detection/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/code-graph/workspace-integration/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/change/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/get-project-context/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/refresh-implementation-tracking/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/resolve-context-specs/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/spec-id-format/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/update-implementation-tracking/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/workspace/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/entities/change.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/errors/incompatible-schema-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/change-repository.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/manifest-change-loader.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/_shared/load-persisted-spec-schema.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/create-change.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/edit-change.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/integration/sqlite-wide-traversal.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/errors/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/approve-signoff.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/approve-spec.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/archive-change-batch-restore.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/archive-change.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/compile-context.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/create-change.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/edit-change.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/get-artifact-instruction.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/helpers.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/invalidate-change.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/skip-artifact.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/transition-change.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/validate-artifacts.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/domain/entities/archived-change.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/domain/entities/change-device-name.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/domain/entities/change.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/domain/services/detect-spec-overlap.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/domain/services/lifecycle-engine.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/infrastructure/fs/archive-repository.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/infrastructure/fs/change-repository.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/infrastructure/vcs/vcs-implementation-detector.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/get-change-spec-coverage.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/composition/host-use-case-factories.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/sqlite/sqlite-worker-dist.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/src/infrastructure/generated/guides.ts",
+      "state": "resolved"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "core:change",
+      "file": "packages/core/src/domain/entities/change.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["ChangeProps", "Change"]
+    },
+    {
+      "specId": "core:create-change",
+      "file": "packages/core/src/domain/errors/incompatible-schema-error.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["IncompatibleSchemaError"]
+    },
+    {
+      "specId": "core:edit-change",
+      "file": "packages/core/src/domain/errors/incompatible-schema-error.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["IncompatibleSchemaError"]
+    },
+    {
+      "specId": "core:change-manifest",
+      "file": "packages/core/src/infrastructure/fs/change-repository.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["changeToManifest", "FsChangeRepository"]
+    },
+    {
+      "specId": "core:change-manifest",
+      "file": "packages/core/src/infrastructure/fs/manifest-change-loader.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["loadChangeFromManifest"]
+    },
+    {
+      "specId": "core:create-change",
+      "file": "packages/core/src/application/use-cases/_shared/load-persisted-spec-schema.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["loadPersistedSpecSchema"]
+    },
+    {
+      "specId": "core:create-change",
+      "file": "packages/core/src/application/use-cases/create-change.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["CreateChange"]
+    },
+    {
+      "specId": "core:edit-change",
+      "file": "packages/core/src/application/use-cases/_shared/load-persisted-spec-schema.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["loadPersistedSpecSchema"]
+    },
+    {
+      "specId": "core:edit-change",
+      "file": "packages/core/src/application/use-cases/edit-change.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["EditChange"]
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:437183c053b9d092a4a5193da96611cc70febfd1eb856c49de57737b401579f6"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:change",
+          "filename": "deltas/core/change/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:7d585f1263fd83c54783bc5b1b657568156eb7c5fd3ce2b1f65fd359bf4cd1e8"
+        },
+        {
+          "key": "core:change-manifest",
+          "filename": "deltas/core/change-manifest/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:8c1f5aa876c274af18d58522c321e1bcc56d509a47fe71550bd560fe47a0ff1c"
+        },
+        {
+          "key": "core:create-change",
+          "filename": "deltas/core/create-change/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:fd085cee87885fbf94f76029df75f31407387044c9a2791da86760f089008249"
+        },
+        {
+          "key": "core:edit-change",
+          "filename": "deltas/core/edit-change/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:e4a0599e556804f0dc675ce4d188bb9ab0de301dba9abd27955f6b2999eb8a80"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:change",
+          "filename": "deltas/core/change/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:9e5337078c24d8c8d55dcf86e91453954cf1d80e498ed0017a48236acd3af526"
+        },
+        {
+          "key": "core:change-manifest",
+          "filename": "deltas/core/change-manifest/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:ac228c6ae08848398e8a83d53429a7287b042447fa37ae612fcb03e201a455c1"
+        },
+        {
+          "key": "core:create-change",
+          "filename": "deltas/core/create-change/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:7472ec700a3d244b52ad1f26dd7978b203938ee009c1c7fd5c3fcaad3cec51d4"
+        },
+        {
+          "key": "core:edit-change",
+          "filename": "deltas/core/edit-change/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:cdfea59873a686feef17eb1e01719e8292695d576f4e43e3fcb537b170d7c057"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:d559bd5dab2a0a72c454540b3c09d10e4501719103ad0a078ac35e953d24ca42"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "verify", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:3a7d2869218f23906639d4f1087815da27eda5da09f178ba72dc92c382fb2c40"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-09-28T18:02:21.334Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": ["core:change", "core:change-manifest"],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-09-28T18:02:21.370Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "core:change"
+        },
+        {
+          "type": "specs",
+          "key": "core:change-manifest"
+        },
+        {
+          "type": "verify",
+          "key": "core:change"
+        },
+        {
+          "type": "verify",
+          "key": "core:change-manifest"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-28T18:03:19.125Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-28T18:11:12.815Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-09-28T18:12:45.179Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["core:change", "core:change-manifest"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:change", "core:change-manifest"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-28T18:12:45.179Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-28T18:13:55.441Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-09-28T18:17:05.682Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["core:change", "core:change-manifest"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:change", "core:change-manifest"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-28T18:17:05.682Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-28T18:17:18.590Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-09-29T05:45:19.774Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["core:change", "core:change-manifest"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:change", "core:change-manifest"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-29T05:45:19.774Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-09-29T05:45:19.777Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:create-change"
+        },
+        {
+          "type": "specs",
+          "key": "core:edit-change"
+        },
+        {
+          "type": "verify",
+          "key": "core:create-change"
+        },
+        {
+          "type": "verify",
+          "key": "core:edit-change"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-29T05:48:34.933Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-29T08:32:12.835Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-29T09:16:38.666Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-29T09:23:32.372Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-29T09:24:00.150Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-29T10:29:38.002Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-09-29T10:29:38.118Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

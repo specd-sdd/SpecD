@@ -74,6 +74,8 @@ function makeReadyChange(name: string, schemaName = 'test-schema'): Change {
     name,
     createdAt,
     specIds: ['auth/login'],
+    schemaName,
+    schemaVersion: 1,
     history: events,
   })
 }
@@ -103,6 +105,8 @@ function makePendingSpecApprovalChange(name: string, schemaName = 'test-schema')
     name,
     createdAt: new Date('2024-01-01T00:00:00Z'),
     specIds: ['auth/login'],
+    schemaName,
+    schemaVersion: 1,
     history: events,
   })
 }
@@ -188,6 +192,8 @@ describe('ApproveSpec', () => {
         name: 'my-change',
         createdAt,
         specIds: ['auth/login'],
+        schemaName: 'test-schema',
+        schemaVersion: 1,
         history: [
           {
             type: 'created',

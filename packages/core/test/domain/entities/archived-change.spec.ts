@@ -15,6 +15,8 @@ function makeArchivedView(
     name,
     createdAt,
     specIds,
+    schemaName: opts.schemaName ?? '@specd/schema-std',
+    schemaVersion: 1,
     history: [
       {
         type: 'created',
