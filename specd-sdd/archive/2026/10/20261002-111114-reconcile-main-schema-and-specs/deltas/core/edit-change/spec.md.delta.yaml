@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'EditChange schema compatibility guardrail on addSpecIds reconciled from main merge'

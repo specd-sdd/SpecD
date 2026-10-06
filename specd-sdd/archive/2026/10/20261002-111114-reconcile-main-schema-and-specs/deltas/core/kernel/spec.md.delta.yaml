@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'Kernel ports, boundaries, and project summary overlap capability reconciled from main merge'
