@@ -7,7 +7,46 @@
   "implementation": [
     {
       "file": "guide:src/application/queries/get-guide-outline-query.ts",
-      "symbols": ["GetGuideOutlineQuery", "GetGuideOutlineInput"]
+      "symbols": ["GetGuideOutlineQuery"]
+    },
+    {
+      "file": "guide:test/unit/application/queries.spec.ts"
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "GetGuideOutlineQuery: topic → GuideOutline — synthesized `${topic}.md` filename (not a path), line/byte stats, 1-indexed sections; throws GuideTopicNotFoundError",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:dbc353e3778acb27ebc6d33253025306bf4c2acd00c1001d1da08369776744cf",
+          "lastModified": "2026-09-24T13:35:20.784Z"
+        },
+        "verify.md": {
+          "hash": "sha256:ae705bf6407cb7ffca20043951ded8649ec149a29844e39288d32e2a8abafb05",
+          "lastModified": "2026-09-24T13:35:20.786Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# GetGuideOutlineQuery\n\nTopic → `GuideOutline` structural map: doc stats + heading/line-span sections, no body text. Cheap token probe for agents & tools.\n\n## Rules\n\n- Impl `GetGuideOutlineQuery` (application layer). Input `{ topic: string }`.\n- Ctor takes `GuideCatalogPort`, wraps `GetGuideQuery`. Unknown topic → `GuideTopicNotFoundError` (`error.code` `'UNKNOWN_GUIDE_TOPIC'`) thrown by inner `GetGuideQuery`, propagated uncaught (not re-thrown locally).\n- Returns `GuideOutline`:\n  - `topic` — canonical topic id; `GetGuideQuery` normalizes: trim, strip trailing `.md`, lowercase.\n  - `file` — **SYNTHESIZED bare filename** = `` `${guide.topic}.md` ``. NOT a real path: no dir component, no collection info. Coincides with real file only while topic == lowercased basename of a single-dir catalog. Breaks for namespaced `collection:topic` keys: `core:ports` → `core:ports.md`, no such file.\n  - `lines` ← `guide.lineCount`; `bytes` ← `guide.byteLength` (UTF-8 bytes of body, frontmatter excluded).\n  - `sections` ← `guide.outline` verbatim (`GuideSection[]`): `index` 1-indexed, `heading` (no leading `#`), `level` 1–6, `startLine`/`endLine` 1-indexed, `lines` = `endLine - startLine + 1`. Also carries `startOffset`/`endOffset` (0-indexed char offsets) by pass-through — unlisted in spec text but present in generated catalog. `content` stays `undefined`; sliced on demand by `GetGuideSectionQuery`.\n- Document with zero `#` headings → `sections: []`; `lines` still reports total doc lines.\n- Single heading case: heading at line N, next equal-level heading at N+1 → `startLine === endLine === N`, `lines === 1`.\n\n## Constraints\n\n- Pure application query. Deps: `GuideCatalogPort` + domain models/errors only. No fs, no I/O.\n- All section boundaries 1-indexed; `endLine` inclusive.\n- MUST NOT emit full body content (token cost).\n- `file` is a display label, NOT a resolvable path — consumers MUST NOT open it as one.\n\nDeps: `guide:conventions`, `guide:guide-model` (owns `GuideOutline` field declarations).",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:dbc353e3778acb27ebc6d33253025306bf4c2acd00c1001d1da08369776744cf",
+          "lastModified": "2026-09-24T13:35:20.784Z"
+        },
+        "verify.md": {
+          "hash": "sha256:ae705bf6407cb7ffca20043951ded8649ec149a29844e39288d32e2a8abafb05",
+          "lastModified": "2026-09-24T13:35:20.786Z"
+        }
+      }
+    }
+  }
 }

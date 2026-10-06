@@ -4,14 +4,7 @@
     "version": 1
   },
   "dependsOn": [],
-  "implementation": [
-    {
-      "file": "default:packages/core/src/public.ts"
-    },
-    {
-      "file": "default:packages/core/src/composition/config-loader.ts"
-    }
-  ],
+  "implementation": [],
   "optimizations": {
     "optimizedDescription": {
       "value": "Hexagonal + DDD: domain center, I/O at edges. domain/application/infrastructure/composition layers for all business-logic packages.",

@@ -1,3 +1,9 @@
+---
+title: Code-Graph Use Cases
+description: Primary use cases exported by the `@specd/code-graph` package.
+sidebar_position: 2
+---
+
 # Code-Graph Use Cases
 
 This document describes the primary use cases exported by the `@specd/code-graph` package.

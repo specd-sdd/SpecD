@@ -1,3 +1,9 @@
+---
+title: Domain Model
+description: Entities and value objects returned by `@specd/core` use cases.
+sidebar_position: 3
+---
+
 # Domain Model
 
 This document describes the entities and value objects that `@specd/core` use cases return. As an integrator, you read data from these objects — you do not construct them directly (repositories and use cases do that) and you do not call their mutation methods (only use cases do that).

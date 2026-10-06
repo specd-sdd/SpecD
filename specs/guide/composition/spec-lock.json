@@ -16,13 +16,63 @@
   "implementation": [
     {
       "file": "guide:src/composition/guide-engine.ts",
-      "symbols": ["GuideEngine", "createGuideEngine", "GuideEngineOptions"]
+      "symbols": ["createGuideEngine"]
+    },
+    {
+      "file": "guide:src/public.ts"
+    },
+    {
+      "file": "guide:package.json"
+    },
+    {
+      "file": "guide:src/infrastructure/adapters/prebundled-guide-catalog-adapter.ts",
+      "symbols": ["PrebundledGuideCatalogAdapter"]
+    },
+    {
+      "file": "guide:src/application/queries/get-guide-query.ts",
+      "symbols": ["GetGuideQuery"]
+    },
+    {
+      "file": "guide:src/sdk.ts"
     },
     {
       "file": "guide:src/index.ts"
-    },
-    {
-      "file": "guide:test/integration/guide-engine.test.ts"
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "@specd/guide composition root: GuideEngine facade + createGuideEngine() factory wiring default prebundled catalog and minisearch ports behind typed domain types.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:aca7519601a0c6447dcd17e1e255229b0aad20269dbcfb98ea092eae79778a94",
+          "lastModified": "2026-09-24T13:35:20.878Z"
+        },
+        "verify.md": {
+          "hash": "sha256:924c8e47de250b62f7028d52f36ab36bc284b85ebe6b0b41a46ff77bbf8c927c",
+          "lastModified": "2026-09-24T13:35:20.880Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Guide Composition\n\n## Rules\n\n- Consumers (`@specd/cli`, `@specd/mcp`) never instantiate repos, adapters, or queries by hand. Composition layer owns all wiring + init, exposing facade `GuideEngine` and factory `createGuideEngine()`.\n\n- `GuideEngine` interface = full app op surface:\n  - `listGuides(): Promise<readonly GuideSummary[]>`\n  - `getGuide(topic: string): Promise<GuideTopic>`\n  - `getGuideOutline(topic: string): Promise<GuideOutline>`\n  - `getGuideSection(topic: string, section: string | number): Promise<GuideSection>`\n  - `sliceGuideLines(content: string, startLine?: number, lineCount?: number): string`\n  - `formatWithLineNumbers(content: string, startLine?: number): string`\n  - `searchGuides(query: string, options?: GuideSearchOptions): Promise<readonly GuideSearchHit[]>`\n\n- MUST export factory `createGuideEngine(options?: GuideEngineOptions): GuideEngine`:\n  - default catalog port = `PrebundledGuideCatalogAdapter`\n  - default search port = `MiniSearchGuideEngineAdapter`\n  - wires queries `ListGuidesQuery`, `GetGuideQuery`, `GetGuideOutlineQuery`, `GetGuideSectionQuery`, `SearchGuidesQuery`\n  - returns assembled facade\n\n- Export surface (`src/index.ts` + `src/public.ts`) MUST export:\n  - factory `createGuideEngine`; facade type `GuideEngine`\n  - domain types `GuideTopic`, `GuideSection`, `GuideOutline`, `GuideSearchHit`, `GuideSummary`\n  - search options type `GuideSearchOptions`\n  - typed errors `GuideTopicNotFoundError`, `GuideSectionNotFoundError`\n\n## Constraints\n\n- Wiring encapsulated; consumers interact strictly through `GuideEngine` + domain types.\n- Typed domain errors propagate unchanged from queries; see `guide:errors`.\n- `getGuideSection` accepts heading text OR 1-indexed section number.\n- Port overrides via `GuideEngineOptions`; overridden catalog skips prebundled load.\n- Default engine instantiation budget: under 10ms.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:aca7519601a0c6447dcd17e1e255229b0aad20269dbcfb98ea092eae79778a94",
+          "lastModified": "2026-09-24T13:35:20.878Z"
+        },
+        "verify.md": {
+          "hash": "sha256:924c8e47de250b62f7028d52f36ab36bc284b85ebe6b0b41a46ff77bbf8c927c",
+          "lastModified": "2026-09-24T13:35:20.880Z"
+        }
+      }
+    }
+  }
 }

@@ -1,0 +1,89 @@
+- op: modified
+  description: 'Name the SDK guide collection as the home for developer-internal material instead of leaving it implicit.'
+  selector:
+    type: section
+    matches: 'Requirement: User guide documentation and frontmatter'
+  content: |
+    User-facing guide documentation under `docs/guide/` MUST carry complete Docusaurus frontmatter and MUST stay focused on using `specd`.
+
+    - Every document under `docs/guide/` MUST define `title`, `description` and `sidebar_position` in its frontmatter.
+    - A document under `docs/guide/` that is missing required frontmatter MUST fail validation.
+    - Documentation of the guide collection MUST open on "What is SpecD".
+    - Configuration and workflow guide parameters MUST match the core implementation.
+    - The project update command and plugin asset orchestration MUST be documented.
+    - Code Graph capabilities and intelligence workflows MUST be prominently documented.
+
+    Developer-internal monorepo documentation (such as internal package internals, skills template rendering details, and low-level subsystem references) MUST NOT live under `docs/guide/`. Such material SHALL be placed in their respective package reference directories under `docs/` (e.g. `docs/skills/`, `docs/core/`, `docs/code-graph/`, `docs/sdk/`, `docs/schemas/`), which together form the SDK guide collection.
+
+- op: modified
+  description: 'Require a command reference doc to be listed in the site sidebar, so reference pages are not orphans.'
+  selector:
+    type: section
+    matches: 'Requirement: CLI documentation'
+  content: |
+    Every `specd` command MUST have a corresponding doc file in `docs/cli/`.
+
+    - A new command MUST provide dedicated docs for all CLI commands it introduces.
+    - Output contract changes MUST update the corresponding documentation in the same change.
+    - `docs/cli/index.md` MUST serve as a complete CLI directory, listing every top-level command family.
+    - User-facing CLI recipes and workflows MUST be maintained in `docs/guide/cli.md`, including the commands the recipes depend on.
+    - A command documented in `docs/cli/<command>.md` MUST be listed in the corresponding category of `apps/public-web/sidebars.ts`, so that its reference page is reachable from site navigation rather than existing as an orphan page.
+
+- op: added
+  description: 'Add the SDK guide discoverability requirement.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: 'Requirement: SDK documentation'
+  content: |
+    ### Requirement: SDK guide documentation and discoverability
+
+    The SDK guide collection MUST be discoverable by the people it is written for — extension developers and integrators — from the surfaces they already use.
+
+    - The `specd guide` command MUST surface the SDK guide in its catalog listing as a structured field naming the command `specd guide-sdk`, present in every supported output format.
+    - `docs/guide/index.md` MUST point readers to the SDK guide.
+    - `docs/guide/cli.md` MUST document `specd guide-sdk` as a scenario-based recipe alongside the other command families.
+    - `docs/cli/guide-sdk.md` MUST exist as the dedicated command reference for `specd guide-sdk`, MUST document its `search` subcommand, and MUST state the difference between `specd guide` and `specd guide-sdk`, including which collection each command serves.
+    - `docs/cli/index.md` MUST list `specd guide-sdk` as a command family.
+    - The Docusaurus sidebar MUST expose the guide CLI reference page for `specd guide-sdk`, so that it is reachable from site navigation.
+
+- op: added
+  description: 'Delete the sdk.md tombstone rather than maintaining a second copy of the host guide.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: 'Requirement: SDK guide documentation and discoverability'
+  content: |
+    ### Requirement: SDK documentation tombstone removal
+
+    `docs/core/sdk.md` duplicates the host guide that already lives at `docs/sdk/index.md` and has never been referenced from any sidebar. It MUST NOT be maintained as a separate copy.
+
+    - `docs/core/sdk.md` MUST be deleted from the repository, together with its frontmatter.
+    - No sidebar entry, internal link or cross-reference MUST be left pointing at `docs/core/sdk.md`.
+    - `docs/core/index.md` MUST NOT be modified to compensate for the deletion, because it never linked the file.
+    - Deleting the file MUST NOT remove any host integration guidance: that guidance remains owned by `docs/sdk/`, which stays the only integrator entry point into SDK documentation.
+
+- op: added
+  description: 'Bind the SDK collection sources to the same frontmatter and membership rules as the user guide.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: 'Requirement: SDK documentation tombstone removal'
+  content: |
+    ### Requirement: SDK collection source documents
+
+    The SDK guide collection compiles hand-written package-reference documents alongside generated API topics, so its sources MUST obey the same documentation conventions as the user guide.
+
+    - The SDK collection source roots MUST be `docs/sdk/`, `docs/core/`, `docs/code-graph/`, `docs/skills/` and `docs/schemas/`.
+    - Every hand-written document under those roots MUST define `title`, `description` and `sidebar_position` in its frontmatter, on the same terms as the user guide.
+    - A package-reference document that is missing required frontmatter MUST fail validation; a lenient or derived fallback, such as deriving the description from the first paragraph, is not permitted.
+    - The SDK collection MUST NOT be populated from `docs/cli/` or `docs/public-web/`, so command-reference pages and site-only content stay out of the package-reference collection.

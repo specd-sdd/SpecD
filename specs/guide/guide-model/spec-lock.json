@@ -6,8 +6,48 @@
   "dependsOn": ["guide:conventions"],
   "implementation": [
     {
-      "file": "guide:src/domain/models/guide-section.ts",
-      "symbols": ["GuideSection"]
+      "file": "guide:src/domain/topic-identity.ts",
+      "symbols": ["isGeneratedTopic", "normalizeTopicRef", "qualifyTopic", "splitQualifiedTopic"]
+    },
+    {
+      "file": "guide:src/domain/models/guide-topic.ts",
+      "symbols": ["GuideTopic"]
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Pure domain types for guide catalog/outline/section/search: GuideTopic, GuideSection, GuideSummary, GuideOutline, GuideSearchHit; file = synthesized <topic>.md.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:8b21d05bb806ba2fb98463a712a3adeddf46b0f0c0b272822d5458d5b0078538",
+          "lastModified": "2026-09-29T14:17:06.096Z"
+        },
+        "verify.md": {
+          "hash": "sha256:6ac1ebf73cd3347da07b624cc5e12755030f79a4eac425596223e1a8429f819b",
+          "lastModified": "2026-09-29T14:17:06.097Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Guide Domain Model\n\nDomain types backing catalog lookups, outline inspection, section slicing, search.\n\n## Rules\n\n### GuideTopic (entity)\n- `topic`: canonical id = source filename w/o extension (`getting-started`).\n- `title`, `description`: frontmatter strings.\n- `order`: numeric sort idx (`sidebar_position`).\n- `content`: markdown body, frontmatter stripped.\n- `lineCount`: lines in `content`. `byteLength`: UTF-8 bytes of `content`.\n- `outline`: `GuideSection[]`.\n\n### GuideSection (value object)\n- `index`: 1-indexed position in doc outline. `heading`: text, no leading `#`.\n- `level`: heading depth 1..6.\n- `startLine` / `endLine`: 1-indexed, inclusive.\n- `lines`: `endLine - startLine + 1`.\n- `startOffset` / `endOffset`: 0-indexed char offsets into parent `content`.\n- `content?`: optional / on-demand; heading line through `endLine`.\n\n### GuideSummary (value object)\n- `topic`, `title`, `description`, `order`, `lineCount`, `byteLength`.\n- Lean catalog row: no `content`, no `outline`.\n\n### GuideOutline (value object)\n- `topic`, `file`, `lines`, `bytes`, `sections: readonly GuideSection[]`.\n\n### GuideSearchHit (value object)\n- `topic`, `file`, `section` (heading text), `sectionIndex`, `level`, `startLine`, `endLine`.\n- `score` (BM25), `snippet` (line-numbered), `readCommand`.\n- `readCommand` = `specd guide <topic> --section <sectionIndex>` (index form, not heading).\n\n## Constraints\n\n- Pure TS types / immutable classes; no runtime deps.\n- All line numbers 1-indexed positive ints; `level` 1..6.\n- `GuideTopic.outline` and `GuideOutline.sections` are `readonly GuideSection[]`.\n\n## `file` Semantics (code-verified)\n\n- `GuideOutline.file` and `GuideSearchHit.file` are **synthesized plain filenames** `${topic}.md` — NOT real source paths.\n- Sources: `packages/guide/src/application/queries/get-guide-outline-query.ts:38`; `packages/guide/src/infrastructure/adapters/minisearch-guide-engine-adapter.ts:290`.\n- Both typed bare `string`; JSDoc/spec say only \"Source filename\" — no path or collection carrier.\n- Blocker for `sdk-development-guide`: multi-directory bundling needs the real source path here. `collection:topic` addressing (`core:ports`, `sdk:index`) yields `core:ports.md`, which is not a real file. Needs a new field or a redefinition of `file`.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:8b21d05bb806ba2fb98463a712a3adeddf46b0f0c0b272822d5458d5b0078538",
+          "lastModified": "2026-09-29T14:17:06.096Z"
+        },
+        "verify.md": {
+          "hash": "sha256:6ac1ebf73cd3347da07b624cc5e12755030f79a4eac425596223e1a8429f819b",
+          "lastModified": "2026-09-29T14:17:06.097Z"
+        }
+      }
+    }
+  }
 }

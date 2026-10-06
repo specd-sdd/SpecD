@@ -1,3 +1,9 @@
+---
+title: Services
+description: Pure domain service functions exported by `@specd/core`.
+sidebar_position: 5
+---
+
 # Services
 
 `@specd/core` exports a set of domain service functions. All are pure functions with no I/O dependencies — they accept typed values and return new values without side effects.

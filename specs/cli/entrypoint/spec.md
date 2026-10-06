@@ -125,6 +125,21 @@ When running in non-TTY environments (such as pipes or automated test runners wi
 
 The CLI program configuration and command registrations SHALL be encapsulated in a reusable factory function (`createProgram(): Command`) separate from process execution. This SHALL enable programmatic inspection, command tree traversal, and documentation coverage verification without triggering argument parsing.
 
+### Requirement: Guide SDK Command Registration
+
+The CLI MUST register `guide-sdk` as a top-level command, sibling to `guide`:
+
+- `specd guide-sdk` MUST be resolvable as a top-level command and MUST appear in the root help output alongside the other command families.
+- The command MUST participate in the standard configuration discovery behaviour: it MUST resolve `specd.yaml` by walking up from the working directory and MUST honour the `--config` override in both its global and local position.
+- The command MUST follow the standard output conventions: successful output to stdout, errors to stderr.
+- The command MUST follow the standard exit codes: success `0`, guide domain errors `1`, hook failure and unhandled system errors per the existing contract.
+- The command MUST follow the standard CLI error convention, rendering expected guide failures as `error: [<CODE>] <message>` and gating stack traces on `SPECD_DEBUG`.
+- The command MUST support the standard `--format` flag and MUST declare its `json` and `toon` output schema in its help text.
+- The command MUST reject excess positional arguments in the same way as other top-level commands, except where a documented positional argument is defined.
+- The command MUST back its catalog with the `@specd/guide/sdk` subpath so that the SDK collection is not reachable from the main `@specd/guide` entry point.
+- The command MUST load the SDK collection lazily, so that a CLI invocation that does not run a `guide-sdk` subcommand does not load the SDK catalog.
+- The command MUST NOT alter the behaviour of any existing command.
+
 ## Constraints
 
 - Every leaf command must call `.allowExcessArguments(false)` so Commander rejects extra positional arguments

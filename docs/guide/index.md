@@ -11,6 +11,8 @@ Welcome to the SpecD User Guides! SpecD is a spec-driven development platform an
 
 Start with [What is SpecD?](./what-is-specd.md) if you want the product in one page: what it is, what you can do with it, and how the Code Graph fits in. The sections below are the map of every guide.
 
+> **Building an integration or extension?** Read the [SDK guide command reference](../cli/guide-sdk.md) and run `specd guide-sdk`. It serves the SDK and package-reference collections for integrators, whereas `specd guide` serves these user-facing guides.
+
 ---
 
 ## 1. Foundations & Philosophy

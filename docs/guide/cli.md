@@ -1,6 +1,6 @@
 ---
 title: CLI Guide & Command Interface
-description: Comprehensive guide to the SpecD command-line interface, covering all 12 command families and practical workflows.
+description: Comprehensive guide to the SpecD command-line interface, covering all 13 command families and practical workflows.
 sidebar_position: 6
 ---
 
@@ -58,6 +58,7 @@ flowchart LR
     subgraph Requirements & Specs
         S[specs]
         G[guide]
+        GS[guide-sdk]
     end
     subgraph Architecture & Engine
         SC[schema]
@@ -199,7 +200,9 @@ Direct inspection, searching, and validation of specifications in workspaces.
 
 Access and search documentation topics directly within your terminal without opening a browser.
 
-- **`specd guide`**: Catalogs all available guides with titles and descriptions.
+- **`specd guide`**: Catalogs all available guides with titles and descriptions. Each collection is delimited and the page position is reported when the result spans several pages.
+- **`specd guide --meta`**: Prints a catalog index — every topic's page, size, and a copy-pasteable command to read its metadata — instead of the plain listing.
+- **`specd guide --page <n> --page-size <n>`**: Bounds and paginates the listing.
 - **`specd guide <topic>`**: Displays the full guide content.
   ```bash
   specd guide workflow
@@ -216,6 +219,37 @@ Access and search documentation topics directly within your terminal without ope
   ```
 
 👉 _See [Guide Reference](../cli/guide.md) for full options and examples._
+
+---
+
+### 7b. `specd guide-sdk` — SDK & Extension Documentation
+
+The sibling of `specd guide`, serving the hand-written package references (`sdk`, `core`, `code-graph`, `skills`, `schemas`) plus generated public API topics. Topics are addressed with an explicit `collection:` prefix.
+
+- **`specd guide-sdk`**: Lists hand-written documents only, so the catalog stays comparable to `specd guide`. The listing reports how many generated API topics are withheld and the exact command that reveals them, so the API is never invisible.
+- **`specd guide-sdk --scope <docs|api|all>`**: Selects topic kinds. `docs` (the default) lists hand-written documents only, `api` lists generated API topics across every collection, and `all` lists both. An unrecognized scope fails with `INVALID_GUIDE_SCOPE` and points at `--collection`.
+- **`specd guide-sdk --collection <collection>`**: Restricts the listing to one collection (`sdk`, `core`, `code-graph`, `skills`, `schemas`). It is an independent dimension, so it combines with any scope; an unrecognized collection fails with `INVALID_GUIDE_COLLECTION`.
+  ```bash
+  specd guide-sdk --collection core
+  specd guide-sdk --scope api --page-size 20
+  specd guide-sdk --scope api --collection code-graph
+  ```
+- **`specd guide-sdk <collection>:<topic> --meta`**: Reports the metadata for one topic. Generated API topics additionally report `packageName` and `importStatement`, a copy-pasteable import from the published package; their internal declaration paths are withheld from published output.
+  ```bash
+  specd guide-sdk code-graph:classes/GetGraphHealth --meta
+  ```
+- **`specd guide-sdk --page <n> --page-size <n>`**: Bounds and paginates large listings.
+- **`specd guide-sdk <collection>:<topic>`**: Retrieves a document or a generated API symbol.
+  ```bash
+  specd guide-sdk core:ports
+  specd guide-sdk sdk:classes/ArtifactDag
+  ```
+- **`specd guide-sdk --meta`**: Prints a bounded catalog index of every topic, with its page, size, and a read command.
+- **`specd guide-sdk <collection>:<topic> --meta`**: Inspects metadata and outline without the body.
+- **`specd guide-sdk <collection>:<topic> --section <name|index>`**: Slices a section by index, heading, or slug.
+- **`specd guide-sdk search <query> --collection <name>`**: BM25 search scoped to one collection.
+
+👉 _See [Guide SDK Reference](../cli/guide-sdk.md) for full options and examples._
 
 ---
 
@@ -338,6 +372,7 @@ When generating prompts or piping commands to AI agents, use `--format toon` to 
 specd project status --format toon
 specd changes context 20260924-user-profile implementing --format toon
 specd guide search "approval gates" --format toon
+specd guide-sdk search "dependency tracking" --collection code-graph --format toon
 ```
 
 ### Recipe 3: Investigate, then measure blast radius

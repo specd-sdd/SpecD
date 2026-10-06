@@ -6,86 +6,228 @@
 
 #### Scenario: GuideTopic stores complete content and outline structure
 
-- **GIVEN** raw Markdown content with 150 lines and 4 sections
-- **WHEN** a `GuideTopic` entity is created
-- **THEN** `topic.content` retains the raw text identically
-- **AND** `topic.lineCount` strictly equals 150
-- **AND** `topic.byteLength` equals the exact Buffer byte length of the content
-- **AND** `topic.outline` contains 4 `GuideSection` items
+- **GIVEN** a compiled guide document
+- **WHEN** a `GuideTopic` is constructed from it
+- **THEN** it MUST carry `collection`, `topic`, `title`, `description`, `order`, `content`, `lineCount`, `byteLength` and `outline`
+- **AND** `content` MUST exclude the frontmatter block
+- **AND** `outline` MUST contain one `GuideSection` per document heading
 
 #### Scenario: Multibyte UTF-8 characters calculate correct byteLength vs character length
 
-- **GIVEN** Markdown content containing UTF-8 characters (e.g. `“añoranza”`, `🎉`, `日本語`)
-- **WHEN** calculating `byteLength` for `GuideTopic`
-- **THEN** `byteLength` reflects the total UTF-8 bytes (which is greater than `content.length`)
-- **AND** `lineCount` counts newline delimiters `\n` accurately
+- **GIVEN** a guide containing multibyte characters
+- **WHEN** `byteLength` is computed
+- **THEN** it MUST equal the UTF-8 byte length
+- **AND** it MUST differ from the JavaScript string length when the document contains multibyte characters
 
 #### Scenario: GuideTopic with Windows CRLF newlines normalizes lineCount
 
-- **GIVEN** Markdown content formatted with CRLF (`\r\n`) newlines
-- **WHEN** `GuideTopic` is constructed
-- **THEN** `lineCount` reflects the actual line count without counting `\r` as extra lines
+- **GIVEN** a guide authored with CRLF line endings
+- **WHEN** `lineCount` is computed
+- **THEN** it MUST equal the count of logical lines
+- **AND** it MUST be identical to the count for the same document authored with LF endings
+
+#### Scenario: Topic is the collection-relative source path without extension
+
+- **GIVEN** a hand-written document at `docs/core/examples/implementing-a-port.md`
+- **WHEN** its `GuideTopic` is constructed
+- **THEN** `collection` MUST be `core`
+- **AND** `topic` MUST be `examples/implementing-a-port`
+- **AND** `topic` MUST NOT contain the `.md` extension
+
+#### Scenario: Topic is lowercased
+
+- **GIVEN** a source file named `Implementing-A-Port.md`
+- **WHEN** its `GuideTopic` is constructed
+- **THEN** `topic` MUST be `implementing-a-port`
+
+#### Scenario: Generated topic carries the bundler-assigned collection-relative path
+
+- **GIVEN** a TypeDoc reflection for an interface in a package whose relative module path is `core/domain/artifact-dag.ts`
+- **WHEN** the generated `GuideTopic` is constructed
+- **THEN** `topic` MUST be a collection-relative path assigned by the bundler
+- **AND** it MUST NOT be derived from the symbol's display name alone
+
+#### Scenario: The colon delimiter is reserved
+
+- **WHEN** a collection or topic identifier containing `:` is considered
+- **THEN** it MUST be rejected or normalised so that it contains no `:`
+- **AND** the composite `collection:topic` form MUST remain unambiguously splittable
+
+#### Scenario: The canonical identity is the composite collection-qualified form
+
+- **GIVEN** two collections each containing a topic `ports`
+- **THEN** their canonical identities MUST differ, being `core:ports` and `sdk:ports`
+- **AND** neither identity MUST be ambiguous
+
+#### Scenario: Slash is preserved inside the topic
+
+- **GIVEN** a nested document
+- **WHEN** its canonical identity is formed
+- **THEN** the `/` MUST remain inside the `topic` segment
+- **AND** it MUST NOT be flattened or replaced by the collection delimiter
 
 ### Requirement: GuideSection Value Object
 
 #### Scenario: Section boundaries are 1-indexed and inclusive
 
-- **GIVEN** a heading starting at line 10 and concluding at line 25 in a document body
-- **WHEN** the `GuideSection` value object is inspected
-- **THEN** `section.startLine` equals 10
-- **AND** `section.endLine` equals 25
-- **AND** `section.lines` equals 16 (inclusive: `25 - 10 + 1`)
-- **AND** `section.startOffset` marks the character index where the heading begins
-- **AND** `section.endOffset` marks the character index where line 25 ends
-- **AND** `section.content` begins with the heading line and ends at line 25 when populated
+- **GIVEN** a document with a section spanning lines 10 through 20
+- **WHEN** its `GuideSection` is constructed
+- **THEN** `startLine` MUST be 10
+- **AND** `endLine` MUST be 20
+- **AND** `lines` MUST equal 11
 
 #### Scenario: Single-line section (heading with no body)
 
-- **GIVEN** a heading on line 42 immediately followed by the next equal-level heading on line 43
-- **WHEN** the `GuideSection` value object is created
-- **THEN** `section.startLine` equals 42
-- **AND** `section.endLine` equals 42
-- **AND** `section.lines` strictly equals 1
-- **AND** `section.endOffset > section.startOffset` spanning the heading line characters
+- **GIVEN** a heading immediately followed by another heading of the same or higher level
+- **WHEN** its `GuideSection` is constructed
+- **THEN** `startLine` MUST equal `endLine`
+- **AND** `lines` MUST equal 1
 
 #### Scenario: Deep heading levels up to level 6
 
-- **GIVEN** headings ranging from `# H1` to `###### H6`
-- **WHEN** `GuideSection` represents each heading
-- **THEN** `section.level` is an integer between 1 and 6 inclusive
-- **AND** `section.heading` contains the heading text without leading `#` or trailing whitespace
+- **GIVEN** a document using headings up to level 6
+- **WHEN** sections are extracted
+- **THEN** each section's `level` MUST report the heading depth correctly
+
+#### Scenario: Offsets characterize exact character bounds
+
+- **WHEN** `content.slice(startOffset, endOffset)` is evaluated for a section
+- **THEN** the result MUST equal the section text exactly, starting with the heading line
+
+#### Scenario: Offsets span the whole document for the final section
+
+- **GIVEN** the last section of a document
+- **WHEN** its offsets are evaluated
+- **THEN** `endOffset` MUST equal the total length of the clean body
+
+#### Scenario: Offsets are carried in the generated catalog
+
+- **GIVEN** a catalog emitted at build time
+- **WHEN** a section is looked up from it
+- **THEN** `startOffset` and `endOffset` MUST both be present
+- **AND** section content MUST be derivable from them without re-parsing the document
 
 ### Requirement: GuideSummary Value Object
 
 #### Scenario: Summary projection contains no heavy content field
 
-- **GIVEN** a 50 KB `GuideTopic` entity
-- **WHEN** mapped to `GuideSummary`
-- **THEN** `summary.topic`, `summary.title`, `summary.description`, `summary.order`, `summary.lineCount`, and `summary.byteLength` are present
-- **AND** `content` and `outline` properties do not exist on the summary object, ensuring minimal memory footprint
+- **GIVEN** a catalog entry
+- **WHEN** it is projected to a `GuideSummary`
+- **THEN** it MUST carry `collection`, `topic`, `title`, `description`, `order`, `lineCount` and `byteLength`
+- **AND** it MUST NOT carry the document body or the outline
+
+#### Scenario: Summary carries the collection it belongs to
+
+- **GIVEN** a summary for a document in the `core` collection
+- **WHEN** the summary is inspected
+- **THEN** `collection` MUST be `core`
+
+#### Scenario: Summary topic is unique only within its collection
+
+- **GIVEN** summaries for `core:ports` and `sdk:ports`
+- **WHEN** they are compared
+- **THEN** both MUST exist as distinct summaries
+- **AND** their `topic` values MAY be equal because their `collection` values differ
+
+#### Scenario: Ordering is defined per collection
+
+- **GIVEN** a listing spanning two collections with interleaved `order` values
+- **WHEN** the listing is produced
+- **THEN** entries MUST be ordered by ascending `order` within each collection
+- **AND** no cross-collection ordering guarantee MUST be relied upon
 
 ### Requirement: GuideOutline Value Object
 
 #### Scenario: Outline provides structural summary of document sections
 
-- **GIVEN** a topic with file `"schemas.md"` containing 8 sections
-- **WHEN** `GuideOutline` is constructed
-- **THEN** `outline.topic` equals `"schemas"`
-- **AND** `outline.file` equals `"schemas.md"`
-- **AND** `outline.lines` equals total document lines
-- **AND** `outline.sections` has length 8
-- **AND** the sum of non-overlapping top-level section spans covers the document lines
+- **GIVEN** a compiled guide
+- **WHEN** its outline is requested
+- **THEN** it MUST return `collection`, `topic`, `file`, `lines`, `bytes` and `sections`
+- **AND** each section MUST expose `index`, `heading`, `level`, `startLine`, `endLine`, `lines`, `startOffset` and `endOffset`
+
+#### Scenario: Outline carries no full section content
+
+- **WHEN** an outline is constructed
+- **THEN** no section MUST carry its full serialized text
+
+#### Scenario: Outline file is the real collection-relative source path
+
+- **GIVEN** a hand-written document at `docs/core/ports.md`
+- **WHEN** its outline is constructed
+- **THEN** `file` MUST be `ports.md`
+- **AND** it MUST NOT be synthesized from the topic identifier
+
+#### Scenario: Outline file preserves nested subdirectories
+
+- **GIVEN** a document at `docs/core/examples/implementing-a-port.md`
+- **WHEN** its outline is constructed
+- **THEN** `file` MUST be `examples/implementing-a-port.md`
+
+#### Scenario: Outline for a generated API topic reports the TypeScript declaration path
+
+- **GIVEN** a generated topic whose symbol was extracted from a TypeScript declaration
+- **WHEN** its outline is constructed
+- **THEN** `file` MUST be the collection-relative path of that TypeScript declaration
+- **AND** it MUST NOT be a `.md` path
+
+#### Scenario: Outline carries the document's collection
+
+- **GIVEN** a document in the `core` collection
+- **WHEN** its outline is constructed
+- **THEN** `collection` MUST be `core`
 
 ### Requirement: GuideSearchHit Value Object
 
 #### Scenario: Search hit contains match coordinates and actionable readCommand
 
-- **GIVEN** a search hit inside topic `"workflow"`, section `"Lifecycle States"`, lines 30-75 with score 4.2
-- **WHEN** `GuideSearchHit` is constructed
-- **THEN** `hit.topic` is `"workflow"`
-- **AND** `hit.section` is `"Lifecycle States"`
-- **AND** `hit.startLine` is 30
-- **AND** `hit.endLine` is 75
-- **AND** `hit.score` is a positive number
-- **AND** `hit.readCommand` contains `specd guide workflow --section "Lifecycle States"`
-- **AND** `hit.snippet` includes formatted line numbers
+- **GIVEN** a search engine adapter producing a match
+- **WHEN** the `GuideSearchHit` is constructed
+- **THEN** it MUST carry `collection`, `topic`, `file`, `section`, `sectionIndex`, `level`, `startLine`, `endLine`, `score` and `snippet`
+- **AND** it MUST carry a `readCommand` that fetches the matched section by index
+
+#### Scenario: Hit carries the collection where the match was found
+
+- **GIVEN** a match inside a document belonging to the `sdk` collection
+- **WHEN** the hit is constructed
+- **THEN** `collection` MUST be `sdk`
+
+#### Scenario: Hit file is the real source path, not a synthesized filename
+
+- **GIVEN** a hit for a hand-written document at `docs/core/ports.md`
+- **WHEN** the hit is constructed
+- **THEN** `file` MUST be `ports.md`
+- **AND** it MUST NOT be `core:ports.md`
+
+#### Scenario: Hit file for a generated API topic is the TypeScript declaration path
+
+- **GIVEN** a hit for a generated topic extracted from a TypeScript declaration
+- **WHEN** the hit is constructed
+- **THEN** `file` MUST be the collection-relative path of that declaration
+
+#### Scenario: Location fields are indexed document fields
+
+- **GIVEN** an indexed section
+- **WHEN** it is reported as a hit
+- **THEN** `level`, `startLine` and `endLine` MUST be retrievable from the index
+- **AND** they MUST NOT require re-parsing the source document
+
+#### Scenario: readCommand names the command serving the hit's collection
+
+- **GIVEN** a hit in the SDK collection at topic `sdk:classes/ArtifactDag`, section index 3
+- **WHEN** `readCommand` is produced
+- **THEN** it MUST be `specd guide-sdk sdk:classes/ArtifactDag --section 3`
+- **AND** it MUST NOT contain `specd guide ` as the command name
+
+#### Scenario: readCommand uses the user command for a user-guide hit
+
+- **GIVEN** a hit in the user guide collection
+- **WHEN** `readCommand` is produced
+- **THEN** it MUST reference `specd guide`
+- **AND** it MUST NOT reference `specd guide-sdk`
+
+#### Scenario: readCommand is derived from the collection, not hardcoded
+
+- **GIVEN** hits in two different collections
+- **WHEN** their `readCommand` values are produced
+- **THEN** the two commands MUST name different commands
+- **AND** the mapping MUST be driven by the hit's `collection` value

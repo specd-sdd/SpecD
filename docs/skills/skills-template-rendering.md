@@ -1,3 +1,9 @@
+---
+title: Skills Template Rendering
+description: How `@specd/skills` renders install-time skill templates for agent plugins.
+sidebar_position: 1
+---
+
 # Skills Template Rendering
 
 `@specd/skills` renders install-time skill templates for agent plugins from

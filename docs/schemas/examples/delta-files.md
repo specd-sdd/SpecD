@@ -1,3 +1,9 @@
+---
+title: 'Example: Delta files'
+description: Delta file format for expressing deterministic spec changes as AST operations.
+sidebar_position: 3
+---
+
 # Example: Delta files
 
 ## What a delta file is

@@ -1,3 +1,9 @@
+---
+title: Errors
+description: Error hierarchy exported by `@specd/core` and its machine-readable codes.
+sidebar_position: 7
+---
+
 # Errors
 
 All errors thrown by `@specd/core` extend `SpecdError`. Every concrete error class exposes a machine-readable `code` string for programmatic handling in delivery adapters (CLI exit codes, MCP error responses, HTTP status codes).

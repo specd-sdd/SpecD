@@ -1,0 +1,13 @@
+- op: added
+  description: Allow the CLI guide delivery adapter to consume the guide package directly.
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: 'Requirement: No circular dependencies between packages'
+  content: |
+    ### Requirement: CLI guide delivery adapter dependency
+
+    `@specd/cli` MAY declare a direct dependency on `@specd/guide` when it acts solely as a delivery adapter for the guide catalog. The adapter MUST delegate catalog retrieval, topic lookup, slicing, and search to the guide package; it MUST NOT reimplement guide domain or application behavior. The CLI MAY load the SDK catalog through the lazy `@specd/guide/sdk` subpath so ordinary user-guide commands do not load generated SDK reference content.

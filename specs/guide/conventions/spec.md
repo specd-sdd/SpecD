@@ -14,7 +14,8 @@
 - `application/`: Contains use-case interactors, queries, and driven ports (interfaces). Depends only on `domain/`. Must NOT import from `infrastructure/` or `composition/`.
 - `infrastructure/`: Contains driven adapters implementing application ports (e.g. static pre-bundled catalog storage, in-memory BM25 search engine with `minisearch`). Depends on `domain/` and `application/`.
 - `composition/`: Contains dependency injection factories, composition root, and the unified engine facade (`createGuideEngine()`).
-- Root exports (`src/index.ts`, `src/public.ts`): Re-exports the public facade, domain types, and typed error classes.
+- `src/public.ts` is the curated root barrel for the package `.` export. It MUST expose only the facade, supported domain types, options, errors, and host utilities; it MUST NOT leak adapters, bundle assets, or the SDK catalog factory.
+- `src/index.ts` is the broader internal barrel for the `./internal` export. It MAY re-export application and infrastructure implementation symbols for controlled internal use, but MUST NOT expose the SDK catalog factory or generated SDK catalog.
 
 ### Requirement: Standalone Zero Core Dependency
 
@@ -22,6 +23,8 @@
 
 - The package MUST be self-contained and run in lightweight environments (such as CI runners, client CLI binaries, or MCP server processes) without pulling in the SpecD kernel, AST parsers, delta engines, or schema validators.
 - Markdown frontmatter and heading parsing for guide bundling MUST occur strictly at build time, preventing runtime AST parsing overhead.
+- Runtime lookup MAY load the package's pre-bundled JSON catalog assets, but MUST NOT read documentation source roots or parse Markdown, frontmatter, or TypeDoc output at runtime.
+- Every runtime JSON catalog asset MUST be included in the published package alongside the entry points that load it.
 
 ### Requirement: Error Handling Architecture
 
@@ -35,6 +38,10 @@ The package MUST define its error hierarchy under `domain/errors/` as specified 
 The package root (`packages/guide/`) MUST provide the complete standard configuration and assets expected of all monorepo packages:
 
 - `package.json`: Configured with package name `@specd/guide`, type `module`, scripts (`build`, `test`, `lint`), and clean dependency declarations.
+- The package MUST declare its entry points through the `exports` field. The package MUST NOT be required to declare `main` or `types`, and MUST NOT declare those fields as its delivery mechanism.
+- The `exports` field MUST declare the main entry (`.`), the internal escape hatch (`./internal`), and the SDK collection entry (`./sdk`).
+- The `build` and `build:dev` scripts MUST run the catalog bundler before the bundler's output is consumed.
+- Build-time documentation tooling MUST be declared as a `devDependency` and MUST NOT become a runtime dependency.
 - `tsconfig.json`: TypeScript configuration matching monorepo compiler settings.
 - `vitest.config.ts`: Vitest test configuration.
 - `test/`: Comprehensive unit and integration test suite covering domain models, queries, adapters, and composition facade.
@@ -48,6 +55,9 @@ The package root MUST include a detailed, high-quality `README.md` (`packages/gu
 - Catalog of pre-bundled guide topics.
 - Quick start usage guide showing how to initialize `createGuideEngine()` and invoke queries.
 - Data schema reference for domain models (`GuideTopic`, `GuideSection`, `GuideOutline`, `GuideSearchHit`, `GuideSummary`).
+- The SDK collection entry point and how to reach it.
+
+The documented topic catalog MUST stay in parity with the topics actually present in the generated user collection. Every topic named in the README MUST exist in the catalog, and every topic in the catalog MUST be documented. A README that names a topic that is absent from the catalog, or omits a topic that is present, MUST be treated as a documentation defect requiring correction in the same change.
 
 ## Constraints
 

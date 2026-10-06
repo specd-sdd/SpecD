@@ -1,0 +1,41 @@
+- op: modified
+  description: 'The Purpose paragraph omitted GuideSectionAmbiguousError, which is a specified and exported error class.'
+  selector:
+    type: section
+    matches: 'Purpose'
+  content: |
+    When users or AI agents request non-existent documentation topics or invalid section headings, `@specd/guide` must provide structured, machine-readable, and actionable errors without depending on `@specd/core`. This spec defines the `SpecdGuideError` base class (which conforms to the SpecD Error Contract by duck-typing) and its concrete domain error subtypes: `GuideTopicNotFoundError`, `GuideSectionNotFoundError`, and `GuideSectionAmbiguousError`.
+- op: modified
+  description: 'Structured candidates stay bounded to the error payload while title suggestions can expose a wrong collection.'
+  selector:
+    type: section
+    matches: 'Requirement: GuideTopicNotFoundError'
+  content: |
+    When a requested topic does not exist in the collection being served, the system MUST throw `GuideTopicNotFoundError`.
+
+    - `error.code` MUST be strictly `'UNKNOWN_GUIDE_TOPIC'`.
+    - `error.topic` MUST be the topic identifier exactly as supplied by the caller, before any normalization.
+    - `error.availableTopics` MUST list the ordinary topic candidates registered in the collection that was searched.
+    - `error.availableTopics` for a qualified request MUST remain scoped to the requested collection.
+    - Every entry in `error.availableTopics` MUST be a collection-qualified identifier, so that a caller can pass a reported value straight back into the topic lookup without transforming it.
+    - `error.titleMatches` MAY list collection-qualified title-equivalent topics from another collection when the requested collection has no such match, and `error.crossCollection` MUST distinguish that case. These fields are structured suggestions only and MUST NOT redirect the original lookup.
+    - `error.message` MUST include the requested topic and MUST NOT enumerate the catalog.
+    - The domain error MUST remain independent of any host command name. A delivery adapter presenting the error to a human MUST add bounded, host-specific guidance for listing, metadata-index, and search operations.
+
+    The error MUST be raised without filesystem access and MUST NOT depend on `@specd/core`. The query MAY enumerate the already-loaded catalog after a failed direct lookup to construct the structured candidates.
+
+- op: modified
+  description: 'Make ambiguous-section candidates actionable by requiring index, line span, and concrete selection flags.'
+  selector:
+    type: section
+    matches: 'Requirement: GuideSectionAmbiguousError'
+  content: |
+    The domain layer MUST define `GuideSectionAmbiguousError` extending `SpecdGuideError`:
+
+    - `readonly code` MUST equal `'AMBIGUOUS_GUIDE_SECTION'`.
+    - `readonly heading: string` MUST preserve the ambiguous heading query string.
+    - `readonly matchingIndices: readonly number[]` MUST contain the 1-indexed section numbers that matched the query.
+    - `readonly matchingHeadings: readonly string[]` MUST contain one descriptor per matching section in matching-index order, formatted as `[<index>] <heading> (lines <start>-<end>)` using the section's absolute 1-indexed line span.
+    - The message MUST state that multiple sections matched and MUST include an explicit `--section <index>` choice for every value in `matchingIndices`; it MUST NOT provide only a placeholder choice.
+
+    The error MUST remain independent of a host command name. A delivery adapter MAY prepend the appropriate host command, but the candidates and selection flags MUST remain actionable without it.

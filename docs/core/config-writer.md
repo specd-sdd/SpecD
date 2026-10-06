@@ -1,3 +1,9 @@
+---
+title: ConfigWriter Port
+description: The core write boundary for project configuration (`specd.yaml`).
+sidebar_position: 10
+---
+
 # ConfigWriter Port
 
 `ConfigWriter` is the core write boundary for project configuration (`specd.yaml`).

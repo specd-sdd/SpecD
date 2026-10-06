@@ -2,7 +2,7 @@
 
 ## Purpose
 
-When users or AI agents request non-existent documentation topics or invalid section headings, `@specd/guide` must provide structured, machine-readable, and actionable errors without depending on `@specd/core`. This spec defines the `SpecdGuideError` base class (which conforms to the SpecD Error Contract by duck-typing) and its concrete domain error subtypes: `GuideTopicNotFoundError` and `GuideSectionNotFoundError`.
+When users or AI agents request non-existent documentation topics or invalid section headings, `@specd/guide` must provide structured, machine-readable, and actionable errors without depending on `@specd/core`. This spec defines the `SpecdGuideError` base class (which conforms to the SpecD Error Contract by duck-typing) and its concrete domain error subtypes: `GuideTopicNotFoundError`, `GuideSectionNotFoundError`, and `GuideSectionAmbiguousError`.
 
 ## Requirements
 
@@ -18,12 +18,18 @@ When users or AI agents request non-existent documentation topics or invalid sec
 
 ### Requirement: GuideTopicNotFoundError
 
-The domain layer MUST define `GuideTopicNotFoundError` extending `SpecdGuideError`:
+When a requested topic does not exist in the collection being served, the system MUST throw `GuideTopicNotFoundError`.
 
-- `readonly code = 'UNKNOWN_GUIDE_TOPIC'`.
-- `readonly topic: string`: The topic identifier that was requested and not found.
-- `readonly availableTopics: readonly string[]`: The list of valid topic identifiers currently available in the catalog.
-- The `message` MUST clearly indicate that the topic was not found and enumerate or suggest available topics.
+- `error.code` MUST be strictly `'UNKNOWN_GUIDE_TOPIC'`.
+- `error.topic` MUST be the topic identifier exactly as supplied by the caller, before any normalization.
+- `error.availableTopics` MUST list the ordinary topic candidates registered in the collection that was searched.
+- `error.availableTopics` for a qualified request MUST remain scoped to the requested collection.
+- Every entry in `error.availableTopics` MUST be a collection-qualified identifier, so that a caller can pass a reported value straight back into the topic lookup without transforming it.
+- `error.titleMatches` MAY list collection-qualified title-equivalent topics from another collection when the requested collection has no such match, and `error.crossCollection` MUST distinguish that case. These fields are structured suggestions only and MUST NOT redirect the original lookup.
+- `error.message` MUST include the requested topic and MUST NOT enumerate the catalog.
+- The domain error MUST remain independent of any host command name. A delivery adapter presenting the error to a human MUST add bounded, host-specific guidance for listing, metadata-index, and search operations.
+
+The error MUST be raised without filesystem access and MUST NOT depend on `@specd/core`. The query MAY enumerate the already-loaded catalog after a failed direct lookup to construct the structured candidates.
 
 ### Requirement: GuideSectionNotFoundError
 
@@ -38,11 +44,13 @@ The domain layer MUST define `GuideSectionNotFoundError` extending `SpecdGuideEr
 
 The domain layer MUST define `GuideSectionAmbiguousError` extending `SpecdGuideError`:
 
-- `readonly code = 'AMBIGUOUS_GUIDE_SECTION'`.
-- `readonly heading: string`: The ambiguous heading query string.
-- `readonly matchingIndices: readonly number[]`: Array of 1-indexed section numbers matching the query.
-- `readonly matchingHeadings: readonly string[]`: Array of formatted section titles with line numbers matching the query.
-- The `message` MUST state that multiple sections matched the heading query and instruct the caller to select by 1-indexed section number.
+- `readonly code` MUST equal `'AMBIGUOUS_GUIDE_SECTION'`.
+- `readonly heading: string` MUST preserve the ambiguous heading query string.
+- `readonly matchingIndices: readonly number[]` MUST contain the 1-indexed section numbers that matched the query.
+- `readonly matchingHeadings: readonly string[]` MUST contain one descriptor per matching section in matching-index order, formatted as `[<index>] <heading> (lines <start>-<end>)` using the section's absolute 1-indexed line span.
+- The message MUST state that multiple sections matched and MUST include an explicit `--section <index>` choice for every value in `matchingIndices`; it MUST NOT provide only a placeholder choice.
+
+The error MUST remain independent of a host command name. A delivery adapter MAY prepend the appropriate host command, but the candidates and selection flags MUST remain actionable without it.
 
 ## Constraints
 

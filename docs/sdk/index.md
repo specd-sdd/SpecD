@@ -1,6 +1,7 @@
 ---
 title: SDK
-sidebar_position: 3
+description: Single import surface for specd delivery hosts, wiring `@specd/core` and `@specd/code-graph`.
+sidebar_position: 1
 ---
 
 # @specd/sdk

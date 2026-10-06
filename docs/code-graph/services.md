@@ -1,3 +1,9 @@
+---
+title: Code-Graph Services
+description: Domain services, configuration builders, and locking utilities exported by `@specd/code-graph`.
+sidebar_position: 3
+---
+
 # Code-Graph Services and Helpers
 
 This document details the core domain services, configuration builders, and locking utilities exported by the `@specd/code-graph` package.

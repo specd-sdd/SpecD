@@ -1,0 +1,45 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "cli:entrypoint",
+    "default:_global/docs",
+    "guide:composition",
+    "guide:guide-model",
+    "guide:bundle-guides",
+    "cli:guide"
+  ],
+  "implementation": [
+    {
+      "file": "cli:src/commands/guide-sdk/index.ts",
+      "symbols": ["registerGuideSdkCommand", "handleGuideSdkError"]
+    },
+    {
+      "file": "cli:src/commands/guide/formatters.ts",
+      "symbols": ["formatGuideSearchHits", "formatGuideMetadata"]
+    },
+    {
+      "file": "cli:src/program.ts"
+    },
+    {
+      "file": "cli:src/commands/guide/listing-options.ts"
+    },
+    {
+      "file": "cli:src/errors/invalid-guide-scope-error.ts"
+    },
+    {
+      "file": "cli:src/errors/missing-guide-topic-error.ts"
+    },
+    {
+      "file": "cli:test/commands/guide/guide.test.ts"
+    },
+    {
+      "file": "cli:src/commands/guide/index.ts"
+    },
+    {
+      "file": "cli:test/commands/guide-sdk/guide-sdk.spec.ts"
+    }
+  ]
+}

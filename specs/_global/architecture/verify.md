@@ -87,6 +87,16 @@
 - **WHEN** a new package declares a `workspace:*` dependency that creates a cycle
 - **THEN** pnpm must reject it
 
+### Requirement: CLI guide delivery adapter dependency
+
+#### Scenario: CLI delegates guide delivery through the guide package
+
+- **GIVEN** the `guide-sdk` CLI command is registered
+- **WHEN** its package dependencies and adapter implementation are inspected
+- **THEN** `@specd/cli` may depend directly on `@specd/guide`
+- **AND** the command delegates catalog retrieval, topic lookup, slicing, and search to the guide engine
+- **AND** the SDK catalog is loaded through `@specd/guide/sdk` only when a guide-sdk command is invoked
+
 ### Requirement: Curated public package entry points
 
 #### Scenario: FsConfigLoader not importable from core public root

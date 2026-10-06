@@ -93,6 +93,8 @@ import { registerPluginsUninstall } from './commands/plugins/uninstall.js'
 
 // guide
 import { registerGuideCommand } from './commands/guide/index.js'
+import { registerGuideSdkCommand } from './commands/guide-sdk/index.js'
+import type { GuideEngine } from '@specd/guide'
 
 /**
  * Builds and configures the Commander program with all command groups.
@@ -258,6 +260,14 @@ export function createProgram(): Command {
 
   // ---- guide ----
   registerGuideCommand(program)
+
+  // The SDK collection engine is resolved through a lazy dynamic import so that
+  // `specd guide` and every other command never load the generated SDK catalog.
+  let sdkEnginePromise: Promise<GuideEngine> | undefined
+  registerGuideSdkCommand(program, async () => {
+    sdkEnginePromise ??= import('@specd/guide/sdk').then((m) => m.createGuideSdkEngine())
+    return sdkEnginePromise
+  })
 
   // ---- default action (no subcommand) ----
   program.action(async () => {

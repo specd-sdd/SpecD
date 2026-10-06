@@ -6,7 +6,8 @@
   "repository": "https://github.com/specd-sdd/SpecD",
   "homepage": "https://getspecd.dev",
   "files": [
-    "dist/"
+    "dist/",
+    "generated/"
   ],
   "type": "module",
   "dependencies": {
@@ -20,13 +21,22 @@
     "./internal": {
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
+    },
+    "./sdk": {
+      "import": "./dist/sdk.js",
+      "types": "./dist/sdk.d.ts"
     }
+  },
+  "devDependencies": {
+    "prettier": "^3.8.3",
+    "typedoc": "^0.28.14",
+    "typedoc-plugin-markdown": "^4.2.8"
   },
   "scripts": {
     "bundle:guides": "tsx scripts/bundle-guides.ts",
-    "build": "tsx scripts/bundle-guides.ts && tsup src/public.ts src/index.ts --format esm --dts --clean",
-    "build:dev": "tsx scripts/bundle-guides.ts && tsup src/public.ts src/index.ts --format esm --dts --sourcemap --clean",
-    "dev": "tsup src/public.ts src/index.ts --format esm --dts --sourcemap --watch",
+    "build": "tsx scripts/bundle-guides.ts && tsup src/public.ts src/index.ts src/sdk.ts --format esm --dts --clean",
+    "build:dev": "tsx scripts/bundle-guides.ts && tsup src/public.ts src/index.ts src/sdk.ts --format esm --dts --sourcemap --clean",
+    "dev": "tsx scripts/bundle-guides.ts && tsup src/public.ts src/index.ts src/sdk.ts --format esm --dts --sourcemap --watch",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "lint": "eslint ."

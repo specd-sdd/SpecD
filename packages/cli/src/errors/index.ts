@@ -1,3 +1,6 @@
 export { SpecdCliError } from './specd-cli-error.js'
 export { CliValidationError } from './cli-validation-error.js'
 export { InvalidFormatError } from './invalid-format-error.js'
+export { InvalidGuideCollectionError } from './invalid-guide-collection-error.js'
+export { InvalidGuideScopeError } from './invalid-guide-scope-error.js'
+export { MissingGuideTopicError } from './missing-guide-topic-error.js'

@@ -1,3 +1,9 @@
+---
+title: Schema Format Reference
+description: YAML schema file format defining artifacts, validation rules, and phase instructions.
+sidebar_position: 1
+---
+
 # Schema Format Reference
 
 A SpecD schema is a YAML file that defines the artifact workflow for a project: what artifacts exist, how they relate to each other, what validation rules apply, and what instructions guide the AI at each phase.

@@ -1,3 +1,9 @@
+---
+title: Ports
+description: Interfaces between the core application layer and the outside world.
+sidebar_position: 4
+---
+
 # Ports
 
 Ports are the interfaces between the application layer and the outside world. Each port represents a capability that use cases need — storing changes, reading specs, running shell hooks — without specifying how that capability is implemented.

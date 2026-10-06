@@ -7,7 +7,46 @@
   "implementation": [
     {
       "file": "guide:src/infrastructure/adapters/minisearch-guide-engine-adapter.ts",
-      "symbols": ["MiniSearchGuideEngineAdapter"]
+      "symbols": ["MiniSearchGuideEngineAdapter", "rankExactQueryMatches", "isExactQueryMatch"]
+    },
+    {
+      "file": "guide:test/unit/infrastructure/search.test.ts"
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "`@specd/guide` search: GuideSearchPort, minisearch BM25 adapter, SearchGuidesQuery; `readCommand` hardcodes `specd guide` (not collection-aware).",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:d463ca0249d328525056f14288c8d94fb5c934e16abae55501658e5e918d376f",
+          "lastModified": "2026-09-29T14:17:06.131Z"
+        },
+        "verify.md": {
+          "hash": "sha256:49dfb822defa70753850fc1f05ac814765d0d7c273c726f2af311fd87d7f324a",
+          "lastModified": "2026-09-29T14:17:06.131Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# guide:search-guides — Guide Full-Text Search\n\n## Rules\n\n**GuideSearchPort** (driven, app)\n- `search(query: string, options?: GuideSearchOptions): Promise<readonly GuideSearchHit[]>`\n- Opts: `topic?` = 1 topic; `limit?` def 5; `snippetLines?` def 3 (per side of match).\n\n**MiniSearch adapter** (infra) — implements port, indexes EVERY `GuideSection`\n- Content from `GuideTopic.content` on the fly: `section.content ?? slice(startOffset,endOffset) ?? lines[startLine-1..endLine]`.\n- Fields `id`,`topic`,`title`,`heading`,`sectionIndex`,`content` (code also `level`,`startLine`,`endLine`).\n- `id` = `` `${guide.topic}#${section.index}` `` — topic-scoped, no collection scope.\n- Boost `title` 5, `heading` 3, `content` 1. `prefix:true`, `fuzzy:0.2`. No index-level stop-word filter.\n\n**Per-hit**\n- `snippet` = line-numbered, `snippetLines` around BEST-MATCH line, not section start. Cache doc lines per topic to window across section bounds. Line score: exact full-query substring > significant term +word-boundary > prefix. Window `max(0,matchIdx-n)`..`min(docEnd,matchIdx+n)`, absolute 1-indexed. No term hits → start at `startLine`.\n- `readCommand` = fetch section by sectionIndex/heading. Literal: `` `specd guide ${doc.topic} --section ${doc.sectionIndex}` `` — `specd guide` HARDCODED, not collection-derived.\n- `file` = `` `${doc.topic}.md` `` — `.md` hardcoded, topic-only, no collection dir. In `GuideSearchHit`, absent from spec text.\n- `section` = `section.heading`.\n\n**SearchGuidesQuery** (app) — holds port. Empty/whitespace query → `[]`, no port call. Else delegate → ranked `GuideSearchHit[]`.\n\n## Constraints\n- Fully in-memory, no persistent DB. `minisearch`, zero external transitive deps.\n- Topic filter: exact match post-search, normalized `.trim().toLowerCase().replace(/\\.md$/,)`. `limit<=0`→5; `snippetLines<0`→3.\n- Punctuation, regex metachars, emoji, Unicode MUST NOT crash; all-stop-word query → empty/fallback, no throw.\n- Collection gap (2nd catalog, e.g. `specd guide-sdk`): `id`, topic-line cache, `file`, `readCommand` all topic-only. Need collection namespace in `id` + collection-derived command, else `id` collides and `readCommand` emits wrong command.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:d463ca0249d328525056f14288c8d94fb5c934e16abae55501658e5e918d376f",
+          "lastModified": "2026-09-29T14:17:06.131Z"
+        },
+        "verify.md": {
+          "hash": "sha256:49dfb822defa70753850fc1f05ac814765d0d7c273c726f2af311fd87d7f324a",
+          "lastModified": "2026-09-29T14:17:06.131Z"
+        }
+      }
+    }
+  }
 }

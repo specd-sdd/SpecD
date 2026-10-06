@@ -266,3 +266,99 @@
 - **WHEN** `createProgram()` is invoked
 - **THEN** a fully assembled Commander `Command` instance is returned with all top-level commands registered
 - **AND** the instance can be introspected without parsing CLI arguments or calling `process.exit`
+
+### Requirement: Guide SDK Command Registration
+
+#### Scenario: 'specd guide-sdk' appears in root help as a top-level command
+
+- **WHEN** `specd --help` is executed
+- **THEN** `guide-sdk` MUST be listed as a top-level command
+- **AND** it MUST be listed as a sibling of `guide`, not nested beneath it
+
+#### Scenario: 'specd guide-sdk' is resolvable
+
+- **WHEN** `specd guide-sdk` is executed with no further arguments
+- **THEN** it MUST resolve the command rather than failing as unknown
+- **AND** it MUST display the SDK documentation catalog
+
+#### Scenario: Command inherits configuration discovery
+
+- **GIVEN** a `specd.yaml` discovered by walking up from the working directory
+- **WHEN** `specd guide-sdk` is executed
+- **THEN** the configuration MUST be resolved exactly as it is for `specd guide`
+
+#### Scenario: Command honours the global --config override
+
+- **GIVEN** an explicit `--config` path supplied before the subcommand
+- **WHEN** `specd guide-sdk` is executed
+- **THEN** the supplied configuration MUST be used
+
+#### Scenario: Command honours the local --config override
+
+- **GIVEN** an explicit `--config` path supplied after the command name
+- **WHEN** `specd guide-sdk` is executed
+- **THEN** it MUST behave equivalently to the global position
+
+#### Scenario: Successful output goes to stdout and errors to stderr
+
+- **WHEN** `specd guide-sdk` runs successfully
+- **THEN** output MUST be written to stdout
+- **AND** nothing MUST be written to stderr
+
+#### Scenario: Command follows the standard exit codes
+
+- **WHEN** `specd guide-sdk` succeeds
+- **THEN** the exit code MUST be `0`
+- **WHEN** a guide domain error occurs, such as an unknown topic
+- **THEN** the exit code MUST be `1`
+
+#### Scenario: Command uses the standard CLI error rendering
+
+- **WHEN** `specd guide-sdk` fails with a guide domain error
+- **THEN** the message MUST use `error: [<CODE>] <message>`
+- **AND** it MUST NOT use a `Guide error:` prefix
+
+#### Scenario: Stack traces are gated on SPECD_DEBUG
+
+- **GIVEN** `SPECD_DEBUG` is unset
+- **WHEN** `specd guide-sdk` fails with a guide domain error
+- **THEN** no stack trace MUST be printed
+- **GIVEN** `SPECD_DEBUG` is set
+- **WHEN** the same failure occurs
+- **THEN** a stack trace MUST be printed
+
+#### Scenario: Command supports the standard --format flag
+
+- **WHEN** `specd guide-sdk --format json` is executed
+- **THEN** structured JSON MUST be emitted
+- **WHEN** `specd guide-sdk --format toon` is executed
+- **THEN** structured TOON MUST be emitted
+
+#### Scenario: Command help declares its json and toon schemas
+
+- **WHEN** `specd guide-sdk --help` is executed
+- **THEN** the help output MUST document the `json` output schema
+- **AND** it MUST document the `toon` output schema
+
+#### Scenario: Excess positional arguments are rejected
+
+- **WHEN** `specd guide-sdk one two three` is executed with no argument accepting that arity
+- **THEN** the command MUST reject the invocation
+- **AND** it MUST exit with the standard error exit code
+
+#### Scenario: Existing commands are unaffected
+
+- **WHEN** the standard command surface is exercised after `guide-sdk` is registered
+- **THEN** every pre-existing command MUST behave exactly as before
+- **AND** `guide` MUST still serve the user guide collection
+
+#### Scenario: The SDK catalog is not reachable from the main guide entry point
+
+- **WHEN** the main `@specd/guide` entry point is inspected
+- **THEN** the SDK collection factory and catalog MUST NOT be exported from it
+
+#### Scenario: The SDK catalog is loaded only when guide-sdk runs
+
+- **GIVEN** a CLI invocation that does not run a `guide-sdk` subcommand
+- **WHEN** the process executes
+- **THEN** the SDK catalog module MUST NOT be loaded

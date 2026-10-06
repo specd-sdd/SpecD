@@ -6,22 +6,15 @@
   "dependsOn": ["core:config", "default:_global/error-handling-conventions"],
   "implementation": [
     {
-      "file": "cli:src/helpers/table.ts"
-    },
-    {
-      "file": "cli:src/program.ts"
-    },
-    {
-      "file": "cli:src/index.ts"
-    },
-    {
-      "file": "cli:test/helpers/table.spec.ts"
-    },
-    {
       "file": "cli:test/documentation-coverage.spec.ts"
     },
     {
-      "file": "cli:test/configuration-coverage.spec.ts"
+      "file": "cli:src/program.ts",
+      "symbols": ["createProgram"]
+    },
+    {
+      "file": "cli:src/commands/guide-sdk/index.ts",
+      "symbols": ["registerGuideSdkCommand"]
     }
   ],
   "optimizations": {

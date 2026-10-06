@@ -45,12 +45,15 @@ describe('CLI guide command', () => {
 
       const out = getStdout()
       const data = JSON.parse(out)
-      expect(Array.isArray(data)).toBe(true)
-      expect(data.length).toBeGreaterThanOrEqual(10)
-      expect(data[0]).toHaveProperty('topic')
-      expect(data[0]).toHaveProperty('title')
-      expect(data[0]).toHaveProperty('description')
-      expect(data[0]).toHaveProperty('order')
+      // The listing is wrapped in an envelope so the SDK guide discovery field can be
+      // carried as a structured sibling of the entries.
+      expect(Array.isArray(data.topics)).toBe(true)
+      expect(data.topics.length).toBeGreaterThanOrEqual(10)
+      expect(data.topics[0]).toHaveProperty('topic')
+      expect(data.topics[0]).toHaveProperty('title')
+      expect(data.topics[0]).toHaveProperty('description')
+      expect(data.topics[0]).toHaveProperty('order')
+      expect(data).toHaveProperty('sdkGuide')
     })
 
     it('lists catalog in TOON format with --format toon', async () => {
@@ -64,6 +67,215 @@ describe('CLI guide command', () => {
       expect(out).toContain('getting-started')
       expect(out).toContain('workflow')
       expect(out).toContain('topic,title,description')
+    })
+  })
+
+  describe('listing envelope', () => {
+    it('reports pagination and collection extents for the user guide catalog', async () => {
+      const getStdout = captureStdout()
+      const program = makeProgram()
+      registerGuideCommand(program)
+
+      await program.parseAsync(['guide', '--page-size', '5', '--page', '2', '--format', 'json'], {
+        from: 'user',
+      })
+
+      const data = JSON.parse(getStdout()) as {
+        topics: Array<{ page: number; scope: string }>
+        pagination: Record<string, number>
+        collections: unknown[]
+      }
+      expect(data.topics).toHaveLength(5)
+      expect(data.pagination).toMatchObject({ page: 2, pageSize: 5, returned: 5 })
+      expect(data.pagination['total']).toBe(22)
+      expect(data.pagination['totalPages']).toBe(5)
+      expect(data.collections).toEqual([
+        { collection: 'guide', total: 22, firstPage: 1, lastPage: 5 },
+      ])
+      expect(data.topics.every((t) => t.page === 2)).toBe(true)
+      // Every entry declares its kind, so the caller does not infer it from the path.
+      expect(data.topics.every((t) => t.scope === 'docs')).toBe(true)
+    })
+
+    it('reports the page position in text output only when several pages exist', async () => {
+      const paged = captureStdout()
+      const pagedProgram = makeProgram()
+      registerGuideCommand(pagedProgram)
+      await pagedProgram.parseAsync(['guide', '--page-size', '5'], { from: 'user' })
+      expect(paged()).toContain('page 1 of 5 · 5 of 22 topics')
+
+      const single = captureStdout()
+      const singleProgram = makeProgram()
+      registerGuideCommand(singleProgram)
+      await singleProgram.parseAsync(['guide'], { from: 'user' })
+      expect(single()).not.toMatch(/page \d+ of \d+/)
+    })
+
+    it('emits the same envelope shape as the SDK guide command', async () => {
+      const getStdout = captureStdout()
+      const program = makeProgram()
+      registerGuideCommand(program)
+
+      await program.parseAsync(['guide', '--page-size', '3', '--format', 'json'], { from: 'user' })
+
+      const data = JSON.parse(getStdout()) as Record<string, Record<string, unknown>>
+      for (const key of ['topics', 'pagination', 'collections', 'sdkGuide']) {
+        expect(data).toHaveProperty(key)
+      }
+      expect(Object.keys(data['pagination'] ?? {}).sort()).toEqual([
+        'page',
+        'pageSize',
+        'returned',
+        'total',
+        'totalPages',
+      ])
+    })
+  })
+
+  describe('catalog index', () => {
+    it('returns a bounded index instead of a plain listing for --meta without a topic', async () => {
+      const getStdout = captureStdout()
+      const program = makeProgram()
+      registerGuideCommand(program)
+
+      await program.parseAsync(['guide', '--meta', '--page-size', '4', '--format', 'json'], {
+        from: 'user',
+      })
+
+      const data = JSON.parse(getStdout()) as {
+        collections: unknown[]
+        pagination: Record<string, number>
+        readHint: string
+        topics: Array<Record<string, unknown>>
+      }
+      expect(data.collections).toEqual([
+        { collection: 'guide', total: 22, firstPage: 1, lastPage: 6 },
+      ])
+      expect(data.pagination).toMatchObject({ page: 1, pageSize: 4, returned: 4, total: 22 })
+      expect(data.topics).toHaveLength(4)
+
+      const first = data.topics[0]!
+      expect(first['collection']).toBe('guide')
+      expect(first['scope']).toBe('docs')
+      expect(typeof first['lines']).toBe('number')
+      expect(typeof first['bytes']).toBe('number')
+      expect(first['page']).toBe(1)
+      // The read shape is stated once, not repeated per topic.
+      expect(data.readHint).toBe('specd guide <topic>')
+      expect(first['readCommand']).toBeUndefined()
+    })
+
+    it('renders the index as tables with a page position in text output', async () => {
+      const getStdout = captureStdout()
+      const program = makeProgram()
+      registerGuideCommand(program)
+
+      await program.parseAsync(['guide', '--meta', '--page-size', '4'], { from: 'user' })
+
+      const out = getStdout()
+      expect(out).toContain('collections:')
+      expect(out).toContain('PAGE')
+      expect(out).toContain('SCOPE')
+      expect(out).toContain('read: specd guide <topic>')
+      expect(out).toContain('page 1 of 6 · 4 of 22 topics')
+      // No per-row read command column.
+      expect(out).not.toContain('READ')
+    })
+
+    it("still returns a single topic's metadata when a topic is supplied", async () => {
+      const getStdout = captureStdout()
+      const program = makeProgram()
+      registerGuideCommand(program)
+
+      await program.parseAsync(['guide', 'what-is-specd', '--meta'], { from: 'user' })
+
+      const out = getStdout()
+      expect(out).toContain('what-is-specd')
+      // A single topic reports its own metadata and outline, not the catalog index.
+      expect(out).toContain('HEADING')
+      expect(out).not.toContain('collections:')
+    })
+  })
+
+  describe('option validation', () => {
+    it('rejects --section, --start-line, and --lines without a topic', async () => {
+      for (const flag of [
+        ['--section', '2'],
+        ['--start-line', '3'],
+        ['--lines', '5'],
+      ]) {
+        const getStdout = captureStdout()
+        const getStderr = captureStderr()
+        const program = makeProgram()
+        registerGuideCommand(program)
+
+        await expect(
+          program.parseAsync(['guide', ...flag, '--format', 'json'], { from: 'user' }),
+        ).rejects.toBeInstanceOf(ExitSentinel)
+
+        expect(getStderr()).toContain(`${flag[0]} requires a <topic> argument`)
+        // Only the structured error is emitted; no catalog listing is rendered,
+        // because that would silently discard the caller's request.
+        const errPayload = JSON.parse(getStdout().trim()) as { code: string; exitCode: number }
+        expect(errPayload).toMatchObject({
+          code: 'MISSING_GUIDE_TOPIC',
+          exitCode: 1,
+        })
+        expect(getStdout()).not.toContain('getting-started')
+        vi.restoreAllMocks()
+        mockProcessExit()
+      }
+    })
+
+    it('names the sibling SDK guide in --help', async () => {
+      const getStdout = captureStdout()
+      const program = makeProgram()
+      registerGuideCommand(program)
+
+      await expect(program.parseAsync(['guide', '--help'], { from: 'user' })).rejects.toThrow()
+
+      const help = getStdout()
+      expect(help).toContain('specd guide-sdk')
+      expect(help).toContain('SDK and extension')
+    })
+  })
+
+  describe('SDK guide discovery field', () => {
+    it('surfaces specd guide-sdk in text output', async () => {
+      const getStdout = captureStdout()
+      const program = makeProgram()
+      registerGuideCommand(program)
+
+      await program.parseAsync(['guide'], { from: 'user' })
+
+      const out = getStdout()
+      expect(out).toContain('sdkGuide')
+      expect(out).toContain('specd guide-sdk')
+    })
+
+    it('surfaces specd guide-sdk as a structured field in json output', async () => {
+      const getStdout = captureStdout()
+      const program = makeProgram()
+      registerGuideCommand(program)
+
+      await program.parseAsync(['guide', '--format', 'json'], { from: 'user' })
+
+      const data = JSON.parse(getStdout())
+      expect(data.sdkGuide).toBeDefined()
+      expect(data.sdkGuide.command).toBe('specd guide-sdk')
+      expect(data.sdkGuide.collections).toContain('sdk')
+    })
+
+    it('surfaces specd guide-sdk as a structured field in toon output', async () => {
+      const getStdout = captureStdout()
+      const program = makeProgram()
+      registerGuideCommand(program)
+
+      await program.parseAsync(['guide', '--format', 'toon'], { from: 'user' })
+
+      const out = getStdout()
+      expect(out).toContain('sdkGuide')
+      expect(out).toContain('specd guide-sdk')
     })
   })
 
@@ -267,8 +479,8 @@ describe('CLI guide command', () => {
       await program.parseAsync(['guide', 'search', 'lifecycle states'], { from: 'user' })
 
       const out = getStdout()
-      expect(out).toContain('workflow')
-      expect(out).toContain('Read: specd guide workflow --section')
+      expect(out).toContain('Transitioning Lifecycle States')
+      expect(out).toContain('Read: specd guide ')
     })
 
     it('scopes results to specific topic with --topic', async () => {

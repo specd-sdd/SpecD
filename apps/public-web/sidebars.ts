@@ -37,6 +37,7 @@ const sidebars: SidebarsConfig = {
       items: [
         'cli/index',
         'cli/guide',
+        'cli/guide-sdk',
         'cli/changes',
         'cli/drafts',
         'cli/discarded',

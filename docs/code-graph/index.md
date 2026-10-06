@@ -1,6 +1,7 @@
 ---
 title: Code graph
-sidebar_position: 4
+description: Package reference for `@specd/code-graph` — indexing, search, impact analysis, and graph health.
+sidebar_position: 1
 ---
 
 # Code graph

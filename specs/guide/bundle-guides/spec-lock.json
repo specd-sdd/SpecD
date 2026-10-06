@@ -6,11 +6,39 @@
   "dependsOn": ["guide:conventions", "guide:guide-model"],
   "implementation": [
     {
-      "file": "guide:scripts/bundle-guides.ts",
-      "symbols": ["extractSections", "compileGuide", "bundleGuides"]
+      "file": "guide:scripts/guide-bundler.ts",
+      "symbols": ["compileCollections", "compileGuide", "parseFrontmatter"]
     },
     {
-      "file": "guide:src/infrastructure/generated/guides.ts"
+      "file": "guide:scripts/sdk-api-generator.ts",
+      "symbols": ["generateSdkApiTopics", "loadApiEntryPoints"]
+    },
+    {
+      "file": "guide:test/unit/infrastructure/bundle.test.ts"
+    },
+    {
+      "file": "guide:README.md"
+    },
+    {
+      "file": "guide:scripts/markdown-formatter.ts",
+      "symbols": ["formatGeneratedBody"]
+    },
+    {
+      "file": "guide:package.json"
+    },
+    {
+      "file": "guide:scripts/bundle-guides.ts",
+      "symbols": ["bundleAllCollections"]
+    },
+    {
+      "file": "guide:src/infrastructure/adapters/prebundled-guide-catalog-adapter.ts",
+      "symbols": ["loadCatalog"]
+    },
+    {
+      "file": "guide:src/infrastructure/index.ts"
+    },
+    {
+      "file": "guide:test/integration/sdk-catalog.spec.ts"
     }
   ]
 }

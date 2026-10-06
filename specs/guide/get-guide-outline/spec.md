@@ -11,14 +11,14 @@ AI agents and automated tools need to inspect the structural layout of a guide (
 The application layer MUST implement `GetGuideOutlineQuery`:
 
 - The query interactor MUST receive an instance of `GuideCatalogPort`.
-- The query MUST accept a `topic: string` identifier.
-- If the topic is not found, the query MUST throw a `GuideTopicNotFoundError`.
-- The query MUST construct and return a `GuideOutline` value object containing:
-  - `topic`: Canonical topic identifier.
-  - `file`: Source Markdown filename (e.g. `<topic>.md`).
-  - `lines`: Total line count of the document.
-  - `bytes`: Total byte length of the raw content.
-  - `sections`: Array of `GuideSection` items, each specifying `index` (1-indexed section position), `heading`, `level`, `startLine`, `endLine`, and `lines`.
+- The query MUST retrieve the guide from the catalog port using the same topic normalization and collection-qualified resolution as `GetGuideQuery`, and MUST propagate the errors that resolution raises rather than raising its own.
+- The query MUST return a `GuideOutline` containing the document metadata (`collection`, `topic`, `file`, `lines`, `bytes`) and the section array WITHOUT serializing full section content.
+- Every returned section record MUST omit its optional `content` field, even when the catalog port supplied section body content.
+- `file` MUST be the real source path of the document relative to its collection root. The query MUST NOT synthesize the value from the topic identifier, and MUST NOT emit a bare `<topic>.md` filename. For a hand-written document this is the relative `.md` path (e.g. `ports.md`, `examples/implementing-a-port.md`); for a generated API topic this is the relative path of the TypeScript declaration the symbol was extracted from.
+- Each returned section MUST expose the fields defined by the `GuideSection` value object, including `index`, `heading`, `level`, `startLine`, `endLine`, `lines`, `startOffset` and `endOffset`.
+- A document with no headings MUST return an empty `sections` array, not `null` and not an error.
+
+The query MUST resolve only topics within the collection served by its catalog port.
 
 ## Constraints
 

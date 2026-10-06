@@ -1,0 +1,19 @@
+- op: added
+  description: Verify the approved CLI-to-guide delivery-adapter dependency boundary.
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: 'Requirement: No circular dependencies between packages'
+  content: |
+    ### Requirement: CLI guide delivery adapter dependency
+
+    #### Scenario: CLI delegates guide delivery through the guide package
+
+    - **GIVEN** the `guide-sdk` CLI command is registered
+    - **WHEN** its package dependencies and adapter implementation are inspected
+    - **THEN** `@specd/cli` may depend directly on `@specd/guide`
+    - **AND** the command delegates catalog retrieval, topic lookup, slicing, and search to the guide engine
+    - **AND** the SDK catalog is loaded through `@specd/guide/sdk` only when a guide-sdk command is invoked

@@ -1,9 +1,16 @@
+import type { GuideCollection } from './guide-topic.js'
+
 /**
  * Lightweight summary of a guide topic, used for catalog listings and directory tables.
  */
 export interface GuideSummary {
   /**
-   * Topic identifier.
+   * Collection identifier the guide belongs to.
+   */
+  readonly collection: GuideCollection
+
+  /**
+   * Canonical topic identifier within its collection.
    */
   readonly topic: string
 

@@ -4,17 +4,44 @@ import {
   GuideSectionAmbiguousError,
   GuideSectionNotFoundError,
   GuideTopicNotFoundError,
+  isGeneratedTopic,
   type GuideEngine,
 } from '@specd/guide'
+import { SpecdCliError } from '../../errors/index.js'
 import { cliError } from '../../handle-error.js'
 import {
-  formatGuideCatalog,
+  assertTopicRequired,
+  DEFAULT_PAGE_SIZE,
+  resolveGuidePagination,
+} from './listing-options.js'
+import {
   formatGuideContent,
+  formatGuideIndex,
+  formatGuideListing,
   formatGuideMetadata,
   formatGuideSearchHits,
   parseGuideFormat,
+  type GuideIndexOptions,
   type GuideOutputFormat,
+  type GuideSdkDiscovery,
 } from './formatters.js'
+
+/**
+ * Structured pointer from `specd guide` to the sibling SDK guide.
+ *
+ * It is emitted under every output format so that agents can discover the SDK guide
+ * without scraping prose.
+ */
+const GUIDE_INDEX_OPTIONS: GuideIndexOptions = {
+  readHint: 'specd guide <topic>',
+}
+
+const SDK_GUIDE_DISCOVERY: GuideSdkDiscovery = {
+  command: 'specd guide-sdk',
+  description:
+    'SDK and extension development guide: package references and generated public API topics',
+  collections: ['sdk', 'core', 'code-graph', 'skills', 'schemas'],
+}
 
 /**
  * Command line options for the main guide command.
@@ -25,6 +52,8 @@ export interface GuideCommandOptions {
   readonly startLine?: number
   readonly lines?: number
   readonly lineNumbers?: boolean
+  readonly page?: number
+  readonly pageSize?: number
   readonly format?: string
 }
 
@@ -63,7 +92,13 @@ function handleGuideError(err: unknown, formatRaw?: string): never {
       format,
       1,
       'UNKNOWN_GUIDE_TOPIC',
-      detail ? { detail } : undefined,
+      detail
+        ? {
+            detail,
+            metadata:
+              err.titleMatches.length > 0 ? { suggestedTopics: [...err.titleMatches] } : undefined,
+          }
+        : undefined,
     )
   }
 
@@ -96,6 +131,11 @@ function handleGuideError(err: unknown, formatRaw?: string): never {
     })
   }
 
+  // CLI-level validation errors already carry their own machine-readable code.
+  if (err instanceof SpecdCliError) {
+    cliError(err.message, format, 1, err.code)
+  }
+
   const message = err instanceof Error ? err.message : String(err)
   cliError(message, format, 1, 'GUIDE_ERROR')
 }
@@ -114,7 +154,17 @@ export function registerGuideCommand(program: Command, engineOverride?: GuideEng
     .description(
       'Retrieve on-demand documentation topics, outline metadata, section slices, and search',
     )
-    .option('--meta', 'Inspect document metadata and outline structure without full text')
+    .option(
+      '--meta',
+      'Inspect document metadata and outline structure without full text; with no topic, print a catalog index',
+    )
+    .option('--page <n>', '1-indexed listing page to return', (val) => parseInt(val, 10), 1)
+    .option(
+      '--page-size <n>',
+      'Maximum entries per listing page',
+      (val) => parseInt(val, 10),
+      DEFAULT_PAGE_SIZE,
+    )
     .option(
       '--section <name|index>',
       'Extract a specific section by heading name, slug, or 1-indexed section number',
@@ -123,22 +173,38 @@ export function registerGuideCommand(program: Command, engineOverride?: GuideEng
     .option('--lines <m>', 'Maximum number of lines to emit', (val) => parseInt(val, 10))
     .option('--line-numbers', 'Prefix each emitted line with its 1-indexed line number')
     .option('--format <format>', 'Output format: text|json|toon')
+    .addHelpText(
+      'after',
+      [
+        '',
+        'This command serves the hand-written SpecD guide. The SDK and extension',
+        'development guide — package references plus generated public API topics —',
+        'is served by `specd guide-sdk`.',
+        '',
+        'Examples:',
+        '  $ specd guide --meta',
+        '  $ specd guide-cli/commands --section 2',
+        '  $ specd guide search "delta lifecycle"',
+        '  $ specd guide-sdk --scope api',
+      ].join('\n'),
+    )
     .action(async (topicArg: string | undefined, options: GuideCommandOptions) => {
       try {
         const format = parseGuideFormat(options.format, 'text')
 
-        // 1. Catalog listing: no topic specified
+        // 1. Catalog listing or catalog index: no topic specified
         if (!topicArg) {
-          const guides = await engine.listGuides()
-          const rendered = formatGuideCatalog(guides, format)
+          assertTopicRequired(options)
+          const pagination = resolveGuidePagination(options.page, options.pageSize)
+          const listing = await engine.listGuides({ pagination })
+          const rendered = options.meta
+            ? formatGuideIndex(listing, format, GUIDE_INDEX_OPTIONS)
+            : formatGuideListing(listing, format, { discovery: SDK_GUIDE_DISCOVERY })
           process.stdout.write(`${rendered}\n`)
           return
         }
 
-        const topic = topicArg.trim().toLowerCase()
-        if (topic === 'search') {
-          return
-        }
+        const topic = topicArg.trim()
 
         // 2. Metadata and outline inspection
         if (options.meta) {
@@ -150,10 +216,14 @@ export function registerGuideCommand(program: Command, engineOverride?: GuideEng
             startLine: s.startLine,
             endLine: s.endLine,
             lines: s.lines,
+            startOffset: s.startOffset,
+            endOffset: s.endOffset,
           }))
           const rendered = formatGuideMetadata(
             {
               topic: outline.topic,
+              scope: isGeneratedTopic(outline.topic) ? 'api' : 'docs',
+              collection: outline.collection,
               file: outline.file,
               lines: outline.lines,
               bytes: outline.bytes,

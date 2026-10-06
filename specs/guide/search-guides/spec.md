@@ -19,26 +19,30 @@ The application layer MUST declare a driven port `GuideSearchPort`:
 
 ### Requirement: In-Memory Search Engine Adapter
 
-The infrastructure layer MUST implement `GuideSearchPort` using `minisearch`:
+The infrastructure layer MUST provide an adapter implementing `GuideSearchPort` using an in-memory BM25 engine (`minisearch`):
 
-- The adapter MUST index every discrete `GuideSection` across all guides.
-- Section content for search documents MUST be extracted on the fly from the parent `GuideTopic.content` using `startOffset` and `endOffset` (or line range).
-- Search documents in the index MUST include fields: `id` (e.g. `${topic}#${section.index}`), `topic`, `title`, `heading`, `sectionIndex`, and `content`.
-- Field boosting weights MUST be applied:
-  - `title`: 5
-  - `heading`: 3
-  - `content`: 1
-- Search configuration MUST enable prefix matching, fuzzy matching, and stop-words filtering.
+- The adapter MUST index every guide section in its collection as a separate document, combining the guide title, section heading and section body.
+- The adapter MUST apply field boosting so that matches in the title and heading outrank matches in the body text.
+- The adapter MUST enable prefix and fuzzy matching.
+- The adapter MUST support section-scoped filtering by topic, including collection-qualified topics.
+- The adapter MUST tolerate queries containing punctuation, symbols, emojis and non-ASCII characters without throwing.
+- The adapter MUST register the per-section location fields `level`, `startLine` and `endLine` as stored fields, so that a hit can report the section bounds without re-parsing source content.
+
+Stop-word handling is scoped to snippet selection only. The adapter MAY maintain an internal set of English stop words for the purpose of choosing which lines to include in a result snippet. Stop-word filtering MUST NOT be applied as a pre-filter that removes documents or terms from the index: BM25 scoring over a small documentation corpus MUST operate over the full indexed content.
 
 ### Requirement: Contextual Snippet and Read Command Generation
 
-For each search match, the search adapter MUST generate:
+For each search hit, the infrastructure layer MUST generate a contextual snippet and an actionable read command:
 
-- `snippet`: A line-numbered snippet showing `snippetLines` lines **before and after the best-matching line** within the section — not from the start of the section. The adapter MUST:
-  - Cache the full document line array per topic to enable line-accurate windowing across section boundaries.
-  - Score each line in the section range to find the best-matching line: exact full-query substring match scores highest, followed by significant-term matches with word-boundary bonuses, then prefix matches. Stop-words are filtered from significant terms.
-  - Emit lines from `max(0, matchIdx - snippetLines)` to `min(docEnd, matchIdx + snippetLines)`, with absolute 1-indexed document line numbers.
-- `readCommand`: An actionable CLI command string that the user or agent can execute to retrieve the full section using its section index or heading (e.g. `specd guide <topic> --section <sectionIndex>`).
+- The snippet MUST be centered on the best-matching line within the matched section.
+- Before applying the requested result limit, the adapter MUST promote every hit containing an exact case-insensitive full-query substring in its indexed title, heading, or section content ahead of hits matched only by partial terms. It MUST preserve ordinary BM25 ordering as the tie-breaker within each group.
+- Within a hit, an exact full-query substring match MUST likewise take priority over partial term matches when choosing snippet lines.
+- When no term matches any line, the snippet MUST fall back to the section start.
+- A snippet MUST NOT bleed across section boundaries.
+- `file` MUST be the real source path of the matched document relative to its collection root, and MUST NOT be synthesized from the topic identifier. For a hand-written document this is the relative `.md` path; for a generated API topic this is the relative path of the TypeScript declaration the symbol was extracted from.
+- `readCommand` MUST name the command that serves the hit's collection. A hit in the SDK collection MUST emit a `specd guide-sdk <collection:topic> --section <sectionIndex>` command and MUST NOT emit `specd guide`.
+
+Search document identifiers MUST be namespaced by collection, so that two collections containing the same topic identifier produce distinct documents and neither overwrites the other when indexing.
 
 ### Requirement: SearchGuidesQuery Implementation
 

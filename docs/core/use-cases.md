@@ -1,3 +1,9 @@
+---
+title: Use Cases
+description: Entry points to `@specd/core` business logic and how to construct them.
+sidebar_position: 6
+---
+
 # Use Cases
 
 > **Audience:** plugin authors and `@specd/core` consumers. Delivery hosts should use [`@specd/sdk`](../sdk/index.md) instead of wiring use cases directly.

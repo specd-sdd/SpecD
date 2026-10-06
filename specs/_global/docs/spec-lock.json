@@ -6,19 +6,22 @@
   "dependsOn": ["default:_global/conventions"],
   "implementation": [
     {
-      "file": "default:docs/guide/workflow.md"
+      "file": "default:docs/cli/guide-sdk.md"
     },
     {
-      "file": "default:packages/guide/src/infrastructure/generated/guides.ts"
+      "file": "default:docs/cli/index.md"
     },
     {
-      "file": "default:docs/core/ports.md"
+      "file": "default:docs/guide/cli.md"
     },
     {
-      "file": "default:docs/schemas/schema-format.md"
+      "file": "default:apps/public-web/sidebars.ts"
     },
     {
-      "file": "default:packages/cli/test/configuration-coverage.spec.ts"
+      "file": "default:docs/guide/index.md"
+    },
+    {
+      "file": "default:packages/cli/test/documentation-coverage.spec.ts"
     }
   ],
   "optimizations": {

@@ -1,19 +1,30 @@
+import type { GuideCollection, GuideSourcePath } from './guide-topic.js'
+
 /**
  * Represents a ranked search result item from the guide search engine.
  */
 export interface GuideSearchHit {
   /**
-   * Topic identifier where the match was located.
+   * Collection identifier where the match was found.
+   */
+  readonly collection: GuideCollection
+
+  /**
+   * Topic identifier within its collection.
    */
   readonly topic: string
 
   /**
-   * Source filename (e.g. 'workflow.md').
+   * Real source path of the matched document, relative to its collection root.
+   *
+   * For a hand-written document this is the relative path of the `.md` file; for
+   * a generated API topic this is the relative path of the TypeScript
+   * declaration the symbol was extracted from. Never synthesized from the topic.
    */
-  readonly file: string
+  readonly file: GuideSourcePath
 
   /**
-   * Heading text of the matched section.
+   * Heading title of the matched section.
    */
   readonly section: string
 
@@ -48,7 +59,10 @@ export interface GuideSearchHit {
   readonly snippet: string
 
   /**
-   * Actionable copy-pasteable CLI command to view the section.
+   * Actionable copy-pasteable CLI command to view the matched section.
+   *
+   * The command name is derived from the hit's collection, so a hit in the SDK
+   * collection emits `specd guide-sdk` and never `specd guide`.
    */
   readonly readCommand: string
 }

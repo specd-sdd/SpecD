@@ -33,8 +33,10 @@
 - **WHEN** `GuideTopicNotFoundError` is thrown
 - **THEN** `error.code` is strictly `'UNKNOWN_GUIDE_TOPIC'`
 - **AND** `error.topic` is `'nonexistent-guide'`
-- **AND** `error.availableTopics` is a non-empty array containing all registered topics
-- **AND** `error.message` includes `"nonexistent-guide"` and lists available topics
+- **AND** `error.availableTopics` is a non-empty array
+- **AND** `error.message` includes `"nonexistent-guide"`
+- **AND** `error.message` does not enumerate the available topics
+- **AND** `error.message` does not name a CLI or host-specific command
 
 #### Scenario: Requested topic with special characters or whitespace
 
@@ -50,6 +52,44 @@
 - **THEN** `error.code` is `'UNKNOWN_GUIDE_TOPIC'`
 - **AND** `error.topic` is `""`
 - **AND** `error.message` informs the caller that the topic name was empty
+
+#### Scenario: Error topic is reported before normalization
+
+- **GIVEN** a caller supplies `"  Core:Ports.MD  "`
+- **WHEN** no topic resolves
+- **THEN** `error.topic` MUST equal the supplied string including its whitespace and extension
+- **AND** it MUST NOT be the normalized form
+
+#### Scenario: Available topics are collection-scoped
+
+- **GIVEN** a collection `core` containing topics `ports` and `use-cases`
+- **AND** another collection `sdk` containing topic `index`
+- **WHEN** an unknown topic is requested from the `core` collection
+- **THEN** `error.availableTopics` MUST contain the `core` topics
+- **AND** it MUST NOT contain any `sdk` topic
+
+#### Scenario: Available topics are collection-qualified
+
+- **GIVEN** a collection `core` containing a topic `ports`
+- **WHEN** an unknown topic is requested from it
+- **THEN** `error.availableTopics` MUST include the qualified identifier `core:ports`
+- **AND** it MUST NOT include the bare identifier `ports`
+
+#### Scenario: Every reported topic resolves when passed back
+
+- **GIVEN** an unknown topic requested from a collection
+- **WHEN** every value in `error.availableTopics` is supplied to the topic lookup in turn
+- **THEN** each MUST resolve successfully
+- **AND** none MUST fail as not found
+
+#### Scenario: Cross-collection title suggestion remains structured and non-resolving
+
+- **GIVEN** the requested collection has no topic titled `ArtifactDag` and a sibling collection has a title-equivalent topic
+- **WHEN** `GuideTopicNotFoundError` is created for the qualified miss
+- **THEN** `error.titleMatches` MUST expose the sibling's qualified identifier
+- **AND** `error.crossCollection` MUST be `true`
+- **AND** `error.availableTopics` MUST remain limited to the requested collection
+- **AND** the original lookup MUST still fail rather than redirecting to the sibling
 
 ### Requirement: GuideSectionNotFoundError
 
@@ -79,19 +119,16 @@
 
 ### Requirement: GuideSectionAmbiguousError
 
-#### Scenario: Multiple duplicate headings trigger ambiguous error with candidate details
+#### Scenario: Multiple duplicate headings trigger actionable candidates
 
-- **GIVEN** a guide containing two sections both titled `"Overview"` at section indices 2 and 7
-- **WHEN** requesting section by heading `"Overview"`
-- **THEN** `GuideSectionAmbiguousError` is thrown
-- **AND** `error.code` is strictly `'AMBIGUOUS_GUIDE_SECTION'`
-- **AND** `error.heading` is `'Overview'`
-- **AND** `error.matchingIndices` contains `[2, 7]`
-- **AND** `error.matchingHeadings` contains formatted strings with indices and line spans
-- **AND** `error.message` guides the user to use `--section <number>` to select the exact section
+- **GIVEN** a guide containing two sections titled `"Overview"` at indices 2 and 7 with spans 10-15 and 42-49
+- **WHEN** requesting the heading `"Overview"`
+- **THEN** `GuideSectionAmbiguousError` MUST expose `matchingIndices` as `[2, 7]`
+- **AND** `matchingHeadings` MUST equal `['[2] Overview (lines 10-15)', '[7] Overview (lines 42-49)']`
 
-#### Scenario: Ambiguity error message specifies exact disambiguation commands
+#### Scenario: Ambiguity error message specifies every exact disambiguation choice
 
-- **GIVEN** a `GuideSectionAmbiguousError` thrown for topic `"workflow"` and heading `"Commands"` with matching indices `[3, 8]`
-- **WHEN** reading `error.message`
-- **THEN** it explicitly mentions `--section 3` and `--section 8` as disambiguation choices
+- **GIVEN** matching indices `[3, 8]`
+- **WHEN** reading the ambiguity error message
+- **THEN** it MUST explicitly mention `--section 3` and `--section 8`
+- **AND** it MUST NOT rely solely on the placeholder `--section <number>`

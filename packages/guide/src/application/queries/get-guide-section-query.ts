@@ -55,7 +55,6 @@ export class GetGuideSectionQuery {
     const guide = await this.getGuideQuery.execute({ topic: input.topic })
     const { section } = input
 
-    // Check if section is a number or purely numeric string
     const isNumeric =
       typeof section === 'number' || (typeof section === 'string' && /^\d+$/.test(section.trim()))
 
@@ -71,7 +70,6 @@ export class GetGuideSectionQuery {
       return this.populateSectionContent(guide.content, found)
     }
 
-    // Match by heading or slug (case-insensitive)
     const rawHeading = String(section).trim().toLowerCase()
     const targetSlug = toSlug(String(section))
 
@@ -89,7 +87,7 @@ export class GetGuideSectionQuery {
       throw new GuideSectionAmbiguousError(
         String(section),
         matches.map((s) => s.index),
-        matches.map((s) => s.heading),
+        matches.map((s) => `[${s.index}] ${s.heading} (lines ${s.startLine}-${s.endLine})`),
       )
     }
 
@@ -100,7 +98,10 @@ export class GetGuideSectionQuery {
   }
 
   /**
-   * Populates the section content dynamically from the guide document body.
+   * Populates the section content from the guide document body.
+   *
+   * The catalog stores only the section's character offsets, so content is sliced
+   * from the topic's Markdown on demand rather than duplicated in generated data.
    *
    * @param guideContent - The full markdown text of the guide
    * @param section - The guide section outline descriptor
@@ -112,7 +113,7 @@ export class GetGuideSectionQuery {
     }
 
     const content =
-      section.startOffset !== undefined && section.endOffset !== undefined
+      typeof section.startOffset === 'number' && typeof section.endOffset === 'number'
         ? guideContent.slice(section.startOffset, section.endOffset)
         : guideContent
             .split(/\r?\n/)

@@ -66,6 +66,10 @@ Packages that serve as delivery mechanisms (`@specd/cli`, `@specd/mcp`, `@specd/
 
 Package dependency direction is strictly one-way: `plugin-*` → `skills` → `core`. `cli` → `sdk`. `mcp` → `sdk`. `sdk` → `core`, `code-graph`. `schema-*` has no dependencies on other specd packages. Any new package must fit into this directed graph without introducing cycles.
 
+### Requirement: CLI guide delivery adapter dependency
+
+`@specd/cli` MAY declare a direct dependency on `@specd/guide` when it acts solely as a delivery adapter for the guide catalog. The adapter MUST delegate catalog retrieval, topic lookup, slicing, and search to the guide package; it MUST NOT reimplement guide domain or application behavior. The CLI MAY load the SDK catalog through the lazy `@specd/guide/sdk` subpath so ordinary user-guide commands do not load generated SDK reference content.
+
 ### Requirement: Curated public package entry points
 
 Packages with business logic (`@specd/core`, `@specd/code-graph`) and the host facade (`@specd/sdk`) MUST expose curated public barrels through `package.json` `exports`:

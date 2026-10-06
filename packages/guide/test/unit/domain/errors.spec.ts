@@ -26,8 +26,44 @@ describe('Domain Errors Hierarchy', () => {
     expect(error.code).toBe('UNKNOWN_GUIDE_TOPIC')
     expect(error.topic).toBe('unknown-topic')
     expect(error.availableTopics).toEqual(['workflow', 'schemas'])
-    expect(error.message).toContain("'unknown-topic'")
-    expect(error.message).toContain('workflow, schemas')
+    expect(error.message).toBe("Guide topic 'unknown-topic' not found.")
+    // The catalog holds over a thousand generated topics. Echoing any of them would bury
+    // the cause under hundreds of lines, so the list stays in `availableTopics` for callers
+    // that want it and never reaches the message.
+    expect(error.message).not.toContain('workflow')
+    expect(error.titleMatches).toEqual([])
+    expect(error.crossCollection).toBe(false)
+  })
+
+  it('GuideTopicNotFoundError names a title match in the message', () => {
+    const error = new GuideTopicNotFoundError(
+      'sdk:classes/StubError',
+      ['code-graph:classes/StubError'],
+      ['code-graph:classes/StubError'],
+      true,
+    )
+    expect(error.message).toBe(
+      "Guide topic 'sdk:classes/StubError' not found. That title exists in another collection: code-graph:classes/StubError.",
+    )
+    expect(error.crossCollection).toBe(true)
+  })
+
+  it('GuideTopicNotFoundError names a title match without claiming another collection', () => {
+    const error = new GuideTopicNotFoundError(
+      'StubError',
+      ['code-graph:classes/StubError'],
+      ['code-graph:classes/StubError'],
+      false,
+    )
+    expect(error.message).toBe(
+      "Guide topic 'StubError' not found. A topic titled 'StubError' exists: code-graph:classes/StubError.",
+    )
+    expect(error.crossCollection).toBe(false)
+  })
+
+  it('GuideTopicNotFoundError reports an empty topic as empty', () => {
+    const error = new GuideTopicNotFoundError('', ['workflow'])
+    expect(error.message).toBe('Guide topic cannot be empty.')
   })
 
   it('GuideTopicNotFoundError handles empty topic and strange characters', () => {
@@ -60,7 +96,8 @@ describe('Domain Errors Hierarchy', () => {
     expect(error.message).toContain("Multiple sections match 'Examples'")
     expect(error.message).toContain('[2] Examples (lines 20-35)')
     expect(error.message).toContain('[6] Examples (lines 140-160)')
-    expect(error.message).toContain('Use --section <number> to disambiguate.')
+    expect(error.message).toContain('--section 2')
+    expect(error.message).toContain('--section 6')
   })
 
   it('Preserves Error.name across all concrete subtypes', () => {

@@ -1,3 +1,9 @@
+---
+title: Core Overview
+description: What `@specd/core` is, who this documentation is for, and how it relates to the delivery hosts.
+sidebar_position: 2
+---
+
 # @specd/core — Overview
 
 `@specd/core` is the domain library for SpecD. It contains all business logic — entities, use cases, ports, and errors — with zero I/O dependencies. The CLI, MCP server, and plugins are adapters that translate between their delivery mechanism and the core.

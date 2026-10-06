@@ -24,20 +24,21 @@ The following flags apply to all `specd` commands:
 
 ## Command Families
 
-| Command Family                    | Description                                                                                    | Documentation                         |
-| --------------------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------- |
-| `specd guide`                     | Retrieve on-demand documentation topics, outline metadata, section slices, and BM25 search.    | [Guide Reference](./guide.md)         |
-| `specd changes`                   | Manage active development changes, lifecycle state transitions, artifact DAGs, and validation. | [Changes Reference](./changes.md)     |
-| `specd drafts`                    | List, inspect, and restore shelved change drafts.                                              | [Drafts Reference](./drafts.md)       |
-| `specd discarded`                 | Browse and inspect abandoned or discarded changes.                                             | [Discarded Reference](./discarded.md) |
-| `specd archive`                   | Browse permanently archived changes and delta audit records.                                   | [Archive Reference](./archive.md)     |
-| `specd specs`                     | Search, inspect, validate, and manage project specifications.                                  | [Specs Reference](./specs.md)         |
-| `specd project` (or `specd init`) | Project initialization, workspace context compilation, and dashboard.                          | [Project Reference](./project.md)     |
-| `specd schema`                    | Inspect, extend, fork, and validate workflow schemas.                                          | [Schema Reference](./schema.md)       |
-| `specd graph`                     | Index codebase, analyze blast-radius impact, find hotspots, and search symbols.                | [Graph Reference](./graph.md)         |
-| `specd config`                    | Inspect resolved configuration cascade and active settings.                                    | [Config Reference](./config.md)       |
-| `specd storage`                   | Rebuild internal index caches and workspaces storage.                                          | [Storage Reference](./storage.md)     |
-| `specd plugins`                   | Install, inspect, update, and manage agent and workflow plugins.                               | [Plugins Reference](./plugins.md)     |
+| Command Family                    | Description                                                                                                                | Documentation                         |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
+| `specd guide`                     | Retrieve the hand-written SpecD guide: catalog listings, topic content, outline metadata, section slices, and BM25 search. | [Guide Reference](./guide.md)         |
+| `specd guide-sdk`                 | Retrieve SDK and extension package references, generated public API topics, and BM25 search.                               | [Guide SDK Reference](./guide-sdk.md) |
+| `specd changes`                   | Manage active development changes, lifecycle state transitions, artifact DAGs, and validation.                             | [Changes Reference](./changes.md)     |
+| `specd drafts`                    | List, inspect, and restore shelved change drafts.                                                                          | [Drafts Reference](./drafts.md)       |
+| `specd discarded`                 | Browse and inspect abandoned or discarded changes.                                                                         | [Discarded Reference](./discarded.md) |
+| `specd archive`                   | Browse permanently archived changes and delta audit records.                                                               | [Archive Reference](./archive.md)     |
+| `specd specs`                     | Search, inspect, validate, and manage project specifications.                                                              | [Specs Reference](./specs.md)         |
+| `specd project` (or `specd init`) | Project initialization, workspace context compilation, and dashboard.                                                      | [Project Reference](./project.md)     |
+| `specd schema`                    | Inspect, extend, fork, and validate workflow schemas.                                                                      | [Schema Reference](./schema.md)       |
+| `specd graph`                     | Index codebase, analyze blast-radius impact, find hotspots, and search symbols.                                            | [Graph Reference](./graph.md)         |
+| `specd config`                    | Inspect resolved configuration cascade and active settings.                                                                | [Config Reference](./config.md)       |
+| `specd storage`                   | Rebuild internal index caches and workspaces storage.                                                                      | [Storage Reference](./storage.md)     |
+| `specd plugins`                   | Install, inspect, update, and manage agent and workflow plugins.                                                           | [Plugins Reference](./plugins.md)     |
 
 ---
 

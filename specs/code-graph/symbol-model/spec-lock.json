@@ -29,36 +29,36 @@
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Modelo inmutable de nodos, referencias y bindings estructurados para grafo de código agnóstico de lenguaje.",
+      "value": "Language-agnostic immutable domain model for code graph files, symbols, relations, logical identities, and member semantics.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:41eaa6985a90d97e15186c33340b2a57a795e947190daacdaaed7521b25f8bc0",
-          "lastModified": "2026-08-16T08:12:47.271Z"
+          "hash": "sha256:a7fa9c173421d6b97fecb8d67df429f61158d6495fcba9c896d0f5fd72ad1fcb",
+          "lastModified": "2026-09-28T07:27:44.390Z"
         },
         "verify.md": {
-          "hash": "sha256:f6398513df9fd2d7960e123adbe2480f082e7e5630d90f40c0e0e28a4d4bca12",
-          "lastModified": "2026-08-16T10:48:01.888Z"
+          "hash": "sha256:d99e928446663c3e04da37da6da0b38a10bc75bbef94007270a9cfdc14d37ac7",
+          "lastModified": "2026-09-28T08:41:52.058Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# Symbol Model\n\n## Rules\n\n- FileNode: canonical workspace:path, config path, language/hash/workspace, optional Float32Array embedding. SpecNode canonical ID/content/dependencies. SymbolNode deterministic occurrence ID, 1-based line/0-based column. DocumentNode searchable non-code.\n- Immutable FileAnalysisDraft/FileAnalysis data: symbols/imports/scoped bindings/calls/namespaces; never retain AST. Optional ParserState/AdapterSessionState caches; IndexSession/SymbolIndex semantic lookup.\n- Closed SymbolKind: function, class, method, variable, type, interface, enum. Relation types: IMPORTS, DEPENDS_ON, DEFINES, EXPORTS, CALLS, CONSTRUCTS, USES_TYPE, EXTENDS, IMPLEMENTS, OVERRIDES, COVERS_FILE, COVERS_SYMBOL.\n- ImportDeclaration describes local/original/specifier/relative + named|namespace|default|side-effect|dynamic|require|blank. EXTENDS inherited type; IMPLEMENTS contract; OVERRIDES persisted replacement.\n- Facts model nested scopes, bindings and calls. Scope cycles return no result; self-relations dropped; unresolved facts diagnostics only.\n- Logical symbols/bindings distinct from occurrences; canonical refs stable across shifts; preserve language case, public/local provenance, coverage status/hash.\n\n## Constraints\n\n- Structural value equality except deterministic SymbolNode.id.\n- No reflection/interprocedural flow. SpecdCodeGraphError extends SpecdError.\n- Runtime @specd/core; embedding/coverage edges version-gated.",
+      "value": "# Symbol Model\n\n## Rules\n- FileNode, SymbolNode, Relation, SpecNode, DocumentNode: immutable value objects (`readonly`).\n- FileNode: canonical `workspace:path`, config path, hash, workspace.\n- Closed SymbolKind: `function`, `class`, `method`, `variable`, `type`, `interface`, `enum`.\n- Closed RelationType: `IMPORTS`, `DEPENDS_ON`, `DEFINES`, `EXPORTS`, `CALLS`, `CONSTRUCTS`, `USES_TYPE`, `EXTENDS`, `IMPLEMENTS`, `OVERRIDES`, `COVERS_FILE`, `COVERS_SYMBOL`.\n- Logical symbols vs occurrences: distinct from syntax-level declaration occurrences (`SymbolNode.id`).\n- Logical symbol: workspace, declaring surface, declaring owner, symbol space, simple name, member semantics (`kind`, `dispatch`, `accessor`, optional `nativeKind`), versioned canonical reference. Stable across line/col shifts.\n- Qualified name: generic dotted path for owned symbols (e.g. `Class.method`). Stored exact-match spelling; not in canonical ID; no alias rows.\n- Symbol spaces: preserve type, value, namespace/module, property. Language-sensitive case comparison.\n- First-class bindings: public export slots addressable by surface, exported name, symbol space. Local bindings preserve lexical scope.\n- Coverage facts: indexed, excluded, unsupported, parse-failed, partial states with indexed content hash.\n- Errors: `SpecdCodeGraphError` extends `SpecdError`.\n\n## Constraints\n- Structural value equality except deterministic `SymbolNode.id`.\n- Immutable value objects; updates exclusively via `GraphStore` atomic upserts.\n- Runtime dependency on `@specd/core`.\n- Closed SymbolKind and RelationType sets.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:41eaa6985a90d97e15186c33340b2a57a795e947190daacdaaed7521b25f8bc0",
-          "lastModified": "2026-08-16T08:12:47.271Z"
+          "hash": "sha256:a7fa9c173421d6b97fecb8d67df429f61158d6495fcba9c896d0f5fd72ad1fcb",
+          "lastModified": "2026-09-28T07:27:44.390Z"
         },
         "verify.md": {
-          "hash": "sha256:f6398513df9fd2d7960e123adbe2480f082e7e5630d90f40c0e0e28a4d4bca12",
-          "lastModified": "2026-08-16T10:48:01.888Z"
+          "hash": "sha256:d99e928446663c3e04da37da6da0b38a10bc75bbef94007270a9cfdc14d37ac7",
+          "lastModified": "2026-09-28T08:41:52.058Z"
         }
       }
     }

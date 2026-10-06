@@ -22,76 +22,115 @@
 
 #### Scenario: Field boosting prioritizes title and heading matches over body text
 
-- **GIVEN** Section A with heading `"Delta Operations"` and Section B where `"delta operations"` only appears in the body paragraph
-- **WHEN** searching for `"delta operations"`
-- **THEN** Section A has a significantly higher BM25 score than Section B
-- **AND** Section A appears before Section B in the search results
+- **GIVEN** a term appearing in one guide's title and in another guide's body text
+- **WHEN** both guides are searched for that term
+- **THEN** the title match MUST rank higher than the body match
 
 #### Scenario: Section content is dynamically extracted and indexed for full-text search
 
-- **GIVEN** guide topics with lightweight outline structures
-- **WHEN** the search index is initialized
-- **THEN** section content extracted on the fly via character offsets is indexed correctly
-- **AND** searches matching words in section bodies return valid hits
+- **GIVEN** a term appearing only in a guide's section body
+- **WHEN** that guide is searched
+- **THEN** the matching section MUST be returned as a hit
 
 #### Scenario: Fuzzy matching resolves typographical errors
 
-- **GIVEN** guide sections mentioning `"configuration"` and `"lifecycle"`
-- **WHEN** searching for typos such as `"configuraton"` or `"lifecicle"`
-- **THEN** the search engine matches the intended sections with non-zero scores
-- **AND** returns relevant hits
+- **GIVEN** a query containing a typographical error
+- **WHEN** search is executed
+- **THEN** the intended guide MUST still be returned
 
 #### Scenario: Query with punctuation, symbols, and regex metacharacters does not crash
 
-- **GIVEN** search queries containing special characters: `"${change.workspace}"`, `"specd.yaml"`, `"[✓]"`, or `"(scope: spec)*"`
-- **WHEN** executing the search
-- **THEN** the search engine processes the query safely without throwing syntax errors, escaping failures, or regex crashes
-- **AND** matches relevant tokens
+- **GIVEN** a query containing punctuation and regular-expression metacharacters
+- **WHEN** search is executed
+- **THEN** it MUST NOT throw
 
-#### Scenario: English stop-words only query
+#### Scenario: English stop-words only query still returns matches
 
-- **GIVEN** a query consisting solely of stop-words: `"the is at which and"`
-- **WHEN** the search engine runs
-- **THEN** it completes without throwing unhandled exceptions
-- **AND** returns either graceful empty results or lowest-tier fallback matches
+- **GIVEN** a query consisting solely of English stop words such as `"the"` or `"of"`
+- **WHEN** search is executed
+- **THEN** matching documents MUST still be returned
+- **AND** the result MUST NOT be empty merely because the query terms are stop words
+- **AND** stop-word handling MUST NOT pre-filter documents out of the index
 
 #### Scenario: Emojis and Unicode characters in query
 
-- **GIVEN** a query with Unicode symbols (e.g. `"árbol"`, `"🚀"`)
-- **WHEN** the search is executed
-- **THEN** the engine processes the search without buffer corruption or errors
+- **GIVEN** a query containing emoji and non-ASCII characters
+- **WHEN** search is executed
+- **THEN** it MUST NOT throw
+
+#### Scenario: Section location fields are stored on each indexed document
+
+- **GIVEN** an indexed section
+- **WHEN** it is reported as a hit
+- **THEN** `level`, `startLine` and `endLine` MUST be retrievable without re-parsing source content
 
 ### Requirement: Contextual Snippet and Read Command Generation
 
 #### Scenario: Snippet is centered on the best-matching line
 
-- **GIVEN** a section spanning lines 100 to 200 in a document
-- **WHEN** the search query matches content on line 150
-- **THEN** `hit.snippet` with `snippetLines: 3` includes lines 147 through 153
-- **AND** each line is prefixed with its absolute 1-indexed document line number (e.g. `150 | ...`)
-- **AND** the snippet does NOT start from line 100 (the section start)
-- **AND** `hit.readCommand` is `specd guide <topic> --section <sectionIndex>`
+- **GIVEN** a section containing the query term on one line and unrelated text on others
+- **WHEN** a hit is generated
+- **THEN** the snippet MUST contain the matching line
 
-#### Scenario: Exact full-query substring match takes priority over partial term matches
+#### Scenario: Exact full-query substring match is promoted before result limiting
 
-- **GIVEN** a section where line A contains one query term and line B contains the exact full query as a substring
-- **WHEN** the search match scoring runs
-- **THEN** line B is selected as `matchIdx` over line A
-- **AND** the snippet window is centered on line B
+- **GIVEN** one section containing the full query as a contiguous substring and another containing only its words separately
+- **WHEN** both are candidates and the search limit would otherwise retain only the partial-only hit
+- **THEN** the exact substring hit MUST rank ahead of the partial-only hit before ordinary score tie-breaking
+- **AND** its snippet MUST center on the exact-match line
 
 #### Scenario: Fallback to section start when no term matches any line
 
-- **GIVEN** a section where none of the query terms appear in any line (fuzzy match from index)
-- **WHEN** generating the snippet
-- **THEN** the snippet falls back to beginning at the section's `startLine`
-- **AND** does not crash or emit empty content
+- **GIVEN** a section where no individual term appears on any line
+- **WHEN** a snippet is generated
+- **THEN** the snippet MUST start at the beginning of the section
 
 #### Scenario: Snippet does not bleed across section boundaries
 
-- **GIVEN** a match near the very start or end of a section
-- **WHEN** `snippetLines` context would extend before `startLine` or after `endLine`
-- **THEN** the snippet is clamped to the document bounds without bleeding into adjacent sections
-- **AND** line numbers remain accurate absolute document positions
+- **GIVEN** two adjacent sections with a match in the first
+- **WHEN** a snippet is generated
+- **THEN** it MUST NOT include lines from the following section
+
+#### Scenario: Hit file is the real source path
+
+- **GIVEN** a hit for the document at `docs/core/ports.md` in the `core` collection
+- **WHEN** the hit is reported
+- **THEN** `file` MUST be `ports.md`
+- **AND** it MUST NOT be `core:ports.md` or a synthesized `<topic>.md`
+
+#### Scenario: Hit file preserves nested subdirectories
+
+- **GIVEN** a hit for `docs/core/examples/implementing-a-port.md`
+- **WHEN** the hit is reported
+- **THEN** `file` MUST be `examples/implementing-a-port.md`
+
+#### Scenario: Generated API hit reports the TypeScript declaration path
+
+- **GIVEN** a hit for the generated topic `sdk:classes/ArtifactDag`, whose symbol was extracted from `packages/sdk/src/.../artifact-dag.ts`
+- **WHEN** the hit is reported
+- **THEN** `file` MUST be the collection-relative path of that TypeScript declaration
+- **AND** it MUST NOT be a `.md` path, because no Markdown source file backs a generated topic
+
+#### Scenario: Hit read command names the command serving its collection
+
+- **GIVEN** a hit in the SDK collection for topic `sdk:classes/ArtifactDag` at section 3
+- **WHEN** the hit's `readCommand` is produced
+- **THEN** it MUST be `specd guide-sdk sdk:classes/ArtifactDag --section 3`
+- **AND** it MUST NOT contain `specd guide ` as the command name
+
+#### Scenario: User guide hit keeps the user command
+
+- **GIVEN** a hit in the user guide collection
+- **WHEN** the hit's `readCommand` is produced
+- **THEN** it MUST reference `specd guide`
+
+#### Scenario: Search document ids are namespaced by collection
+
+- **GIVEN** two collections each containing a topic with the same identifier and the same section index
+- **WHEN** both are indexed into one engine
+- **THEN** both documents MUST remain retrievable
+- **AND** neither MUST overwrite the other
+- **AND** each hit MUST report its own `collection`
 
 ### Requirement: SearchGuidesQuery Implementation
 

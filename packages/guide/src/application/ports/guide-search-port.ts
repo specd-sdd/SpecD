@@ -5,9 +5,18 @@ import type { GuideSearchHit } from '../../domain/models/index.js'
  */
 export interface GuideSearchOptions {
   /**
-   * Restrict search to a specific guide topic.
+   * Restrict search to specific guide topics.
+   *
+   * A single value MAY be a bare topic identifier, which matches that topic in any
+   * collection, or a `collection:topic` identifier, which matches only that
+   * collection. A list matches any of its values. An empty list restricts nothing.
    */
-  readonly topic?: string | undefined
+  readonly topic?: string | readonly string[] | undefined
+
+  /**
+   * Restrict search to specific collections.
+   */
+  readonly collections?: readonly string[] | undefined
 
   /**
    * Maximum number of search results to return (default: 5).

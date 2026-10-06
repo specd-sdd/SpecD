@@ -25,24 +25,16 @@ No documentation lives outside `docs/` except `README.md` at the project root an
 
 ### Requirement: User guide documentation and frontmatter
 
-All user-facing guides MUST live under `docs/guide/`. Developer-internal monorepo documentation (such as internal package internals, skills template rendering details, and low-level subsystem references) MUST NOT live under `docs/guide/` and SHALL be placed in their respective package reference directories under `docs/` (e.g. `docs/skills/`, `docs/core/`, `docs/code-graph/`).
+User-facing guide documentation under `docs/guide/` MUST carry complete Docusaurus frontmatter and MUST stay focused on using `specd`.
 
-Every document under `docs/guide/` MUST include Docusaurus-compatible YAML frontmatter containing:
+- Every document under `docs/guide/` MUST define `title`, `description` and `sidebar_position` in its frontmatter.
+- A document under `docs/guide/` that is missing required frontmatter MUST fail validation.
+- Documentation of the guide collection MUST open on "What is SpecD".
+- Configuration and workflow guide parameters MUST match the core implementation.
+- The project update command and plugin asset orchestration MUST be documented.
+- Code Graph capabilities and intelligence workflows MUST be prominently documented.
 
-- `title`: Human-readable title of the guide.
-- `description`: A concise summary of the guide topic used for search indexing and metadata.
-- `sidebar_position`: An integer defining the navigation ordering in Docusaurus sidebars.
-
-All user guides under `docs/guide/` MUST be compatible with static website generation in `apps/public-web` and build-time bundling in `@specd/guide`.
-
-Configuration, workflow, schema, and lifecycle guides under `docs/guide/` MUST maintain complete parity with the `@specd/core` implementation and schemas. In particular:
-
-- All archive pattern variables supported by `FsArchiveRepository` (`{{year}}`, `{{month}}`, `{{day}}`, `{{date}}`, `{{change.name}}`, `{{change.archivedName}}`) SHALL be accurately documented without referencing uninstalled template engines.
-- Template variable substitution supported across lifecycle hooks (`run:`, `instruction:`) and schema artifact templates (`template`, `instruction`, `deltaInstruction`, rules) SHALL be accurately documented. Developer `run:` values are inserted verbatim. SpecD then translates only quote syntax the host shell does not understand. The guide MUST say that non-Windows hooks run with the absolute `SHELL` value when it is absolute, and otherwise `/bin/sh`. It MUST NOT describe that substitution as shell escaping.
-- Workspace configuration options (including `metadataPath`, `graph` discovery settings, segment rules for `prefix`, and the reserved status of `'root'`) SHALL be exhaustively documented.
-- Project update behavior via `specd project update` SHALL be clearly documented in user guides, specifying that it orchestrates declared agent plugins and synthesizes project-managed assets (`AGENTS.md`, `CLAUDE.md`, skill templates), detailing when it is necessary (after manual edits to `plugins.agents` or upgrading SpecD packages) versus general configuration changes that are resolved dynamically at runtime without requiring an update command.
-- Code Graph intelligence SHALL be prominently documented as a core platform capability across user guides (`code-graph.md`, `index.md`, `philosophy.md`, `skills.md`, `cli.md`), exhaustively detailing document indexing and search (`--documents`), indexed source file search (`--files`), spec search and spec-level blast radius (`--spec <id>`), public export surface impact (`--export <name> --from <surface>`), multi-file aggregated blast radius, traversal directions and depth, hotspot detection, and implementation coverage diagnostics.
-- The user guide and the public docs SHALL open on a page that explains what SpecD is and what a reader can do with it. That page MUST live at `docs/guide/what-is-specd.md`, MUST be the first guide in sidebar order, and MUST be the public docs entry target. It MUST present the Code Graph as a core capability (symbol and document search, blast radius, and spec-to-code traceability) and MUST link to installation, the quickstart, philosophy, the guide index, and `docs/guide/code-graph.md`. The guide index MUST remain the topic map and MUST link to the opening page.
+Developer-internal monorepo documentation (such as internal package internals, skills template rendering details, and low-level subsystem references) MUST NOT live under `docs/guide/`. Such material SHALL be placed in their respective package reference directories under `docs/` (e.g. `docs/skills/`, `docs/core/`, `docs/code-graph/`, `docs/sdk/`, `docs/schemas/`), which together form the SDK guide collection.
 
 ### Requirement: Skills guide documentation
 
@@ -143,11 +135,13 @@ An ADR is created for every significant architectural or design decision. Signif
 
 ### Requirement: CLI documentation
 
-Every `specd` command has a corresponding doc file in `docs/cli/` describing its purpose, flags, examples, and exit codes. The `docs/cli/` directory MUST include an `index.md` serving as the comprehensive CLI command directory and entry point, and MUST provide dedicated docs for all CLI commands, including `guide.md` and lifecycle command groups.
+Every `specd` command MUST have a corresponding doc file in `docs/cli/`.
 
-When a command's contract includes command-specific output semantics, caching semantics, or other machine-consumed response behavior, the corresponding CLI documentation MUST describe those behaviors clearly enough for a reader to understand how the command behaves without reading the implementation.
-
-Changes to a command's documented output contract MUST update the corresponding `docs/cli/` reference in the same change. User-facing CLI overviews, tutorials, and scenario recipes MUST be maintained in `docs/guide/cli.md`.
+- A new command MUST provide dedicated docs for all CLI commands it introduces.
+- Output contract changes MUST update the corresponding documentation in the same change.
+- `docs/cli/index.md` MUST serve as a complete CLI directory, listing every top-level command family.
+- User-facing CLI recipes and workflows MUST be maintained in `docs/guide/cli.md`, including the commands the recipes depend on.
+- A command documented in `docs/cli/<command>.md` MUST be listed in the corresponding category of `apps/public-web/sidebars.ts`, so that its reference page is reachable from site navigation rather than existing as an orphan page.
 
 ### Requirement: MCP documentation
 
@@ -179,6 +173,35 @@ Examples in `docs/sdk/` MUST use `@specd/sdk` imports and document both assembly
 Legacy `docs/core/sdk.md` content MUST move into `docs/sdk/`. `docs/core/` and `docs/code-graph/` remain package-reference sections (sidebar label **Package reference** or nested under SDK) for plugin authors and symbol semantics — not parallel integrator paths.
 
 When public API reference content is generated for the website, generation entry points and landing copy MUST treat `@specd/sdk` as the integrator surface per `public-web:api-reference`.
+
+### Requirement: SDK guide documentation and discoverability
+
+The SDK guide collection MUST be discoverable by the people it is written for — extension developers and integrators — from the surfaces they already use.
+
+- The `specd guide` command MUST surface the SDK guide in its catalog listing as a structured field naming the command `specd guide-sdk`, present in every supported output format.
+- `docs/guide/index.md` MUST point readers to the SDK guide.
+- `docs/guide/cli.md` MUST document `specd guide-sdk` as a scenario-based recipe alongside the other command families.
+- `docs/cli/guide-sdk.md` MUST exist as the dedicated command reference for `specd guide-sdk`, MUST document its `search` subcommand, and MUST state the difference between `specd guide` and `specd guide-sdk`, including which collection each command serves.
+- `docs/cli/index.md` MUST list `specd guide-sdk` as a command family.
+- The Docusaurus sidebar MUST expose the guide CLI reference page for `specd guide-sdk`, so that it is reachable from site navigation.
+
+### Requirement: SDK documentation tombstone removal
+
+`docs/core/sdk.md` duplicates the host guide that already lives at `docs/sdk/index.md` and has never been referenced from any sidebar. It MUST NOT be maintained as a separate copy.
+
+- `docs/core/sdk.md` MUST be deleted from the repository, together with its frontmatter.
+- No sidebar entry, internal link or cross-reference MUST be left pointing at `docs/core/sdk.md`.
+- `docs/core/index.md` MUST NOT be modified to compensate for the deletion, because it never linked the file.
+- Deleting the file MUST NOT remove any host integration guidance: that guidance remains owned by `docs/sdk/`, which stays the only integrator entry point into SDK documentation.
+
+### Requirement: SDK collection source documents
+
+The SDK guide collection compiles hand-written package-reference documents alongside generated API topics, so its sources MUST obey the same documentation conventions as the user guide.
+
+- The SDK collection source roots MUST be `docs/sdk/`, `docs/core/`, `docs/code-graph/`, `docs/skills/` and `docs/schemas/`.
+- Every hand-written document under those roots MUST define `title`, `description` and `sidebar_position` in its frontmatter, on the same terms as the user guide.
+- A package-reference document that is missing required frontmatter MUST fail validation; a lenient or derived fallback, such as deriving the description from the first paragraph, is not permitted.
+- The SDK collection MUST NOT be populated from `docs/cli/` or `docs/public-web/`, so command-reference pages and site-only content stay out of the package-reference collection.
 
 ### Requirement: JSDoc on all symbols
 
