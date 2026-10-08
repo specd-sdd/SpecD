@@ -106,6 +106,30 @@ const SYMBOL_DEPENDENCY_RELATION_TYPES = [
 ] as const
 
 const SQLITE_BATCH_PARAMETER_LIMIT = 900
+
+/**
+ * Computes the number of primary values that fit inside one SQLite statement.
+ *
+ * @param fixedParameterCount - Bind positions not supplied by the primary values.
+ * @param inputMultiplicity - Bind positions used by each primary value.
+ * @returns A positive chunk size.
+ * @throws {RangeError} When parameter accounting is invalid or exhausts the budget.
+ */
+function getSqliteInputChunkSize(fixedParameterCount: number, inputMultiplicity = 1): number {
+  if (
+    !Number.isInteger(fixedParameterCount) ||
+    fixedParameterCount < 0 ||
+    !Number.isInteger(inputMultiplicity) ||
+    inputMultiplicity < 1
+  ) {
+    throw new RangeError('Invalid SQLite batch parameter accounting')
+  }
+  const chunkSize = Math.floor(
+    (SQLITE_BATCH_PARAMETER_LIMIT - fixedParameterCount) / inputMultiplicity,
+  )
+  if (chunkSize < 1) throw new RangeError('SQLite batch parameter budget exhausted')
+  return chunkSize
+}
 const SYMBOL_ROW_COLUMNS =
   'id, name, kind, file_path, parent_id, line, column_number, end_line, end_column, selection_start_line, selection_start_column, selection_end_line, selection_end_column, comment'
 
@@ -873,9 +897,8 @@ export class SQLiteGraphDatabase {
    * @returns The result of find directly affected files.
    */
   findDirectlyAffectedFiles(filePaths: readonly string[]): string[] {
-    const paths = [...new Set(filePaths)]
+    const paths = [...new Set(filePaths)].sort()
     if (paths.length === 0) return []
-    const placeholders = paths.map(() => '?').join(', ')
     const dependencyTypes = [
       ...SYMBOL_DEPENDENCY_RELATION_TYPES,
       RelationType.Extends,
@@ -883,8 +906,12 @@ export class SQLiteGraphDatabase {
       RelationType.Overrides,
     ]
     const typePlaceholders = dependencyTypes.map(() => '?').join(', ')
-    const rows = this.statement(
-      `SELECT DISTINCT affected_path FROM (
+    const affectedPaths = new Set<string>()
+    const chunkSize = getSqliteInputChunkSize(1 + dependencyTypes.length, 2)
+    for (const chunk of chunksOf(paths, chunkSize)) {
+      const placeholders = chunk.map(() => '?').join(', ')
+      const rows = this.statement(
+        `SELECT DISTINCT affected_path FROM (
          SELECT r.source AS affected_path
          FROM relations r
          WHERE r.type = ? AND r.target IN (${placeholders})
@@ -896,10 +923,12 @@ export class SQLiteGraphDatabase {
          WHERE target_symbol.file_path IN (${placeholders})
            AND r.type IN (${typePlaceholders})
        ) ORDER BY affected_path`,
-    ).all(RelationType.Imports, ...paths, ...paths, ...dependencyTypes) as Array<{
-      affected_path: string
-    }>
-    return rows.map((row) => row.affected_path)
+      ).all(RelationType.Imports, ...chunk, ...chunk, ...dependencyTypes) as Array<{
+        affected_path: string
+      }>
+      for (const row of rows) affectedPaths.add(row.affected_path)
+    }
+    return [...affectedPaths].sort((left, right) => left.localeCompare(right))
   }
 
   /**
@@ -1207,11 +1236,17 @@ export class SQLiteGraphDatabase {
    */
   findLogicalSymbolsByIds(ids: readonly string[]): LogicalSymbol[] {
     if (ids.length === 0) return []
-    const placeholders = ids.map(() => '?').join(', ')
-    const rows = this.statement(
-      `SELECT id, workspace, surface, name, space, owner_id, member_kind, member_dispatch, member_accessor, native_kind, qualified_name FROM logical_symbols WHERE id IN (${placeholders}) ORDER BY workspace, surface, name, space, owner_id, member_kind, member_dispatch, member_accessor, native_kind, id`,
-    ).all(...ids) as LogicalSymbolRow[]
-    return rows.map((row) => this.mapLogicalSymbolRow(row))
+    const rowsById = new Map<string, LogicalSymbolRow>()
+    for (const chunk of chunksOf([...new Set(ids)].sort(), getSqliteInputChunkSize(0))) {
+      const placeholders = chunk.map(() => '?').join(', ')
+      const rows = this.statement(
+        `SELECT id, workspace, surface, name, space, owner_id, member_kind, member_dispatch, member_accessor, native_kind, qualified_name FROM logical_symbols WHERE id IN (${placeholders})`,
+      ).all(...chunk) as LogicalSymbolRow[]
+      for (const row of rows) rowsById.set(row.id, row)
+    }
+    return [...rowsById.values()]
+      .map((row) => this.mapLogicalSymbolRow(row))
+      .sort(compareLogicalSymbols)
   }
 
   /**
@@ -1222,12 +1257,21 @@ export class SQLiteGraphDatabase {
    */
   findDeclarations(logicalSymbolIds: readonly string[]): LogicalDeclaration[] {
     if (logicalSymbolIds.length === 0) return []
-    const placeholders = [...new Set(logicalSymbolIds)].map(() => '?').join(', ')
-    const rows = this.statement(
-      `SELECT logical_symbol_id, symbol_id, file_path, line, column_number, end_line, end_column, kind
-       FROM logical_declarations WHERE logical_symbol_id IN (${placeholders})`,
-    ).all(...new Set(logicalSymbolIds)) as LogicalDeclarationRow[]
-    return rows.map((row) => this.mapLogicalDeclarationRow(row)).sort(compareLogicalDeclarations)
+    const rowsByKey = new Map<string, LogicalDeclarationRow>()
+    for (const chunk of chunksOf(
+      [...new Set(logicalSymbolIds)].sort(),
+      getSqliteInputChunkSize(0),
+    )) {
+      const placeholders = chunk.map(() => '?').join(', ')
+      const rows = this.statement(
+        `SELECT logical_symbol_id, symbol_id, file_path, line, column_number, end_line, end_column, kind FROM logical_declarations WHERE logical_symbol_id IN (${placeholders})`,
+      ).all(...chunk) as LogicalDeclarationRow[]
+      for (const row of rows)
+        rowsByKey.set(`${row.logical_symbol_id}\u0000${row.symbol_id}\u0000${row.kind}`, row)
+    }
+    return [...rowsByKey.values()]
+      .map((row) => this.mapLogicalDeclarationRow(row))
+      .sort(compareLogicalDeclarations)
   }
 
   /**
@@ -1237,14 +1281,19 @@ export class SQLiteGraphDatabase {
    * @returns The result of find public bindings by exported names.
    */
   findPublicBindingsByExportedNames(exportedNames: readonly string[]): PublicBinding[] {
-    const names = [...new Set(exportedNames)]
+    const names = [...new Set(exportedNames)].sort()
     if (names.length === 0) return []
-    const placeholders = names.map(() => '?').join(', ')
-    const rows = this.statement(
-      `SELECT id, surface, exported_name, space, target_id FROM public_bindings
-       WHERE exported_name IN (${placeholders})`,
-    ).all(...names) as PublicBindingRow[]
-    return rows.map((row) => this.mapPublicBindingRow(row)).sort(comparePublicBindings)
+    const rowsById = new Map<string, PublicBindingRow>()
+    for (const chunk of chunksOf(names, getSqliteInputChunkSize(0))) {
+      const placeholders = chunk.map(() => '?').join(', ')
+      const rows = this.statement(
+        `SELECT id, surface, exported_name, space, target_id FROM public_bindings WHERE exported_name IN (${placeholders})`,
+      ).all(...chunk) as PublicBindingRow[]
+      for (const row of rows) rowsById.set(row.id, row)
+    }
+    return [...rowsById.values()]
+      .map((row) => this.mapPublicBindingRow(row))
+      .sort(comparePublicBindings)
   }
 
   /**
@@ -1270,10 +1319,7 @@ export class SQLiteGraphDatabase {
       params.push(query.filePath)
     }
 
-    if (query.filePaths !== undefined && query.filePaths.length > 0) {
-      conditions.push(`file_path IN (${query.filePaths.map(() => '?').join(', ')})`)
-      params.push(...query.filePaths)
-    }
+    const filePaths = query.filePaths === undefined ? [] : [...new Set(query.filePaths)].sort()
 
     if (query.parentSymbolId !== undefined) {
       conditions.push('parent_id = ?')
@@ -1300,25 +1346,35 @@ export class SQLiteGraphDatabase {
       }
     }
 
-    const where = conditions.length > 0 ? ` WHERE ${conditions.join(' AND ')}` : ''
-    const rows = this.statement(
-      `SELECT id, name, kind, file_path, parent_id, line, column_number, end_line, end_column, selection_start_line, selection_start_column, selection_end_line, selection_end_column, comment FROM symbols${where}`,
-    ).all(...params) as Array<{
-      id: string
-      name: string
-      kind: string
-      file_path: string
-      parent_id: string | null
-      line: number
-      column_number: number
-      end_line: number
-      end_column: number
-      selection_start_line: number
-      selection_start_column: number
-      selection_end_line: number
-      selection_end_column: number
-      comment: string | null
-    }>
+    const readRows = (extraCondition?: string, extraParams: readonly string[] = []) => {
+      const whereConditions =
+        extraCondition === undefined ? conditions : [...conditions, extraCondition]
+      const where = whereConditions.length > 0 ? ` WHERE ${whereConditions.join(' AND ')}` : ''
+      return this.statement(
+        `SELECT id, name, kind, file_path, parent_id, line, column_number, end_line, end_column, selection_start_line, selection_start_column, selection_end_line, selection_end_column, comment FROM symbols${where}`,
+      ).all(...params, ...extraParams) as Array<{
+        id: string
+        name: string
+        kind: string
+        file_path: string
+        parent_id: string | null
+        line: number
+        column_number: number
+        end_line: number
+        end_column: number
+        selection_start_line: number
+        selection_start_column: number
+        selection_end_line: number
+        selection_end_column: number
+        comment: string | null
+      }>
+    }
+    const rows =
+      filePaths.length === 0
+        ? readRows()
+        : chunksOf(filePaths, getSqliteInputChunkSize(params.length)).flatMap((chunk) =>
+            readRows(`file_path IN (${chunk.map(() => '?').join(', ')})`, chunk),
+          )
 
     let results = rows.map((row) => this.mapSymbolRow(row))
     const ci = !caseSensitive
@@ -1342,7 +1398,7 @@ export class SQLiteGraphDatabase {
       }
     }
 
-    return results
+    return results.sort(compareSymbolNodes)
   }
 
   /**
@@ -2160,12 +2216,14 @@ export class SQLiteGraphDatabase {
    * @returns The result of read freshness latches.
    */
   readFreshnessLatches(workspaces: readonly string[]): FreshnessLatches {
-    const names = ['__graph__', ...new Set(workspaces)]
-    const placeholders = names.map(() => '?').join(', ')
-    const rows = this.statement(
-      `SELECT workspace, known_stale FROM freshness_latches WHERE workspace IN (${placeholders})`,
-    ).all(...names) as Array<{ workspace: string; known_stale: number }>
-    const values = new Map(rows.map((row) => [row.workspace, row.known_stale === 1]))
+    const names = [...new Set(['__graph__', ...workspaces])].sort()
+    const values = new Map<string, boolean>()
+    for (const chunk of chunksOf(names, getSqliteInputChunkSize(0))) {
+      const rows = this.statement(
+        `SELECT workspace, known_stale FROM freshness_latches WHERE workspace IN (${chunk.map(() => '?').join(', ')})`,
+      ).all(...chunk) as Array<{ workspace: string; known_stale: number }>
+      for (const row of rows) values.set(row.workspace, row.known_stale === 1)
+    }
     return {
       graph: values.get('__graph__') ?? false,
       workspaces: Object.fromEntries(
@@ -2258,14 +2316,19 @@ export class SQLiteGraphDatabase {
    * @returns Matching logical symbols in deterministic order.
    */
   findLogicalSymbolsByQualifiedNames(qualifiedNames: readonly string[]): LogicalSymbol[] {
-    const names = [...new Set(qualifiedNames.filter((name) => name.length > 0))]
+    const names = [...new Set(qualifiedNames.filter((name) => name.length > 0))].sort()
     if (names.length === 0) return []
-    const placeholders = names.map(() => '?').join(', ')
-    const rows = this.statement(
-      `SELECT id, workspace, surface, name, space, owner_id, member_kind, member_dispatch, member_accessor, native_kind, qualified_name
-       FROM logical_symbols WHERE qualified_name IN (${placeholders})`,
-    ).all(...names) as LogicalSymbolRow[]
-    return rows.map((row) => this.mapLogicalSymbolRow(row)).sort(compareLogicalSymbols)
+    const results = new Map<string, LogicalSymbol>()
+    for (const chunk of chunksOf(names, getSqliteInputChunkSize(0))) {
+      const placeholders = chunk.map(() => '?').join(', ')
+      for (const row of this.statement(
+        `SELECT id, workspace, surface, name, space, owner_id, member_kind, member_dispatch, member_accessor, native_kind, qualified_name FROM logical_symbols WHERE qualified_name IN (${placeholders})`,
+      ).all(...chunk) as LogicalSymbolRow[]) {
+        const symbol = this.mapLogicalSymbolRow(row)
+        results.set(symbol.id, symbol)
+      }
+    }
+    return [...results.values()].sort(compareLogicalSymbols)
   }
 
   /**
@@ -2276,12 +2339,7 @@ export class SQLiteGraphDatabase {
    */
   findLogicalDeclarations(logicalSymbolIds: readonly string[]): LogicalDeclaration[] {
     if (logicalSymbolIds.length === 0) return []
-    const placeholders = [...new Set(logicalSymbolIds)].map(() => '?').join(', ')
-    const rows = this.statement(
-      `SELECT logical_symbol_id, symbol_id, file_path, line, column_number, end_line, end_column, kind
-       FROM logical_declarations WHERE logical_symbol_id IN (${placeholders})`,
-    ).all(...new Set(logicalSymbolIds)) as LogicalDeclarationRow[]
-    return rows.map((row) => this.mapLogicalDeclarationRow(row)).sort(compareLogicalDeclarations)
+    return this.findDeclarations(logicalSymbolIds)
   }
 
   /**
@@ -2350,13 +2408,20 @@ export class SQLiteGraphDatabase {
    */
   findResolutionSteps(fromIds: readonly string[]): ResolutionStep[] {
     if (fromIds.length === 0) return []
-    const ids = [...new Set(fromIds)]
-    const rows = this.statement(
-      `SELECT from_id, to_id, kind FROM resolution_steps WHERE from_id IN (${ids.map(() => '?').join(', ')})`,
-    ).all(...ids) as ResolutionStepRow[]
-    return rows
-      .map((row) => ({ fromId: row.from_id, toId: row.to_id, kind: row.kind }))
-      .sort(compareResolutionSteps)
+    const ids = [...new Set(fromIds)].sort()
+    const results = new Map<string, ResolutionStep>()
+    for (const chunk of chunksOf(ids, getSqliteInputChunkSize(0))) {
+      const rows = this.statement(
+        `SELECT from_id, to_id, kind FROM resolution_steps WHERE from_id IN (${chunk.map(() => '?').join(', ')})`,
+      ).all(...chunk) as ResolutionStepRow[]
+      for (const row of rows)
+        results.set(`${row.from_id}\u0000${row.to_id}\u0000${row.kind}`, {
+          fromId: row.from_id,
+          toId: row.to_id,
+          kind: row.kind,
+        })
+    }
+    return [...results.values()].sort(compareResolutionSteps)
   }
 
   /**
@@ -2367,12 +2432,15 @@ export class SQLiteGraphDatabase {
    */
   findIndexCoverage(filePaths: readonly string[]): IndexCoverage[] {
     if (filePaths.length === 0) return []
-    const paths = [...new Set(filePaths)]
-    const rows = this.statement(
-      `SELECT file_path, content_hash, status, reason, capabilities_json FROM index_coverage
-       WHERE file_path IN (${paths.map(() => '?').join(', ')})`,
-    ).all(...paths) as IndexCoverageRow[]
-    return rows
+    const paths = [...new Set(filePaths)].sort()
+    const rowsByPath = new Map<string, IndexCoverageRow>()
+    for (const chunk of chunksOf(paths, getSqliteInputChunkSize(0))) {
+      const rows = this.statement(
+        `SELECT file_path, content_hash, status, reason, capabilities_json FROM index_coverage WHERE file_path IN (${chunk.map(() => '?').join(', ')})`,
+      ).all(...chunk) as IndexCoverageRow[]
+      for (const row of rows) rowsByPath.set(row.file_path, row)
+    }
+    return [...rowsByPath.values()]
       .map((row) => ({
         filePath: row.file_path,
         contentHash: row.content_hash ?? undefined,
@@ -2929,19 +2997,12 @@ export class SQLiteGraphDatabase {
    * @param filePath - File path parameter.
    */
   private deleteFileLocalState(db: SqliteDatabase, filePath: string): void {
-    const symbolIds = (
-      db.prepare('SELECT id FROM symbols WHERE file_path = ?').all(filePath) as Array<{
-        id: string
-      }>
-    ).map((row) => row.id)
-
-    if (symbolIds.length > 0) {
-      const placeholders = symbolIds.map(() => '?').join(', ')
-      db.prepare(
-        `DELETE FROM relations WHERE source IN (${placeholders}) OR target IN (${placeholders})`,
-      ).run(...symbolIds, ...symbolIds)
-      db.prepare(`DELETE FROM symbols WHERE id IN (${placeholders})`).run(...symbolIds)
-    }
+    db.prepare(
+      `DELETE FROM relations
+       WHERE source IN (SELECT id FROM symbols WHERE file_path = ?)
+          OR target IN (SELECT id FROM symbols WHERE file_path = ?)`,
+    ).run(filePath, filePath)
+    db.prepare('DELETE FROM symbols WHERE file_path = ?').run(filePath)
 
     db.prepare('DELETE FROM relations WHERE source = ? OR target = ?').run(filePath, filePath)
     db.prepare('DELETE FROM file_content_fts WHERE path = ?').run(filePath)
@@ -3125,12 +3186,16 @@ export class SQLiteGraphDatabase {
   private getRelationsByTargets(type: RelationTypeValue, targets: readonly string[]): Relation[] {
     const uniqueTargets = [...new Set(targets)].sort()
     if (uniqueTargets.length === 0) return []
-    const placeholders = uniqueTargets.map(() => '?').join(', ')
-    return this.readRelations(
-      this.statement(
+    const rowsByKey = new Map<string, RelationRow>()
+    for (const chunk of chunksOf(uniqueTargets, getSqliteInputChunkSize(1))) {
+      const placeholders = chunk.map(() => '?').join(', ')
+      const rows = this.statement(
         `SELECT source, target, type, metadata_json FROM relations WHERE type = ? AND target IN (${placeholders}) ORDER BY source, type, target`,
-      ).all(type, ...uniqueTargets) as RelationRow[],
-    )
+      ).all(type, ...chunk) as RelationRow[]
+      for (const row of rows)
+        rowsByKey.set(`${row.source}\u0000${row.type}\u0000${row.target}`, row)
+    }
+    return this.readRelations([...rowsByKey.values()]).sort(compareRelations)
   }
 
   /**
@@ -3863,6 +3928,21 @@ function compareLogicalSymbols(left: LogicalSymbol, right: LogicalSymbol): numbe
       right.memberSemantics?.nativeKind ?? '',
       right.id,
     ],
+  )
+}
+
+/**
+ * Orders symbols deterministically by location and identifier.
+ * @param left - First symbol.
+ * @param right - Second symbol.
+ * @returns Comparison result.
+ */
+function compareSymbolNodes(left: SymbolNode, right: SymbolNode): number {
+  return (
+    left.filePath.localeCompare(right.filePath) ||
+    left.line - right.line ||
+    left.column - right.column ||
+    left.id.localeCompare(right.id)
   )
 }
 

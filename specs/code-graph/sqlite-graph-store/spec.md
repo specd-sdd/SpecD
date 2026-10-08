@@ -75,10 +75,13 @@ worker boundary as one RPC rather than one RPC per symbol or relation type.
 
 Batch symbol lookup SHALL use set-based predicates. Incoming and outgoing
 relation lookup SHALL query all requested symbol ids and relation types together.
-Large input sets MUST be divided into deterministic bounded SQL parameter chunks
-inside the worker so SQLite parameter limits cannot make a valid graph traversal
-fail. Results MUST preserve the deterministic ordering and empty-input semantics
-of the abstract contract.
+Set-based batch reads that bind caller-provided collections as SQL parameters
+MUST divide those collections into deterministic chunks that remain within the
+configured safe parameter budget after accounting for fixed parameters and for
+inputs referenced more than once by a statement. The logical batch MUST still
+cross the worker boundary as one RPC. Results merged from multiple SQL chunks
+MUST preserve the abstract contract's deterministic ordering, de-duplication,
+unknown-value behavior, and empty-input semantics.
 
 ### Requirement: Query-time filtered impact reads
 
@@ -280,6 +283,13 @@ A transaction MUST NOT span multiple host/worker round trips. Each atomic
 mutation, including `upsertFile()`, `removeFile()`, `upsertSpec()`,
 `removeSpec()`, and bulk commit, MUST execute as one self-contained worker
 operation. Failure MUST preserve the previously committed graph state.
+
+File-local state cleanup during `upsertFile()`, `removeFile()`, and bulk commit
+MUST use a number of SQL parameters that is independent of the number of symbols
+previously stored for the file. Cleanup MUST remove every relation whose source or
+target is one of those symbols before removing the symbols themselves. A cleanup
+failure MUST roll back the complete mutation without leaving dangling relations,
+partially removed symbols, or other partially committed file state.
 
 ### Requirement: Bulk indexing support
 

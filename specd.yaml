@@ -268,18 +268,18 @@ schemaOverrides:
         hooks:
           post:
             - id: implementing-run-tests
-              run: 'rtk pnpm test'
+              run: 'pnpm test'
             - id: implementing-run-lint
-              run: 'rtk pnpm lint'
+              run: 'pnpm lint'
             - id: implementing-run-typecheck
-              run: 'rtk pnpm typecheck'
+              run: 'pnpm typecheck'
       - step: archiving
         hooks:
           pre:
             - id: archiving-run-tests
-              run: 'rtk pnpm test'
+              run: 'pnpm test'
             - id: archiving-run-lint
-              run: 'rtk pnpm lint'
+              run: 'pnpm lint'
             - id: archiving-edit-description
               instruction: |
                 Read the proposal.md and design.md files in this change

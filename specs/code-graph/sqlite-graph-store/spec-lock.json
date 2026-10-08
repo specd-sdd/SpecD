@@ -11,12 +11,49 @@
   ],
   "implementation": [
     {
-      "file": "code-graph:src/infrastructure/sqlite/schema.ts",
-      "symbols": ["SQLITE_SCHEMA_VERSION"]
+      "file": "code-graph:src/infrastructure/sqlite/sqlite-graph-database.ts",
+      "symbols": [
+        "getSqliteInputChunkSize",
+        "deleteFileLocalState",
+        "findDirectlyAffectedFiles",
+        "getRelationsByTargets",
+        "findLogicalSymbolsByIds",
+        "findDeclarations",
+        "findPublicBindingsByExportedNames",
+        "findLogicalSymbolsByQualifiedNames",
+        "findLogicalDeclarations",
+        "findResolutionSteps",
+        "findIndexCoverage",
+        "readFreshnessLatches",
+        "compareSymbolNodes",
+        "findSymbols",
+        "SQLiteGraphDatabase.findLogicalSymbolsByIds",
+        "SQLiteGraphDatabase.findDeclarations",
+        "SQLiteGraphDatabase.findPublicBindingsByExportedNames",
+        "SQLiteGraphDatabase.findLogicalSymbolsByQualifiedNames",
+        "SQLiteGraphDatabase.findLogicalDeclarations",
+        "SQLiteGraphDatabase.findResolutionSteps",
+        "SQLiteGraphDatabase.findIndexCoverage",
+        "SQLiteGraphDatabase.readFreshnessLatches"
+      ]
     },
     {
-      "file": "code-graph:src/infrastructure/sqlite/sqlite-graph-database.ts",
-      "symbols": ["SQLiteGraphDatabase", "findLogicalSymbolsByQualifiedNames"]
+      "file": "code-graph:test/infrastructure/sqlite/sqlite-graph-store.spec.ts"
+    },
+    {
+      "file": "code-graph:src/infrastructure/sqlite/sqlite-graph-store.ts",
+      "symbols": [
+        "SQLiteGraphStore.findDirectlyAffectedFiles",
+        "SQLiteGraphStore.getCoveringSpecsForFiles",
+        "SQLiteGraphStore.getCoveringSpecsForSymbols",
+        "SQLiteGraphStore.findLogicalSymbolsByQualifiedNames",
+        "SQLiteGraphStore.findLogicalSymbolsByIds",
+        "SQLiteGraphStore.findDeclarations",
+        "SQLiteGraphStore.findPublicBindings",
+        "SQLiteGraphStore.findPublicBindingsByExportedNames",
+        "SQLiteGraphStore.findResolutionSteps",
+        "SQLiteGraphStore.findIndexCoverage"
+      ]
     }
   ],
   "optimizations": {

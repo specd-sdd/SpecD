@@ -403,6 +403,357 @@ describe('SQLiteGraphStore', () => {
     ])
   })
 
+  it('avoids worker dispatch for empty newly chunked lookup inputs', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-empty-chunked-lookups-'))
+    const store = new SQLiteGraphStore(tempDir)
+    const sendRequest = vi.spyOn(SQLiteWorkerClient.prototype, 'sendRequest')
+    sendRequest.mockResolvedValue({ graph: false, workspaces: {} })
+
+    await expect(store.findDirectlyAffectedFiles([])).resolves.toEqual([])
+    await expect(store.getCoveringSpecsForFiles([])).resolves.toEqual([])
+    await expect(store.getCoveringSpecsForSymbols([])).resolves.toEqual([])
+    await expect(store.findLogicalSymbolsByQualifiedNames([])).resolves.toEqual([])
+    await expect(store.findLogicalSymbolsByIds([])).resolves.toEqual([])
+    await expect(store.findDeclarations([])).resolves.toEqual([])
+    await expect(store.findPublicBindings([])).resolves.toEqual([])
+    await expect(store.findPublicBindingsByExportedNames([])).resolves.toEqual([])
+    await expect(store.findResolutionSteps([])).resolves.toEqual([])
+    await expect(store.findIndexCoverage([])).resolves.toEqual([])
+    await expect(store.getFreshnessLatches([])).resolves.toEqual({ graph: false, workspaces: {} })
+
+    expect(sendRequest.mock.calls).toEqual([['readFreshnessLatches', { workspaces: [] }]])
+  })
+
+  it('dispatches one worker operation for each oversized chunked lookup', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-chunked-lookup-rpc-'))
+    const store = new SQLiteGraphStore(tempDir)
+    const sendRequest = vi.spyOn(SQLiteWorkerClient.prototype, 'sendRequest')
+    sendRequest.mockResolvedValue([])
+    const filePaths = Array.from({ length: 901 }, (_, index) => `core:src/${String(index)}.ts`)
+    const ids = filePaths.map((path) => `logical:${path}`)
+
+    await Promise.all([
+      store.findDirectlyAffectedFiles(filePaths),
+      store.getCoveringSpecsForFiles(filePaths),
+      store.findLogicalSymbolsByIds(ids),
+      store.findResolutionSteps(ids),
+      store.findIndexCoverage(filePaths),
+      store.findSymbols({ filePaths }),
+    ])
+
+    expect(sendRequest.mock.calls.map(([method]) => method)).toEqual([
+      'findDirectlyAffectedFiles',
+      'getCoveringSpecsForFiles',
+      'findLogicalSymbolsByIds',
+      'findResolutionSteps',
+      'findIndexCoverage',
+      'findSymbols',
+    ])
+  })
+
+  it('chunks repeated affected-file path parameters at the budget boundary', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-affected-file-boundary-'))
+    const store = new SQLiteGraphStore(tempDir)
+    await store.open()
+    const changedFiles = Array.from({ length: 447 }, (_, index) =>
+      createFileNode({
+        path: `core:src/changed-${String(index).padStart(3, '0')}.ts`,
+        configRelativePath: `src/changed-${String(index).padStart(3, '0')}.ts`,
+        language: 'typescript',
+        contentHash: `sha256:changed-${String(index)}`,
+        workspace: 'core',
+      }),
+    )
+    const affectedFiles = changedFiles.map((changed, index) =>
+      createFileNode({
+        path: `core:src/affected-${String(index).padStart(3, '0')}.ts`,
+        configRelativePath: `src/affected-${String(index).padStart(3, '0')}.ts`,
+        language: 'typescript',
+        contentHash: `sha256:affected-${String(index)}`,
+        workspace: 'core',
+      }),
+    )
+    const relations = changedFiles.map((changed, index) =>
+      createRelation({
+        source: affectedFiles[index]!.path,
+        target: changed.path,
+        type: RelationType.Imports,
+      }),
+    )
+    await store.bulkLoad({
+      files: [...changedFiles, ...affectedFiles],
+      symbols: [],
+      specs: [],
+      relations,
+    })
+
+    const expected = affectedFiles
+      .map((file) => file.path)
+      .sort((left, right) => left.localeCompare(right))
+    const belowBoundaryExpected = affectedFiles
+      .slice(0, 446)
+      .map((file) => file.path)
+      .sort((left, right) => left.localeCompare(right))
+    const request = [
+      ...changedFiles.map((file) => file.path).reverse(),
+      changedFiles[0]!.path,
+      'missing',
+    ]
+    await expect(
+      store.findDirectlyAffectedFiles(changedFiles.slice(0, 446).map((file) => file.path)),
+    ).resolves.toEqual(belowBoundaryExpected)
+    await expect(store.findDirectlyAffectedFiles(request)).resolves.toEqual(expected)
+    await store.close()
+  })
+
+  it('chunks fixed relation-type coverage lookups at the budget boundary', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-coverage-boundary-'))
+    const store = new SQLiteGraphStore(tempDir)
+    await store.open()
+    const spec = createSpecNode({
+      specId: 'core:coverage-boundary',
+      path: 'specs/coverage-boundary',
+      title: 'Coverage boundary',
+      contentHash: 'sha256:coverage-boundary',
+      workspace: 'core',
+    })
+    const files = Array.from({ length: 900 }, (_, index) =>
+      createFileNode({
+        path: `core:src/covered-${String(index).padStart(3, '0')}.ts`,
+        configRelativePath: `src/covered-${String(index).padStart(3, '0')}.ts`,
+        language: 'typescript',
+        contentHash: `sha256:covered-${String(index)}`,
+        workspace: 'core',
+      }),
+    )
+    const symbols = files.map((file, index) =>
+      createSymbolNode({
+        name: `covered${String(index)}`,
+        kind: SymbolKind.Function,
+        filePath: file.path,
+        line: 1,
+        column: 0,
+      }),
+    )
+    const relations = [
+      ...files.map((file) =>
+        createRelation({ source: spec.specId, target: file.path, type: RelationType.CoversFile }),
+      ),
+      ...symbols.map((symbol) =>
+        createRelation({ source: spec.specId, target: symbol.id, type: RelationType.CoversSymbol }),
+      ),
+    ]
+    await store.bulkLoad({ files, symbols, specs: [spec], relations })
+
+    const fileTargets = [...files.map((file) => file.path).reverse(), files[0]!.path, 'missing']
+    const symbolTargets = [
+      ...symbols.map((symbol) => symbol.id).reverse(),
+      symbols[0]!.id,
+      'missing',
+    ]
+    const fileCoverage = await store.getCoveringSpecsForFiles(fileTargets)
+    const symbolCoverage = await store.getCoveringSpecsForSymbols(symbolTargets)
+
+    expect(fileCoverage).toHaveLength(900)
+    expect(symbolCoverage).toHaveLength(900)
+    expect(fileCoverage).toEqual(
+      [...fileCoverage].sort(
+        (left, right) =>
+          left.source.localeCompare(right.source) ||
+          left.type.localeCompare(right.type) ||
+          left.target.localeCompare(right.target),
+      ),
+    )
+    expect(symbolCoverage).toEqual(
+      [...symbolCoverage].sort(
+        (left, right) =>
+          left.source.localeCompare(right.source) ||
+          left.type.localeCompare(right.type) ||
+          left.target.localeCompare(right.target),
+      ),
+    )
+    await store.close()
+  })
+
+  it('chunks freshness latches and index coverage lookups above the safe budget', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-freshness-coverage-chunk-'))
+    const store = new SQLiteGraphStore(tempDir)
+    await store.open()
+    const workspaces = Array.from({ length: 901 }, (_, index) => `workspace-${String(index)}`)
+    const files = workspaces.map((workspace, index) =>
+      createFileNode({
+        path: `${workspace}:src/index.ts`,
+        configRelativePath: 'src/index.ts',
+        language: 'typescript',
+        contentHash: `sha256:coverage-${String(index)}`,
+        workspace,
+      }),
+    )
+    const session = store.beginBulkIndexSession()
+    await session.writeFiles(files)
+    await session.writeReferenceFacts({
+      logicalSymbols: [],
+      declarations: [],
+      publicBindings: [],
+      localBindings: [],
+      steps: [],
+      coverage: files.map((file) => ({
+        filePath: file.path,
+        contentHash: file.contentHash,
+        status: 'indexed' as const,
+        reason: undefined,
+        capabilities: [],
+      })),
+    })
+    await session.commit()
+    await store.markWorkspacesAndGraphStaleSinceLastIndex(workspaces)
+
+    const latches = await store.getFreshnessLatches([...workspaces, workspaces[0]!, 'missing'])
+    const coverage = await store.findIndexCoverage([
+      ...files.map((file) => file.path).reverse(),
+      files[0]!.path,
+      'missing',
+    ])
+
+    expect(latches.graph).toBe(true)
+    expect(latches.workspaces).toEqual(
+      Object.fromEntries([
+        ...workspaces.map((workspace) => [workspace, true] as const),
+        ['missing', false],
+      ]),
+    )
+    const expectedCoveragePaths = files
+      .map((file) => file.path)
+      .sort((left, right) => left.localeCompare(right))
+    expect(coverage.map((item) => item.filePath)).toEqual(expectedCoveragePaths)
+    expect(
+      (
+        await store.findIndexCoverage([
+          'missing',
+          files[0]!.path,
+          ...files.map((file) => file.path),
+        ])
+      ).map((item) => item.filePath),
+    ).toEqual(expectedCoveragePaths)
+    await store.close()
+  })
+
+  it('chunks logical-reference lookup families above the safe budget', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-logical-reference-chunk-'))
+    const store = new SQLiteGraphStore(tempDir)
+    await store.open()
+    const logicalSymbols = Array.from({ length: 901 }, (_, index) => {
+      const symbol = createLogicalSymbol({
+        workspace: 'core',
+        surface: 'core:src/references.ts',
+        name: `Reference${String(index)}`,
+        space: SymbolSpace.Value,
+        ownerId: undefined,
+        memberSemantics: undefined,
+      })
+      return { ...symbol, qualifiedName: `Reference.${String(index)}` }
+    })
+    const publicBindings = logicalSymbols.map((symbol, index) =>
+      createPublicBinding({
+        surface: 'core',
+        exportedName: `Reference${String(index)}`,
+        space: SymbolSpace.Value,
+        targetId: symbol.id,
+      }),
+    )
+    const declarations = logicalSymbols.map((symbol, index) => ({
+      logicalSymbolId: symbol.id,
+      declaration: {
+        logicalId: symbol.id,
+        symbolId: `symbol:${String(index)}`,
+        location: {
+          filePath: 'core:src/references.ts',
+          line: index + 1,
+          column: 0,
+          endLine: index + 1,
+          endColumn: 1,
+        },
+        kind: SymbolKind.Variable,
+      },
+    }))
+    const steps = logicalSymbols.map((symbol, index) => ({
+      fromId: symbol.id,
+      toId: `resolved:${String(index)}`,
+      kind: 'export' as const,
+    }))
+    await store.replaceReferenceFacts({
+      logicalSymbols,
+      declarations,
+      publicBindings,
+      localBindings: [],
+      steps,
+      coverage: [],
+    })
+
+    const ids = [
+      ...logicalSymbols.map((symbol) => symbol.id).reverse(),
+      logicalSymbols[0]!.id,
+      'missing',
+    ]
+    const names = [
+      ...publicBindings.map((binding) => binding.exportedName).reverse(),
+      publicBindings[0]!.exportedName,
+      'missing',
+    ]
+    const storedQualifiedNames = logicalSymbols.map((symbol) => symbol.qualifiedName ?? '')
+    const qualifiedNames = [
+      ...storedQualifiedNames.reverse(),
+      storedQualifiedNames[0] ?? '',
+      'missing',
+    ]
+    const expectedLogicalIds = [...logicalSymbols]
+      .sort((left, right) => left.name.localeCompare(right.name) || left.id.localeCompare(right.id))
+      .map((symbol) => symbol.id)
+    const expectedDeclarationIds = [...declarations]
+      .sort((left, right) => left.logicalSymbolId.localeCompare(right.logicalSymbolId))
+      .map((declaration) => declaration.declaration.symbolId)
+    const expectedBindingIds = [...publicBindings]
+      .sort(
+        (left, right) =>
+          left.surface.localeCompare(right.surface) ||
+          left.exportedName.localeCompare(right.exportedName) ||
+          left.space.localeCompare(right.space) ||
+          (left.targetId ?? '').localeCompare(right.targetId ?? '') ||
+          left.id.localeCompare(right.id),
+      )
+      .map((binding) => binding.id)
+    const expectedStepKeys = [...steps]
+      .sort(
+        (left, right) =>
+          left.fromId.localeCompare(right.fromId) ||
+          left.toId.localeCompare(right.toId) ||
+          left.kind.localeCompare(right.kind),
+      )
+      .map((step) => `${step.fromId}\u0000${step.toId}\u0000${step.kind}`)
+
+    expect((await store.findLogicalSymbolsByIds(ids)).map((symbol) => symbol.id)).toEqual(
+      expectedLogicalIds,
+    )
+    expect(
+      (await store.findDeclarations(ids)).map((declaration) => declaration.declaration.symbolId),
+    ).toEqual(expectedDeclarationIds)
+    expect(
+      (await store.findPublicBindingsByExportedNames(names)).map((binding) => binding.id),
+    ).toEqual(expectedBindingIds)
+    expect(
+      (await store.findLogicalSymbolsByQualifiedNames(qualifiedNames)).map((symbol) => symbol.id),
+    ).toEqual(expectedLogicalIds)
+    expect(
+      (await store.findResolutionSteps(ids)).map(
+        (step) => `${step.fromId}\u0000${step.toId}\u0000${step.kind}`,
+      ),
+    ).toEqual(expectedStepKeys)
+    expect(
+      (await store.findLogicalSymbolsByIds([...ids].reverse())).map((symbol) => symbol.id),
+    ).toEqual(expectedLogicalIds)
+    await store.close()
+  })
+
   it('accounts for all bind parameters when chunking ids together with relation types', async () => {
     tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-rel-types-chunk-'))
     const store = new SQLiteGraphStore(tempDir)
@@ -693,11 +1044,30 @@ describe('SQLiteGraphStore', () => {
       workspace: 'core',
       content: 'export const baseline = true',
     })
-    await store.upsertFile(baseline, [], [])
+    const baselineSymbol = createSymbolNode({
+      name: 'baseline',
+      kind: SymbolKind.Variable,
+      filePath: baseline.path,
+      line: 1,
+      column: 13,
+    })
+    const baselineTarget = createSymbolNode({
+      name: 'baselineTarget',
+      kind: SymbolKind.Function,
+      filePath: baseline.path,
+      line: 2,
+      column: 0,
+    })
+    const baselineRelation = createRelation({
+      source: baselineSymbol.id,
+      target: baselineTarget.id,
+      type: RelationType.Calls,
+    })
+    await store.upsertFile(baseline, [baselineSymbol, baselineTarget], [baselineRelation])
 
     const staged = createFileNode({
-      path: 'core:src/staged.ts',
-      configRelativePath: 'src/staged.ts',
+      path: baseline.path,
+      configRelativePath: baseline.configRelativePath,
       language: 'typescript',
       contentHash: 'sha256:staged',
       workspace: 'core',
@@ -712,6 +1082,7 @@ describe('SQLiteGraphStore', () => {
       memberSemantics: undefined,
     })
     const session = store.beginBulkIndexSession()
+    await session.removeFiles([baseline.path])
     await session.writeFiles([staged])
     await session.writeReferenceFacts({
       logicalSymbols: [logical, logical],
@@ -724,7 +1095,149 @@ describe('SQLiteGraphStore', () => {
 
     await expect(session.commit()).rejects.toThrow()
     expect(await store.getFile(baseline.path)).toEqual(baseline)
-    expect(await store.getFile(staged.path)).toBeUndefined()
+    expect(await store.findSymbols({ filePath: baseline.path })).toEqual([
+      baselineSymbol,
+      baselineTarget,
+    ])
+    expect(
+      await store.getIncomingSymbolRelations([baselineTarget.id], [RelationType.Calls]),
+    ).toEqual([baselineRelation])
+    await expect(
+      store.searchSourceContentCandidates({
+        normalizedQuery: 'baseline',
+        rawTerms: ['baseline'],
+        expandedTerms: [],
+        limit: 10,
+      }),
+    ).resolves.toMatchObject({ candidates: [{ file: { path: baseline.path } }] })
+    await store.close()
+  })
+
+  it('rolls back a direct file upsert when relation persistence fails after cleanup', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-upsert-rollback-'))
+    const store = new SQLiteGraphStore(tempDir)
+    await store.open()
+    const baseline = createFileNode({
+      path: 'core:src/direct-rollback.ts',
+      configRelativePath: 'src/direct-rollback.ts',
+      language: 'typescript',
+      contentHash: 'sha256:direct-rollback-baseline',
+      workspace: 'core',
+      content: 'export const directRollbackBaselineNeedle = true',
+    })
+    const retainedFile = createFileNode({
+      path: 'core:src/direct-rollback-retained.ts',
+      configRelativePath: 'src/direct-rollback-retained.ts',
+      language: 'typescript',
+      contentHash: 'sha256:direct-rollback-retained',
+      workspace: 'core',
+    })
+    const baselineSymbols = [
+      createSymbolNode({
+        name: 'directRollbackIncomingTarget',
+        kind: SymbolKind.Function,
+        filePath: baseline.path,
+        line: 1,
+        column: 0,
+      }),
+      createSymbolNode({
+        name: 'directRollbackOutgoingSource',
+        kind: SymbolKind.Function,
+        filePath: baseline.path,
+        line: 2,
+        column: 0,
+      }),
+    ]
+    const retainedSymbol = createSymbolNode({
+      name: 'directRollbackRetained',
+      kind: SymbolKind.Function,
+      filePath: retainedFile.path,
+      line: 1,
+      column: 0,
+    })
+    const baselineRelations = [
+      createRelation({
+        source: retainedSymbol.id,
+        target: baselineSymbols[0]!.id,
+        type: RelationType.Calls,
+      }),
+      createRelation({
+        source: baselineSymbols[1]!.id,
+        target: retainedSymbol.id,
+        type: RelationType.Calls,
+      }),
+      createRelation({
+        source: baseline.path,
+        target: retainedFile.path,
+        type: RelationType.Imports,
+      }),
+    ]
+    await store.upsertFile(retainedFile, [retainedSymbol], [])
+    await store.upsertFile(baseline, baselineSymbols, baselineRelations)
+
+    const replacement = createFileNode({
+      ...baseline,
+      contentHash: 'sha256:direct-rollback-replacement',
+      content: 'export const directRollbackReplacementNeedle = true',
+    })
+    const replacementSymbols = [
+      createSymbolNode({
+        name: 'directRollbackReplacementSource',
+        kind: SymbolKind.Function,
+        filePath: replacement.path,
+        line: 1,
+        column: 0,
+      }),
+      createSymbolNode({
+        name: 'directRollbackReplacementTarget',
+        kind: SymbolKind.Function,
+        filePath: replacement.path,
+        line: 2,
+        column: 0,
+      }),
+    ]
+    const invalidMetadataRelation = createRelation({
+      source: replacementSymbols[0]!.id,
+      target: replacementSymbols[1]!.id,
+      type: RelationType.Calls,
+      metadata: { invalid: 1n },
+    })
+
+    await expect(
+      store.upsertFile(replacement, replacementSymbols, [invalidMetadataRelation]),
+    ).rejects.toThrow()
+    expect(await store.getFile(baseline.path)).toEqual(baseline)
+    expect(await store.findSymbols({ filePath: baseline.path })).toEqual(baselineSymbols)
+    expect(
+      await store.getIncomingSymbolRelations([baselineSymbols[0]!.id], [RelationType.Calls]),
+    ).toEqual([baselineRelations[0]])
+    expect(
+      await store.getOutgoingSymbolRelations([baselineSymbols[1]!.id], [RelationType.Calls]),
+    ).toEqual([baselineRelations[1]])
+    expect(await store.getImportees(baseline.path)).toEqual([baselineRelations[2]])
+    expect(
+      (
+        await store.searchSourceContentCandidates({
+          normalizedQuery: 'directRollbackBaselineNeedle',
+          rawTerms: ['directRollbackBaselineNeedle'],
+          expandedTerms: [],
+          limit: 10,
+        })
+      ).candidates.map((candidate) => candidate.file.path),
+    ).toEqual([baseline.path])
+    expect(
+      (
+        await store.searchSourceContentCandidates({
+          normalizedQuery: 'directRollbackReplacementNeedle',
+          rawTerms: ['directRollbackReplacementNeedle'],
+          expandedTerms: [],
+          limit: 10,
+        })
+      ).candidates,
+    ).toEqual([])
+    expect(
+      await store.getOutgoingSymbolRelations([replacementSymbols[0]!.id], [RelationType.Calls]),
+    ).toEqual([])
     await store.close()
   })
 
@@ -1476,6 +1989,80 @@ describe('SQLiteGraphStore', () => {
     await store.close()
   })
 
+  it('chunks findSymbols file-path filters within the SQLite parameter budget', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-find-symbols-chunk-'))
+    const store = new SQLiteGraphStore(tempDir)
+    await store.open()
+    const files = Array.from({ length: 901 }, (_, index) =>
+      createFileNode({
+        path: `core:src/chunk-${String(index)}.ts`,
+        configRelativePath: `src/chunk-${String(index)}.ts`,
+        language: 'typescript',
+        contentHash: `sha256:chunk-${String(index)}`,
+        workspace: 'core',
+      }),
+    )
+    const symbols = files.map((file, index) =>
+      createSymbolNode({
+        name: 'Chunked',
+        kind: SymbolKind.Function,
+        filePath: file.path,
+        line: index + 1,
+        column: 0,
+      }),
+    )
+    const sameFileSymbols = [
+      createSymbolNode({
+        name: 'Chunked',
+        kind: SymbolKind.Function,
+        filePath: files[0]!.path,
+        line: 2,
+        column: 0,
+      }),
+      createSymbolNode({
+        name: 'Chunked',
+        kind: SymbolKind.Function,
+        filePath: files[0]!.path,
+        line: 1,
+        column: 2,
+      }),
+      createSymbolNode({
+        name: 'Chunked',
+        kind: SymbolKind.Function,
+        filePath: files[0]!.path,
+        line: 1,
+        column: 1,
+      }),
+    ]
+    const allSymbols = [...symbols, ...sameFileSymbols]
+    await store.bulkLoad({ files, symbols: allSymbols, specs: [], relations: [] })
+
+    const results = await store.findSymbols({
+      filePaths: [...files.map((file) => file.path), files[0]!.path, 'core:src/missing.ts'],
+      name: 'chunked',
+    })
+
+    const expectedIds = [...allSymbols]
+      .sort(
+        (left, right) =>
+          left.filePath.localeCompare(right.filePath) ||
+          left.line - right.line ||
+          left.column - right.column ||
+          left.id.localeCompare(right.id),
+      )
+      .map((symbol) => symbol.id)
+    expect(results.map((symbol) => symbol.id)).toEqual(expectedIds)
+    expect(
+      (
+        await store.findSymbols({
+          filePaths: [...files].reverse().map((file) => file.path),
+          name: 'chunked',
+        })
+      ).map((symbol) => symbol.id),
+    ).toEqual(results.map((symbol) => symbol.id))
+    await store.close()
+  })
+
   it('expands specd/code-shaped queries before applying sqlite ranking', async () => {
     tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-test-'))
 
@@ -1956,5 +2543,295 @@ describe('SQLiteGraphStore', () => {
 
       await store.close()
     })
+  })
+
+  it('removes a file with more symbols than the former variable limit allowed', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-large-file-remove-'))
+    const store = new SQLiteGraphStore(tempDir)
+    await store.open()
+    const file = createFileNode({
+      path: 'core:src/generated.ts',
+      configRelativePath: 'src/generated.ts',
+      language: 'typescript',
+      contentHash: 'sha256:generated',
+      workspace: 'core',
+      content: 'export const removedLargeFileNeedle = true',
+    })
+    const retainedFile = createFileNode({
+      path: 'core:src/retained-remove.ts',
+      configRelativePath: 'src/retained-remove.ts',
+      language: 'typescript',
+      contentHash: 'sha256:retained-remove',
+      workspace: 'core',
+    })
+    const retainedSymbol = createSymbolNode({
+      name: 'retainedRemove',
+      kind: SymbolKind.Function,
+      filePath: retainedFile.path,
+      line: 1,
+      column: 0,
+    })
+    const symbols = Array.from({ length: 16_384 }, (_, index) =>
+      createSymbolNode({
+        name: `generated${String(index)}`,
+        kind: SymbolKind.Variable,
+        filePath: file.path,
+        line: index + 1,
+        column: 0,
+      }),
+    )
+    const relations = [
+      createRelation({
+        source: retainedSymbol.id,
+        target: symbols[0]!.id,
+        type: RelationType.Calls,
+      }),
+      createRelation({
+        source: symbols[1]!.id,
+        target: retainedSymbol.id,
+        type: RelationType.Calls,
+      }),
+      createRelation({
+        source: file.path,
+        target: retainedFile.path,
+        type: RelationType.Imports,
+      }),
+    ]
+    await store.upsertFile(retainedFile, [retainedSymbol], [])
+    await store.upsertFile(file, symbols, relations)
+
+    await expect(store.removeFile(file.path)).resolves.toBeUndefined()
+    expect(await store.getFile(file.path)).toBeUndefined()
+    expect(await store.findSymbols({ filePath: file.path })).toEqual([])
+    expect(await store.getIncomingSymbolRelations([symbols[0]!.id], [RelationType.Calls])).toEqual(
+      [],
+    )
+    expect(await store.getOutgoingSymbolRelations([symbols[1]!.id], [RelationType.Calls])).toEqual(
+      [],
+    )
+    expect(await store.getImportees(file.path)).toEqual([])
+    expect(
+      (
+        await store.searchSourceContentCandidates({
+          normalizedQuery: 'removedLargeFileNeedle',
+          rawTerms: ['removedLargeFileNeedle'],
+          expandedTerms: [],
+          limit: 10,
+        })
+      ).candidates,
+    ).toEqual([])
+    expect(await store.getFile(retainedFile.path)).toEqual(retainedFile)
+    await store.close()
+  })
+
+  it('replaces a file with more symbols than the former variable limit allowed', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-large-file-upsert-'))
+    const store = new SQLiteGraphStore(tempDir)
+    await store.open()
+    const file = createFileNode({
+      path: 'core:src/generated-replace.ts',
+      configRelativePath: 'src/generated-replace.ts',
+      language: 'typescript',
+      contentHash: 'sha256:generated-before',
+      workspace: 'core',
+      content: 'export const replacedLargeFileNeedle = true',
+    })
+    const retainedFile = createFileNode({
+      path: 'core:src/retained-replace.ts',
+      configRelativePath: 'src/retained-replace.ts',
+      language: 'typescript',
+      contentHash: 'sha256:retained-replace',
+      workspace: 'core',
+    })
+    const retainedSymbol = createSymbolNode({
+      name: 'retainedReplace',
+      kind: SymbolKind.Function,
+      filePath: retainedFile.path,
+      line: 1,
+      column: 0,
+    })
+    const oldSymbols = Array.from({ length: 16_384 }, (_, index) =>
+      createSymbolNode({
+        name: `old${String(index)}`,
+        kind: SymbolKind.Variable,
+        filePath: file.path,
+        line: index + 1,
+        column: 0,
+      }),
+    )
+    const replacement = createFileNode({
+      path: file.path,
+      configRelativePath: file.configRelativePath,
+      language: file.language,
+      contentHash: 'sha256:generated-after',
+      workspace: file.workspace,
+      content: 'export const replacementLargeFileNeedle = true',
+    })
+    const replacementSymbol = createSymbolNode({
+      name: 'replacement',
+      kind: SymbolKind.Variable,
+      filePath: file.path,
+      line: 1,
+      column: 0,
+    })
+    const oldRelations = [
+      createRelation({
+        source: retainedSymbol.id,
+        target: oldSymbols[0]!.id,
+        type: RelationType.Calls,
+      }),
+      createRelation({
+        source: oldSymbols[1]!.id,
+        target: retainedSymbol.id,
+        type: RelationType.Calls,
+      }),
+      createRelation({
+        source: file.path,
+        target: retainedFile.path,
+        type: RelationType.Imports,
+      }),
+    ]
+    await store.upsertFile(retainedFile, [retainedSymbol], [])
+    await store.upsertFile(file, oldSymbols, oldRelations)
+
+    await expect(store.upsertFile(replacement, [replacementSymbol], [])).resolves.toBeUndefined()
+    expect(await store.getFile(file.path)).toEqual(replacement)
+    expect(await store.findSymbols({ filePath: file.path })).toEqual([replacementSymbol])
+    expect(
+      await store.getIncomingSymbolRelations([oldSymbols[0]!.id], [RelationType.Calls]),
+    ).toEqual([])
+    expect(
+      await store.getOutgoingSymbolRelations([oldSymbols[1]!.id], [RelationType.Calls]),
+    ).toEqual([])
+    expect(await store.getImportees(file.path)).toEqual([])
+    expect(
+      (
+        await store.searchSourceContentCandidates({
+          normalizedQuery: 'replacedLargeFileNeedle',
+          rawTerms: ['replacedLargeFileNeedle'],
+          expandedTerms: [],
+          limit: 10,
+        })
+      ).candidates,
+    ).toEqual([])
+    expect(
+      (
+        await store.searchSourceContentCandidates({
+          normalizedQuery: 'replacementLargeFileNeedle',
+          rawTerms: ['replacementLargeFileNeedle'],
+          expandedTerms: [],
+          limit: 10,
+        })
+      ).candidates.map((candidate) => candidate.file.path),
+    ).toEqual([file.path])
+    await store.close()
+  })
+
+  it('replaces a large file during bulk commit without exceeding SQLite variables', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-large-file-bulk-replace-'))
+    const store = new SQLiteGraphStore(tempDir)
+    await store.open()
+    const file = createFileNode({
+      path: 'core:src/generated-bulk.ts',
+      configRelativePath: 'src/generated-bulk.ts',
+      language: 'typescript',
+      contentHash: 'sha256:generated-bulk',
+      workspace: 'core',
+      content: 'export const replacedBulkLargeFileNeedle = true',
+    })
+    const retainedFile = createFileNode({
+      path: 'core:src/retained-bulk.ts',
+      configRelativePath: 'src/retained-bulk.ts',
+      language: 'typescript',
+      contentHash: 'sha256:retained-bulk',
+      workspace: 'core',
+    })
+    const retainedSymbol = createSymbolNode({
+      name: 'retainedBulk',
+      kind: SymbolKind.Function,
+      filePath: retainedFile.path,
+      line: 1,
+      column: 0,
+    })
+    const symbols = Array.from({ length: 16_384 }, (_, index) =>
+      createSymbolNode({
+        name: `bulk${String(index)}`,
+        kind: SymbolKind.Variable,
+        filePath: file.path,
+        line: index + 1,
+        column: 0,
+      }),
+    )
+    const oldRelations = [
+      createRelation({
+        source: retainedSymbol.id,
+        target: symbols[0]!.id,
+        type: RelationType.Calls,
+      }),
+      createRelation({
+        source: symbols[1]!.id,
+        target: retainedSymbol.id,
+        type: RelationType.Calls,
+      }),
+      createRelation({
+        source: file.path,
+        target: retainedFile.path,
+        type: RelationType.Imports,
+      }),
+    ]
+    await store.upsertFile(retainedFile, [retainedSymbol], [])
+    await store.upsertFile(file, symbols, oldRelations)
+    const replacement = createFileNode({
+      path: file.path,
+      configRelativePath: file.configRelativePath,
+      language: file.language,
+      contentHash: 'sha256:generated-bulk-replaced',
+      workspace: file.workspace,
+      content: 'export const replacementBulkLargeFileNeedle = true',
+    })
+    const replacementSymbol = createSymbolNode({
+      name: 'bulkReplacement',
+      kind: SymbolKind.Variable,
+      filePath: file.path,
+      line: 1,
+      column: 0,
+    })
+    const session = store.beginBulkIndexSession()
+    await session.removeFiles([file.path])
+    await session.writeFiles([replacement])
+    await session.writeSymbols([replacementSymbol])
+
+    await expect(session.commit()).resolves.toBeUndefined()
+    expect(await store.getFile(file.path)).toEqual(replacement)
+    expect(await store.findSymbols({ filePath: file.path })).toEqual([replacementSymbol])
+    expect(await store.getIncomingSymbolRelations([symbols[0]!.id], [RelationType.Calls])).toEqual(
+      [],
+    )
+    expect(await store.getOutgoingSymbolRelations([symbols[1]!.id], [RelationType.Calls])).toEqual(
+      [],
+    )
+    expect(await store.getImportees(file.path)).toEqual([])
+    expect(
+      (
+        await store.searchSourceContentCandidates({
+          normalizedQuery: 'replacedBulkLargeFileNeedle',
+          rawTerms: ['replacedBulkLargeFileNeedle'],
+          expandedTerms: [],
+          limit: 10,
+        })
+      ).candidates,
+    ).toEqual([])
+    expect(
+      (
+        await store.searchSourceContentCandidates({
+          normalizedQuery: 'replacementBulkLargeFileNeedle',
+          rawTerms: ['replacementBulkLargeFileNeedle'],
+          expandedTerms: [],
+          limit: 10,
+        })
+      ).candidates.map((candidate) => candidate.file.path),
+    ).toEqual([file.path])
+    expect(await store.getFile(retainedFile.path)).toEqual(retainedFile)
+    await store.close()
   })
 })

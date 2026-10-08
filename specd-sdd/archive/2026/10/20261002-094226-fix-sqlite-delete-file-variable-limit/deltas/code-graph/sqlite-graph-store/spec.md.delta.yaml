@@ -1,0 +1,40 @@
+- op: modified
+  description: Update Worker-efficient batch reads to enforce the SQLite parameter budget
+  selector:
+    type: section
+    matches: 'Requirement: Worker-efficient batch reads'
+  content: |
+    SQLite SHALL implement the batch symbol and relation queries defined by
+    `GraphStore` as set-based worker operations. One batch call MUST cross the
+    worker boundary as one RPC rather than one RPC per symbol or relation type.
+
+    Batch symbol lookup SHALL use set-based predicates. Incoming and outgoing
+    relation lookup SHALL query all requested symbol ids and relation types together.
+    Set-based batch reads that bind caller-provided collections as SQL parameters
+    MUST divide those collections into deterministic chunks that remain within the
+    configured safe parameter budget after accounting for fixed parameters and for
+    inputs referenced more than once by a statement. The logical batch MUST still
+    cross the worker boundary as one RPC. Results merged from multiple SQL chunks
+    MUST preserve the abstract contract's deterministic ordering, de-duplication,
+    unknown-value behavior, and empty-input semantics.
+
+- op: modified
+  description: Update Transactional mutation model to bound file cleanup parameters independently of symbol count
+  selector:
+    type: section
+    matches: 'Requirement: Transactional mutation model'
+  content: |
+    `SQLiteGraphStore` SHALL execute SQLite transactions entirely inside the worker
+    to preserve the atomic mutation semantics required by `GraphStore`.
+
+    A transaction MUST NOT span multiple host/worker round trips. Each atomic
+    mutation, including `upsertFile()`, `removeFile()`, `upsertSpec()`,
+    `removeSpec()`, and bulk commit, MUST execute as one self-contained worker
+    operation. Failure MUST preserve the previously committed graph state.
+
+    File-local state cleanup during `upsertFile()`, `removeFile()`, and bulk commit
+    MUST use a number of SQL parameters that is independent of the number of symbols
+    previously stored for the file. Cleanup MUST remove every relation whose source or
+    target is one of those symbols before removing the symbols themselves. A cleanup
+    failure MUST roll back the complete mutation without leaving dangling relations,
+    partially removed symbols, or other partially committed file state.

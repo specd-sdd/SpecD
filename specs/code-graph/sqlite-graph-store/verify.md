@@ -188,13 +188,23 @@
 - **THEN** each logical batch is sent as one worker RPC
 - **AND** the worker executes set-based lookup rather than one RPC per symbol or relation type
 
-#### Scenario: Large batches are chunked transparently inside the worker
+#### Scenario: Collection-binding batch reads are chunked transparently inside the worker
 
-- **GIVEN** a batch exceeds SQLite's safe parameter count
-- **WHEN** the worker executes the batch query
-- **THEN** it divides the query into deterministic bounded SQL parameter chunks
-- **AND** the merged result preserves the abstract contract's deterministic order
-- **AND** no valid requested symbol or relation is lost or duplicated
+- **GIVEN** each set-based batch-read family receives a caller collection larger than the configured safe parameter budget
+- **AND** the collection includes duplicate and unknown values
+- **WHEN** the worker executes each logical batch
+- **THEN** every SQL statement remains within the configured safe parameter budget
+- **AND** the merged result preserves the abstract contract's deterministic order, de-duplication, and unknown-value behavior
+- **AND** no SQLite variable limit error is raised
+
+#### Scenario: Fixed and repeated parameters count toward the chunk budget
+
+- **GIVEN** a set-based lookup has fixed parameters or references each caller-provided value more than once
+- **AND** the unchunked statement would exceed the configured safe parameter budget even though the input collection alone would not
+- **WHEN** the worker executes the logical batch
+- **THEN** it chooses chunks small enough for the complete statement parameter count
+- **AND** it returns the same deterministic result as the equivalent smaller lookups
+- **AND** no SQLite variable limit error is raised
 
 #### Scenario: Empty batch avoids worker and SQLite work
 
@@ -540,11 +550,20 @@
 
 ### Requirement: Transactional mutation model
 
-#### Scenario: File upsert is all-or-nothing
+#### Scenario: File upsert and removal are all-or-nothing
 
-- **WHEN** `upsertFile()` is invoked
-- **THEN** the complete file-level graph replacement executes within a single worker-side transaction
-- **AND** if an error occurs during replacement, previous graph state remains intact
+- **WHEN** `upsertFile()` or `removeFile()` is invoked
+- **THEN** the complete file-level mutation executes within a single worker-side transaction
+- **AND** if an error occurs after cleanup begins, the previously committed file, symbols, and relations remain intact
+
+#### Scenario: Direct file upsert rolls back a failure after cleanup begins
+
+- **GIVEN** a committed file has symbols, incoming and outgoing relations, and searchable content
+- **AND** a replacement `upsertFile()` is constructed to fail after the existing file-local state has been cleaned up
+- **WHEN** the direct upsert is attempted
+- **THEN** the operation rejects
+- **AND** the previously committed file, symbols, incoming and outgoing relations, and searchable content remain intact
+- **AND** none of the failed replacement state becomes visible
 
 #### Scenario: Bulk indexing batch is all-or-nothing
 
@@ -552,6 +571,23 @@
 - **WHEN** the batch commit is requested
 - **THEN** the complete session becomes visible atomically within a single worker transaction
 - **AND** a failure before or during commit leaves previously committed graph state intact
+
+#### Scenario: Direct file mutations clean up a file with a large symbol count
+
+- **GIVEN** a file has enough symbols and associated incoming and outgoing relations that expanding every symbol id into the cleanup statement would exceed SQLite's host parameter limit
+- **WHEN** `upsertFile()` or `removeFile()` replaces or removes the file
+- **THEN** the mutation completes without a SQLite variable-limit error
+- **AND** none of the file's previous symbols or their incoming or outgoing relations remain
+- **AND** an upsert exposes only the replacement file state
+
+#### Scenario: Bulk commit cleans up a file with a large symbol count
+
+- **GIVEN** a committed file has enough symbols and associated relations that expanding every symbol id into the cleanup statement would exceed SQLite's host parameter limit
+- **AND** a bulk index session stages replacement state for that file
+- **WHEN** the session commits
+- **THEN** the commit completes without a SQLite variable-limit error
+- **AND** none of the file's previous symbols or their incoming or outgoing relations remain
+- **AND** the replacement state becomes visible atomically
 
 ### Requirement: Bulk indexing support
 
