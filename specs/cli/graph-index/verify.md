@@ -111,8 +111,8 @@
 - **WHEN** `specd graph index` executes after resolving its command context
 - **THEN** it calls `runIsolatedGraphIndex` imported from `@specd/sdk` exactly once
 - **AND** the call contains the resolved storage root, the packaged graph-index task
-  module URL, a serializable configured-or-bootstrap context descriptor, the index
-  input, and an optional progress callback
+  module URL, a serializable forced, discovered, or bootstrap context descriptor,
+  the index input, and an optional progress callback
 
 #### Scenario: CLI does not own lock or subprocess mechanics
 
@@ -122,13 +122,41 @@
   lock-path, fork, IPC, signal-forwarding, or child-cleanup helpers
 - **AND** the CLI has no direct dependency or import on `@specd/code-graph`
 
+#### Scenario: Explicit config remains forced in the child
+
+- **GIVEN** `specd graph index --config /repo/specd.yaml` is invoked
+- **AND** `/repo/specd.local.yaml` exists but is not in the explicit config's
+  `extends` chain
+- **WHEN** the parent constructs and the child reconstructs the task descriptor
+- **THEN** the descriptor identifies forced mode with `/repo/specd.yaml`
+- **AND** the child calls `openSpecdHost({ configPath: '/repo/specd.yaml' })`
+- **AND** the sibling local file is not attached by discovery
+
+#### Scenario: Automatic discovery replays local cascade in the child
+
+- **GIVEN** the command is invoked without `--config`
+- **AND** discovery from `/repo/packages/app` activates `/repo/specd.yaml` and an
+  extending `/repo/specd.local.yaml` with different graph exclusions
+- **WHEN** the parent constructs and the child reconstructs the task descriptor
+- **THEN** the descriptor identifies discovered mode with the absolute start
+  directory `/repo/packages/app`
+- **AND** the child calls `openSpecdHost({ startDir: '/repo/packages/app' })`
+- **AND** the child observes the same local cascade values as the parent
+
+#### Scenario: Discovery replay does not silently substitute bootstrap
+
+- **GIVEN** automatic discovery succeeds in the parent
+- **AND** the project config is no longer discoverable when the child reconstructs
+  the context
+- **WHEN** the packaged task opens the discovered descriptor
+- **THEN** task execution fails through the worker/system-error path
+- **AND** the child does not create a bootstrap context or select another project
+
 #### Scenario: Packaged task invokes SDK indexing once
 
 - **GIVEN** the isolated child loads the trusted packaged CLI task module
-- **WHEN** the task receives a valid configured-project descriptor
-- **THEN** it reconstructs an equivalent configured SDK context from the explicit
-  configuration location and workspace selection
-- **AND** it calls `runIndexProjectGraph(ctx, input)` exactly once
+- **WHEN** the task reconstructs a valid forced, discovered, or bootstrap context
+- **THEN** it calls `runIndexProjectGraph(ctx, input)` exactly once
 - **AND** it returns the resulting `IndexResult` without CLI presentation fields
 
 #### Scenario: Bootstrap context remains explicit

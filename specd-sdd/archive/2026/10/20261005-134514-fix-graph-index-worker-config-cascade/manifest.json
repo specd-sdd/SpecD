@@ -1,0 +1,381 @@
+{
+  "name": "fix-graph-index-worker-config-cascade",
+  "createdAt": "2026-10-05T13:45:14.323Z",
+  "updatedAt": "2026-10-08T16:50:45.105Z",
+  "description": "Preserve config-resolution intent across the isolated graph-index boundary so automatic discovery replays local cascade layers in the child. Explicit --config remains forced, bootstrap remains explicit, and the fix adds focused coverage for descriptor transport, reconstruction, fail-fast behavior, and real cascade behavior.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": ["cli:graph-index", "code-graph:isolated-index-worker", "core:config-loader"],
+  "specDependsOn": {
+    "cli:graph-index": [
+      "cli:entrypoint",
+      "core:config",
+      "core:list-workspaces",
+      "sdk:run-index-project-graph",
+      "sdk:host-context",
+      "code-graph:isolated-index-worker",
+      "core:config-loader"
+    ],
+    "code-graph:isolated-index-worker": ["code-graph:sqlite-graph-store"],
+    "core:config-loader": [
+      "core:config",
+      "core:composition",
+      "core:schema-merge",
+      "default:_global/architecture",
+      "core:vcs-adapter-port",
+      "core:vcs-adapter"
+    ]
+  },
+  "invalidationPolicy": "downstream",
+  "implementationTrackingStartedAt": "2026-10-08T13:10:16.872Z",
+  "trackedImplementationFiles": [
+    {
+      "file": "specs/cli/entrypoint/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/composition/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/sqlite-graph-store/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/kernel/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/vcs-adapter/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/graph-index-task.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/index-graph.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/graph-index.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/graph-index-task.spec.ts",
+      "state": "resolved"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "cli:graph-index",
+      "file": "packages/cli/src/graph-index-task.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["CliGraphIndexContextDescriptor", "runGraphIndexTask"]
+    },
+    {
+      "specId": "cli:graph-index",
+      "file": "packages/cli/src/commands/graph/index-graph.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["registerGraphIndex"]
+    },
+    {
+      "specId": "cli:graph-index",
+      "file": "packages/cli/test/commands/graph-index.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:graph-index",
+      "file": "packages/cli/test/graph-index-task.spec.ts",
+      "fileLinkExplicit": true
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:ad30f401fca0c4c7c65a919a3e7ff32cc614b699f70e77630335866290542729"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "cli:graph-index",
+          "filename": "deltas/cli/graph-index/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:fa19e42e83b8325395f0087de80bc084bc42043cd9e330649e50433a0326c432"
+        },
+        {
+          "key": "code-graph:isolated-index-worker",
+          "filename": "deltas/code-graph/isolated-index-worker/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:a3f64c638e922758c0ce0a2913a509d9f661e43298f9e8d22d3340885b25d823"
+        },
+        {
+          "key": "core:config-loader",
+          "filename": "deltas/core/config-loader/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:13dbe513945c8e56968b14b3688f9f67e9048018a22faf3a9bbed3291175db66"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "cli:graph-index",
+          "filename": "deltas/cli/graph-index/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:fdea1f7f9560037153844517d447c70bfe369b1f9a4bcbc46301e418d5446a92"
+        },
+        {
+          "key": "code-graph:isolated-index-worker",
+          "filename": "deltas/code-graph/isolated-index-worker/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:2dd5c06be48e83aac71ac004f832a0c1b8c6af575253688b38331c50c158f2bb"
+        },
+        {
+          "key": "core:config-loader",
+          "filename": "deltas/core/config-loader/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:6f38acacf3de40e49a6cc2b0b5e306364785ce659af370993a8f20f8c8fda8b2"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:061eadefe5c96de18ff638f63c115fbcccc6c9d41c56da4308ad51020bcf7980"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "verify", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:cd78ce5e7b408c44c732d70d405e765c4d8a35403353f122f2759bac8a223241"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-10-05T13:45:14.323Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": ["cli:graph-index", "code-graph:isolated-index-worker", "core:config-loader"],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-05T13:45:14.341Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "cli:graph-index"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:isolated-index-worker"
+        },
+        {
+          "type": "specs",
+          "key": "core:config-loader"
+        },
+        {
+          "type": "verify",
+          "key": "cli:graph-index"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:isolated-index-worker"
+        },
+        {
+          "type": "verify",
+          "key": "core:config-loader"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-08T12:23:39.475Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-08T12:54:32.027Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["cli:graph-index", "code-graph:isolated-index-worker", "core:config-loader"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:graph-index", "code-graph:isolated-index-worker", "core:config-loader"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-08T13:00:55.160Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-08T13:10:16.872Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-08T13:18:12.063Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-08T16:20:49.291Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-08T16:21:05.584Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-10-08T16:50:31.351Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "description": "Preserve config-resolution intent across the isolated graph-index boundary so automatic discovery replays local cascade layers in the child. Explicit --config remains forced, bootstrap remains explicit, and the fix adds focused coverage for descriptor transport, reconstruction, fail-fast behavior, and real cascade behavior."
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-08T16:50:45.104Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-10-08T16:50:45.403Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

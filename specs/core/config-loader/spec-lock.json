@@ -11,10 +11,5 @@
     "core:vcs-adapter-port",
     "core:vcs-adapter"
   ],
-  "implementation": [
-    {
-      "file": "core:src/infrastructure/fs/config-loader.ts",
-      "symbols": ["FsConfigLoader"]
-    }
-  ]
+  "implementation": []
 }

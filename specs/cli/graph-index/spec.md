@@ -26,10 +26,10 @@ specd graph index [--force] [--exclude-path <pattern>...] [--config <path> | --p
 Index execution MUST go through the high-level `runIsolatedGraphIndex` capability
 imported from `@specd/sdk`. The CLI SHALL provide:
 
-- the graph storage root resolved for the command context;
+- the graph storage root resolved from the parent's effective command context;
 - the URL of its trusted, packaged graph-index task module;
-- JSON-serializable task input containing the explicit configured or bootstrap
-  context descriptor plus `force` and additional exclude paths;
+- JSON-serializable task input containing an explicit forced, discovered, or
+  bootstrap context descriptor plus `force` and additional exclude paths;
 - a progress callback that renders text-mode progress while leaving structured
   modes presentation-neutral.
 
@@ -38,12 +38,28 @@ the graph index lock. It MUST NOT spawn or fork a graph-index process itself. Lo
 acquisition, child creation, signal forwarding, IPC validation, termination
 classification, and cleanup belong to the code-graph isolated worker.
 
+The parent SHALL preserve the mode used to resolve the command context:
+
+- an explicit `--config` SHALL produce a forced descriptor containing the selected
+  config path;
+- automatic project discovery SHALL produce a discovered descriptor containing the
+  absolute directory from which the parent started discovery;
+- `--path` or no-config fallback SHALL produce the existing bootstrap descriptor
+  containing the explicit project and VCS roots.
+
 The packaged CLI task SHALL execute inside the isolated child. It SHALL reconstruct
-an SDK host context equivalent to the parent's explicit configured or bootstrap
-descriptor and invoke `runIndexProjectGraph(ctx, input)` exactly once. Because an
-in-memory kernel cannot cross a process boundary, the task MUST NOT claim or attempt
-to reuse the same kernel object identity. It MUST preserve the selected config path
-or bootstrap root and MUST NOT perform implicit project substitution.
+a host context equivalent to the parent's descriptor: forced descriptors SHALL use
+`openSpecdHost({ configPath })`, discovered descriptors SHALL replay normal discovery
+with `openSpecdHost({ startDir })`, and bootstrap descriptors SHALL construct the
+explicit bootstrap config without discovery. A discovered descriptor MUST NOT be
+converted into forced loading of its resolved root config file. After reconstruction,
+the task SHALL invoke `runIndexProjectGraph(ctx, input)` exactly once.
+
+If discovered reconstruction no longer finds a valid project configuration, the task
+MUST fail through the existing worker/system-error path. It MUST NOT fall back to
+bootstrap mode or substitute another project. Because an in-memory kernel cannot
+cross a process boundary, the task MUST NOT claim or attempt to reuse the same kernel
+object identity.
 
 Workspace assembly, VCS resolution, spec metadata materialization, provider
 lifecycle, repair handling, and `IndexProjectGraph` orchestration SHALL remain in
@@ -51,15 +67,14 @@ lifecycle, repair handling, and `IndexProjectGraph` orchestration SHALL remain i
 
 Production execution SHALL always use the process-isolated worker. CLI-specific
 `SPECD_GRAPH_INDEX_WORKER` and `SPECD_GRAPH_INDEX_NO_WORKER` execution branches are
-not part of the target command behaviour. Tests SHALL use explicit worker/task
-seams without changing the production path.
+not part of the target command behaviour. Tests SHALL use explicit worker/task seams
+without changing the production path.
 
 The parent CLI SHALL receive typed progress, result, and failure outcomes from the
-high-level worker. It SHALL render the successful `RunIndexProjectGraphResult`
-using the existing text, JSON, or TOON contract. Per-file indexing errors remain a
+high-level worker. It SHALL render the successful `RunIndexProjectGraphResult` using
+the existing text, JSON, or TOON contract. Per-file indexing errors remain a
 successful result; busy, fork, task, protocol, abnormal-exit, signal, provider, and
-other infrastructure failures SHALL follow the command's existing system-error
-path.
+other infrastructure failures SHALL follow the command's existing system-error path.
 
 ### Requirement: Output format
 
@@ -184,5 +199,7 @@ $ specd graph index --format json
   execution orchestration performed by the injected CLI task
 - [`sdk:host-context`](../../sdk/host-context/spec.md) — equivalent SDK host context
   reconstruction inside the child
-- `code-graph:isolated-index-worker` — lock-aware process isolation and injected
-  task execution consumed through SDK
+- `code-graph:isolated-index-worker` — lock-aware process isolation and injected task
+  execution consumed through SDK
+- `core:config-loader` — forced and start-directory discovery semantics replayed by
+  the packaged child task

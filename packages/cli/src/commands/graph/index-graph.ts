@@ -70,6 +70,7 @@ JSON/TOON output schema:
           cliError('--config and --path are mutually exclusive', opts.format, 1)
         }
 
+        const discoveryStartDir = process.cwd()
         let context: Awaited<ReturnType<typeof resolveGraphCliContext>>
         try {
           context = await resolveGraphCliContext({
@@ -90,7 +91,10 @@ JSON/TOON output schema:
           if (context.configFilePath === null) {
             cliError('configured graph context is missing its config file path', opts.format, 1)
           }
-          taskContext = { mode: 'configured', configFilePath: context.configFilePath }
+          taskContext =
+            opts.config !== undefined
+              ? { mode: 'forced', configPath: context.configFilePath }
+              : { mode: 'discovered', startDir: discoveryStartDir }
         } else {
           if (context.vcsRoot === null) {
             cliError('bootstrap graph context is missing its VCS root', opts.format, 1)

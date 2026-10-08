@@ -11,12 +11,23 @@ import { buildCliKernelOptions } from './helpers/cli-context.js'
 /** Serializable description of the graph context reconstructed by the task. */
 export type CliGraphIndexContextDescriptor =
   | {
-      readonly mode: 'configured'
-      readonly configFilePath: string
+      /** Explicit config-file loading; filename discovery must not attach siblings. */
+      readonly mode: 'forced'
+      /** Absolute config entrypoint selected by --config. */
+      readonly configPath: string
     }
   | {
+      /** Normal project discovery replayed inside the child. */
+      readonly mode: 'discovered'
+      /** Absolute directory from which the parent started discovery. */
+      readonly startDir: string
+    }
+  | {
+      /** Explicit no-config graph bootstrap. */
       readonly mode: 'bootstrap'
+      /** Absolute project root used by the bootstrap config. */
       readonly projectRoot: string
+      /** Absolute VCS root used by the bootstrap config. */
       readonly vcsRoot: string
     }
 
@@ -58,18 +69,23 @@ export const runGraphIndexTask: GraphIndexTask<
 > = async (input, emitProgress) => {
   const kernel = buildCliKernelOptions()
   const host =
-    input.context.mode === 'configured'
+    input.context.mode === 'forced'
       ? await openSpecdHost({
-          configPath: input.context.configFilePath,
+          configPath: input.context.configPath,
           options: { kernel },
         })
-      : await createSdkContext(
-          createBootstrapGraphConfig({
-            projectRoot: input.context.projectRoot,
-            vcsRoot: input.context.vcsRoot,
-          }),
-          { kernel },
-        )
+      : input.context.mode === 'discovered'
+        ? await openSpecdHost({
+            startDir: input.context.startDir,
+            options: { kernel },
+          })
+        : await createSdkContext(
+            createBootstrapGraphConfig({
+              projectRoot: input.context.projectRoot,
+              vcsRoot: input.context.vcsRoot,
+            }),
+            { kernel },
+          )
 
   return runIndexProjectGraph(host, {
     force: input.index.force,

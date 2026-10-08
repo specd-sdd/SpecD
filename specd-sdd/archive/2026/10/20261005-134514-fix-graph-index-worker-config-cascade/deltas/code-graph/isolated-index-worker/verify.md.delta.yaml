@@ -1,0 +1,2 @@
+- op: no-op
+  description: Existing isolated-worker scenarios already verify opaque JSON task transport and protocol validation; CLI-specific context reconstruction is covered by cli:graph-index.

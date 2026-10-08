@@ -83,16 +83,23 @@ afterEach(() => {
 })
 
 describe('graph index', () => {
-  it('delegates one configured run to the SDK worker with its packaged task', async () => {
+  it('delegates explicit config as a forced descriptor', async () => {
     const config = setup()
-    await run(makeIndexProgram(), '--force', '--exclude-path', 'foo,bar')
+    await run(
+      makeIndexProgram(),
+      '--config',
+      '/project/specd.yaml',
+      '--force',
+      '--exclude-path',
+      'foo,bar',
+    )
     expect(runIsolatedGraphIndex).toHaveBeenCalledTimes(1)
     expect(runIsolatedGraphIndex).toHaveBeenCalledWith(
       expect.objectContaining({
         storageRoot: config.configPath,
         taskModule: expect.any(URL),
         taskInput: {
-          context: { mode: 'configured', configFilePath: '/project/specd.yaml' },
+          context: { mode: 'forced', configPath: '/project/specd.yaml' },
           index: { force: true, excludePaths: ['foo', 'bar'] },
         },
         onProgress: expect.any(Function),
@@ -101,6 +108,22 @@ describe('graph index', () => {
     expect(
       (vi.mocked(runIsolatedGraphIndex).mock.calls[0]?.[0].taskModule as URL).pathname,
     ).toContain('graph-index-task.js')
+  })
+
+  it('replays automatic discovery from the parent start directory', async () => {
+    vi.spyOn(process, 'cwd').mockReturnValue('/project/packages/app')
+    const config = setup()
+    await run(makeIndexProgram())
+    expect(runIsolatedGraphIndex).toHaveBeenCalledTimes(1)
+    expect(runIsolatedGraphIndex).toHaveBeenCalledWith(
+      expect.objectContaining({
+        storageRoot: config.configPath,
+        taskInput: {
+          context: { mode: 'discovered', startDir: '/project/packages/app' },
+          index: { force: false },
+        },
+      }),
+    )
   })
 
   it('uses an exact bootstrap descriptor and only supplies progress for text output', async () => {
@@ -142,6 +165,22 @@ describe('graph index', () => {
     setup()
     vi.mocked(runIsolatedGraphIndex).mockRejectedValueOnce(new Error('GRAPH_INDEX_WORKER_PROTOCOL'))
     await run(makeIndexProgram())
+    expect(process.exit).toHaveBeenCalledWith(3)
+  })
+
+  it('maps discovered replay failure to code 3 without changing its descriptor', async () => {
+    vi.spyOn(process, 'cwd').mockReturnValue('/project/packages/app')
+    setup()
+    vi.mocked(runIsolatedGraphIndex).mockRejectedValueOnce(new Error('config disappeared'))
+    await run(makeIndexProgram())
+    expect(runIsolatedGraphIndex).toHaveBeenCalledWith(
+      expect.objectContaining({
+        taskInput: {
+          context: { mode: 'discovered', startDir: '/project/packages/app' },
+          index: { force: false },
+        },
+      }),
+    )
     expect(process.exit).toHaveBeenCalledWith(3)
   })
 

@@ -23,13 +23,13 @@ import { runGraphIndexTask } from '../src/graph-index-task.js'
 afterEach(() => vi.clearAllMocks())
 
 describe('runGraphIndexTask', () => {
-  it('reconstructs configured CLI context and indexes once', async () => {
+  it('reconstructs forced CLI context and indexes once', async () => {
     const host = {} as never
     vi.mocked(openSpecdHost).mockResolvedValue(host)
     vi.mocked(runIndexProjectGraph).mockResolvedValue({ filesIndexed: 1 } as never)
     const output = await runGraphIndexTask(
       {
-        context: { mode: 'configured', configFilePath: '/repo/specd.yaml' },
+        context: { mode: 'forced', configPath: '/repo/specd.yaml' },
         index: { force: true },
       },
       vi.fn(),
@@ -38,9 +38,47 @@ describe('runGraphIndexTask', () => {
       configPath: '/repo/specd.yaml',
       options: { kernel: { logger: 'cli' } },
     })
+    expect(createBootstrapGraphConfig).not.toHaveBeenCalled()
     expect(createSdkContext).not.toHaveBeenCalled()
     expect(runIndexProjectGraph).toHaveBeenCalledTimes(1)
     expect(output).toEqual({ filesIndexed: 1 })
+  })
+
+  it('reconstructs discovered CLI context from its parent start directory', async () => {
+    const host = {} as never
+    vi.mocked(openSpecdHost).mockResolvedValue(host)
+    vi.mocked(runIndexProjectGraph).mockResolvedValue({ filesIndexed: 1 } as never)
+    await runGraphIndexTask(
+      {
+        context: { mode: 'discovered', startDir: '/repo/packages/app' },
+        index: { force: false },
+      },
+      vi.fn(),
+    )
+    expect(openSpecdHost).toHaveBeenCalledTimes(1)
+    expect(openSpecdHost).toHaveBeenCalledWith({
+      startDir: '/repo/packages/app',
+      options: { kernel: { logger: 'cli' } },
+    })
+    expect(createSdkContext).not.toHaveBeenCalled()
+    expect(runIndexProjectGraph).toHaveBeenCalledTimes(1)
+  })
+
+  it('propagates discovery failure without substituting bootstrap', async () => {
+    const failure = new Error('config disappeared')
+    vi.mocked(openSpecdHost).mockRejectedValue(failure)
+    await expect(
+      runGraphIndexTask(
+        {
+          context: { mode: 'discovered', startDir: '/repo/packages/app' },
+          index: { force: false },
+        },
+        vi.fn(),
+      ),
+    ).rejects.toBe(failure)
+    expect(createBootstrapGraphConfig).not.toHaveBeenCalled()
+    expect(createSdkContext).not.toHaveBeenCalled()
+    expect(runIndexProjectGraph).not.toHaveBeenCalled()
   })
 
   it('reconstructs bootstrap context and forwards options/progress unchanged', async () => {
