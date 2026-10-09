@@ -474,84 +474,28 @@ async function executeBatch(
   if (change === undefined) {
     cliError(`change '${name}' is drafted; restore it before validating`, opts.format)
   }
-  const specIds = change.specIds
 
-  if (specIds.length === 0) {
+  const batchResult = await kernel.changes.validateBatch.execute({
+    name,
+    ...(opts.artifact !== undefined ? { artifactId: opts.artifact } : {}),
+  })
+
+  if (batchResult.total === 0) {
     const fmt = parseFormat(opts.format)
     if (fmt === 'text') {
       output(`${name}: no specIds declared`, 'text')
     } else {
-      output({ passed: true, total: 0, results: [] }, fmt)
+      output(batchResult, fmt)
     }
     return
   }
 
-  const activeSchema = await kernel.specs.getActiveSchema.execute()
-  if (activeSchema.raw) {
-    cliError('Active schema resolution returned raw data unexpectedly', opts.format)
-  }
-  const schema = activeSchema.schema
-  const dag = schema.artifactDag()
-
-  const results: Array<{
-    spec: string | null
-    artifact: string
-    passed: boolean
-    failures: ValidateFailure[]
-    warnings: ValidateNote[]
-    files: readonly ValidationFileEntry[]
-  }> = []
-
-  for (const artifactId of dag.topologicalOrder()) {
-    if (opts.artifact !== undefined && artifactId !== opts.artifact) continue
-
-    const artifactType = schema.artifact(artifactId)
-    if (artifactType === null) continue
-
-    if (artifactType.scope === 'change') {
-      const result = toValidateResult(
-        await kernel.changes.validate.execute({
-          name,
-          artifactId,
-        }),
-      )
-      results.push({
-        spec: null,
-        artifact: artifactId,
-        passed: result.failures.length === 0,
-        failures: result.failures,
-        warnings: result.notes,
-        files: result.files,
-      })
-      continue
-    }
-
-    for (const specId of specIds) {
-      const result = toValidateResult(
-        await kernel.changes.validate.execute({
-          name,
-          specPath: specId,
-          artifactId,
-        }),
-      )
-      results.push({
-        spec: specId,
-        artifact: artifactId,
-        passed: result.failures.length === 0,
-        failures: result.failures,
-        warnings: result.notes,
-        files: result.files,
-      })
-    }
-  }
-
-  const allPassed = results.every((r) => r.passed)
   const fmt = parseFormat(opts.format)
 
   if (fmt === 'text') {
     const isChangeScopedArtifact =
       opts.artifact !== undefined && requestedArtifactScope === 'change'
-    for (const r of results) {
+    for (const r of batchResult.results) {
       const target =
         r.spec === null
           ? `${name} [artifact:${r.artifact}]`
@@ -587,20 +531,13 @@ async function executeBatch(
         output(`validation failed ${target}:\n${allLines.join('\n')}`, 'text')
       }
     }
-    const passedSteps = results.filter((r) => r.passed).length
-    output(`validated ${passedSteps}/${results.length} steps`, 'text')
+    const passedSteps = batchResult.results.filter((r) => r.passed).length
+    output(`validated ${passedSteps}/${batchResult.total} steps`, 'text')
   } else {
-    output(
-      {
-        passed: allPassed,
-        total: results.length,
-        results,
-      },
-      fmt,
-    )
+    output(batchResult, fmt)
   }
 
-  if (!allPassed) {
+  if (!batchResult.passed) {
     process.exitCode = 1
   }
 }

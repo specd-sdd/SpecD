@@ -8,12 +8,13 @@
     "core:change",
     "core:validate-artifacts",
     "core:spec-id-format",
-    "core:preview-spec"
+    "core:preview-spec",
+    "core:validate-change-batch"
   ],
   "implementation": [
     {
       "file": "cli:src/commands/change/validate.ts",
-      "symbols": ["registerChangeValidate", "executeSingle", "executeBatch"]
+      "symbols": ["registerChangeValidate"]
     }
   ]
 }

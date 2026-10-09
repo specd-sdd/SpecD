@@ -1,0 +1,39 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["core:change", "core:validate-artifacts", "core:schema-format"],
+  "implementation": [
+    {
+      "file": "core:src/application/use-cases/validate-change-batch.ts",
+      "symbols": [
+        "ValidateChangeBatch",
+        "ValidateChangeBatchInput",
+        "ValidateChangeBatchStepResult",
+        "ValidateChangeBatchResult"
+      ]
+    },
+    {
+      "file": "core:src/application/use-cases/index.ts"
+    },
+    {
+      "file": "core:src/composition/use-cases/validate-change-batch.ts",
+      "symbols": [
+        "createValidateChangeBatch",
+        "ValidateChangeBatchDeps",
+        "resolveValidateChangeBatchDeps"
+      ]
+    },
+    {
+      "file": "core:src/composition/use-cases/index.ts"
+    },
+    {
+      "file": "core:src/composition/kernel.ts",
+      "symbols": ["Kernel", "createKernel"]
+    },
+    {
+      "file": "core:src/public.ts"
+    }
+  ]
+}

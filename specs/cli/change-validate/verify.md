@@ -34,6 +34,12 @@
 - **THEN** the CLI prints or serializes that filename from the result metadata
 - **AND** it does not recompute a replacement path in the CLI layer
 
+#### Scenario: Single-spec validation delegates directly to ValidateArtifacts
+
+- **WHEN** `specd changes validate <name> core:config` runs without `--all`
+- **THEN** the command invokes `ValidateArtifacts` for that target
+- **AND** it does not route single-spec validation through `ValidateChangeBatch`
+
 ### Requirement: Structural validation scope
 
 #### Scenario: Successful validate does not imply semantic approval
@@ -188,6 +194,17 @@
 - **AND** spec-scoped artifacts such as `specs` are validated once per specId
 - **AND** validation order respects `artifactDag().topologicalOrder()` (parents before children)
 
+#### Scenario: --all uses kernel validateBatch
+
+- **WHEN** `specd changes validate <name> --all` runs
+- **THEN** CLI calls `kernel.changes.validateBatch.execute({ name })` once
+- **AND** it does not loop `specIds` with `ValidateArtifacts` directly in the CLI layer
+
+#### Scenario: --all --artifact forwards filter
+
+- **WHEN** `specd changes validate <name> --all --artifact specs` runs
+- **THEN** `validateBatch.execute` receives `{ name, artifactId: "specs" }`
+
 #### Scenario: --all with specPath is rejected
 
 - **WHEN** `specd change validate my-change default:auth/login --all` is run
@@ -216,4 +233,5 @@
 
 - **GIVEN** a batch where all scheduled steps pass
 - **WHEN** `specd change validate my-change --all --format json` is run
-- **THEN** output includes `passed`, `total`, and `results[]` with `artifact` and `spec` (null for change-scoped steps) per entry
+- **THEN** output includes `passed`, `total`, and `results[]` with `artifact`, `spec`, `failures`, `warnings`, and `files` per entry
+- **AND** change-scoped steps serialize `spec` as `null`

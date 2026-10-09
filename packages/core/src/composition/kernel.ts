@@ -58,6 +58,7 @@ import { type UpdateImplementationTracking } from '../application/use-cases/upda
 import { type UpdateProjectMetadata } from '../application/use-cases/update-project-metadata.js'
 import { type UpdateSpecDeps } from '../application/use-cases/update-spec-deps.js'
 import { type ValidateArtifacts } from '../application/use-cases/validate-artifacts.js'
+import { type ValidateChangeBatch } from '../application/use-cases/validate-change-batch.js'
 import { type ValidateSchema } from '../application/use-cases/validate-schema.js'
 import { type ValidateSpecs } from '../application/use-cases/validate-specs.js'
 import { type ArchiveRepository } from '../application/ports/archive-repository.js'
@@ -171,6 +172,10 @@ import {
   createValidateArtifacts,
   resolveValidateArtifactsDeps,
 } from './use-cases/validate-artifacts.js'
+import {
+  createValidateChangeBatch,
+  resolveValidateChangeBatchDeps,
+} from './use-cases/validate-change-batch.js'
 import { createValidateSchema, resolveValidateSchemaDeps } from './use-cases/validate-schema.js'
 import { createValidateSpecs, resolveValidateSpecsDeps } from './use-cases/validate-specs.js'
 import { type CompositionRegistryView } from './composition-registries.js'
@@ -193,6 +198,7 @@ export interface Kernel {
     discard: DiscardChange
     archive: ArchiveChange
     validate: ValidateArtifacts
+    validateBatch: ValidateChangeBatch
     compile: CompileContext
     list: ListChanges
     listDrafts: ListDrafts
@@ -360,6 +366,9 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
   const discard = createDiscardChange(resolveDiscardChangeDeps(resolver))
   const archive = createArchiveChange(resolveArchiveChangeDeps(resolver))
   const validate = createValidateArtifacts(resolveValidateArtifactsDeps(resolver))
+  const validateBatch = createValidateChangeBatch(
+    resolveValidateChangeBatchDeps(resolver, { validateArtifacts: validate }),
+  )
   const compile = createCompileContext(resolveCompileContextDeps(resolver))
   const edit = createEditChange(resolveEditChangeDeps(resolver))
   const invalidate = createInvalidateChange(resolveInvalidateChangeDeps(resolver))
@@ -414,6 +423,7 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
       discard,
       archive,
       validate,
+      validateBatch,
       compile,
       list: listChanges,
       listDrafts,

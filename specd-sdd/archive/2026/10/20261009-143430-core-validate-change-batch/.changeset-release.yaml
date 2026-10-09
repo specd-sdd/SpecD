@@ -1,0 +1,3 @@
+releases:
+  core:validate-change-batch: minor
+  cli:change-validate: patch

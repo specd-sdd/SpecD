@@ -22,7 +22,9 @@ Canonical agent-facing guidance MUST use plural command groups (for example `cha
 
 ### Requirement: Behaviour
 
-The command invokes the `ValidateArtifacts` use case, passing the change name, spec ID, and optionally the artifact ID from `--artifact`.
+For single-spec validation targets, the command invokes the `ValidateArtifacts` use case, passing the change name, spec ID, and optionally the artifact ID from `--artifact`.
+
+For `--all` validation targets, the command invokes `ValidateChangeBatch` and consumes its aggregated step results. The CLI MUST NOT reimplement artifact DAG scheduling, change-scoped versus spec-scoped branching, or batch failure aggregation locally.
 
 The command MUST render file path details from the use case's structured file result metadata instead of recomputing expected paths in the CLI layer.
 
@@ -159,16 +161,16 @@ If `--artifact` is provided with an artifact ID that does not exist in the activ
 
 ### Requirement: Batch mode (--all)
 
-With `--all`, the command validates the change using the active schema's artifact DAG instead of looping `specIds` with a full multi-artifact pass per spec.
+With `--all`, the command invokes `ValidateChangeBatch`, which validates the change using the active schema's artifact DAG instead of looping `specIds` with a full multi-artifact pass per spec in the CLI layer.
 
 `--all` is mutually exclusive with the `<workspace:capability-path>` positional — providing both exits with `error: --all and <specPath> are mutually exclusive`. Omitting both exits with `error: either <specPath> or --all is required`.
 
-The batch driver MUST walk `schema.artifactDag().topologicalOrder()`. For each artifact type in that order:
+The delegated batch driver MUST walk `schema.artifactDag().topologicalOrder()`. For each artifact type in that order:
 
 - **`scope: change`** — invoke `ValidateArtifacts` once for that artifact type with **no `specPath` field** in the use-case input (do not pass a placeholder `specIds[0]`).
 - **`scope: spec`** — invoke `ValidateArtifacts` once per `specId` in the change for that artifact type.
 
-When `--artifact <artifactId>` is combined with `--all`, the driver MUST use the same topological walk but execute only steps whose artifact id matches `<artifactId>`.
+When `--artifact <artifactId>` is combined with `--all`, the delegated batch driver MUST use the same topological walk but execute only steps whose artifact id matches `<artifactId>`.
 
 Individual validation failures MUST NOT abort the batch early — all scheduled steps run and results are aggregated.
 
@@ -199,4 +201,5 @@ specd change validate update-billing default:billing/invoices --artifact specs
 - [`core:change`](../../core/change/spec.md) — artifact status, validation, approval invalidation
 - [`core:validate-artifacts`](../../core/validate-artifacts/spec.md) — validation result shape and expected artifact file paths
 - [`core:spec-id-format`](../../core/spec-id-format/spec.md) — canonical `workspace:capabilityPath` format
-- [`core:preview-spec`](../../core/preview-spec/spec.md) — inline diff review for successful single-artifact spec-delta validation reuses the preview merge/diff surface
+- [`core:preview-spec`](../../core/preview-spec/spec.md) — merged spec content and diff preview for review
+- [`core:validate-change-batch`](../../core/validate-change-batch/spec.md) — core-owned batch scheduling contract for `--all`

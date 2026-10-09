@@ -20,6 +20,7 @@ const KERNEL_ASSEMBLY_EXPORTS: Record<string, string> = {
   'changes.discard': 'createDiscardChange',
   'changes.archive': 'createArchiveChange',
   'changes.validate': 'createValidateArtifacts',
+  'changes.validateBatch': 'createValidateChangeBatch',
   'changes.compile': 'createCompileContext',
   'changes.list': 'createListChanges',
   'changes.listDrafts': 'createListDrafts',

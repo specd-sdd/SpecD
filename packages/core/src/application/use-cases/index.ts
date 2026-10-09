@@ -131,6 +131,12 @@ export {
   type ValidationWarning,
 } from './validate-artifacts.js'
 export {
+  ValidateChangeBatch,
+  type ValidateChangeBatchInput,
+  type ValidateChangeBatchStepResult,
+  type ValidateChangeBatchResult,
+} from './validate-change-batch.js'
+export {
   type CompileContext,
   type CompileContextInput,
   type CompileContextResult,
