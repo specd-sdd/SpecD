@@ -18,6 +18,14 @@ The adapter SHALL extract named function declarations, callable variable initial
 
 Each symbol SHALL use the complete parser node as its construct range and the declared identifier node as its `selectionRange`, following the shared half-open range convention. Immediately preceding JSDoc, block, or contiguous line comments SHALL be retained verbatim when attached to the declaration. Invalid or range-less candidates SHALL be omitted rather than approximated.
 
+### Requirement: Object properties in array data records
+
+The adapter SHALL omit a non-callable object property from symbol extraction when the property's enclosing object is anonymous and an array boundary is encountered before a supported named declaration while traversing the property's enclosing expression path. The classification SHALL apply to direct array elements and to objects nested beneath an array element.
+
+The adapter SHALL preserve scalar properties belonging to named object declarations, including declarations wrapped in supported transparent expressions such as parentheses, type assertions, `as const`, and `satisfies`. It SHALL preserve callable property values and object methods regardless of array ancestry.
+
+Filtering these property symbols MUST NOT remove or alter the file's indexed source content. Every preserved property symbol SHALL retain its parser-derived construct range and declared-name selection range, and equivalent analysis SHALL remain deterministic.
+
 ### Requirement: Logical identity and declaring owners
 
 The adapter SHALL create logical declarations in the type or value space proven by the supported declaration kind. Supported class and interface method-like declarations SHALL carry the logical identity of their syntactically declaring class or interface; they MUST NOT use a raw parser-node ID or an optional `SymbolNode.parentId` as the canonical owner.

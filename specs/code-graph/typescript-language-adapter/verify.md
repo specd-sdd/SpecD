@@ -20,6 +20,38 @@
 - **THEN** every supported declaration has its expected broad kind
 - **AND** each name selection is contained by its parser-derived complete construct range
 
+### Requirement: Object properties in array data records
+
+#### Scenario: Direct and nested data-record properties are omitted
+
+- **GIVEN** an array containing an anonymous object with scalar fields and a nested anonymous object with scalar fields
+- **WHEN** symbols are extracted twice from equivalent content
+- **THEN** neither the direct nor nested scalar fields appear as symbols
+- **AND** both analyses produce identical ordered output
+- **AND** the complete source text remains available to file-content indexing
+
+#### Scenario: Named wrapped dictionaries retain scalar properties
+
+- **GIVEN** named object declarations wrapped by parentheses, a type assertion, `as const`, and `satisfies`
+- **WHEN** symbols are extracted
+- **THEN** scalar properties belonging to each named declaration remain symbols
+- **AND** each preserved symbol has its declared-name selection range inside its complete construct range
+
+#### Scenario: An array boundary inside a named object starts a data-record path
+
+- **GIVEN** a named object whose property contains an array of anonymous objects with nested scalar fields
+- **WHEN** symbols are extracted
+- **THEN** the named object's own scalar properties remain symbols
+- **AND** non-callable properties below the array boundary are omitted
+
+#### Scenario: Callable array-record members remain discoverable
+
+- **GIVEN** an anonymous array record containing an object method, an arrow-function property, a function-expression property, and scalar data fields
+- **WHEN** symbols are extracted
+- **THEN** every callable member remains a symbol
+- **AND** the scalar data fields are omitted
+- **AND** each preserved callable symbol retains its parser-derived construct and selection ranges
+
 ### Requirement: Logical identity and declaring owners
 
 #### Scenario: Same-name methods remain owner-qualified

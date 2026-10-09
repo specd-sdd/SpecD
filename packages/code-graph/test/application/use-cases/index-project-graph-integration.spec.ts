@@ -25,6 +25,7 @@ import { buildProjectGraphConfig } from '../../../src/application/services/build
 import { makeMockSpecRepository } from '../../helpers/make-mock-spec-repository.js'
 import { GraphStorageRecoveryRequiredError } from '../../../src/domain/errors/graph-storage-recovery-required-error.js'
 import { IndexCodeGraph } from '../../../src/application/use-cases/index-code-graph.js'
+import { SearchCodeGraph } from '../../../src/application/use-cases/search-code-graph.js'
 import { AdapterRegistry } from '../../../src/infrastructure/tree-sitter/adapter-registry.js'
 import { GoLanguageAdapter } from '../../../src/infrastructure/tree-sitter/go-language-adapter.js'
 import { TypeScriptLanguageAdapter } from '../../../src/infrastructure/tree-sitter/typescript-language-adapter.js'
@@ -594,6 +595,63 @@ describe('IndexProjectGraph integration', () => {
     expect(result.errors).toEqual([])
     expect(store.beginCount).toBe(1)
     expect(await provider.searchReferenceSymbols({ query: 'indexedOnce' })).toHaveLength(1)
+    await provider.close()
+  })
+
+  it('keeps anonymous array data searchable as source without indexing field symbols', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'index-project-graph-array-data-'))
+    const codeRoot = join(tempDir, 'workspace')
+    mkdirSync(codeRoot, { recursive: true })
+    writeFileSync(
+      join(codeRoot, 'catalog.ts'),
+      `export const Named = { kept: 'yes' };
+export const rows = [{ filteredField: 'unique-array-content-value' }];
+`,
+    )
+
+    const store = new SQLiteGraphStore(tempDir)
+    const provider = createCodeGraphProvider({
+      storagePath: tempDir,
+      projectRoot: tempDir,
+      graphStoreId: 'array-data-test',
+      graphStoreFactories: { 'array-data-test': { create: () => store } },
+    })
+    await provider.open()
+    const result = await provider.index({
+      projectRoot: tempDir,
+      vcsRoot: null,
+      workspaces: [
+        {
+          name: 'fixture',
+          prefix: null,
+          codeRoot,
+          specRepo: makeMockRepo(),
+          ownership: 'owned',
+          isExternal: false,
+        },
+      ],
+      graphConfig: { includePaths: [], excludePaths: [], workspaces: new Map() },
+      codeGraphVersion: readInstalledCodeGraphVersion(),
+    })
+
+    expect(result.errors).toEqual([])
+    const search = new SearchCodeGraph(store)
+    const contentResult = await search.execute({
+      query: 'unique-array-content-value',
+      categories: ['files'],
+      limit: 10,
+      includeSnippet: true,
+    })
+    const symbolResult = await search.executeSymbols({ query: 'filteredField' })
+
+    expect(contentResult.files).toHaveLength(1)
+    expect(contentResult.files[0]?.file.path).toBe('fixture:catalog.ts')
+    expect(contentResult.files[0]?.matches).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ matchedText: 'unique-array-content-value' }),
+      ]),
+    )
+    expect(symbolResult).toHaveLength(0)
     await provider.close()
   })
 

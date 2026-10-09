@@ -514,6 +514,146 @@ Article.formatTitle = (title) => { };`
       expect(varSym!.kind).toBe(SymbolKind.Variable)
     })
 
+    it('preserves scalar properties in wrapped named object declarations', () => {
+      const code = `type Entry = { asserted: string };
+const Parenthesized = ({ parenthesized: 'yes' });
+const Asserted = <Entry>{ asserted: 'yes' };
+const Frozen = { frozen: 'yes' } as const;
+const Checked = { checked: 1 } satisfies Record<string, number>;`
+
+      const symbols = adapter.extractSymbols('main.ts', code)
+
+      for (const name of ['parenthesized', 'asserted', 'frozen', 'checked']) {
+        expect(symbols.find((symbol: SymbolNode) => symbol.name === name)?.kind, name).toBe(
+          SymbolKind.Variable,
+        )
+      }
+    })
+
+    it('omits scalar properties from direct and nested anonymous array records', () => {
+      const code = `const rows = [{
+        id: 1,
+        label: 'a',
+        nested: { enabled: true }
+      }];`
+
+      const symbols = adapter.extractSymbols('main.ts', code)
+
+      for (const name of ['id', 'label', 'nested', 'enabled']) {
+        expect(symbols.some((symbol: SymbolNode) => symbol.name === name)).toBe(false)
+      }
+    })
+
+    it('treats arrays nested in named objects as data-record boundaries', () => {
+      const code = `const config = {
+        version: '1',
+        rows: [{ id: 1, nested: { enabled: true } }]
+      };`
+
+      const symbols = adapter.extractSymbols('main.ts', code)
+
+      expect(symbols.find((symbol: SymbolNode) => symbol.name === 'version')?.kind).toBe(
+        SymbolKind.Variable,
+      )
+      for (const name of ['id', 'nested', 'enabled']) {
+        expect(symbols.some((symbol: SymbolNode) => symbol.name === name)).toBe(false)
+      }
+    })
+
+    it('preserves callable members inside anonymous array records', () => {
+      const code = `const rows = [{
+        scalar: 'omit',
+        method() { return 1 },
+        arrow: () => 2,
+        expression: function () { return 3 },
+        generator: function* () { yield 4 }
+      }];`
+
+      const symbols = adapter.extractSymbols('main.ts', code)
+
+      expect(symbols.some((symbol: SymbolNode) => symbol.name === 'scalar')).toBe(false)
+      for (const name of ['method', 'arrow', 'expression', 'generator']) {
+        const symbol = symbols.find((candidate: SymbolNode) => candidate.name === name)
+        expect(symbol?.kind).toBe(SymbolKind.Method)
+        expect(sliceRange(code, symbol!.selectionRange)).toBe(name)
+        expect(
+          sliceRange(code, {
+            startLine: symbol!.line,
+            startColumn: symbol!.column,
+            endLine: symbol!.endLine,
+            endColumn: symbol!.endColumn,
+          }),
+        ).toContain(name)
+      }
+    })
+
+    it('stops array-record classification at callable bodies', () => {
+      const code = `const rows = [{
+        scalar: 'omit',
+        execute: () => {
+          const local = { preserved: 'yes' };
+          return local;
+        }
+      }];`
+
+      const symbols = adapter.extractSymbols('main.ts', code)
+
+      expect(symbols.find((symbol: SymbolNode) => symbol.name === 'execute')?.kind).toBe(
+        SymbolKind.Method,
+      )
+      expect(symbols.find((symbol: SymbolNode) => symbol.name === 'preserved')?.kind).toBe(
+        SymbolKind.Variable,
+      )
+      expect(symbols.some((symbol: SymbolNode) => symbol.name === 'scalar')).toBe(false)
+    })
+
+    it('keeps filtered analysis deterministic with authoritative ranges', () => {
+      const code = `const Named = ({ version: '1' } as const);
+const rows = [{ omitted: 1, run: () => true }];`
+
+      const first = adapter.extractSymbols('main.ts', code)
+      const second = adapter.extractSymbols('main.ts', code)
+      const version = first.find((symbol: SymbolNode) => symbol.name === 'version')!
+      const run = first.find((symbol: SymbolNode) => symbol.name === 'run')!
+
+      expect(first).toEqual(second)
+      expect(first.some((symbol: SymbolNode) => symbol.name === 'omitted')).toBe(false)
+      expect(sliceRange(code, version.selectionRange)).toBe('version')
+      expect(sliceRange(code, run.selectionRange)).toBe('run')
+      expect(
+        sliceRange(code, {
+          startLine: version.line,
+          startColumn: version.column,
+          endLine: version.endLine,
+          endColumn: version.endColumn,
+        }),
+      ).toBe("version: '1'")
+      expect(
+        sliceRange(code, {
+          startLine: run.line,
+          startColumn: run.column,
+          endLine: run.endLine,
+          endColumn: run.endColumn,
+        }),
+      ).toBe('run: () => true')
+    })
+
+    it('keeps symbol cardinality bounded for high-volume array data', () => {
+      const records = Array.from(
+        { length: 1_000 },
+        (_, index) => `{ recordId: ${index}, label: 'row-${index}' }`,
+      ).join(',\n')
+      const code = `const Named = { kept: 'yes' };
+const rows = [${records}, { recordId: 1000, run: () => true }];`
+
+      const symbols = adapter.extractSymbols('main.ts', code)
+
+      expect(symbols.map((symbol: SymbolNode) => [symbol.name, symbol.kind])).toEqual([
+        ['kept', SymbolKind.Variable],
+        ['run', SymbolKind.Method],
+      ])
+    })
+
     it('extracts class arrow fields', () => {
       const code = `class ArticleHandler {
         generateAltHeadlines = (config, data) => { };

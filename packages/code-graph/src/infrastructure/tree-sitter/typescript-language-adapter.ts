@@ -100,6 +100,32 @@ function nodeKind(node: SgNode): string {
   return String(node.kind())
 }
 
+const CALLABLE_BOUNDARY_KINDS: ReadonlySet<string> = new Set([
+  'arrow_function',
+  'function',
+  'function_expression',
+  'generator_function',
+  'generator_function_declaration',
+  'method_definition',
+])
+
+/**
+ * Determines whether an object-literal pair is non-callable data below an array boundary.
+ * Traversal stops at a named variable declaration or an enclosing callable boundary.
+ * @param node - The pair or property-definition node to classify.
+ * @returns True when an array ancestor is reached before a preserving boundary.
+ */
+function isArrayDataRecordProperty(node: SgNode): boolean {
+  let current = node.parent()
+  while (current) {
+    const kind = nodeKind(current)
+    if (kind === 'array') return true
+    if (kind === 'variable_declarator' || CALLABLE_BOUNDARY_KINDS.has(kind)) return false
+    current = current.parent()
+  }
+  return false
+}
+
 /**
  * Extracts the raw comment text immediately preceding a declaration node.
  * Handles export statements and variable declarations by walking up to the
@@ -1272,12 +1298,16 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
       valKind === 'generator_function'
     ) {
       addSymbol(keyName, SymbolKind.Method, node, keyNode, extractComment(node))
-    } else if (
+      return
+    }
+
+    if (
       valKind === 'object' ||
       valKind === 'string' ||
       valKind === 'number' ||
       valKind === 'boolean_literal'
     ) {
+      if (isArrayDataRecordProperty(node)) return
       addSymbol(keyName, SymbolKind.Variable, node, keyNode, extractComment(node))
     }
   }

@@ -11,44 +11,47 @@
   "implementation": [
     {
       "file": "code-graph:src/infrastructure/tree-sitter/typescript-language-adapter.ts",
-      "symbols": ["TypeScriptLanguageAdapter"]
+      "symbols": ["isArrayDataRecordProperty", "TypeScriptLanguageAdapter.processPairNode"]
     },
     {
       "file": "code-graph:test/infrastructure/tree-sitter/typescript-language-adapter.spec.ts"
+    },
+    {
+      "file": "code-graph:test/application/use-cases/index-project-graph-integration.spec.ts"
     }
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Parses TS/TSX/JS/JSX into shared code-graph facts, extracting symbols, imports, exports, scoped bindings, calls, and class/interface hierarchy.",
+      "value": "Maps TS/TSX/JS/JSX to deterministic code-graph facts; filters anonymous array-data properties but preserves callable and named-object symbols.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:113e0159a628e78f079888213fd9531692f7ea4233314cc1c61d8e7b8034185f",
-          "lastModified": "2026-08-16T08:12:48.910Z"
+          "hash": "sha256:31aa0ef3ab8be515ea451bf29bf8fc9cdb4446d6388eeac7e495933b024b8de2",
+          "lastModified": "2026-10-09T15:18:44.663Z"
         },
         "verify.md": {
-          "hash": "sha256:ce21db9ddb3c4acf7984a80f4dc87cb212f23cb1ca3f71f10e485a9e29dad30e",
-          "lastModified": "2026-08-16T08:12:48.912Z"
+          "hash": "sha256:1e40f6567f1da93e1c44307be2ae0ad94636b556bd65258d627a003e67799b8c",
+          "lastModified": "2026-10-09T15:18:44.664Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# typescript-language-adapter\n\n## Rules\n\n### Scope & Languages\n- Handles `.ts` (`typescript`), `.tsx` (`tsx`), `.js` (`javascript`), `.jsx` (`jsx`).\n- Single-pass parsing via Tree-sitter/ast-grep; outputs `FileAnalysisDraft` without AST retention.\n\n### Declarations & Owners\n- Extracts functions, callable variables/arrows/HOFs, classes, methods, fields, prototype/static assignments, namespace/member assignments, destructured bindings, exports, type aliases, interfaces, enums.\n- Construct range = complete node; `selectionRange` = declared identifier. Retains attached JSDoc/block comments.\n- Declaring owner derived from construct containment. Same-name members across owners remain distinct. Top-level declarations have no owner.\n\n### Imports & Exports\n- Extracts named/default/namespace/type-only/side-effect/aliased static imports, ESM/CJS exports, literal `import()` and `require()`. Drops non-literal dynamic imports/requires.\n- Public export slots track surface, exported name, symbol space, target, re-export route (no overwriting competing routes). Relative imports evaluate extension/index candidates.\n\n### Scoped Bindings, Calls & Relations\n- Emits deterministic facts for lexical scopes, params, constructor properties, fields, return types, `this` bindings, `new` construction.\n- Emits `IMPORTS`, `CALLS`, `CONSTRUCTS`, `USES_TYPE` only when proven by local/imported/receiver facts.\n- Innermost function/method = caller. Drops module-scope calls, ambiguous receivers, unresolved globals, computed members.\n\n### Hierarchy & Evidence\n- Extracts `extends`/`implements` -> emits `EXTENDS` (class/interface), `IMPLEMENTS` (class->interface), `OVERRIDES` (member replacement).\n- Reference facts retain child owner, ancestor/contract owner, relation kind, precedence, provenance steps for `ResolveSymbolReference`. Bounded cycle termination.\n- Advertises `hierarchy: true`. Unsupported syntax (mixins, decorators, declaration merging) dropped, not guessed.\n\n### Package & Capability Boundary\n- Bounded search upward to repo root for `package.json` `name`.\n- `tsconfig` paths/baseUrl, conditional `exports`/`imports` unsupported -> advertises `buildContext: false`.\n- Parse failure/unsupported syntax reported via shared coverage; NO name-only guessing.\n\n## Constraints\n- NO code execution or TypeScript compiler invocations.\n- Runtime reflection, computed exports, monkey patching -> unsupported.\n- TS-specific syntax logic MUST stay inside adapter.",
+      "value": "# TypeScript language adapter\n\n## Rules\n- `TypeScriptLanguageAdapter`: `.ts`→`typescript`, `.tsx`→`tsx`, `.js`→`javascript`, `.jsx`→`jsx`; parse content once via registered Tree-sitter/ast-grep; return complete `FileAnalysisDraft`; no source reads or persisted AST.\n- Emit deterministic symbols, imports, scoped bindings, calls, references, compact serializable parser state; parser runtime keepalive only indexing session.\n- Extract functions; callable variables/arrows/HOF wrappers; classes; class/object methods, fields; prototype/static, namespace/member assignments; destructuring; exported variables; aliases, interfaces, enums. Shared broad `SymbolKind` never substitutes symbol-space/member form.\n- Symbol construct range = full parser node; `selectionRange` = declared identifier; retain attached JSDoc/block/contiguous-line comments verbatim; omit invalid/rangeless candidates.\n- Omit non-callable property when anonymous enclosing object crosses array boundary before supported named declaration; include direct/nested array records. Preserve scalar properties on named object declarations through parentheses, assertions, `as const`, `satisfies`; always preserve callable values/methods. Filtering never alters indexed source content; preserved properties keep parser ranges; analysis deterministic.\n- Logical declaration space follows proven kind. Class/interface method logical owner derives parser containment then owner logical symbol, never parser ID/`SymbolNode.parentId`; distinct same-name owners remain distinct; top-level no owner; preserve proven member forms. Unsupported-owner method-like symbols remain location-backed, omitted logical-member facts.\n- Extract static imports (named/default/namespace/type-only/side-effect/aliased), literal `import()`/`require()`, ESM/CJS exports, named/star re-exports; drop nonliteral dynamic loads. Public bindings preserve surface, exported name, space, known target, every re-export route; Pass 2 routes never collapse; relative candidates include extensions/index; package imports use known identities.\n- Emit deterministic scope/import/alias/typed-param/constructor-property/field/return/type-RHS/`this`/construction facts. Emit `IMPORTS`, `CALLS`, `CONSTRUCTS`, `USES_TYPE` only proven locally/import/receiver/indexed; caller = innermost callable; drop module-scope, ambiguous, unresolved, computed, runtime-only.\n- Resolve class/interface `extends`, class `implements`, same-form proven member replacement: `EXTENDS`, `IMPLEMENTS`, `OVERRIDES`. Reference facts include child, ancestor/contract, relation, precedence, ordered provenance; separate alternate routes; terminate cycles. `hierarchy: true` only with supported evidence.\n- Package identity: nearest bounded `package.json` `name`; bare/scoped package longest known prefix; filesystem search stops repo root. `buildContext: false`; no tsconfig inheritance/references/`baseUrl`/`paths`, conditions/conditional `exports`/`imports`.\n- Advertise only emitted-fact capabilities. Parse failure, unsupported/incomplete semantics use coverage; no name-only guesses; all output/provenance deterministic.\n\n## Constraints\n- No project-code execution or implicit TypeScript compiler fallback.\n- Runtime reflection, computed exports, monkey patching, unproven interprocedural value flow unsupported.\n- TypeScript syntax logic stays adapter; generic resolution consumes shared facts only.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:113e0159a628e78f079888213fd9531692f7ea4233314cc1c61d8e7b8034185f",
-          "lastModified": "2026-08-16T08:12:48.910Z"
+          "hash": "sha256:31aa0ef3ab8be515ea451bf29bf8fc9cdb4446d6388eeac7e495933b024b8de2",
+          "lastModified": "2026-10-09T15:18:44.663Z"
         },
         "verify.md": {
-          "hash": "sha256:ce21db9ddb3c4acf7984a80f4dc87cb212f23cb1ca3f71f10e485a9e29dad30e",
-          "lastModified": "2026-08-16T08:12:48.912Z"
+          "hash": "sha256:1e40f6567f1da93e1c44307be2ae0ad94636b556bd65258d627a003e67799b8c",
+          "lastModified": "2026-10-09T15:18:44.664Z"
         }
       }
     }
