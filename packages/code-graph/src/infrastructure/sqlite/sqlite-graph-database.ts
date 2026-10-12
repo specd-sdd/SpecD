@@ -13,7 +13,13 @@ import { expandSymbolName } from '../../domain/services/expand-symbol-name.js'
 import { matchesExclude } from '../../domain/services/matches-exclude.js'
 import { splitWorkspaceIdentity } from '../../domain/services/split-workspace-identity.js'
 import { createDocumentNode, type DocumentNode } from '../../domain/value-objects/document-node.js'
-import { createFileNode, type FileNode } from '../../domain/value-objects/file-node.js'
+import {
+  createFileNode,
+  FILE_CATEGORIES,
+  type FileNode,
+  type FileCategory,
+} from '../../domain/value-objects/file-node.js'
+import { resolveAdmittedCategories } from '../../domain/value-objects/impact-result.js'
 import { type GraphStatistics } from '../../domain/value-objects/graph-statistics.js'
 import { createRelation, type Relation } from '../../domain/value-objects/relation.js'
 import {
@@ -443,7 +449,7 @@ export class SQLiteGraphDatabase {
    */
   getFile(path: string): FileNode | undefined {
     const row = this.statement(
-      'SELECT path, config_relative_path, language, content_hash, workspace, embedding, content FROM files WHERE path = ?',
+      'SELECT path, config_relative_path, language, content_hash, workspace, category, embedding, content FROM files WHERE path = ?',
     ).get(path) as
       | {
           path: string
@@ -451,6 +457,7 @@ export class SQLiteGraphDatabase {
           language: string
           content_hash: string
           workspace: string
+          category?: string | null
           embedding: Buffer | null
           content: string | null
         }
@@ -487,13 +494,14 @@ export class SQLiteGraphDatabase {
    */
   findFilesByConfigRelativePath(configRelativePath: string): FileNode[] {
     const rows = this.statement(
-      'SELECT path, config_relative_path, language, content_hash, workspace, embedding, content FROM files WHERE config_relative_path = ?',
+      'SELECT path, config_relative_path, language, content_hash, workspace, category, embedding, content FROM files WHERE config_relative_path = ?',
     ).all(configRelativePath) as Array<{
       path: string
       config_relative_path: string
       language: string
       content_hash: string
       workspace: string
+      category?: string | null
       embedding: Buffer | null
       content: string | null
     }>
@@ -620,19 +628,30 @@ export class SQLiteGraphDatabase {
 
     const relationRows = new Map<string, RelationRow>()
     const neighborIds = new Set<string>()
+    const omittedTestFiles = new Set<string>()
+    const omittedIgnoredFiles = new Set<string>()
+
     const directions =
       input.direction === 'both'
         ? (['upstream', 'downstream'] as const)
         : ([input.direction] as const)
     for (const direction of directions) {
-      for (const row of this.queryImpactFrontierDirection(
+      const { rows, omittedFiles } = this.queryImpactFrontierDirection(
         input,
         direction,
         frontier,
         relationTypes,
-      )) {
+      )
+      for (const row of rows) {
         relationRows.set(`${row.source}\u0000${row.type}\u0000${row.target}`, row)
         neighborIds.add(direction === 'upstream' ? row.source : row.target)
+      }
+      for (const omitted of omittedFiles) {
+        if (omitted.category === 'test') {
+          omittedTestFiles.add(omitted.path)
+        } else if (omitted.category === 'ignored') {
+          omittedIgnoredFiles.add(omitted.path)
+        }
       }
     }
 
@@ -642,13 +661,29 @@ export class SQLiteGraphDatabase {
     const materializes = (type: 'files' | 'symbols' | 'specs'): boolean =>
       types === undefined || types.length === 0 || types.includes(type)
 
-    return {
+    const result: ImpactFrontierResult = {
       relations,
       symbols:
         input.resource === 'symbol' && materializes('symbols') ? this.getSymbolsByIds(ids) : [],
       files: input.resource === 'file' && materializes('files') ? this.getFilesByPaths(ids) : [],
       specs: input.resource === 'spec' && materializes('specs') ? this.getSpecsByIds(ids) : [],
     }
+
+    if (omittedTestFiles.size > 0 || omittedIgnoredFiles.size > 0) {
+      return {
+        ...result,
+        omittedCounts: {
+          tests: omittedTestFiles.size,
+          ignored: omittedIgnoredFiles.size,
+        },
+        omittedFiles: {
+          tests: [...omittedTestFiles].sort(),
+          ignored: [...omittedIgnoredFiles].sort(),
+        },
+      }
+    }
+
+    return result
   }
 
   /**
@@ -664,13 +699,14 @@ export class SQLiteGraphDatabase {
     for (const chunk of chunksOf(uniquePaths, SQLITE_BATCH_PARAMETER_LIMIT)) {
       const placeholders = chunk.map(() => '?').join(', ')
       const rows = this.statement(
-        `SELECT path, config_relative_path, language, content_hash, workspace, embedding, content FROM files WHERE path IN (${placeholders})`,
+        `SELECT path, config_relative_path, language, content_hash, workspace, category, embedding, content FROM files WHERE path IN (${placeholders})`,
       ).all(...chunk) as Array<{
         path: string
         config_relative_path: string
         language: string
         content_hash: string
         workspace: string
+        category?: string | null
         embedding: Buffer | null
         content: string | null
       }>
@@ -1097,9 +1133,29 @@ export class SQLiteGraphDatabase {
   /**
    * Retrieves file importer counts.
    *
+   * @param options - Optional filtering options.
+   * @param options.categories - Optional file categories to restrict importers to.
    * @returns The result of get file importer counts.
    */
-  getFileImporterCounts(): Map<string, number> {
+  getFileImporterCounts(options?: { categories?: readonly FileCategory[] }): Map<string, number> {
+    const admitted =
+      options?.categories && options.categories.length > 0 ? options.categories : undefined
+    if (admitted) {
+      const placeholders = admitted.map(() => '?').join(', ')
+      const rows = this.ensureOpen()
+        .prepare(
+          `
+            SELECT r.target, COUNT(DISTINCT r.source) AS importer_count
+            FROM relations r
+            JOIN files f ON f.path = r.source
+            WHERE r.type = ? AND f.category IN (${placeholders})
+            GROUP BY r.target
+          `,
+        )
+        .all(RelationType.Imports, ...admitted) as Array<{ target: string; importer_count: number }>
+      return new Map(rows.map((row) => [row.target, row.importer_count]))
+    }
+
     const rows = this.ensureOpen()
       .prepare(
         `
@@ -1122,7 +1178,7 @@ export class SQLiteGraphDatabase {
   getAllFiles(): FileNode[] {
     const rows = this.ensureOpen()
       .prepare(
-        'SELECT path, config_relative_path, language, content_hash, workspace, embedding, content FROM files',
+        'SELECT path, config_relative_path, language, content_hash, workspace, category, embedding, content FROM files',
       )
       .all() as Array<{
       path: string
@@ -1130,6 +1186,7 @@ export class SQLiteGraphDatabase {
       language: string
       content_hash: string
       workspace: string
+      category?: string | null
       embedding: Buffer | null
       content: string | null
     }>
@@ -1344,6 +1401,12 @@ export class SQLiteGraphDatabase {
         conditions.push("instr(lower(COALESCE(comment, '')), lower(?)) > 0")
         params.push(query.comment)
       }
+    }
+
+    if (query.categories !== undefined && query.categories.length > 0) {
+      const placeholders = query.categories.map(() => '?').join(', ')
+      conditions.push(`file_path IN (SELECT path FROM files WHERE category IN (${placeholders}))`)
+      params.push(...query.categories)
     }
 
     const readRows = (extraCondition?: string, extraParams: readonly string[] = []) => {
@@ -1884,6 +1947,7 @@ export class SQLiteGraphDatabase {
                   f.language,
                   f.content_hash,
                   f.workspace,
+                  f.category,
                   f.embedding,
                   f.content,
                   (-bm25(file_content_fts)) AS backend_score
@@ -1905,6 +1969,7 @@ export class SQLiteGraphDatabase {
             language: string
             content_hash: string
             workspace: string
+            category?: string | null
             embedding: Buffer | null
             content: string | null
             backend_score: number
@@ -1918,6 +1983,7 @@ export class SQLiteGraphDatabase {
                   f.language,
                   f.content_hash,
                   f.workspace,
+                  f.category,
                   f.embedding,
                   f.content,
                   1.0 AS backend_score
@@ -1934,6 +2000,7 @@ export class SQLiteGraphDatabase {
             language: string
             content_hash: string
             workspace: string
+            category?: string | null
             embedding: Buffer | null
             content: string | null
             backend_score: number
@@ -2680,13 +2747,14 @@ export class SQLiteGraphDatabase {
   private insertFile(db: SqliteDatabase, file: FileNode): void {
     db.prepare(
       `
-        INSERT INTO files (path, config_relative_path, language, content_hash, workspace, embedding, content)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO files (path, config_relative_path, language, content_hash, workspace, category, embedding, content)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(path) DO UPDATE SET
           config_relative_path = excluded.config_relative_path,
           language = excluded.language,
           content_hash = excluded.content_hash,
           workspace = excluded.workspace,
+          category = excluded.category,
           embedding = excluded.embedding,
           content = excluded.content
       `,
@@ -2696,6 +2764,7 @@ export class SQLiteGraphDatabase {
       file.language,
       file.contentHash,
       file.workspace,
+      file.category,
       this.serializeEmbedding(file.embedding),
       file.content ?? null,
     )
@@ -2710,13 +2779,14 @@ export class SQLiteGraphDatabase {
   private insertFiles(db: SqliteDatabase, files: readonly FileNode[]): void {
     executeBatchedInsert(
       db,
-      'INSERT INTO files (path, config_relative_path, language, content_hash, workspace, embedding, content)',
+      'INSERT INTO files (path, config_relative_path, language, content_hash, workspace, category, embedding, content)',
       files.map((file) => [
         file.path,
         file.configRelativePath,
         file.language,
         file.contentHash,
         file.workspace,
+        file.category,
         this.serializeEmbedding(file.embedding),
         file.content ?? null,
       ]),
@@ -2725,6 +2795,7 @@ export class SQLiteGraphDatabase {
         language = excluded.language,
         content_hash = excluded.content_hash,
         workspace = excluded.workspace,
+        category = excluded.category,
         embedding = excluded.embedding,
         content = excluded.content`,
     )
@@ -3082,18 +3153,27 @@ export class SQLiteGraphDatabase {
     direction: 'upstream' | 'downstream',
     frontier: readonly string[],
     relationTypes: readonly RelationTypeValue[],
-  ): RelationRow[] {
+  ): {
+    readonly rows: RelationRow[]
+    readonly omittedFiles: readonly { readonly path: string; readonly category: FileCategory }[]
+  } {
     const endpoint = direction === 'upstream' ? 'r.source' : 'r.target'
     const frontierEndpoint = direction === 'upstream' ? 'r.target' : 'r.source'
     const joins: string[] = []
     const conditions: string[] = []
     const filterParams: unknown[] = []
     const filter = input.filter
+    const admittedCategories = resolveAdmittedCategories(filter)
 
     let workspaceColumn: string
+    let categoryColumn: string | undefined
+    let filePathColumn: string | undefined
+
     if (input.resource === 'symbol') {
       joins.push(`JOIN symbols n ON n.id = ${endpoint}`, 'JOIN files f ON f.path = n.file_path')
       workspaceColumn = 'f.workspace'
+      categoryColumn = 'f.category'
+      filePathColumn = 'f.path'
       const kinds = [...new Set(filter?.kinds ?? [])].sort()
       if (kinds.length > 0) {
         conditions.push(`n.kind IN (${kinds.map(() => '?').join(', ')})`)
@@ -3102,9 +3182,16 @@ export class SQLiteGraphDatabase {
     } else if (input.resource === 'file') {
       joins.push(`JOIN files n ON n.path = ${endpoint}`)
       workspaceColumn = 'n.workspace'
+      categoryColumn = 'n.category'
+      filePathColumn = 'n.path'
     } else {
       joins.push(`JOIN specs n ON n.spec_id = ${endpoint}`)
       workspaceColumn = 'n.workspace'
+    }
+
+    if (categoryColumn !== undefined) {
+      conditions.push(`${categoryColumn} IN (${admittedCategories.map(() => '?').join(', ')})`)
+      filterParams.push(...admittedCategories)
     }
 
     const includedWorkspaces = [...new Set(filter?.workspaces ?? [])].sort()
@@ -3118,6 +3205,11 @@ export class SQLiteGraphDatabase {
       filterParams.push(...excludedWorkspaces)
     }
 
+    const nonAdmittedCategories =
+      categoryColumn === undefined
+        ? []
+        : FILE_CATEGORIES.filter((c) => !admittedCategories.includes(c))
+
     const fixedParameterCount = relationTypes.length + filterParams.length
     const frontierChunkSize = SQLITE_BATCH_PARAMETER_LIMIT - fixedParameterCount
     if (frontierChunkSize < 1) {
@@ -3125,7 +3217,9 @@ export class SQLiteGraphDatabase {
     }
 
     const rows: RelationRow[] = []
+    const omittedFiles: { path: string; category: FileCategory }[] = []
     const relationTypePlaceholders = relationTypes.map(() => '?').join(', ')
+
     for (const frontierChunk of chunksOf(frontier, frontierChunkSize)) {
       const frontierPlaceholders = frontierChunk.map(() => '?').join(', ')
       const predicateSql = [
@@ -3142,8 +3236,58 @@ export class SQLiteGraphDatabase {
            ORDER BY r.source, r.type, r.target`,
         ).all(...frontierChunk, ...relationTypes, ...filterParams) as RelationRow[]),
       )
+
+      if (
+        categoryColumn !== undefined &&
+        filePathColumn !== undefined &&
+        nonAdmittedCategories.length > 0
+      ) {
+        const otherConditions: string[] = []
+        const otherParams: unknown[] = []
+        if (input.resource === 'symbol' && filter?.kinds !== undefined && filter.kinds.length > 0) {
+          const kinds = [...new Set(filter.kinds)].sort()
+          otherConditions.push(`n.kind IN (${kinds.map(() => '?').join(', ')})`)
+          otherParams.push(...kinds)
+        }
+        if (includedWorkspaces.length > 0) {
+          otherConditions.push(
+            `${workspaceColumn} IN (${includedWorkspaces.map(() => '?').join(', ')})`,
+          )
+          otherParams.push(...includedWorkspaces)
+        }
+        if (excludedWorkspaces.length > 0) {
+          otherConditions.push(
+            `${workspaceColumn} NOT IN (${excludedWorkspaces.map(() => '?').join(', ')})`,
+          )
+          otherParams.push(...excludedWorkspaces)
+        }
+
+        const nonAdmittedPlaceholders = nonAdmittedCategories.map(() => '?').join(', ')
+        const omittedPredicateSql = [
+          `${frontierEndpoint} IN (${frontierPlaceholders})`,
+          `r.type IN (${relationTypePlaceholders})`,
+          `${categoryColumn} IN (${nonAdmittedPlaceholders})`,
+          ...otherConditions,
+        ].join(' AND ')
+
+        const omittedRows = this.statement(
+          `SELECT DISTINCT ${filePathColumn} AS path, ${categoryColumn} AS category
+           FROM relations r
+           ${joins.join('\n')}
+           WHERE ${omittedPredicateSql}`,
+        ).all(
+          ...frontierChunk,
+          ...relationTypes,
+          ...nonAdmittedCategories,
+          ...otherParams,
+        ) as Array<{
+          path: string
+          category: FileCategory
+        }>
+        omittedFiles.push(...omittedRows)
+      }
     }
-    return rows
+    return { rows, omittedFiles }
   }
 
   /**
@@ -3566,6 +3710,7 @@ export class SQLiteGraphDatabase {
    * @param row.workspace - The workspace value.
    * @param row.embedding - The embedding value.
    * @param row.content - The content value.
+   * @param row.category - The category value.
    * @returns The result of map file row.
    */
   private mapFileRow(row: {
@@ -3574,6 +3719,7 @@ export class SQLiteGraphDatabase {
     language: string
     content_hash: string
     workspace: string
+    category?: string | null
     embedding: Buffer | null
     content: string | null
   }): FileNode {
@@ -3583,6 +3729,7 @@ export class SQLiteGraphDatabase {
       language: row.language,
       contentHash: row.content_hash,
       workspace: row.workspace,
+      category: (row.category as FileCategory | undefined) ?? 'source',
       ...(row.embedding !== null ? { embedding: this.deserializeEmbedding(row.embedding) } : {}),
       ...(row.content !== null ? { content: row.content } : {}),
     })

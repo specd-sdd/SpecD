@@ -61,6 +61,13 @@
 - **WHEN** it is persisted and loaded back through the abstract `GraphStore`
 - **THEN** the returned relation preserves that metadata without backend-specific decoding
 
+#### Scenario: Backend persists file category
+
+- **GIVEN** a file node with category `'test'` or `'ignored'`
+- **WHEN** it is persisted in the store and loaded back
+- **THEN** the returned `FileNode` preserves its `category` attribute
+- **AND** files without explicit category default to `'source'`
+
 ### Requirement: Store recreation
 
 #### Scenario: Closed recreation rotates physical storage
@@ -353,6 +360,12 @@
 - **WHEN** `getCoveringSpecsForSymbol('core:Change.transition')` is called
 - **THEN** the persisted `COVERS_SYMBOL` relation is returned
 
+#### Scenario: findSymbols filters by category
+
+- **GIVEN** symbols declared in files with category `'source'`, `'test'`, and `'ignored'`
+- **WHEN** `findSymbols({ categories: ['source'] })` is called
+- **THEN** only symbols declared in files with category `'source'` are returned
+
 ### Requirement: Filtered impact query contract
 
 #### Scenario: Store applies canonical filter precedence
@@ -386,6 +399,13 @@
 - **GIVEN** a frontier of symbol or file nodes and a request for covering specs
 - **WHEN** `queryImpactFrontier` is invoked with candidate resource category `spec` and depth `0`
 - **THEN** it queries and hydrates the admitted spec nodes directly without requiring a positive traversal depth
+
+#### Scenario: Category filter excludes non-admitted categories in physical query
+
+- **GIVEN** an SQLite store with callers located in both `'source'` and `'test'` files
+- **WHEN** `queryImpactFrontier` executes with default categories (`['source']`)
+- **THEN** callers located in `'test'` files are excluded directly in the SQL statement
+- **AND** only callers from `'source'` files are returned across the boundary
 
 ### Requirement: Batched symbol traversal reads
 

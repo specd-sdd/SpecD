@@ -18,7 +18,7 @@ Every `GraphStore` implementation SHALL support the code-graph package's minimum
 
 At minimum, the abstract store contract MUST support:
 
-- file nodes carrying the `FileNode` data needed by indexing, traversal, and CLI queries, including both canonical workspace-prefixed paths and config-relative file paths, and the full textual **content**
+- file nodes carrying the `FileNode` data needed by indexing, traversal, and CLI queries, including both canonical workspace-prefixed paths and config-relative file paths, the full textual **content**, and semantic **category** (`source` | `test` | `ignored`)
 - symbol nodes carrying the `SymbolNode` data needed by indexing, traversal, and CLI queries
 - spec nodes carrying the `SpecNode` data needed by spec indexing and search
 - **document nodes** carrying the `DocumentNode` data (textual non-code resources)
@@ -27,7 +27,7 @@ At minimum, the abstract store contract MUST support:
 
 `COVERS_FILE` and `COVERS_SYMBOL` are the abstract relation families used for requirement-aware graph linkage. `COVERS_FILE` links a spec to a covered implementation file. `COVERS_SYMBOL` links a spec to a covered implementation symbol and MAY carry `metadata.stale` when the archived symbol-level link no longer resolves to a live indexed symbol.
 
-The `files` storage SHALL persist the full textual content of indexed source files to enable match-aware snippet extraction without re-reading from disk at query time.
+The `files` storage SHALL persist the full textual content of indexed source files to enable match-aware snippet extraction without re-reading from disk at query time. It SHALL also persist and index the `category` attribute (defaulting to `'source'`) to support low-latency filtering during graph traversal and search.
 
 The store MUST provide operations for upserting and removing `DocumentNode` entries, as well as searching them via full-text search.
 
@@ -123,17 +123,17 @@ Unlike `upsertFile` which replaces all data for a file, `addRelations` is purely
 - **`getCoveringSpecsForFile(filePath: string): Promise<Relation[]>`** — all `COVERS_FILE` relations where `target` matches
 - **`getCoveredSymbols(specId: string): Promise<Relation[]>`** — all `COVERS_SYMBOL` relations where `source` matches
 - **`getCoveringSpecsForSymbol(symbolId: string): Promise<Relation[]>`** — all `COVERS_SYMBOL` relations where `target` matches
-- **`findSymbols(query: SymbolQuery): Promise<SymbolNode[]>`** — search symbols by name pattern, kind, or file path
+- **`findSymbols(query: SymbolQuery): Promise<SymbolNode[]>`** — search symbols by name pattern, kind, file path, or category
 
-`SymbolQuery` is a value object with optional fields: `name` (glob or regex), `kinds` (array of `SymbolKind` for filtering by one or more kinds), `filePath` (exact match or glob), `comment` (substring match for full-text search within symbol comments), `caseSensitive` (boolean, defaults to `false` — when `false`, `name` and `comment` matching is case insensitive).
+`SymbolQuery` is a value object with optional fields: `name` (glob or regex), `kinds` (array of `SymbolKind` for filtering by one or more kinds), `filePath` (exact match or glob), `comment` (substring match for full-text search within symbol comments), `caseSensitive` (boolean, defaults to `false` — when `false`, `name` and `comment` matching is case insensitive), and `categories` (array of `FileCategory` for filtering symbols by the category of their declaring file).
 
 ### Requirement: Filtered impact query contract
 
-`GraphStore` SHALL expose backend-neutral impact-query inputs that carry requested result types, symbol kinds, included workspaces, and excluded workspaces together with the target, relation direction, candidate resource category, and traversal depth needed by impact analysis.
+`GraphStore` SHALL expose backend-neutral impact-query inputs that carry requested result types, symbol kinds, included workspaces, excluded workspaces, and admitted file categories (`categories?: readonly FileCategory[]`, `includeTests?: boolean`, `includeIgnored?: boolean`) together with the target, relation direction, candidate resource category, and traversal depth needed by impact analysis.
 
-Filtered impact reads SHALL return only nodes and relations admitted by the normalized predicates. The query `resource` field SHALL identify the candidate or neighbor resource category to expand towards or hydrate. Traversal reads SHALL support depth-zero queries for direct coverage lookups. Workspace matching SHALL use canonical workspace identity, an empty inclusion set SHALL admit every workspace, and exclusions SHALL take precedence. Symbol-kind predicates SHALL be applied to symbol candidates before those candidates are returned from the store.
+Filtered impact reads SHALL return only nodes and relations admitted by the normalized predicates. By default, when categories are unspecified, only files with category `'source'` and their contained symbols SHALL be admitted. The query `resource` field SHALL identify the candidate or neighbor resource category to expand towards or hydrate. Traversal reads SHALL support depth-zero queries for direct coverage lookups. Workspace matching SHALL use canonical workspace identity, an empty inclusion set SHALL admit every workspace, and exclusions SHALL take precedence. Symbol-kind predicates SHALL be applied to symbol candidates before those candidates are returned from the store.
 
-Store implementations SHALL apply supported type, kind, inclusion, and exclusion predicates in their physical query execution. An implementation MUST NOT load an unrestricted impact candidate set across the adapter boundary and then remove excluded rows in TypeScript. Batch and worker-backed implementations SHALL preserve the filters through their request protocol without widening the query.
+Store implementations SHALL apply supported type, kind, category, inclusion, and exclusion predicates in their physical query execution (e.g. SQL joins and where clauses). An implementation MUST NOT load an unrestricted impact candidate set across the adapter boundary and then remove excluded rows in TypeScript. Batch and worker-backed implementations SHALL preserve the filters through their request protocol without widening the query.
 
 The contract SHALL remain backend-neutral: it defines predicate and result semantics but MUST NOT expose SQLite statements, worker messages, table names, or storage-specific pagination details.
 

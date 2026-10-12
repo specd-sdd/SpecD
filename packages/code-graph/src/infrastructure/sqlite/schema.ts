@@ -1,4 +1,4 @@
-export const SQLITE_SCHEMA_VERSION = 12
+export const SQLITE_SCHEMA_VERSION = 13
 
 export const SQLITE_SCHEMA_DDL = `
 PRAGMA foreign_keys = ON;
@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS files (
   language TEXT NOT NULL,
   content_hash TEXT NOT NULL,
   workspace TEXT NOT NULL,
+  category TEXT NOT NULL DEFAULT 'source',
   embedding BLOB,
   content TEXT
 );
@@ -145,6 +146,7 @@ CREATE TABLE IF NOT EXISTS freshness_latches (
 
 CREATE INDEX IF NOT EXISTS idx_files_config_relative_path ON files(config_relative_path);
 CREATE INDEX IF NOT EXISTS idx_files_workspace ON files(workspace);
+CREATE INDEX IF NOT EXISTS idx_files_category ON files(category);
 CREATE INDEX IF NOT EXISTS idx_documents_config_relative_path ON documents(config_relative_path);
 CREATE INDEX IF NOT EXISTS idx_symbols_file_path ON symbols(file_path);
 CREATE INDEX IF NOT EXISTS idx_symbols_kind ON symbols(kind);

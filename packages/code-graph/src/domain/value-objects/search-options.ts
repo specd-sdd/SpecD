@@ -1,3 +1,4 @@
+import { type FileCategory } from './file-node.js'
 import { type SymbolKind } from './symbol-kind.js'
 
 /**
@@ -12,4 +13,7 @@ export interface SearchOptions {
   readonly workspace?: string
   readonly excludePaths?: readonly string[]
   readonly excludeWorkspaces?: readonly string[]
+  readonly categories?: readonly FileCategory[]
+  readonly includeTests?: boolean
+  readonly includeIgnored?: boolean
 }

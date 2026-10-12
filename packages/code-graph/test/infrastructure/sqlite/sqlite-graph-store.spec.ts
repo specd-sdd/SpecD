@@ -1500,8 +1500,10 @@ describe('SQLiteGraphStore', () => {
   })
 
   it('declares sqlite schema version and fts-backed ddl', () => {
-    expect(SQLITE_SCHEMA_VERSION).toBe(12)
+    expect(SQLITE_SCHEMA_VERSION).toBe(13)
     expect(SQLITE_SCHEMA_DDL).toContain('CREATE TABLE IF NOT EXISTS files')
+    expect(SQLITE_SCHEMA_DDL).toContain("category TEXT NOT NULL DEFAULT 'source'")
+    expect(SQLITE_SCHEMA_DDL).toContain('idx_files_category')
     expect(SQLITE_SCHEMA_DDL).toContain('content TEXT')
     expect(SQLITE_SCHEMA_DDL).toContain('CREATE TABLE IF NOT EXISTS documents')
     expect(SQLITE_SCHEMA_DDL).toContain('CREATE VIRTUAL TABLE IF NOT EXISTS symbol_fts')
@@ -1532,36 +1534,41 @@ describe('SQLiteGraphStore', () => {
     )
   })
 
-  it.each(['10', '11'])('rejects schema version %s without altering the table', async (version) => {
-    const dir = mkdtempSync(join(tmpdir(), `code-graph-sqlite-schema-v${version}-`))
-    const databasePath = join(dir, 'graph', 'code-graph.sqlite')
-    const initialStore = new SQLiteGraphStore(dir)
-    await initialStore.open()
-    await initialStore.close()
-    const db = new Database(databasePath)
-    const before = db.prepare('PRAGMA table_info(logical_symbols)').all()
-    db.prepare('UPDATE meta SET value = ? WHERE key = ?').run(version, 'schemaVersion')
-    db.close()
+  it.each(['10', '11', '12'])(
+    'rejects schema version %s without altering the table',
+    async (version) => {
+      const dir = mkdtempSync(join(tmpdir(), `code-graph-sqlite-schema-v${version}-`))
+      const databasePath = join(dir, 'graph', 'code-graph.sqlite')
+      const initialStore = new SQLiteGraphStore(dir)
+      await initialStore.open()
+      await initialStore.close()
+      const db = new Database(databasePath)
+      const before = db.prepare('PRAGMA table_info(logical_symbols)').all()
+      db.prepare('UPDATE meta SET value = ? WHERE key = ?').run(version, 'schemaVersion')
+      db.close()
 
-    const incompatibleStore = new SQLiteGraphStore(dir)
-    const openError = await incompatibleStore.open().catch((error: unknown) => error)
-    expect(openError).toBeInstanceOf(GraphStorageRecoveryRequiredError)
-    if (!(openError instanceof Error)) throw openError
-    expect(openError.message).toContain(
-      `SQLite graph storage schema ${version} is incompatible with expected 12`,
-    )
+      const incompatibleStore = new SQLiteGraphStore(dir)
+      const openError = await incompatibleStore.open().catch((error: unknown) => error)
+      expect(openError).toBeInstanceOf(GraphStorageRecoveryRequiredError)
+      if (!(openError instanceof Error)) throw openError
+      expect(openError.message).toContain(
+        `SQLite graph storage schema ${version} is incompatible with expected ${SQLITE_SCHEMA_VERSION}`,
+      )
 
-    const afterDb = new Database(databasePath, { readonly: true })
-    try {
-      expect(afterDb.prepare('PRAGMA table_info(logical_symbols)').all()).toEqual(before)
-      expect(afterDb.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get()).toEqual({
-        value: version,
-      })
-    } finally {
-      afterDb.close()
-      rmSync(dir, { recursive: true, force: true })
-    }
-  })
+      const afterDb = new Database(databasePath, { readonly: true })
+      try {
+        expect(afterDb.prepare('PRAGMA table_info(logical_symbols)').all()).toEqual(before)
+        expect(afterDb.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get()).toEqual(
+          {
+            value: version,
+          },
+        )
+      } finally {
+        afterDb.close()
+        rmSync(dir, { recursive: true, force: true })
+      }
+    },
+  )
 
   it('reopens schema 12 without rebuilding stored member rows', async () => {
     tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-schema-v11-'))
@@ -1689,7 +1696,7 @@ describe('SQLiteGraphStore', () => {
 
     const incompatibleStore = new SQLiteGraphStore(tempDir)
     await expect(incompatibleStore.open()).rejects.toThrow(
-      'SQLite graph storage schema 9 is incompatible with expected 12',
+      `SQLite graph storage schema 9 is incompatible with expected ${SQLITE_SCHEMA_VERSION}`,
     )
     expect(existsSync(databasePath)).toBe(true)
   })
@@ -1708,7 +1715,7 @@ describe('SQLiteGraphStore', () => {
 
     const incompatibleStore = new SQLiteGraphStore(tempDir)
     await expect(incompatibleStore.open()).rejects.toThrow(
-      'SQLite graph storage schema 9 is incompatible with expected 12',
+      `SQLite graph storage schema 9 is incompatible with expected ${SQLITE_SCHEMA_VERSION}`,
     )
     expect(existsSync(databasePath)).toBe(true)
   })
@@ -2832,6 +2839,51 @@ describe('SQLiteGraphStore', () => {
       ).candidates.map((candidate) => candidate.file.path),
     ).toEqual([file.path])
     expect(await store.getFile(retainedFile.path)).toEqual(retainedFile)
+    await store.close()
+  })
+
+  it('persists and hydrates file categories for test, ignored, and source files', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-file-category-'))
+    const store = new SQLiteGraphStore(tempDir)
+    await store.open()
+
+    const sourceFile = createFileNode({
+      path: 'core:src/service.ts',
+      configRelativePath: 'src/service.ts',
+      language: 'typescript',
+      contentHash: 'sha256:source',
+      workspace: 'core',
+      category: 'source',
+    })
+    const testFile = createFileNode({
+      path: 'core:test/service.spec.ts',
+      configRelativePath: 'test/service.spec.ts',
+      language: 'typescript',
+      contentHash: 'sha256:test',
+      workspace: 'core',
+      category: 'test',
+    })
+    const ignoredFile = createFileNode({
+      path: 'core:dist/bundle.js',
+      configRelativePath: 'dist/bundle.js',
+      language: 'javascript',
+      contentHash: 'sha256:ignored',
+      workspace: 'core',
+      category: 'ignored',
+    })
+
+    await store.upsertFile(sourceFile, [], [])
+    await store.upsertFile(testFile, [], [])
+    await store.upsertFile(ignoredFile, [], [])
+
+    expect(await store.getFile(sourceFile.path)).toEqual(sourceFile)
+    expect(await store.getFile(testFile.path)).toEqual(testFile)
+    expect(await store.getFile(ignoredFile.path)).toEqual(ignoredFile)
+
+    expect((await store.getFile(sourceFile.path))?.category).toBe('source')
+    expect((await store.getFile(testFile.path))?.category).toBe('test')
+    expect((await store.getFile(ignoredFile.path))?.category).toBe('ignored')
+
     await store.close()
   })
 })

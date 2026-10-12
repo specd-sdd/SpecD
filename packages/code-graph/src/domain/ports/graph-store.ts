@@ -1,4 +1,4 @@
-import { type FileNode } from '../value-objects/file-node.js'
+import { type FileCategory, type FileNode } from '../value-objects/file-node.js'
 import { type DocumentNode } from '../value-objects/document-node.js'
 import { type SymbolNode } from '../value-objects/symbol-node.js'
 import { type SpecNode } from '../value-objects/spec-node.js'
@@ -7,7 +7,7 @@ import { type RelationType } from '../value-objects/relation-type.js'
 import { type SymbolQuery } from '../value-objects/symbol-query.js'
 import { type GraphStatistics } from '../value-objects/graph-statistics.js'
 import { type SearchOptions } from '../value-objects/search-options.js'
-import { type ImpactResultFilter } from '../value-objects/impact-result.js'
+import { type ImpactResultFilter, type OmittedCounts } from '../value-objects/impact-result.js'
 import {
   type DeclarationOccurrence,
   type LocalBinding,
@@ -163,6 +163,13 @@ export interface ImpactFrontierResult {
   readonly files: readonly FileNode[]
   /** Hydrated neighboring spec nodes selected by the query. */
   readonly specs: readonly SpecNode[]
+  /** Counts of files omitted by category filtering during this frontier step. */
+  readonly omittedCounts?: OmittedCounts
+  /** Omitted file paths partitioned by category. */
+  readonly omittedFiles?: {
+    readonly tests: readonly string[]
+    readonly ignored: readonly string[]
+  }
 }
 
 /**
@@ -860,9 +867,12 @@ export abstract class GraphStore {
   /**
    * Returns the number of files that import each file in the graph.
    * Used for batch hotspot computation.
+   * @param options - Optional category filtering options.
    * @returns A map from file path to importer count.
    */
-  abstract getFileImporterCounts(): Promise<Map<string, number>>
+  abstract getFileImporterCounts(options?: {
+    categories?: readonly FileCategory[]
+  }): Promise<Map<string, number>>
 
   /**
    * Removes every logical-generation artifact, including incremental and semantic

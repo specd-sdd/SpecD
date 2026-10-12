@@ -11,4 +11,6 @@ export {
   type SpecdStorageConfig,
   type SpecdContextEntry,
   isSpecdConfig,
+  DEFAULT_GRAPH_TEST_PATHS,
+  DEFAULT_GRAPH_IGNORE_PATHS,
 } from './specd-config.js'

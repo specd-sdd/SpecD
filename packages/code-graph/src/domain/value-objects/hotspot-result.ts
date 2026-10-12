@@ -1,3 +1,5 @@
+import { type FileCategory } from './file-node.js'
+import { type OmittedCounts } from './impact-result.js'
 import { type SymbolNode } from './symbol-node.js'
 import { type SymbolKind } from './symbol-kind.js'
 import { SymbolKind as SymbolKindEnum } from './symbol-kind.js'
@@ -34,6 +36,9 @@ export interface HotspotOptions {
   readonly includeImporterOnly?: boolean
   readonly excludePaths?: readonly string[]
   readonly excludeWorkspaces?: readonly string[]
+  readonly categories?: readonly FileCategory[]
+  readonly includeTests?: boolean
+  readonly includeIgnored?: boolean
 }
 
 /**
@@ -42,4 +47,5 @@ export interface HotspotOptions {
 export interface HotspotResult {
   readonly entries: readonly HotspotEntry[]
   readonly totalSymbols: number
+  readonly omittedCounts: OmittedCounts
 }

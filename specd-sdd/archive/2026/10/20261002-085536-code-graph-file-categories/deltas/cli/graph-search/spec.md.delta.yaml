@@ -1,0 +1,64 @@
+- op: modified
+  description: 'Add category flags to Command signature'
+  selector:
+    type: section
+    matches: '^Requirement: Command signature$'
+  content: |
+    ```text
+    specd graph search <query> [--symbols] [--files] [--specs] [--documents] [--snippet] [--kind <kinds>] [--file <path>] [--workspace <name>] [--exclude-path <pattern>] [--exclude-workspace <name>] [--limit <n>] [--include-tests] [--include-ignored] [--all] [--category <categories>] [--spec-content] [--config <path> | --path <path>] [--format text|json|toon]
+    ```
+
+    `<query>` is required and supports multiple whitespace-delimited terms plus the shared separator/CamelCase expansion. `--symbols`, `--files`, `--specs`, and `--documents` select only those categories; when none is supplied, all four are searched.
+
+    `--files` selects arbitrary indexed source-content results. It is distinct from `--file <path>`, which remains a path filter and applies to symbol and source-file categories. An exact file selector SHALL accept canonical workspace-relative, config/project-relative, and absolute path forms. A selector containing wildcards SHALL retain case-insensitive pattern semantics. Existing workspace, exclusion, kind, limit, snippet, spec-content, context, and format options retain their meanings.
+
+    The command SHALL support category inclusion and restriction options:
+    - `--include-tests`: include `test` category files and symbols alongside `source`
+    - `--include-ignored`: include `ignored` category files and symbols
+    - `--all`: include all categories (`source`, `test`, `ignored`)
+    - `--category <categories>`: restrict admitted categories strictly to the specified category or comma-separated list of categories (e.g. `test`, `source,test`, `ignored`)
+
+    Category flags MAY be combined. The CLI SHALL send the query, selected categories, filters, per-category limit, and snippet preference in one unified Code Graph search request. `--config` and `--path` remain mutually exclusive.
+
+    The requested limit is per category and SHALL be applied by Code Graph after logical grouping and symbol/file occurrence suppression. The CLI MUST NOT pre-limit, merge, rerank, or deduplicate category results.
+
+- op: modified
+  description: 'Add category filters to Command signature (filters)'
+  selector:
+    type: section
+    matches: 'Requirement: Command signature \(filters\)'
+  content: |
+    The command accepts the following filter options applied at the store level:
+
+    - `--kind <kinds>` — filter symbols by kind (e.g., `class,method`)
+    - `--file <path>` — filter symbols by file path pattern (supports `*` wildcards)
+    - `--workspace <name>` — filter to a single workspace
+    - `--exclude-path <pattern>` — exclude symbols/specs matching the glob pattern
+    - `--exclude-workspace <name>` — exclude results from the given workspace
+    - `--include-tests` — include `test` category files alongside `source`
+    - `--include-ignored` — include `ignored` category files alongside `source`
+    - `--all` — include all categories (`source`, `test`, `ignored`)
+    - `--category <categories>` — restrict search results to the given category or comma-separated categories (e.g. `test`, `source,test`)
+
+- op: modified
+  description: 'Add omission notices and omittedCounts to Output format'
+  selector:
+    type: section
+    matches: '^Requirement: Output format$'
+  content: |
+    Text, JSON, and TOON SHALL remain category-grouped in deterministic `symbols`, `files`, `specs`, and `documents` order. Text category headers SHALL show the number returned and active per-category limit.
+
+    Structured symbol entries SHALL expose logical identity, declarations, bindings, directly matched bindings, match tier/reasons, and the symbol's complete construct plus declared-name selection ranges. Text symbol entries SHALL show real declaration locations and SHALL NOT print serialized canonical identifiers by default. When a public export or barrel alias caused the match, text SHALL show `matched export: <project-relative-path>::<exported-name>` followed by the underlying declaration location; other bindings MAY be summarized by count rather than enumerated.
+
+    Source-file entries SHALL expose file identity, retained precise matches, `totalMatches`, and `omittedMatches`; each match identifies whether it came from the complete query, a raw term, or an expanded term. General and wildcard-path output SHALL preserve the relevance-tier ordering of retained occurrences, while exact single-file output SHALL preserve source order. Text SHALL render `N more matches in this file` when matches were omitted. Spec and document entries retain their existing identities and match locations.
+
+    Without `--snippet`, structured output omits snippet content but retains precise match ranges, and text renders compact locations. With `--snippet`, every category MAY include sanitized match-centered preview blocks with a snippet range distinct from the underlying match or symbol range.
+
+    A file containing several occurrences SHALL be rendered once with its ordered matches. A file whose declaration occurrence duplicates a symbol result but also contains a call, string, comment, or other non-symbol occurrence SHALL render only the remaining occurrences.
+
+    `--spec-content` continues to include full spec content only in JSON/TOON. When every selected category is empty, text output SHALL be `No results found.`
+
+    When `omittedCounts` indicates that results were filtered out (`tests > 0` or `ignored > 0`), text mode output SHALL display an omission notice:
+    `ℹ Excluded from results: <count> test files, <count> ignored files. Use --include-tests, --include-ignored, or --all to view them.`
+
+    In `json` or `toon` mode, the output object SHALL include `omittedCounts: { tests: number, ignored: number }`.

@@ -25,6 +25,8 @@ The exact numeric weighting of these signals is intentionally not fixed by this 
 - cross-workspace caller evidence contributes at least as strongly as same-workspace caller evidence
 - file-level importer data is a secondary signal that refines symbol ranking rather than replacing symbol-level evidence
 - hierarchy-derived structural centrality contributes to ranking when the symbol is a base type, a widely implemented contract, or a method with overriding dependents
+- caller, importer, and hierarchy signals are computed strictly over admitted file categories (`source` by default), preventing test or auxiliary callers from distorting production hotspot scores
+- symbols defined in non-admitted categories are excluded from candidate ranking by default
 
 ### Requirement: Risk level
 
@@ -34,7 +36,8 @@ Each entry's `riskLevel` SHALL be computed using the existing `computeRiskLevel(
 
 Hotspot computation applies product defaults per option:
 
-- **kinds = \[`class`, `method`, `function`, `interface`]** — the default hotspot view focuses on callable or structural symbols
+- **categories = \['source']** — only production source code is ranked and contributes to caller/importer counts by default
+- **kinds = \['class', 'method', 'function']** — the default hotspot view focuses on callable or structural symbols
 - **score > 0** — symbols with no caller signal, importer signal, or hierarchy signal are excluded
 - **risk >= MEDIUM** — LOW-risk symbols are filtered out
 - **limit 20** — only the top 20 results are returned
@@ -50,6 +53,8 @@ Explicit options override only their own defaults:
 - explicit `limit` → use only the requested limit
 - omitted `workspace`, `filePath`, `excludePaths`, `excludeWorkspaces` → no extra filter
 - explicit `workspace`, `filePath`, `excludePaths`, `excludeWorkspaces` → add only the requested scope restriction
+- omitted `categories` → use `['source']`
+- explicit `categories`, `includeTests`, or `includeIgnored` → widen or restrict the admitted category set
 
 Importer-only exclusion remains active unless the user explicitly widens the result set with `includeImporterOnly = true`.
 
@@ -57,16 +62,20 @@ In other words, changing `minRisk`, `limit`, or `workspace` MUST NOT silently re
 
 Examples:
 
-- `specd graph hotspots` → defaults apply (kinds = `class,method,function,interface`, no importer-only entries, risk >= MEDIUM, limit 20)
+- `specd graph hotspots` → defaults apply (categories = `source`, kinds = `class,method,function`, no importer-only entries, risk >= MEDIUM, limit 20)
 - `specd graph hotspots --min-risk HIGH` → risk >= HIGH, while default kinds, importer-only exclusion, and limit 20 remain active
 - `specd graph hotspots --limit 50` → limit 50, while default kinds, importer-only exclusion, and risk >= MEDIUM remain active
 - `specd graph hotspots --kind interface` → only `interface` symbols, with the rest of the default ranking policy still active
 - `specd graph hotspots --include-importer-only --kind interface` → explicit broad query; importer-only `interface` symbols may appear
+- `specd graph hotspots --include-tests` → include `test` category callers, importers, and symbol candidates
 
 ### Requirement: Filtering
 
 `HotspotOptions` supports these optional filters:
 
+- **categories** — array of `FileCategory` to admit (defaults to `['source']`)
+- **includeTests** — convenience boolean to include `test` category alongside `source`
+- **includeIgnored** — convenience boolean to include `ignored` category
 - **workspace** — only include symbols whose `filePath` starts with this workspace prefix
 - **kinds** — only include symbols whose kind is in the provided `SymbolKind[]`
 - **filePath** — only include symbols in this file
@@ -85,6 +94,7 @@ Excludes are applied alongside the existing include filters before the limit is 
 
 - **entries** — array of `HotspotEntry`, sorted by score descending
 - **totalSymbols** — total number of symbols in the graph (before filtering)
+- **omittedCounts** — record `{ tests: number, ignored: number }` indicating how many test and ignored files were omitted from rankings and caller metrics
 
 Each `HotspotEntry` contains:
 

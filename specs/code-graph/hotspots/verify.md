@@ -30,6 +30,13 @@
 - **WHEN** hotspots are computed
 - **THEN** that hierarchy evidence contributes to the symbol's score
 
+#### Scenario: Callers in test files do not count toward hotspot scores by default
+
+- **GIVEN** symbol A called only by test files and symbol B called by production code
+- **WHEN** hotspots are computed with default options
+- **THEN** symbol A does not receive caller points from test callers
+- **AND** only symbol B reflects caller evidence in its score
+
 ### Requirement: Risk level
 
 #### Scenario: Default filters exclude LOW risk
@@ -42,7 +49,7 @@
 #### Scenario: Default kind set focuses the hotspot view
 
 - **WHEN** `computeHotspots` is called with no explicit kind filter
-- **THEN** only `class`, `method`, `function`, and `interface` symbols are eligible for the default hotspot view
+- **THEN** only `class`, `method`, and `function` symbols are eligible for the default hotspot view
 
 #### Scenario: Default view excludes importer-only symbols
 
@@ -91,6 +98,12 @@
 - **WHEN** `kinds` is set to `['class', 'method']`
 - **THEN** only symbols with kind `class` or `method` are returned
 
+#### Scenario: Include tests in hotspot computation
+
+- **GIVEN** symbol A has callers in test files
+- **WHEN** `computeHotspots` is called with `includeTests: true`
+- **THEN** test callers are counted in directCallers and score for symbol A
+
 ### Requirement: Output
 
 #### Scenario: Ranking order
@@ -107,6 +120,12 @@
 
 - **WHEN** the graph has 100 symbols but only 10 pass filters
 - **THEN** `totalSymbols` is 100 and `entries` has length 10
+
+#### Scenario: Omitted test and ignored files tracked in output
+
+- **GIVEN** a graph with test files and ignored files
+- **WHEN** `computeHotspots` is called with default options
+- **THEN** `omittedCounts` in `HotspotResult` contains the counts of excluded test and ignored files
 
 ### Requirement: Pure function
 

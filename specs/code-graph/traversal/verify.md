@@ -170,6 +170,20 @@
 - **WHEN** `analyzeImpact(store, target.id, 'upstream')` is called
 - **THEN** overriding methods are included in `affectedSymbols`
 
+#### Scenario: Test callers do not inflate risk level or dependents
+
+- **GIVEN** a production symbol called by 1 production module and 20 test files
+- **WHEN** `analyzeImpact(store, symbol.id, 'upstream')` is called with default categories
+- **THEN** `directDependents` is 1
+- **AND** `riskLevel` is `LOW`
+- **AND** `omittedCounts.tests` is 20
+
+#### Scenario: Anchored test target traverses dependencies
+
+- **GIVEN** a test file target `test/my.spec.ts`
+- **WHEN** `analyzeFileImpact(store, 'test/my.spec.ts', 'downstream')` is called
+- **THEN** downstream dependencies of `test/my.spec.ts` are returned in `affectedFiles`
+
 ### Requirement: Filtered impact results
 
 #### Scenario: Omitted filter preserves legacy impact
@@ -219,6 +233,13 @@
 - **WHEN** filtered impact analysis executes
 - **THEN** the store predicates exclude those candidates before the final limit
 - **AND** admitted candidates fill the deterministic result up to that limit
+
+#### Scenario: Category filter prunes BFS traversal through test files
+
+- **GIVEN** module A called by test file T, and test file T also imports module B
+- **WHEN** `analyzeImpact(store, A.id, 'both')` is called with default categories
+- **THEN** BFS expansion halts at test file T
+- **AND** module B is NOT reached through test file T
 
 ### Requirement: Spec impact
 

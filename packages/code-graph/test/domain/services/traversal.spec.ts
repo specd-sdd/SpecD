@@ -993,6 +993,97 @@ describe('Traversal services', () => {
     })
   })
 
+  describe('Category filtering during impact traversal', () => {
+    function fileWithCategory(path: string, category: 'source' | 'test' | 'ignored') {
+      return createFileNode({
+        path,
+        configRelativePath: '',
+        language: 'typescript',
+        contentHash: 'sha256:x',
+        workspace: '/p',
+        category,
+      })
+    }
+
+    it('test callers do not inflate risk level or dependents', async () => {
+      const target = sym('target', 'src/target.ts', 1)
+      const prodCaller = sym('prodCaller', 'src/prod.ts', 1)
+      await store.upsertFile(fileWithCategory('src/target.ts', 'source'), [target], [])
+      await store.upsertFile(
+        fileWithCategory('src/prod.ts', 'source'),
+        [prodCaller],
+        [createRelation({ source: prodCaller.id, target: target.id, type: RelationType.Calls })],
+      )
+
+      for (let i = 0; i < 20; i++) {
+        const testCaller = sym(`testCaller${i}`, `test/test-${i}.spec.ts`, 1)
+        await store.upsertFile(
+          fileWithCategory(`test/test-${i}.spec.ts`, 'test'),
+          [testCaller],
+          [createRelation({ source: testCaller.id, target: target.id, type: RelationType.Calls })],
+        )
+      }
+
+      const result = await analyzeImpact(store, target.id, 'upstream')
+      expect(result.directDependents).toBe(1)
+      expect(result.riskLevel).toBe('LOW')
+      expect(result.omittedCounts?.tests).toBe(20)
+      expect(result.omittedFiles?.tests).toHaveLength(20)
+      expect(result.affectedSymbols.map((s) => s.name)).toEqual(['prodCaller'])
+    })
+
+    it('category filter prunes BFS traversal through test files', async () => {
+      // Module A -> called by Test T -> called by Module B
+      // Upstream traversal from A should halt at T and NOT reach B
+      const symA = sym('fnA', 'src/module-a.ts', 1)
+      const symT = sym('testT', 'test/module.spec.ts', 1)
+      const symB = sym('fnB', 'src/module-b.ts', 1)
+
+      await store.upsertFile(fileWithCategory('src/module-a.ts', 'source'), [symA], [])
+      await store.upsertFile(
+        fileWithCategory('test/module.spec.ts', 'test'),
+        [symT],
+        [createRelation({ source: symT.id, target: symA.id, type: RelationType.Calls })],
+      )
+      await store.upsertFile(
+        fileWithCategory('src/module-b.ts', 'source'),
+        [symB],
+        [createRelation({ source: symB.id, target: symT.id, type: RelationType.Calls })],
+      )
+
+      const result = await analyzeImpact(store, symA.id, 'both')
+      expect(result.affectedSymbols.map((s) => s.name)).not.toContain('fnB')
+      expect(result.affectedSymbols.map((s) => s.name)).not.toContain('testT')
+      expect(result.omittedCounts?.tests).toBe(1)
+      expect(result.omittedFiles?.tests).toContain('test/module.spec.ts')
+    })
+
+    it('anchored test target traverses dependencies', async () => {
+      const testFile = fileWithCategory('test/my.spec.ts', 'test')
+      const sourceFile = fileWithCategory('src/index.ts', 'source')
+      const targetSym = sym('testCase', 'test/my.spec.ts', 1)
+      const depSym = sym('mainFn', 'src/index.ts', 1)
+
+      await store.upsertFile(
+        testFile,
+        [targetSym],
+        [
+          createRelation({
+            source: 'test/my.spec.ts',
+            target: 'src/index.ts',
+            type: RelationType.Imports,
+          }),
+          createRelation({ source: targetSym.id, target: depSym.id, type: RelationType.Calls }),
+        ],
+      )
+      await store.upsertFile(sourceFile, [depSym], [])
+
+      const result = await analyzeFileImpact(store, 'test/my.spec.ts', 'downstream')
+      expect(result.affectedFiles).toContain('src/index.ts')
+      expect(result.affectedSymbols.map((s) => s.name)).toContain('mainFn')
+    })
+  })
+
   describe('Immutability checks', () => {
     it('does not mutate the store when running traversals', async () => {
       const target = sym('target', 'a.ts', 1)

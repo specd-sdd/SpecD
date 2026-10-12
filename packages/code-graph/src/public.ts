@@ -67,7 +67,11 @@ export {
 } from './domain/value-objects/indexed-input-freshness.js'
 
 // Value objects
-export { type FileNode } from './domain/value-objects/file-node.js'
+export {
+  type FileNode,
+  type FileCategory,
+  FILE_CATEGORIES,
+} from './domain/value-objects/file-node.js'
 export { type DocumentNode } from './domain/value-objects/document-node.js'
 export { type SourceRange, type SymbolNode } from './domain/value-objects/symbol-node.js'
 export { type SpecNode } from './domain/value-objects/spec-node.js'
@@ -147,6 +151,7 @@ export {
   type CoveringSpecImpact,
   type ImpactResult,
   type FileImpactResult,
+  type OmittedCounts,
 } from './domain/value-objects/impact-result.js'
 export { type ChangeDetectionResult } from './domain/value-objects/change-detection-result.js'
 export { type RiskLevel } from './domain/value-objects/risk-level.js'
@@ -187,6 +192,7 @@ export {
 } from './application/use-cases/discover-files.js'
 
 // Domain services
+export { classifyFileCategory } from './domain/services/classify-file-category.js'
 export { expandSymbolName } from './domain/services/expand-symbol-name.js'
 export { expandSearchQuery, expandSearchToken } from './domain/services/expand-search-query.js'
 export { isGraphStale } from './domain/services/is-graph-stale.js'

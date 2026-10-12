@@ -9,6 +9,8 @@ import {
   type SpecdWorkspaceConfig,
   type SpecdStorageConfig,
   type SpecdContextEntry,
+  DEFAULT_GRAPH_TEST_PATHS,
+  DEFAULT_GRAPH_IGNORE_PATHS,
 } from '../../application/specd-config.js'
 import { type SchemaOperations } from '../../domain/services/merge-schema-layers.js'
 import { ConfigValidationError } from '../../domain/errors/config-validation-error.js'
@@ -464,6 +466,10 @@ export class FsConfigLoader extends ConfigLoader {
                 ...(ws.graph.allowedPaths !== undefined
                   ? { allowedPaths: ws.graph.allowedPaths }
                   : {}),
+                ...(ws.graph.testPaths !== undefined ? { testPaths: ws.graph.testPaths } : {}),
+                ...(ws.graph.ignorePaths !== undefined
+                  ? { ignorePaths: ws.graph.ignorePaths }
+                  : {}),
               },
             }
           : {}),
@@ -618,18 +624,16 @@ export class FsConfigLoader extends ConfigLoader {
       workspaces,
       storage,
       approvals: { spec: data.approvals?.spec ?? false, signoff: data.approvals?.signoff ?? false },
-      ...(data.graph !== undefined
-        ? {
-            graph: {
-              ...(data.graph.includePaths !== undefined
-                ? { includePaths: data.graph.includePaths }
-                : {}),
-              ...(data.graph.excludePaths !== undefined
-                ? { excludePaths: data.graph.excludePaths }
-                : {}),
-            },
-          }
-        : {}),
+      graph: {
+        ...(data.graph?.includePaths !== undefined
+          ? { includePaths: data.graph.includePaths }
+          : {}),
+        ...(data.graph?.excludePaths !== undefined
+          ? { excludePaths: data.graph.excludePaths }
+          : {}),
+        testPaths: data.graph?.testPaths ?? DEFAULT_GRAPH_TEST_PATHS,
+        ignorePaths: data.graph?.ignorePaths ?? DEFAULT_GRAPH_IGNORE_PATHS,
+      },
       logging: { level: data.logging?.level ?? 'info' },
       ...(data.actorProvider !== undefined ? { actorProvider: data.actorProvider } : {}),
       ...(data.privacy !== undefined ? { privacy: data.privacy } : {}),

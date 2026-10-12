@@ -9,7 +9,7 @@ Users and agents need a fast way to identify the most structurally coupled symbo
 ### Requirement: Command signature
 
 ```text
-specd graph hotspots [--workspace <name>] [--kind <kinds>] [--file <path>] [--exclude-path <pattern>] [--exclude-workspace <name>] [--limit <n>] [--min-score <n>] [--include-importer-only] [--min-risk LOW|MEDIUM|HIGH|CRITICAL] [--config <path> | --path <path>] [--format text|json|toon]
+specd graph hotspots [--workspace <name>] [--kind <kinds>] [--file <path>] [--exclude-path <pattern>] [--exclude-workspace <name>] [--limit <n>] [--min-score <n>] [--include-importer-only] [--min-risk LOW|MEDIUM|HIGH|CRITICAL] [--include-tests] [--include-ignored] [--all] [--category <categories>] [--config <path> | --path <path>] [--format text|json|toon]
 ```
 
 - `--workspace <name>` — optional; filter results to a single workspace
@@ -21,13 +21,17 @@ specd graph hotspots [--workspace <name>] [--kind <kinds>] [--file <path>] [--ex
 - `--min-score <n>` — optional; minimum hotspot score
 - `--include-importer-only` — optional; include symbols with no direct callers whose score comes only from file importers
 - `--min-risk <level>` — optional; minimum risk level
+- `--include-tests` — optional; include test category files in caller metrics and candidate rankings
+- `--include-ignored` — optional; include ignored category files
+- `--all` — optional; include all file categories (`source`, `test`, `ignored`)
+- `--category <categories>` — optional; restrict candidates and caller metrics strictly to the specified category or comma-separated list of categories (e.g. `source,test`, `test`, `ignored`)
 - `--config <path>` — optional; explicit path to `specd.yaml`, matching the standard CLI meaning
 - `--path <path>` — optional; repo-root bootstrap mode
 - `--format text|json|toon` — optional; output format, defaults to `text`
 
 `--config` and `--path` are mutually exclusive.
 
-When no explicit option is passed, the command SHALL apply its default hotspot policy: `kinds = class,method,function`, importer-only symbols excluded, `minScore > 0`, `minRisk >= MEDIUM`, and `limit = 20`.
+When no explicit option is passed, the command SHALL apply its default hotspot policy: `categories = source`, `kinds = class,method,function`, importer-only symbols excluded, `minScore > 0`, `minRisk >= MEDIUM`, and `limit = 20`.
 
 Explicit options SHALL override only their own defaults:
 
@@ -37,6 +41,7 @@ Explicit options SHALL override only their own defaults:
 - `--workspace`, `--file`, `--exclude-path`, and `--exclude-workspace` add their requested scope restrictions without disabling the other defaults
 - `--min-score` changes only the score threshold
 - `--include-importer-only` widens the query and may re-enable importer-only symbols
+- `--include-tests`, `--include-ignored`, `--all`, and `--category` adjust only the admitted categories
 
 ### Requirement: Context resolution
 
@@ -74,7 +79,7 @@ The command SHALL resolve graph context via `cli:graph-cli-context`, open a prov
 
 Platform symbols MUST come from `@specd/sdk`.
 
-The command SHALL pass all requested filters through to the provider, including workspace, kind list, file path, exclusion filters, limit, score threshold, and minimum risk.
+The command SHALL pass all requested filters through to the provider, including workspace, kind list, file path, exclusion filters, limit, score threshold, minimum risk, and category options (`categories`, `includeTests`, `includeIgnored`).
 
 ### Requirement: Concurrent indexing guard
 
@@ -96,7 +101,10 @@ In `text` mode, the command SHALL print a ranked table with:
 
 If no entries match, the command SHALL output `No hotspots found.`
 
-In `json` or `toon` mode, the command SHALL output an object containing `totalSymbols` and `entries`. Each entry SHALL include the symbol payload, `score`, `directCallers`, `crossWorkspaceCallers`, `fileImporters`, `riskLevel`, and the derived `workspace` field.
+When `omittedCounts` indicates that results were filtered out (`tests > 0` or `ignored > 0`), text mode output SHALL display an omission notice:
+`ℹ Excluded from results: <count> test files, <count> ignored files. Use --include-tests, --include-ignored, or --all to view them.`
+
+In `json` or `toon` mode, the command SHALL output an object containing `totalSymbols`, `entries`, and `omittedCounts: { tests: number, ignored: number }`. Each entry SHALL include the symbol payload, `score`, `directCallers`, `crossWorkspaceCallers`, `fileImporters`, `riskLevel`, and the derived `workspace` field.
 
 ### Requirement: Backpressure-safe hotspot presentation
 

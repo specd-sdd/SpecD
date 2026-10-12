@@ -338,14 +338,14 @@
 
 #### Scenario: Category headers show explicit limits in text mode
 
-- **WHEN** `specd graph search \"hook\" --limit 5` is run in text mode
+- **WHEN** `specd graph search "hook" --limit 5` is run in text mode
 - **THEN** the `Symbols` header matches `Symbols (N shown, limit 5):`
 - **AND** the `Specs` header matches `Specs (M shown, limit 5):`
 
 #### Scenario: JSON output includes workspace and scores but excludes full content
 
-- **WHEN** `specd graph search \"hook\" --format json` is run
-- **THEN** output is `{\"symbols\":[...],\"specs\":[...],\"documents\":[...]}`
+- **WHEN** `specd graph search "hook" --format json` is run
+- **THEN** output is `{"symbols":[...],"specs":[...],"documents":[...]}`
 - **AND** each entry includes a `workspace` field and a `score` field
 - **AND** each entry includes `startLine` and `endLine` fields
 - **AND** no entry includes a `snippet` field unless `--snippet` was passed
@@ -372,13 +372,13 @@
 
 #### Scenario: JSON with --spec-content includes full spec content
 
-- **WHEN** `specd graph search \"hook\" --format json --spec-content` is run
+- **WHEN** `specd graph search "hook" --format json --spec-content` is run
 - **THEN** spec entries include a `content` field with the full spec text
 - **AND** spec entries omit the `snippet` field unless `--snippet` is also passed
 
 #### Scenario: --spec-content with text format fails
 
-- **WHEN** `specd graph search \"hook\" --spec-content` is run (text format)
+- **WHEN** `specd graph search "hook" --spec-content` is run (text format)
 - **THEN** the command exits with code 1
 - **AND** an error message explains that `--spec-content` requires `--format json` or `--format toon`
 
@@ -390,14 +390,14 @@
 #### Scenario: Text output groups document results separately
 
 - **GIVEN** document search returns one or more matching documents
-- **WHEN** `specd graph search \"Change\"` is run in text mode
+- **WHEN** `specd graph search "Change"` is run in text mode
 - **THEN** stdout contains a `Documents (` section
 - **AND** each document result shows the owning workspace and match location metadata without requiring a snippet block
 
 #### Scenario: Structured output includes documents array
 
 - **GIVEN** document search returns one or more matching documents
-- **WHEN** `specd graph search \"Change\" --format json` is run
+- **WHEN** `specd graph search "Change" --format json` is run
 - **THEN** stdout is valid JSON containing `symbols`, `specs`, and `documents`
 
 #### Scenario: Text-mode symbol snippet uses normalized indentation
@@ -473,6 +473,17 @@
 - **WHEN** JSON or TOON output is rendered
 - **THEN** its file result includes `totalMatches` and `omittedMatches` alongside retained `matches`
 
+#### Scenario: Omission notice displayed in text mode when search prunes non-admitted files
+
+- **GIVEN** a search query where 8 test files matched but were omitted by default
+- **WHEN** `specd graph search "helper"` is run in text mode
+- **THEN** stdout includes `Excluded from results: 8 test files`
+
+#### Scenario: Search JSON output includes omittedCounts
+
+- **WHEN** `specd graph search "helper" --format json` is run
+- **THEN** stdout JSON includes `omittedCounts: { tests: number, ignored: number }`
+
 ### Requirement: Command signature (filters)
 
 #### Scenario: Filter by multiple symbol kinds
@@ -491,6 +502,25 @@
 - **WHEN** `specd graph search "kernel" --workspace core` is run
 - **THEN** only symbols from workspace `core` are returned
 - **AND** only specs from workspace `core` are returned
+
+#### Scenario: Filter by category
+
+- **GIVEN** symbols in source, test, and ignored files
+- **WHEN** `specd graph search "helper" --category test` is run
+- **THEN** only results from `test` category files are returned
+
+#### Scenario: Filter by comma-separated categories
+
+- **GIVEN** symbols in source, test, and ignored files
+- **WHEN** `specd graph search "helper" --category "source,test"` is run
+- **THEN** results from both `source` and `test` category files are returned
+- **AND** results from `ignored` category files are excluded
+
+#### Scenario: Include tests alongside source
+
+- **GIVEN** symbols in source and test files
+- **WHEN** `specd graph search "helper" --include-tests` is run
+- **THEN** results from both `source` and `test` categories are returned
 
 ### Requirement: Reference-aware symbol results
 

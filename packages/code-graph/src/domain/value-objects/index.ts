@@ -1,4 +1,4 @@
-export { type FileNode, createFileNode } from './file-node.js'
+export { type FileNode, createFileNode, type FileCategory, FILE_CATEGORIES } from './file-node.js'
 export { type DocumentNode, createDocumentNode } from './document-node.js'
 export { type SymbolNode, createSymbolNode } from './symbol-node.js'
 export { type SpecNode, createSpecNode } from './spec-node.js'
@@ -16,6 +16,7 @@ export {
   type ImpactResult,
   type FileImpactResult,
   type AffectedSymbol,
+  type OmittedCounts,
 } from './impact-result.js'
 export { type RiskLevel, computeRiskLevel } from './risk-level.js'
 export { type ChangeDetectionResult } from './change-detection-result.js'

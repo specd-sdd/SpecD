@@ -96,4 +96,37 @@ describe('FileNode', () => {
     })
     expect(node.configRelativePath).toBe('')
   })
+
+  it('defaults category to source when omitted', () => {
+    const node = createFileNode({
+      path: 'src/index.ts',
+      configRelativePath: '',
+      language: 'typescript',
+      contentHash: 'sha256:abc',
+      workspace: 'core',
+    })
+    expect(node.category).toBe('source')
+  })
+
+  it('preserves explicit category', () => {
+    const testNode = createFileNode({
+      path: 'test/foo.spec.ts',
+      configRelativePath: '',
+      language: 'typescript',
+      contentHash: 'sha256:abc',
+      workspace: 'core',
+      category: 'test',
+    })
+    expect(testNode.category).toBe('test')
+
+    const ignoredNode = createFileNode({
+      path: 'fixtures/data.json',
+      configRelativePath: '',
+      language: 'json',
+      contentHash: 'sha256:abc',
+      workspace: 'core',
+      category: 'ignored',
+    })
+    expect(ignoredNode.category).toBe('ignored')
+  })
 })

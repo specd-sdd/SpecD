@@ -1938,5 +1938,196 @@ describe('graph impact', () => {
       expect(stdout).toContain('  core:auth-spec')
       expect(stdout).toContain('  core:session-spec')
     })
+
+    it('rejects invalid --category before provider access', async () => {
+      const { getStderr } = setup()
+
+      try {
+        await makeImpactProgram().parseAsync([
+          'node',
+          'specd',
+          'graph',
+          'impact',
+          '--file',
+          'packages/core/src/model.ts',
+          '--category',
+          'fixtures',
+        ])
+      } catch {
+        /* ExitSentinel */
+      }
+
+      expect(getStderr()).toContain(
+        'invalid category "fixtures". Expected one of: source, test, ignored',
+      )
+      expect(process.exit).toHaveBeenCalledWith(1)
+      expect(withProvider).not.toHaveBeenCalled()
+    })
+
+    it('passes comma-separated categories to provider', async () => {
+      const { mockProvider } = setup()
+      mockProvider.resolveFileSelector.mockResolvedValue([
+        { canonicalPath: 'core:src/model.ts', workspace: 'core', kind: 'file' },
+      ])
+      mockProvider.analyzeFileImpact.mockResolvedValue({
+        target: 'core:src/model.ts',
+        directDependents: 0,
+        indirectDependents: 0,
+        transitiveDependents: 0,
+        riskLevel: 'LOW',
+        affectedFiles: [],
+        affectedSymbols: [],
+        symbols: [],
+        coveringSpecs: [],
+        omittedCounts: { tests: 0, ignored: 1 },
+      })
+
+      await makeImpactProgram().parseAsync([
+        'node',
+        'specd',
+        'graph',
+        'impact',
+        '--file',
+        'core:src/model.ts',
+        '--category',
+        'source,test',
+      ])
+
+      expect(mockProvider.analyzeFileImpact).toHaveBeenCalledWith(
+        'core:src/model.ts',
+        'upstream',
+        3,
+        expect.objectContaining({ categories: ['source', 'test'] }),
+      )
+    })
+
+    it('rejects invalid category within comma-separated list', async () => {
+      const { getStderr } = setup()
+
+      try {
+        await makeImpactProgram().parseAsync([
+          'node',
+          'specd',
+          'graph',
+          'impact',
+          '--file',
+          'packages/core/src/model.ts',
+          '--category',
+          'source,invalid',
+        ])
+      } catch {
+        /* ExitSentinel */
+      }
+
+      expect(getStderr()).toContain(
+        'invalid category "invalid". Expected one of: source, test, ignored',
+      )
+      expect(process.exit).toHaveBeenCalledWith(1)
+      expect(withProvider).not.toHaveBeenCalled()
+    })
+
+    it('passes category flags (--include-tests, --include-ignored, --all, --category) to provider', async () => {
+      const { mockProvider } = setup()
+      mockProvider.resolveFileSelector.mockResolvedValue([
+        { canonicalPath: 'core:src/model.ts', workspace: 'core', kind: 'file' },
+      ])
+      mockProvider.analyzeFileImpact.mockResolvedValue({
+        target: 'core:src/model.ts',
+        directDependents: 0,
+        indirectDependents: 0,
+        transitiveDependents: 0,
+        riskLevel: 'LOW',
+        affectedFiles: [],
+        affectedSymbols: [],
+        symbols: [],
+        coveringSpecs: [],
+        omittedCounts: { tests: 1, ignored: 0 },
+      })
+
+      await makeImpactProgram().parseAsync([
+        'node',
+        'specd',
+        'graph',
+        'impact',
+        '--file',
+        'core:src/model.ts',
+        '--include-tests',
+      ])
+
+      expect(mockProvider.analyzeFileImpact).toHaveBeenCalledWith(
+        'core:src/model.ts',
+        'upstream',
+        3,
+        expect.objectContaining({ includeTests: true }),
+      )
+    })
+
+    it('renders omission notice in text mode when tests are excluded', async () => {
+      const { mockProvider, getStdout } = setup()
+      mockProvider.resolveFileSelector.mockResolvedValue([
+        { canonicalPath: 'core:src/model.ts', workspace: 'core', kind: 'file' },
+      ])
+      mockProvider.analyzeFileImpact.mockResolvedValue({
+        target: 'core:src/model.ts',
+        directDependents: 0,
+        indirectDependents: 0,
+        transitiveDependents: 0,
+        riskLevel: 'LOW',
+        affectedFiles: [],
+        affectedSymbols: [],
+        symbols: [],
+        coveringSpecs: [],
+        omittedCounts: { tests: 3, ignored: 1 },
+      })
+
+      await makeImpactProgram().parseAsync([
+        'node',
+        'specd',
+        'graph',
+        'impact',
+        '--file',
+        'core:src/model.ts',
+        '--format',
+        'text',
+      ])
+
+      const stdout = getStdout()
+      expect(stdout).toContain(
+        'ℹ Excluded from results: 3 test files, 1 ignored file. Use --include-tests, --include-ignored, or --all to view them.',
+      )
+    })
+
+    it('includes omittedCounts in JSON mode', async () => {
+      const { mockProvider, getStdout } = setup()
+      mockProvider.resolveFileSelector.mockResolvedValue([
+        { canonicalPath: 'core:src/model.ts', workspace: 'core', kind: 'file' },
+      ])
+      mockProvider.analyzeFileImpact.mockResolvedValue({
+        target: 'core:src/model.ts',
+        directDependents: 0,
+        indirectDependents: 0,
+        transitiveDependents: 0,
+        riskLevel: 'LOW',
+        affectedFiles: [],
+        affectedSymbols: [],
+        symbols: [],
+        coveringSpecs: [],
+        omittedCounts: { tests: 2, ignored: 0 },
+      })
+
+      await makeImpactProgram().parseAsync([
+        'node',
+        'specd',
+        'graph',
+        'impact',
+        '--file',
+        'core:src/model.ts',
+        '--format',
+        'json',
+      ])
+
+      const rendered = JSON.parse(getStdout())
+      expect(rendered.omittedCounts).toEqual({ tests: 2, ignored: 0 })
+    })
   })
 })

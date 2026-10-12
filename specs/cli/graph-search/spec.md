@@ -9,12 +9,19 @@ The code graph contains symbols with names and comments, and specs with titles, 
 ### Requirement: Command signature
 
 ```text
-specd graph search <query> [--symbols] [--files] [--specs] [--documents] [--snippet] [--kind <kinds>] [--file <path>] [--workspace <name>] [--exclude-path <pattern>] [--exclude-workspace <name>] [--limit <n>] [--spec-content] [--config <path> | --path <path>] [--format text|json|toon]
+specd graph search <query> [--symbols] [--files] [--specs] [--documents] [--snippet] [--kind <kinds>] [--file <path>] [--workspace <name>] [--exclude-path <pattern>] [--exclude-workspace <name>] [--limit <n>] [--include-tests] [--include-ignored] [--all] [--category <categories>] [--spec-content] [--config <path> | --path <path>] [--format text|json|toon]
 ```
 
 `<query>` is required and supports multiple whitespace-delimited terms plus the shared separator/CamelCase expansion. `--symbols`, `--files`, `--specs`, and `--documents` select only those categories; when none is supplied, all four are searched.
 
 `--files` selects arbitrary indexed source-content results. It is distinct from `--file <path>`, which remains a path filter and applies to symbol and source-file categories. An exact file selector SHALL accept canonical workspace-relative, config/project-relative, and absolute path forms. A selector containing wildcards SHALL retain case-insensitive pattern semantics. Existing workspace, exclusion, kind, limit, snippet, spec-content, context, and format options retain their meanings.
+
+The command SHALL support category inclusion and restriction options:
+
+- `--include-tests`: include `test` category files and symbols alongside `source`
+- `--include-ignored`: include `ignored` category files and symbols
+- `--all`: include all categories (`source`, `test`, `ignored`)
+- `--category <categories>`: restrict admitted categories strictly to the specified category or comma-separated list of categories (e.g. `test`, `source,test`, `ignored`)
 
 Category flags MAY be combined. The CLI SHALL send the query, selected categories, filters, per-category limit, and snippet preference in one unified Code Graph search request. `--config` and `--path` remain mutually exclusive.
 
@@ -57,6 +64,11 @@ A file containing several occurrences SHALL be rendered once with its ordered ma
 
 `--spec-content` continues to include full spec content only in JSON/TOON. When every selected category is empty, text output SHALL be `No results found.`
 
+When `omittedCounts` indicates that results were filtered out (`tests > 0` or `ignored > 0`), text mode output SHALL display an omission notice:
+`ℹ Excluded from results: <count> test files, <count> ignored files. Use --include-tests, --include-ignored, or --all to view them.`
+
+In `json` or `toon` mode, the output object SHALL include `omittedCounts: { tests: number, ignored: number }`.
+
 ### Requirement: Error cases
 
 If the provider cannot be opened, the command exits with code 3 (same as other graph commands).
@@ -72,6 +84,10 @@ The command accepts the following filter options applied at the store level:
 - `--workspace <name>` — filter to a single workspace
 - `--exclude-path <pattern>` — exclude symbols/specs matching the glob pattern
 - `--exclude-workspace <name>` — exclude results from the given workspace
+- `--include-tests` — include `test` category files alongside `source`
+- `--include-ignored` — include `ignored` category files alongside `source`
+- `--all` — include all categories (`source`, `test`, `ignored`)
+- `--category <categories>` — restrict search results to the given category or comma-separated categories (e.g. `test`, `source,test`)
 
 ### Requirement: Reference-aware symbol results
 

@@ -199,6 +199,18 @@
 - **THEN** all file paths in the output (e.g., `packages/core/src/index.ts`) are relative to the project root
 - **AND** they do not include workspace-prefixed identities unless explicitly requested
 
+#### Scenario: Omission notice displayed in text mode when tests are excluded
+
+- **GIVEN** an impact query where 5 test files were omitted from results
+- **WHEN** `specd graph impact --file src/foo.ts` is run in text mode
+- **THEN** stdout includes `Excluded from results: 5 test files`
+
+#### Scenario: Omitted counts included in JSON output
+
+- **GIVEN** an impact query where test files were omitted
+- **WHEN** `specd graph impact --file src/foo.ts --format json` is run
+- **THEN** the output object includes `omittedCounts` with the count of omitted test and ignored files
+
 ### Requirement: Pure display-path projection
 
 #### Scenario: File paths render without graph reads
@@ -297,6 +309,19 @@
 - **WHEN** impact receives that name
 - **THEN** it returns a bounded deterministic ambiguity list and performs no traversal
 - **AND** prefix or textual candidates are never accepted as targets
+
+#### Scenario: Category inclusion flags widen analysis scope
+
+- **GIVEN** a symbol imported by both production and test files
+- **WHEN** `specd graph impact --symbol myFunc --include-tests` is run
+- **THEN** test files and their callers are included in the results
+
+#### Scenario: Category filter accepts comma-separated categories
+
+- **GIVEN** a symbol imported by production, test, and ignored files
+- **WHEN** `specd graph impact --symbol myFunc --category source,test` is run
+- **THEN** production and test files and their callers are included in the results
+- **AND** ignored callers remain excluded
 
 ### Requirement: Provider-owned impact result filters
 

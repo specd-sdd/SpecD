@@ -853,6 +853,75 @@ describe('SearchCodeGraph', () => {
     expect(results[0]?.logicalTarget?.id).toBe(member.id)
     expect(results[0]?.matchTier).toBe('exact-logical-identity')
   })
+
+  it('filters symbols and files by category and tracks omission counts', async () => {
+    const prodSymbol = createSymbolNode({
+      name: 'formatHelper',
+      kind: SymbolKind.Function,
+      filePath: 'code-graph:src/helper.ts',
+      line: 1,
+      column: 0,
+    })
+    const testSymbol = createSymbolNode({
+      name: 'formatHelper',
+      kind: SymbolKind.Function,
+      filePath: 'code-graph:test/helper.spec.ts',
+      line: 1,
+      column: 0,
+    })
+
+    await store.upsertFile(
+      fileNode('code-graph:src/helper.ts', 'code-graph', 'source'),
+      [prodSymbol],
+      [],
+    )
+    await store.upsertFile(
+      fileNode('code-graph:test/helper.spec.ts', 'code-graph', 'test'),
+      [testSymbol],
+      [],
+    )
+
+    const search = new SearchCodeGraph(store)
+
+    // Default search: only production symbol returned, test symbol omitted
+    const defaultResult = await search.execute({
+      query: 'formatHelper',
+      categories: ['symbols'],
+      limit: 10,
+      includeSnippet: false,
+    })
+
+    expect(defaultResult.symbols).toHaveLength(1)
+    expect(defaultResult.symbols[0]?.hits[0]?.symbol.filePath).toBe('code-graph:src/helper.ts')
+    expect(defaultResult.omittedCounts).toEqual({ tests: 1, ignored: 0 })
+
+    // With includeTests: true, both symbols returned
+    const withTestsResult = await search.execute({
+      query: 'formatHelper',
+      categories: ['symbols'],
+      limit: 10,
+      includeSnippet: false,
+      includeTests: true,
+    })
+
+    expect(withTestsResult.symbols).toHaveLength(2)
+    expect(withTestsResult.omittedCounts).toEqual({ tests: 0, ignored: 0 })
+
+    // Category restriction to 'test': only test symbol returned
+    const testOnlyResult = await search.execute({
+      query: 'formatHelper',
+      categories: ['symbols'],
+      limit: 10,
+      includeSnippet: false,
+      fileCategories: ['test'],
+    })
+
+    expect(testOnlyResult.symbols).toHaveLength(1)
+    expect(testOnlyResult.symbols[0]?.hits[0]?.symbol.filePath).toBe(
+      'code-graph:test/helper.spec.ts',
+    )
+    expect(testOnlyResult.omittedCounts).toEqual({ tests: 0, ignored: 0 })
+  })
 })
 
 function declaration(
@@ -873,12 +942,17 @@ function declaration(
   }
 }
 
-function fileNode(path: string, workspace: string) {
+function fileNode(
+  path: string,
+  workspace: string,
+  category: 'source' | 'test' | 'ignored' = 'source',
+) {
   return createFileNode({
     path,
     configRelativePath: path.slice(path.indexOf(':') + 1),
     language: 'typescript',
     contentHash: `hash:${path}`,
     workspace,
+    category,
   })
 }

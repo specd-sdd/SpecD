@@ -11,12 +11,44 @@
   ],
   "implementation": [
     {
-      "file": "code-graph:src/domain/ports/graph-store.ts",
-      "symbols": ["LogicalSymbolLookup", "findLogicalSymbolsByQualifiedNames"]
+      "file": "code-graph:src/domain/value-objects/file-node.ts",
+      "symbols": ["FileCategory", "FILE_CATEGORIES", "FileNode", "createFileNode"]
     },
     {
-      "file": "code-graph:src/application/services/session-reference-store.ts",
-      "symbols": ["SessionReferenceStore"]
+      "file": "code-graph:src/domain/services/classify-file-category.ts",
+      "symbols": ["classifyFileCategory"]
+    },
+    {
+      "file": "code-graph:test/domain/services/classify-file-category.spec.ts",
+      "symbols": ["classifyFileCategory"]
+    },
+    {
+      "file": "code-graph:src/infrastructure/sqlite/schema.ts",
+      "symbols": ["SQLITE_SCHEMA_VERSION", "SQLITE_SCHEMA_DDL"]
+    },
+    {
+      "file": "code-graph:src/infrastructure/sqlite/sqlite-graph-database.ts",
+      "symbols": ["SQLiteGraphDatabase", "queryImpactFrontierDirection", "findSymbols"]
+    },
+    {
+      "file": "code-graph:src/application/use-cases/index-project-graph.ts",
+      "symbols": ["IndexProjectGraph"]
+    },
+    {
+      "file": "code-graph:src/application/services/build-project-graph-config.ts",
+      "symbols": ["buildProjectGraphConfig"]
+    },
+    {
+      "file": "code-graph:test/infrastructure/sqlite/sqlite-graph-store.spec.ts",
+      "symbols": ["SQLiteGraphStore"]
+    },
+    {
+      "file": "code-graph:src/application/use-cases/search-code-graph.ts",
+      "symbols": ["SearchCodeGraph"]
+    },
+    {
+      "file": "code-graph:test/application/use-cases/search-code-graph.spec.ts",
+      "symbols": ["SearchCodeGraph"]
     }
   ],
   "optimizations": {

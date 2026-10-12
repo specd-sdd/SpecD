@@ -6,7 +6,16 @@
   "dependsOn": ["cli:entrypoint", "cli:graph-cli-context", "core:config", "code-graph:composition"],
   "implementation": [
     {
-      "file": "cli:src/commands/graph/hotspots.ts"
+      "file": "cli:src/commands/graph/hotspots.ts",
+      "symbols": ["registerGraphHotspots"]
+    },
+    {
+      "file": "cli:test/commands/graph-hotspots.spec.ts",
+      "symbols": ["passes category flags"]
+    },
+    {
+      "file": "cli:src/commands/graph/parse-file-categories.ts",
+      "symbols": ["parseFileCategories"]
     }
   ],
   "optimizations": {

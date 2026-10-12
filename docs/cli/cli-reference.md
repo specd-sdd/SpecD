@@ -1341,28 +1341,43 @@ rules as `graph index`.
 
 If a graph index is currently running, this command may return `GRAPH_BUSY` with the message: `The code graph is currently being indexed. Try again in a few seconds.`
 
-| Option                       | Description                                                                     |
-| ---------------------------- | ------------------------------------------------------------------------------- |
-| `--symbols`                  | Search only symbols.                                                            |
-| `--files`                    | Search only indexed source-file content.                                        |
-| `--specs`                    | Search only specs.                                                              |
-| `--documents`                | Search only documents.                                                          |
-| `--snippet`                  | Include snippet previews. Without it, output stays compact and location-first.  |
-| `--kind <list>`              | Filter symbol results by comma-separated kinds, for example `class,method`.     |
-| `--config <path>`            | Config file path. Mutually exclusive with `--path`.                             |
-| `--path <path>`              | Repository root bootstrap path. Ignores any discovered config.                  |
-| `--file <path>`              | Restrict selected categories to paths matching the wildcard pattern.            |
-| `--workspace <name>`         | Restrict results to the named workspace.                                        |
-| `--exclude-path <pattern>`   | Exclude symbols/specs whose file path matches the wildcard pattern. Repeatable. |
-| `--exclude-workspace <name>` | Exclude results from the named workspace. Repeatable.                           |
-| `--limit <n>`                | Maximum number of results per category (default: 10).                           |
-| `--spec-content`             | Include full spec content in `json` or `toon` output.                           |
-| `--format text\|json\|toon`  | Output format.                                                                  |
+| Option                       | Description                                                                                                                            |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `--symbols`                  | Search only symbols.                                                                                                                   |
+| `--files`                    | Search only indexed source-file content.                                                                                               |
+| `--specs`                    | Search only specs.                                                                                                                     |
+| `--documents`                | Search only documents.                                                                                                                 |
+| `--snippet`                  | Include snippet previews. Without it, output stays compact and location-first.                                                         |
+| `--kind <list>`              | Filter symbol results by comma-separated kinds, for example `class,method`.                                                            |
+| `--config <path>`            | Config file path. Mutually exclusive with `--path`.                                                                                    |
+| `--path <path>`              | Repository root bootstrap path. Ignores any discovered config.                                                                         |
+| `--file <path>`              | Restrict selected categories to paths matching the wildcard pattern.                                                                   |
+| `--workspace <name>`         | Restrict results to the named workspace.                                                                                               |
+| `--exclude-path <pattern>`   | Exclude symbols/specs whose file path matches the wildcard pattern. Repeatable.                                                        |
+| `--exclude-workspace <name>` | Exclude results from the named workspace. Repeatable.                                                                                  |
+| `--limit <n>`                | Maximum number of results per category (default: 10).                                                                                  |
+| `--include-tests`            | Include `test` category files and symbols alongside `source`.                                                                          |
+| `--include-ignored`          | Include `ignored` category files and symbols.                                                                                          |
+| `--all`                      | Include all categories (`source`, `test`, `ignored`).                                                                                  |
+| `--category <categories>`    | Restrict search results strictly to `source`, `test`, or `ignored` (accepts single value or comma-separated list, e.g. `source,test`). |
+| `--spec-content`             | Include full spec content in `json` or `toon` output.                                                                                  |
+| `--format text\|json\|toon`  | Output format.                                                                                                                         |
 
 With no category flag, the command requests symbols, files, specs, and documents in
 one provider call. Category flags narrow that request. `--files` selects source
 content; it is intentionally different from `--file`, which is a path filter and
 never enables a category.
+
+By default, `graph search` searches only files and symbols in the `source` category. Test
+files and ignored files are excluded unless requested with `--include-tests`,
+`--include-ignored`, `--all`, or `--category`. When matches in test or ignored files are excluded, text mode
+displays an omission notice:
+
+```text
+ℹ Excluded from results: <count> test files, <count> ignored files. Use --include-tests, --include-ignored, or --all to view them.
+```
+
+In `json` and `toon` mode, the output includes `omittedCounts: { tests: number, ignored: number }`.
 
 Code Graph owns expansion, candidate paging, exact-first semantic ranking, grouping,
 deduplication, declaration-name suppression, and post-suppression limit refill. The
@@ -1467,22 +1482,34 @@ List the most connected symbols in the graph ranked by coupling risk. Context re
 
 If a graph index is currently running, this command may return `GRAPH_BUSY` with the message: `The code graph is currently being indexed. Try again in a few seconds.`
 
-| Option                       | Description                                                                                                 |
-| ---------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `--workspace <name>`         | Restrict hotspots to the named workspace.                                                                   |
-| `--kind <list>`              | Filter hotspots by comma-separated symbol kinds, for example `class,method`. Replaces the default kind set. |
-| `--file <path>`              | Restrict hotspots to a file path.                                                                           |
-| `--exclude-path <pattern>`   | Exclude symbols whose file path matches the wildcard pattern. Repeatable.                                   |
-| `--exclude-workspace <name>` | Exclude hotspots from the named workspace. Repeatable.                                                      |
-| `--limit <n>`                | Maximum number of results. When omitted, defaults to `20`.                                                  |
-| `--min-score <n>`            | Minimum score threshold. When omitted, defaults to `1`.                                                     |
-| `--include-importer-only`    | Include symbols with no direct callers whose score comes only from file importers.                          |
-| `--min-risk <level>`         | Minimum risk level to show. When omitted, defaults to `MEDIUM`.                                             |
-| `--config <path>`            | Config file path. Mutually exclusive with `--path`.                                                         |
-| `--path <path>`              | Repository root bootstrap path. Ignores any discovered config.                                              |
-| `--format text\|json\|toon`  | Output format.                                                                                              |
+| Option                       | Description                                                                                                                                           |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ----- | -------------- |
+| `--workspace <name>`         | Restrict hotspots to the named workspace.                                                                                                             |
+| `--kind <list>`              | Filter hotspots by comma-separated symbol kinds, for example `class,method`. Replaces the default kind set.                                           |
+| `--file <path>`              | Restrict hotspots to a file path.                                                                                                                     |
+| `--exclude-path <pattern>`   | Exclude symbols whose file path matches the wildcard pattern. Repeatable.                                                                             |
+| `--exclude-workspace <name>` | Exclude hotspots from the named workspace. Repeatable.                                                                                                |
+| `--limit <n>`                | Maximum number of results. When omitted, defaults to `20`.                                                                                            |
+| `--min-score <n>`            | Minimum score threshold. When omitted, defaults to `1`.                                                                                               |
+| `--include-importer-only`    | Include symbols with no direct callers whose score comes only from file importers.                                                                    |
+| `--include-tests`            | Include test category files in caller metrics and candidate rankings.                                                                                 |
+| `--include-ignored`          | Include ignored category files in caller metrics and candidate rankings.                                                                              |
+| `--all`                      | Include all categories (`source`, `test`, `ignored`).                                                                                                 |
+| `--category <categories>`    | Restrict candidates and caller metrics strictly to `source`, `test`, or `ignored` (accepts single value or comma-separated list, e.g. `source,test`). |
+| `--min-risk <level>`         | Minimum risk level to show. When omitted, defaults to `MEDIUM`.                                                                                       |
+| `--config <path>`            | Config file path. Mutually exclusive with `--path`.                                                                                                   |
+| `--path <path>`              | Repository root bootstrap path. Ignores any discovered config.                                                                                        |
+| `--format text               | json                                                                                                                                                  | toon` | Output format. |
 
-By default, `graph hotspots` shows only `class`, `method`, and `function` symbols, applies `min-score=1`, `min-risk=MEDIUM`, and `limit=20`, and excludes importer-only symbols that have no direct callers.
+By default, `graph hotspots` shows only `class`, `method`, and `function` symbols, applies `min-score=1`, `min-risk=MEDIUM`, and `limit=20`, excludes importer-only symbols that have no direct callers, and restricts candidates and caller metrics to `source` category files. Test files and ignored files are excluded by default.
+
+In text format, if non-source files are omitted, an omission notice is displayed at the bottom:
+
+```text
+ℹ Excluded from results: <count> test files, <count> ignored files. Use --include-tests, --include-ignored, or --all to view them.
+```
+
+In JSON and TOON format, an `omittedCounts` object (`{ tests: number, ignored: number }`) is returned with counts of omitted candidates.
 
 `--kind` accepts a single comma-separated list and validates every token against the supported symbol kinds. Invalid values fail the command before querying the graph. When you pass `--kind`, that list fully replaces the default kind set instead of merging with it.
 
@@ -1621,26 +1648,40 @@ traversal does not run. Bare names first require an exact case-sensitive declara
 name, fall back to case-insensitive exact lookup only when none exists, and never
 widen prefixes or partial search hits into impact targets.
 
-| Option                                                             | Description                                                                                       |
-| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
-| `--spec <id>`                                                      | Spec ID to analyze.                                                                               |
-| `--symbol <name>`                                                  | Symbol selector to analyze. Supports bare names, qualified selectors, and full ids.               |
-| `--file <path...>`                                                 | One or more file paths to analyze (config-relative, workspace-prefixed, or absolute).             |
-| `--export <name>`                                                  | Exact public export name; requires `--from`.                                                      |
-| `--from <surface>`                                                 | File or public surface containing `--export`.                                                     |
-| `--direction dependents\|dependencies\|upstream\|downstream\|both` | Impact direction (default: `dependents`).                                                         |
-| `--type <types>`                                                   | Comma-separated result categories: `files`, `symbols`, and/or `specs`.                            |
-| `--kind <kinds>`                                                   | Comma-separated impacted symbol kinds; requires omitted `--type` or `--type` including `symbols`. |
-| `--workspace <name>`                                               | Include result rows from a workspace. Repeat this option for multiple workspaces.                 |
-| `--exclude-workspace <name>`                                       | Exclude result rows from a workspace. Repeat this option; exclusions take precedence.             |
-| `--depth <n>`                                                      | Maximum traversal depth (default: `3`).                                                           |
-| `--config <path>`                                                  | Config file path. Mutually exclusive with `--path`.                                               |
-| `--path <path>`                                                    | Repository root bootstrap path. Ignores any discovered config.                                    |
-| `--format text\|json\|toon`                                        | Output format.                                                                                    |
+| Option                                                             | Description                                                                                                                                 |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--spec <id>`                                                      | Spec ID to analyze.                                                                                                                         |
+| `--symbol <name>`                                                  | Symbol selector to analyze. Supports bare names, qualified selectors, and full ids.                                                         |
+| `--file <path...>`                                                 | One or more file paths to analyze (config-relative, workspace-prefixed, or absolute).                                                       |
+| `--export <name>`                                                  | Exact public export name; requires `--from`.                                                                                                |
+| `--from <surface>`                                                 | File or public surface containing `--export`.                                                                                               |
+| `--direction dependents\|dependencies\|upstream\|downstream\|both` | Impact direction (default: `dependents`).                                                                                                   |
+| `--type <types>`                                                   | Comma-separated result categories: `files`, `symbols`, and/or `specs`.                                                                      |
+| `--kind <kinds>`                                                   | Comma-separated impacted symbol kinds; requires omitted `--type` or `--type` including `symbols`.                                           |
+| `--workspace <name>`                                               | Include result rows from a workspace. Repeat this option for multiple workspaces.                                                           |
+| `--exclude-workspace <name>`                                       | Exclude result rows from a workspace. Repeat this option; exclusions take precedence.                                                       |
+| `--depth <n>`                                                      | Maximum traversal depth (default: `3`).                                                                                                     |
+| `--include-tests`                                                  | Admit `test` category files and symbols alongside `source`.                                                                                 |
+| `--include-ignored`                                                | Admit `ignored` category files and symbols.                                                                                                 |
+| `--all`                                                            | Admit all categories (`source`, `test`, `ignored`).                                                                                         |
+| `--category <categories>`                                          | Restrict traversal admission strictly to `source`, `test`, or `ignored` (accepts single value or comma-separated list, e.g. `source,test`). |
+| `--config <path>`                                                  | Config file path. Mutually exclusive with `--path`.                                                                                         |
+| `--path <path>`                                                    | Repository root bootstrap path. Ignores any discovered config.                                                                              |
+| `--format text\|json\|toon`                                        | Output format.                                                                                                                              |
 
 `dependents` is the preferred name for blast-radius analysis: it reports code that
 depends on the target. `dependencies` reports code the target depends on. The legacy
 values `upstream` and `downstream` remain accepted aliases for compatibility.
+
+By default, impact traversal admits only files and symbols in the `source` category. The BFS traversal prunes search paths before crossing into test or ignored files unless requested, preventing non-source files from acting as traversal bridges.
+
+In text format, if non-source files or symbols are omitted, an omission notice is rendered at the bottom:
+
+```text
+ℹ Excluded from results: <count> test files, <count> ignored files. Use --include-tests, --include-ignored, or --all to view them.
+```
+
+In JSON and TOON format, an `omittedCounts` object (`{ tests: number, ignored: number }`) reports the number of omitted items per category.
 
 Text output renders file paths relative to `projectRoot`.
 

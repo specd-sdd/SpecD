@@ -1,0 +1,100 @@
+- op: modified
+  description: 'Add category inclusion flags scenario to Command signature'
+  selector:
+    type: section
+    matches: 'Requirement: Command signature'
+  content: |
+    #### Scenario: Export selector requires both flags
+
+    - **WHEN** only `--export X` or only `--from barrel.ts` is supplied
+    - **THEN** the command fails usage validation before provider open
+
+    #### Scenario: Target families are exclusive
+
+    - **WHEN** export flags are combined with file, symbol, or spec
+    - **THEN** the command rejects the invocation
+
+    #### Scenario: Case-exact symbol selector wins
+
+    - **GIVEN** one declaration named `Change` and many variables named `change`
+    - **WHEN** impact receives `--symbol Change`
+    - **THEN** Code Graph selects the unique case-exact declaration and traverses only it
+
+    #### Scenario: Exact ambiguity is bounded and not traversed
+
+    - **GIVEN** several declarations have the same case-exact unqualified name
+    - **WHEN** impact receives that name
+    - **THEN** it returns a bounded deterministic ambiguity list and performs no traversal
+    - **AND** prefix or textual candidates are never accepted as targets
+
+    #### Scenario: Category inclusion flags widen analysis scope
+
+    - **GIVEN** a symbol imported by both production and test files
+    - **WHEN** `specd graph impact --symbol myFunc --include-tests` is run
+    - **THEN** test files and their callers are included in the results
+
+    #### Scenario: Category filter accepts comma-separated categories
+
+    - **GIVEN** a symbol imported by production, test, and ignored files
+    - **WHEN** `specd graph impact --symbol myFunc --category source,test` is run
+    - **THEN** production and test files and their callers are included in the results
+    - **AND** ignored callers remain excluded
+
+- op: modified
+  description: 'Add omission notice and omittedCounts scenarios to Output format'
+  selector:
+    type: section
+    matches: 'Requirement: Output format'
+  content: |
+    #### Scenario: Text output shows risk level and counts
+
+    - **GIVEN** `core:src/auth.ts` has risk level HIGH with 6 direct, 3 indirect, and 1 transitive dependents
+    - **WHEN** `specd graph impact --file core:src/auth.ts` is run
+    - **THEN** stdout contains `Risk level:       HIGH`
+    - **AND** stdout contains `Direct deps:      6`
+
+    #### Scenario: Text output shows changed symbols for file impact
+
+    - **WHEN** `specd graph impact --file core:src/auth.ts` is run
+    - **THEN** text output includes a `Changed symbols:` block before the affected files list
+
+    #### Scenario: Multi-file text output shows grouped changed symbols
+
+    - **WHEN** `specd graph impact --file core:src/auth.ts cli:src/user.ts` is run
+    - **THEN** text output includes one aggregated summary
+    - **AND** a `Changed symbols:` block grouped by input file
+    - **AND** a per-file breakdown section
+
+    #### Scenario: JSON output includes changedSymbols for file impact
+
+    - **WHEN** `specd graph impact --file core:src/auth.ts --format json` is run
+    - **THEN** stdout is valid JSON containing `changedSymbols`, `affectedSymbols`, and `affectedFiles`
+
+    #### Scenario: JSON output for symbol impact
+
+    - **WHEN** `specd graph impact --symbol createKernel --format json` is run
+    - **THEN** stdout is valid JSON containing `symbol` and `impact` objects
+
+    #### Scenario: JSON output includes aggregate impact fields
+
+    - **WHEN** `specd graph impact --file <path> --format json` is run
+    - **THEN** stdout is valid JSON
+    - **AND** it contains `riskLevel`, `directDepsCount`, `indirectDepsCount`, `transitiveDepsCount`, and `affectedFilesCount`
+
+    #### Scenario: Impact paths are rendered relative to project root
+
+    - **WHEN** `specd graph impact` is run
+    - **THEN** all file paths in the output (e.g., `packages/core/src/index.ts`) are relative to the project root
+    - **AND** they do not include workspace-prefixed identities unless explicitly requested
+
+    #### Scenario: Omission notice displayed in text mode when tests are excluded
+
+    - **GIVEN** an impact query where 5 test files were omitted from results
+    - **WHEN** `specd graph impact --file src/foo.ts` is run in text mode
+    - **THEN** stdout includes `Excluded from results: 5 test files`
+
+    #### Scenario: Omitted counts included in JSON output
+
+    - **GIVEN** an impact query where test files were omitted
+    - **WHEN** `specd graph impact --file src/foo.ts --format json` is run
+    - **THEN** the output object includes `omittedCounts` with the count of omitted test and ignored files

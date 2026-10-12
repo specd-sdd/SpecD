@@ -9,7 +9,7 @@ Before modifying code, developers and agents need to understand the blast radius
 ### Requirement: Command signature
 
 ```text
-specd graph impact [--file <paths...> | --symbol <reference> | --spec <id> | --export <public-name> --from <file-or-surface>] [--direction dependents|dependencies|upstream|downstream|both] [--depth <n>] [--config <path> | --path <path>] [--format text|json|toon]
+specd graph impact [--file <paths...> | --symbol <reference> | --spec <id> | --export <public-name> --from <file-or-surface>] [--direction dependents|dependencies|upstream|downstream|both] [--depth <n>] [--include-tests] [--include-ignored] [--all] [--category <categories>] [--config <path> | --path <path>] [--format text|json|toon]
 ```
 
 Exactly one target family SHALL be supplied. `--export` and `--from` MUST appear together and are mutually exclusive with file, symbol, and spec targets. A missing half of the export selector is a usage error before provider open.
@@ -20,13 +20,22 @@ The CLI SHALL normalize direction aliases before delegation and MUST NOT impleme
 
 For an unqualified `--symbol`, Code Graph SHALL select a unique case-exact name match when one exists. If several case-exact candidates exist it SHALL return a bounded deterministic ambiguity result and perform no traversal. Only when no case-exact candidate exists SHALL it consider case-insensitive exact-name candidates. Prefix, component, and textual matches MUST NOT be accepted as impact targets. Qualified and full occurrence selectors retain their existing exact semantics.
 
+The command SHALL support category inclusion and restriction options:
+
+- `--include-tests`: admit `test` category files and symbols alongside `source`
+- `--include-ignored`: admit `ignored` category files and symbols
+- `--all`: admit all categories (`source`, `test`, `ignored`)
+- `--category <categories>`: restrict admitted categories strictly to the specified category or comma-separated list of categories (e.g. `source,test`, `test`, `ignored`)
+
 ### Requirement: Provider-owned impact result filters
 
-`specd graph impact` SHALL accept `--type <types>`, `--kind <kinds>`, repeatable `--workspace <workspace>`, and repeatable `--exclude-workspace <workspace>` options for every impact target family.
+`specd graph impact` SHALL accept `--type <types>`, `--kind <kinds>`, repeatable `--workspace <workspace>`, repeatable `--exclude-workspace <workspace>`, `--include-tests`, `--include-ignored`, `--all`, and `--category <categories>` options for every impact target family.
 
 `--type` and `--kind` SHALL accept comma-separated values. The supported result types SHALL be `files`, `symbols`, and `specs`; documents are not an impact-result category. `--kind` SHALL accept the shared Code Graph symbol-kind vocabulary and SHALL be a usage error when `--type` is present without `symbols`.
 
 Repeated `--workspace` values SHALL form an inclusion set and repeated `--exclude-workspace` values SHALL form an exclusion set with the same normalization and matching semantics as `graph search`. Exclusions SHALL take precedence when a workspace occurs in both sets.
+
+`--category` SHALL validate that each comma-separated value is one of `source`, `test`, or `ignored`. `--all` admits all categories. `--include-tests` and `--include-ignored` add the respective category to the default `source` category.
 
 The CLI SHALL validate and normalize the options into one typed impact-filter request and pass that request through the existing provider operation for the selected target. The CLI MUST NOT remove files, symbols, specs, or symbol kinds from a returned impact result. Text, JSON, and TOON rendering SHALL consume the provider-filtered result while retaining pure display-path projection.
 
@@ -143,7 +152,12 @@ Spec impact output MUST surface files reached through `COVERS_FILE` and symbols 
 
 When multiple symbols match, each analysis is listed sequentially.
 
-In `json` or `toon` mode, the full result object is object as-is. The `AffectedSymbol` entries in JSON include the `depth` field.
+**Omission notices:**
+When `omittedCounts` indicates that results were filtered out (`tests > 0` or `ignored > 0`), text mode output SHALL display an omission notice:
+`ℹ Excluded from results: <count> test files, <count> ignored files. Use --include-tests, --include-ignored, or --all to view them.`
+When only one category has omissions, the notice MAY mention only that category (e.g. `ℹ Excluded from results: 14 test files. Use --include-tests or --all to view them.`).
+
+In `json` or `toon` mode, the full result object is output as-is, including `omittedCounts: { tests: number, ignored: number }`. The `AffectedSymbol` entries in JSON include the `depth` field.
 
 The JSON output MUST include aggregate impact fields to support automated risk assessment:
 
@@ -152,6 +166,7 @@ The JSON output MUST include aggregate impact fields to support automated risk a
 - `indirectDepsCount`
 - `transitiveDepsCount`
 - `affectedFilesCount`
+- `omittedCounts`
 
 ### Requirement: Pure display-path projection
 

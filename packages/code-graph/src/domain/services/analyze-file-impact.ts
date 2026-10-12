@@ -5,6 +5,7 @@ import {
   type FileImpactResult,
   type ImpactResult,
   type ImpactResultFilter,
+  resolveAdmittedCategories,
 } from '../value-objects/impact-result.js'
 import { computeRiskLevel, maxRisk } from '../value-objects/risk-level.js'
 import { type DocumentNode } from '../value-objects/document-node.js'
@@ -183,6 +184,23 @@ export async function analyzeFileImpactDetails(
 
   const symbolAffectedSpecs = new Set(symbolResults.flatMap((r) => r.affectedSpecs))
 
+  const omittedTestFiles = new Set<string>(fileImpact.omittedFiles?.tests ?? [])
+  const omittedIgnoredFiles = new Set<string>(fileImpact.omittedFiles?.ignored ?? [])
+  for (const r of symbolResults) {
+    if (r.omittedFiles) {
+      for (const f of r.omittedFiles.tests) omittedTestFiles.add(f)
+      for (const f of r.omittedFiles.ignored) omittedIgnoredFiles.add(f)
+    }
+  }
+  const omittedCounts = {
+    tests: omittedTestFiles.size,
+    ignored: omittedIgnoredFiles.size,
+  }
+  const omittedFiles = {
+    tests: [...omittedTestFiles].sort(),
+    ignored: [...omittedIgnoredFiles].sort(),
+  }
+
   return {
     result: {
       target: filePath,
@@ -197,6 +215,8 @@ export async function analyzeFileImpactDetails(
       affectedProcesses: [],
       affectedSpecs: materializesImpactType(filter, 'specs') ? [...symbolAffectedSpecs].sort() : [],
       symbols: materializesImpactType(filter, 'symbols') ? symbolResults : [],
+      omittedCounts,
+      omittedFiles,
     },
     fileDepths,
     symbolDepths,
@@ -219,81 +239,18 @@ async function analyzeFileImportImpact(
   maxDepth: number,
   filter?: ImpactResultFilter,
 ): Promise<ImpactResult & { readonly depthFiles: ReadonlyMap<number, readonly string[]> }> {
-  if (filter !== undefined) {
-    return analyzeFilteredFileImportImpact(store, filePath, direction, maxDepth, filter)
-  }
-
-  const visited = new Set<string>([filePath])
-  const depthFiles = new Map<number, string[]>()
-
-  let currentFiles = [filePath]
-
-  for (let depth = 1; depth <= maxDepth; depth++) {
-    const nextFiles: string[] = []
-
-    for (const fp of currentFiles) {
-      const relations = []
-      if (direction === 'upstream' || direction === 'both') {
-        relations.push(...(await store.getImporters(fp)))
-      }
-      if (direction === 'downstream' || direction === 'both') {
-        relations.push(...(await store.getImportees(fp)))
-      }
-
-      for (const rel of relations) {
-        // For upstream (importers): the dependent is rel.source (the file that imports us)
-        // For downstream (importees): the dependency is rel.target (the file we import)
-        // For both: pick the end that isn't the current file
-        const candidate = rel.source === fp ? rel.target : rel.source
-        if (!visited.has(candidate)) {
-          visited.add(candidate)
-          nextFiles.push(candidate)
+  const effectiveFilter: ImpactResultFilter =
+    filter?.categories !== undefined
+      ? filter
+      : {
+          ...filter,
+          categories: resolveAdmittedCategories(filter),
         }
-      }
-    }
-
-    if (nextFiles.length > 0) {
-      depthFiles.set(depth, nextFiles)
-    }
-
-    if (nextFiles.length === 0) break
-    currentFiles = nextFiles
-  }
-
-  const directDependents = depthFiles.get(1)?.length ?? 0
-  const indirectDependents = depthFiles.get(2)?.length ?? 0
-  let transitiveDependents = 0
-  for (const [depth, files] of depthFiles) {
-    if (depth >= 3) transitiveDependents += files.length
-  }
-
-  const totalDependents = directDependents + indirectDependents + transitiveDependents
-  const affectedFiles: string[] = []
-  for (const files of depthFiles.values()) {
-    affectedFiles.push(...files)
-  }
-
-  return {
-    target: filePath,
-    directDependents,
-    indirectDependents,
-    transitiveDependents,
-    riskLevel: computeRiskLevel(directDependents, totalDependents, 0),
-    affectedFiles,
-    affectedSymbols: [],
-    affectedSpecs: [],
-    affectedProcesses: [],
-    depthFiles,
-  }
+  return analyzeFilteredFileImportImpact(store, filePath, direction, maxDepth, effectiveFilter)
 }
 
 /**
  * Traverses file imports through the storage-owned filtering boundary.
- *
- * The unfiltered operation deliberately remains in {@link analyzeFileImportImpact}
- * so existing callers retain its per-file query ordering. With a filter present,
- * every depth is one admitted backend frontier before it contributes to the
- * visited set, counts, or risk.
  *
  * @param store - Graph store that owns filtered frontier admission.
  * @param filePath - Canonical root file path.
@@ -311,6 +268,8 @@ async function analyzeFilteredFileImportImpact(
 ): Promise<ImpactResult & { readonly depthFiles: ReadonlyMap<number, readonly string[]> }> {
   const visited = new Set<string>([filePath])
   const depthFiles = new Map<number, string[]>()
+  const omittedTestFiles = new Set<string>()
+  const omittedIgnoredFiles = new Set<string>()
   let currentFiles = [filePath]
 
   for (let depth = 1; depth <= maxDepth && currentFiles.length > 0; depth++) {
@@ -323,6 +282,10 @@ async function analyzeFilteredFileImportImpact(
       relationTypes: [RelationType.Imports],
       filter,
     })
+    if (result.omittedFiles) {
+      for (const f of result.omittedFiles.tests) omittedTestFiles.add(f)
+      for (const f of result.omittedFiles.ignored) omittedIgnoredFiles.add(f)
+    }
     const nextFiles = collectAdjacentFileIds(result.relations, currentFiles, direction)
       .filter((path) => !visited.has(path))
       .sort()
@@ -354,6 +317,14 @@ async function analyzeFilteredFileImportImpact(
     affectedSymbols: [],
     affectedSpecs: [],
     affectedProcesses: [],
+    omittedCounts: {
+      tests: omittedTestFiles.size,
+      ignored: omittedIgnoredFiles.size,
+    },
+    omittedFiles: {
+      tests: [...omittedTestFiles].sort(),
+      ignored: [...omittedIgnoredFiles].sort(),
+    },
     depthFiles,
   }
 }

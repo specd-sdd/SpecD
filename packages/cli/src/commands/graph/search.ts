@@ -1,14 +1,15 @@
 import { Command, Option } from 'commander'
-import { type SearchCategory, type SearchCodeGraphInput } from '@specd/sdk'
+import { type FileCategory, type SearchCategory, type SearchCodeGraphInput } from '@specd/sdk'
 import { output, parseFormat } from '../../formatter.js'
 import { cliError } from '../../handle-error.js'
 import { parseGraphKinds } from './parse-graph-kinds.js'
+import { parseFileCategories } from './parse-file-categories.js'
 import { resolveGraphCliContext } from './resolve-graph-cli-context.js'
 import { withProvider } from './with-provider.js'
 import { normalizeSnippet } from './normalize-snippet.js'
 import { splitWorkspaceIdentity, toGraphDisplayPath } from './resolve-impact-file-selectors.js'
-
 import { warnGraphStale } from './warn-graph-staleness.js'
+import { formatOmissionNotice } from './format-omission-notice.js'
 
 /**
  * Collects repeatable option values into an array.
@@ -101,6 +102,13 @@ export function registerGraphSearch(parent: Command): void {
       [],
     )
     .option('--limit <n>', 'max results per category', '10')
+    .option('--include-tests', 'include test category files and symbols alongside source')
+    .option('--include-ignored', 'include ignored category files and symbols')
+    .option('--all', 'include all categories (source, test, ignored)')
+    .option(
+      '--category <categories>',
+      'restrict search results strictly to source|test|ignored (comma-separated)',
+    )
     .option('--spec-content', 'include full spec content (only with --format json|toon)')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .addHelpText(
@@ -148,6 +156,7 @@ JSON/TOON output schema:
       endLine: number
       snippet?: string
     }>
+    omittedCounts: { tests: number, ignored: number }
   }
 
 Exclude examples:
@@ -174,6 +183,10 @@ Exclude examples:
           excludeWorkspace: string[]
           specContent?: boolean
           limit: string
+          includeTests?: boolean
+          includeIgnored?: boolean
+          all?: boolean
+          category?: string
           format: string
         },
       ) => {
@@ -187,6 +200,26 @@ Exclude examples:
         }
         if (opts.config !== undefined && opts.path !== undefined) {
           cliError('--config and --path are mutually exclusive', opts.format, 1)
+        }
+        const parsedCategories = parseFileCategories(opts.category, opts.format)
+        let fileCategories: readonly FileCategory[] | undefined = undefined
+        let includeTests: boolean | undefined = undefined
+        let includeIgnored: boolean | undefined = undefined
+
+        if (opts.all) {
+          fileCategories = ['source', 'test', 'ignored']
+          includeTests = true
+          includeIgnored = true
+        } else {
+          if (parsedCategories !== undefined) {
+            fileCategories = parsedCategories
+          }
+          if (opts.includeTests) {
+            includeTests = true
+          }
+          if (opts.includeIgnored) {
+            includeIgnored = true
+          }
         }
         const searchAll = !opts.symbols && !opts.files && !opts.specs && !opts.documents
         const kinds = (() => {
@@ -231,6 +264,9 @@ Exclude examples:
               ...(opts.excludeWorkspace.length > 0
                 ? { excludeWorkspaces: opts.excludeWorkspace }
                 : undefined),
+              ...(fileCategories !== undefined ? { fileCategories } : undefined),
+              ...(includeTests !== undefined ? { includeTests } : undefined),
+              ...(includeIgnored !== undefined ? { includeIgnored } : undefined),
             }
 
             const {
@@ -238,6 +274,7 @@ Exclude examples:
               files: fileResults,
               specs: specResults,
               documents: documentResults,
+              omittedCounts,
             } = await provider.search(searchInput)
 
             const toDisplayPath = (canonicalPath: string): string =>
@@ -353,6 +390,12 @@ Exclude examples:
                 lines.push('No results found.')
               }
 
+              const omissionNotice = formatOmissionNotice(omittedCounts)
+              if (omissionNotice !== undefined) {
+                lines.push('')
+                lines.push(omissionNotice)
+              }
+
               output(lines.join('\n'), 'text')
             } else {
               output(
@@ -413,6 +456,7 @@ Exclude examples:
                       ...(opts.snippet ? { snippet } : {}),
                     }),
                   ),
+                  omittedCounts: omittedCounts ?? { tests: 0, ignored: 0 },
                 },
                 fmt,
               )

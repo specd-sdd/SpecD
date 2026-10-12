@@ -263,22 +263,22 @@ The Code Graph is a core SpecD pillar: AST symbols, call and import edges, spec 
   specd graph index --force --exclude-path "**/dist/**"
   ```
 - **`specd graph stats`**: File, document, symbol, and spec counts, relation totals, and freshness (`Content fresh`, `Known stale`, coverage completeness).
-- **`specd graph search "<query>"`**: With no category flag, searches symbols, source files, specs, and documents. Narrow with `--symbols`, `--files`, `--specs`, or `--documents`. Useful flags: `--kind`, `--snippet`, `--spec-content` (json/toon only), `--workspace`, `--exclude-workspace`, `--file`, `--exclude-path`, `--limit`.
+- **`specd graph search "<query>"`**: With no category flag, searches symbols, source files, specs, and documents. Narrow with `--symbols`, `--files`, `--specs`, or `--documents`. Useful flags: `--kind`, `--snippet`, `--spec-content` (json/toon only), `--workspace`, `--exclude-workspace`, `--file`, `--exclude-path`, `--limit`, `--category <categories>`, `--include-tests`, `--include-ignored`, `--all`.
   ```bash
   specd graph search "archive pattern" --specs --spec-content --format toon
   specd graph search "cascade resolution" --documents --snippet --format text
-  specd graph search "createChange" --symbols --kind function --exclude-path "*:test/*"
+  specd graph search "createChange" --symbols --kind function --format text
   ```
-- **`specd graph impact`**: Blast radius. Pass exactly one of `--symbol`, `--file` (repeatable, aggregated), `--spec <workspace:capability-path>`, or `--export <name> --from <surface>`. `--direction` is `dependents` (default; alias `upstream`), `dependencies` (alias `downstream`), or `both`. `--depth` defaults to `3`.
+- **`specd graph impact`**: Blast radius. Pass exactly one of `--symbol`, `--file` (repeatable, aggregated), `--spec <workspace:capability-path>`, or `--export <name> --from <surface>`. `--direction` is `dependents` (default; alias `upstream`), `dependencies` (alias `downstream`), or `both`. `--depth` defaults to `3`. Category flags: `--category <categories>`, `--include-tests`, `--include-ignored`, `--all`.
   ```bash
   specd graph impact --symbol "resolveCliContext" --direction dependents --format toon
   specd graph impact --file "packages/core/src/domain/entities/change.ts" --file "packages/core/src/application/use-cases/edit-change.ts" --direction dependents
   specd graph impact --spec "core:core/transition-change" --direction both --depth 2
   specd graph impact --export "SpecdConfig" --from "core:src/public.ts" --direction dependents
   ```
-- **`specd graph hotspots`**: Ranks coupled symbols. Defaults: kinds `class,method,function`, `--min-risk MEDIUM`, `--min-score 1`, `--limit 20`. `--kind` replaces the default kinds. `--include-importer-only` adds symbols scored only from imports.
+- **`specd graph hotspots`**: Ranks coupled symbols. Defaults: kinds `class,method,function`, `--min-risk MEDIUM`, `--min-score 1`, `--limit 20`, source files only. `--kind` replaces the default kinds. `--include-importer-only` adds symbols scored only from imports. Category flags: `--category <categories>`, `--include-tests`, `--include-ignored`, `--all`.
   ```bash
-  specd graph hotspots --min-risk HIGH --exclude-path "*:test/*" --format toon
+  specd graph hotspots --min-risk HIGH --format toon
   ```
 
 👉 _See [Code Graph & Intelligence](./code-graph.md) for playbooks, and [Graph Reference](../cli/graph.md) for the command contract._

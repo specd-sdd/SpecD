@@ -13,3 +13,4 @@ export {
   type ScopedBindingEnvironment,
   type SymbolLookup,
 } from './scoped-binding-environment.js'
+export { classifyFileCategory } from './classify-file-category.js'

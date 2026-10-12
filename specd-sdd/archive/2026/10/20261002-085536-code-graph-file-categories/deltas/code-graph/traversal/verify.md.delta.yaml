@@ -1,0 +1,164 @@
+- op: modified
+  description: 'Add category isolation and anchored target scenarios to Impact analysis'
+  selector:
+    type: section
+    matches: 'Requirement: Impact analysis'
+  content: |
+    #### Scenario: LOW risk — no dependents
+
+    - **GIVEN** a symbol with 0 callers
+    - **WHEN** `analyzeImpact(store, symbol.id, 'upstream')` is called
+    - **THEN** `riskLevel` is `LOW` and `directDependents` is 0
+
+    #### Scenario: MEDIUM risk — few direct dependents
+
+    - **GIVEN** a symbol with 4 direct callers and 0 indirect
+    - **WHEN** `analyzeImpact(store, symbol.id, 'upstream')` is called
+    - **THEN** `riskLevel` is `MEDIUM`
+
+    #### Scenario: HIGH risk — many direct dependents
+
+    - **GIVEN** a symbol with 8 direct callers
+    - **WHEN** `analyzeImpact(store, symbol.id, 'upstream')` is called
+    - **THEN** `riskLevel` is `HIGH`
+
+    #### Scenario: CRITICAL risk — widely used symbol
+
+    - **GIVEN** a symbol with 25 total dependents across all depths
+    - **WHEN** `analyzeImpact(store, symbol.id, 'upstream')` is called
+    - **THEN** `riskLevel` is `CRITICAL`
+
+    #### Scenario: Risk thresholds map dependent counts to levels
+
+    - **GIVEN** a symbol with 0 total dependents
+    - **WHEN** `analyzeImpact(store, symbol.id, 'upstream')` is called
+    - **THEN** `riskLevel` is `LOW`
+    - **GIVEN** a symbol with 4 direct callers and 0 indirect callers
+    - **WHEN** `analyzeImpact(store, symbol.id, 'upstream')` is called
+    - **THEN** `riskLevel` is `MEDIUM`
+    - **GIVEN** a symbol with 8 direct callers
+    - **WHEN** `analyzeImpact(store, symbol.id, 'upstream')` is called
+    - **THEN** `riskLevel` is `HIGH`
+    - **GIVEN** a symbol with 25 total dependents across all depths
+    - **WHEN** `analyzeImpact(store, symbol.id, 'upstream')` is called
+    - **THEN** `riskLevel` is `CRITICAL`
+
+    #### Scenario: affectedFiles deduplication
+
+    - **GIVEN** symbols A and B are both in `src/utils.ts` and both are callers of target
+    - **WHEN** `analyzeImpact` is called
+    - **THEN** `affectedFiles` contains `src/utils.ts` only once
+
+    #### Scenario: affectedSymbols include depth
+
+    - **GIVEN** a call chain: D calls C, C calls B, B calls target
+    - **WHEN** `analyzeImpact(store, target.id, 'upstream')` is called
+    - **THEN** `affectedSymbols` contains B with `depth: 1`, C with `depth: 2`, D with `depth: 3`
+
+    #### Scenario: custom maxDepth limits traversal
+
+    - **GIVEN** a call chain of depth 5
+    - **WHEN** `analyzeImpact(store, target.id, 'upstream', 5)` is called
+    - **THEN** symbols up to depth 5 are included in `affectedSymbols`
+    - **AND** `transitiveDependents` counts depths 3 through 5
+
+    #### Scenario: default maxDepth is 3
+
+    - **GIVEN** a call chain of depth 5
+    - **WHEN** `analyzeImpact(store, target.id, 'upstream')` is called without maxDepth
+    - **THEN** only symbols up to depth 3 are included
+
+    #### Scenario: maxDepth 1 returns only direct dependents
+
+    - **GIVEN** a symbol with direct and indirect callers
+    - **WHEN** `analyzeImpact(store, target.id, 'upstream', 1)` is called
+    - **THEN** only depth-1 symbols are returned
+    - **AND** `indirectDependents` and `transitiveDependents` are 0
+
+    #### Scenario: Base type change affects inheritors and implementors
+
+    - **GIVEN** a type symbol with persisted `EXTENDS` and `IMPLEMENTS` dependents
+    - **WHEN** `analyzeImpact(store, target.id, 'upstream')` is called
+    - **THEN** those hierarchy-dependent symbols are included in `affectedSymbols`
+    - **AND** their files contribute to `affectedFiles`
+
+    #### Scenario: Base method change affects overriding methods
+
+    - **GIVEN** a method symbol with persisted `OVERRIDES` dependents
+    - **WHEN** `analyzeImpact(store, target.id, 'upstream')` is called
+    - **THEN** overriding methods are included in `affectedSymbols`
+
+    #### Scenario: Test callers do not inflate risk level or dependents
+
+    - **GIVEN** a production symbol called by 1 production module and 20 test files
+    - **WHEN** `analyzeImpact(store, symbol.id, 'upstream')` is called with default categories
+    - **THEN** `directDependents` is 1
+    - **AND** `riskLevel` is `LOW`
+    - **AND** `omittedCounts.tests` is 20
+
+    #### Scenario: Anchored test target traverses dependencies
+
+    - **GIVEN** a test file target `test/my.spec.ts`
+    - **WHEN** `analyzeFileImpact(store, 'test/my.spec.ts', 'downstream')` is called
+    - **THEN** downstream dependencies of `test/my.spec.ts` are returned in `affectedFiles`
+
+- op: modified
+  description: 'Add BFS pruning through non-admitted files scenario to Filtered impact results'
+  selector:
+    type: section
+    matches: 'Requirement: Filtered impact results'
+  content: |
+    #### Scenario: Omitted filter preserves legacy impact
+
+    - **GIVEN** the same graph and impact target
+    - **WHEN** impact analysis runs once without a filter and once with an omitted optional filter
+    - **THEN** both results have identical traversal evidence, aggregates, risk, and deterministic ordering
+
+    #### Scenario: Kind and workspace eligibility shape aggregates
+
+    - **GIVEN** reachable symbols of several kinds across included and excluded workspaces
+    - **WHEN** impact analysis receives symbol-kind, workspace-inclusion, and workspace-exclusion predicates
+    - **THEN** returned symbols contain only admitted kinds and workspaces
+    - **AND** depth counts, risk, affected files, and covering-spec evidence are derived from the admitted traversal evidence
+
+    #### Scenario: Result types control materialized categories
+
+    - **GIVEN** admitted reachability can produce file, symbol, and spec results
+    - **WHEN** the filter requests only `files` and `specs`
+    - **THEN** Code Graph materializes those categories without returning a symbol collection for CLI-side removal
+    - **AND** it may use admitted symbol reachability internally to derive the requested categories
+
+    #### Scenario: Symbol specs are derived from admitted coverage
+
+    - **GIVEN** an impacted symbol or its admitted file is covered by indexed specs
+    - **WHEN** symbol impact requests only the `specs` result type
+    - **THEN** `affectedSpecs` contains the deterministic covering spec identifiers
+    - **AND** `affectedFiles` and `affectedSymbols` remain present as empty arrays
+
+    #### Scenario: Spec impact derives files from symbol coverage under files-only filter
+
+    - **GIVEN** a spec covers only symbols whose owning files are in the graph
+    - **WHEN** spec impact requests only the `files` result type
+    - **THEN** `affectedFiles` contains the owning files of those covered symbols
+    - **AND** `affectedSymbols` remains an empty array
+
+    #### Scenario: File impact derives specs from call-affected symbols under specs-only filter
+
+    - **GIVEN** a file's root symbols have call-affected dependents that have spec coverage
+    - **WHEN** file impact requests only the `specs` result type
+    - **THEN** `affectedSpecs` and `coveringSpecs` contain the covering specs discovered through the full blast-radius traversal
+    - **AND** `affectedFiles` and `affectedSymbols` remain empty arrays while impact counts and risk reflect the full admitted traversal
+
+    #### Scenario: Filtering precedes result limits
+
+    - **GIVEN** excluded candidates would otherwise occupy the available result limit
+    - **WHEN** filtered impact analysis executes
+    - **THEN** the store predicates exclude those candidates before the final limit
+    - **AND** admitted candidates fill the deterministic result up to that limit
+
+    #### Scenario: Category filter prunes BFS traversal through test files
+
+    - **GIVEN** module A called by test file T, and test file T also imports module B
+    - **WHEN** `analyzeImpact(store, A.id, 'both')` is called with default categories
+    - **THEN** BFS expansion halts at test file T
+    - **AND** module B is NOT reached through test file T

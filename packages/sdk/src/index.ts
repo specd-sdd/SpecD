@@ -104,6 +104,9 @@ export {
   type CoveringSpecEvidence,
   type CoveringSpecImpact,
   type ImpactResult,
+  type FileCategory,
+  FILE_CATEGORIES,
+  type OmittedCounts,
   CODE_GRAPH_VERSION,
 } from '@specd/code-graph'
 

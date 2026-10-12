@@ -22,13 +22,23 @@ export interface ProjectGraphConfig {
   readonly includePaths?: readonly string[]
 
   /**
-   * Global exclusion patterns applied to file/document discovery.
+   * Optional global exclusion patterns applied to file/document discovery.
    *
    * These patterns are relative to the project root and are merged with
    * synthetic spec-root exclusions during effective discovery resolution.
    * Workspace-local excludes are additive on top of this global set.
    */
   readonly excludePaths?: readonly string[]
+
+  /**
+   * Optional project-level test file patterns.
+   */
+  readonly testPaths?: readonly string[]
+
+  /**
+   * Optional project-level ignored file patterns.
+   */
+  readonly ignorePaths?: readonly string[]
 
   /**
    * Per-workspace graph overrides.
@@ -49,6 +59,16 @@ export interface ProjectGraphConfig {
        * These patterns are additive on top of the resolved global exclusion set.
        */
       readonly excludePaths?: readonly string[]
+
+      /**
+       * Optional workspace-level test file patterns.
+       */
+      readonly testPaths?: readonly string[]
+
+      /**
+       * Optional workspace-level ignored file patterns.
+       */
+      readonly ignorePaths?: readonly string[]
 
       /**
        * Whether `.gitignore` files are loaded and applied during file discovery.

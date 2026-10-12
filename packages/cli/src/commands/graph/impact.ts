@@ -2,6 +2,7 @@ import { Command, Option } from 'commander'
 import {
   type CoveringSpecImpact,
   createCodeGraphProvider,
+  type FileCategory,
   type FileImpactResult,
   GraphSpecNotFoundError as SpecNotFoundError,
   type SpecdConfig,
@@ -11,12 +12,14 @@ import { output, parseFormat } from '../../formatter.js'
 import { resolveGraphCliContext } from './resolve-graph-cli-context.js'
 import { withProvider } from './with-provider.js'
 import { warnGraphStale } from './warn-graph-staleness.js'
+import { formatOmissionNotice } from './format-omission-notice.js'
 import {
   resolveImpactFileSelectors,
   splitWorkspaceIdentity,
   toGraphDisplayPath,
 } from './resolve-impact-file-selectors.js'
 import { parseGraphKinds } from './parse-graph-kinds.js'
+import { parseFileCategories } from './parse-file-categories.js'
 
 /** Provider-supported graph impact traversal directions. */
 type ImpactDirection = 'upstream' | 'downstream' | 'both'
@@ -69,6 +72,10 @@ function normalizeRepeatedValues(values: readonly string[]): string[] {
  * @param opts.kind - Comma-separated symbol kinds.
  * @param opts.workspace - Repeated included workspace names.
  * @param opts.excludeWorkspace - Repeated excluded workspace names.
+ * @param opts.category - Category filter constraint.
+ * @param opts.includeTests - Whether to include test category files.
+ * @param opts.includeIgnored - Whether to include ignored category files.
+ * @param opts.all - Whether to include all categories.
  * @param format - Raw output format used for CLI errors.
  * @returns One provider filter, or undefined when no filter flags were supplied.
  */
@@ -78,9 +85,15 @@ function normalizeImpactResultFilter(
     readonly kind?: string
     readonly workspace: readonly string[]
     readonly excludeWorkspace: readonly string[]
+    readonly category?: string
+    readonly includeTests?: boolean
+    readonly includeIgnored?: boolean
+    readonly all?: boolean
   },
   format: string,
 ): ImpactResultFilter | undefined {
+  const parsedCategories = parseFileCategories(opts.category, format)
+
   const types =
     opts.type === undefined
       ? undefined
@@ -107,17 +120,44 @@ function normalizeImpactResultFilter(
 
   const workspaces = normalizeRepeatedValues(opts.workspace)
   const excludeWorkspaces = normalizeRepeatedValues(opts.excludeWorkspace)
+
+  let categories: readonly FileCategory[] | undefined = undefined
+  let includeTests: boolean | undefined = undefined
+  let includeIgnored: boolean | undefined = undefined
+
+  if (opts.all) {
+    categories = ['source', 'test', 'ignored']
+    includeTests = true
+    includeIgnored = true
+  } else {
+    if (parsedCategories !== undefined) {
+      categories = parsedCategories
+    }
+    if (opts.includeTests) {
+      includeTests = true
+    }
+    if (opts.includeIgnored) {
+      includeIgnored = true
+    }
+  }
+
   if (
     types === undefined &&
     kinds === undefined &&
     workspaces.length === 0 &&
-    excludeWorkspaces.length === 0
+    excludeWorkspaces.length === 0 &&
+    categories === undefined &&
+    includeTests === undefined &&
+    includeIgnored === undefined
   ) {
     return undefined
   }
   return {
     ...(types === undefined ? {} : { types }),
     ...(kinds === undefined ? {} : { kinds }),
+    ...(categories === undefined ? {} : { categories }),
+    ...(includeTests === undefined ? {} : { includeTests }),
+    ...(includeIgnored === undefined ? {} : { includeIgnored }),
     workspaces,
     excludeWorkspaces,
   }
@@ -311,6 +351,13 @@ export function registerGraphImpact(parent: Command): void {
       [],
     )
     .option('--depth <n>', 'max traversal depth (positive integer)', '3')
+    .option('--include-tests', 'include test category files and symbols')
+    .option('--include-ignored', 'include ignored category files and symbols')
+    .option('--all', 'include all categories (source, test, ignored)')
+    .option(
+      '--category <categories>',
+      'restrict admitted categories strictly to source|test|ignored (comma-separated)',
+    )
     .option('--config <path>', 'path to specd.yaml')
     .option('--path <path>', 'repository root for bootstrap mode')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
@@ -340,7 +387,7 @@ JSON/TOON output schema:
   ImpactResult: { target, directDependents, indirectDependents, transitiveDependents,
     riskLevel: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL", affectedFiles: string[],
     affectedSymbols: Array<{ id, name, filePath }>, affectedSpecs: string[],
-    affectedProcesses: string[] }
+    affectedProcesses: string[], omittedCounts: { tests: number, ignored: number } }
 `,
     )
     .action(
@@ -356,6 +403,10 @@ JSON/TOON output schema:
         workspace: string[]
         excludeWorkspace: string[]
         depth: string
+        includeTests?: boolean
+        includeIgnored?: boolean
+        all?: boolean
+        category?: string
         config?: string
         path?: string
         format: string
@@ -539,9 +590,26 @@ async function handlePublicExportImpact(
         (line) => `  ${line}`,
       ),
     ]
+    const omissionNotice =
+      formatOmissionNotice(result.canonicalImpact.omittedCounts) ??
+      formatOmissionNotice(result.bindingImpact.omittedCounts)
+    if (omissionNotice !== undefined) {
+      lines.push('')
+      lines.push(omissionNotice)
+    }
     output(lines.join('\n'), 'text')
   } else {
-    output({ export: exportedName, from: surface, resolution, ...result }, fmt)
+    output(
+      {
+        export: exportedName,
+        from: surface,
+        resolution,
+        ...result,
+        omittedCounts: result.canonicalImpact.omittedCounts ??
+          result.bindingImpact.omittedCounts ?? { tests: 0, ignored: 0 },
+      },
+      fmt,
+    )
   }
 }
 
@@ -614,6 +682,11 @@ async function handleFilesImpact(
         }
       }
       lines.push(...formatCoveringSpecs(result.coveringSpecs))
+      const omissionNotice = formatOmissionNotice(result.omittedCounts)
+      if (omissionNotice !== undefined) {
+        lines.push('')
+        lines.push(omissionNotice)
+      }
       output(lines.join('\n'), 'text')
     } else {
       output(
@@ -626,6 +699,7 @@ async function handleFilesImpact(
           indirectDepsCount: result.indirectDependents,
           transitiveDepsCount: result.transitiveDependents,
           affectedFilesCount: result.affectedFiles.length,
+          omittedCounts: result.omittedCounts ?? { tests: 0, ignored: 0 },
         },
         fmt,
       )
@@ -686,6 +760,11 @@ async function handleFilesImpact(
       )
     }
     lines.push(...formatCoveringSpecs(result.coveringSpecs))
+    const omissionNotice = formatOmissionNotice(result.omittedCounts)
+    if (omissionNotice !== undefined) {
+      lines.push('')
+      lines.push(omissionNotice)
+    }
     output(lines.join('\n'), 'text')
   } else {
     output(
@@ -697,6 +776,7 @@ async function handleFilesImpact(
         indirectDepsCount: result.indirectDependents,
         transitiveDepsCount: result.transitiveDependents,
         affectedFilesCount: result.affectedFiles.length,
+        omittedCounts: result.omittedCounts ?? { tests: 0, ignored: 0 },
         // Legacy fields for backward compatibility
         directDependents: result.directDependents,
         indirectDependents: result.indirectDependents,
@@ -816,6 +896,11 @@ async function handleSymbolImpact(
       displayResult,
       maxDepth,
     )
+    const omissionNotice = formatOmissionNotice(result.omittedCounts)
+    if (omissionNotice !== undefined) {
+      lines.push('')
+      lines.push(omissionNotice)
+    }
     output(lines.join('\n'), 'text')
   } else {
     output(
@@ -827,6 +912,7 @@ async function handleSymbolImpact(
         indirectDepsCount: result.indirectDependents,
         transitiveDepsCount: result.transitiveDependents,
         affectedFilesCount: result.affectedFiles.length,
+        omittedCounts: result.omittedCounts ?? { tests: 0, ignored: 0 },
         impact: displayResult,
       },
       fmt,
@@ -872,7 +958,13 @@ async function handleSpecImpact(
     })),
   }
   if (fmt === 'text') {
-    output(formatSpecImpact(spec.specId, displayResult, maxDepth).join('\n'), 'text')
+    const lines = formatSpecImpact(spec.specId, displayResult, maxDepth)
+    const omissionNotice = formatOmissionNotice(result.omittedCounts)
+    if (omissionNotice !== undefined) {
+      lines.push('')
+      lines.push(omissionNotice)
+    }
+    output(lines.join('\n'), 'text')
   } else {
     output(
       {
@@ -882,6 +974,7 @@ async function handleSpecImpact(
         indirectDepsCount: result.indirectDependents,
         transitiveDepsCount: result.transitiveDependents,
         affectedFilesCount: result.affectedFiles.length,
+        omittedCounts: result.omittedCounts ?? { tests: 0, ignored: 0 },
         impact: displayResult,
       },
       fmt,

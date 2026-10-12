@@ -77,6 +77,23 @@ export function graphStoreContractTests(
         expect(retrieved).toBeDefined()
         expect(retrieved!.path).toBe('src/main.ts')
         expect(retrieved!.language).toBe('typescript')
+        expect(retrieved!.category).toBe('source')
+      })
+
+      it('persists and retrieves file category', async () => {
+        const file = createFileNode({
+          path: 'test/main.spec.ts',
+          configRelativePath: 'test/main.spec.ts',
+          language: 'typescript',
+          contentHash: 'sha256:spec',
+          workspace: '/project',
+          category: 'test',
+        })
+        await store.upsertFile(file, [], [])
+
+        const retrieved = await store.getFile('test/main.spec.ts')
+        expect(retrieved).toBeDefined()
+        expect(retrieved!.category).toBe('test')
       })
 
       it('upserts and retrieves a document', async () => {
@@ -1144,6 +1161,64 @@ export function graphStoreContractTests(
           upper,
           lower,
         ])
+      })
+
+      it('findSymbols filters by category', async () => {
+        const sourceFile = createFileNode({
+          path: 'src/main.ts',
+          configRelativePath: '',
+          language: 'typescript',
+          contentHash: 'sha256:src',
+          workspace: '/project',
+          category: 'source',
+        })
+        const testFile = createFileNode({
+          path: 'test/main.spec.ts',
+          configRelativePath: '',
+          language: 'typescript',
+          contentHash: 'sha256:test',
+          workspace: '/project',
+          category: 'test',
+        })
+        const ignoredFile = createFileNode({
+          path: 'dist/bundle.js',
+          configRelativePath: '',
+          language: 'javascript',
+          contentHash: 'sha256:ign',
+          workspace: '/project',
+          category: 'ignored',
+        })
+        const srcSym = createSymbolNode({
+          name: 'targetFn',
+          kind: SymbolKind.Function,
+          filePath: sourceFile.path,
+          line: 1,
+          column: 0,
+        })
+        const testSym = createSymbolNode({
+          name: 'targetFn',
+          kind: SymbolKind.Function,
+          filePath: testFile.path,
+          line: 1,
+          column: 0,
+        })
+        const ignSym = createSymbolNode({
+          name: 'targetFn',
+          kind: SymbolKind.Function,
+          filePath: ignoredFile.path,
+          line: 1,
+          column: 0,
+        })
+
+        await store.upsertFile(sourceFile, [srcSym], [])
+        await store.upsertFile(testFile, [testSym], [])
+        await store.upsertFile(ignoredFile, [ignSym], [])
+
+        const result = await store.findSymbols({ categories: ['source'] })
+        expect(result).toEqual([srcSym])
+
+        const testResult = await store.findSymbols({ categories: ['test'] })
+        expect(testResult).toEqual([testSym])
       })
 
       it('getStatistics returns correct counts', async () => {

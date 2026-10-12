@@ -1,12 +1,14 @@
 import { Command, Option } from 'commander'
-import { type HotspotOptions, type RiskLevel, SymbolKind } from '@specd/sdk'
+import { type FileCategory, type HotspotOptions, type RiskLevel, SymbolKind } from '@specd/sdk'
 import { output, parseFormat } from '../../formatter.js'
 import { cliError } from '../../handle-error.js'
 import { parseGraphKinds } from './parse-graph-kinds.js'
+import { parseFileCategories } from './parse-file-categories.js'
 import { resolveGraphCliContext } from './resolve-graph-cli-context.js'
 import { splitWorkspaceIdentity, toGraphDisplayPath } from './resolve-impact-file-selectors.js'
 import { withProvider } from './with-provider.js'
 import { warnGraphStale } from './warn-graph-staleness.js'
+import { formatOmissionNotice } from './format-omission-notice.js'
 
 /**
  * Collects repeatable option values into an array.
@@ -74,6 +76,16 @@ export function registerGraphHotspots(parent: Command): void {
         'CRITICAL',
       ]),
     )
+    .option(
+      '--include-tests',
+      'include test category files in caller metrics and candidate rankings',
+    )
+    .option('--include-ignored', 'include ignored category files')
+    .option('--all', 'include all categories (source, test, ignored)')
+    .option(
+      '--category <categories>',
+      'restrict candidates and caller metrics strictly to source|test|ignored (comma-separated)',
+    )
     .option('--config <path>', 'path to specd.yaml')
     .option('--path <path>', 'repository root for bootstrap mode')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
@@ -93,6 +105,7 @@ JSON/TOON output schema:
       workspace: string
       displayPath: string
     }>
+    omittedCounts: { tests: number, ignored: number }
   }
 
   displayPath is the config-relative project path projected from the
@@ -125,12 +138,17 @@ Exclude examples:
         minScore?: string
         minRisk?: string
         includeImporterOnly?: boolean
+        includeTests?: boolean
+        includeIgnored?: boolean
+        all?: boolean
+        category?: string
         format: string
       }) => {
         const fmt = parseFormat(opts.format)
         if (opts.config !== undefined && opts.path !== undefined) {
           cliError('--config and --path are mutually exclusive', opts.format, 1)
         }
+        const parsedCategories = parseFileCategories(opts.category, opts.format)
         const kinds = (() => {
           try {
             return parseGraphKinds(opts.kind)
@@ -153,6 +171,26 @@ Exclude examples:
           opts.format,
           async (provider) => {
             await warnGraphStale(provider, config, kernel)
+            let categories: readonly FileCategory[] | undefined = undefined
+            let includeTests: boolean | undefined = undefined
+            let includeIgnored: boolean | undefined = undefined
+
+            if (opts.all) {
+              categories = ['source', 'test', 'ignored']
+              includeTests = true
+              includeIgnored = true
+            } else {
+              if (parsedCategories !== undefined) {
+                categories = parsedCategories
+              }
+              if (opts.includeTests) {
+                includeTests = true
+              }
+              if (opts.includeIgnored) {
+                includeIgnored = true
+              }
+            }
+
             const options: HotspotOptions = {
               ...(opts.workspace ? { workspace: opts.workspace } : undefined),
               kinds: kinds ?? [...CLI_DEFAULT_HOTSPOT_KINDS],
@@ -167,13 +205,22 @@ Exclude examples:
                 : undefined),
               ...(opts.minRisk !== undefined ? { minRisk: opts.minRisk as RiskLevel } : undefined),
               ...(opts.includeImporterOnly === true ? { includeImporterOnly: true } : undefined),
+              ...(categories !== undefined ? { categories } : undefined),
+              ...(includeTests !== undefined ? { includeTests } : undefined),
+              ...(includeIgnored !== undefined ? { includeIgnored } : undefined),
             }
 
             const result = await provider.getHotspots(options)
 
             if (fmt === 'text') {
               if (result.entries.length === 0) {
-                output('No hotspots found.', 'text')
+                const lines = ['No hotspots found.']
+                const omissionNotice = formatOmissionNotice(result.omittedCounts)
+                if (omissionNotice !== undefined) {
+                  lines.push('')
+                  lines.push(omissionNotice)
+                }
+                output(lines.join('\n'), 'text')
                 return
               }
 
@@ -200,6 +247,12 @@ Exclude examples:
                 )
               }
 
+              const omissionNotice = formatOmissionNotice(result.omittedCounts)
+              if (omissionNotice !== undefined) {
+                lines.push('')
+                lines.push(omissionNotice)
+              }
+
               output(lines.join('\n'), 'text')
             } else {
               output(
@@ -215,6 +268,7 @@ Exclude examples:
                     workspace: splitWorkspaceIdentity(e.symbol.filePath)?.workspace ?? '',
                     displayPath: toGraphDisplayPath(config, e.symbol.filePath),
                   })),
+                  omittedCounts: result.omittedCounts ?? { tests: 0, ignored: 0 },
                 },
                 fmt,
               )

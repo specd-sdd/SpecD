@@ -46,6 +46,8 @@ export {
   type SpecdStorageConfig,
   type SpecdContextEntry,
   isSpecdConfig,
+  DEFAULT_GRAPH_TEST_PATHS,
+  DEFAULT_GRAPH_IGNORE_PATHS,
 } from './application/specd-config.js'
 export { Logger } from './application/logger.js'
 export { TemplateExpander } from './application/template-expander.js'

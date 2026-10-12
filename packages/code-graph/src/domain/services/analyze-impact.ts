@@ -3,6 +3,7 @@ import {
   type ImpactResult,
   type AffectedSymbol,
   type ImpactResultFilter,
+  resolveAdmittedCategories,
 } from '../value-objects/impact-result.js'
 import {
   type DeclarationOccurrence,
@@ -12,8 +13,6 @@ import {
   type SymbolResolutionResult,
 } from '../value-objects/symbol-reference.js'
 import { computeRiskLevel } from '../value-objects/risk-level.js'
-import { getUpstream } from './get-upstream.js'
-import { getDownstream } from './get-downstream.js'
 import { RelationType } from '../value-objects/relation-type.js'
 import { collectImpactSpecIds } from './collect-impact-specs.js'
 
@@ -153,153 +152,21 @@ async function analyzeTraversalTargets(
   maxDepth: number,
   filter?: ImpactResultFilter,
 ): Promise<ImpactResult> {
-  if (filter !== undefined) {
-    return analyzeFilteredTraversalTargets(
-      store,
-      traversalTargets,
-      resultTarget,
-      direction,
-      maxDepth,
-      filter,
-    )
-  }
-
-  // CALLS-based traversal (symbol-level)
-  const results = []
-  for (const traversalTarget of [...new Set(traversalTargets)].sort()) {
-    if (direction === 'upstream' || direction === 'both') {
-      results.push(await getUpstream(store, traversalTarget, { maxDepth, includeFiles: false }))
-    }
-    if (direction === 'downstream' || direction === 'both') {
-      results.push(await getDownstream(store, traversalTarget, { maxDepth, includeFiles: false }))
-    }
-  }
-
-  const affectedFileSet = new Set<string>()
-  const allSymbolsByDepth = new Map<number, Set<string>>()
-  const affectedSymbolMap = new Map<string, AffectedSymbol>()
-
-  for (const result of results) {
-    for (const [depth, symbols] of result.levels) {
-      if (!allSymbolsByDepth.has(depth)) {
-        allSymbolsByDepth.set(depth, new Set())
-      }
-      const depthSet = allSymbolsByDepth.get(depth)!
-      for (const symbol of symbols) {
-        depthSet.add(symbol.id)
-        affectedFileSet.add(symbol.filePath)
-        if (!affectedSymbolMap.has(symbol.id)) {
-          affectedSymbolMap.set(symbol.id, {
-            id: symbol.id,
-            name: symbol.name,
-            filePath: symbol.filePath,
-            line: symbol.line,
-            depth,
-          })
+  const effectiveFilter: ImpactResultFilter =
+    filter?.categories !== undefined
+      ? filter
+      : {
+          ...filter,
+          categories: resolveAdmittedCategories(filter),
         }
-      }
-    }
-  }
-
-  // IMPORTS-based traversal (file-level) — tracked separately to avoid
-  // conflating file-level and symbol-level dependent counts.
-  const filesByDepth = new Map<number, Set<string>>()
-  const rootSymbols = (
-    await Promise.all(traversalTargets.map((traversalTarget) => store.getSymbol(traversalTarget)))
-  ).filter((symbol) => symbol !== undefined)
-  if (rootSymbols.length > 0) {
-    const rootFiles = [...new Set(rootSymbols.map((symbol) => symbol.filePath))].sort()
-    const visited = new Set<string>(rootFiles)
-    let currentFiles = rootFiles
-
-    for (let depth = 1; depth <= maxDepth; depth++) {
-      const nextFiles: string[] = []
-
-      for (const fp of currentFiles) {
-        const relations = []
-        if (direction === 'upstream' || direction === 'both') {
-          relations.push(...(await store.getImporters(fp)))
-        }
-        if (direction === 'downstream' || direction === 'both') {
-          relations.push(...(await store.getImportees(fp)))
-        }
-
-        for (const rel of relations) {
-          const file = rel.source === fp ? rel.target : rel.source
-          if (!visited.has(file)) {
-            visited.add(file)
-            nextFiles.push(file)
-            affectedFileSet.add(file)
-
-            if (!filesByDepth.has(depth)) {
-              filesByDepth.set(depth, new Set())
-            }
-            filesByDepth.get(depth)!.add(file)
-          }
-        }
-      }
-
-      if (nextFiles.length === 0) break
-      currentFiles = nextFiles
-    }
-  }
-
-  for (let depth = 1; depth <= maxDepth; depth++) {
-    const files = [...(filesByDepth.get(depth) ?? new Set<string>())].sort()
-    if (files.length === 0) continue
-
-    const baselineAffectedIds = new Set(affectedSymbolMap.keys())
-    const nextSymbols = await collectImportedFileSymbols(store, files, baselineAffectedIds, depth)
-
-    for (const symbol of nextSymbols) {
-      const existing = affectedSymbolMap.get(symbol.id)
-      if (!existing || symbol.depth < existing.depth) {
-        affectedSymbolMap.set(symbol.id, symbol)
-      }
-    }
-  }
-
-  // Take the larger of symbol-level or file-level counts per depth
-  const symbolDirect = allSymbolsByDepth.get(1)?.size ?? 0
-  const symbolIndirect = allSymbolsByDepth.get(2)?.size ?? 0
-  let symbolTransitive = 0
-  for (const [depth, ids] of allSymbolsByDepth) {
-    if (depth >= 3) symbolTransitive += ids.size
-  }
-
-  const fileDirect = filesByDepth.get(1)?.size ?? 0
-  const fileIndirect = filesByDepth.get(2)?.size ?? 0
-  let fileTransitive = 0
-  for (const [depth, ids] of filesByDepth) {
-    if (depth >= 3) fileTransitive += ids.size
-  }
-
-  const directDependents = Math.max(symbolDirect, fileDirect)
-  const indirectDependents = Math.max(symbolIndirect, fileIndirect)
-  const transitiveDependents = Math.max(symbolTransitive, fileTransitive)
-  const totalDependents = directDependents + indirectDependents + transitiveDependents
-  // TODO: wire affectedProcesses count once execution flow tracking is implemented
-  const riskLevel = computeRiskLevel(directDependents, totalDependents, 0)
-  const affectedFiles = [...affectedFileSet].sort()
-  const affectedSymbols = [...affectedSymbolMap.values()].sort(compareAffectedSymbols)
-  const affectedSpecs = await collectAffectedSpecs(
+  return analyzeFilteredTraversalTargets(
     store,
-    rootSymbols,
-    [...affectedSymbolMap.keys()],
-    filesByDepth,
+    traversalTargets,
+    resultTarget,
+    direction,
+    maxDepth,
+    effectiveFilter,
   )
-
-  return {
-    target: resultTarget,
-    directDependents,
-    indirectDependents,
-    transitiveDependents,
-    riskLevel,
-    affectedFiles,
-    affectedSymbols,
-    affectedSpecs,
-    affectedProcesses: [],
-  }
 }
 
 /**
@@ -332,6 +199,8 @@ async function analyzeFilteredTraversalTargets(
   const allSymbolsByDepth = new Map<number, Set<string>>()
   const affectedSymbols = new Map<string, AffectedSymbol>()
   const affectedFiles = new Set<string>()
+  const omittedTestFiles = new Set<string>()
+  const omittedIgnoredFiles = new Set<string>()
 
   let currentSymbols = roots
   const seenSymbols = new Set(roots)
@@ -345,6 +214,10 @@ async function analyzeFilteredTraversalTargets(
       relationTypes: SYMBOL_IMPACT_RELATION_TYPES,
       filter,
     })
+    if (result.omittedFiles) {
+      for (const f of result.omittedFiles.tests) omittedTestFiles.add(f)
+      for (const f of result.omittedFiles.ignored) omittedIgnoredFiles.add(f)
+    }
     const nextSymbols = collectAdjacentIds(result.relations, currentSymbols, direction)
       .filter((id) => !seenSymbols.has(id))
       .sort()
@@ -399,6 +272,10 @@ async function analyzeFilteredTraversalTargets(
         relationTypes: [RelationType.Imports],
         filter,
       })
+      if (result.omittedFiles) {
+        for (const f of result.omittedFiles.tests) omittedTestFiles.add(f)
+        for (const f of result.omittedFiles.ignored) omittedIgnoredFiles.add(f)
+      }
       const nextFiles = collectAdjacentIds(result.relations, currentFiles, direction)
         .filter((id) => !seenFiles.has(id))
         .sort()
@@ -441,6 +318,14 @@ async function analyzeFilteredTraversalTargets(
       : [],
     affectedSpecs,
     affectedProcesses: [],
+    omittedCounts: {
+      tests: omittedTestFiles.size,
+      ignored: omittedIgnoredFiles.size,
+    },
+    omittedFiles: {
+      tests: [...omittedTestFiles].sort(),
+      ignored: [...omittedIgnoredFiles].sort(),
+    },
   }
 }
 
@@ -511,6 +396,7 @@ function emptyImpact(target: string): ImpactResult {
     affectedSymbols: [],
     affectedSpecs: [],
     affectedProcesses: [],
+    omittedCounts: { tests: 0, ignored: 0 },
   }
 }
 
@@ -538,112 +424,6 @@ async function collectAffectedSpecs(
     for (const file of files) filePaths.add(file)
   }
   return collectImpactSpecIds(store, [...filePaths], symbolIds, filter)
-}
-
-/**
- * Resolves affected symbols for imported files deterministically, using the
- * already-affected symbol set as a fixed seed for the current depth.
- *
- * When a file contains symbols directly connected to the seed set via `CALLS`,
- * the entire connected call subgraph inside that file is treated as affected.
- * If no such seed is found, the file falls back to its exported symbols.
- *
- * @param store - The graph store to query.
- * @param files - Imported files reached at the current depth.
- * @param affectedIds - Symbols already known to be affected before this depth.
- * @param depth - The import-traversal depth being processed.
- * @returns Deterministically resolved affected symbols for the current depth.
- */
-async function collectImportedFileSymbols(
-  store: GraphStore,
-  files: readonly string[],
-  affectedIds: ReadonlySet<string>,
-  depth: number,
-): Promise<AffectedSymbol[]> {
-  const results: AffectedSymbol[] = []
-
-  for (const file of files) {
-    const fileSymbols = await store.findSymbols({ filePath: file })
-    if (fileSymbols.length === 0) continue
-
-    const fileSymbolIds = new Set(fileSymbols.map((symbol) => symbol.id))
-    const adjacency = new Map<string, Set<string>>()
-    const directSeeds = new Set<string>()
-
-    for (const symbol of fileSymbols) {
-      const [callers, callees] = await Promise.all([
-        store.getCallers(symbol.id),
-        store.getCallees(symbol.id),
-      ])
-
-      const neighbors = new Set<string>()
-
-      for (const relation of callers) {
-        if (affectedIds.has(relation.source)) {
-          directSeeds.add(symbol.id)
-        }
-        if (fileSymbolIds.has(relation.source)) {
-          neighbors.add(relation.source)
-        }
-      }
-
-      for (const relation of callees) {
-        if (affectedIds.has(relation.target)) {
-          directSeeds.add(symbol.id)
-        }
-        if (fileSymbolIds.has(relation.target)) {
-          neighbors.add(relation.target)
-        }
-      }
-
-      adjacency.set(symbol.id, neighbors)
-    }
-
-    if (directSeeds.size === 0) {
-      const exported = await store.getExportedSymbols(file)
-      for (const symbol of exported) {
-        results.push({
-          id: symbol.id,
-          name: symbol.name,
-          filePath: symbol.filePath,
-          line: symbol.line,
-          depth,
-        })
-      }
-      continue
-    }
-
-    const byId = new Map(fileSymbols.map((symbol) => [symbol.id, symbol]))
-    const queue = [...directSeeds].sort()
-    const visited = new Set<string>()
-
-    while (queue.length > 0) {
-      const currentId = queue.shift()
-      if (currentId === undefined || visited.has(currentId)) continue
-      visited.add(currentId)
-
-      const symbol = byId.get(currentId)
-      if (symbol !== undefined) {
-        results.push({
-          id: symbol.id,
-          name: symbol.name,
-          filePath: symbol.filePath,
-          line: symbol.line,
-          depth,
-        })
-      }
-
-      const neighbors = adjacency.get(currentId)
-      if (neighbors === undefined) continue
-      for (const neighborId of [...neighbors].sort()) {
-        if (!visited.has(neighborId)) {
-          queue.push(neighborId)
-        }
-      }
-    }
-  }
-
-  return results
 }
 
 /**

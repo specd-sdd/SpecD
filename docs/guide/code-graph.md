@@ -108,7 +108,103 @@ Health reasons:
 
 ---
 
-## 3. Multi-Modal Codebase Search (`specd graph search`)
+## 3. Semantic File Categories & Boundary Pruning
+
+Codebases contain diverse types of files: production source code, unit and integration tests, fixtures, mocks, and third-party vendor code. Treating test files and fixtures identically to production source creates significant noise:
+
+- Blast-radius impact analysis traverses through test assertions, treating test suites as downstream callers or intermediate bridges connecting unrelated modules.
+- Architectural hotspot ranking inflates coupling scores with test helpers and fixtures.
+- Symbol search buries production implementations under mock classes and test utilities.
+
+To solve this, SpecD provides a **three-tier semantic category model**:
+
+| Category      | Description                                                          | Default Behavior                                                                             |
+| :------------ | :------------------------------------------------------------------- | :------------------------------------------------------------------------------------------- |
+| **`source`**  | Core production source code.                                         | Admitted by default in all queries, impact traversals, and hotspot rankings.                 |
+| **`test`**    | Test suites, specs, fixtures, integration tests, and test utilities. | Excluded by default from blast-radius impact analysis, hotspot rankings, and search results. |
+| **`ignored`** | Vendored dependencies, generated mock data, and test fixtures.       | Excluded by default from blast-radius impact analysis, hotspot rankings, and search results. |
+
+### Configuration & Glob Patterns
+
+File categorization is configured via `specd.yaml` at both the project root level and per-workspace level:
+
+```yaml
+graph:
+  testPaths:
+    - '**/*.test.*'
+    - '**/*.spec.*'
+    - '**/tests/**'
+    - '**/__tests__/**'
+  ignorePaths:
+    - '**/vendor/**'
+    - '**/fixtures/**'
+    - '**/mocks/**'
+```
+
+Per-workspace overrides take precedence when defined:
+
+```yaml
+workspaces:
+  core:
+    path: packages/core
+    graph:
+      testPaths:
+        - 'test/**'
+      ignorePaths:
+        - 'fixtures/**'
+```
+
+#### Built-in Default Patterns
+
+When `testPaths` or `ignorePaths` are omitted from configuration, SpecD applies the following built-in glob pattern defaults:
+
+- **Default Test Patterns:** `**/*.test.*`, `**/*.spec.*`, `**/tests/**`, `**/__tests__/**`
+- **Default Ignore Patterns:** `**/vendor/**`, `**/fixtures/**`, `**/mocks/**`
+
+#### Classification Precedence
+
+During graph indexing, file paths are matched relative to the workspace root using fast glob matching:
+
+1. If the path matches `ignorePaths` (or default ignore patterns), the file is categorized as **`ignored`**.
+2. If the path matches `testPaths` (or default test patterns), the file is categorized as **`test`**.
+3. Otherwise, the file is categorized as **`source`**.
+
+### Traversal Boundary Pruning in Impact Analysis
+
+When executing `specd graph impact`, BFS traversal enforces strict semantic isolation:
+
+- By default, traversal admits only files and symbols in the `source` category.
+- When an edge would traverse into a `test` or `ignored` file, BFS traversal **prunes the path before crossing the boundary**.
+- Pruning at the boundary prevents test files from acting as "bridges" that connect unrelated production components, ensuring blast radius reflects actual runtime dependencies.
+
+### Command Flags & Omission Notices
+
+All graph query commands support flags to include non-source categories when needed:
+
+- **`--include-tests`**: Includes `test` category files alongside `source`.
+- **`--include-ignored`**: Includes `ignored` category files alongside `source`.
+- **`--all`**: Admits all categories (`source`, `test`, and `ignored`).
+- **`--category <categories>`**: Restricts results strictly to the designated category or comma-separated list (e.g. `source,test`).
+
+#### Omission Notices in Human & Structured Output
+
+When test or ignored files are omitted by default filters:
+
+- **Text output:** Prints an omission notice at the bottom:
+  ```text
+  ℹ Excluded from results: 12 test files. Use --include-tests, --include-ignored, or --all to view them.
+  ```
+- **JSON / TOON output:** Includes an `omittedCounts` object reporting omitted counts per category:
+  ```json
+  "omittedCounts": {
+    "tests": 12,
+    "ignored": 0
+  }
+  ```
+
+---
+
+## 4. Multi-Modal Codebase Search (`specd graph search`)
 
 `specd graph search "<query>"` searches four categories. With no category flag it searches all of them. Pass one or more of `--symbols`, `--files`, `--specs`, and `--documents` to narrow the search. `--limit` defaults to `10` results per category. `--snippet` adds preview text in `text`, `json`, and `toon`. `--spec-content` includes full spec bodies and requires `--format json` or `--format toon`.
 
@@ -175,7 +271,7 @@ specd graph search "storage" --symbols --exclude-workspace public-web --exclude-
 
 ---
 
-## 4. Blast Radius & Impact Analysis (`specd graph impact`)
+## 5. Blast Radius & Impact Analysis (`specd graph impact`)
 
 Before modifying a file or refactoring a symbol, developers and AI agents must assess the **blast radius**—the transitive set of files, symbols, specifications, and processes that could break as a result of the change.
 
@@ -252,8 +348,9 @@ specd graph impact --file "packages/cli/src/commands/project/update.ts" --direct
 ### Traversal Depth & Filtering
 
 - **Depth (`--depth <n>`):** Controls how many levels of transitive dependencies to traverse (default: `3`).
-- **Category Filter (`--type files,symbols,specs`):** Restricts impact results to specific entity types.
+- **Result Type Filter (`--type files,symbols,specs`):** Restricts impact results to specific entity types.
 - **Kind Filter (`--kind <kinds>`):** Restricts impacted symbols to specific kinds (e.g. `--kind function,method`).
+- **File Category Filter (`--category <categories>`, `--include-tests`, `--include-ignored`, `--all`):** Restricts or widens traversal admission across file categories. Default admits only `source` files and prunes traversal before crossing into test or ignored files.
 
 ---
 
@@ -272,7 +369,7 @@ Direct dependents are depth 1. Total dependents include later depths. Record `HI
 
 ---
 
-## 5. Architectural Hotspots (`specd graph hotspots`)
+## 6. Architectural Hotspots (`specd graph hotspots`)
 
 Hotspot analysis ranks symbols by structural coupling. The default view keeps kinds `class`, `method`, and `function`, score of at least 1, risk of at least `MEDIUM`, and the top 20 results. Symbols with no direct callers are omitted unless you pass `--include-importer-only`.
 
@@ -298,13 +395,17 @@ Hierarchy weight is `(extenders × 3) + (implementors × 4) + (overriders × 2)`
 - `--min-risk <level>`: `LOW`, `MEDIUM`, `HIGH`, or `CRITICAL`. Default: `MEDIUM`.
 - `--min-score <n>`: Minimum score. Default: `1`.
 - `--limit <n>`: Maximum results. Default: `20`.
-- `--kind <kinds>`: Replaces the default kind set. It does not merge with it. Example: `--kind interface,type`.
+- `--kind <kinds>`: Replaces the default kind set (`class,method,function`). It does not merge with it. Example: `--kind interface,type`.
 - `--include-importer-only`: Include symbols whose score comes only from file importers.
+- `--include-tests`: Include test category files in caller metrics and candidate rankings.
+- `--include-ignored`: Include ignored category files in caller metrics and candidate rankings.
+- `--all`: Include all categories (`source`, `test`, `ignored`).
+- `--category <categories>`: Restrict candidates and caller metrics strictly to designated category or comma-separated list (e.g. `source,test`).
 - `--workspace <name>`, `--exclude-workspace <name>`, `--file <path>`, `--exclude-path <pattern>`: Scope the ranking. Repeat `--exclude-path` and `--exclude-workspace`.
 
 ---
 
-## 6. Implementation Coverage & Diagnostics
+## 7. Implementation Coverage & Diagnostics
 
 Indexing checks persisted spec-to-code links (`COVERS_FILE`, `COVERS_SYMBOL`) and prints `coverage diagnostics` on `specd graph index` when a link cannot be resolved:
 
@@ -323,7 +424,7 @@ Reasons:
 
 ---
 
-## 7. The Graph-First Protocol for Agents & Developers
+## 8. The Graph-First Protocol for Agents & Developers
 
 All AI coding assistants and developers in a SpecD repository follow the **Graph-First Protocol**:
 
@@ -366,7 +467,7 @@ All AI coding assistants and developers in a SpecD repository follow the **Graph
 
 ---
 
-## 8. Practical Playbooks
+## 9. Practical Playbooks
 
 ### Playbook 1: Safe Refactoring of a Shared Function
 

@@ -110,6 +110,7 @@ export async function analyzeSpecImpact(
     ),
     affectedProcesses: [],
     affectedSpecs: [...affectedSpecs].sort(),
+    omittedCounts: { tests: 0, ignored: 0 },
   }
 }
 
@@ -243,6 +244,7 @@ async function analyzeFilteredSpecImpact(
       : [],
     affectedProcesses: [],
     affectedSpecs: materializesImpactType(filter, 'specs') ? [...affectedSpecs].sort() : [],
+    omittedCounts: { tests: 0, ignored: 0 },
   }
 }
 

@@ -1,0 +1,75 @@
+- op: modified
+  description: 'Add testPaths and ignorePaths scenarios to Workspace-level graph configuration'
+  selector:
+    type: section
+    matches: 'Requirement: Workspace-level graph configuration'
+  content: |
+    #### Scenario: Allowed paths constrain workspace indexing
+
+    - **GIVEN** a workspace declares `graph.allowedPaths: ["src/**"]`
+    - **WHEN** the config is loaded
+    - **THEN** the workspace configuration includes the `allowedPaths` constraint
+
+    #### Scenario: excludePaths replaces built-in defaults
+
+    - **GIVEN** a workspace with `graph.excludePaths: ["fixtures/"]`
+    - **WHEN** the config is loaded
+    - **THEN** `SpecdWorkspaceConfig.graph.excludePaths` is `["fixtures/"]`
+    - **AND** the built-in defaults (`node_modules/`, `dist/`, etc.) are NOT applied — only the declared patterns are used
+
+    #### Scenario: graph block absent — no field on workspace config
+
+    - **GIVEN** a workspace with no `graph` key
+    - **WHEN** the config is loaded
+    - **THEN** `SpecdWorkspaceConfig.graph` is `undefined`
+    - **AND** `discoverFiles` falls back to built-in default exclusions
+
+    #### Scenario: respectGitignore defaults to true
+
+    - **GIVEN** a workspace with `graph: {}` (no `respectGitignore` key)
+    - **WHEN** the config is loaded
+    - **THEN** `SpecdWorkspaceConfig.graph.respectGitignore` is `undefined` (treated as `true` by the indexer)
+
+    #### Scenario: respectGitignore set to false
+
+    - **GIVEN** a workspace with `graph.respectGitignore: false`
+    - **WHEN** the config is loaded
+    - **THEN** `SpecdWorkspaceConfig.graph.respectGitignore` is `false`
+
+    #### Scenario: Workspace testPaths and ignorePaths configured
+
+    - **GIVEN** a workspace declares `graph.testPaths: ["**/*.spec.ts"]` and `graph.ignorePaths: ["fixtures/**"]`
+    - **WHEN** the config is loaded
+    - **THEN** `SpecdWorkspaceConfig.graph.testPaths` contains `["**/*.spec.ts"]`
+    - **AND** `SpecdWorkspaceConfig.graph.ignorePaths` contains `["fixtures/**"]`
+
+- op: modified
+  description: 'Add testPaths and ignorePaths scenarios to Project-level graph configuration'
+  selector:
+    type: section
+    matches: 'Requirement: Project-level graph configuration'
+  content: |
+    #### Scenario: Project graph include paths discovered
+
+    - **GIVEN** `specd.yaml` declares `graph.includePaths: ["docs/**"]`
+    - **WHEN** the config is loaded
+    - **THEN** `config.graph.includePaths` includes the `docs/**` pattern
+
+    #### Scenario: Project graph exclude paths discovered
+
+    - **GIVEN** `specd.yaml` declares `graph.excludePaths: ["specs/"]`
+    - **WHEN** the config is loaded
+    - **THEN** `config.graph.excludePaths` includes the `specs/` pattern
+
+    #### Scenario: Project testPaths and ignorePaths configured
+
+    - **GIVEN** `specd.yaml` declares `graph.testPaths: ["**/*.test.*"]` and `graph.ignorePaths: ["mock/**"]`
+    - **WHEN** the config is loaded
+    - **THEN** `config.graph.testPaths` contains `["**/*.test.*"]`
+    - **AND** `config.graph.ignorePaths` contains `["mock/**"]`
+
+    #### Scenario: Project testPaths omitted defaults applied
+
+    - **GIVEN** `specd.yaml` declares `graph` without `testPaths`
+    - **WHEN** the config is loaded
+    - **THEN** `config.graph.testPaths` includes default patterns `**/*.spec.*`, `**/*.test.*`, `**/test/**`, `**/tests/**`, `**/__tests__/**`, and `*_test.*`

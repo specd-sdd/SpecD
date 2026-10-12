@@ -411,7 +411,7 @@ describe('graph search', () => {
       readonly specs: readonly unknown[]
       readonly documents: readonly unknown[]
     }
-    expect(Object.keys(parsed)).toEqual(['symbols', 'files', 'specs', 'documents'])
+    expect(Object.keys(parsed)).toEqual(['symbols', 'files', 'specs', 'documents', 'omittedCounts'])
     expect(parsed.symbols[0]!.publicBindings).toHaveLength(1)
     expect(parsed.symbols[0]!.matchedPublicBindings).toEqual([
       expect.objectContaining({ id: 'binding-id' }),
@@ -529,5 +529,165 @@ describe('graph search', () => {
     }
     expect(getStderr()).toContain("invalid --kind value 'unknownkind'")
     expect(mockProvider.search).not.toHaveBeenCalled()
+  })
+
+  it('rejects invalid --category before opening provider', async () => {
+    const { getStderr, mockProvider } = setup()
+    try {
+      await makeSearchProgram().parseAsync([
+        'node',
+        'specd',
+        'graph',
+        'search',
+        'target',
+        '--category',
+        'unknown',
+      ])
+    } catch {
+      // ExitSentinel
+    }
+    expect(getStderr()).toContain(
+      'invalid category "unknown". Expected one of: source, test, ignored',
+    )
+    expect(mockProvider.search).not.toHaveBeenCalled()
+  })
+
+  it('passes --category test to search input', async () => {
+    const { mockProvider } = setup()
+    mockProvider.search.mockResolvedValue({
+      ...EMPTY_RESULT,
+      omittedCounts: { tests: 0, ignored: 0 },
+    })
+
+    await makeSearchProgram().parseAsync([
+      'node',
+      'specd',
+      'graph',
+      'search',
+      'target',
+      '--category',
+      'test',
+    ])
+
+    expect(mockProvider.search).toHaveBeenCalledWith(
+      expect.objectContaining({
+        fileCategories: ['test'],
+      }),
+    )
+  })
+
+  it('passes comma-separated categories to search input', async () => {
+    const { mockProvider } = setup()
+    mockProvider.search.mockResolvedValue({
+      ...EMPTY_RESULT,
+      omittedCounts: { tests: 0, ignored: 0 },
+    })
+
+    await makeSearchProgram().parseAsync([
+      'node',
+      'specd',
+      'graph',
+      'search',
+      'target',
+      '--category',
+      'source,test',
+    ])
+
+    expect(mockProvider.search).toHaveBeenCalledWith(
+      expect.objectContaining({
+        fileCategories: ['source', 'test'],
+      }),
+    )
+  })
+
+  it('rejects invalid category within comma-separated list', async () => {
+    const { mockProvider, getStderr } = setup()
+    try {
+      await makeSearchProgram().parseAsync([
+        'node',
+        'specd',
+        'graph',
+        'search',
+        'target',
+        '--category',
+        'source,invalid',
+      ])
+    } catch {
+      // ExitSentinel
+    }
+    expect(getStderr()).toContain(
+      'invalid category "invalid". Expected one of: source, test, ignored',
+    )
+    expect(mockProvider.search).not.toHaveBeenCalled()
+  })
+
+  it('passes --include-tests, --include-ignored, --all to search input', async () => {
+    const { mockProvider } = setup()
+    mockProvider.search.mockResolvedValue({
+      ...EMPTY_RESULT,
+      omittedCounts: { tests: 0, ignored: 0 },
+    })
+
+    await makeSearchProgram().parseAsync([
+      'node',
+      'specd',
+      'graph',
+      'search',
+      'target',
+      '--include-tests',
+      '--include-ignored',
+    ])
+
+    expect(mockProvider.search).toHaveBeenCalledWith(
+      expect.objectContaining({
+        includeTests: true,
+        includeIgnored: true,
+      }),
+    )
+  })
+
+  it('displays omission notice in text mode when tests are excluded', async () => {
+    const { mockProvider, getStdout } = setup()
+    mockProvider.search.mockResolvedValue({
+      ...EMPTY_RESULT,
+      omittedCounts: { tests: 3, ignored: 0 },
+    })
+
+    await makeSearchProgram().parseAsync([
+      'node',
+      'specd',
+      'graph',
+      'search',
+      'target',
+      '--format',
+      'text',
+    ])
+
+    const stdout = getStdout()
+    expect(stdout).toContain('No results found.')
+    expect(stdout).toContain(
+      'ℹ Excluded from results: 3 test files. Use --include-tests, --include-ignored, or --all to view them.',
+    )
+  })
+
+  it('includes omittedCounts in JSON mode', async () => {
+    const { mockProvider, getStdout } = setup()
+    mockProvider.search.mockResolvedValue({
+      ...EMPTY_RESULT,
+      omittedCounts: { tests: 4, ignored: 1 },
+    })
+
+    await makeSearchProgram().parseAsync([
+      'node',
+      'specd',
+      'graph',
+      'search',
+      'target',
+      '--format',
+      'json',
+    ])
+
+    const parsed = JSON.parse(getStdout())
+    expect(parsed.omittedCounts).toEqual({ tests: 4, ignored: 1 })
   })
 })

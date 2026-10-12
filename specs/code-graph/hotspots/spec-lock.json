@@ -4,5 +4,18 @@
     "version": 1
   },
   "dependsOn": ["code-graph:symbol-model", "code-graph:graph-store", "code-graph:traversal"],
-  "implementation": []
+  "implementation": [
+    {
+      "file": "code-graph:src/domain/value-objects/hotspot-result.ts",
+      "symbols": ["HotspotOptions", "HotspotResult"]
+    },
+    {
+      "file": "code-graph:src/domain/services/compute-hotspots.ts",
+      "symbols": ["computeHotspots"]
+    },
+    {
+      "file": "code-graph:test/domain/services/compute-hotspots.spec.ts",
+      "symbols": ["computeHotspots"]
+    }
+  ]
 }

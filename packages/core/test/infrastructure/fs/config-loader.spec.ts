@@ -1749,6 +1749,46 @@ storage:
       const loader = createLoader({ configPath })
       await expect(loader.load()).rejects.toThrow(/workspaces\.default\.graph/)
     })
+
+    it('parses graph.testPaths and graph.ignorePaths correctly on workspace', async () => {
+      const configPath = await writeConfig(`
+schema: "@specd/schema-std"
+workspaces:
+  default:
+    specs:
+      adapter: fs
+      fs:
+        path: specs
+    graph:
+      testPaths:
+        - "**/*.spec.ts"
+      ignorePaths:
+        - "fixtures/**"
+storage:
+  changes:
+    adapter: fs
+    fs:
+      path: .specd/changes
+  drafts:
+    adapter: fs
+    fs:
+      path: .specd/drafts
+  discarded:
+    adapter: fs
+    fs:
+      path: .specd/discarded
+  archive:
+    adapter: fs
+    fs:
+      path: .specd/archive
+`)
+      const loader = createLoader({ configPath })
+      const config = await loader.load()
+      const defaultWs = config.workspaces.find((w) => w.name === 'default')
+
+      expect(defaultWs?.graph?.testPaths).toEqual(['**/*.spec.ts'])
+      expect(defaultWs?.graph?.ignorePaths).toEqual(['fixtures/**'])
+    })
   })
 
   describe('Requirement: Project graph config', () => {
@@ -1781,6 +1821,64 @@ graph:
 
       const loader = createLoader({ configPath })
       await expect(loader.load()).rejects.toThrow(/graph\.includePaths/)
+    })
+
+    it('reads configured graph.testPaths and graph.ignorePaths into SpecdConfig', async () => {
+      const configPath = await writeConfig(
+        minimalYaml(`
+graph:
+  testPaths:
+    - "**/*.test.*"
+  ignorePaths:
+    - "mock/**"
+`),
+      )
+
+      const loader = createLoader({ configPath })
+      const config = await loader.load()
+
+      expect(config.graph?.testPaths).toEqual(['**/*.test.*'])
+      expect(config.graph?.ignorePaths).toEqual(['mock/**'])
+    })
+
+    it('populates default testPaths and ignorePaths when omitted in graph block', async () => {
+      const configPath = await writeConfig(
+        minimalYaml(`
+graph:
+  includePaths:
+    - docs/**
+`),
+      )
+
+      const loader = createLoader({ configPath })
+      const config = await loader.load()
+
+      expect(config.graph?.testPaths).toEqual([
+        '**/*.spec.*',
+        '**/*.test.*',
+        '**/test/**',
+        '**/tests/**',
+        '**/__tests__/**',
+        '*_test.*',
+      ])
+      expect(config.graph?.ignorePaths).toEqual([])
+    })
+
+    it('populates default testPaths and ignorePaths when graph block is completely omitted', async () => {
+      const configPath = await writeConfig(minimalYaml())
+
+      const loader = createLoader({ configPath })
+      const config = await loader.load()
+
+      expect(config.graph?.testPaths).toEqual([
+        '**/*.spec.*',
+        '**/*.test.*',
+        '**/test/**',
+        '**/tests/**',
+        '**/__tests__/**',
+        '*_test.*',
+      ])
+      expect(config.graph?.ignorePaths).toEqual([])
     })
   })
 

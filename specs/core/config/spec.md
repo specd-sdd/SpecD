@@ -215,6 +215,10 @@ workspaces:
       excludePaths: # optional; gitignore-syntax, supports negation with !
         - .specd/*
         - '!.specd/metadata/'
+      testPaths: # optional; gitignore-syntax, classifies matching files as 'test'
+        - '**/*.spec.ts'
+      ignorePaths: # optional; gitignore-syntax, classifies matching files as 'ignored'
+        - 'fixtures/**'
   core:
     codeRoot: packages/core
     graph:
@@ -245,6 +249,10 @@ coverage/
 ```
 
 When `graph.excludePaths` **is** specified, it **replaces** the built-in defaults entirely. The user takes full ownership — built-in patterns are not merged.
+
+**`graph.testPaths`** (string array, gitignore-syntax) — optional workspace-specific patterns identifying test and verification files. Evaluated relative to the workspace's `codeRoot`. When present, these patterns supplement the project-level `graph.testPaths` for this workspace.
+
+**`graph.ignorePaths`** (string array, gitignore-syntax) — optional workspace-specific patterns identifying auxiliary files (fixtures, static mocks, scratch scripts). Evaluated relative to the workspace's `codeRoot`. When present, these patterns supplement the project-level `graph.ignorePaths` for this workspace.
 
 Patterns are evaluated relative to the workspace's `codeRoot`.
 
@@ -577,10 +585,19 @@ These warnings MUST be non-fatal diagnostics about configuration shape or compat
 
 - **`includePaths`** — optional array of glob patterns (relative to project root) to discover project-global files outside workspace-owned graph identities (for example `docs/**`, `package.json`).
 - **`excludePaths`** — optional array of gitignore-syntax patterns to exclude from file/document discovery globally.
+- **`testPaths`** — optional array of gitignore-syntax patterns identifying test and verification files. When omitted, the built-in defaults apply: `['**/*.spec.*', '**/*.test.*', '**/test/**', '**/tests/**', '**/__tests__/**', '*_test.*']`.
+- **`ignorePaths`** — optional array of gitignore-syntax patterns identifying auxiliary files (fixtures, static mocks, dev/scratch scripts). When omitted, defaults to an empty array (`[]`).
 
 Resources discovered via `graph.includePaths` SHALL be assigned to the reserved `root:` graph namespace only when they are not already owned by a configured workspace `codeRoot`.
 
 `graph.excludePaths` SHALL apply to project-global discovery and workspace discovery alike. Workspace-level graph filters MAY add additional restrictions, but they MUST NOT remove or override global exclusions.
+
+Categorization precedence applies across all indexed files:
+
+1. An exclusion via `excludePaths` or `.gitignore` has absolute priority (file is not read or indexed).
+2. If the file matches `ignorePaths` (project or workspace level), it is categorized as `ignored`.
+3. If the file matches `testPaths` (project or workspace level), it is categorized as `test`.
+4. Otherwise, the file is categorized as `source`.
 
 ## Constraints
 

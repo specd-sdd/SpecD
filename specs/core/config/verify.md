@@ -261,6 +261,13 @@
 - **WHEN** the config is loaded
 - **THEN** `SpecdWorkspaceConfig.graph.respectGitignore` is `false`
 
+#### Scenario: Workspace testPaths and ignorePaths configured
+
+- **GIVEN** a workspace declares `graph.testPaths: ["**/*.spec.ts"]` and `graph.ignorePaths: ["fixtures/**"]`
+- **WHEN** the config is loaded
+- **THEN** `SpecdWorkspaceConfig.graph.testPaths` contains `["**/*.spec.ts"]`
+- **AND** `SpecdWorkspaceConfig.graph.ignorePaths` contains `["fixtures/**"]`
+
 ### Requirement: Project-level graph configuration
 
 #### Scenario: Project graph include paths discovered
@@ -274,6 +281,19 @@
 - **GIVEN** `specd.yaml` declares `graph.excludePaths: ["specs/"]`
 - **WHEN** the config is loaded
 - **THEN** `config.graph.excludePaths` includes the `specs/` pattern
+
+#### Scenario: Project testPaths and ignorePaths configured
+
+- **GIVEN** `specd.yaml` declares `graph.testPaths: ["**/*.test.*"]` and `graph.ignorePaths: ["mock/**"]`
+- **WHEN** the config is loaded
+- **THEN** `config.graph.testPaths` contains `["**/*.test.*"]`
+- **AND** `config.graph.ignorePaths` contains `["mock/**"]`
+
+#### Scenario: Project testPaths omitted defaults applied
+
+- **GIVEN** `specd.yaml` declares `graph` without `testPaths`
+- **WHEN** the config is loaded
+- **THEN** `config.graph.testPaths` includes default patterns `**/*.spec.*`, `**/*.test.*`, `**/test/**`, `**/tests/**`, `**/__tests__/**`, and `*_test.*`
 
 ### Requirement: Storage configuration
 

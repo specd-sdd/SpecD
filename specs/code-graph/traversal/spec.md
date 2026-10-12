@@ -80,6 +80,7 @@ The function produces an `ImpactResult` containing:
 - **`affectedFiles`** — unique file paths containing any affected symbol
 - **`affectedSymbols`** — array of `AffectedSymbol` entries with depth information
 - **`affectedProcesses`** — execution flows that include the target or any affected symbol (when process data is available)
+- **`omittedCounts`** — record `{ tests: number, ignored: number }` indicating how many test and ignored files were encountered during reachability traversal but omitted from the result
 
 `AffectedSymbol` SHALL contain:
 
@@ -88,6 +89,10 @@ The function produces an `ImpactResult` containing:
 - **`filePath`** (`string`) — workspace-prefixed file path
 - **`line`** (`number`) — 1-based line number
 - **`depth`** (`number`) — distance from the target: 1 = direct dependent, 2 = indirect, 3+ = transitive
+
+Impact analysis MUST compute `directDependents`, `indirectDependents`, `transitiveDependents`, and the derived `riskLevel` solely over admitted category nodes (`source` by default). Dependents in `test` or `ignored` files SHALL NOT inflate dependent counts or risk level unless explicitly admitted by the caller.
+
+When the analysis target is itself explicitly located in a `test` or `ignored` file (e.g. diagnosing the impact of a test file or fixture), downstream dependencies of that anchored target SHALL be traversed.
 
 Impact analysis MUST include hierarchy relations in addition to existing call/import reachability:
 
@@ -107,13 +112,15 @@ Risk level thresholds:
 
 ### Requirement: Filtered impact results
 
-Symbol, file, multi-file, spec, and public-binding impact operations SHALL accept one optional typed filter containing requested result types, symbol kinds, included workspaces, and excluded workspaces. Result types SHALL use the closed vocabulary `files | symbols | specs`; omitted filters SHALL preserve the existing unfiltered result contract.
+Symbol, file, multi-file, spec, and public-binding impact operations SHALL accept one optional typed filter containing requested result types, symbol kinds, included workspaces, excluded workspaces, and admitted file categories (`categories?: readonly FileCategory[]`, `includeTests?: boolean`, `includeIgnored?: boolean`). Result types SHALL use the closed vocabulary `files | symbols | specs`; omitted filters SHALL preserve the existing unfiltered result contract.
+
+Categories default to `['source']` when omitted. Traversal operations SHALL express category eligibility via `GraphStore` impact queries and MUST halt BFS expansion at non-admitted file boundaries during upstream and bidirectional walks. Pruning non-admitted files ensures test and auxiliary files do not act as transitive relational bridges connecting unrelated production symbols.
 
 Workspace inclusion and exclusion SHALL use canonical graph workspace identities. An empty inclusion set SHALL admit every workspace, and exclusions SHALL take precedence over inclusions. Symbol-kind predicates SHALL apply only to symbol results. A filter that requests no symbol result category MAY still use admitted symbol reachability to compute requested file or spec results.
 
-Code Graph SHALL apply kind and workspace eligibility before it builds returned category collections and aggregate dependent counts. Risk, depth counts, affected-file aggregation, covering-spec evidence, and deterministic ordering SHALL be derived from the admitted traversal evidence. A result-type selection SHALL control which of the `files`, `symbols`, and `specs` collections are materialized without causing the CLI to reconstruct or post-filter another category.
+Code Graph SHALL apply kind, category, and workspace eligibility before it builds returned category collections and aggregate dependent counts. Risk, depth counts, affected-file aggregation, covering-spec evidence, and deterministic ordering SHALL be derived from the admitted traversal evidence. A result-type selection SHALL control which of the `files`, `symbols`, and `specs` collections are materialized without causing the CLI to reconstruct or post-filter another category.
 
-Every `ImpactResult`, including symbol and public-binding impact, SHALL contain a required deterministic `affectedSpecs` collection. When `specs` is requested, Code Graph SHALL populate it from specs covering admitted impacted symbols and files through `COVERS_SYMBOL` and `COVERS_FILE` evidence. When `specs` is not requested, `affectedSpecs` SHALL be an empty array. A specs-only filter MUST still traverse admitted symbol and file evidence needed to discover coverage.
+Every `ImpactResult`, including symbol and public-binding impact, SHALL contain a required deterministic `affectedSpecs` collection and `omittedCounts` record. When `specs` is requested, Code Graph SHALL populate it from specs covering admitted impacted symbols and files through `COVERS_SYMBOL` and `COVERS_FILE` evidence. When `specs` is not requested, `affectedSpecs` SHALL be an empty array. A specs-only filter MUST still traverse admitted symbol and file evidence needed to discover coverage.
 
 Filtering MUST occur before any final result limit. Traversal services MUST express eligible node and relation reads through the `GraphStore` filtered-impact query contract and MUST NOT fetch an unrestricted backend result set solely to discard excluded nodes in the service or delivery layer.
 

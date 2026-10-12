@@ -75,6 +75,16 @@ export interface SpecdWorkspaceGraphConfig {
    * graph indexing only and do not change workspace ownership semantics.
    */
   readonly allowedPaths?: readonly string[]
+  /**
+   * Gitignore-syntax test file patterns.
+   * Additive on top of project-level testPaths.
+   */
+  readonly testPaths?: readonly string[]
+  /**
+   * Gitignore-syntax ignored file patterns.
+   * Additive on top of project-level ignorePaths.
+   */
+  readonly ignorePaths?: readonly string[]
 }
 
 /** Project-level code graph configuration from `specd.yaml`. */
@@ -94,7 +104,30 @@ export interface SpecdGraphConfig {
    * Workspace-local graph excludes are additive on top of this set.
    */
   readonly excludePaths?: readonly string[]
+  /**
+   * Optional project-level test file patterns.
+   * When omitted, built-in defaults are used.
+   */
+  readonly testPaths?: readonly string[]
+  /**
+   * Optional project-level ignored file patterns.
+   * When omitted, defaults to empty list.
+   */
+  readonly ignorePaths?: readonly string[]
 }
+
+/** Built-in default test file patterns for code graph indexing. */
+export const DEFAULT_GRAPH_TEST_PATHS: readonly string[] = [
+  '**/*.spec.*',
+  '**/*.test.*',
+  '**/test/**',
+  '**/tests/**',
+  '**/__tests__/**',
+  '*_test.*',
+]
+
+/** Built-in default ignored file patterns for code graph indexing. */
+export const DEFAULT_GRAPH_IGNORE_PATHS: readonly string[] = []
 
 /**
  * Named adapter binding preserved from `specd.yaml`.
@@ -282,6 +315,8 @@ const specdConfigShape = z.object({
     .object({
       includePaths: z.array(z.string()).optional(),
       excludePaths: z.array(z.string()).optional(),
+      testPaths: z.array(z.string()).optional(),
+      ignorePaths: z.array(z.string()).optional(),
     })
     .optional(),
   logging: z

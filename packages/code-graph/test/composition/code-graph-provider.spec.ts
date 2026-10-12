@@ -808,6 +808,7 @@ describe('CodeGraphProvider', () => {
       kinds: [SymbolKind.Function],
       workspaces: ['fixture'],
       excludeWorkspaces: ['excluded'],
+      categories: ['source'],
     }
     const frontier = vi.spyOn(store, 'queryImpactFrontier')
     const generation = vi.spyOn(store, 'getStorageGeneration')

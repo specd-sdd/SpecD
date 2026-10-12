@@ -33,6 +33,17 @@
 - **THEN** importer-only symbols may be returned
 - **AND** the command keeps the default kind set unless `--kind` is also provided
 
+#### Scenario: Category flags passed to hotspots
+
+- **WHEN** `specd graph hotspots --include-tests` is run
+- **THEN** the command includes test files in caller metrics and ranking candidates
+
+#### Scenario: Category filter accepts comma-separated categories
+
+- **WHEN** `specd graph hotspots --category source,test` is run
+- **THEN** the command admits both source and test files in caller metrics and ranking candidates
+- **AND** ignored files remain excluded
+
 ### Requirement: Context resolution
 
 #### Scenario: Explicit config path bypasses discovery
@@ -124,6 +135,17 @@
 - **WHEN** `specd graph hotspots --format json` is run
 - **THEN** stdout is a JSON object containing `totalSymbols` and `entries`
 - **AND** each entry includes `symbol`, `score`, `directCallers`, `crossWorkspaceCallers`, `fileImporters`, `riskLevel`, and `workspace`
+
+#### Scenario: Text output shows omission notice when items excluded
+
+- **GIVEN** a hotspot run where 12 test files were excluded
+- **WHEN** `specd graph hotspots` is run in text mode
+- **THEN** stdout includes `Excluded from results: 12 test files`
+
+#### Scenario: JSON output includes omittedCounts
+
+- **WHEN** `specd graph hotspots --format json` is run
+- **THEN** stdout JSON contains `omittedCounts` with test and ignored counts
 
 ### Requirement: Backpressure-safe hotspot presentation
 

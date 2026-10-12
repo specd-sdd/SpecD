@@ -255,4 +255,97 @@ describe('graph hotspots', () => {
       'Overriding `--min-risk`, `--limit`, or `--min-score` does not disable the other defaults',
     )
   })
+
+  it('rejects invalid --category before computing hotspots', async () => {
+    const { getStderr } = setup()
+
+    const program = makeHotspotsProgram()
+    try {
+      await program.parseAsync(['node', 'specd', 'graph', 'hotspots', '--category', 'unknown'])
+    } catch {
+      /* ExitSentinel */
+    }
+
+    expect(getStderr()).toContain(
+      'invalid category "unknown". Expected one of: source, test, ignored',
+    )
+    expect(process.exit).toHaveBeenCalledWith(1)
+  })
+
+  it('rejects invalid category within comma-separated list', async () => {
+    const { getStderr } = setup()
+
+    const program = makeHotspotsProgram()
+    try {
+      await program.parseAsync([
+        'node',
+        'specd',
+        'graph',
+        'hotspots',
+        '--category',
+        'source,invalid',
+      ])
+    } catch {
+      /* ExitSentinel */
+    }
+
+    expect(getStderr()).toContain(
+      'invalid category "invalid". Expected one of: source, test, ignored',
+    )
+    expect(process.exit).toHaveBeenCalledWith(1)
+  })
+
+  it('passes comma-separated categories to getHotspots', async () => {
+    const { mockProvider } = setup()
+
+    const program = makeHotspotsProgram()
+    await program.parseAsync(['node', 'specd', 'graph', 'hotspots', '--category', 'source,test'])
+
+    expect(mockProvider.getHotspots).toHaveBeenCalledWith(
+      expect.objectContaining({ categories: ['source', 'test'] }),
+    )
+  })
+
+  it('passes category flags (--include-tests, --include-ignored, --all, --category) to getHotspots', async () => {
+    const { mockProvider } = setup()
+
+    const program = makeHotspotsProgram()
+    await program.parseAsync(['node', 'specd', 'graph', 'hotspots', '--include-tests'])
+
+    expect(mockProvider.getHotspots).toHaveBeenCalledWith(
+      expect.objectContaining({ includeTests: true }),
+    )
+  })
+
+  it('displays omission notice in text mode when tests or ignored are omitted', async () => {
+    const { mockProvider, getStdout } = setup()
+    mockProvider.getHotspots.mockResolvedValue({
+      totalSymbols: 0,
+      entries: [],
+      omittedCounts: { tests: 5, ignored: 2 },
+    })
+
+    const program = makeHotspotsProgram()
+    await program.parseAsync(['node', 'specd', 'graph', 'hotspots', '--format', 'text'])
+
+    const stdout = getStdout()
+    expect(stdout).toContain(
+      'ℹ Excluded from results: 5 test files, 2 ignored files. Use --include-tests, --include-ignored, or --all to view them.',
+    )
+  })
+
+  it('includes omittedCounts in JSON mode', async () => {
+    const { mockProvider, getStdout } = setup()
+    mockProvider.getHotspots.mockResolvedValue({
+      totalSymbols: 0,
+      entries: [],
+      omittedCounts: { tests: 5, ignored: 0 },
+    })
+
+    const program = makeHotspotsProgram()
+    await program.parseAsync(['node', 'specd', 'graph', 'hotspots', '--format', 'json'])
+
+    const parsed = JSON.parse(getStdout())
+    expect(parsed.omittedCounts).toEqual({ tests: 5, ignored: 0 })
+  })
 })

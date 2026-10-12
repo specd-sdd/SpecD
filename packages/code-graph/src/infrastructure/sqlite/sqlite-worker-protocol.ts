@@ -1,5 +1,5 @@
 import { type DocumentNode } from '../../domain/value-objects/document-node.js'
-import { type FileNode } from '../../domain/value-objects/file-node.js'
+import { type FileCategory, type FileNode } from '../../domain/value-objects/file-node.js'
 import { type Relation } from '../../domain/value-objects/relation.js'
 import { type RelationType } from '../../domain/value-objects/relation-type.js'
 import { type SpecNode } from '../../domain/value-objects/spec-node.js'
@@ -184,7 +184,10 @@ export interface SQLiteWorkerOperationMap {
     result: Array<{ symbol: SymbolNode; callerFilePath: string }>
   }
   /** Retrieves importer counts per file. */
-  getFileImporterCounts: { payload: Record<string, never>; result: Map<string, number> }
+  getFileImporterCounts: {
+    payload: { categories?: readonly FileCategory[] }
+    result: Map<string, number>
+  }
   /** Retrieves all file nodes. */
   getAllFiles: { payload: Record<string, never>; result: FileNode[] }
   /** Retrieves all document nodes. */

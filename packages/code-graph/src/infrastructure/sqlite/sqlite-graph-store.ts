@@ -12,7 +12,7 @@ import {
   type StorageGenerationSnapshot,
 } from '../../domain/ports/graph-store.js'
 import { type DocumentNode } from '../../domain/value-objects/document-node.js'
-import { type FileNode } from '../../domain/value-objects/file-node.js'
+import { type FileCategory, type FileNode } from '../../domain/value-objects/file-node.js'
 import { type GraphStatistics } from '../../domain/value-objects/graph-statistics.js'
 import { type Relation } from '../../domain/value-objects/relation.js'
 import { type RelationType } from '../../domain/value-objects/relation-type.js'
@@ -725,10 +725,14 @@ export class SQLiteGraphStore extends GraphStore {
   /**
    * Retrieves incoming importer counts per file.
    *
+   * @param options - Optional category filtering options.
+   * @param options.categories - Optional file categories to restrict importers to.
    * @returns Promise resolving to a map from file path to count.
    */
-  async getFileImporterCounts(): Promise<Map<string, number>> {
-    return this.client.sendRequest('getFileImporterCounts', {})
+  async getFileImporterCounts(options?: {
+    categories?: readonly FileCategory[]
+  }): Promise<Map<string, number>> {
+    return this.client.sendRequest('getFileImporterCounts', options ?? {})
   }
 
   /**

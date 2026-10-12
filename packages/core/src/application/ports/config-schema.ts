@@ -158,6 +158,8 @@ export const WorkspaceGraphZodSchema = z
     respectGitignore: z.boolean().optional(),
     excludePaths: z.array(z.string()).optional(),
     allowedPaths: z.array(z.string()).optional(),
+    testPaths: z.array(z.string()).optional(),
+    ignorePaths: z.array(z.string()).optional(),
   })
   .strict()
 
@@ -165,6 +167,8 @@ export const ProjectGraphZodSchema = z
   .object({
     includePaths: z.array(z.string()).optional(),
     excludePaths: z.array(z.string()).optional(),
+    testPaths: z.array(z.string()).optional(),
+    ignorePaths: z.array(z.string()).optional(),
   })
   .strict()
 

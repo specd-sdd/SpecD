@@ -13,8 +13,20 @@
   ],
   "implementation": [
     {
+      "file": "cli:src/commands/graph/format-omission-notice.ts",
+      "symbols": ["formatOmissionNotice"]
+    },
+    {
       "file": "cli:src/commands/graph/impact.ts",
       "symbols": ["registerGraphImpact"]
+    },
+    {
+      "file": "cli:test/commands/graph-impact.spec.ts",
+      "symbols": ["passes category flags"]
+    },
+    {
+      "file": "cli:src/commands/graph/parse-file-categories.ts",
+      "symbols": ["parseFileCategories"]
     }
   ],
   "optimizations": {

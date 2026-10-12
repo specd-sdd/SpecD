@@ -13,7 +13,8 @@ import {
   type StorageGenerationSnapshot,
 } from '../../src/domain/ports/graph-store.js'
 import { type DocumentNode } from '../../src/domain/value-objects/document-node.js'
-import { type FileNode } from '../../src/domain/value-objects/file-node.js'
+import { type FileNode, type FileCategory } from '../../src/domain/value-objects/file-node.js'
+import { resolveAdmittedCategories } from '../../src/domain/value-objects/impact-result.js'
 import { type SymbolNode } from '../../src/domain/value-objects/symbol-node.js'
 import { type SpecNode } from '../../src/domain/value-objects/spec-node.js'
 import { type Relation } from '../../src/domain/value-objects/relation.js'
@@ -560,6 +561,8 @@ export class InMemoryGraphStore extends GraphStore {
     const relationTypes = new Set(input.relationTypes)
     const admittedRelations = new Map<string, Relation>()
     const neighboringIds = new Set<string>()
+    const omittedTestFiles = new Set<string>()
+    const omittedIgnoredFiles = new Set<string>()
 
     for (const relation of this.relations) {
       if (!relationTypes.has(relation.type)) continue
@@ -579,12 +582,20 @@ export class InMemoryGraphStore extends GraphStore {
       }
 
       for (const neighbor of neighbors) {
-        if (!this.matchesImpactResource(input, neighbor)) continue
-        admittedRelations.set(
-          `${relation.source}\u0000${relation.type}\u0000${relation.target}`,
-          relation,
-        )
-        neighboringIds.add(neighbor)
+        const evaluation = this.evaluateImpactResource(input, neighbor)
+        if (evaluation.status === 'admitted') {
+          admittedRelations.set(
+            `${relation.source}\u0000${relation.type}\u0000${relation.target}`,
+            relation,
+          )
+          neighboringIds.add(neighbor)
+        } else if (evaluation.status === 'omitted-by-category') {
+          if (evaluation.category === 'test') {
+            omittedTestFiles.add(evaluation.filePath)
+          } else if (evaluation.category === 'ignored') {
+            omittedIgnoredFiles.add(evaluation.filePath)
+          }
+        }
       }
     }
 
@@ -592,7 +603,7 @@ export class InMemoryGraphStore extends GraphStore {
     const materializes = (type: 'files' | 'symbols' | 'specs'): boolean =>
       types === undefined || types.length === 0 || types.includes(type)
 
-    return {
+    const result: ImpactFrontierResult = {
       relations: [...admittedRelations.values()].sort(compareRelations),
       symbols: materializes('symbols')
         ? [...neighboringIds]
@@ -613,6 +624,88 @@ export class InMemoryGraphStore extends GraphStore {
             .sort((left, right) => left.specId.localeCompare(right.specId))
         : [],
     }
+
+    if (omittedTestFiles.size > 0 || omittedIgnoredFiles.size > 0) {
+      return {
+        ...result,
+        omittedCounts: {
+          tests: omittedTestFiles.size,
+          ignored: omittedIgnoredFiles.size,
+        },
+        omittedFiles: {
+          tests: [...omittedTestFiles].sort(),
+          ignored: [...omittedIgnoredFiles].sort(),
+        },
+      }
+    }
+
+    return result
+  }
+
+  /**
+   * Evaluates whether one neighboring identifier satisfies the filter predicates.
+   * Distinguishes category omissions from workspace/kind rejections.
+   */
+  private evaluateImpactResource(
+    input: ImpactFrontierQuery,
+    id: string,
+  ):
+    | { status: 'admitted' }
+    | { status: 'rejected' }
+    | { status: 'omitted-by-category'; filePath: string; category: FileCategory } {
+    const filter = input.filter
+    const admittedCategories = resolveAdmittedCategories(filter)
+    let workspace: string | undefined
+    let filePath: string | undefined
+    let category: FileCategory | undefined
+
+    if (input.resource === 'symbol') {
+      const symbol = this.symbols.get(id)
+      if (symbol === undefined) return { status: 'rejected' }
+      if (
+        filter?.kinds !== undefined &&
+        filter.kinds.length > 0 &&
+        !filter.kinds.includes(symbol.kind)
+      ) {
+        return { status: 'rejected' }
+      }
+      const file = this.files.get(symbol.filePath)
+      workspace = file?.workspace
+      filePath = symbol.filePath
+      category = file?.category ?? 'source'
+    } else if (input.resource === 'file') {
+      const file = this.files.get(id)
+      if (file === undefined) return { status: 'rejected' }
+      workspace = file.workspace
+      filePath = file.path
+      category = file.category ?? 'source'
+    } else {
+      const spec = this.specs.get(id)
+      if (spec === undefined) return { status: 'rejected' }
+      workspace = spec.workspace
+    }
+
+    const excluded = new Set(filter?.excludeWorkspaces ?? [])
+    if (workspace !== undefined && excluded.has(workspace)) return { status: 'rejected' }
+
+    const included = filter?.workspaces
+    if (
+      included !== undefined &&
+      included.length > 0 &&
+      (workspace === undefined || !included.includes(workspace))
+    ) {
+      return { status: 'rejected' }
+    }
+
+    if (
+      category !== undefined &&
+      filePath !== undefined &&
+      !admittedCategories.includes(category)
+    ) {
+      return { status: 'omitted-by-category', filePath, category }
+    }
+
+    return { status: 'admitted' }
   }
 
   /**
@@ -623,39 +716,7 @@ export class InMemoryGraphStore extends GraphStore {
    * @returns Whether the resource admits its relation into the frontier result.
    */
   private matchesImpactResource(input: ImpactFrontierQuery, id: string): boolean {
-    const filter = input.filter
-    let workspace: string | undefined
-
-    if (input.resource === 'symbol') {
-      const symbol = this.symbols.get(id)
-      if (symbol === undefined) return false
-      if (
-        filter?.kinds !== undefined &&
-        filter.kinds.length > 0 &&
-        !filter.kinds.includes(symbol.kind)
-      ) {
-        return false
-      }
-      workspace = this.files.get(symbol.filePath)?.workspace
-    } else if (input.resource === 'file') {
-      const file = this.files.get(id)
-      if (file === undefined) return false
-      workspace = file.workspace
-    } else {
-      const spec = this.specs.get(id)
-      if (spec === undefined) return false
-      workspace = spec.workspace
-    }
-
-    const excluded = new Set(filter?.excludeWorkspaces ?? [])
-    if (workspace !== undefined && excluded.has(workspace)) return false
-
-    const included = filter?.workspaces
-    return (
-      included === undefined ||
-      included.length === 0 ||
-      (workspace !== undefined && included.includes(workspace))
-    )
+    return this.evaluateImpactResource(input, id).status === 'admitted'
   }
 
   async getIncomingSymbolRelations(
@@ -909,6 +970,15 @@ export class InMemoryGraphStore extends GraphStore {
       }
     }
 
+    if (query.categories !== undefined && query.categories.length > 0) {
+      const cats = new Set(query.categories)
+      results = results.filter((s) => {
+        const file = this.files.get(s.filePath)
+        const cat = file?.category ?? 'source'
+        return cats.has(cat)
+      })
+    }
+
     return results
   }
 
@@ -1135,11 +1205,20 @@ export class InMemoryGraphStore extends GraphStore {
     return results
   }
 
-  async getFileImporterCounts(): Promise<Map<string, number>> {
+  async getFileImporterCounts(options?: {
+    categories?: readonly FileCategory[]
+  }): Promise<Map<string, number>> {
     this.ensureOpen()
+    const admitted =
+      options?.categories && options.categories.length > 0 ? new Set(options.categories) : undefined
     const counts = new Map<string, number>()
     for (const rel of this.relations) {
       if (rel.type === RelationType.Imports) {
+        if (admitted) {
+          const sourceFile = this.files.get(rel.source)
+          const category = sourceFile?.category ?? 'source'
+          if (!admitted.has(category)) continue
+        }
         counts.set(rel.target, (counts.get(rel.target) ?? 0) + 1)
       }
     }

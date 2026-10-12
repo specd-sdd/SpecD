@@ -49,14 +49,18 @@ specd graph search <query> [options]
 
 ### Options
 
-| Option                        | Description                                          |
-| ----------------------------- | ---------------------------------------------------- |
-| `--symbols`                   | Search only symbol identifiers and declarations.     |
-| `--specs`                     | Search only specification requirements.              |
-| `--files`                     | Search only indexed source files.                    |
-| `--workspace <name>`          | Limit search to a specific workspace.                |
-| `--limit <n>`                 | Maximum number of results to return (default: `20`). |
-| `--format <text\|json\|toon>` | Output format.                                       |
+| Option                        | Description                                                                                     |
+| ----------------------------- | ----------------------------------------------------------------------------------------------- |
+| `--symbols`                   | Search only symbol identifiers and declarations.                                                |
+| `--specs`                     | Search only specification requirements.                                                         |
+| `--files`                     | Search only indexed source files.                                                               |
+| `--workspace <name>`          | Limit search to a specific workspace.                                                           |
+| `--include-tests`             | Include test category files and symbols.                                                        |
+| `--include-ignored`           | Include ignored category files and symbols.                                                     |
+| `--all`                       | Include all categories (`source`, `test`, `ignored`).                                           |
+| `--category <categories>`     | Filter strictly by category (accepts single value or comma-separated list, e.g. `source,test`). |
+| `--limit <n>`                 | Maximum number of results to return (default: `20`).                                            |
+| `--format <text\|json\|toon>` | Output format.                                                                                  |
 
 ---
 
@@ -70,15 +74,19 @@ specd graph impact [options]
 
 ### Options
 
-| Option                                   | Description                                                                                    |
-| ---------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| `--symbol <name>`                        | Target symbol name or qualified identifier.                                                    |
-| `--file <path>`                          | Target file path. Repeatable flag.                                                             |
-| `--spec <id>`                            | Target specification identifier.                                                               |
-| `--direction <dependents\|dependencies>` | Traversal direction (`dependents` for blast radius, `dependencies` for upstream requirements). |
-| `--depth <n>`                            | Maximum traversal depth.                                                                       |
-| `--type <symbols\|files\|specs>`         | Filter impacted result types.                                                                  |
-| `--format <text\|json\|toon>`            | Output format.                                                                                 |
+| Option                                   | Description                                                                                                                           |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `--symbol <name>`                        | Target symbol name or qualified identifier.                                                                                           |
+| `--file <path>`                          | Target file path. Repeatable flag.                                                                                                    |
+| `--spec <id>`                            | Target specification identifier.                                                                                                      |
+| `--direction <dependents\|dependencies>` | Traversal direction (`dependents` for blast radius, `dependencies` for upstream requirements).                                        |
+| `--depth <n>`                            | Maximum traversal depth.                                                                                                              |
+| `--type <symbols\|files\|specs>`         | Filter impacted result types.                                                                                                         |
+| `--include-tests`                        | Admit `test` category files and symbols alongside `source`.                                                                           |
+| `--include-ignored`                      | Admit `ignored` category files and symbols.                                                                                           |
+| `--all`                                  | Admit all categories (`source`, `test`, `ignored`).                                                                                   |
+| `--category <categories>`                | Restrict traversal admission strictly to designated categories (accepts single category or comma-separated list, e.g. `source,test`). |
+| `--format <text\|json\|toon>`            | Output format.                                                                                                                        |
 
 ### Examples
 
@@ -102,13 +110,17 @@ specd graph hotspots [options]
 
 ### Options
 
-| Option                        | Description                                                                      |
-| ----------------------------- | -------------------------------------------------------------------------------- |
-| `--min-risk <level>`          | Minimum risk threshold (`LOW`, `MEDIUM`, `HIGH`, `CRITICAL`). Default: `MEDIUM`. |
-| `--limit <n>`                 | Maximum results to return (default: `20`).                                       |
-| `--workspace <name>`          | Filter by workspace.                                                             |
-| `--kind <list>`               | Filter by comma-separated symbol kinds (e.g. `class,method,function`).           |
-| `--format <text\|json\|toon>` | Output format.                                                                   |
+| Option                        | Description                                                                                                                                     |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--min-risk <level>`          | Minimum risk threshold (`LOW`, `MEDIUM`, `HIGH`, `CRITICAL`). Default: `MEDIUM`.                                                                |
+| `--limit <n>`                 | Maximum results to return (default: `20`).                                                                                                      |
+| `--workspace <name>`          | Filter by workspace.                                                                                                                            |
+| `--kind <list>`               | Filter by comma-separated symbol kinds (e.g. `class,method,function`).                                                                          |
+| `--include-tests`             | Include test category files in caller metrics and candidate rankings.                                                                           |
+| `--include-ignored`           | Include ignored category files in caller metrics and candidate rankings.                                                                        |
+| `--all`                       | Include all categories (`source`, `test`, `ignored`).                                                                                           |
+| `--category <categories>`     | Restrict candidates and caller metrics strictly to designated categories (accepts single category or comma-separated list, e.g. `source,test`). |
+| `--format <text\|json\|toon>` | Output format.                                                                                                                                  |
 
 ---
 

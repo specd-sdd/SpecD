@@ -10,8 +10,20 @@
   ],
   "implementation": [
     {
-      "file": "code-graph:src/application/use-cases/search-code-graph.ts",
-      "symbols": ["SearchCodeGraph"]
+      "file": "code-graph:src/domain/value-objects/impact-result.ts",
+      "symbols": ["OmittedCounts", "ImpactResultFilter", "ImpactResult"]
+    },
+    {
+      "file": "code-graph:src/domain/services/analyze-impact.ts",
+      "symbols": ["analyzeImpact"]
+    },
+    {
+      "file": "code-graph:src/domain/services/analyze-file-impact.ts",
+      "symbols": ["analyzeFileImpact"]
+    },
+    {
+      "file": "code-graph:test/domain/services/traversal.spec.ts",
+      "symbols": ["analyzeImpact"]
     }
   ],
   "optimizations": {

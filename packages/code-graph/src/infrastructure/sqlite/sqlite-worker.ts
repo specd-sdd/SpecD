@@ -9,7 +9,7 @@ import {
   type SQLiteWorkerRequest,
   type SQLiteWorkerResponse,
 } from './sqlite-worker-protocol.js'
-import { type FileNode } from '../../domain/value-objects/file-node.js'
+import { type FileCategory, type FileNode } from '../../domain/value-objects/file-node.js'
 import { type DocumentNode } from '../../domain/value-objects/document-node.js'
 import { type SymbolNode } from '../../domain/value-objects/symbol-node.js'
 import { type SpecNode } from '../../domain/value-objects/spec-node.js'
@@ -365,7 +365,8 @@ export async function handleMessage(
         break
       }
       case 'getFileImporterCounts': {
-        result = database.getFileImporterCounts()
+        const p = payload as { categories?: readonly FileCategory[] }
+        result = database.getFileImporterCounts(p)
         break
       }
       case 'getAllFiles': {

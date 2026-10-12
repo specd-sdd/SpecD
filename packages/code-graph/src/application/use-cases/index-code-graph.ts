@@ -2,11 +2,18 @@ import { readFileSync, statSync, rmSync, existsSync, mkdirSync, writeFileSync } 
 import { join, relative } from 'node:path'
 import { setImmediate } from 'node:timers'
 import { performance } from 'node:perf_hooks'
-import { type Spec, SpecPath, Logger } from '@specd/core'
+import {
+  type Spec,
+  SpecPath,
+  Logger,
+  DEFAULT_GRAPH_TEST_PATHS,
+  DEFAULT_GRAPH_IGNORE_PATHS,
+} from '@specd/core'
 import { type GraphStore, type ReferenceFactsWrite } from '../../domain/ports/graph-store.js'
 import { ResolveSymbolReference } from './resolve-symbol-reference.js'
 import { asGraphStore, SessionReferenceStore } from '../services/session-reference-store.js'
 import { type FileNode, createFileNode } from '../../domain/value-objects/file-node.js'
+import { classifyFileCategory } from '../../domain/services/classify-file-category.js'
 import { type DocumentNode, createDocumentNode } from '../../domain/value-objects/document-node.js'
 import { type SymbolNode } from '../../domain/value-objects/symbol-node.js'
 import { SymbolKind } from '../../domain/value-objects/symbol-kind.js'
@@ -983,6 +990,21 @@ export class IndexCodeGraph {
               capabilities: enabledCapabilities,
             })
 
+            const wsConfig = options.graphConfig.workspaces?.get(wsName)
+            const effectiveTestPatterns = [
+              ...(options.graphConfig.testPaths ?? DEFAULT_GRAPH_TEST_PATHS),
+              ...(wsConfig?.testPaths ?? []),
+            ]
+            const effectiveIgnorePatterns = [
+              ...(options.graphConfig.ignorePaths ?? DEFAULT_GRAPH_IGNORE_PATHS),
+              ...(wsConfig?.ignorePaths ?? []),
+            ]
+            const category = classifyFileCategory(
+              relPath,
+              effectiveTestPatterns,
+              effectiveIgnorePatterns,
+            )
+
             chunkFiles.push(
               createFileNode({
                 path: prefixedPath,
@@ -990,6 +1012,7 @@ export class IndexCodeGraph {
                 language,
                 contentHash: hash,
                 workspace: wsName,
+                category,
                 content,
               }),
             )
