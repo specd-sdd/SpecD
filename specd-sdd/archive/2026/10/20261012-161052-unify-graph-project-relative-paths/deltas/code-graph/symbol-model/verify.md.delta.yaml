@@ -1,0 +1,94 @@
+- op: modified
+  description: 'Update File node verification scenarios to test projectRelativePath'
+  selector:
+    type: section
+    matches: 'Requirement: File node'
+  content: |
+    #### Scenario: FileNode equality still uses canonical path
+
+    - **GIVEN** two `FileNode` values with the same canonical `path` but different `contentHash` and `projectRelativePath`
+    - **WHEN** equality is checked
+    - **THEN** they are considered equal because `path` remains the canonical graph identity
+
+    #### Scenario: FileNode path normalization
+
+    - **GIVEN** a file discovered under workspace `core` at OS path `src\\domain\\entities\\change.ts`
+    - **WHEN** a `FileNode` is created
+    - **THEN** `path` is stored as `core:src/domain/entities/change.ts`
+
+    #### Scenario: FileNode projectRelativePath is repository-style
+
+    - **GIVEN** the active `specd.yaml` lives at `/project/specd.yaml`
+    - **AND** workspace `core` has codeRoot `/project/packages/core`
+    - **AND** the discovered file is `/project/packages/core/src/index.ts`
+    - **WHEN** a `FileNode` is created
+    - **THEN** `path` is `core:src/index.ts`
+    - **AND** `projectRelativePath` is `packages/core/src/index.ts`
+    - **AND** `workspace` is `core`
+
+    #### Scenario: FileNode projectRelativePath may include parent segments
+
+    - **GIVEN** the active `specd.yaml` lives at `/project/apps/web/specd.yaml`
+    - **AND** workspace `core` has codeRoot `/project/packages/core`
+    - **AND** the discovered file is `/project/packages/core/src/index.ts`
+    - **WHEN** a `FileNode` is created
+    - **THEN** `projectRelativePath` is `../../packages/core/src/index.ts`
+    - **AND** it does not replace the canonical `path`
+
+- op: modified
+  description: 'Update Symbol node verification scenarios to include projectRelativePath'
+  selector:
+    type: section
+    matches: 'Requirement: Symbol node'
+  content: |
+    #### Scenario: Deterministic id generation
+
+    - **GIVEN** a symbol with `filePath: 'core/src/utils.ts'`, `kind: function`, `name: 'hash'`, `line: 10`, `column: 0`
+    - **WHEN** the id is computed
+    - **THEN** it produces `'core/src/utils.ts:function:hash:10:0'` every time for these inputs
+
+    #### Scenario: Different line produces different id
+
+    - **GIVEN** two symbols with the same `filePath`, `kind`, and `name` but different `line` values
+    - **WHEN** their ids are computed
+    - **THEN** the ids are different
+
+    #### Scenario: Id includes workspace-prefixed path
+
+    - **GIVEN** a symbol in file `core:src/index.ts` (workspace-prefixed path)
+    - **WHEN** the id is computed
+    - **THEN** the id starts with `core:src/index.ts:`
+    - **AND** the id is globally unique across workspaces
+
+    #### Scenario: Comment extracted from JSDoc
+
+    - **GIVEN** a TypeScript file with `/** Computes the hash. */` immediately before `function computeHash()`
+    - **WHEN** the symbol is extracted
+    - **THEN** `comment` is `'/** Computes the hash. */'`
+
+    #### Scenario: Symbol without comment
+
+    - **GIVEN** a function declaration with no preceding comment
+    - **WHEN** the symbol is extracted
+    - **THEN** `comment` is `undefined`
+
+    #### Scenario: Construct and selection ranges round-trip
+
+    - **GIVEN** a multi-line named declaration whose name is not at the construct start
+    - **WHEN** the symbol is extracted, persisted, and read
+    - **THEN** its half-open complete construct range contains its declared-name `selectionRange`
+    - **AND** slicing indexed content by the complete range returns the whole declaration
+    - **AND** slicing by `selectionRange` returns only the declared name
+
+    #### Scenario: Range enrichment preserves symbol identity
+
+    - **GIVEN** an existing symbol identified by file, kind, name, line, and column
+    - **WHEN** end coordinates and `selectionRange` are added
+    - **THEN** its symbol id is unchanged
+    - **AND** `line` and `column` equal the complete construct start
+
+    #### Scenario: SymbolNode carries denormalized projectRelativePath
+
+    - **GIVEN** a symbol extracted from a file with `projectRelativePath` `packages/core/src/index.ts`
+    - **WHEN** the `SymbolNode` is created
+    - **THEN** its `projectRelativePath` equals `packages/core/src/index.ts`

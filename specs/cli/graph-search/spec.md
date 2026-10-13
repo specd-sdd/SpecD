@@ -54,9 +54,11 @@ The command MUST NOT perform a host-managed pre-open lock probe. Busy and stale 
 
 Text, JSON, and TOON SHALL remain category-grouped in deterministic `symbols`, `files`, `specs`, and `documents` order. Text category headers SHALL show the number returned and active per-category limit.
 
-Structured symbol entries SHALL expose logical identity, declarations, bindings, directly matched bindings, match tier/reasons, and the symbol's complete construct plus declared-name selection ranges. Text symbol entries SHALL show real declaration locations and SHALL NOT print serialized canonical identifiers by default. When a public export or barrel alias caused the match, text SHALL show `matched export: <project-relative-path>::<exported-name>` followed by the underlying declaration location; other bindings MAY be summarized by count rather than enumerated.
+The command SHALL delegate graph querying and path projection to `sdk:run-graph-search`.
 
-Source-file entries SHALL expose file identity, retained precise matches, `totalMatches`, and `omittedMatches`; each match identifies whether it came from the complete query, a raw term, or an expanded term. General and wildcard-path output SHALL preserve the relevance-tier ordering of retained occurrences, while exact single-file output SHALL preserve source order. Text SHALL render `N more matches in this file` when matches were omitted. Spec and document entries retain their existing identities and match locations.
+Structured symbol entries SHALL expose logical identity, declarations, bindings, directly matched bindings, match tier/reasons, the symbol's complete construct plus declared-name selection ranges, and `projectRelativePath` on every declaration location (`location.projectRelativePath`), symbol hit (`symbol.projectRelativePath`), and logical target / public binding surface (`projectRelativePath`). Text symbol entries SHALL show real declaration locations and SHALL NOT print serialized canonical identifiers by default. When a public export or barrel alias caused the match, text SHALL show `matched export: <project-relative-path>::<exported-name>` followed by the underlying declaration location; other bindings MAY be summarized by count rather than enumerated.
+
+Source-file entries SHALL expose file identity (`workspace` and canonical `path`), `projectRelativePath`, retained precise matches, `totalMatches`, and `omittedMatches`; each match identifies whether it came from the complete query, a raw term, or an expanded term. Source-file entries in structured output SHALL NOT expose `configRelativePath`. General and wildcard-path output SHALL preserve the relevance-tier ordering of retained occurrences, while exact single-file output SHALL preserve source order. Text SHALL render `N more matches in this file` when matches were omitted. Spec and document entries retain their existing identities and match locations; document entries in structured output SHALL expose `projectRelativePath` and SHALL NOT expose `configRelativePath`.
 
 Without `--snippet`, structured output omits snippet content but retains precise match ranges, and text renders compact locations. With `--snippet`, every category MAY include sanitized match-centered preview blocks with a snippet range distinct from the underlying match or symbol range.
 
@@ -161,3 +163,4 @@ Documents (10 shown, limit 10):
 - `code-graph:graph-store` — indexed reference fields
 - `cli:graph-cli-context` — lifecycle and selectors
 - `code-graph:resolve-symbol-reference` — canonical reference semantics
+- `sdk:run-graph-search` — SDK graph search orchestration and path projection

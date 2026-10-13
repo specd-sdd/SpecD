@@ -1,0 +1,39 @@
+- op: modified
+  description: 'Require projectRelativePath across symbols, files, and documents in structured output, removing configRelativePath'
+  selector:
+    type: section
+    matches: 'Requirement: Output format'
+  content: |
+    Text, JSON, and TOON SHALL remain category-grouped in deterministic `symbols`, `files`, `specs`, and `documents` order. Text category headers SHALL show the number returned and active per-category limit.
+
+    The command SHALL delegate graph querying and path projection to `sdk:run-graph-search`.
+
+    Structured symbol entries SHALL expose logical identity, declarations, bindings, directly matched bindings, match tier/reasons, the symbol's complete construct plus declared-name selection ranges, and `projectRelativePath` on every declaration location (`location.projectRelativePath`), symbol hit (`symbol.projectRelativePath`), and logical target / public binding surface (`projectRelativePath`). Text symbol entries SHALL show real declaration locations and SHALL NOT print serialized canonical identifiers by default. When a public export or barrel alias caused the match, text SHALL show `matched export: <project-relative-path>::<exported-name>` followed by the underlying declaration location; other bindings MAY be summarized by count rather than enumerated.
+
+    Source-file entries SHALL expose file identity (`workspace` and canonical `path`), `projectRelativePath`, retained precise matches, `totalMatches`, and `omittedMatches`; each match identifies whether it came from the complete query, a raw term, or an expanded term. Source-file entries in structured output SHALL NOT expose `configRelativePath`. General and wildcard-path output SHALL preserve the relevance-tier ordering of retained occurrences, while exact single-file output SHALL preserve source order. Text SHALL render `N more matches in this file` when matches were omitted. Spec and document entries retain their existing identities and match locations; document entries in structured output SHALL expose `projectRelativePath` and SHALL NOT expose `configRelativePath`.
+
+    Without `--snippet`, structured output omits snippet content but retains precise match ranges, and text renders compact locations. With `--snippet`, every category MAY include sanitized match-centered preview blocks with a snippet range distinct from the underlying match or symbol range.
+
+    A file containing several occurrences SHALL be rendered once with its ordered matches. A file whose declaration occurrence duplicates a symbol result but also contains a call, string, comment, or other non-symbol occurrence SHALL render only the remaining occurrences.
+
+    `--spec-content` continues to include full spec content only in JSON/TOON. When every selected category is empty, text output SHALL be `No results found.`
+
+    When `omittedCounts` indicates that results were filtered out (`tests > 0` or `ignored > 0`), text mode output SHALL display an omission notice:
+    `ℹ Excluded from results: <count> test files, <count> ignored files. Use --include-tests, --include-ignored, or --all to view them.`
+
+    In `json` or `toon` mode, the output object SHALL include `omittedCounts: { tests: number, ignored: number }`.
+
+- op: modified
+  description: 'Add sdk:run-graph-search to Spec Dependencies'
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - `cli:entrypoint` — CLI conventions
+    - `core:config` — graph configuration
+    - `code-graph:composition` — provider search surface
+    - `code-graph:document-model` — document results
+    - `code-graph:graph-store` — indexed reference fields
+    - `cli:graph-cli-context` — lifecycle and selectors
+    - `code-graph:resolve-symbol-reference` — canonical reference semantics
+    - `sdk:run-graph-search` — SDK graph search orchestration and path projection

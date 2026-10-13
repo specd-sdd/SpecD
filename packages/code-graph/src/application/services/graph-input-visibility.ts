@@ -9,7 +9,7 @@ import { resolveEffectiveGraphConfig } from '../use-cases/_shared/resolve-effect
 /** Current graph-visible filesystem membership and explicit input-channel boundaries. */
 export interface GraphInputVisibilitySnapshot {
   readonly currentInputs: ReadonlyMap<string, ReadonlyMap<string, string>>
-  isVisible(workspace: string, configRelativePath: string): boolean
+  isVisible(workspace: string, projectRelativePath: string): boolean
 }
 
 /**
@@ -81,8 +81,8 @@ export function buildGraphInputVisibilitySnapshot(
 
   return {
     currentInputs,
-    isVisible(workspace: string, configRelativePath: string): boolean {
-      const normalized = normalizePortablePath(configRelativePath)
+    isVisible(workspace: string, projectRelativePath: string): boolean {
+      const normalized = normalizePortablePath(projectRelativePath)
       if (currentInputs.get(workspace)?.has(normalized) === true) return true
       if (persistedInputs.get(workspace)?.has(normalized) === true) return true
       const specRoot = specRoots.get(workspace)

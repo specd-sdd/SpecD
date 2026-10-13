@@ -27,7 +27,7 @@ export interface ResolveSelectorOptions {
  */
 export interface ResolvedFileSelector {
   readonly canonicalPath: string
-  readonly configRelativePath: string
+  readonly projectRelativePath: string
   readonly workspace: string
   readonly kind: 'file' | 'document'
 }
@@ -77,14 +77,14 @@ export async function resolveFileSelector(
     return direct
   }
 
-  const configRelativePath = toConfigRelativePath(trimmed, options.projectRoot)
-  if (configRelativePath === null) {
+  const projectRelativePath = toProjectRelativePath(trimmed, options.projectRoot)
+  if (projectRelativePath === null) {
     return []
   }
 
   const [files, documents] = await Promise.all([
-    options.store.findFilesByConfigRelativePath(configRelativePath),
-    options.store.findDocumentsByConfigRelativePath(configRelativePath),
+    options.store.findFilesByProjectRelativePath(projectRelativePath),
+    options.store.findDocumentsByProjectRelativePath(projectRelativePath),
   ])
 
   return [
@@ -280,24 +280,24 @@ async function resolveDirectPath(
 }
 
 /**
- * Normalizes a raw file selector to the config-relative path used for lookup.
+ * Normalizes a raw file selector to the project-relative path used for lookup.
  * @param input - The raw selector string.
  * @param projectRoot - The project root used for absolute selectors.
- * @returns The normalized config-relative path, or the trimmed input when normalization is not possible.
+ * @returns The normalized project-relative path, or the trimmed input when normalization is not possible.
  */
 export function normalizeFileSelectorPath(input: string, projectRoot?: string): string {
   const trimmed = input.trim()
-  const configRelativePath = toConfigRelativePath(trimmed, projectRoot)
-  return configRelativePath ?? trimmed
+  const projectRelativePath = toProjectRelativePath(trimmed, projectRoot)
+  return projectRelativePath ?? trimmed
 }
 
 /**
- * Converts a raw path selector into a config-relative path when possible.
+ * Converts a raw path selector into a project-relative path when possible.
  * @param input - The raw selector string.
  * @param projectRoot - The project root used for absolute selectors.
- * @returns A normalized config-relative path or null when it cannot be derived.
+ * @returns A normalized project-relative path or null when it cannot be derived.
  */
-function toConfigRelativePath(input: string, projectRoot?: string): string | null {
+function toProjectRelativePath(input: string, projectRoot?: string): string | null {
   if (isAbsolute(input)) {
     if (projectRoot === undefined) {
       return null
@@ -383,7 +383,7 @@ function parseQualifiedSelector(
 function mapFile(file: FileNode): ResolvedFileSelector {
   return {
     canonicalPath: file.path,
-    configRelativePath: file.configRelativePath,
+    projectRelativePath: file.projectRelativePath,
     workspace: file.workspace,
     kind: 'file',
   }
@@ -397,7 +397,7 @@ function mapFile(file: FileNode): ResolvedFileSelector {
 function mapDocument(document: DocumentNode): ResolvedFileSelector {
   return {
     canonicalPath: document.path,
-    configRelativePath: document.configRelativePath,
+    projectRelativePath: document.projectRelativePath,
     workspace: document.workspace,
     kind: 'document',
   }

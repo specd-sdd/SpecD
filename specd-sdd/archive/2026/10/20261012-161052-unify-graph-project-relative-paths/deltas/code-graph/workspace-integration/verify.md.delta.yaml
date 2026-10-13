@@ -1,0 +1,69 @@
+- op: modified
+  description: 'Update FileNode path and workspace semantics scenarios to test projectRelativePath'
+  selector:
+    type: section
+    matches: 'Requirement: FileNode path and workspace semantics'
+  content: |
+    #### Scenario: Single workspace file path
+
+    - **WHEN** a file `src/index.ts` is discovered in workspace `core` with codeRoot `/project/packages/core`
+    - **THEN** `FileNode.path` is `core:src/index.ts`
+    - **AND** `FileNode.workspace` is `core`
+
+    #### Scenario: Project-relative path stored alongside canonical identity
+
+    - **GIVEN** the active `specd.yaml` lives at `/project/specd.yaml`
+    - **WHEN** a file `src/index.ts` is discovered in workspace `core` with codeRoot `/project/packages/core`
+    - **THEN** `FileNode.path` is `core:src/index.ts`
+    - **AND** `FileNode.projectRelativePath` is `packages/core/src/index.ts`
+
+    #### Scenario: Duplicate filenames across workspaces remain distinct
+
+    - **WHEN** two workspaces `core` and `cli` both contain `src/index.ts`
+    - **THEN** their canonical FileNode paths are `core:src/index.ts` and `cli:src/index.ts`
+    - **AND** both can still be stored in the same graph without conflict
+
+- op: modified
+  description: 'Rename Requirement: Config-relative file lookup to Project-relative file lookup and update scenarios'
+  selector:
+    type: section
+    matches: 'Requirement: Config-relative file lookup'
+  rename: 'Requirement: Project-relative file lookup'
+  content: |
+    #### Scenario: Unprefixed selector resolves through projectRelativePath
+
+    - **GIVEN** the active `specd.yaml` lives at `/project/specd.yaml`
+    - **AND** file `core:src/index.ts` is indexed with `projectRelativePath` `packages/core/src/index.ts`
+    - **WHEN** a CLI command resolves the selector `packages/core/src/index.ts`
+    - **THEN** it can map that selector back to canonical file `core:src/index.ts`
+
+    #### Scenario: Absolute selector normalizes to projectRelativePath before lookup
+
+    - **GIVEN** the active `specd.yaml` lives at `/project/specd.yaml`
+    - **AND** file `core:src/index.ts` is indexed with `projectRelativePath` `packages/core/src/index.ts`
+    - **WHEN** a CLI command resolves `/project/packages/core/src/index.ts`
+    - **THEN** it normalizes the absolute path to `packages/core/src/index.ts`
+    - **AND** resolves the canonical file `core:src/index.ts`
+
+    #### Scenario: Project-relative lookup supports parent segments
+
+    - **GIVEN** the active `specd.yaml` lives at `/project/apps/web/specd.yaml`
+    - **AND** file `core:src/index.ts` is indexed with `projectRelativePath` `../../packages/core/src/index.ts`
+    - **WHEN** a CLI command resolves `../../packages/core/src/index.ts`
+    - **THEN** it resolves the canonical file `core:src/index.ts`
+
+- op: modified
+  description: 'Update Backward compatibility scenario to reflect projectRelativePath'
+  selector:
+    type: section
+    matches: 'Backward compatibility'
+  content: |
+    #### Scenario: Force re-index on path format change
+
+    - **WHEN** an existing graph store has file identity metadata incompatible with the current format
+    - **THEN** a full rebuild is required before lookups are considered trustworthy
+
+    #### Scenario: Force re-index after adding projectRelativePath metadata
+
+    - **WHEN** an existing graph store was built before `projectRelativePath` was persisted
+    - **THEN** the next rebuild path must recreate the graph before unprefixed selector lookup can rely on that metadata

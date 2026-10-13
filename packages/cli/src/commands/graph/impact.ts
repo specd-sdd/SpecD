@@ -3,21 +3,17 @@ import {
   type CoveringSpecImpact,
   createCodeGraphProvider,
   type FileCategory,
-  type FileImpactResult,
-  GraphSpecNotFoundError as SpecNotFoundError,
-  type SpecdConfig,
+  runGraphImpact,
+  createSdkContext,
+  type SdkHostContext,
 } from '@specd/sdk'
 import { cliError } from '../../handle-error.js'
 import { output, parseFormat } from '../../formatter.js'
+import { buildCliKernelOptions } from '../../helpers/cli-context.js'
 import { resolveGraphCliContext } from './resolve-graph-cli-context.js'
 import { withProvider } from './with-provider.js'
 import { warnGraphStale } from './warn-graph-staleness.js'
 import { formatOmissionNotice } from './format-omission-notice.js'
-import {
-  resolveImpactFileSelectors,
-  splitWorkspaceIdentity,
-  toGraphDisplayPath,
-} from './resolve-impact-file-selectors.js'
 import { parseGraphKinds } from './parse-graph-kinds.js'
 import { parseFileCategories } from './parse-file-categories.js'
 
@@ -171,12 +167,12 @@ type FormattedImpactResult = {
   transitiveDependents: number
   affectedFiles: readonly string[]
   affectedSymbols?: readonly { name: string; filePath: string; line: number; depth: number }[]
-  affectedSpecs?: readonly string[]
+  affectedSpecs?: readonly string[] | undefined
 }
 
 /** Spec impact payload shape used by text formatters in this command. */
 type FormattedSpecImpactResult = FormattedImpactResult & {
-  affectedSpecs: readonly string[]
+  affectedSpecs?: readonly string[] | undefined
 }
 
 /**
@@ -372,21 +368,21 @@ File selectors:
 
 JSON/TOON output schema:
   --symbol (single match):
-    { symbol: { id, name, kind, filePath, line, column, comment }, impact: ImpactResult }
+    { symbol: { id, name, kind, filePath, line, column, comment }, projectRelativePath: string, riskLevel, directDepsCount, indirectDepsCount, transitiveDepsCount, affectedFilesCount, omittedCounts, impact: ImpactResult }
   --symbol (multiple matches):
-    Array<{ symbol: { id, name, kind, filePath, line, column, comment }, impact: ImpactResult }>
+    { error: "ambiguous", symbol: string, totalCandidates: number, candidates: Array<{ symbol, projectRelativePath: string }> }
   --file (single):
-    FileImpactResult (ImpactResult + symbols: ImpactResult[])
+    { canonicalPath: string, projectRelativePath: string, riskLevel, directDepsCount, indirectDepsCount, transitiveDepsCount, affectedFilesCount, directDependents, indirectDependents, transitiveDependents, affectedFiles: string[], affectedSymbols: Array<{ id, name, filePath, depth }>, symbols: any[], coveringSpecs: any[], omittedCounts }
   --file (multiple):
-    AggregatedFileImpactResult
+    { targets: string[], projectRelativeTargets: string[], riskLevel, directDepsCount, indirectDepsCount, transitiveDepsCount, affectedFilesCount, omittedCounts, directDependents, indirectDependents, transitiveDependents, affectedFiles: string[], coveringSpecs: any[], perFile: Array<{ file: string, projectRelativePath: string, result }> }
   --spec:
-    { spec: string, impact: SpecImpactResult }
+    { spec: string, riskLevel, directDepsCount, indirectDepsCount, transitiveDepsCount, affectedFilesCount, omittedCounts, impact: SpecImpactResult }
   --symbol (no match):
     { error: "not_found", symbol: string }
 
   ImpactResult: { target, directDependents, indirectDependents, transitiveDependents,
     riskLevel: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL", affectedFiles: string[],
-    affectedSymbols: Array<{ id, name, filePath }>, affectedSpecs: string[],
+    affectedSymbols: Array<{ id, name, filePath, depth }>, affectedSpecs: string[],
     affectedProcesses: string[], omittedCounts: { tests: number, ignored: number } }
 `,
     )
@@ -445,6 +441,11 @@ JSON/TOON output schema:
             1,
           ),
         )
+        const hostContext: SdkHostContext =
+          kernel !== null
+            ? { kernel, createGraphProvider: () => createCodeGraphProvider(config) }
+            : await createSdkContext(config, { kernel: buildCliKernelOptions() })
+
         await withProvider(
           config,
           opts.format,
@@ -452,28 +453,45 @@ JSON/TOON output schema:
             await warnGraphStale(provider, config, kernel)
             if (opts.export !== undefined && opts.from !== undefined) {
               await handlePublicExportImpact(
-                provider,
+                hostContext,
                 opts.export,
                 opts.from,
                 direction,
                 maxDepth,
                 fmt,
                 filter,
+                provider,
               )
             } else if (opts.symbol) {
               await handleSymbolImpact(
-                provider,
+                hostContext,
                 opts.symbol,
                 direction,
                 maxDepth,
                 fmt,
-                config,
                 filter,
+                provider,
               )
             } else if (opts.spec) {
-              await handleSpecImpact(provider, opts.spec, direction, maxDepth, fmt, config, filter)
+              await handleSpecImpact(
+                hostContext,
+                opts.spec,
+                direction,
+                maxDepth,
+                fmt,
+                filter,
+                provider,
+              )
             } else if (opts.file) {
-              await handleFilesImpact(provider, opts.file, direction, maxDepth, fmt, config, filter)
+              await handleFilesImpact(
+                hostContext,
+                opts.file,
+                direction,
+                maxDepth,
+                fmt,
+                filter,
+                provider,
+              )
             }
           },
           { kernel },
@@ -485,181 +503,146 @@ JSON/TOON output schema:
 /**
  * Resolves and renders one exact public export independently from its canonical target.
  *
- * @param provider - Open code graph provider
+ * @param hostContext - Active SDK host context
  * @param exportedName - Public exported spelling
  * @param surface - Public surface containing the export
  * @param direction - Traversal direction
  * @param maxDepth - Maximum traversal depth
  * @param fmt - Output format
  * @param filter - Optional normalized provider-side impact filter.
+ * @param provider - Optional open code graph provider
  * @returns When rendering completes
  */
 async function handlePublicExportImpact(
-  provider: Awaited<ReturnType<typeof createCodeGraphProvider>>,
+  hostContext: SdkHostContext,
   exportedName: string,
   surface: string,
   direction: ImpactDirection,
   maxDepth: number,
   fmt: 'text' | 'json' | 'toon',
   filter: ImpactResultFilter | undefined,
+  provider?: GraphImpactProvider,
 ): Promise<void> {
-  let canonicalSurface = surface
-  if (!surface.includes(':')) {
-    const matches = await provider.resolveFileSelector(surface)
-    if (matches.length > 1) {
-      cliError(
-        `ambiguous public surface "${surface}": ${matches.map((match) => match.canonicalPath).join(', ')}`,
-        fmt,
-        1,
-      )
-    }
-    if (matches.length === 1) canonicalSurface = matches[0]!.canonicalPath
-  }
-  const workspace = splitWorkspaceIdentity(canonicalSurface)?.workspace ?? 'default'
-  const resolution = await provider.resolveSymbolReference({
-    workspace,
-    requested: exportedName,
-    publicSurface: canonicalSurface,
+  const result = await runGraphImpact(hostContext, {
+    export: exportedName,
+    from: surface,
+    direction,
+    depth: maxDepth,
+    ...(filter !== undefined ? { filter } : {}),
+    ...(provider !== undefined ? { provider } : {}),
   })
 
-  if (resolution.status !== 'resolved' || resolution.target === null) {
-    if (fmt === 'text') {
-      const reason = resolution.reasonCode === null ? '' : ` (${resolution.reasonCode})`
-      output(`Public export ${surface}::${exportedName}: ${resolution.status}${reason}`, 'text')
-    } else {
-      output({ export: exportedName, from: surface, resolution }, fmt)
+  if (result.kind === 'export') {
+    if (result.status !== 'resolved') {
+      if (result.status === 'ambiguous') {
+        const candidates = result.candidates ?? []
+        if (fmt === 'text') {
+          output(
+            `Public export ${surface}::${exportedName}: ambiguous (${String(candidates.length)} routes)`,
+            'text',
+          )
+        } else {
+          output(
+            {
+              export: exportedName,
+              from: surface,
+              resolution: result.resolution,
+              candidates,
+            },
+            fmt,
+          )
+        }
+        return
+      }
+
+      if (fmt === 'text') {
+        const reason =
+          result.resolution.reasonCode === null ? '' : ` (${result.resolution.reasonCode})`
+        output(
+          `Public export ${surface}::${exportedName}: ${result.resolution.status}${reason}`,
+          'text',
+        )
+      } else {
+        output({ export: exportedName, from: surface, resolution: result.resolution }, fmt)
+      }
+      return
     }
-    return
-  }
 
-  const selected = await provider.getExactPublicBinding({
-    surface: canonicalSurface,
-    exportedName,
-    space: resolution.target.space,
-    targetId: resolution.target.id,
-  })
-
-  if (selected === null) {
-    const candidates: readonly never[] = []
     if (fmt === 'text') {
-      output(
-        `Public export ${surface}::${exportedName}: ambiguous (${String(candidates.length)} routes)`,
-        'text',
-      )
+      const lines = [
+        `Public export impact for ${surface}::${exportedName}`,
+        `  Binding: ${result.binding.id}`,
+        `  Target:  ${result.target.id}`,
+        `  Path:    ${result.path.map((step) => `${step.kind}:${step.fromId}->${step.toId}`).join(' | ') || '(direct)'}`,
+        '',
+        'Exact public-binding impact:',
+        ...formatImpact(result.binding.id, result.bindingImpact, maxDepth).map(
+          (line) => `  ${line}`,
+        ),
+        '',
+        'Canonical-symbol impact:',
+        ...formatImpact(result.target.id, result.canonicalImpact, maxDepth).map(
+          (line) => `  ${line}`,
+        ),
+      ]
+      const omissionNotice =
+        formatOmissionNotice(result.canonicalImpact.omittedCounts) ??
+        formatOmissionNotice(result.bindingImpact.omittedCounts)
+      if (omissionNotice !== undefined) {
+        lines.push('')
+        lines.push(omissionNotice)
+      }
+      output(lines.join('\n'), 'text')
     } else {
       output(
         {
-          export: exportedName,
-          from: surface,
-          resolution: {
-            ...resolution,
-            status: 'ambiguous',
-            reasonCode: 'AMBIGUOUS_PUBLIC_BINDING',
-          },
-          candidates,
+          export: result.export,
+          from: result.from,
+          projectRelativeSurface: result.projectRelativeSurface,
+          resolution: result.resolution,
+          binding: result.binding,
+          target: result.target,
+          path: result.path,
+          bindingImpact: result.bindingImpact,
+          canonicalImpact: result.canonicalImpact,
+          omittedCounts: result.omittedCounts,
         },
         fmt,
       )
     }
-    return
-  }
-
-  const input = {
-    binding: selected.binding,
-    target: resolution.target,
-    declarations: selected.declarations,
-    path: resolution.path,
-  }
-  const result =
-    filter === undefined
-      ? await provider.analyzePublicBindingImpact(input, direction, maxDepth)
-      : await provider.analyzePublicBindingImpact(input, direction, maxDepth, filter)
-
-  if (fmt === 'text') {
-    const lines = [
-      `Public export impact for ${surface}::${exportedName}`,
-      `  Binding: ${result.binding.id}`,
-      `  Target:  ${result.target.id}`,
-      `  Path:    ${result.path.map((step) => `${step.kind}:${step.fromId}->${step.toId}`).join(' | ') || '(direct)'}`,
-      '',
-      'Exact public-binding impact:',
-      ...formatImpact(result.binding.id, result.bindingImpact, maxDepth).map((line) => `  ${line}`),
-      '',
-      'Canonical-symbol impact:',
-      ...formatImpact(result.target.id, result.canonicalImpact, maxDepth).map(
-        (line) => `  ${line}`,
-      ),
-    ]
-    const omissionNotice =
-      formatOmissionNotice(result.canonicalImpact.omittedCounts) ??
-      formatOmissionNotice(result.bindingImpact.omittedCounts)
-    if (omissionNotice !== undefined) {
-      lines.push('')
-      lines.push(omissionNotice)
-    }
-    output(lines.join('\n'), 'text')
-  } else {
-    output(
-      {
-        export: exportedName,
-        from: surface,
-        resolution,
-        ...result,
-        omittedCounts: result.canonicalImpact.omittedCounts ??
-          result.bindingImpact.omittedCounts ?? { tests: 0, ignored: 0 },
-      },
-      fmt,
-    )
   }
 }
 
 /**
  * Handles file-level impact analysis.
- * @param provider - The code graph provider.
+ * @param hostContext - The SDK host context.
  * @param rawSelectors - The file selectors to resolve and analyze.
  * @param direction - The traversal direction.
  * @param maxDepth - Maximum traversal depth.
  * @param fmt - The output format.
- * @param config - Resolved project configuration used for pure display-path projection.
  * @param filter - Optional normalized provider-side impact filter.
+ * @param provider - The code graph provider.
  */
 async function handleFilesImpact(
-  provider: Awaited<ReturnType<typeof createCodeGraphProvider>>,
+  hostContext: SdkHostContext,
   rawSelectors: string[],
   direction: 'upstream' | 'downstream' | 'both',
   maxDepth: number,
   fmt: 'text' | 'json' | 'toon',
-  config: SpecdConfig,
   filter: ImpactResultFilter | undefined,
+  provider: GraphImpactProvider,
 ): Promise<void> {
-  const resolvedFiles = await resolveImpactFileSelectors(provider, rawSelectors)
-  const resolved = resolvedFiles.map((file) => ({
-    canonicalPath: file.path,
-    configRelativePath: toGraphDisplayPath(config, file.path),
-    workspace: file.workspace,
-    kind: 'file' as const,
-  }))
-  const toDisplayPath = (canonicalPath: string): string => toGraphDisplayPath(config, canonicalPath)
+  const result = await runGraphImpact(hostContext, {
+    files: rawSelectors,
+    direction,
+    depth: maxDepth,
+    ...(filter !== undefined ? { filter } : {}),
+    provider,
+  })
 
-  if (resolved.length === 1) {
-    const file = resolved[0]!
-    const result =
-      filter === undefined
-        ? await provider.analyzeFileImpact(file.canonicalPath, direction, maxDepth)
-        : await provider.analyzeFileImpact(file.canonicalPath, direction, maxDepth, filter)
-    const displayResult = {
-      ...result,
-      affectedFiles: result.affectedFiles.map((path) => toDisplayPath(path)),
-      affectedSymbols: result.affectedSymbols
-        ? result.affectedSymbols.map((symbol) => ({
-            ...symbol,
-            filePath: toDisplayPath(symbol.filePath),
-          }))
-        : result.affectedSymbols,
-    }
-
+  if (result.kind === 'file') {
     if (fmt === 'text') {
-      const lines = formatImpact(file.configRelativePath, displayResult, maxDepth)
+      const lines = formatImpact(result.projectRelativePath, result, maxDepth)
 
       if (result.symbols.length > 0) {
         lines.push('')
@@ -691,15 +674,21 @@ async function handleFilesImpact(
     } else {
       output(
         {
-          ...displayResult,
-          canonicalPath: file.canonicalPath,
-          displayPath: file.configRelativePath,
+          canonicalPath: result.canonicalPath,
+          projectRelativePath: result.projectRelativePath,
           riskLevel: result.riskLevel,
-          directDepsCount: result.directDependents,
-          indirectDepsCount: result.indirectDependents,
-          transitiveDepsCount: result.transitiveDependents,
-          affectedFilesCount: result.affectedFiles.length,
-          omittedCounts: result.omittedCounts ?? { tests: 0, ignored: 0 },
+          directDepsCount: result.directDepsCount,
+          indirectDepsCount: result.indirectDepsCount,
+          transitiveDepsCount: result.transitiveDepsCount,
+          affectedFilesCount: result.affectedFilesCount,
+          directDependents: result.directDependents,
+          indirectDependents: result.indirectDependents,
+          transitiveDependents: result.transitiveDependents,
+          affectedFiles: result.affectedFiles,
+          affectedSymbols: result.affectedSymbols,
+          symbols: result.symbols,
+          coveringSpecs: result.coveringSpecs,
+          omittedCounts: result.omittedCounts,
         },
         fmt,
       )
@@ -707,277 +696,232 @@ async function handleFilesImpact(
     return
   }
 
-  const filePaths = resolved.map((file) => file.canonicalPath)
-  const result =
-    filter === undefined
-      ? await provider.analyzeFilesImpact(filePaths, direction, maxDepth)
-      : await provider.analyzeFilesImpact(filePaths, direction, maxDepth, filter)
-
-  const individualResults = result.symbols as unknown as FileImpactResult[]
-  const perFile = resolved.map((f, i) => ({
-    file: f,
-    result: individualResults[i]!,
-  }))
-
-  if (fmt === 'text') {
-    const label =
-      resolved.length <= 3
-        ? resolved.map((f) => f.configRelativePath).join(', ')
-        : `${String(resolved.length)} files`
-    const lines = formatImpact(
-      label,
-      {
-        riskLevel: result.riskLevel,
-        directDependents: result.directDependents,
-        indirectDependents: result.indirectDependents,
-        transitiveDependents: result.transitiveDependents,
-        affectedFiles: result.affectedFiles,
-      },
-      maxDepth,
-    )
-
-    const allChangedSymbols = perFile.flatMap(({ file, result: r }) =>
-      r.symbols.map((s) => ({ file: file.configRelativePath, symbol: s })),
-    )
-    if (allChangedSymbols.length > 0) {
-      lines.push('')
-      lines.push('Changed symbols:')
-      for (const { file, symbol: s } of allChangedSymbols) {
-        const segments = s.target.split(':')
-        const nameIdx = segments.length >= 4 ? segments.length - 3 : -1
-        const lineIdx = segments.length >= 2 ? segments.length - 2 : -1
-        const name = nameIdx >= 0 ? segments[nameIdx] : s.target
-        const line = lineIdx >= 0 ? segments[lineIdx] : ''
-        lines.push(`  ${file}: ${name}:${line}`)
-      }
-    }
-
-    lines.push('')
-    lines.push('Per-file breakdown:')
-    for (const { file, result: r } of perFile) {
-      lines.push(
-        `  ${file.configRelativePath}  risk=${r.riskLevel} direct=${String(r.directDependents)} files=${String(r.affectedFiles.length)}`,
+  if (result.kind === 'files') {
+    if (fmt === 'text') {
+      const label =
+        result.projectRelativeTargets.length <= 3
+          ? result.projectRelativeTargets.join(', ')
+          : `${String(result.projectRelativeTargets.length)} files`
+      const lines = formatImpact(
+        label,
+        {
+          riskLevel: result.riskLevel,
+          directDependents: result.directDependents,
+          indirectDependents: result.indirectDependents,
+          transitiveDependents: result.transitiveDependents,
+          affectedFiles: result.affectedFiles,
+        },
+        maxDepth,
       )
-    }
-    lines.push(...formatCoveringSpecs(result.coveringSpecs))
-    const omissionNotice = formatOmissionNotice(result.omittedCounts)
-    if (omissionNotice !== undefined) {
+
+      const allChangedSymbols = result.perFile.flatMap(({ projectRelativePath, result: r }) =>
+        r.symbols.map((s) => ({ file: projectRelativePath, symbol: s })),
+      )
+      if (allChangedSymbols.length > 0) {
+        lines.push('')
+        lines.push('Changed symbols:')
+        for (const { file, symbol: s } of allChangedSymbols) {
+          const segments = s.target.split(':')
+          const nameIdx = segments.length >= 4 ? segments.length - 3 : -1
+          const lineIdx = segments.length >= 2 ? segments.length - 2 : -1
+          const name = nameIdx >= 0 ? segments[nameIdx] : s.target
+          const line = lineIdx >= 0 ? segments[lineIdx] : ''
+          lines.push(`  ${file}: ${name}:${line}`)
+        }
+      }
+
       lines.push('')
-      lines.push(omissionNotice)
-    }
-    output(lines.join('\n'), 'text')
-  } else {
-    output(
-      {
-        targets: resolved.map((f) => f.canonicalPath),
-        displayTargets: resolved.map((f) => f.configRelativePath),
-        riskLevel: result.riskLevel,
-        directDepsCount: result.directDependents,
-        indirectDepsCount: result.indirectDependents,
-        transitiveDepsCount: result.transitiveDependents,
-        affectedFilesCount: result.affectedFiles.length,
-        omittedCounts: result.omittedCounts ?? { tests: 0, ignored: 0 },
-        // Legacy fields for backward compatibility
-        directDependents: result.directDependents,
-        indirectDependents: result.indirectDependents,
-        transitiveDependents: result.transitiveDependents,
-        affectedFiles: result.affectedFiles.map((path) => toDisplayPath(path)),
-        coveringSpecs: result.coveringSpecs,
-        perFile: perFile.map(({ file, result: r }) => ({
-          file: file.canonicalPath,
-          displayPath: file.configRelativePath,
-          result: {
-            ...r,
-            affectedFiles: r.affectedFiles.map((path) => toDisplayPath(path)),
-          },
-        })),
-      },
-      fmt,
-    )
-  }
-}
-
-/**
- * Handles symbol-level impact analysis.
- * @param provider - The code graph provider.
- * @param symbolSelector - The symbol selector to resolve and analyze.
- * @param direction - The traversal direction.
- * @param maxDepth - Maximum traversal depth.
- * @param fmt - The output format.
- * @param config - Resolved project configuration used for pure display-path projection.
- * @param filter - Optional normalized provider-side impact filter.
- */
-async function handleSymbolImpact(
-  provider: Awaited<ReturnType<typeof createCodeGraphProvider>>,
-  symbolSelector: string,
-  direction: 'upstream' | 'downstream' | 'both',
-  maxDepth: number,
-  fmt: 'text' | 'json' | 'toon',
-  config: SpecdConfig,
-  filter: ImpactResultFilter | undefined,
-): Promise<void> {
-  const toDisplayPath = (canonicalPath: string): string => toGraphDisplayPath(config, canonicalPath)
-  const resolved = await provider.resolveSymbolSelector(symbolSelector)
-  if (resolved.status === 'missing') {
-    if (fmt === 'text') {
-      output(`No symbol found matching "${symbolSelector}".`, 'text')
-    } else {
-      output({ error: 'not_found', symbol: symbolSelector }, fmt)
-    }
-    return
-  }
-
-  if (resolved.status === 'ambiguous') {
-    const foundById = new Map(
-      (
-        await provider.getSymbolsByIds(resolved.candidates.map((candidate) => candidate.symbolId))
-      ).map((symbol) => [symbol.id, symbol]),
-    )
-    const candidates = resolved.candidates.map((candidate) => {
-      const symbol = foundById.get(candidate.symbolId)
-      return symbol === undefined ? null : { symbol, displayPath: toDisplayPath(symbol.filePath) }
-    })
-    const present = candidates.filter((candidate) => candidate !== null)
-    if (fmt === 'text') {
-      const lines = [
-        `${String(resolved.totalCandidates)} symbols exactly match "${symbolSelector}"; qualify the selector:`,
-      ]
-      for (const { symbol, displayPath } of present) {
+      lines.push('Per-file breakdown:')
+      for (const { projectRelativePath, result: r } of result.perFile) {
         lines.push(
-          `  ${displayPath}:${symbol.kind}:${symbol.name}:${String(symbol.line)}:${String(symbol.column)}`,
+          `  ${projectRelativePath}  risk=${r.riskLevel} direct=${String(r.directDependents)} files=${String(r.affectedFiles.length)}`,
         )
       }
-      if (resolved.totalCandidates > present.length) {
-        lines.push(`  ${String(resolved.totalCandidates - present.length)} more candidates`)
+      lines.push(...formatCoveringSpecs(result.coveringSpecs))
+      const omissionNotice = formatOmissionNotice(result.omittedCounts)
+      if (omissionNotice !== undefined) {
+        lines.push('')
+        lines.push(omissionNotice)
       }
       output(lines.join('\n'), 'text')
     } else {
       output(
         {
-          error: 'ambiguous',
-          symbol: symbolSelector,
-          totalCandidates: resolved.totalCandidates,
-          candidates: present,
+          targets: result.targets,
+          projectRelativeTargets: result.projectRelativeTargets,
+          riskLevel: result.riskLevel,
+          directDepsCount: result.directDepsCount,
+          indirectDepsCount: result.indirectDepsCount,
+          transitiveDepsCount: result.transitiveDepsCount,
+          affectedFilesCount: result.affectedFilesCount,
+          omittedCounts: result.omittedCounts,
+          directDependents: result.directDependents,
+          indirectDependents: result.indirectDependents,
+          transitiveDependents: result.transitiveDependents,
+          affectedFiles: result.affectedFiles,
+          coveringSpecs: result.coveringSpecs,
+          perFile: result.perFile.map(({ file, projectRelativePath, result: r }) => ({
+            file,
+            projectRelativePath,
+            result: r,
+          })),
         },
         fmt,
       )
     }
-    return
   }
+}
 
-  const sym = await provider.getSymbol(resolved.match.symbolId)
+/**
+ * Handles symbol-level impact analysis.
+ * @param hostContext - The SDK host context.
+ * @param symbolSelector - The symbol selector to resolve and analyze.
+ * @param direction - The traversal direction.
+ * @param maxDepth - Maximum traversal depth.
+ * @param fmt - The output format.
+ * @param filter - Optional normalized provider-side impact filter.
+ * @param provider - The code graph provider.
+ */
+async function handleSymbolImpact(
+  hostContext: SdkHostContext,
+  symbolSelector: string,
+  direction: 'upstream' | 'downstream' | 'both',
+  maxDepth: number,
+  fmt: 'text' | 'json' | 'toon',
+  filter: ImpactResultFilter | undefined,
+  provider: GraphImpactProvider,
+): Promise<void> {
+  const result = await runGraphImpact(hostContext, {
+    symbol: symbolSelector,
+    direction,
+    depth: maxDepth,
+    ...(filter !== undefined ? { filter } : {}),
+    provider,
+  })
 
-  if (sym === undefined) {
-    if (fmt === 'text') {
-      output(`No symbol found matching "${symbolSelector}".`, 'text')
-    } else {
-      output({ error: 'not_found', symbol: symbolSelector }, fmt)
+  if (result.kind === 'symbol') {
+    if (result.status === 'not_found') {
+      if (fmt === 'text') {
+        output(`No symbol found matching "${symbolSelector}".`, 'text')
+      } else {
+        output({ error: 'not_found', symbol: symbolSelector }, fmt)
+      }
+      return
     }
-    return
-  }
 
-  const result =
-    filter === undefined
-      ? await provider.analyzeImpact(sym.id, direction, maxDepth)
-      : await provider.analyzeImpact(sym.id, direction, maxDepth, filter)
-  const displayPath = toDisplayPath(sym.filePath)
-  const displayResult = {
-    ...result,
-    affectedFiles: result.affectedFiles.map((path) => toDisplayPath(path)),
-    affectedSymbols: result.affectedSymbols.map((symbol) => ({
-      ...symbol,
-      filePath: toDisplayPath(symbol.filePath),
-    })),
-  }
-
-  if (fmt === 'text') {
-    const lines = formatImpact(
-      `${sym.kind} ${sym.name} (${displayPath}:${String(sym.line)})`,
-      displayResult,
-      maxDepth,
-    )
-    const omissionNotice = formatOmissionNotice(result.omittedCounts)
-    if (omissionNotice !== undefined) {
-      lines.push('')
-      lines.push(omissionNotice)
+    if (result.status === 'ambiguous') {
+      if (fmt === 'text') {
+        const lines = [
+          `${String(result.totalCandidates)} symbols exactly match "${symbolSelector}"; qualify the selector:`,
+        ]
+        for (const { symbol, projectRelativePath } of result.candidates) {
+          lines.push(
+            `  ${projectRelativePath}:${symbol.kind}:${symbol.name}:${String(symbol.line)}:${String(symbol.column)}`,
+          )
+        }
+        if (result.totalCandidates > result.candidates.length) {
+          lines.push(
+            `  ${String(result.totalCandidates - result.candidates.length)} more candidates`,
+          )
+        }
+        output(lines.join('\n'), 'text')
+      } else {
+        output(
+          {
+            error: 'ambiguous',
+            symbol: symbolSelector,
+            totalCandidates: result.totalCandidates,
+            candidates: result.candidates,
+          },
+          fmt,
+        )
+      }
+      return
     }
-    output(lines.join('\n'), 'text')
-  } else {
-    output(
-      {
-        symbol: sym,
-        displayPath,
-        riskLevel: result.riskLevel,
-        directDepsCount: result.directDependents,
-        indirectDepsCount: result.indirectDependents,
-        transitiveDepsCount: result.transitiveDependents,
-        affectedFilesCount: result.affectedFiles.length,
-        omittedCounts: result.omittedCounts ?? { tests: 0, ignored: 0 },
-        impact: displayResult,
-      },
-      fmt,
-    )
+
+    if (result.status === 'resolved') {
+      if (fmt === 'text') {
+        const lines = formatImpact(
+          `${result.symbol.kind} ${result.symbol.name} (${result.projectRelativePath}:${String(result.symbol.line)})`,
+          result.impact,
+          maxDepth,
+        )
+        const omissionNotice = formatOmissionNotice(result.omittedCounts)
+        if (omissionNotice !== undefined) {
+          lines.push('')
+          lines.push(omissionNotice)
+        }
+        output(lines.join('\n'), 'text')
+      } else {
+        output(
+          {
+            symbol: result.symbol,
+            projectRelativePath: result.projectRelativePath,
+            riskLevel: result.riskLevel,
+            directDepsCount: result.directDepsCount,
+            indirectDepsCount: result.indirectDepsCount,
+            transitiveDepsCount: result.transitiveDepsCount,
+            affectedFilesCount: result.affectedFilesCount,
+            omittedCounts: result.omittedCounts,
+            impact: result.impact,
+          },
+          fmt,
+        )
+      }
+    }
   }
 }
 
 /**
  * Handles spec-level impact analysis.
- * @param provider - The code graph provider.
+ * @param hostContext - The SDK host context.
  * @param specId - The spec identifier to analyze.
  * @param direction - The traversal direction.
  * @param maxDepth - Maximum traversal depth.
  * @param fmt - The output format.
- * @param config - Resolved project configuration used for pure display-path projection.
  * @param filter - Optional normalized provider-side impact filter.
+ * @param provider - The code graph provider.
  */
 async function handleSpecImpact(
-  provider: Awaited<ReturnType<typeof createCodeGraphProvider>>,
+  hostContext: SdkHostContext,
   specId: string,
   direction: 'upstream' | 'downstream' | 'both',
   maxDepth: number,
   fmt: 'text' | 'json' | 'toon',
-  config: SpecdConfig,
   filter: ImpactResultFilter | undefined,
+  provider: GraphImpactProvider,
 ): Promise<void> {
-  const spec = await provider.getSpec(specId)
-  if (spec === undefined) {
-    throw new SpecNotFoundError(specId)
-  }
+  const result = await runGraphImpact(hostContext, {
+    spec: specId,
+    direction,
+    depth: maxDepth,
+    ...(filter !== undefined ? { filter } : {}),
+    provider,
+  })
 
-  const result =
-    filter === undefined
-      ? await provider.analyzeSpecImpact(specId, direction, maxDepth)
-      : await provider.analyzeSpecImpact(specId, direction, maxDepth, filter)
-  const toDisplayPath = (canonicalPath: string): string => toGraphDisplayPath(config, canonicalPath)
-  const displayResult = {
-    ...result,
-    affectedFiles: result.affectedFiles.map((path) => toDisplayPath(path)),
-    affectedSymbols: result.affectedSymbols.map((sym) => ({
-      ...sym,
-      filePath: toDisplayPath(sym.filePath),
-    })),
-  }
-  if (fmt === 'text') {
-    const lines = formatSpecImpact(spec.specId, displayResult, maxDepth)
-    const omissionNotice = formatOmissionNotice(result.omittedCounts)
-    if (omissionNotice !== undefined) {
-      lines.push('')
-      lines.push(omissionNotice)
+  if (result.kind === 'spec') {
+    if (fmt === 'text') {
+      const lines = formatSpecImpact(result.spec, result.impact, maxDepth)
+      const omissionNotice = formatOmissionNotice(result.omittedCounts)
+      if (omissionNotice !== undefined) {
+        lines.push('')
+        lines.push(omissionNotice)
+      }
+      output(lines.join('\n'), 'text')
+    } else {
+      output(
+        {
+          spec: result.spec,
+          riskLevel: result.riskLevel,
+          directDepsCount: result.directDepsCount,
+          indirectDepsCount: result.indirectDepsCount,
+          transitiveDepsCount: result.transitiveDepsCount,
+          affectedFilesCount: result.affectedFilesCount,
+          omittedCounts: result.omittedCounts,
+          impact: result.impact,
+        },
+        fmt,
+      )
     }
-    output(lines.join('\n'), 'text')
-  } else {
-    output(
-      {
-        spec: spec.specId,
-        riskLevel: result.riskLevel,
-        directDepsCount: result.directDependents,
-        indirectDepsCount: result.indirectDependents,
-        transitiveDepsCount: result.transitiveDependents,
-        affectedFilesCount: result.affectedFiles.length,
-        omittedCounts: result.omittedCounts ?? { tests: 0, ignored: 0 },
-        impact: displayResult,
-      },
-      fmt,
-    )
   }
 }

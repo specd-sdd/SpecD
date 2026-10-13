@@ -25,7 +25,7 @@ function sym(name: string, filePath: string, line: number) {
 function file(path: string) {
   return createFileNode({
     path,
-    configRelativePath: '',
+    projectRelativePath: '',
     language: 'typescript',
     contentHash: 'sha256:x',
     workspace: '/p',
@@ -352,7 +352,7 @@ describe('analyzeFilesImpact service', () => {
     const inWorkspace = (path: string, workspace: string) =>
       createFileNode({
         path,
-        configRelativePath: '',
+        projectRelativePath: '',
         language: 'typescript',
         contentHash: 'sha256:x',
         workspace,

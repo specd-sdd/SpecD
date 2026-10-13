@@ -1,11 +1,19 @@
 import { Command, Option } from 'commander'
-import { type FileCategory, type HotspotOptions, type RiskLevel, SymbolKind } from '@specd/sdk'
+import {
+  type FileCategory,
+  type RiskLevel,
+  SymbolKind,
+  runGraphHotspots,
+  createSdkContext,
+  createCodeGraphProvider,
+  type SdkHostContext,
+} from '@specd/sdk'
 import { output, parseFormat } from '../../formatter.js'
 import { cliError } from '../../handle-error.js'
+import { buildCliKernelOptions } from '../../helpers/cli-context.js'
 import { parseGraphKinds } from './parse-graph-kinds.js'
 import { parseFileCategories } from './parse-file-categories.js'
 import { resolveGraphCliContext } from './resolve-graph-cli-context.js'
-import { splitWorkspaceIdentity, toGraphDisplayPath } from './resolve-impact-file-selectors.js'
 import { withProvider } from './with-provider.js'
 import { warnGraphStale } from './warn-graph-staleness.js'
 import { formatOmissionNotice } from './format-omission-notice.js'
@@ -103,12 +111,12 @@ JSON/TOON output schema:
       fileImporters: number
       riskLevel: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL"
       workspace: string
-      displayPath: string
+      projectRelativePath: string
     }>
     omittedCounts: { tests: number, ignored: number }
   }
 
-  displayPath is the config-relative project path projected from the
+  projectRelativePath is the repository-relative project path projected from the
   canonical symbol.filePath identity; filePath remains the canonical
   workspace-prefixed graph identity used for selectors and further queries.
 
@@ -191,26 +199,28 @@ Exclude examples:
               }
             }
 
-            const options: HotspotOptions = {
-              ...(opts.workspace ? { workspace: opts.workspace } : undefined),
+            const hostContext: SdkHostContext =
+              kernel !== null
+                ? { kernel, createGraphProvider: () => createCodeGraphProvider(config) }
+                : await createSdkContext(config, { kernel: buildCliKernelOptions() })
+
+            const result = await runGraphHotspots(hostContext, {
+              ...(opts.workspace ? { workspace: opts.workspace } : {}),
               kinds: kinds ?? [...CLI_DEFAULT_HOTSPOT_KINDS],
-              ...(opts.file ? { filePath: opts.file } : undefined),
-              ...(opts.excludePath.length > 0 ? { excludePaths: opts.excludePath } : undefined),
+              ...(opts.file ? { file: opts.file } : {}),
+              ...(opts.excludePath.length > 0 ? { excludePaths: opts.excludePath } : {}),
               ...(opts.excludeWorkspace.length > 0
                 ? { excludeWorkspaces: opts.excludeWorkspace }
-                : undefined),
-              ...(opts.limit !== undefined ? { limit: parseInt(opts.limit, 10) } : undefined),
-              ...(opts.minScore !== undefined
-                ? { minScore: parseInt(opts.minScore, 10) }
-                : undefined),
-              ...(opts.minRisk !== undefined ? { minRisk: opts.minRisk as RiskLevel } : undefined),
-              ...(opts.includeImporterOnly === true ? { includeImporterOnly: true } : undefined),
-              ...(categories !== undefined ? { categories } : undefined),
-              ...(includeTests !== undefined ? { includeTests } : undefined),
-              ...(includeIgnored !== undefined ? { includeIgnored } : undefined),
-            }
-
-            const result = await provider.getHotspots(options)
+                : {}),
+              ...(opts.limit !== undefined ? { limit: parseInt(opts.limit, 10) } : {}),
+              ...(opts.minScore !== undefined ? { minScore: parseInt(opts.minScore, 10) } : {}),
+              ...(opts.minRisk !== undefined ? { minRisk: opts.minRisk as RiskLevel } : {}),
+              ...(opts.includeImporterOnly === true ? { includeImporterOnly: true } : {}),
+              ...(categories !== undefined ? { categories } : {}),
+              ...(includeTests !== undefined ? { includeTests } : {}),
+              ...(includeIgnored !== undefined ? { includeIgnored } : {}),
+              provider,
+            })
 
             if (fmt === 'text') {
               if (result.entries.length === 0) {
@@ -223,9 +233,6 @@ Exclude examples:
                 output(lines.join('\n'), 'text')
                 return
               }
-
-              const toDisplayPath = (canonicalPath: string): string =>
-                toGraphDisplayPath(config, canonicalPath)
 
               const lines: string[] = []
               lines.push(
@@ -240,10 +247,8 @@ Exclude examples:
               lines.push('─'.repeat(90))
 
               for (const entry of result.entries) {
-                const ws = splitWorkspaceIdentity(entry.symbol.filePath)?.workspace ?? ''
-                const displayPath = toDisplayPath(entry.symbol.filePath)
                 lines.push(
-                  `${String(entry.score).padStart(6)}  ${entry.riskLevel.padEnd(8)}  ${String(entry.crossWorkspaceCallers).padStart(3)}  ${entry.symbol.kind.padEnd(9)}  ${entry.symbol.name.padEnd(30)}  [${ws}] ${displayPath}:${String(entry.symbol.line)}`,
+                  `${String(entry.score).padStart(6)}  ${entry.riskLevel.padEnd(8)}  ${String(entry.crossWorkspaceCallers).padStart(3)}  ${entry.symbol.kind.padEnd(9)}  ${entry.symbol.name.padEnd(30)}  [${entry.workspace}] ${entry.projectRelativePath}:${String(entry.symbol.line)}`,
                 )
               }
 
@@ -255,23 +260,7 @@ Exclude examples:
 
               output(lines.join('\n'), 'text')
             } else {
-              output(
-                {
-                  totalSymbols: result.totalSymbols,
-                  entries: result.entries.map((e) => ({
-                    symbol: e.symbol,
-                    score: e.score,
-                    directCallers: e.directCallers,
-                    crossWorkspaceCallers: e.crossWorkspaceCallers,
-                    fileImporters: e.fileImporters,
-                    riskLevel: e.riskLevel,
-                    workspace: splitWorkspaceIdentity(e.symbol.filePath)?.workspace ?? '',
-                    displayPath: toGraphDisplayPath(config, e.symbol.filePath),
-                  })),
-                  omittedCounts: result.omittedCounts ?? { tests: 0, ignored: 0 },
-                },
-                fmt,
-              )
+              output(result, fmt)
             }
           },
           { kernel },

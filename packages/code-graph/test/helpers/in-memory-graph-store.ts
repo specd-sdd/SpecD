@@ -505,22 +505,22 @@ export class InMemoryGraphStore extends GraphStore {
     return this.documents.get(path)
   }
 
-  async findFilesByConfigRelativePath(configRelativePath: string): Promise<FileNode[]> {
+  async findFilesByProjectRelativePath(projectRelativePath: string): Promise<FileNode[]> {
     this.ensureOpen()
     const results: FileNode[] = []
     for (const file of this.files.values()) {
-      if (file.configRelativePath === configRelativePath) {
+      if (file.projectRelativePath === projectRelativePath) {
         results.push(file)
       }
     }
     return results
   }
 
-  async findDocumentsByConfigRelativePath(configRelativePath: string): Promise<DocumentNode[]> {
+  async findDocumentsByProjectRelativePath(projectRelativePath: string): Promise<DocumentNode[]> {
     this.ensureOpen()
     const results: DocumentNode[] = []
     for (const document of this.documents.values()) {
-      if (document.configRelativePath === configRelativePath) {
+      if (document.projectRelativePath === projectRelativePath) {
         results.push(document)
       }
     }
@@ -1122,7 +1122,7 @@ export class InMemoryGraphStore extends GraphStore {
     }> = []
     for (const document of this.documents.values()) {
       const text =
-        `${document.path} ${document.configRelativePath} ${document.content}`.toLowerCase()
+        `${document.path} ${document.projectRelativePath} ${document.content}`.toLowerCase()
       const contentScore = countContentTokenHits(text, query.expandedTokens)
       if (contentScore === 0) continue
       if (options.workspace && document.workspace !== options.workspace) continue
@@ -1135,7 +1135,7 @@ export class InMemoryGraphStore extends GraphStore {
         rawTokens: query.rawTokens,
         expandedTokens: query.expandedTokens,
         canonicalIdentity: document.path,
-        alternateIdentity: document.configRelativePath,
+        alternateIdentity: document.projectRelativePath,
         contentScore,
       })
       const score = composeRankingScore(ranking)

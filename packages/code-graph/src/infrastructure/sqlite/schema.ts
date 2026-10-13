@@ -1,11 +1,11 @@
-export const SQLITE_SCHEMA_VERSION = 13
+export const SQLITE_SCHEMA_VERSION = 14
 
 export const SQLITE_SCHEMA_DDL = `
 PRAGMA foreign_keys = ON;
 
 CREATE TABLE IF NOT EXISTS files (
   path TEXT PRIMARY KEY,
-  config_relative_path TEXT NOT NULL DEFAULT '',
+  project_relative_path TEXT NOT NULL DEFAULT '',
   language TEXT NOT NULL,
   content_hash TEXT NOT NULL,
   workspace TEXT NOT NULL,
@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS files (
 
 CREATE TABLE IF NOT EXISTS documents (
   path TEXT PRIMARY KEY,
-  config_relative_path TEXT NOT NULL DEFAULT '',
+  project_relative_path TEXT NOT NULL DEFAULT '',
   content_hash TEXT NOT NULL,
   content TEXT NOT NULL,
   workspace TEXT NOT NULL
@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS symbols (
   name TEXT NOT NULL,
   kind TEXT NOT NULL,
   file_path TEXT NOT NULL,
+  project_relative_path TEXT NOT NULL DEFAULT '',
   parent_id TEXT,
   line INTEGER NOT NULL,
   column_number INTEGER NOT NULL,
@@ -144,11 +145,12 @@ CREATE TABLE IF NOT EXISTS freshness_latches (
   known_stale INTEGER NOT NULL DEFAULT 0
 );
 
-CREATE INDEX IF NOT EXISTS idx_files_config_relative_path ON files(config_relative_path);
+CREATE INDEX IF NOT EXISTS idx_files_project_relative_path ON files(project_relative_path);
 CREATE INDEX IF NOT EXISTS idx_files_workspace ON files(workspace);
 CREATE INDEX IF NOT EXISTS idx_files_category ON files(category);
-CREATE INDEX IF NOT EXISTS idx_documents_config_relative_path ON documents(config_relative_path);
+CREATE INDEX IF NOT EXISTS idx_documents_project_relative_path ON documents(project_relative_path);
 CREATE INDEX IF NOT EXISTS idx_symbols_file_path ON symbols(file_path);
+CREATE INDEX IF NOT EXISTS idx_symbols_project_relative_path ON symbols(project_relative_path);
 CREATE INDEX IF NOT EXISTS idx_symbols_kind ON symbols(kind);
 CREATE INDEX IF NOT EXISTS idx_symbols_kind_file_path ON symbols(kind, file_path);
 CREATE INDEX IF NOT EXISTS idx_symbols_name ON symbols(name);
@@ -185,7 +187,7 @@ CREATE VIRTUAL TABLE IF NOT EXISTS spec_fts USING fts5(
 
 CREATE VIRTUAL TABLE IF NOT EXISTS document_fts USING fts5(
   path,
-  config_relative_path,
+  project_relative_path,
   content,
   tokenize = 'porter'
 );

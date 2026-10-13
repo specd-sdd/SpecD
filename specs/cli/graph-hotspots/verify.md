@@ -134,7 +134,8 @@
 
 - **WHEN** `specd graph hotspots --format json` is run
 - **THEN** stdout is a JSON object containing `totalSymbols` and `entries`
-- **AND** each entry includes `symbol`, `score`, `directCallers`, `crossWorkspaceCallers`, `fileImporters`, `riskLevel`, and `workspace`
+- **AND** each entry includes `symbol`, `score`, `directCallers`, `crossWorkspaceCallers`, `fileImporters`, `riskLevel`, `workspace`, and `projectRelativePath`
+- **AND** entry does not include `displayPath`
 
 #### Scenario: Text output shows omission notice when items excluded
 

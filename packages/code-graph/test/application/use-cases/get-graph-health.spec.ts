@@ -268,7 +268,7 @@ describe('GetGraphHealth', () => {
       getAllFiles: vi.fn().mockResolvedValue([
         createFileNode({
           path: 'core:src/index.ts',
-          configRelativePath: 'src/index.ts',
+          projectRelativePath: 'src/index.ts',
           language: 'typescript',
           contentHash: 'indexed-hash',
           workspace: 'core',
@@ -305,7 +305,7 @@ describe('GetGraphHealth', () => {
       getAllFiles: vi.fn().mockResolvedValue([
         createFileNode({
           path: 'core:src/index.ts',
-          configRelativePath: 'not-a-directory/index.ts',
+          projectRelativePath: 'not-a-directory/index.ts',
           language: 'typescript',
           contentHash: 'indexed-hash',
           workspace: 'core',

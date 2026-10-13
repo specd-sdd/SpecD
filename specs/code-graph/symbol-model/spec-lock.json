@@ -10,21 +10,16 @@
   ],
   "implementation": [
     {
-      "file": "code-graph:src/domain/value-objects/symbol-reference.ts",
-      "symbols": [
-        "createLogicalSymbol",
-        "parseLogicalSymbol",
-        "deriveQualifiedName",
-        "assignQualifiedNames"
-      ]
+      "file": "code-graph:src/domain/value-objects/symbol-node.ts",
+      "symbols": ["SymbolNode", "createSymbolNode"]
     },
     {
-      "file": "code-graph:src/domain/services/exact-lane-query.ts",
-      "symbols": ["isExactLaneQuery", "qualifiedLookupText"]
+      "file": "code-graph:src/domain/value-objects/file-node.ts",
+      "symbols": ["FileNode", "createFileNode"]
     },
     {
-      "file": "code-graph:src/domain/services/parse-member-reference.ts",
-      "symbols": ["parseDottedMemberReference", "renderDottedMemberReference"]
+      "file": "code-graph:src/domain/value-objects/source-location.ts",
+      "symbols": ["SourceLocation"]
     }
   ],
   "optimizations": {

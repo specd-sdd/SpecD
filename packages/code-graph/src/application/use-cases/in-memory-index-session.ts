@@ -31,7 +31,7 @@ export class InMemoryIndexSession implements IndexSession {
     string,
     {
       fileId: number
-      configRelativePath: string
+      projectRelativePath: string
       language: string
       contentHash: string
       workspace: string
@@ -79,7 +79,7 @@ export class InMemoryIndexSession implements IndexSession {
     const fileId = this.nextFileId++
     this.files.set(input.filePath, {
       fileId,
-      configRelativePath: input.configRelativePath,
+      projectRelativePath: input.projectRelativePath,
       language: input.language,
       contentHash: input.contentHash,
       workspace: input.workspace,
@@ -92,7 +92,7 @@ export class InMemoryIndexSession implements IndexSession {
    * Hydrates an unchanged persisted file and its symbols without parser analysis.
    * @param file - Persisted file node.
    * @param file.path - Canonical file path.
-   * @param file.configRelativePath - Config-relative selector path.
+   * @param file.projectRelativePath - Project-relative selector path.
    * @param file.language - Persisted language id.
    * @param file.contentHash - Indexed content hash.
    * @param file.workspace - Owning workspace.
@@ -101,7 +101,7 @@ export class InMemoryIndexSession implements IndexSession {
   hydratePersistedFile(
     file: {
       readonly path: string
-      readonly configRelativePath: string
+      readonly projectRelativePath: string
       readonly language: string
       readonly contentHash: string
       readonly workspace: string
@@ -110,7 +110,7 @@ export class InMemoryIndexSession implements IndexSession {
   ): void {
     this.registerFile({
       filePath: file.path,
-      configRelativePath: file.configRelativePath,
+      projectRelativePath: file.projectRelativePath,
       language: file.language,
       contentHash: file.contentHash,
       workspace: file.workspace,
@@ -163,7 +163,7 @@ export class InMemoryIndexSession implements IndexSession {
       filePath: input.filePath,
       contentHash: fileInfo.contentHash,
       workspace: fileInfo.workspace,
-      configRelativePath: fileInfo.configRelativePath,
+      projectRelativePath: fileInfo.projectRelativePath,
     }
 
     this.analyses.set(input.filePath, fileAnalysis)

@@ -9,24 +9,17 @@
     "core:config",
     "code-graph:traversal",
     "code-graph:workspace-integration",
-    "code-graph:resolve-symbol-reference"
+    "code-graph:resolve-symbol-reference",
+    "sdk:run-graph-impact"
   ],
   "implementation": [
     {
-      "file": "cli:src/commands/graph/format-omission-notice.ts",
-      "symbols": ["formatOmissionNotice"]
+      "file": "cli:src/commands/graph/resolve-impact-file-selectors.ts",
+      "symbols": ["resolveImpactFileSelectors"]
     },
     {
       "file": "cli:src/commands/graph/impact.ts",
       "symbols": ["registerGraphImpact"]
-    },
-    {
-      "file": "cli:test/commands/graph-impact.spec.ts",
-      "symbols": ["passes category flags"]
-    },
-    {
-      "file": "cli:src/commands/graph/parse-file-categories.ts",
-      "symbols": ["parseFileCategories"]
     }
   ],
   "optimizations": {

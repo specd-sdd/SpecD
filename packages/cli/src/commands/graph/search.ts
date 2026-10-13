@@ -1,13 +1,21 @@
 import { Command, Option } from 'commander'
-import { type FileCategory, type SearchCategory, type SearchCodeGraphInput } from '@specd/sdk'
+import {
+  type FileCategory,
+  type SearchCategory,
+  runGraphSearch,
+  createSdkContext,
+  createCodeGraphProvider,
+  type SdkHostContext,
+} from '@specd/sdk'
 import { output, parseFormat } from '../../formatter.js'
 import { cliError } from '../../handle-error.js'
+import { buildCliKernelOptions } from '../../helpers/cli-context.js'
 import { parseGraphKinds } from './parse-graph-kinds.js'
 import { parseFileCategories } from './parse-file-categories.js'
 import { resolveGraphCliContext } from './resolve-graph-cli-context.js'
 import { withProvider } from './with-provider.js'
 import { normalizeSnippet } from './normalize-snippet.js'
-import { splitWorkspaceIdentity, toGraphDisplayPath } from './resolve-impact-file-selectors.js'
+import { splitWorkspaceIdentity } from './resolve-impact-file-selectors.js'
 import { warnGraphStale } from './warn-graph-staleness.js'
 import { formatOmissionNotice } from './format-omission-notice.js'
 
@@ -117,19 +125,27 @@ export function registerGraphSearch(parent: Command): void {
 JSON/TOON output schema:
   {
     symbols: Array<{
-      logicalTarget: LogicalSymbol | null
-      declarations: LogicalDeclaration[]
-      publicBindings: PublicBinding[]
-      matchedPublicBindings: PublicBinding[]
+      logicalTarget: (LogicalSymbol & { projectRelativePath: string }) | null
+      declarations: Array<{
+        logicalSymbolId: string
+        declaration: {
+          location: { filePath: string, projectRelativePath: string, line: number, column: number, endLine?: number, endColumn?: number }
+          logicalId: string
+          symbolId: string
+          kind: string
+        }
+      }>
+      publicBindings: Array<PublicBinding & { projectRelativePath: string }>
+      matchedPublicBindings: Array<PublicBinding & { projectRelativePath: string }>
       score: number
       matchTier: string
       matchReasons: string[]
-      hits: Array<{ symbol: SymbolNode, score, startLine, endLine, snippet? }>
+      hits: Array<{ symbol: SymbolNode & { projectRelativePath: string }, score, startLine, endLine, snippet? }>
     }>
     files: Array<{
       workspace: string
       path: string
-      configRelativePath: string
+      projectRelativePath: string
       score: number
       totalMatches: number
       omittedMatches: number
@@ -150,7 +166,7 @@ JSON/TOON output schema:
     documents: Array<{
       workspace: string
       path: string
-      configRelativePath: string
+      projectRelativePath: string
       score: number
       startLine: number
       endLine: number
@@ -252,42 +268,38 @@ Exclude examples:
                   ...(opts.specs ? (['specs'] as const) : []),
                   ...(opts.documents ? (['documents'] as const) : []),
                 ]
-            const searchInput: SearchCodeGraphInput = {
+            const hostContext: SdkHostContext =
+              kernel !== null
+                ? { kernel, createGraphProvider: () => createCodeGraphProvider(config) }
+                : await createSdkContext(config, { kernel: buildCliKernelOptions() })
+
+            const result = await runGraphSearch(hostContext, {
               query,
               categories,
               limit,
-              includeSnippet: opts.snippet === true,
-              ...(kinds !== undefined ? { kinds } : undefined),
-              ...(opts.file ? { filePattern: opts.file } : undefined),
-              ...(opts.workspace ? { workspace: opts.workspace } : undefined),
-              ...(opts.excludePath.length > 0 ? { excludePaths: opts.excludePath } : undefined),
+              snippet: opts.snippet === true,
+              specContent: opts.specContent === true,
+              ...(kinds !== undefined ? { kinds } : {}),
+              ...(opts.file ? { file: opts.file } : {}),
+              ...(opts.workspace ? { workspace: opts.workspace } : {}),
+              ...(opts.excludePath.length > 0 ? { excludePaths: opts.excludePath } : {}),
               ...(opts.excludeWorkspace.length > 0
                 ? { excludeWorkspaces: opts.excludeWorkspace }
-                : undefined),
-              ...(fileCategories !== undefined ? { fileCategories } : undefined),
-              ...(includeTests !== undefined ? { includeTests } : undefined),
-              ...(includeIgnored !== undefined ? { includeIgnored } : undefined),
-            }
-
-            const {
-              symbols: symbolResults,
-              files: fileResults,
-              specs: specResults,
-              documents: documentResults,
-              omittedCounts,
-            } = await provider.search(searchInput)
-
-            const toDisplayPath = (canonicalPath: string): string =>
-              toGraphDisplayPath(config, canonicalPath)
+                : {}),
+              ...(fileCategories !== undefined ? { fileCategories } : {}),
+              ...(includeTests !== undefined ? { includeTests } : {}),
+              ...(includeIgnored !== undefined ? { includeIgnored } : {}),
+              provider,
+            })
 
             if (fmt === 'text') {
               const lines: string[] = []
 
-              if (symbolResults.length > 0) {
+              if (result.symbols.length > 0) {
                 lines.push(
-                  `Symbols (${String(symbolResults.length)} shown, limit ${String(limit)}):`,
+                  `Symbols (${String(result.symbols.length)} shown, limit ${String(limit)}):`,
                 )
-                for (const group of symbolResults) {
+                for (const group of result.symbols) {
                   const target = group.logicalTarget
                   const firstHit = group.hits[0]
                   if (target === null && firstHit !== undefined) {
@@ -295,7 +307,7 @@ Exclude examples:
                       splitWorkspaceIdentity(firstHit.symbol.filePath)?.workspace ?? ''
                     lines.push(`  [${workspace}] ${firstHit.symbol.kind} ${firstHit.symbol.name}`)
                     lines.push(
-                      `    ${toDisplayPath(firstHit.symbol.filePath)}:${String(firstHit.symbol.line)}:${String(firstHit.symbol.column)}`,
+                      `    ${firstHit.symbol.projectRelativePath}:${String(firstHit.symbol.line)}:${String(firstHit.symbol.column)}`,
                     )
                   } else {
                     lines.push(
@@ -307,7 +319,7 @@ Exclude examples:
                   if (target !== null) {
                     for (const binding of group.matchedPublicBindings) {
                       lines.push(
-                        `    matched export: ${toDisplayPath(binding.surface)}::${binding.exportedName}`,
+                        `    matched export: ${binding.projectRelativePath}::${binding.exportedName}`,
                       )
                     }
                   }
@@ -318,13 +330,13 @@ Exclude examples:
                     for (const declaration of group.declarations) {
                       const location = declaration.declaration.location
                       lines.push(
-                        `    declaration: ${toDisplayPath(location.filePath)}:${String(location.line)}:${String(location.column)}`,
+                        `    declaration: ${location.projectRelativePath}:${String(location.line)}:${String(location.column)}`,
                       )
                     }
                   } else {
                     for (const hit of group.hits) {
                       lines.push(
-                        `    declaration: ${toDisplayPath(hit.symbol.filePath)}:${String(hit.symbol.line)}:${String(hit.symbol.column)}`,
+                        `    declaration: ${hit.symbol.projectRelativePath}:${String(hit.symbol.line)}:${String(hit.symbol.column)}`,
                       )
                     }
                   }
@@ -336,12 +348,12 @@ Exclude examples:
                 }
               }
 
-              if (fileResults.length > 0) {
+              if (result.files.length > 0) {
                 if (lines.length > 0) lines.push('')
-                lines.push(`Files (${String(fileResults.length)} shown, limit ${String(limit)}):`)
-                for (const { file, matches, omittedMatches } of fileResults) {
-                  lines.push(`  [${file.workspace}] ${file.configRelativePath}`)
-                  for (const match of matches) {
+                lines.push(`Files (${String(result.files.length)} shown, limit ${String(limit)}):`)
+                for (const file of result.files) {
+                  lines.push(`  [${file.workspace}] ${file.projectRelativePath}`)
+                  for (const match of file.matches) {
                     lines.push(
                       `    ${match.matchKind} ${renderSourceRange(match.range)} ${JSON.stringify(match.matchedText)} source=${match.sourceToken}`,
                     )
@@ -354,17 +366,17 @@ Exclude examples:
                       )
                     }
                   }
-                  if (omittedMatches > 0) {
-                    lines.push(`    ${String(omittedMatches)} more matches in this file`)
+                  if (file.omittedMatches > 0) {
+                    lines.push(`    ${String(file.omittedMatches)} more matches in this file`)
                   }
                 }
               }
 
-              if (specResults.length > 0) {
+              if (result.specs.length > 0) {
                 if (lines.length > 0) lines.push('')
-                lines.push(`Specs (${String(specResults.length)} shown, limit ${String(limit)}):`)
-                for (const { spec, snippet, startLine, endLine } of specResults) {
-                  lines.push(`  [${spec.workspace}] ${spec.specId}`)
+                lines.push(`Specs (${String(result.specs.length)} shown, limit ${String(limit)}):`)
+                for (const { specId, workspace, snippet, startLine, endLine } of result.specs) {
+                  lines.push(`  [${workspace}] ${specId}`)
                   lines.push(`    ${renderMatchLocation(startLine, endLine)}`)
                   if (opts.snippet && snippet) {
                     renderSnippetBlock(lines, snippet, startLine, endLine)
@@ -372,16 +384,16 @@ Exclude examples:
                 }
               }
 
-              if (documentResults.length > 0) {
+              if (result.documents.length > 0) {
                 if (lines.length > 0) lines.push('')
                 lines.push(
-                  `Documents (${String(documentResults.length)} shown, limit ${String(limit)}):`,
+                  `Documents (${String(result.documents.length)} shown, limit ${String(limit)}):`,
                 )
-                for (const { document, snippet, startLine, endLine } of documentResults) {
-                  lines.push(`  [${document.workspace}] ${document.configRelativePath}`)
-                  lines.push(`    ${renderMatchLocation(startLine, endLine)}`)
-                  if (opts.snippet && snippet) {
-                    renderSnippetBlock(lines, snippet, startLine, endLine)
+                for (const doc of result.documents) {
+                  lines.push(`  [${doc.workspace}] ${doc.projectRelativePath}`)
+                  lines.push(`    ${renderMatchLocation(doc.startLine, doc.endLine)}`)
+                  if (opts.snippet && doc.snippet) {
+                    renderSnippetBlock(lines, doc.snippet, doc.startLine, doc.endLine)
                   }
                 }
               }
@@ -390,7 +402,7 @@ Exclude examples:
                 lines.push('No results found.')
               }
 
-              const omissionNotice = formatOmissionNotice(omittedCounts)
+              const omissionNotice = formatOmissionNotice(result.omittedCounts)
               if (omissionNotice !== undefined) {
                 lines.push('')
                 lines.push(omissionNotice)
@@ -398,68 +410,7 @@ Exclude examples:
 
               output(lines.join('\n'), 'text')
             } else {
-              output(
-                {
-                  symbols: symbolResults.map((group) => ({
-                    logicalTarget: group.logicalTarget,
-                    declarations: group.declarations,
-                    publicBindings: group.publicBindings,
-                    matchedPublicBindings: group.matchedPublicBindings,
-                    score: group.score,
-                    matchTier: group.matchTier,
-                    matchReasons: group.matchReasons,
-                    hits: group.hits.map(({ symbol, score, snippet, startLine, endLine }) => ({
-                      symbol,
-                      score,
-                      startLine,
-                      endLine,
-                      ...(opts.snippet ? { snippet } : {}),
-                    })),
-                  })),
-                  files: fileResults.map(
-                    ({ file, score, matches, totalMatches, omittedMatches }) => ({
-                      workspace: file.workspace,
-                      path: file.path,
-                      configRelativePath: file.configRelativePath,
-                      score,
-                      totalMatches,
-                      omittedMatches,
-                      matches: matches.map((match) => ({
-                        range: match.range,
-                        matchedText: match.matchedText,
-                        matchKind: match.matchKind,
-                        sourceToken: match.sourceToken,
-                        ...(opts.snippet ? { snippet: match.snippet } : {}),
-                      })),
-                    }),
-                  ),
-                  specs: specResults.map(({ spec, score, snippet, startLine, endLine }) => ({
-                    workspace: spec.workspace,
-                    specId: spec.specId,
-                    path: spec.path,
-                    title: spec.title,
-                    description: spec.description,
-                    ...(opts.specContent ? { content: spec.content } : {}),
-                    score,
-                    startLine,
-                    endLine,
-                    ...(opts.snippet ? { snippet } : {}),
-                  })),
-                  documents: documentResults.map(
-                    ({ document, score, snippet, startLine, endLine }) => ({
-                      workspace: document.workspace,
-                      path: document.path,
-                      configRelativePath: document.configRelativePath,
-                      score,
-                      startLine,
-                      endLine,
-                      ...(opts.snippet ? { snippet } : {}),
-                    }),
-                  ),
-                  omittedCounts: omittedCounts ?? { tests: 0, ignored: 0 },
-                },
-                fmt,
-              )
+              output(result, fmt)
             }
           },
           { kernel },

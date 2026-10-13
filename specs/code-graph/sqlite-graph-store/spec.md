@@ -195,9 +195,11 @@ The SQLite schema SHALL persist the logical node kinds required by the abstract 
 - **`Document`** nodes for textual non-code resources
 - `Meta` records for store-level metadata
 
-The `File` table SHALL include the source content needed to derive symbol snippets from file-backed context.
+The `File` table SHALL include columns for `path` (PK), `project_relative_path`, `language`, `content_hash`, `workspace`, `category`, and `content`.
 
-The `Document` table SHALL include columns for `path` (PK), `configRelativePath`, `contentHash`, `content`, and `workspace`.
+The `Document` table SHALL include columns for `path` (PK), `project_relative_path`, `content_hash`, `content`, and `workspace`.
+
+The `Symbol` table SHALL include columns for `id` (PK), `name`, `kind`, `file_path`, `project_relative_path`, `parent_id`, line, column, end_line, end_column, selection coordinates, `comment`, and `search_text`.
 
 ### Requirement: Persisted relation storage
 
@@ -245,7 +247,7 @@ The adapter MUST:
 - prioritize **strong non-exact identity matches** ahead of generic content-only matches, including:
   - symbol declared-name equality when comment/body-only hits would otherwise rank higher
   - spec-id prefix, suffix, substring, and real component matches
-  - document canonical-path or config-relative-path prefix, suffix, substring, and real component matches
+  - document canonical-path or project-relative-path prefix, suffix, substring, and real component matches
 - count how many expanded query tokens match the selected identity fields and use that token coverage to rank candidates that satisfy more of the query intent above candidates satisfying fewer identity tokens
 - use BM25 ranking for remaining textual matches across searchable columns after identity preference is applied
 - sanitize and join multi-token queries using `OR` logic for broad discovery
@@ -334,15 +336,21 @@ abstract `GraphStore` contract.
 
 SQLite SHALL persist the logical-symbol, declaration, member-semantics, symbol-space, binding, provenance, coverage, construct-range, and selection-range fields required by `GraphStore`. Structured lookup columns SHALL be indexed. Serialized canonical ids MUST NOT be parsed or substring-ranked to implement semantic lookup. Canonical ids remain unique external identities; backend-local integer row keys MAY be used for physical joins when provider-visible ids do not change.
 
-The reference schema version MUST be **12**. `SQLITE_SCHEMA_VERSION` MUST change to 12 in the same revision as the DDL. `CREATE TABLE IF NOT EXISTS` does not alter an existing database, so the version mismatch MUST reject ordinary reads with `GraphSchemaIncompatibleError` and recovery reason `SCHEMA_INCOMPATIBLE`. `graph index` SHALL recreate derived storage, rotate `storage.epoch`, and rebuild search indexes before readiness. The implementation MUST NOT use `ALTER TABLE` and MUST NOT read version 10 or version 11 rows beside version 12 rows.
+The reference schema version MUST be **14**. `SQLITE_SCHEMA_VERSION` MUST change to 14 in the same revision as the DDL. `CREATE TABLE IF NOT EXISTS` does not alter an existing database, so the version mismatch MUST reject ordinary reads with `GraphSchemaIncompatibleError` and recovery reason `SCHEMA_INCOMPATIBLE`. `graph index` SHALL recreate derived storage, rotate `storage.epoch`, and rebuild search indexes before readiness. The implementation MUST NOT use `ALTER TABLE` and MUST NOT read version 13 or older rows beside version 14 rows.
 
-`logical_symbols` SHALL drop `member_form` and SHALL add nullable `member_kind`, `member_dispatch`, `member_accessor`, `native_kind`, and `qualified_name`. `qualified_name` stores the generic dotted owner path and MUST have an equality index. `idx_logical_symbols_member_lookup` SHALL use the member-semantics columns in place of `member_form`. `id`, `workspace`, `surface`, `name`, `space`, and `owner_id` stay. Stored `id` text MUST use the versioned canonical encoding; previous ids are discarded by the rebuild.
+In schema version 14:
+
+- `files` SHALL persist `project_relative_path` and drop `config_relative_path`.
+- `documents` SHALL persist `project_relative_path` and drop `config_relative_path`.
+- `symbols` SHALL persist `project_relative_path` (denormalized at index time to achieve zero-join query speed across symbol searches and hotspot calculations).
+
+`logical_symbols` SHALL keep `member_kind`, `member_dispatch`, `member_accessor`, `native_kind`, and `qualified_name`. `qualified_name` stores the generic dotted owner path and MUST have an equality index. `idx_logical_symbols_member_lookup` SHALL use the member-semantics columns. `id`, `workspace`, `surface`, `name`, `space`, and `owner_id` stay. Stored `id` text MUST use the versioned canonical encoding.
 
 `public_bindings`, `resolution_steps`, `symbols.parent_id`, `symbols.search_text`, `logical_declarations`, `local_bindings`, `index_coverage`, `relations`, and `symbol_fts` (`id`, `search_text`, `comment`) MUST keep their current columns. New re-export bindings and resolution steps are new rows. `symbol_fts.search_text` MAY still contain a qualified spelling for discovery. It MUST NOT be the exact-match key. `symbols.search_text` remains the expanded bare name.
 
 SQLite SHALL maintain the substring-capable source-content index and bounded short-query fallback required by the abstract store. Reverse coverage and traversal batch reads SHALL use set-based predicates and deterministic ordering.
 
-Indexed-input observations, freshness latches, VCS evidence, and compact unchanged-file facts SHALL remain persisted. One indexing run SHALL use one transaction, set-based endpoint validation, bounded writes, one commit, and one semantic and content index rebuild. Inserts, selects, and the worker row shape MUST use the version 12 columns in the same revision.
+Indexed-input observations, freshness latches, VCS evidence, and compact unchanged-file facts SHALL remain persisted. One indexing run SHALL use one transaction, set-based endpoint validation, bounded writes, one commit, and one semantic and content index rebuild. Inserts, selects, and the worker row shape MUST use the version 14 columns in the same revision.
 
 ## Constraints
 
@@ -371,3 +379,4 @@ Indexed-input observations, freshness latches, VCS evidence, and compact unchang
 ## ADRs
 
 - [ADR-0025: Non-Blocking Worker-Thread SQLite Graph Store](../../../docs/adr/0025-nonblocking-worker-sqlite-graph-store.md) — the built-in SQLite backend executes on a persistent worker thread
+- [ADR-0028: Denormalized Project-Relative Paths in Code Graph SQLite Store](../../../docs/adr/0028-denormalized-project-relative-paths-in-code-graph-sqlite-store.md) — denormalized project_relative_path in symbols for zero-join query speed

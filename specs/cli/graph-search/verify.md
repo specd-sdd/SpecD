@@ -350,7 +350,10 @@
 - **AND** each entry includes `startLine` and `endLine` fields
 - **AND** no entry includes a `snippet` field unless `--snippet` was passed
 - **AND** spec entries include `specId`, `path`, `title`, `description` but NOT `content`
-- **AND** document entries include `path`, `configRelativePath` but NOT `content`
+- **AND** document entries include `path`, `projectRelativePath` but NOT `content`
+- **AND** document entries do NOT include `configRelativePath`
+- **AND** file entries include `path`, `projectRelativePath` but NOT `configRelativePath`
+- **AND** symbol entries include `projectRelativePath` on declarations, hits, and logical targets
 
 #### Scenario: JSON output includes snippet only when requested
 

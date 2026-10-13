@@ -65,7 +65,7 @@ adapter.extractSymbols = (filePath: string, content: string): SymbolNode[] => {
   const session = new InMemoryIndexSession()
   session.registerFile({
     filePath,
-    configRelativePath: filePath,
+    projectRelativePath: filePath,
     language: 'php',
     contentHash: 'abc',
     workspace: 'ws',
@@ -90,7 +90,7 @@ adapter.extractImportedNames = (filePath: string, content: string): ImportDeclar
   const session = new InMemoryIndexSession()
   session.registerFile({
     filePath,
-    configRelativePath: filePath,
+    projectRelativePath: filePath,
     language: 'php',
     contentHash: 'abc',
     workspace: 'ws',
@@ -111,7 +111,7 @@ adapter.extractBindingFacts = (
   const session = new InMemoryIndexSession()
   session.registerFile({
     filePath,
-    configRelativePath: filePath,
+    projectRelativePath: filePath,
     language: 'php',
     contentHash: 'abc',
     workspace: 'ws',
@@ -131,7 +131,7 @@ adapter.extractCallFacts = (
   const session = new InMemoryIndexSession()
   session.registerFile({
     filePath,
-    configRelativePath: filePath,
+    projectRelativePath: filePath,
     language: 'php',
     contentHash: 'abc',
     workspace: 'ws',
@@ -156,7 +156,7 @@ adapter.extractRelations = (
   for (const fp of filePaths) {
     session.registerFile({
       filePath: fp,
-      configRelativePath: fp,
+      projectRelativePath: fp,
       language: 'php',
       contentHash: 'abc',
       workspace: 'ws',
@@ -178,7 +178,7 @@ adapter.extractRelations = (
     if (path !== filePath) {
       session.registerFile({
         filePath: path,
-        configRelativePath: path,
+        projectRelativePath: path,
         language: 'php',
         contentHash: 'abc',
         workspace: 'ws',
@@ -199,7 +199,7 @@ adapter.extractRelations = (
   // Register target file
   session.registerFile({
     filePath,
-    configRelativePath: filePath,
+    projectRelativePath: filePath,
     language: 'php',
     contentHash: 'abc',
     workspace: 'ws',

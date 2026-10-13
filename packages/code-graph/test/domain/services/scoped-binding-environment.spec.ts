@@ -57,7 +57,7 @@ function mockAnalysis(params: {
     filePath,
     contentHash: 'hash',
     workspace: 'default',
-    configRelativePath: 'service.ts',
+    projectRelativePath: 'service.ts',
     symbols: params.symbols ?? [],
     imports: [],
     bindingFacts: params.facts ?? [],

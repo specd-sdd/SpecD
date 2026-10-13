@@ -19,7 +19,7 @@ If a physical file falls under a configured workspace `codeRoot`, the workspace 
 
 `path` remains the canonical graph identity used by `SymbolNode.filePath`, symbol ids, and persisted relations.
 
-Each node MUST also store its `configRelativePath` (relative to the directory containing the active `specd.yaml`) to enable user-facing lookups from project-relative path selectors.
+Each node MUST also store its `projectRelativePath` (relative to the project root containing the active `specd.yaml`) to enable user-facing lookups and direct filesystem navigation.
 
 This ensures that two workspaces with identical relative paths produce distinct `FileNode.path` values while still allowing CLI users to resolve file arguments using repository-style paths relative to the active config. The workspace name is the `SpecdWorkspaceConfig.name` from the specd configuration.
 
@@ -49,16 +49,16 @@ For each workspace with a `codeRoot`, the indexer SHALL discover files starting 
 
 Files are discovered per workspace and their paths are prefixed with the workspace name before being stored in the graph. The `discoverFiles` function itself has no workspace knowledge — it accepts a root directory and returns paths relative to that root.
 
-### Requirement: Config-relative file lookup
+### Requirement: Project-relative file lookup
 
-The graph SHALL support resolving file selectors by a path relative to the directory containing the active `specd.yaml`.
+The graph SHALL support resolving file selectors by a path relative to the project root containing the active `specd.yaml`.
 
 For a configured project:
 
-1. The indexer computes `configRelativePath` for every indexed file from the active config directory to the file on disk.
+1. The indexer computes `projectRelativePath` for every indexed file and document from the project root to the file on disk, and denormalizes it onto every extracted symbol.
 2. The value is normalized to forward slashes and MUST NOT include a leading `./`.
-3. Files outside the config directory remain representable by a relative path containing `..` segments.
-4. CLI commands that accept file selectors MAY use this field to resolve inputs that do not include a `{workspace}:` prefix.
+3. Files outside the project root remain representable by a relative path containing `..` segments.
+4. CLI commands and tool hosts that accept file selectors MAY use this field to resolve inputs that do not include a `{workspace}:` prefix.
 
 This lookup is in addition to canonical workspace-prefixed graph identity; it does not replace it.
 
@@ -184,9 +184,9 @@ Exact graph file selectors SHALL normalize canonical workspace-relative paths, c
 
 - `@specd/code-graph` depends on `@specd/core` as a runtime dependency (types, domain services)
 - Single `.specd/code-graph.lbug` file for the whole project
-- The `discoverFiles` function remains workspace-agnostic — workspace prefixing and config-relative path derivation happen in the indexer
+- The `discoverFiles` function remains workspace-agnostic — workspace prefixing and project-relative path derivation happen in the indexer
 - Spec resolution uses `SpecRepository` exclusively — no filesystem fallback
-- Existing graph stores are incompatible when file identity metadata changes (for example adding `configRelativePath`) — a full rebuild is required after upgrading
+- Existing graph stores are incompatible when file identity metadata changes (for example replacing `configRelativePath` with `projectRelativePath`) — a full rebuild is required after upgrading
 
 ## Examples
 

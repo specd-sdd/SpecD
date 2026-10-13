@@ -58,7 +58,7 @@ adapter.extractSymbols = (filePath: string, content: string): SymbolNode[] => {
   const session = new InMemoryIndexSession()
   session.registerFile({
     filePath,
-    configRelativePath: filePath,
+    projectRelativePath: filePath,
     language: 'go',
     contentHash: 'abc',
     workspace: 'ws',
@@ -74,7 +74,7 @@ adapter.extractImportedNames = (filePath: string, content: string): ImportDeclar
   const session = new InMemoryIndexSession()
   session.registerFile({
     filePath,
-    configRelativePath: filePath,
+    projectRelativePath: filePath,
     language: 'go',
     contentHash: 'abc',
     workspace: 'ws',
@@ -95,7 +95,7 @@ adapter.extractBindingFacts = (
   const session = new InMemoryIndexSession()
   session.registerFile({
     filePath,
-    configRelativePath: filePath,
+    projectRelativePath: filePath,
     language: 'go',
     contentHash: 'abc',
     workspace: 'ws',
@@ -115,7 +115,7 @@ adapter.extractCallFacts = (
   const session = new InMemoryIndexSession()
   session.registerFile({
     filePath,
-    configRelativePath: filePath,
+    projectRelativePath: filePath,
     language: 'go',
     contentHash: 'abc',
     workspace: 'ws',
@@ -138,7 +138,7 @@ adapter.extractRelations = (
   for (const fp of filePaths) {
     session.registerFile({
       filePath: fp,
-      configRelativePath: fp,
+      projectRelativePath: fp,
       language: 'go',
       contentHash: 'abc',
       workspace: 'ws',
@@ -146,7 +146,7 @@ adapter.extractRelations = (
   }
   session.registerFile({
     filePath,
-    configRelativePath: filePath,
+    projectRelativePath: filePath,
     language: 'go',
     contentHash: 'abc',
     workspace: 'ws',
@@ -585,7 +585,7 @@ type HandlerFn func(event Event) Result`
       const session = new InMemoryIndexSession()
       session.registerFile({
         filePath: 'workspace:service/reader.go',
-        configRelativePath: 'service/reader.go',
+        projectRelativePath: 'service/reader.go',
         language: 'go',
         contentHash: 'hash',
         workspace: 'workspace',

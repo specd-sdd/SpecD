@@ -194,9 +194,9 @@ export async function handleMessage(
         result = database.getFile(p.filePath)
         break
       }
-      case 'findFilesByConfigRelativePath': {
-        const p = payload as { configRelativePath: string }
-        result = database.findFilesByConfigRelativePath(p.configRelativePath)
+      case 'findFilesByProjectRelativePath': {
+        const p = payload as { projectRelativePath: string }
+        result = database.findFilesByProjectRelativePath(p.projectRelativePath)
         break
       }
       case 'getDocument': {
@@ -204,9 +204,9 @@ export async function handleMessage(
         result = database.getDocument(p.documentId)
         break
       }
-      case 'findDocumentsByConfigRelativePath': {
-        const p = payload as { configRelativePath: string }
-        result = database.findDocumentsByConfigRelativePath(p.configRelativePath)
+      case 'findDocumentsByProjectRelativePath': {
+        const p = payload as { projectRelativePath: string }
+        result = database.findDocumentsByProjectRelativePath(p.projectRelativePath)
         break
       }
       case 'getSymbol': {

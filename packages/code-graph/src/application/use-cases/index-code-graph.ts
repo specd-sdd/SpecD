@@ -487,7 +487,7 @@ export class IndexCodeGraph {
       const fileHashes = new Map<string, string>()
       const coverageByFilePath = new Map<string, IndexCoverage>()
       const absolutePaths = new Map<string, string>()
-      const configRelativePaths = new Map<string, string>()
+      const projectRelativePaths = new Map<string, string>()
       const wsBreakdowns = new Map<string, MutableWorkspaceIndexBreakdown>()
       const indexedWorkspaceNames = new Set(options.workspaces.map((ws) => ws.name))
       const effectiveGraphConfig = resolveEffectiveGraphConfig(
@@ -520,13 +520,13 @@ export class IndexCodeGraph {
         for (const relPath of discovered) {
           const prefixed = `${ws.name}:${relPath}`
           const absPath = join(ws.codeRoot, relPath)
-          const configRel = toPortableGraphPath(relative(options.projectRoot, absPath))
+          const projectRel = toPortableGraphPath(relative(options.projectRoot, absPath))
 
           allDiscoveredPaths.push(prefixed)
           absolutePaths.set(prefixed, absPath)
-          configRelativePaths.set(
+          projectRelativePaths.set(
             prefixed,
-            configRel.startsWith('./') ? configRel.slice(2) : configRel,
+            projectRel.startsWith('./') ? projectRel.slice(2) : projectRel,
           )
         }
       }
@@ -562,7 +562,7 @@ export class IndexCodeGraph {
           const absPath = join(options.projectRoot, relPath)
           allDiscoveredPaths.push(prefixed)
           absolutePaths.set(prefixed, absPath)
-          configRelativePaths.set(prefixed, toPortableGraphPath(relPath))
+          projectRelativePaths.set(prefixed, toPortableGraphPath(relPath))
         }
       }
 
@@ -911,7 +911,7 @@ export class IndexCodeGraph {
               const hash = fileHashes.get(prefixedPath) ?? computeContentHash(decodedContent)
               const document = createDocumentNode({
                 path: prefixedPath,
-                configRelativePath: configRelativePaths.get(prefixedPath) ?? '',
+                projectRelativePath: projectRelativePaths.get(prefixedPath) ?? '',
                 contentHash: hash,
                 content: decodedContent,
                 workspace: wsName,
@@ -960,7 +960,7 @@ export class IndexCodeGraph {
 
             session.registerFile({
               filePath: prefixedPath,
-              configRelativePath: configRelativePaths.get(prefixedPath) ?? '',
+              projectRelativePath: projectRelativePaths.get(prefixedPath) ?? '',
               language,
               contentHash: hash,
               workspace: wsName,
@@ -1008,7 +1008,7 @@ export class IndexCodeGraph {
             chunkFiles.push(
               createFileNode({
                 path: prefixedPath,
-                configRelativePath: configRelativePaths.get(prefixedPath) ?? '',
+                projectRelativePath: projectRelativePaths.get(prefixedPath) ?? '',
                 language,
                 contentHash: hash,
                 workspace: wsName,
@@ -1018,7 +1018,13 @@ export class IndexCodeGraph {
             )
             indexedResourceKinds.set(prefixedPath, IndexedResourceKind.File)
             fileLanguages.set(prefixedPath, language)
-            chunkSymbols.push(...finalDraft.symbols)
+            const fileProjRel = projectRelativePaths.get(prefixedPath) ?? ''
+            const symbolsWithProjRel = finalDraft.symbols.map((sym) =>
+              sym.projectRelativePath === fileProjRel
+                ? sym
+                : { ...sym, projectRelativePath: fileProjRel },
+            )
+            chunkSymbols.push(...symbolsWithProjRel)
             if (contentChangedPaths.has(prefixedPath)) {
               filesIndexed++
               const breakdown = wsBreakdowns.get(wsName)
@@ -1067,7 +1073,7 @@ export class IndexCodeGraph {
         if (existing.length > 0) {
           session.registerFile({
             filePath: prefixedPath,
-            configRelativePath: configRelativePaths.get(prefixedPath) ?? '',
+            projectRelativePath: projectRelativePaths.get(prefixedPath) ?? '',
             language: fileLanguages.get(prefixedPath) ?? 'unknown',
             contentHash: existingArtifactHashes.get(prefixedPath) ?? '',
             workspace: workspaceIdentityName(prefixedPath),
@@ -1572,7 +1578,7 @@ export class IndexCodeGraph {
         for (const resourceId of allDiscoveredPaths) {
           const resourceKind = indexedResourceKinds.get(resourceId)
           const absolutePath = absolutePaths.get(resourceId)
-          const inputLocator = configRelativePaths.get(resourceId)
+          const inputLocator = projectRelativePaths.get(resourceId)
           const indexedContentHash =
             fileHashes.get(resourceId) ?? existingArtifactHashes.get(resourceId)
           if (

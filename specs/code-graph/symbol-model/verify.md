@@ -6,7 +6,7 @@
 
 #### Scenario: FileNode equality still uses canonical path
 
-- **GIVEN** two `FileNode` values with the same canonical `path` but different `contentHash` and `configRelativePath`
+- **GIVEN** two `FileNode` values with the same canonical `path` but different `contentHash` and `projectRelativePath`
 - **WHEN** equality is checked
 - **THEN** they are considered equal because `path` remains the canonical graph identity
 
@@ -16,23 +16,23 @@
 - **WHEN** a `FileNode` is created
 - **THEN** `path` is stored as `core:src/domain/entities/change.ts`
 
-#### Scenario: FileNode configRelativePath is repository-style
+#### Scenario: FileNode projectRelativePath is repository-style
 
 - **GIVEN** the active `specd.yaml` lives at `/project/specd.yaml`
 - **AND** workspace `core` has codeRoot `/project/packages/core`
 - **AND** the discovered file is `/project/packages/core/src/index.ts`
 - **WHEN** a `FileNode` is created
 - **THEN** `path` is `core:src/index.ts`
-- **AND** `configRelativePath` is `packages/core/src/index.ts`
+- **AND** `projectRelativePath` is `packages/core/src/index.ts`
 - **AND** `workspace` is `core`
 
-#### Scenario: FileNode configRelativePath may include parent segments
+#### Scenario: FileNode projectRelativePath may include parent segments
 
 - **GIVEN** the active `specd.yaml` lives at `/project/apps/web/specd.yaml`
 - **AND** workspace `core` has codeRoot `/project/packages/core`
 - **AND** the discovered file is `/project/packages/core/src/index.ts`
 - **WHEN** a `FileNode` is created
-- **THEN** `configRelativePath` is `../../packages/core/src/index.ts`
+- **THEN** `projectRelativePath` is `../../packages/core/src/index.ts`
 - **AND** it does not replace the canonical `path`
 
 ### Requirement: Spec node
@@ -108,6 +108,12 @@
 - **WHEN** end coordinates and `selectionRange` are added
 - **THEN** its symbol id is unchanged
 - **AND** `line` and `column` equal the complete construct start
+
+#### Scenario: SymbolNode carries denormalized projectRelativePath
+
+- **GIVEN** a symbol extracted from a file with `projectRelativePath` `packages/core/src/index.ts`
+- **WHEN** the `SymbolNode` is created
+- **THEN** its `projectRelativePath` equals `packages/core/src/index.ts`
 
 ### Requirement: File analysis model
 

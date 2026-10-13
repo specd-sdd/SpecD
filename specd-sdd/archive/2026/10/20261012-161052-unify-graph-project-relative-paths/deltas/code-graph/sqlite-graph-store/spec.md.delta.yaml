@@ -1,0 +1,100 @@
+- op: modified
+  description: 'Update Persisted node storage to reflect project_relative_path across files, documents, and symbols'
+  selector:
+    type: section
+    matches: 'Requirement: Persisted node storage'
+  content: |
+    The SQLite schema SHALL persist the logical node kinds required by the abstract graph model:
+
+    - `File` nodes for indexed source files, including persisted source content used for symbol snippet extraction
+    - `Symbol` nodes for extracted code symbols
+    - `Spec` nodes for indexed specification documents
+    - **`Document`** nodes for textual non-code resources
+    - `Meta` records for store-level metadata
+
+    The `File` table SHALL include columns for `path` (PK), `project_relative_path`, `language`, `content_hash`, `workspace`, `category`, and `content`.
+
+    The `Document` table SHALL include columns for `path` (PK), `project_relative_path`, `content_hash`, `content`, and `workspace`.
+
+    The `Symbol` table SHALL include columns for `id` (PK), `name`, `kind`, `file_path`, `project_relative_path`, `parent_id`, line, column, end_line, end_column, selection coordinates, `comment`, and `search_text`.
+
+- op: modified
+  description: 'Update SQLite full-text search to use project-relative-path'
+  selector:
+    type: section
+    matches: 'Requirement: SQLite full-text search'
+  content: |
+    `SQLiteGraphStore` SHALL implement symbol, spec, and document search using SQLite full-text search (FTS5).
+
+    The adapter MUST:
+
+    - provide full-text search over `Document` content and paths
+    - keep SQLite FTS candidate generation in place for `searchSymbols()`, `searchSpecs()`, and `searchDocuments()` using the existing `MATCH` query path
+    - sanitize and join multi-token queries using `OR` logic for broad discovery
+    - expand raw query tokens with the shared specd/code-aware lexical policy before applying identity-aware ranking
+    - supplement the FTS candidate set with identity-derived candidates when FTS tokenization alone would miss a strong identity hit required by the abstract contract
+    - compute identity-aware ranking in SQL with explicit ordering columns rather than relying on BM25 weights alone
+    - prioritize **exact canonical identity matches** (Spec ID, Symbol Name/ID, Document Path) by boosting results where the query matches the primary identity column exactly
+    - prioritize **strong non-exact identity matches** ahead of generic content-only matches, including:
+      - symbol declared-name equality when comment/body-only hits would otherwise rank higher
+      - spec-id prefix, suffix, substring, and real component matches
+      - document canonical-path or project-relative-path prefix, suffix, substring, and real component matches
+    - count how many expanded query tokens match the selected identity fields and use that token coverage to rank candidates that satisfy more of the query intent above candidates satisfying fewer identity tokens
+    - use BM25 ranking for remaining textual matches across searchable columns after identity preference is applied
+    - sanitize and join multi-token queries using `OR` logic for broad discovery
+    - derive match-aware snippets and the corresponding 1-based line range from persisted file source content or FTS matches
+
+    Observable SQLite ordering semantics MUST hold:
+
+    - exact canonical identity matches rank first
+    - identity-oriented non-exact hits rank ahead of body-only/comment-only/content-only hits
+    - exact token identity matches outrank prefix token matches
+    - prefix token matches outrank suffix token matches
+    - suffix token matches outrank arbitrary substring token matches
+    - real identity-component matches outrank arbitrary substring-only hits on the same identity field
+    - candidates matching more expanded identity tokens outrank candidates matching fewer expanded identity tokens when generic text relevance is otherwise competing
+    - generic term frequency in spec/document body content MUST NOT outrank a stronger spec-id, symbol-name, or document-path match for the same query intent
+
+    The SQLite FTS schema MUST include:
+
+    - **`symbol_fts`** virtual table covering `Symbol.name` and `Symbol.comment`
+    - **`spec_fts`** virtual table covering `Spec.title`, `Spec.description`, and `Spec.content`
+    - **`document_fts`** virtual table covering `Document.path` and `Document.content`
+
+    The implementation MAY use stemming, weighted BM25, identity boost unions, or other SQLite-supported ranking/indexing options, provided the abstract graph-store contract remains satisfied.
+
+    SQLite identity-aware ranking MUST be expressed through explicit SQL ordering logic over the discovered candidate set, such as computed rank columns or `CASE`-based ordering. Candidate discovery MAY combine FTS `MATCH` results with identity-derived candidates, but it MUST NOT replace FTS retrieval with plain whole-query `LIKE` filtering only.
+
+    Persisted `File` content used for snippet extraction SHALL NOT, by itself, become a separate full-text searchable file category in this change.
+
+- op: modified
+  description: 'Upgrade reference schema to version 14 with denormalized project_relative_path in symbols'
+  selector:
+    type: section
+    matches: 'Requirement: Reference schema upgrade'
+  content: |
+    SQLite SHALL persist the logical-symbol, declaration, member-semantics, symbol-space, binding, provenance, coverage, construct-range, and selection-range fields required by `GraphStore`. Structured lookup columns SHALL be indexed. Serialized canonical ids MUST NOT be parsed or substring-ranked to implement semantic lookup. Canonical ids remain unique external identities; backend-local integer row keys MAY be used for physical joins when provider-visible ids do not change.
+
+    The reference schema version MUST be **14**. `SQLITE_SCHEMA_VERSION` MUST change to 14 in the same revision as the DDL. `CREATE TABLE IF NOT EXISTS` does not alter an existing database, so the version mismatch MUST reject ordinary reads with `GraphSchemaIncompatibleError` and recovery reason `SCHEMA_INCOMPATIBLE`. `graph index` SHALL recreate derived storage, rotate `storage.epoch`, and rebuild search indexes before readiness. The implementation MUST NOT use `ALTER TABLE` and MUST NOT read version 13 or older rows beside version 14 rows.
+
+    In schema version 14:
+    - `files` SHALL persist `project_relative_path` and drop `config_relative_path`.
+    - `documents` SHALL persist `project_relative_path` and drop `config_relative_path`.
+    - `symbols` SHALL persist `project_relative_path` (denormalized at index time to achieve zero-join query speed across symbol searches and hotspot calculations).
+
+    `logical_symbols` SHALL keep `member_kind`, `member_dispatch`, `member_accessor`, `native_kind`, and `qualified_name`. `qualified_name` stores the generic dotted owner path and MUST have an equality index. `idx_logical_symbols_member_lookup` SHALL use the member-semantics columns. `id`, `workspace`, `surface`, `name`, `space`, and `owner_id` stay. Stored `id` text MUST use the versioned canonical encoding.
+
+    `public_bindings`, `resolution_steps`, `symbols.parent_id`, `symbols.search_text`, `logical_declarations`, `local_bindings`, `index_coverage`, `relations`, and `symbol_fts` (`id`, `search_text`, `comment`) MUST keep their current columns. New re-export bindings and resolution steps are new rows. `symbol_fts.search_text` MAY still contain a qualified spelling for discovery. It MUST NOT be the exact-match key. `symbols.search_text` remains the expanded bare name.
+
+    SQLite SHALL maintain the substring-capable source-content index and bounded short-query fallback required by the abstract store. Reverse coverage and traversal batch reads SHALL use set-based predicates and deterministic ordering.
+
+    Indexed-input observations, freshness latches, VCS evidence, and compact unchanged-file facts SHALL remain persisted. One indexing run SHALL use one transaction, set-based endpoint validation, bounded writes, one commit, and one semantic and content index rebuild. Inserts, selects, and the worker row shape MUST use the version 14 columns in the same revision.
+
+- op: modified
+  description: 'Add ADR-0028 to ADRs section'
+  selector:
+    type: section
+    matches: 'ADRs'
+  content: |
+    - [ADR-0025: Non-Blocking Worker-Thread SQLite Graph Store](../../../docs/adr/0025-nonblocking-worker-sqlite-graph-store.md) — the built-in SQLite backend executes on a persistent worker thread
+    - [ADR-0028: Denormalized Project-Relative Paths in Code Graph SQLite Store](../../../docs/adr/0028-denormalized-project-relative-paths-in-code-graph-sqlite-store.md) — denormalized project_relative_path in symbols for zero-join query speed

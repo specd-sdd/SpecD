@@ -11,13 +11,13 @@ A code graph needs a unified, language-agnostic representation of source code st
 A `FileNode` SHALL represent a single source file in the workspace. It contains:
 
 - **`path`** (`string`) — globally unique path in format `{workspaceName}:{relativeToCodeRoot}` (e.g. `core:src/index.ts`). Forward-slash-normalized. This is the node's canonical identity.
-- **`configRelativePath`** (`string`) — forward-slash-normalized path from the directory containing the `specd.yaml` used for indexing to the file on disk (e.g. `packages/core/src/index.ts`). This path is not the node identity and MAY include `..` segments when the file lives outside the config directory.
+- **`projectRelativePath`** (`string`) — forward-slash-normalized path from the project root containing the active `specd.yaml` to the file on disk (e.g. `packages/core/src/index.ts`). This path is not the node identity and MAY include `..` segments when the file lives outside the project root.
 - **`language`** (`string`) — language identifier (e.g. `typescript`, `python`). Determined by the language adapter at index time.
 - **`contentHash`** (`string`) — hash of the file's content at last index. Used for incremental diffing.
 - **`workspace`** (`string`) — the workspace name this file belongs to (e.g. `core`, `cli`, `default`).
 - **`embedding`** (`Float32Array | undefined`) — optional vector embedding for semantic search. Deferred to v2+.
 
-Two `FileNode` values are equal if and only if their `path` fields match (since `path` includes the workspace name prefix and remains the canonical graph identity). `configRelativePath` exists for user-facing lookup and diagnostics; it MUST NOT replace the canonical workspace-prefixed path in persisted relations or symbol identifiers.
+Two `FileNode` values are equal if and only if their `path` fields match (since `path` includes the workspace name prefix and remains the canonical graph identity). `projectRelativePath` exists for user-facing lookup and diagnostics; it MUST NOT replace the canonical workspace-prefixed path in persisted relations or symbol identifiers.
 
 ### Requirement: Spec node
 
@@ -42,6 +42,7 @@ A `SymbolNode` SHALL represent a named code construct extracted from a file. It 
 - **`name`** (`string`) — the symbol's declared name.
 - **`kind`** (`SymbolKind`) — the category of this symbol.
 - **`filePath`** (`string`) — workspace-prefixed path of the file containing this symbol.
+- **`projectRelativePath`** (`string`) — forward-slash-normalized path from the project root to the file containing this symbol (e.g. `packages/core/src/index.ts`), denormalized from the owning file node at index time.
 - **`line`** (`number`) — 1-based start line of the complete syntactic construct.
 - **`column`** (`number`) — 0-based start column of the complete syntactic construct.
 - **`endLine`** (`number`) — 1-based end line of the complete syntactic construct.
@@ -343,3 +344,4 @@ const specRelation: Relation = {
 ## ADRs
 
 - [ADR-0024: Logical symbol resolution](../../../docs/adr/0024-logical-symbol-resolution.md)
+- [ADR-0028: Denormalized Project-Relative Paths in Code Graph SQLite Store](../../../docs/adr/0028-denormalized-project-relative-paths-in-code-graph-sqlite-store.md)

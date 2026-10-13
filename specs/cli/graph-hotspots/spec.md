@@ -89,6 +89,8 @@ If the provider reports that the graph is busy or stale after opening, the comma
 
 ### Requirement: Output format
 
+The command SHALL delegate hotspot retrieval and path projection to `sdk:run-graph-hotspots`.
+
 In `text` mode, the command SHALL print a ranked table with:
 
 - total returned entries and total symbol count
@@ -104,7 +106,7 @@ If no entries match, the command SHALL output `No hotspots found.`
 When `omittedCounts` indicates that results were filtered out (`tests > 0` or `ignored > 0`), text mode output SHALL display an omission notice:
 `ℹ Excluded from results: <count> test files, <count> ignored files. Use --include-tests, --include-ignored, or --all to view them.`
 
-In `json` or `toon` mode, the command SHALL output an object containing `totalSymbols`, `entries`, and `omittedCounts: { tests: number, ignored: number }`. Each entry SHALL include the symbol payload, `score`, `directCallers`, `crossWorkspaceCallers`, `fileImporters`, `riskLevel`, and the derived `workspace` field.
+In `json` or `toon` mode, the command SHALL output an object containing `totalSymbols`, `entries`, and `omittedCounts: { tests: number, ignored: number }`. Each entry SHALL include the symbol payload, `score`, `directCallers`, `crossWorkspaceCallers`, `fileImporters`, `riskLevel`, the derived `workspace` field, and `projectRelativePath`. Hotspot entries in structured output SHALL NOT expose `displayPath`.
 
 ### Requirement: Backpressure-safe hotspot presentation
 
@@ -151,6 +153,7 @@ The CLI help text for `specd graph hotspots` and the existing reference document
 - [`cli:graph-cli-context`](../graph-cli-context/spec.md) — shared graph context and provider lifecycle
 - [`core:config`](../../core/config/spec.md) — config discovery contract and bootstrap-mode relationship to configured operation
 - [`code-graph:composition`](../../code-graph/composition/spec.md) — CodeGraphProvider facade used by the command
+- [`sdk:run-graph-hotspots`](../../sdk/run-graph-hotspots/spec.md) — SDK hotspots orchestration and path projection
 
 ## ADRs
 

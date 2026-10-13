@@ -49,5 +49,5 @@ export interface FileAnalysis extends FileAnalysisDraft {
   readonly filePath: string
   readonly contentHash: string
   readonly workspace: string
-  readonly configRelativePath: string
+  readonly projectRelativePath: string
 }

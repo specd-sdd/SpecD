@@ -137,7 +137,7 @@ function getSqliteInputChunkSize(fixedParameterCount: number, inputMultiplicity 
   return chunkSize
 }
 const SYMBOL_ROW_COLUMNS =
-  'id, name, kind, file_path, parent_id, line, column_number, end_line, end_column, selection_start_line, selection_start_column, selection_end_line, selection_end_column, comment'
+  'id, name, kind, file_path, project_relative_path, parent_id, line, column_number, end_line, end_column, selection_start_line, selection_start_column, selection_end_line, selection_end_column, comment'
 
 /**
  * Converts a SqliteRuntimeDescriptor modulePath into a dynamic-import target.
@@ -163,6 +163,7 @@ interface SymbolRow {
   readonly name: string
   readonly kind: string
   readonly file_path: string
+  readonly project_relative_path: string
   readonly parent_id: string | null
   readonly line: number
   readonly column_number: number
@@ -449,11 +450,11 @@ export class SQLiteGraphDatabase {
    */
   getFile(path: string): FileNode | undefined {
     const row = this.statement(
-      'SELECT path, config_relative_path, language, content_hash, workspace, category, embedding, content FROM files WHERE path = ?',
+      'SELECT path, project_relative_path, language, content_hash, workspace, category, embedding, content FROM files WHERE path = ?',
     ).get(path) as
       | {
           path: string
-          config_relative_path: string
+          project_relative_path: string
           language: string
           content_hash: string
           workspace: string
@@ -473,11 +474,11 @@ export class SQLiteGraphDatabase {
    */
   getDocument(path: string): DocumentNode | undefined {
     const row = this.statement(
-      'SELECT path, config_relative_path, content_hash, content, workspace FROM documents WHERE path = ?',
+      'SELECT path, project_relative_path, content_hash, content, workspace FROM documents WHERE path = ?',
     ).get(path) as
       | {
           path: string
-          config_relative_path: string
+          project_relative_path: string
           content_hash: string
           content: string
           workspace: string
@@ -487,17 +488,17 @@ export class SQLiteGraphDatabase {
   }
 
   /**
-   * Finds files by config relative path.
+   * Finds files by project relative path.
    *
-   * @param configRelativePath - Config relative path parameter.
-   * @returns The result of find files by config relative path.
+   * @param projectRelativePath - Project relative path parameter.
+   * @returns The result of find files by project relative path.
    */
-  findFilesByConfigRelativePath(configRelativePath: string): FileNode[] {
+  findFilesByProjectRelativePath(projectRelativePath: string): FileNode[] {
     const rows = this.statement(
-      'SELECT path, config_relative_path, language, content_hash, workspace, category, embedding, content FROM files WHERE config_relative_path = ?',
-    ).all(configRelativePath) as Array<{
+      'SELECT path, project_relative_path, language, content_hash, workspace, category, embedding, content FROM files WHERE project_relative_path = ?',
+    ).all(projectRelativePath) as Array<{
       path: string
-      config_relative_path: string
+      project_relative_path: string
       language: string
       content_hash: string
       workspace: string
@@ -509,17 +510,17 @@ export class SQLiteGraphDatabase {
   }
 
   /**
-   * Finds documents by config relative path.
+   * Finds documents by project relative path.
    *
-   * @param configRelativePath - Config relative path parameter.
-   * @returns The result of find documents by config relative path.
+   * @param projectRelativePath - Project relative path parameter.
+   * @returns The result of find documents by project relative path.
    */
-  findDocumentsByConfigRelativePath(configRelativePath: string): DocumentNode[] {
+  findDocumentsByProjectRelativePath(projectRelativePath: string): DocumentNode[] {
     const rows = this.statement(
-      'SELECT path, config_relative_path, content_hash, content, workspace FROM documents WHERE config_relative_path = ?',
-    ).all(configRelativePath) as Array<{
+      'SELECT path, project_relative_path, content_hash, content, workspace FROM documents WHERE project_relative_path = ?',
+    ).all(projectRelativePath) as Array<{
       path: string
-      config_relative_path: string
+      project_relative_path: string
       content_hash: string
       content: string
       workspace: string
@@ -535,13 +536,14 @@ export class SQLiteGraphDatabase {
    */
   getSymbol(id: string): SymbolNode | undefined {
     const row = this.statement(
-      'SELECT id, name, kind, file_path, parent_id, line, column_number, end_line, end_column, selection_start_line, selection_start_column, selection_end_line, selection_end_column, comment FROM symbols WHERE id = ?',
+      'SELECT id, name, kind, file_path, project_relative_path, parent_id, line, column_number, end_line, end_column, selection_start_line, selection_start_column, selection_end_line, selection_end_column, comment FROM symbols WHERE id = ?',
     ).get(id) as
       | {
           id: string
           name: string
           kind: string
           file_path: string
+          project_relative_path: string
           parent_id: string | null
           line: number
           column_number: number
@@ -699,10 +701,10 @@ export class SQLiteGraphDatabase {
     for (const chunk of chunksOf(uniquePaths, SQLITE_BATCH_PARAMETER_LIMIT)) {
       const placeholders = chunk.map(() => '?').join(', ')
       const rows = this.statement(
-        `SELECT path, config_relative_path, language, content_hash, workspace, category, embedding, content FROM files WHERE path IN (${placeholders})`,
+        `SELECT path, project_relative_path, language, content_hash, workspace, category, embedding, content FROM files WHERE path IN (${placeholders})`,
       ).all(...chunk) as Array<{
         path: string
-        config_relative_path: string
+        project_relative_path: string
         language: string
         content_hash: string
         workspace: string
@@ -732,10 +734,10 @@ export class SQLiteGraphDatabase {
     for (const chunk of chunksOf(uniquePaths, SQLITE_BATCH_PARAMETER_LIMIT)) {
       const placeholders = chunk.map(() => '?').join(', ')
       const rows = this.statement(
-        `SELECT path, config_relative_path, content_hash, content, workspace FROM documents WHERE path IN (${placeholders})`,
+        `SELECT path, project_relative_path, content_hash, content, workspace FROM documents WHERE path IN (${placeholders})`,
       ).all(...chunk) as Array<{
         path: string
-        config_relative_path: string
+        project_relative_path: string
         content_hash: string
         content: string
         workspace: string
@@ -1041,6 +1043,7 @@ export class SQLiteGraphDatabase {
           s.name,
           s.kind,
           s.file_path,
+          s.project_relative_path,
           s.parent_id,
           s.line,
           s.column_number,
@@ -1056,22 +1059,7 @@ export class SQLiteGraphDatabase {
           ON r.target = s.id
         WHERE r.type = ? AND r.source = ?
       `,
-    ).all(RelationType.Exports, filePath) as Array<{
-      id: string
-      name: string
-      kind: string
-      file_path: string
-      parent_id: string | null
-      line: number
-      column_number: number
-      end_line: number
-      end_column: number
-      selection_start_line: number
-      selection_start_column: number
-      selection_end_line: number
-      selection_end_column: number
-      comment: string | null
-    }>
+    ).all(RelationType.Exports, filePath) as SymbolRow[]
     return rows.map((row) => this.mapSymbolRow(row))
   }
 
@@ -1089,6 +1077,7 @@ export class SQLiteGraphDatabase {
             target.name,
             target.kind,
             target.file_path,
+            target.project_relative_path,
             target.parent_id,
             target.line,
             target.column_number,
@@ -1106,23 +1095,7 @@ export class SQLiteGraphDatabase {
           WHERE r.type IN (?, ?, ?)
         `,
       )
-      .all(...SYMBOL_DEPENDENCY_RELATION_TYPES) as Array<{
-      id: string
-      name: string
-      kind: string
-      file_path: string
-      parent_id: string | null
-      line: number
-      column_number: number
-      end_line: number
-      end_column: number
-      selection_start_line: number
-      selection_start_column: number
-      selection_end_line: number
-      selection_end_column: number
-      comment: string | null
-      caller_file_path: string
-    }>
+      .all(...SYMBOL_DEPENDENCY_RELATION_TYPES) as Array<SymbolRow & { caller_file_path: string }>
 
     return rows.map((row) => ({
       symbol: this.mapSymbolRow(row),
@@ -1178,11 +1151,11 @@ export class SQLiteGraphDatabase {
   getAllFiles(): FileNode[] {
     const rows = this.ensureOpen()
       .prepare(
-        'SELECT path, config_relative_path, language, content_hash, workspace, category, embedding, content FROM files',
+        'SELECT path, project_relative_path, language, content_hash, workspace, category, embedding, content FROM files',
       )
       .all() as Array<{
       path: string
-      config_relative_path: string
+      project_relative_path: string
       language: string
       content_hash: string
       workspace: string
@@ -1200,10 +1173,12 @@ export class SQLiteGraphDatabase {
    */
   getAllDocuments(): DocumentNode[] {
     const rows = this.ensureOpen()
-      .prepare('SELECT path, config_relative_path, content_hash, content, workspace FROM documents')
+      .prepare(
+        'SELECT path, project_relative_path, content_hash, content, workspace FROM documents',
+      )
       .all() as Array<{
       path: string
-      config_relative_path: string
+      project_relative_path: string
       content_hash: string
       content: string
       workspace: string
@@ -1413,24 +1388,10 @@ export class SQLiteGraphDatabase {
       const whereConditions =
         extraCondition === undefined ? conditions : [...conditions, extraCondition]
       const where = whereConditions.length > 0 ? ` WHERE ${whereConditions.join(' AND ')}` : ''
-      return this.statement(
-        `SELECT id, name, kind, file_path, parent_id, line, column_number, end_line, end_column, selection_start_line, selection_start_column, selection_end_line, selection_end_column, comment FROM symbols${where}`,
-      ).all(...params, ...extraParams) as Array<{
-        id: string
-        name: string
-        kind: string
-        file_path: string
-        parent_id: string | null
-        line: number
-        column_number: number
-        end_line: number
-        end_column: number
-        selection_start_line: number
-        selection_start_column: number
-        selection_end_line: number
-        selection_end_column: number
-        comment: string | null
-      }>
+      return this.statement(`SELECT ${SYMBOL_ROW_COLUMNS} FROM symbols${where}`).all(
+        ...params,
+        ...extraParams,
+      ) as SymbolRow[]
     }
     const rows =
       filePaths.length === 0
@@ -1568,6 +1529,7 @@ export class SQLiteGraphDatabase {
             s.name,
             s.kind,
             s.file_path,
+            s.project_relative_path,
             s.parent_id,
             s.line,
             s.column_number,
@@ -1592,6 +1554,7 @@ export class SQLiteGraphDatabase {
       name: string
       kind: string
       file_path: string
+      project_relative_path: string
       parent_id: string | null
       line: number
       column_number: number
@@ -1810,8 +1773,8 @@ export class SQLiteGraphDatabase {
     const ranking = buildIdentityRankingSql({
       canonicalExpr: 'lower(d.path)',
       canonicalComponentsExpr: buildIdentityComponentsExpr('lower(d.path)'),
-      alternateExpr: 'lower(d.config_relative_path)',
-      alternateComponentsExpr: buildIdentityComponentsExpr('lower(d.config_relative_path)'),
+      alternateExpr: 'lower(d.project_relative_path)',
+      alternateComponentsExpr: buildIdentityComponentsExpr('lower(d.project_relative_path)'),
       normalizedQuery: query.normalizedQuery,
       rawTokens: query.rawTokens,
       expandedTokens: query.expandedTokens,
@@ -1819,8 +1782,8 @@ export class SQLiteGraphDatabase {
     const identityCandidates = buildIdentityCandidatePredicateSql({
       canonicalExpr: 'lower(d.path)',
       canonicalComponentsExpr: buildIdentityComponentsExpr('lower(d.path)'),
-      alternateExpr: 'lower(d.config_relative_path)',
-      alternateComponentsExpr: buildIdentityComponentsExpr('lower(d.config_relative_path)'),
+      alternateExpr: 'lower(d.project_relative_path)',
+      alternateComponentsExpr: buildIdentityComponentsExpr('lower(d.project_relative_path)'),
       expandedTokens: query.expandedTokens,
     })
     const rows = this.ensureOpen()
@@ -1851,7 +1814,7 @@ export class SQLiteGraphDatabase {
           )
           SELECT
             d.path,
-            d.config_relative_path,
+            d.project_relative_path,
             d.content_hash,
             d.content,
             d.workspace,
@@ -1865,7 +1828,7 @@ export class SQLiteGraphDatabase {
       )
       .all(query.ftsQuery, ...identityCandidates.params, ...ranking.params) as Array<{
       path: string
-      config_relative_path: string
+      project_relative_path: string
       content_hash: string
       content: string
       workspace: string
@@ -1943,7 +1906,7 @@ export class SQLiteGraphDatabase {
               `
                 SELECT
                   f.path,
-                  f.config_relative_path,
+                  f.project_relative_path,
                   f.language,
                   f.content_hash,
                   f.workspace,
@@ -1965,7 +1928,7 @@ export class SQLiteGraphDatabase {
               offset,
             ) as Array<{
             path: string
-            config_relative_path: string
+            project_relative_path: string
             language: string
             content_hash: string
             workspace: string
@@ -1979,7 +1942,7 @@ export class SQLiteGraphDatabase {
               `
                 SELECT
                   f.path,
-                  f.config_relative_path,
+                  f.project_relative_path,
                   f.language,
                   f.content_hash,
                   f.workspace,
@@ -1996,7 +1959,7 @@ export class SQLiteGraphDatabase {
             )
             .all(terms[0]!, ...filterParams, fetchLimit, offset) as Array<{
             path: string
-            config_relative_path: string
+            project_relative_path: string
             language: string
             content_hash: string
             workspace: string
@@ -2747,10 +2710,10 @@ export class SQLiteGraphDatabase {
   private insertFile(db: SqliteDatabase, file: FileNode): void {
     db.prepare(
       `
-        INSERT INTO files (path, config_relative_path, language, content_hash, workspace, category, embedding, content)
+        INSERT INTO files (path, project_relative_path, language, content_hash, workspace, category, embedding, content)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(path) DO UPDATE SET
-          config_relative_path = excluded.config_relative_path,
+          project_relative_path = excluded.project_relative_path,
           language = excluded.language,
           content_hash = excluded.content_hash,
           workspace = excluded.workspace,
@@ -2760,7 +2723,7 @@ export class SQLiteGraphDatabase {
       `,
     ).run(
       file.path,
-      file.configRelativePath,
+      file.projectRelativePath,
       file.language,
       file.contentHash,
       file.workspace,
@@ -2779,10 +2742,10 @@ export class SQLiteGraphDatabase {
   private insertFiles(db: SqliteDatabase, files: readonly FileNode[]): void {
     executeBatchedInsert(
       db,
-      'INSERT INTO files (path, config_relative_path, language, content_hash, workspace, category, embedding, content)',
+      'INSERT INTO files (path, project_relative_path, language, content_hash, workspace, category, embedding, content)',
       files.map((file) => [
         file.path,
-        file.configRelativePath,
+        file.projectRelativePath,
         file.language,
         file.contentHash,
         file.workspace,
@@ -2791,7 +2754,7 @@ export class SQLiteGraphDatabase {
         file.content ?? null,
       ]),
       `ON CONFLICT(path) DO UPDATE SET
-        config_relative_path = excluded.config_relative_path,
+        project_relative_path = excluded.project_relative_path,
         language = excluded.language,
         content_hash = excluded.content_hash,
         workspace = excluded.workspace,
@@ -2858,17 +2821,17 @@ export class SQLiteGraphDatabase {
   private insertDocument(db: SqliteDatabase, document: DocumentNode): void {
     db.prepare(
       `
-        INSERT INTO documents (path, config_relative_path, content_hash, content, workspace)
+        INSERT INTO documents (path, project_relative_path, content_hash, content, workspace)
         VALUES (?, ?, ?, ?, ?)
         ON CONFLICT(path) DO UPDATE SET
-          config_relative_path = excluded.config_relative_path,
+          project_relative_path = excluded.project_relative_path,
           content_hash = excluded.content_hash,
           content = excluded.content,
           workspace = excluded.workspace
       `,
     ).run(
       document.path,
-      document.configRelativePath,
+      document.projectRelativePath,
       document.contentHash,
       document.content,
       document.workspace,
@@ -2884,16 +2847,16 @@ export class SQLiteGraphDatabase {
   private insertDocuments(db: SqliteDatabase, documents: readonly DocumentNode[]): void {
     executeBatchedInsert(
       db,
-      'INSERT INTO documents (path, config_relative_path, content_hash, content, workspace)',
+      'INSERT INTO documents (path, project_relative_path, content_hash, content, workspace)',
       documents.map((document) => [
         document.path,
-        document.configRelativePath,
+        document.projectRelativePath,
         document.contentHash,
         document.content,
         document.workspace,
       ]),
       `ON CONFLICT(path) DO UPDATE SET
-        config_relative_path = excluded.config_relative_path,
+        project_relative_path = excluded.project_relative_path,
         content_hash = excluded.content_hash,
         content = excluded.content,
         workspace = excluded.workspace`,
@@ -2910,7 +2873,7 @@ export class SQLiteGraphDatabase {
     executeBatchedInsert(
       db,
       `INSERT INTO symbols (
-        id, name, kind, file_path, parent_id, line, column_number, end_line, end_column,
+        id, name, kind, file_path, project_relative_path, parent_id, line, column_number, end_line, end_column,
         selection_start_line, selection_start_column, selection_end_line, selection_end_column,
         comment, search_text
       )`,
@@ -2919,6 +2882,7 @@ export class SQLiteGraphDatabase {
         symbol.name,
         symbol.kind,
         symbol.filePath,
+        symbol.projectRelativePath,
         symbol.parentId ?? null,
         symbol.line,
         symbol.column,
@@ -2935,6 +2899,7 @@ export class SQLiteGraphDatabase {
         name = excluded.name,
         kind = excluded.kind,
         file_path = excluded.file_path,
+        project_relative_path = excluded.project_relative_path,
         parent_id = excluded.parent_id,
         line = excluded.line,
         column_number = excluded.column_number,
@@ -3600,13 +3565,13 @@ export class SQLiteGraphDatabase {
     }
 
     const documentInsert = db.prepare(
-      'INSERT INTO document_fts (path, config_relative_path, content) VALUES (?, ?, ?)',
+      'INSERT INTO document_fts (path, project_relative_path, content) VALUES (?, ?, ?)',
     )
     const documentRows = db
-      .prepare('SELECT path, config_relative_path, content FROM documents')
-      .all() as Array<{ path: string; config_relative_path: string; content: string }>
+      .prepare('SELECT path, project_relative_path, content FROM documents')
+      .all() as Array<{ path: string; project_relative_path: string; content: string }>
     for (const row of documentRows) {
-      documentInsert.run(row.path, row.config_relative_path, row.content)
+      documentInsert.run(row.path, row.project_relative_path, row.content)
     }
 
     const fileContentInsert = db.prepare(
@@ -3704,7 +3669,7 @@ export class SQLiteGraphDatabase {
    *
    * @param row - Row parameter.
    * @param row.path - The path value.
-   * @param row.config_relative_path - The config relative path value.
+   * @param row.project_relative_path - The project relative path value.
    * @param row.language - The language value.
    * @param row.content_hash - The content hash value.
    * @param row.workspace - The workspace value.
@@ -3715,7 +3680,7 @@ export class SQLiteGraphDatabase {
    */
   private mapFileRow(row: {
     path: string
-    config_relative_path: string
+    project_relative_path: string
     language: string
     content_hash: string
     workspace: string
@@ -3725,7 +3690,7 @@ export class SQLiteGraphDatabase {
   }): FileNode {
     return createFileNode({
       path: row.path,
-      configRelativePath: row.config_relative_path,
+      projectRelativePath: row.project_relative_path,
       language: row.language,
       contentHash: row.content_hash,
       workspace: row.workspace,
@@ -3740,7 +3705,7 @@ export class SQLiteGraphDatabase {
    *
    * @param row - Row parameter.
    * @param row.path - The path value.
-   * @param row.config_relative_path - The config relative path value.
+   * @param row.project_relative_path - The project relative path value.
    * @param row.content_hash - The content hash value.
    * @param row.content - The content value.
    * @param row.workspace - The workspace value.
@@ -3748,14 +3713,14 @@ export class SQLiteGraphDatabase {
    */
   private mapDocumentRow(row: {
     path: string
-    config_relative_path: string
+    project_relative_path: string
     content_hash: string
     content: string
     workspace: string
   }): DocumentNode {
     return createDocumentNode({
       path: row.path,
-      configRelativePath: row.config_relative_path,
+      projectRelativePath: row.project_relative_path,
       contentHash: row.content_hash,
       content: row.content,
       workspace: row.workspace,
@@ -3770,6 +3735,7 @@ export class SQLiteGraphDatabase {
    * @param row.name - The name value.
    * @param row.kind - The kind value.
    * @param row.file_path - The file path value.
+   * @param row.project_relative_path - The project-relative path value.
    * @param row.parent_id - The parent id value.
    * @param row.line - The line value.
    * @param row.column_number - The column number value.
@@ -3787,6 +3753,7 @@ export class SQLiteGraphDatabase {
     name: string
     kind: string
     file_path: string
+    project_relative_path?: string
     parent_id: string | null
     line: number
     column_number: number
@@ -3802,6 +3769,7 @@ export class SQLiteGraphDatabase {
       name: row.name,
       kind: row.kind,
       filePath: row.file_path,
+      projectRelativePath: row.project_relative_path ?? row.file_path,
       line: row.line,
       column: row.column_number,
       endLine: row.end_line,

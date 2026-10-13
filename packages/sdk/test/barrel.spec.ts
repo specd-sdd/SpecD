@@ -40,6 +40,12 @@ describe('@specd/sdk barrel', () => {
     expect(typeof sdk.buildImplementationReview).toBe('function')
     expect(typeof sdk.buildProjectStatusSnapshot).toBe('function')
     expect(typeof sdk.runIndexProjectGraph).toBe('function')
+    expect(typeof sdk.runGraphSearch).toBe('function')
+    expect(typeof sdk.runGraphHotspots).toBe('function')
+    expect(typeof sdk.runGraphImpact).toBe('function')
+    expect(typeof sdk.toProjectRelativePath).toBe('function')
+    expect(typeof sdk.toGraphDisplayPath).toBe('function')
+    expect(typeof sdk.splitWorkspaceIdentity).toBe('function')
   })
 
   it('re-exports core bootstrap factories', () => {

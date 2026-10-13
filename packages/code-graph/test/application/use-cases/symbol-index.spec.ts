@@ -27,7 +27,7 @@ describe('InMemoryIndexSession', () => {
 
     session.registerFile({
       filePath: 'ws:file1.ts',
-      configRelativePath: 'file1.ts',
+      projectRelativePath: 'file1.ts',
       language: 'typescript',
       contentHash: 'abc',
       workspace: 'ws',
@@ -59,7 +59,7 @@ describe('InMemoryIndexSession', () => {
 
     session.registerFile({
       filePath: 'ws:file1.ts',
-      configRelativePath: 'file1.ts',
+      projectRelativePath: 'file1.ts',
       language: 'typescript',
       contentHash: 'abc',
       workspace: 'ws',
@@ -98,7 +98,7 @@ describe('InMemoryIndexSession', () => {
 
     session.registerFile({
       filePath: 'ws1:file.ts',
-      configRelativePath: 'file.ts',
+      projectRelativePath: 'file.ts',
       language: 'typescript',
       contentHash: 'abc',
       workspace: 'ws1',
@@ -116,7 +116,7 @@ describe('InMemoryIndexSession', () => {
 
     session.registerFile({
       filePath: 'ws2:file.ts',
-      configRelativePath: 'file.ts',
+      projectRelativePath: 'file.ts',
       language: 'typescript',
       contentHash: 'def',
       workspace: 'ws2',
@@ -175,7 +175,7 @@ describe('InMemoryIndexSession', () => {
     ] as const) {
       session.registerFile({
         filePath: symbol.filePath,
-        configRelativePath: symbol.filePath.slice(3),
+        projectRelativePath: symbol.filePath.slice(3),
         language: 'typescript',
         contentHash: symbol.id,
         workspace: 'ws',
@@ -267,7 +267,7 @@ describe('InMemoryIndexSession', () => {
 
     session.registerFile({
       filePath: 'ws:file.ts',
-      configRelativePath: 'file.ts',
+      projectRelativePath: 'file.ts',
       language: 'typescript',
       contentHash: 'hash',
       workspace: 'ws',

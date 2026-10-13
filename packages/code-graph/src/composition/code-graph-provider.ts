@@ -113,8 +113,8 @@ export interface CodeGraphProvider {
   getDocumentsByPaths(paths: readonly string[]): Promise<DocumentNode[]>
   getSymbolsByIds(symbolIds: readonly string[]): Promise<SymbolNode[]>
   getSpecsByIds(specIds: readonly string[]): Promise<SpecNode[]>
-  findFilesByConfigRelativePath(configRelativePath: string): Promise<FileNode[]>
-  findDocumentsByConfigRelativePath(configRelativePath: string): Promise<DocumentNode[]>
+  findFilesByProjectRelativePath(projectRelativePath: string): Promise<FileNode[]>
+  findDocumentsByProjectRelativePath(projectRelativePath: string): Promise<DocumentNode[]>
   resolveFileSelector(input: string): Promise<ResolvedFileSelector[]>
   resolveSymbolSelector(input: string): Promise<ResolvedSymbolSelectorResult>
   getSpec(specId: string): Promise<SpecNode | undefined>
@@ -471,23 +471,23 @@ export class CodeGraphProviderImpl implements CodeGraphProvider {
   }
 
   /**
-   * Finds files by their config-relative path.
-   * @param configRelativePath - The config-relative path to search for.
+   * Finds files by their project-relative path.
+   * @param projectRelativePath - The project-relative path to search for.
    * @returns Matching file nodes.
    */
-  async findFilesByConfigRelativePath(configRelativePath: string): Promise<FileNode[]> {
+  async findFilesByProjectRelativePath(projectRelativePath: string): Promise<FileNode[]> {
     await this.assertAvailable()
-    return this.store.findFilesByConfigRelativePath(configRelativePath)
+    return this.store.findFilesByProjectRelativePath(projectRelativePath)
   }
 
   /**
-   * Finds documents by their config-relative path.
-   * @param configRelativePath - The config-relative path to search for.
+   * Finds documents by their project-relative path.
+   * @param projectRelativePath - The project-relative path to search for.
    * @returns Matching document nodes.
    */
-  async findDocumentsByConfigRelativePath(configRelativePath: string): Promise<DocumentNode[]> {
+  async findDocumentsByProjectRelativePath(projectRelativePath: string): Promise<DocumentNode[]> {
     await this.assertAvailable()
-    return this.store.findDocumentsByConfigRelativePath(configRelativePath)
+    return this.store.findDocumentsByProjectRelativePath(projectRelativePath)
   }
 
   /**

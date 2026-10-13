@@ -128,14 +128,70 @@ Both are pure synchronous functions: no I/O, no kernel access, no process side e
 
 ## Orchestration
 
-| Function                     | Purpose                                                      |
-| ---------------------------- | ------------------------------------------------------------ |
-| `buildProjectStatusSnapshot` | `GetProjectSummary` + optional `GetGraphHealth` / hotspots   |
-| `runIndexProjectGraph`       | `listWorkspaces` + VCS ref + `IndexProjectGraph`             |
-| `runIsolatedGraphIndex`      | Code Graph-owned isolated child execution for a trusted task |
-| `buildImplementationReview`  | Core raw tracking + one Code Graph resolution batch          |
+| Function                     | Purpose                                                                                                |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `buildProjectStatusSnapshot` | `GetProjectSummary` + optional `GetGraphHealth` / hotspots                                             |
+| `runIndexProjectGraph`       | `listWorkspaces` + VCS ref + `IndexProjectGraph`                                                       |
+| `runIsolatedGraphIndex`      | Code Graph-owned isolated child execution for a trusted task                                           |
+| `buildImplementationReview`  | Core raw tracking + one Code Graph resolution batch                                                    |
+| `runGraphSearch`             | Multi-modal graph search with provider lifecycle and `projectRelativePath` projection                  |
+| `runGraphHotspots`           | Architectural hotspot ranking with provider lifecycle and `projectRelativePath` projection             |
+| `runGraphImpact`             | Target/multi-target blast radius impact analysis with `projectRelativePath` projection                 |
+| `toProjectRelativePath`      | Pure projection mapping canonical graph paths (`<workspace>:<relPath>`) to project-root relative paths |
+| `splitWorkspaceIdentity`     | Pure helper decomposing canonical identities into workspace name and relative path                     |
 
 All return structured data — formatting stays in delivery presenters.
+
+### Code Graph Query Orchestration & Path Projections
+
+Delivery hosts (CLI, MCP, IDE plugins) query the Code Graph through SDK orchestration functions that manage provider lifecycle and project internal canonical paths (`<workspace>:<relPath>`) into repository-relative filesystem paths (`projectRelativePath`):
+
+```typescript
+import {
+  openSpecdHost,
+  runGraphSearch,
+  runGraphHotspots,
+  runGraphImpact,
+  toProjectRelativePath,
+  splitWorkspaceIdentity,
+} from '@specd/sdk'
+
+const host = await openSpecdHost({ startDir: process.cwd() })
+
+// 1. Multi-modal search: symbols, files, specs, documents
+const searchResult = await runGraphSearch(host, {
+  query: 'createKernel',
+  categories: ['symbols', 'files'],
+  limit: 10,
+})
+// searchResult.hits[0].projectRelativePath === 'packages/core/src/bootstrap.ts'
+
+// 2. Architectural hotspots: ranked symbols by coupling impact
+const hotspotsResult = await runGraphHotspots(host, {
+  minRisk: 'HIGH',
+  limit: 20,
+})
+// hotspotsResult.hotspots[0].projectRelativePath === 'packages/core/src/domain/entities/change.ts'
+
+// 3. Blast radius impact analysis: single/multi-file, symbol, or spec
+const impactResult = await runGraphImpact(host, {
+  target: {
+    type: 'file',
+    filePaths: ['packages/core/src/domain/entities/change.ts'],
+  },
+  direction: 'dependents',
+  depth: 3,
+})
+// impactResult.projectRelativeTargets === ['packages/core/src/domain/entities/change.ts']
+// impactResult.impactedFiles[0].projectRelativePath === 'packages/cli/src/commands/changes/status.ts'
+```
+
+#### Synchronous Path Projection Utilities
+
+The SDK provides pure projection utilities that map SQLite canonical identifiers to repository-relative filesystem paths:
+
+- `toProjectRelativePath(config, canonicalPath)`: Resolves `<workspace>:<relPath>` against `config.projectRoot` and the workspace's declared `codeRoot`.
+- `splitWorkspaceIdentity(canonicalPath)`: Purely decomposes a canonical identity string into `{ workspace, relPath }`.
 
 `runIsolatedGraphIndex` is the SDK re-export for a host that needs to run a trusted,
 installed graph-index task in a child process. The host supplies a graph storage root,
@@ -228,15 +284,17 @@ them in the SDK or CLI.
 
 `@specd/cli` and `@specd/mcp` depend on `@specd/sdk` only — no direct `@specd/core` or `@specd/code-graph` runtime imports in delivery hosts.
 
-| CLI surface                            | SDK entry                                                        |
-| -------------------------------------- | ---------------------------------------------------------------- |
-| `resolveCliContext`                    | `openSpecdHost` + `buildCliKernelOptions`                        |
-| `project status`                       | `buildProjectStatusSnapshot`                                     |
-| `project context-specs`                | `kernel.project.resolveContextSpecs` (core re-export types)      |
-| `graph stats`                          | `withOpenGraphProvider` + `createGetGraphHealth`                 |
-| `graph index`                          | `runIsolatedGraphIndex` → packaged task → `runIndexProjectGraph` |
-| `graph search` / `hotspots` / `impact` | `withOpenGraphProvider` via `withProvider`                       |
-| `changes implementation` / status      | `buildImplementationReview`                                      |
+| CLI surface                       | SDK entry                                                        |
+| --------------------------------- | ---------------------------------------------------------------- |
+| `resolveCliContext`               | `openSpecdHost` + `buildCliKernelOptions`                        |
+| `project status`                  | `buildProjectStatusSnapshot`                                     |
+| `project context-specs`           | `kernel.project.resolveContextSpecs` (core re-export types)      |
+| `graph stats`                     | `withOpenGraphProvider` + `createGetGraphHealth`                 |
+| `graph index`                     | `runIsolatedGraphIndex` → packaged task → `runIndexProjectGraph` |
+| `graph search`                    | `runGraphSearch`                                                 |
+| `graph hotspots`                  | `runGraphHotspots`                                               |
+| `graph impact`                    | `runGraphImpact`                                                 |
+| `changes implementation` / status | `buildImplementationReview`                                      |
 
 ## Re-exports
 
@@ -244,7 +302,7 @@ The SDK root exports explicit symbols from the curated `@specd/core` and `@specd
 
 - `createDefaultConfigLoader`, `createConfigWriter`, `createKernel`, kernel-equivalent `createX` factories, and repository factories
 - Standalone `createX` factories (e.g. `createGetStatus`, `createResolveSchema`) for hosts that need a single use case without `createKernel`
-- Host orchestration: `openSpecdHost`, `withOpenGraphProvider`, `buildProjectStatusSnapshot`, `runIndexProjectGraph`, `runIsolatedGraphIndex`, `buildImplementationReview`
+- Host orchestration: `openSpecdHost`, `withOpenGraphProvider`, `buildProjectStatusSnapshot`, `runIndexProjectGraph`, `runIsolatedGraphIndex`, `buildImplementationReview`, `runGraphSearch`, `runGraphHotspots`, `runGraphImpact`, `toProjectRelativePath`, `splitWorkspaceIdentity`
 - Isolated worker contracts and typed failures: `GraphIndexJsonValue`, `GraphIndexTask`, `RunIsolatedGraphIndexInput`, `GraphIndexWorkerStartError`, `GraphIndexTaskContractError`, `GraphIndexTaskExecutionError`, `GraphIndexWorkerProtocolError`, `GraphIndexWorkerExitError`, `GraphIndexWorkerSignalError`, and `GraphIndexProgressHandlerError`
 - Graph helpers: `createGetGraphHealth`, `GetGraphHealthResult`, `IndexResult`, `HotspotResult`, `GraphProviderStaleError`, `GraphStorageRecoveryRequiredError`, `GraphStoreRecreateRequiresClosedError`
 - `SDK_VERSION`, `CORE_VERSION`, `CODE_GRAPH_VERSION`

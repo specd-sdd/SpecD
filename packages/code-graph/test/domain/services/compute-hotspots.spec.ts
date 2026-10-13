@@ -19,7 +19,7 @@ function file(
 ) {
   return createFileNode({
     path,
-    configRelativePath: '',
+    projectRelativePath: '',
     language: 'typescript',
     contentHash: 'sha256:x',
     workspace,

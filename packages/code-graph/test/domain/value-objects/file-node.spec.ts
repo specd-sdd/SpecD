@@ -5,7 +5,7 @@ describe('FileNode', () => {
   it('creates a file node with normalized path', () => {
     const node = createFileNode({
       path: 'src\\domain\\file.ts',
-      configRelativePath: '',
+      projectRelativePath: '',
       language: 'typescript',
       contentHash: 'sha256:abc',
       workspace: 'core',
@@ -20,7 +20,7 @@ describe('FileNode', () => {
   it('preserves forward-slash paths', () => {
     const node = createFileNode({
       path: 'src/domain/file.ts',
-      configRelativePath: '',
+      projectRelativePath: '',
       language: 'typescript',
       contentHash: 'sha256:abc',
       workspace: 'core',
@@ -32,7 +32,7 @@ describe('FileNode', () => {
     const embedding = new Float32Array([1, 2, 3])
     const node = createFileNode({
       path: 'file.ts',
-      configRelativePath: '',
+      projectRelativePath: '',
       language: 'typescript',
       contentHash: 'sha256:abc',
       workspace: 'core',
@@ -44,7 +44,7 @@ describe('FileNode', () => {
   it('workspace value is passed through as-is', () => {
     const node = createFileNode({
       path: 'org/core/src/index.ts',
-      configRelativePath: '',
+      projectRelativePath: '',
       language: 'typescript',
       contentHash: 'sha256:abc',
       workspace: 'org/core',
@@ -55,7 +55,7 @@ describe('FileNode', () => {
   it('supports root-namespaced canonical paths', () => {
     const node = createFileNode({
       path: 'root:dev/scripts/sync.ts',
-      configRelativePath: 'dev/scripts/sync.ts',
+      projectRelativePath: 'dev/scripts/sync.ts',
       language: 'typescript',
       contentHash: 'sha256:abc',
       workspace: 'root',
@@ -64,43 +64,42 @@ describe('FileNode', () => {
     expect(node.workspace).toBe('root')
   })
 
-  it('normalizes configRelativePath with backslashes', () => {
+  it('normalizes projectRelativePath with backslashes', () => {
     const node = createFileNode({
       path: 'core:src/model.ts',
-      configRelativePath: 'packages\\core\\src\\model.ts',
+      projectRelativePath: 'packages\\core\\src\\model.ts',
       language: 'typescript',
       contentHash: 'sha256:abc',
       workspace: 'core',
     })
-    expect(node.configRelativePath).toBe('packages/core/src/model.ts')
+    expect(node.projectRelativePath).toBe('packages/core/src/model.ts')
   })
 
-  it('preserves forward-slash configRelativePath', () => {
+  it('preserves forward-slash projectRelativePath', () => {
     const node = createFileNode({
       path: 'core:src/model.ts',
-      configRelativePath: 'packages/core/src/model.ts',
+      projectRelativePath: 'packages/core/src/model.ts',
       language: 'typescript',
       contentHash: 'sha256:abc',
       workspace: 'core',
     })
-    expect(node.configRelativePath).toBe('packages/core/src/model.ts')
+    expect(node.projectRelativePath).toBe('packages/core/src/model.ts')
   })
 
-  it('defaults configRelativePath to empty string', () => {
+  it('defaults projectRelativePath to path when omitted', () => {
     const node = createFileNode({
       path: 'src/index.ts',
-      configRelativePath: '',
       language: 'typescript',
       contentHash: 'sha256:abc',
       workspace: 'core',
     })
-    expect(node.configRelativePath).toBe('')
+    expect(node.projectRelativePath).toBe('src/index.ts')
   })
 
   it('defaults category to source when omitted', () => {
     const node = createFileNode({
       path: 'src/index.ts',
-      configRelativePath: '',
+      projectRelativePath: '',
       language: 'typescript',
       contentHash: 'sha256:abc',
       workspace: 'core',
@@ -111,7 +110,7 @@ describe('FileNode', () => {
   it('preserves explicit category', () => {
     const testNode = createFileNode({
       path: 'test/foo.spec.ts',
-      configRelativePath: '',
+      projectRelativePath: '',
       language: 'typescript',
       contentHash: 'sha256:abc',
       workspace: 'core',
@@ -121,12 +120,42 @@ describe('FileNode', () => {
 
     const ignoredNode = createFileNode({
       path: 'fixtures/data.json',
-      configRelativePath: '',
+      projectRelativePath: '',
       language: 'json',
       contentHash: 'sha256:abc',
       workspace: 'core',
       category: 'ignored',
     })
     expect(ignoredNode.category).toBe('ignored')
+  })
+
+  it('FileNode equality still uses canonical path when projectRelativePath differs', () => {
+    const fileA = createFileNode({
+      path: 'core:src/index.ts',
+      projectRelativePath: 'packages/core/src/index.ts',
+      language: 'typescript',
+      contentHash: 'sha256:hash1',
+      workspace: 'core',
+    })
+    const fileB = createFileNode({
+      path: 'core:src/index.ts',
+      projectRelativePath: '../../packages/core/src/index.ts',
+      language: 'typescript',
+      contentHash: 'sha256:hash2',
+      workspace: 'core',
+    })
+    expect(fileA.path).toBe(fileB.path)
+    expect(fileA.projectRelativePath).not.toBe(fileB.projectRelativePath)
+  })
+
+  it('FileNode projectRelativePath may include parent segments', () => {
+    const node = createFileNode({
+      path: 'core:src/index.ts',
+      projectRelativePath: '../../packages/core/src/index.ts',
+      language: 'typescript',
+      contentHash: 'sha256:hash',
+      workspace: 'core',
+    })
+    expect(node.projectRelativePath).toBe('../../packages/core/src/index.ts')
   })
 })

@@ -177,15 +177,17 @@
 - **AND** a `Changed symbols:` block grouped by input file
 - **AND** a per-file breakdown section
 
-#### Scenario: JSON output includes changedSymbols for file impact
+#### Scenario: JSON output includes symbols for file impact
 
 - **WHEN** `specd graph impact --file core:src/auth.ts --format json` is run
-- **THEN** stdout is valid JSON containing `changedSymbols`, `affectedSymbols`, and `affectedFiles`
+- **THEN** stdout is valid JSON containing `symbols`, `affectedSymbols`, `affectedFiles`, `canonicalPath`, and `projectRelativePath`
+- **AND** stdout JSON does not contain `displayPath`
 
 #### Scenario: JSON output for symbol impact
 
 - **WHEN** `specd graph impact --symbol createKernel --format json` is run
-- **THEN** stdout is valid JSON containing `symbol` and `impact` objects
+- **THEN** stdout is valid JSON containing `symbol`, `impact`, and `projectRelativePath`
+- **AND** stdout JSON does not contain `displayPath`
 
 #### Scenario: JSON output includes aggregate impact fields
 
@@ -196,8 +198,9 @@
 #### Scenario: Impact paths are rendered relative to project root
 
 - **WHEN** `specd graph impact` is run
-- **THEN** all file paths in the output (e.g., `packages/core/src/index.ts`) are relative to the project root
+- **THEN** all file paths in the output (e.g., `packages/core/src/index.ts`) are relative to the project root as `projectRelativePath`
 - **AND** they do not include workspace-prefixed identities unless explicitly requested
+- **AND** structured output does not include `displayPath` or `displayTargets`
 
 #### Scenario: Omission notice displayed in text mode when tests are excluded
 

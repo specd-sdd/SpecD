@@ -30,7 +30,7 @@ describe('SQLiteWorker responsiveness', () => {
       const files = Array.from({ length: fileCount }, (_, i) =>
         createFileNode({
           path: `core:src/module-${i}.ts`,
-          configRelativePath: `src/module-${i}.ts`,
+          projectRelativePath: `src/module-${i}.ts`,
           language: 'typescript',
           contentHash: `sha256:hash-${i}`,
           workspace: 'core',

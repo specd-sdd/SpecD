@@ -4,6 +4,8 @@
 export interface SourceLocation {
   /** Workspace-prefixed file path containing the source location. */
   readonly filePath: string
+  /** Repository-relative file path containing the source location, when known. */
+  readonly projectRelativePath?: string
   /** One-based start line. */
   readonly line: number
   /** Zero-based start column. */

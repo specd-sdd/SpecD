@@ -3,7 +3,7 @@
  */
 export interface DocumentNode {
   readonly path: string
-  readonly configRelativePath: string
+  readonly projectRelativePath: string
   readonly contentHash: string
   readonly content: string
   readonly workspace: string
@@ -22,7 +22,7 @@ function normalizePath(filePath: string): string {
  * Creates a new DocumentNode with normalized paths.
  * @param params - The document node properties.
  * @param params.path - Canonical graph path.
- * @param params.configRelativePath - Path relative to the config directory.
+ * @param params.projectRelativePath - Path relative to the project root.
  * @param params.contentHash - Content hash for incremental diffing.
  * @param params.content - Full textual content.
  * @param params.workspace - Owning workspace or reserved namespace.
@@ -30,14 +30,14 @@ function normalizePath(filePath: string): string {
  */
 export function createDocumentNode(params: {
   path: string
-  configRelativePath: string
+  projectRelativePath?: string
   contentHash: string
   content: string
   workspace: string
 }): DocumentNode {
   return {
     path: normalizePath(params.path),
-    configRelativePath: normalizePath(params.configRelativePath),
+    projectRelativePath: normalizePath(params.projectRelativePath ?? params.path),
     contentHash: params.contentHash,
     content: params.content,
     workspace: params.workspace,

@@ -19,7 +19,7 @@ function sym(name: string, filePath: string, line: number) {
 function file(path: string) {
   return createFileNode({
     path,
-    configRelativePath: '',
+    projectRelativePath: '',
     language: 'typescript',
     contentHash: 'sha256:x',
     workspace: '/p',
@@ -29,7 +29,7 @@ function file(path: string) {
 function fileInWorkspace(path: string, workspace: string) {
   return createFileNode({
     path,
-    configRelativePath: '',
+    projectRelativePath: '',
     language: 'typescript',
     contentHash: 'sha256:x',
     workspace,
@@ -997,7 +997,7 @@ describe('Traversal services', () => {
     function fileWithCategory(path: string, category: 'source' | 'test' | 'ignored') {
       return createFileNode({
         path,
-        configRelativePath: '',
+        projectRelativePath: '',
         language: 'typescript',
         contentHash: 'sha256:x',
         workspace: '/p',

@@ -75,28 +75,28 @@ describe('SQLiteGraphStore', () => {
   async function seedImpactFrontierFixture(store: SQLiteGraphStore) {
     const coreFile = createFileNode({
       path: 'core:src/impact-source.ts',
-      configRelativePath: 'src/impact-source.ts',
+      projectRelativePath: 'src/impact-source.ts',
       language: 'typescript',
       contentHash: 'sha256:impact-core',
       workspace: 'core',
     })
     const cliFile = createFileNode({
       path: 'cli:src/impact-source.ts',
-      configRelativePath: 'src/impact-source.ts',
+      projectRelativePath: 'src/impact-source.ts',
       language: 'typescript',
       contentHash: 'sha256:impact-cli',
       workspace: 'cli',
     })
     const targetFile = createFileNode({
       path: 'code-graph:src/impact-target.ts',
-      configRelativePath: 'src/impact-target.ts',
+      projectRelativePath: 'src/impact-target.ts',
       language: 'typescript',
       contentHash: 'sha256:impact-target',
       workspace: 'code-graph',
     })
     const quotedFile = createFileNode({
       path: 'quoted:src/impact-source.ts',
-      configRelativePath: 'src/impact-source.ts',
+      projectRelativePath: 'src/impact-source.ts',
       language: 'typescript',
       contentHash: 'sha256:impact-quoted',
       workspace: "quoted' OR 1=1 --",
@@ -458,7 +458,7 @@ describe('SQLiteGraphStore', () => {
     const changedFiles = Array.from({ length: 447 }, (_, index) =>
       createFileNode({
         path: `core:src/changed-${String(index).padStart(3, '0')}.ts`,
-        configRelativePath: `src/changed-${String(index).padStart(3, '0')}.ts`,
+        projectRelativePath: `src/changed-${String(index).padStart(3, '0')}.ts`,
         language: 'typescript',
         contentHash: `sha256:changed-${String(index)}`,
         workspace: 'core',
@@ -467,7 +467,7 @@ describe('SQLiteGraphStore', () => {
     const affectedFiles = changedFiles.map((changed, index) =>
       createFileNode({
         path: `core:src/affected-${String(index).padStart(3, '0')}.ts`,
-        configRelativePath: `src/affected-${String(index).padStart(3, '0')}.ts`,
+        projectRelativePath: `src/affected-${String(index).padStart(3, '0')}.ts`,
         language: 'typescript',
         contentHash: `sha256:affected-${String(index)}`,
         workspace: 'core',
@@ -520,7 +520,7 @@ describe('SQLiteGraphStore', () => {
     const files = Array.from({ length: 900 }, (_, index) =>
       createFileNode({
         path: `core:src/covered-${String(index).padStart(3, '0')}.ts`,
-        configRelativePath: `src/covered-${String(index).padStart(3, '0')}.ts`,
+        projectRelativePath: `src/covered-${String(index).padStart(3, '0')}.ts`,
         language: 'typescript',
         contentHash: `sha256:covered-${String(index)}`,
         workspace: 'core',
@@ -583,7 +583,7 @@ describe('SQLiteGraphStore', () => {
     const files = workspaces.map((workspace, index) =>
       createFileNode({
         path: `${workspace}:src/index.ts`,
-        configRelativePath: 'src/index.ts',
+        projectRelativePath: 'src/index.ts',
         language: 'typescript',
         contentHash: `sha256:coverage-${String(index)}`,
         workspace,
@@ -760,7 +760,7 @@ describe('SQLiteGraphStore', () => {
     await store.open()
     const file = createFileNode({
       path: 'core:src/rel-chunk.ts',
-      configRelativePath: 'src/rel-chunk.ts',
+      projectRelativePath: 'src/rel-chunk.ts',
       language: 'typescript',
       contentHash: 'sha256:rel-chunk',
       workspace: 'core',
@@ -836,7 +836,7 @@ describe('SQLiteGraphStore', () => {
       )
       const file = createFileNode({
         path: `core:src/ring-${String(symbolCount)}.ts`,
-        configRelativePath: `src/ring-${String(symbolCount)}.ts`,
+        projectRelativePath: `src/ring-${String(symbolCount)}.ts`,
         language: 'typescript',
         contentHash: `sha256:ring-${String(symbolCount)}`,
         workspace: 'core',
@@ -886,7 +886,7 @@ describe('SQLiteGraphStore', () => {
     await store.open()
     const file = createFileNode({
       path: 'core:src/wide.ts',
-      configRelativePath: 'src/wide.ts',
+      projectRelativePath: 'src/wide.ts',
       language: 'typescript',
       contentHash: 'sha256:wide',
       workspace: 'core',
@@ -969,7 +969,7 @@ describe('SQLiteGraphStore', () => {
     const files = Array.from({ length: 905 }, (_, index) =>
       createFileNode({
         path: `core:src/bulk-${String(index)}.ts`,
-        configRelativePath: `src/bulk-${String(index)}.ts`,
+        projectRelativePath: `src/bulk-${String(index)}.ts`,
         language: 'typescript',
         contentHash: `sha256:bulk-${String(index)}`,
         workspace: 'core',
@@ -978,7 +978,7 @@ describe('SQLiteGraphStore', () => {
     const documents = Array.from({ length: 905 }, (_, index) =>
       createDocumentNode({
         path: `root:docs/bulk-${String(index)}.md`,
-        configRelativePath: `docs/bulk-${String(index)}.md`,
+        projectRelativePath: `docs/bulk-${String(index)}.md`,
         contentHash: `sha256:doc-${String(index)}`,
         content: `# Doc ${String(index)}`,
         workspace: 'root',
@@ -1038,7 +1038,7 @@ describe('SQLiteGraphStore', () => {
     await store.open()
     const baseline = createFileNode({
       path: 'core:src/baseline.ts',
-      configRelativePath: 'src/baseline.ts',
+      projectRelativePath: 'src/baseline.ts',
       language: 'typescript',
       contentHash: 'sha256:baseline',
       workspace: 'core',
@@ -1067,7 +1067,7 @@ describe('SQLiteGraphStore', () => {
 
     const staged = createFileNode({
       path: baseline.path,
-      configRelativePath: baseline.configRelativePath,
+      projectRelativePath: baseline.projectRelativePath,
       language: 'typescript',
       contentHash: 'sha256:staged',
       workspace: 'core',
@@ -1119,7 +1119,7 @@ describe('SQLiteGraphStore', () => {
     await store.open()
     const baseline = createFileNode({
       path: 'core:src/direct-rollback.ts',
-      configRelativePath: 'src/direct-rollback.ts',
+      projectRelativePath: 'src/direct-rollback.ts',
       language: 'typescript',
       contentHash: 'sha256:direct-rollback-baseline',
       workspace: 'core',
@@ -1127,7 +1127,7 @@ describe('SQLiteGraphStore', () => {
     })
     const retainedFile = createFileNode({
       path: 'core:src/direct-rollback-retained.ts',
-      configRelativePath: 'src/direct-rollback-retained.ts',
+      projectRelativePath: 'src/direct-rollback-retained.ts',
       language: 'typescript',
       contentHash: 'sha256:direct-rollback-retained',
       workspace: 'core',
@@ -1247,7 +1247,7 @@ describe('SQLiteGraphStore', () => {
     await store.open()
     const original = createFileNode({
       path: 'core:src/incremental.ts',
-      configRelativePath: 'src/incremental.ts',
+      projectRelativePath: 'src/incremental.ts',
       language: 'typescript',
       contentHash: 'sha256:original',
       workspace: 'core',
@@ -1283,7 +1283,7 @@ describe('SQLiteGraphStore', () => {
 
     const file = createFileNode({
       path: 'src/types.ts',
-      configRelativePath: '',
+      projectRelativePath: '',
       language: 'typescript',
       contentHash: 'sha256:abc',
       workspace: '/project',
@@ -1377,7 +1377,7 @@ describe('SQLiteGraphStore', () => {
 
     const file = createFileNode({
       path: 'src/kernel.ts',
-      configRelativePath: '',
+      projectRelativePath: '',
       language: 'typescript',
       contentHash: 'sha256:kernel',
       workspace: '/project',
@@ -1500,8 +1500,10 @@ describe('SQLiteGraphStore', () => {
   })
 
   it('declares sqlite schema version and fts-backed ddl', () => {
-    expect(SQLITE_SCHEMA_VERSION).toBe(13)
+    expect(SQLITE_SCHEMA_VERSION).toBe(14)
     expect(SQLITE_SCHEMA_DDL).toContain('CREATE TABLE IF NOT EXISTS files')
+    expect(SQLITE_SCHEMA_DDL).toContain('project_relative_path TEXT NOT NULL')
+    expect(SQLITE_SCHEMA_DDL).not.toContain('config_relative_path')
     expect(SQLITE_SCHEMA_DDL).toContain("category TEXT NOT NULL DEFAULT 'source'")
     expect(SQLITE_SCHEMA_DDL).toContain('idx_files_category')
     expect(SQLITE_SCHEMA_DDL).toContain('content TEXT')
@@ -1534,7 +1536,7 @@ describe('SQLiteGraphStore', () => {
     )
   })
 
-  it.each(['10', '11', '12'])(
+  it.each(['10', '11', '12', '13', '15'])(
     'rejects schema version %s without altering the table',
     async (version) => {
       const dir = mkdtempSync(join(tmpdir(), `code-graph-sqlite-schema-v${version}-`))
@@ -1785,7 +1787,7 @@ describe('SQLiteGraphStore', () => {
     await store.open()
     const file = createFileNode({
       path: 'C:/repo/src/a.ts',
-      configRelativePath: 'src/a.ts',
+      projectRelativePath: 'src/a.ts',
       language: 'typescript',
       contentHash: 'sha256:drive',
       workspace: 'repo',
@@ -1815,7 +1817,7 @@ describe('SQLiteGraphStore', () => {
     await store.open()
     const file = createFileNode({
       path: 'code-graph:src/alpha.ts',
-      configRelativePath: 'src/alpha.ts',
+      projectRelativePath: 'src/alpha.ts',
       language: 'typescript',
       contentHash: 'sha256:alpha',
       workspace: 'code-graph',
@@ -1890,7 +1892,7 @@ describe('SQLiteGraphStore', () => {
 
     const file = createFileNode({
       path: 'src/snippet.ts',
-      configRelativePath: '',
+      projectRelativePath: '',
       language: 'typescript',
       contentHash: 'sha256:snippet',
       workspace: 'core',
@@ -1942,14 +1944,14 @@ describe('SQLiteGraphStore', () => {
 
     const fileOne = createFileNode({
       path: 'src/alpha.ts',
-      configRelativePath: '',
+      projectRelativePath: '',
       language: 'typescript',
       contentHash: 'sha256:alpha',
       workspace: '/project',
     })
     const fileTwo = createFileNode({
       path: 'src/beta.ts',
-      configRelativePath: '',
+      projectRelativePath: '',
       language: 'typescript',
       contentHash: 'sha256:beta',
       workspace: '/project',
@@ -2003,7 +2005,7 @@ describe('SQLiteGraphStore', () => {
     const files = Array.from({ length: 901 }, (_, index) =>
       createFileNode({
         path: `core:src/chunk-${String(index)}.ts`,
-        configRelativePath: `src/chunk-${String(index)}.ts`,
+        projectRelativePath: `src/chunk-${String(index)}.ts`,
         language: 'typescript',
         contentHash: `sha256:chunk-${String(index)}`,
         workspace: 'core',
@@ -2075,7 +2077,7 @@ describe('SQLiteGraphStore', () => {
 
     const file = createFileNode({
       path: 'core:src/archive.ts',
-      configRelativePath: 'packages/core/src/archive.ts',
+      projectRelativePath: 'packages/core/src/archive.ts',
       language: 'typescript',
       contentHash: 'sha256:archive',
       workspace: 'core',
@@ -2116,14 +2118,14 @@ describe('SQLiteGraphStore', () => {
     })
     const strongDocument = createDocumentNode({
       path: 'core:docs/architecture.md',
-      configRelativePath: 'docs/architecture.md',
+      projectRelativePath: 'docs/architecture.md',
       contentHash: 'sha256:doc-strong',
       content: 'Architecture document',
       workspace: 'core',
     })
     const weakDocument = createDocumentNode({
       path: 'core:docs/notes.md',
-      configRelativePath: 'docs/notes.md',
+      projectRelativePath: 'docs/notes.md',
       contentHash: 'sha256:doc-weak',
       content: 'docs/architecture.md docs/architecture.md docs/architecture.md',
       workspace: 'core',
@@ -2154,7 +2156,7 @@ describe('SQLiteGraphStore', () => {
     tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-test-'))
     const file = createFileNode({
       path: 'core:src/identity.ts',
-      configRelativePath: 'packages/core/src/identity.ts',
+      projectRelativePath: 'packages/core/src/identity.ts',
       language: 'typescript',
       contentHash: 'sha256:identity-file',
       workspace: 'core',
@@ -2178,7 +2180,7 @@ describe('SQLiteGraphStore', () => {
     })
     const document = createDocumentNode({
       path: 'root:docs/identity.md',
-      configRelativePath: 'docs/identity.md',
+      projectRelativePath: 'docs/identity.md',
       contentHash: 'sha256:identity-document',
       content: '# Identity',
       workspace: 'root',
@@ -2207,7 +2209,7 @@ describe('SQLiteGraphStore', () => {
       { spec: { specId: spec.specId } },
     ])
     await expect(
-      store.searchDocuments({ query: document.configRelativePath }),
+      store.searchDocuments({ query: document.projectRelativePath }),
     ).resolves.toMatchObject([{ document: { path: document.path } }])
     await store.close()
   })
@@ -2217,7 +2219,7 @@ describe('SQLiteGraphStore', () => {
 
     const file = createFileNode({
       path: 'core:src/repository.ts',
-      configRelativePath: 'packages/core/src/repository.ts',
+      projectRelativePath: 'packages/core/src/repository.ts',
       language: 'typescript',
       contentHash: 'sha256:token-order',
       workspace: 'core',
@@ -2282,7 +2284,7 @@ describe('SQLiteGraphStore', () => {
 
     const sourceFile = createFileNode({
       path: 'src/consumer.ts',
-      configRelativePath: '',
+      projectRelativePath: '',
       language: 'typescript',
       contentHash: 'sha256:consumer',
       workspace: '/project',
@@ -2332,7 +2334,7 @@ describe('SQLiteGraphStore', () => {
       tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-test-'))
       const file = createFileNode({
         path: 'src/artifacts.ts',
-        configRelativePath: '',
+        projectRelativePath: '',
         language: 'typescript',
         contentHash: 'sha256:abc',
         workspace: 'core',
@@ -2359,7 +2361,7 @@ describe('SQLiteGraphStore', () => {
       tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-test-'))
       const file = createFileNode({
         path: 'src/logic.ts',
-        configRelativePath: '',
+        projectRelativePath: '',
         language: 'typescript',
         contentHash: 'sha256:abc',
         workspace: 'core',
@@ -2395,7 +2397,7 @@ describe('SQLiteGraphStore', () => {
       tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-test-'))
       const file1 = createFileNode({
         path: 'src/status.ts',
-        configRelativePath: '',
+        projectRelativePath: '',
         language: 'typescript',
         contentHash: 'sha256:1',
         workspace: 'core',
@@ -2409,7 +2411,7 @@ describe('SQLiteGraphStore', () => {
       })
       const file2 = createFileNode({
         path: 'src/lifecycle.ts',
-        configRelativePath: '',
+        projectRelativePath: '',
         language: 'typescript',
         contentHash: 'sha256:2',
         workspace: 'core',
@@ -2443,7 +2445,7 @@ describe('SQLiteGraphStore', () => {
       tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-test-'))
       const file = createFileNode({
         path: 'src/relevance.ts',
-        configRelativePath: '',
+        projectRelativePath: '',
         language: 'typescript',
         contentHash: 'sha256:3',
         workspace: 'core',
@@ -2499,14 +2501,14 @@ describe('SQLiteGraphStore', () => {
       await session.writeFiles([
         createFileNode({
           path: 'core:src/a.ts',
-          configRelativePath: 'src/a.ts',
+          projectRelativePath: 'src/a.ts',
           language: 'typescript',
           contentHash: 'sha256:a',
           workspace: 'core',
         }),
         createFileNode({
           path: 'core:src/b.ts',
-          configRelativePath: 'src/b.ts',
+          projectRelativePath: 'src/b.ts',
           language: 'typescript',
           contentHash: 'sha256:b',
           workspace: 'core',
@@ -2558,7 +2560,7 @@ describe('SQLiteGraphStore', () => {
     await store.open()
     const file = createFileNode({
       path: 'core:src/generated.ts',
-      configRelativePath: 'src/generated.ts',
+      projectRelativePath: 'src/generated.ts',
       language: 'typescript',
       contentHash: 'sha256:generated',
       workspace: 'core',
@@ -2566,7 +2568,7 @@ describe('SQLiteGraphStore', () => {
     })
     const retainedFile = createFileNode({
       path: 'core:src/retained-remove.ts',
-      configRelativePath: 'src/retained-remove.ts',
+      projectRelativePath: 'src/retained-remove.ts',
       language: 'typescript',
       contentHash: 'sha256:retained-remove',
       workspace: 'core',
@@ -2637,7 +2639,7 @@ describe('SQLiteGraphStore', () => {
     await store.open()
     const file = createFileNode({
       path: 'core:src/generated-replace.ts',
-      configRelativePath: 'src/generated-replace.ts',
+      projectRelativePath: 'src/generated-replace.ts',
       language: 'typescript',
       contentHash: 'sha256:generated-before',
       workspace: 'core',
@@ -2645,7 +2647,7 @@ describe('SQLiteGraphStore', () => {
     })
     const retainedFile = createFileNode({
       path: 'core:src/retained-replace.ts',
-      configRelativePath: 'src/retained-replace.ts',
+      projectRelativePath: 'src/retained-replace.ts',
       language: 'typescript',
       contentHash: 'sha256:retained-replace',
       workspace: 'core',
@@ -2668,7 +2670,7 @@ describe('SQLiteGraphStore', () => {
     )
     const replacement = createFileNode({
       path: file.path,
-      configRelativePath: file.configRelativePath,
+      projectRelativePath: file.projectRelativePath,
       language: file.language,
       contentHash: 'sha256:generated-after',
       workspace: file.workspace,
@@ -2740,7 +2742,7 @@ describe('SQLiteGraphStore', () => {
     await store.open()
     const file = createFileNode({
       path: 'core:src/generated-bulk.ts',
-      configRelativePath: 'src/generated-bulk.ts',
+      projectRelativePath: 'src/generated-bulk.ts',
       language: 'typescript',
       contentHash: 'sha256:generated-bulk',
       workspace: 'core',
@@ -2748,7 +2750,7 @@ describe('SQLiteGraphStore', () => {
     })
     const retainedFile = createFileNode({
       path: 'core:src/retained-bulk.ts',
-      configRelativePath: 'src/retained-bulk.ts',
+      projectRelativePath: 'src/retained-bulk.ts',
       language: 'typescript',
       contentHash: 'sha256:retained-bulk',
       workspace: 'core',
@@ -2790,7 +2792,7 @@ describe('SQLiteGraphStore', () => {
     await store.upsertFile(file, symbols, oldRelations)
     const replacement = createFileNode({
       path: file.path,
-      configRelativePath: file.configRelativePath,
+      projectRelativePath: file.projectRelativePath,
       language: file.language,
       contentHash: 'sha256:generated-bulk-replaced',
       workspace: file.workspace,
@@ -2849,7 +2851,7 @@ describe('SQLiteGraphStore', () => {
 
     const sourceFile = createFileNode({
       path: 'core:src/service.ts',
-      configRelativePath: 'src/service.ts',
+      projectRelativePath: 'src/service.ts',
       language: 'typescript',
       contentHash: 'sha256:source',
       workspace: 'core',
@@ -2857,7 +2859,7 @@ describe('SQLiteGraphStore', () => {
     })
     const testFile = createFileNode({
       path: 'core:test/service.spec.ts',
-      configRelativePath: 'test/service.spec.ts',
+      projectRelativePath: 'test/service.spec.ts',
       language: 'typescript',
       contentHash: 'sha256:test',
       workspace: 'core',
@@ -2865,7 +2867,7 @@ describe('SQLiteGraphStore', () => {
     })
     const ignoredFile = createFileNode({
       path: 'core:dist/bundle.js',
-      configRelativePath: 'dist/bundle.js',
+      projectRelativePath: 'dist/bundle.js',
       language: 'javascript',
       contentHash: 'sha256:ignored',
       workspace: 'core',
@@ -2883,6 +2885,40 @@ describe('SQLiteGraphStore', () => {
     expect((await store.getFile(sourceFile.path))?.category).toBe('source')
     expect((await store.getFile(testFile.path))?.category).toBe('test')
     expect((await store.getFile(ignoredFile.path))?.category).toBe('ignored')
+
+    await store.close()
+  })
+
+  it('persists and retrieves denormalized project_relative_path on symbol records', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-symbol-projrel-'))
+    const store = new SQLiteGraphStore(tempDir)
+    await store.open()
+
+    const file = createFileNode({
+      path: 'core:src/service.ts',
+      projectRelativePath: 'packages/core/src/service.ts',
+      language: 'typescript',
+      contentHash: 'sha256:service',
+      workspace: 'core',
+    })
+    const symbol = createSymbolNode({
+      name: 'runService',
+      kind: SymbolKind.Function,
+      filePath: file.path,
+      projectRelativePath: 'packages/core/src/service.ts',
+      line: 10,
+      column: 2,
+    })
+
+    await store.upsertFile(file, [symbol], [])
+
+    const found = await store.findSymbols({ filePath: file.path })
+    expect(found).toHaveLength(1)
+    expect(found[0]!.projectRelativePath).toBe('packages/core/src/service.ts')
+
+    const byId = await store.getSymbolsByIds([symbol.id])
+    expect(byId).toHaveLength(1)
+    expect(byId[0]!.projectRelativePath).toBe('packages/core/src/service.ts')
 
     await store.close()
   })

@@ -40,7 +40,7 @@ describe('SearchCodeGraph', () => {
     await store.upsertFile(
       createFileNode({
         path: 'code-graph:src/api.ts',
-        configRelativePath: 'src/api.ts',
+        projectRelativePath: 'src/api.ts',
         language: 'typescript',
         contentHash: 'hash',
         workspace: 'code-graph',
@@ -147,7 +147,7 @@ describe('SearchCodeGraph', () => {
     await store.upsertFile(
       createFileNode({
         path: 'code-graph:a.ts',
-        configRelativePath: 'a.ts',
+        projectRelativePath: 'a.ts',
         language: 'typescript',
         contentHash: 'hash',
         workspace: 'code-graph',
@@ -314,7 +314,7 @@ describe('SearchCodeGraph', () => {
     await store.upsertFile(
       createFileNode({
         path: 'code-graph:src/impact.ts',
-        configRelativePath: 'src/impact.ts',
+        projectRelativePath: 'src/impact.ts',
         language: 'typescript',
         contentHash: 'hash',
         workspace: 'code-graph',
@@ -356,7 +356,7 @@ describe('SearchCodeGraph', () => {
     await store.upsertFile(
       createFileNode({
         path: 'code-graph:src/messages.ts',
-        configRelativePath: 'src/messages.ts',
+        projectRelativePath: 'src/messages.ts',
         language: 'typescript',
         contentHash: 'hash',
         workspace: 'code-graph',
@@ -382,7 +382,7 @@ describe('SearchCodeGraph', () => {
   it('requests subsequent candidate pages until the post-suppression limit is filled', async () => {
     const declarationFile = createFileNode({
       path: 'code-graph:a.ts',
-      configRelativePath: 'a.ts',
+      projectRelativePath: 'a.ts',
       language: 'typescript',
       contentHash: 'a',
       workspace: 'code-graph',
@@ -390,7 +390,7 @@ describe('SearchCodeGraph', () => {
     })
     const retainedFile = createFileNode({
       path: 'code-graph:b.ts',
-      configRelativePath: 'b.ts',
+      projectRelativePath: 'b.ts',
       language: 'typescript',
       contentHash: 'b',
       workspace: 'code-graph',
@@ -489,7 +489,7 @@ describe('SearchCodeGraph', () => {
     ).join('\n')
     const file = createFileNode({
       path: 'code-graph:src/matches.ts',
-      configRelativePath: 'packages/code-graph/src/matches.ts',
+      projectRelativePath: 'packages/code-graph/src/matches.ts',
       language: 'typescript',
       contentHash: 'matches',
       workspace: 'code-graph',
@@ -523,7 +523,7 @@ describe('SearchCodeGraph', () => {
     const content = [...Array.from({ length: 12 }, () => '// Spec'), '// SpecRepository'].join('\n')
     const file = createFileNode({
       path: 'code-graph:src/spec-repository.ts',
-      configRelativePath: 'packages/code-graph/src/spec-repository.ts',
+      projectRelativePath: 'packages/code-graph/src/spec-repository.ts',
       language: 'typescript',
       contentHash: 'spec-repository',
       workspace: 'code-graph',
@@ -572,7 +572,7 @@ describe('SearchCodeGraph', () => {
   it('ranks later source candidate pages before applying the file limit', async () => {
     const early = createFileNode({
       path: 'code-graph:src/early.ts',
-      configRelativePath: 'packages/code-graph/src/early.ts',
+      projectRelativePath: 'packages/code-graph/src/early.ts',
       language: 'typescript',
       contentHash: 'early',
       workspace: 'code-graph',
@@ -580,7 +580,7 @@ describe('SearchCodeGraph', () => {
     })
     const later = createFileNode({
       path: 'code-graph:src/later.ts',
-      configRelativePath: 'packages/code-graph/src/later.ts',
+      projectRelativePath: 'packages/code-graph/src/later.ts',
       language: 'typescript',
       contentHash: 'later',
       workspace: 'code-graph',
@@ -608,7 +608,7 @@ describe('SearchCodeGraph', () => {
   it('consumes a repeated backend cursor at most once', async () => {
     const file = createFileNode({
       path: 'code-graph:src/repeated.ts',
-      configRelativePath: 'packages/code-graph/src/repeated.ts',
+      projectRelativePath: 'packages/code-graph/src/repeated.ts',
       language: 'typescript',
       contentHash: 'repeated',
       workspace: 'code-graph',
@@ -633,7 +633,7 @@ describe('SearchCodeGraph', () => {
     const content = Array.from({ length: 11 }, () => 'function target() {}').join('\n')
     const file = createFileNode({
       path: 'code-graph:src/overloads.ts',
-      configRelativePath: 'packages/code-graph/src/overloads.ts',
+      projectRelativePath: 'packages/code-graph/src/overloads.ts',
       language: 'typescript',
       contentHash: 'overloads',
       workspace: 'code-graph',
@@ -949,7 +949,7 @@ function fileNode(
 ) {
   return createFileNode({
     path,
-    configRelativePath: path.slice(path.indexOf(':') + 1),
+    projectRelativePath: path.slice(path.indexOf(':') + 1),
     language: 'typescript',
     contentHash: `hash:${path}`,
     workspace,

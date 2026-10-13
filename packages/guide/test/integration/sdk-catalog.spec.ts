@@ -161,7 +161,7 @@ describe('SDK collection', () => {
     const guides = await sdkEngine.listGuides({ scope: { generated: false } })
     expect(guides.pagination.total).toBeGreaterThan(0)
     // The scope still reports what it withholds, so a caller can reveal it.
-    expect(guides.withheld?.generatedTopics).toBe(1319)
+    expect(guides.withheld?.generatedTopics).toBe(1348)
     expect(guides.topics.every((g) => !isGeneratedTopic(g.topic))).toBe(true)
   })
 

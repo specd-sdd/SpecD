@@ -408,7 +408,7 @@ describe('Workspace indexing', () => {
 
     const document = await store.getDocument('ws1:docs/guide.md')
     expect(document).toBeDefined()
-    expect(document?.configRelativePath).toBe('ws1/docs/guide.md')
+    expect(document?.projectRelativePath).toBe('ws1/docs/guide.md')
     expect(result.documentsIndexed).toBe(1)
   })
 

@@ -472,7 +472,7 @@ async function assessObservedContent(
     roots.set('root', input.config.projectRoot)
     const observations = await input.provider.getIndexedInputObservations(resources)
     const locatorByResource = new Map(
-      [...files, ...documents].map((node) => [node.path, node.configRelativePath]),
+      [...files, ...documents].map((node) => [node.path, node.projectRelativePath]),
     )
     const specLocators = new Map<string, Set<string>>()
     for (const observation of observations) {
@@ -550,7 +550,7 @@ async function assessObservedContent(
           ? coverageLocators
           : [...files, ...documents]
               .filter((node) => node.workspace === workspace)
-              .map((node) => node.configRelativePath),
+              .map((node) => node.projectRelativePath),
       )
       const currentLocators = new Set(visibility.currentInputs.get(workspace)?.keys() ?? [])
       if (
@@ -629,7 +629,7 @@ async function compareIndexedContent(
       input.provider.getAllDocuments(),
     ])
     const indexed = new Map(
-      [...files, ...documents].map((node) => [node.configRelativePath, node.contentHash]),
+      [...files, ...documents].map((node) => [node.projectRelativePath, node.contentHash]),
     )
     if (indexed.size === 0) return null
 
@@ -659,12 +659,12 @@ async function compareIndexedContent(
         onInspectionError,
       })) {
         const absolutePath = join(workspace.codeRoot, relPath)
-        const configRelativePath = relative(input.config.projectRoot, absolutePath).replaceAll(
+        const projectRelativePath = relative(input.config.projectRoot, absolutePath).replaceAll(
           '\\',
           '/',
         )
         discovered.set(
-          configRelativePath.startsWith('./') ? configRelativePath.slice(2) : configRelativePath,
+          projectRelativePath.startsWith('./') ? projectRelativePath.slice(2) : projectRelativePath,
           absolutePath,
         )
       }
@@ -690,8 +690,8 @@ async function compareIndexedContent(
     if (inspectionFailed) return null
     if (discovered.size !== indexed.size) return false
     const matches = await Promise.all(
-      [...discovered].map(async ([configRelativePath, absolutePath]) => {
-        const indexedHash = indexed.get(configRelativePath)
+      [...discovered].map(async ([projectRelativePath, absolutePath]) => {
+        const indexedHash = indexed.get(projectRelativePath)
         if (indexedHash === undefined) return false
         const content = await readFile(resolve(absolutePath), 'utf8')
         return computeContentHash(content) === indexedHash

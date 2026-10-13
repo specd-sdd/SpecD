@@ -89,6 +89,8 @@ If the provider reports that the graph is busy or stale after opening, the comma
 
 ### Requirement: Output format
 
+The command SHALL delegate impact analysis and path projection to `sdk:run-graph-impact`.
+
 All file paths rendered in the impact analysis output (both text and JSON) SHALL be formatted relative to the project root for consistency across multi-workspace projects.
 
 **File impact** in `text` mode:
@@ -157,7 +159,7 @@ When `omittedCounts` indicates that results were filtered out (`tests > 0` or `i
 `ℹ Excluded from results: <count> test files, <count> ignored files. Use --include-tests, --include-ignored, or --all to view them.`
 When only one category has omissions, the notice MAY mention only that category (e.g. `ℹ Excluded from results: 14 test files. Use --include-tests or --all to view them.`).
 
-In `json` or `toon` mode, the full result object is output as-is, including `omittedCounts: { tests: number, ignored: number }`. The `AffectedSymbol` entries in JSON include the `depth` field.
+In `json` or `toon` mode, the full result object is output as-is, including `omittedCounts: { tests: number, ignored: number }`. The `AffectedSymbol` entries in JSON include the `depth` field. Target file and symbol entries SHALL expose `canonicalPath` and `projectRelativePath`. Multi-file impact results SHALL expose `targets` (canonical) and `projectRelativeTargets`. The JSON/TOON output SHALL NOT expose `displayPath` or `displayTargets`. All affected file and symbol paths SHALL be formatted relative to the project root (`projectRelativePath`).
 
 The JSON output MUST include aggregate impact fields to support automated risk assessment:
 
@@ -171,13 +173,13 @@ The JSON output MUST include aggregate impact fields to support automated risk a
 ### Requirement: Pure display-path projection
 
 The CLI SHALL render file paths in impact output by projecting canonical graph
-paths to project-relative display paths using project and workspace
+paths to project-relative paths using project and workspace
 configuration alone. Path projection SHALL NOT perform graph reads, SHALL NOT
 resolve files or documents through the provider, and SHALL NOT require
 availability validation.
 
-For single-file impact, all affected-file display paths SHALL derive from the
-resolved project configuration. For multi-file impact, the display path for each
+For single-file impact, all affected-file project-relative paths SHALL derive from the
+resolved project configuration. For multi-file impact, the project-relative path for each
 input file SHALL derive from that file's own resolved workspace configuration,
 and every affected file SHALL be rendered exactly once per input file that
 contributed it.
@@ -274,6 +276,7 @@ $ specd graph impact --file /repo/packages/core/src/auth.ts --format json
 - `code-graph:traversal` — canonical and public-binding impact
 - `code-graph:workspace-integration` — selector identity
 - `code-graph:resolve-symbol-reference` — target resolution and ambiguity
+- `sdk:run-graph-impact` — SDK impact analysis orchestration and path projection
 
 ## ADRs
 

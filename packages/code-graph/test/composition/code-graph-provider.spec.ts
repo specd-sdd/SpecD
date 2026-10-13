@@ -422,7 +422,7 @@ describe('CodeGraphProvider', () => {
     await store.upsertFile(
       createFileNode({
         path: 'root:src/messages.ts',
-        configRelativePath: 'packages/root/src/messages.ts',
+        projectRelativePath: 'packages/root/src/messages.ts',
         language: 'typescript',
         contentHash: 'hash',
         workspace: 'root',
@@ -435,7 +435,7 @@ describe('CodeGraphProvider', () => {
     expect(resolved).toHaveLength(1)
     expect(resolved[0]).toMatchObject({
       canonicalPath: 'root:src/messages.ts',
-      configRelativePath: 'packages/root/src/messages.ts',
+      projectRelativePath: 'packages/root/src/messages.ts',
       workspace: 'root',
     })
     await provider.close()
@@ -552,7 +552,7 @@ describe('CodeGraphProvider', () => {
     await store.upsertFile(
       createFileNode({
         path: 'root:src/messages.ts',
-        configRelativePath: 'src/messages.ts',
+        projectRelativePath: 'src/messages.ts',
         language: 'typescript',
         contentHash: 'hash',
         workspace: 'root',
@@ -589,7 +589,7 @@ describe('CodeGraphProvider', () => {
     await store.upsertFile(
       createFileNode({
         path: 'root:src/messages.ts',
-        configRelativePath: 'packages/root/src/messages.ts',
+        projectRelativePath: 'packages/root/src/messages.ts',
         language: 'typescript',
         contentHash: 'hash',
         workspace: 'root',
@@ -738,7 +738,7 @@ describe('CodeGraphProvider', () => {
     await store.upsertFile(
       createFileNode({
         path: target.filePath,
-        configRelativePath: 'src/target.ts',
+        projectRelativePath: 'src/target.ts',
         language: 'typescript',
         contentHash: 'target',
         workspace: 'fixture',
@@ -749,7 +749,7 @@ describe('CodeGraphProvider', () => {
     await store.upsertFile(
       createFileNode({
         path: consumer.filePath,
-        configRelativePath: 'src/consumer.ts',
+        projectRelativePath: 'src/consumer.ts',
         language: 'typescript',
         contentHash: 'consumer',
         workspace: 'fixture',

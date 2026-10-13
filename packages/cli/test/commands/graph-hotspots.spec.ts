@@ -4,6 +4,7 @@ import {
   captureStderr,
   captureStdout,
   makeMockConfig,
+  makeMockKernel,
   makeProgram,
   mockProcessExit,
 } from './helpers.js'
@@ -29,11 +30,13 @@ import { registerGraphHotspots } from '../../src/commands/graph/hotspots.js'
 
 function setup() {
   const config = makeMockConfig()
+  const kernel = makeMockKernel()
+  kernel.project.getConfig.execute.mockReturnValue(config)
   vi.mocked(resolveGraphCliContext).mockResolvedValue({
     mode: 'configured',
     config,
     configFilePath: '/project/specd.yaml',
-    kernel: null,
+    kernel,
     projectRoot: '/project',
     vcsRoot: '/project',
   })
@@ -347,5 +350,95 @@ describe('graph hotspots', () => {
 
     const parsed = JSON.parse(getStdout())
     expect(parsed.omittedCounts).toEqual({ tests: 5, ignored: 0 })
+  })
+
+  it('projects projectRelativePath and eliminates displayPath in JSON mode', async () => {
+    const { mockProvider, getStdout } = setup()
+    mockProvider.getHotspots.mockResolvedValue({
+      totalSymbols: 1,
+      entries: [
+        {
+          symbol: {
+            id: 'default:src/service.ts:class:AuthService:10:0',
+            name: 'AuthService',
+            kind: 'class',
+            filePath: 'default:src/service.ts',
+            projectRelativePath: 'src/service.ts',
+            line: 10,
+            column: 0,
+          },
+          score: 80,
+          directCallers: 5,
+          crossWorkspaceCallers: 2,
+          fileImporters: 3,
+          riskLevel: 'HIGH',
+        },
+      ],
+    })
+
+    const program = makeHotspotsProgram()
+    await program.parseAsync(['node', 'specd', 'graph', 'hotspots', '--format', 'json'])
+
+    const parsed = JSON.parse(getStdout()) as {
+      readonly totalSymbols: number
+      readonly entries: ReadonlyArray<Record<string, unknown>>
+    }
+    expect(parsed.entries).toHaveLength(1)
+    const entry = parsed.entries[0]!
+    expect(entry).toHaveProperty('projectRelativePath', 'src/service.ts')
+    expect(entry).toHaveProperty('workspace', 'default')
+    expect(entry).not.toHaveProperty('displayPath')
+    expect(entry.symbol as Record<string, unknown>).not.toHaveProperty('displayPath')
+  })
+
+  it('renders projectRelativePath and avoids displayPath in TOON and text modes', async () => {
+    const { mockProvider, getStdout } = setup()
+    mockProvider.getHotspots.mockResolvedValue({
+      totalSymbols: 1,
+      entries: [
+        {
+          symbol: {
+            id: 'default:src/service.ts:class:AuthService:10:0',
+            name: 'AuthService',
+            kind: 'class',
+            filePath: 'default:src/service.ts',
+            projectRelativePath: 'src/service.ts',
+            line: 10,
+            column: 0,
+          },
+          score: 80,
+          directCallers: 5,
+          crossWorkspaceCallers: 2,
+          fileImporters: 3,
+          riskLevel: 'HIGH',
+        },
+      ],
+    })
+
+    const programText = makeHotspotsProgram()
+    await programText.parseAsync(['node', 'specd', 'graph', 'hotspots', '--format', 'text'])
+    const textOutput = getStdout()
+    expect(textOutput).toContain('[default] src/service.ts:10')
+    expect(textOutput).not.toContain('displayPath')
+
+    const programToon = makeHotspotsProgram()
+    await programToon.parseAsync(['node', 'specd', 'graph', 'hotspots', '--format', 'toon'])
+    const toonOutput = getStdout()
+    expect(toonOutput).toContain('projectRelativePath')
+    expect(toonOutput).toContain('src/service.ts')
+    expect(toonOutput).not.toContain('displayPath')
+  })
+
+  it('renders "No hotspots found." in text mode when entries are empty', async () => {
+    const { mockProvider, getStdout } = setup()
+    mockProvider.getHotspots.mockResolvedValue({
+      totalSymbols: 0,
+      entries: [],
+      omittedCounts: { tests: 0, ignored: 0 },
+    })
+
+    const program = makeHotspotsProgram()
+    await program.parseAsync(['node', 'specd', 'graph', 'hotspots', '--format', 'text'])
+    expect(getStdout()).toContain('No hotspots found.')
   })
 })

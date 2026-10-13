@@ -29,7 +29,7 @@ describe('resolve-graph-selector', () => {
     await store.upsertFile(
       createFileNode({
         path: 'core:src/index.ts',
-        configRelativePath: 'packages/core/src/index.ts',
+        projectRelativePath: 'packages/core/src/index.ts',
         language: 'typescript',
         contentHash: 'sha256:file',
         workspace: 'core',
@@ -40,7 +40,7 @@ describe('resolve-graph-selector', () => {
     await store.upsertDocument(
       createDocumentNode({
         path: 'root:docs/guide.md',
-        configRelativePath: 'docs/guide.md',
+        projectRelativePath: 'docs/guide.md',
         contentHash: 'sha256:doc',
         content: '# Guide',
         workspace: 'root',
@@ -53,7 +53,7 @@ describe('resolve-graph-selector', () => {
     expect(fileMatches).toEqual([
       {
         canonicalPath: 'core:src/index.ts',
-        configRelativePath: 'packages/core/src/index.ts',
+        projectRelativePath: 'packages/core/src/index.ts',
         workspace: 'core',
         kind: 'file',
       },
@@ -61,7 +61,7 @@ describe('resolve-graph-selector', () => {
     expect(documentMatches).toEqual([
       {
         canonicalPath: 'root:docs/guide.md',
-        configRelativePath: 'docs/guide.md',
+        projectRelativePath: 'docs/guide.md',
         workspace: 'root',
         kind: 'document',
       },
@@ -71,7 +71,7 @@ describe('resolve-graph-selector', () => {
   it('prefers full symbol ids and qualified selectors before bare names', async () => {
     const file = createFileNode({
       path: 'core:src/domain/entities/change.ts',
-      configRelativePath: 'packages/core/src/domain/entities/change.ts',
+      projectRelativePath: 'packages/core/src/domain/entities/change.ts',
       language: 'typescript',
       contentHash: 'sha256:file',
       workspace: 'core',
@@ -122,7 +122,7 @@ describe('resolve-graph-selector', () => {
   it('prefers case-exact bare names and bounds exact ambiguity', async () => {
     const file = createFileNode({
       path: 'core:src/change.ts',
-      configRelativePath: 'packages/core/src/change.ts',
+      projectRelativePath: 'packages/core/src/change.ts',
       language: 'typescript',
       contentHash: 'sha256:change',
       workspace: 'core',
@@ -164,7 +164,7 @@ describe('resolve-graph-selector', () => {
   it('does not widen bare impact selectors to prefixes', async () => {
     const file = createFileNode({
       path: 'core:src/validate.ts',
-      configRelativePath: 'packages/core/src/validate.ts',
+      projectRelativePath: 'packages/core/src/validate.ts',
       language: 'typescript',
       contentHash: 'sha256:validate',
       workspace: 'core',
@@ -192,7 +192,7 @@ describe('resolve-graph-selector', () => {
   it('resolves an unanchored qualified member without falling through to the bare name', async () => {
     const file = createFileNode({
       path: 'core:src/edit.ts',
-      configRelativePath: 'packages/core/src/edit.ts',
+      projectRelativePath: 'packages/core/src/edit.ts',
       language: 'typescript',
       contentHash: 'sha256:edit',
       workspace: 'core',
@@ -238,7 +238,7 @@ describe('resolve-graph-selector', () => {
     })
     const otherFile = createFileNode({
       path: 'core:src/other.ts',
-      configRelativePath: 'packages/core/src/other.ts',
+      projectRelativePath: 'packages/core/src/other.ts',
       language: 'typescript',
       contentHash: 'sha256:other',
       workspace: 'core',
@@ -303,5 +303,54 @@ describe('resolve-graph-selector', () => {
 
     const native = await resolveSymbolSelector('EditChange::execute', { store, resolveReference })
     expect(native).toEqual(both)
+  })
+
+  it('normalizes absolute path selector against projectRoot before lookup', async () => {
+    const file = createFileNode({
+      path: 'core:src/index.ts',
+      projectRelativePath: 'packages/core/src/index.ts',
+      language: 'typescript',
+      contentHash: 'sha256:abs',
+      workspace: 'core',
+    })
+    await store.upsertFile(file, [], [])
+
+    const resolved = await resolveFileSelector('/project/packages/core/src/index.ts', {
+      store,
+      projectRoot: '/project',
+    })
+
+    expect(resolved).toEqual([
+      {
+        canonicalPath: 'core:src/index.ts',
+        projectRelativePath: 'packages/core/src/index.ts',
+        workspace: 'core',
+        kind: 'file',
+      },
+    ])
+  })
+
+  it('supports project-relative lookup with parent segments', async () => {
+    const file = createFileNode({
+      path: 'core:src/index.ts',
+      projectRelativePath: '../../packages/core/src/index.ts',
+      language: 'typescript',
+      contentHash: 'sha256:parent',
+      workspace: 'core',
+    })
+    await store.upsertFile(file, [], [])
+
+    const resolved = await resolveFileSelector('../../packages/core/src/index.ts', {
+      store,
+    })
+
+    expect(resolved).toEqual([
+      {
+        canonicalPath: 'core:src/index.ts',
+        projectRelativePath: '../../packages/core/src/index.ts',
+        workspace: 'core',
+        kind: 'file',
+      },
+    ])
   })
 })

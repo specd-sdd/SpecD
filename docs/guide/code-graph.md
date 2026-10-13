@@ -507,3 +507,20 @@ All AI coding assistants and developers in a SpecD repository follow the **Graph
    ```bash
    specd graph hotspots --workspace core --min-risk HIGH --exclude-path "*:test/*" --exclude-path "*.spec.ts" --format toon
    ```
+
+---
+
+## 10. Output Paths & Selectors: Canonical Identities vs. Project-Relative Paths
+
+When interacting with the SpecD Code Graph via the CLI or AI agent tools, file locations appear in two distinct forms:
+
+- **Canonical selectors (`<workspace>:<relPath>`):** Stable, language-agnostic identifiers used for precise graph queries (e.g. `--file core:src/kernel.ts`).
+- **Project-relative paths (`projectRelativePath`):** Standard filesystem paths relative to the repository root containing `specd.yaml` (e.g. `packages/core/src/kernel.ts`). Consistently emitted across all CLI outputs (`text`, `json`, `toon`) for direct consumption by developers and AI agents.
+
+### Path Representations in Query Results
+
+In structured outputs (`--format json` or `--format toon`), file locations are reported via `projectRelativePath`:
+
+- **`graph search`:** Every matching symbol, source file, spec, and document entry reports `projectRelativePath`.
+- **`graph hotspots`:** Ranked hotspots report `projectRelativePath` identifying the exact file containing the hotspot symbol.
+- **`graph impact`:** The analysis root reports `projectRelativePath` (or `projectRelativeTargets` for multi-file impact), and all impacted files and symbols provide `projectRelativePath`.

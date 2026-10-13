@@ -60,7 +60,7 @@ adapter.extractSymbols = (filePath: string, content: string): SymbolNode[] => {
   const session = new InMemoryIndexSession()
   session.registerFile({
     filePath,
-    configRelativePath: filePath,
+    projectRelativePath: filePath,
     language: 'typescript',
     contentHash: 'abc',
     workspace: 'ws',
@@ -76,7 +76,7 @@ adapter.extractImportedNames = (filePath: string, content: string): ImportDeclar
   const session = new InMemoryIndexSession()
   session.registerFile({
     filePath,
-    configRelativePath: filePath,
+    projectRelativePath: filePath,
     language: 'typescript',
     contentHash: 'abc',
     workspace: 'ws',
@@ -97,7 +97,7 @@ adapter.extractBindingFacts = (
   const session = new InMemoryIndexSession()
   session.registerFile({
     filePath,
-    configRelativePath: filePath,
+    projectRelativePath: filePath,
     language: 'typescript',
     contentHash: 'abc',
     workspace: 'ws',
@@ -117,7 +117,7 @@ adapter.extractCallFacts = (
   const session = new InMemoryIndexSession()
   session.registerFile({
     filePath,
-    configRelativePath: filePath,
+    projectRelativePath: filePath,
     language: 'typescript',
     contentHash: 'abc',
     workspace: 'ws',
@@ -140,7 +140,7 @@ adapter.extractRelations = (
   for (const fp of filePaths) {
     session.registerFile({
       filePath: fp,
-      configRelativePath: fp,
+      projectRelativePath: fp,
       language: 'typescript',
       contentHash: 'abc',
       workspace: 'ws',
@@ -148,7 +148,7 @@ adapter.extractRelations = (
   }
   session.registerFile({
     filePath,
-    configRelativePath: filePath,
+    projectRelativePath: filePath,
     language: 'typescript',
     contentHash: 'abc',
     workspace: 'ws',
@@ -317,7 +317,7 @@ class Service {
     for (const [filePath, content] of files) {
       session.registerFile({
         filePath,
-        configRelativePath: filePath,
+        projectRelativePath: filePath,
         language: 'typescript',
         contentHash: 'abc',
         workspace: 'workspace',
@@ -1019,7 +1019,7 @@ describe('TypeScriptLanguageAdapter member references and re-exports', () => {
     for (const file of files) {
       session.registerFile({
         filePath: file.path,
-        configRelativePath: file.path,
+        projectRelativePath: file.path,
         language: 'typescript',
         contentHash: 'hash',
         workspace: file.workspace,

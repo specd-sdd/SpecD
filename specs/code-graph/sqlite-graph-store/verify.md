@@ -382,6 +382,17 @@
 - **THEN** the persisted file record includes source content sufficient to derive symbol snippets from file-backed context
 - **AND** symbol preview extraction does not require a separate persisted snippet field per symbol
 
+#### Scenario: File and document tables store project_relative_path
+
+- **WHEN** files and documents are persisted by `SQLiteGraphStore`
+- **THEN** their table records persist `project_relative_path` and do not contain `config_relative_path`
+
+#### Scenario: Symbols table stores denormalized project_relative_path
+
+- **WHEN** symbols are persisted by `SQLiteGraphStore`
+- **THEN** the `symbols` table record stores `project_relative_path` matching the owning file's project-relative path
+- **AND** symbol retrieval does not require a join against the `files` table
+
 ### Requirement: Persisted relation storage
 
 #### Scenario: All required relation families are stored
@@ -621,39 +632,33 @@
 
 #### Scenario: SQLite old schema rebuilds safely
 
-- **GIVEN** schema version 10 or 11 and the reference schema expects 12
+- **GIVEN** schema version 12 or 13 and the reference schema expects 14
 - **WHEN** normal read and then graph index are attempted
 - **THEN** read rejects with `GraphSchemaIncompatibleError` without empty recreation
-- **AND** index rotates generation, rebuilds fields and FTS, and opens version 12
+- **AND** index rotates generation, rebuilds fields and FTS, and opens version 14
 
-#### Scenario: member_form is replaced in place
+#### Scenario: Version 14 table columns persist project_relative_path
 
-- **WHEN** a version 12 database is created
-- **THEN** `logical_symbols` has `member_kind`, `member_dispatch`, `member_accessor`, `native_kind`, and `qualified_name`
+- **WHEN** a version 14 database is created
+- **THEN** `files` has column `project_relative_path` and no `config_relative_path`
+- **AND** `documents` has column `project_relative_path` and no `config_relative_path`
+- **AND** `symbols` has column `project_relative_path`
+- **AND** `logical_symbols` has `member_kind`, `member_dispatch`, `member_accessor`, `native_kind`, and `qualified_name`
 - **AND** `qualified_name` has an equality index
-- **AND** it has no `member_form` column
-- **AND** `public_bindings`, `symbols.search_text`, and `symbol_fts` keep their previous columns
 
-#### Scenario: Version 12 opens without rebuild
+#### Scenario: Version 14 opens without rebuild
 
-- **GIVEN** `meta.schemaVersion` is already 12
+- **GIVEN** `meta.schemaVersion` is already 14
 - **WHEN** the store opens for a read
 - **THEN** it does not throw `GraphSchemaIncompatibleError`
 - **AND** it does not recreate the database
 
 #### Scenario: Any other version is incompatible
 
-- **GIVEN** `meta.schemaVersion` is 9 or 13
+- **GIVEN** `meta.schemaVersion` is 13 or 15
 - **WHEN** the store opens
 - **THEN** the error is `GraphSchemaIncompatibleError`
 - **AND** no `ALTER TABLE` is executed
-
-#### Scenario: Rebuild discards old logical ids
-
-- **GIVEN** a version 10 database contains logical ids that embed member form
-- **WHEN** graph index recreates version 12
-- **THEN** those old id strings are absent
-- **AND** new ids round-trip through the versioned encoding
 
 #### Scenario: Qualified spelling is an equality column
 

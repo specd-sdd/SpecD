@@ -42,7 +42,7 @@ export interface IndexCoverage {
  */
 export interface RegisterFileInput {
   readonly filePath: string
-  readonly configRelativePath: string
+  readonly projectRelativePath: string
   readonly language: string
   readonly contentHash: string
   readonly workspace: string

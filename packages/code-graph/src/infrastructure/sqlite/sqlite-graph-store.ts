@@ -268,24 +268,24 @@ export class SQLiteGraphStore extends GraphStore {
   /**
    * Finds files matching a config-relative path.
    *
-   * @param configRelativePath - Workspace/config relative path.
+   * @param projectRelativePath - Project-relative path.
    * @returns Promise resolving to matching file nodes.
    */
-  async findFilesByConfigRelativePath(configRelativePath: string): Promise<FileNode[]> {
-    return this.client.sendRequest('findFilesByConfigRelativePath', {
-      configRelativePath,
+  async findFilesByProjectRelativePath(projectRelativePath: string): Promise<FileNode[]> {
+    return this.client.sendRequest('findFilesByProjectRelativePath', {
+      projectRelativePath,
     })
   }
 
   /**
-   * Finds documents matching a config-relative path.
+   * Finds documents matching a project-relative path.
    *
-   * @param configRelativePath - Workspace/config relative path.
+   * @param projectRelativePath - Project-relative path.
    * @returns Promise resolving to matching document nodes.
    */
-  async findDocumentsByConfigRelativePath(configRelativePath: string): Promise<DocumentNode[]> {
-    return this.client.sendRequest('findDocumentsByConfigRelativePath', {
-      configRelativePath,
+  async findDocumentsByProjectRelativePath(projectRelativePath: string): Promise<DocumentNode[]> {
+    return this.client.sendRequest('findDocumentsByProjectRelativePath', {
+      projectRelativePath,
     })
   }
 

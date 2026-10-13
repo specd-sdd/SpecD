@@ -105,13 +105,13 @@ export interface SQLiteWorkerOperationMap {
   }
   /** Retrieves a file node. */
   getFile: { payload: { filePath: string }; result: FileNode | undefined }
-  /** Finds files by config relative path. */
-  findFilesByConfigRelativePath: { payload: { configRelativePath: string }; result: FileNode[] }
+  /** Finds files by project relative path. */
+  findFilesByProjectRelativePath: { payload: { projectRelativePath: string }; result: FileNode[] }
   /** Retrieves a document node. */
   getDocument: { payload: { documentId: string }; result: DocumentNode | undefined }
-  /** Finds documents by config relative path. */
-  findDocumentsByConfigRelativePath: {
-    payload: { configRelativePath: string }
+  /** Finds documents by project relative path. */
+  findDocumentsByProjectRelativePath: {
+    payload: { projectRelativePath: string }
     result: DocumentNode[]
   }
   /** Retrieves a symbol node. */

@@ -10,12 +10,12 @@
 - **THEN** `FileNode.path` is `core:src/index.ts`
 - **AND** `FileNode.workspace` is `core`
 
-#### Scenario: Config-relative path stored alongside canonical identity
+#### Scenario: Project-relative path stored alongside canonical identity
 
 - **GIVEN** the active `specd.yaml` lives at `/project/specd.yaml`
 - **WHEN** a file `src/index.ts` is discovered in workspace `core` with codeRoot `/project/packages/core`
 - **THEN** `FileNode.path` is `core:src/index.ts`
-- **AND** `FileNode.configRelativePath` is `packages/core/src/index.ts`
+- **AND** `FileNode.projectRelativePath` is `packages/core/src/index.ts`
 
 #### Scenario: Duplicate filenames across workspaces remain distinct
 
@@ -90,27 +90,27 @@
 - **WHEN** IndexOptions contains a single workspace
 - **THEN** the indexer SHALL behave identically to multi-workspace with one entry
 
-### Requirement: Config-relative file lookup
+### Requirement: Project-relative file lookup
 
-#### Scenario: Unprefixed selector resolves through configRelativePath
+#### Scenario: Unprefixed selector resolves through projectRelativePath
 
 - **GIVEN** the active `specd.yaml` lives at `/project/specd.yaml`
-- **AND** file `core:src/index.ts` is indexed with `configRelativePath` `packages/core/src/index.ts`
+- **AND** file `core:src/index.ts` is indexed with `projectRelativePath` `packages/core/src/index.ts`
 - **WHEN** a CLI command resolves the selector `packages/core/src/index.ts`
 - **THEN** it can map that selector back to canonical file `core:src/index.ts`
 
-#### Scenario: Absolute selector normalizes to configRelativePath before lookup
+#### Scenario: Absolute selector normalizes to projectRelativePath before lookup
 
 - **GIVEN** the active `specd.yaml` lives at `/project/specd.yaml`
-- **AND** file `core:src/index.ts` is indexed with `configRelativePath` `packages/core/src/index.ts`
+- **AND** file `core:src/index.ts` is indexed with `projectRelativePath` `packages/core/src/index.ts`
 - **WHEN** a CLI command resolves `/project/packages/core/src/index.ts`
 - **THEN** it normalizes the absolute path to `packages/core/src/index.ts`
 - **AND** resolves the canonical file `core:src/index.ts`
 
-#### Scenario: Config-relative lookup supports parent segments
+#### Scenario: Project-relative lookup supports parent segments
 
 - **GIVEN** the active `specd.yaml` lives at `/project/apps/web/specd.yaml`
-- **AND** file `core:src/index.ts` is indexed with `configRelativePath` `../../packages/core/src/index.ts`
+- **AND** file `core:src/index.ts` is indexed with `projectRelativePath` `../../packages/core/src/index.ts`
 - **WHEN** a CLI command resolves `../../packages/core/src/index.ts`
 - **THEN** it resolves the canonical file `core:src/index.ts`
 
@@ -192,9 +192,9 @@
 - **WHEN** an existing graph store has file identity metadata incompatible with the current format
 - **THEN** a full rebuild is required before lookups are considered trustworthy
 
-#### Scenario: Force re-index after adding configRelativePath metadata
+#### Scenario: Force re-index after adding projectRelativePath metadata
 
-- **WHEN** an existing graph store was built before `configRelativePath` was persisted
+- **WHEN** an existing graph store was built before `projectRelativePath` was persisted
 - **THEN** the next rebuild path must recreate the graph before unprefixed selector lookup can rely on that metadata
 
 ### Requirement: Canonical module and package resolution identity

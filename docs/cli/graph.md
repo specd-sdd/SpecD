@@ -62,6 +62,14 @@ specd graph search <query> [options]
 | `--limit <n>`                 | Maximum number of results to return (default: `20`).                                            |
 | `--format <text\|json\|toon>` | Output format.                                                                                  |
 
+### Output Schema
+
+In JSON and TOON formats, all file paths are exposed as `projectRelativePath` (relative to the repository project root containing `specd.yaml`). Legacy properties (`configRelativePath`) have been removed:
+
+- **Symbols:** `declaration.location.projectRelativePath`, `symbol.projectRelativePath`, `logicalTarget.projectRelativePath`, `publicBindings[].projectRelativePath`.
+- **Files:** `file.projectRelativePath`.
+- **Documents:** `document.projectRelativePath`.
+
 ---
 
 ## graph impact
@@ -87,6 +95,15 @@ specd graph impact [options]
 | `--all`                                  | Admit all categories (`source`, `test`, `ignored`).                                                                                   |
 | `--category <categories>`                | Restrict traversal admission strictly to designated categories (accepts single category or comma-separated list, e.g. `source,test`). |
 | `--format <text\|json\|toon>`            | Output format.                                                                                                                        |
+
+### Output Schema
+
+In JSON and TOON formats, all targets and affected file paths are exposed as `projectRelativePath` (or `projectRelativeTargets` for multi-file impact). Legacy properties (`displayPath` and `displayTargets`) have been removed:
+
+- **Single-file impact:** `canonicalPath`, `projectRelativePath`, `affectedFiles` (array of `projectRelativePath`), `affectedSymbols[].filePath` (`projectRelativePath`).
+- **Multi-file impact:** `targets` (canonical), `projectRelativeTargets` (repository-relative), `perFile[].projectRelativePath`.
+- **Symbol impact:** `canonicalPath`, `projectRelativePath`, `impact.affectedFiles` (array of `projectRelativePath`).
+- **Spec impact:** `spec`, `impact.affectedFiles` (array of `projectRelativePath`).
 
 ### Examples
 
@@ -121,6 +138,12 @@ specd graph hotspots [options]
 | `--all`                       | Include all categories (`source`, `test`, `ignored`).                                                                                           |
 | `--category <categories>`     | Restrict candidates and caller metrics strictly to designated categories (accepts single category or comma-separated list, e.g. `source,test`). |
 | `--format <text\|json\|toon>` | Output format.                                                                                                                                  |
+
+### Output Schema
+
+In JSON and TOON formats, each hotspot entry exposes `projectRelativePath` (relative to the repository project root containing `specd.yaml`). Legacy property `displayPath` has been removed:
+
+- **Hotspots entries:** `entries[].projectRelativePath`, `entries[].workspace`, `entries[].symbol.filePath` (canonical).
 
 ---
 

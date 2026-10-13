@@ -8,9 +8,6 @@
     {
       "file": "code-graph:src/domain/value-objects/document-node.ts",
       "symbols": ["DocumentNode", "createDocumentNode"]
-    },
-    {
-      "file": "code-graph:test/domain/value-objects/document-node.spec.ts"
     }
   ],
   "optimizations": {

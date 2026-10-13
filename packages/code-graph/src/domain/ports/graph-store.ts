@@ -490,18 +490,18 @@ export abstract class GraphStore {
   abstract getDocument(path: string): Promise<DocumentNode | undefined>
 
   /**
-   * Retrieves all file nodes whose configRelativePath exactly matches the given path.
-   * @param configRelativePath - The normalized config-relative path to search.
+   * Retrieves all file nodes whose projectRelativePath exactly matches the given path.
+   * @param projectRelativePath - The normalized project-relative path to search.
    * @returns An array of matching file nodes.
    */
-  abstract findFilesByConfigRelativePath(configRelativePath: string): Promise<FileNode[]>
+  abstract findFilesByProjectRelativePath(projectRelativePath: string): Promise<FileNode[]>
 
   /**
-   * Retrieves all document nodes whose configRelativePath exactly matches the given path.
-   * @param configRelativePath - The normalized config-relative path to search.
+   * Retrieves all document nodes whose projectRelativePath exactly matches the given path.
+   * @param projectRelativePath - The normalized project-relative path to search.
    * @returns An array of matching document nodes.
    */
-  abstract findDocumentsByConfigRelativePath(configRelativePath: string): Promise<DocumentNode[]>
+  abstract findDocumentsByProjectRelativePath(projectRelativePath: string): Promise<DocumentNode[]>
 
   /**
    * Retrieves a symbol node by its id.
