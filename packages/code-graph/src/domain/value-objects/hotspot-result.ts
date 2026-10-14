@@ -5,10 +5,15 @@ import { type SymbolKind } from './symbol-kind.js'
 import { SymbolKind as SymbolKindEnum } from './symbol-kind.js'
 import { type RiskLevel } from './risk-level.js'
 
+/**
+ * Default symbol kinds considered when computing code graph hotspots.
+ * Includes architectural boundaries (classes, interfaces, methods, functions).
+ */
 export const DEFAULT_HOTSPOT_KINDS: readonly SymbolKind[] = [
   SymbolKindEnum.Class,
   SymbolKindEnum.Method,
   SymbolKindEnum.Function,
+  SymbolKindEnum.Interface,
 ] as const
 
 /**

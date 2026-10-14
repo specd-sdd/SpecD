@@ -21,15 +21,11 @@ Identifier case and normalization SHALL follow the source language. Path and wor
 
 ### Requirement: Logical canonical targets
 
-The resolver SHALL return a logical symbol as the canonical target and SHALL retain
-every declaration occurrence contributing to it. Language-defined overload sets,
-declaration merging, and equivalent constructs SHALL resolve as one logical target
-rather than false ambiguity. Genuinely competing declarations SHALL remain separate
-candidates.
+The resolver SHALL return a logical symbol as the canonical target and SHALL retain every declaration occurrence contributing to it. Language-defined overload sets, declaration merging, and equivalent constructs SHALL resolve as one logical target rather than false ambiguity.
 
-The target SHALL expose workspace, module or package, declaring owner, symbol space,
-simple name, member form, contributing declaration locations, and a stable canonical
-reference independent of line or column movement.
+When graph selector resolution produces multiple candidate declarations that all belong to the same logical symbol or overload set, the selector resolution SHALL return `status: 'resolved'`. Only declarations belonging to genuinely competing, distinct logical symbols SHALL be treated as ambiguous candidates.
+
+The target SHALL expose workspace, module or package, declaring owner, symbol space, simple name, member form, contributing declaration locations, and a stable canonical reference independent of line or column movement.
 
 ### Requirement: Public and local binding identity
 

@@ -83,7 +83,7 @@ Adapter-owned fact extraction SHALL include language-specific syntax and semanti
 
 Adapters SHALL extract deterministic facts for:
 
-- lexical ownership of file, class/type, method, function, and block scopes where the language exposes them clearly
+- lexical ownership of container scopes (classes, interfaces, structs, protocols, enums) and routine scopes (functions, methods), maintaining an active scope stack that pops enclosing scopes when AST traversal moves past the construct's end line
 - typed parameters, including constructor parameters and constructor parameter properties where applicable
 - typed properties and fields
 - explicit construction expressions such as `new X()` or language-equivalent constructor calls that can produce `CONSTRUCTS`
@@ -181,7 +181,7 @@ An `AdapterRegistry` SHALL map language identifiers to `LanguageAdapter` instanc
 
 The extension-to-language map is built dynamically from registered adapters — there is no hardcoded extension list in the registry. Adding a new language requires only registering a new adapter.
 
-The TypeScript adapter MUST be registered by default when the registry is created. Additional adapters can be registered to extend language support.
+Adapters SHALL be registered via `register()`. Built-in adapters (such as TypeScript, Python, Go, and PHP) are registered into the registry through composition providers.
 
 ### Requirement: Resolver capability declaration
 
@@ -203,7 +203,13 @@ An adapter that advertises member support SHALL derive a member's declaring owne
 
 An adapter that proves a member SHALL emit `MemberSemantics` (`kind`, `dispatch`, `accessor`, and `nativeKind` only when the grammar proves it) on the logical member. It MUST NOT emit the retired single-axis member form.
 
-The same adapter SHALL set `parentId` on declaration occurrences whose syntax has a declaring owner. The indexer MUST NOT recompute that parent from a language name list. A top-level declaration SHALL omit `parentId`.
+The same adapter SHALL set `parentId` on declaration occurrences according to lexical hierarchy:
+
+- Member methods and properties enclosed within a container type (class, interface, struct, protocol, enum) SHALL have `parentId` set to the enclosing container's symbol ID.
+- Local variables and nested functions enclosed within a routine body (function, method) SHALL have `parentId` set to the enclosing routine's symbol ID.
+- Top-level declarations at file or module scope SHALL omit `parentId`.
+
+The adapter MUST enforce strict scope boundaries when assigning `parentId`. As line numbers advance during AST processing, any scope whose `endLine` is strictly less than the candidate symbol's declaration line MUST be popped from the active scope stack, preventing trailing sibling or top-level declarations from inheriting stale parent IDs. The indexer MUST NOT recompute parent IDs from a hardcoded language list.
 
 ### Requirement: Human reference parse and render
 

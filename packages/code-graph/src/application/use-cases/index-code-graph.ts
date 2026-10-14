@@ -1904,19 +1904,21 @@ export class IndexCodeGraph {
         const superMethods = ownershipIndex.methodsByOwnerId.get(superTypeId)
         if (superMethods === undefined) continue
         for (const [name, subMethodIds] of subMethods) {
-          const superMethodId = superMethods.get(name)?.[0]
-          if (superMethodId === undefined) continue
-          for (const subId of subMethodIds) {
-            const key = `${subId}:${RelationType.Overrides}:${superMethodId}`
-            if (seenOverrideKeys.has(key)) continue
-            relations.push(
-              createRelation({
-                source: subId,
-                target: superMethodId,
-                type: RelationType.Overrides,
-              }),
-            )
-            seenOverrideKeys.add(key)
+          const superMethodIds = superMethods.get(name)
+          if (superMethodIds === undefined || superMethodIds.length === 0) continue
+          for (const superMethodId of superMethodIds) {
+            for (const subId of subMethodIds) {
+              const key = `${subId}:${RelationType.Overrides}:${superMethodId}`
+              if (seenOverrideKeys.has(key)) continue
+              relations.push(
+                createRelation({
+                  source: subId,
+                  target: superMethodId,
+                  type: RelationType.Overrides,
+                }),
+              )
+              seenOverrideKeys.add(key)
+            }
           }
         }
       }

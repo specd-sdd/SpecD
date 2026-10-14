@@ -559,6 +559,13 @@
 - **THEN** the backend still returns that symbol as a candidate
 - **AND** it is ordered by the same identity-strength ladder instead of being omitted for lack of FTS coverage
 
+#### Scenario: Kind-tiered ranking acts as tie-breaker for equal relevance matches
+
+- **GIVEN** a query matches a class, a function, a type, and a property with identical identity and relevance scores
+- **WHEN** `searchSymbols()` is executed on the SQLite backend
+- **THEN** the class (Tier 4) ranks above the function (Tier 3), which ranks above the type (Tier 2), which ranks above the property (Tier 1)
+- **AND** fine-grained property and variable symbols do not displace foundational classes and functions in equal-relevance rankings
+
 ### Requirement: Transactional mutation model
 
 #### Scenario: File upsert and removal are all-or-nothing

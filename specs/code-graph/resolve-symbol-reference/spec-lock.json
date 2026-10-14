@@ -11,8 +11,8 @@
   ],
   "implementation": [
     {
-      "file": "code-graph:src/application/use-cases/resolve-symbol-reference.ts",
-      "symbols": ["ResolveSymbolReference"]
+      "file": "code-graph:src/application/services/resolve-graph-selector.ts",
+      "symbols": ["unifyOverloadSetCandidates", "resolveSymbolSelector"]
     }
   ],
   "optimizations": {

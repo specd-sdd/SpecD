@@ -1331,3 +1331,93 @@ describe('PhpLanguageAdapter drive-letter paths', () => {
     expect(resolved).toBe('C:/repo/src/b.php')
   })
 })
+
+describe('PhpLanguageAdapter dependency detection enhancements', () => {
+  it('extracts class properties and class constants as SymbolKind.Property with class parentId', () => {
+    const code = `<?php
+class User {
+    public int $id;
+    protected string $name = 'default';
+    public const MAX_USERS = 100;
+}
+`
+    const symbols = adapter.extractSymbols('models/User.php', code)
+    const userClass = symbols.find((s) => s.name === 'User' && s.kind === SymbolKind.Class)!
+    expect(userClass).toBeDefined()
+
+    const idProp = symbols.find((s) => s.name === 'id')
+    const nameProp = symbols.find((s) => s.name === 'name')
+    const maxConst = symbols.find((s) => s.name === 'MAX_USERS')
+
+    expect(idProp).toBeDefined()
+    expect(idProp?.kind).toBe(SymbolKind.Property)
+    expect(idProp?.parentId).toBe(userClass.id)
+
+    expect(nameProp).toBeDefined()
+    expect(nameProp?.kind).toBe(SymbolKind.Property)
+    expect(nameProp?.parentId).toBe(userClass.id)
+
+    expect(maxConst).toBeDefined()
+    expect(maxConst?.kind).toBe(SymbolKind.Property)
+    expect(maxConst?.parentId).toBe(userClass.id)
+  })
+
+  it('extracts enum cases as SymbolKind.Property with enum parentId', () => {
+    const code = `<?php
+enum Status: string {
+    case Active = 'active';
+    case Inactive = 'inactive';
+}
+`
+    const symbols = adapter.extractSymbols('models/Status.php', code)
+    const statusEnum = symbols.find((s) => s.name === 'Status' && s.kind === SymbolKind.Enum)!
+    expect(statusEnum).toBeDefined()
+
+    const activeCase = symbols.find((s) => s.name === 'Active')
+    const inactiveCase = symbols.find((s) => s.name === 'Inactive')
+
+    expect(activeCase).toBeDefined()
+    expect(activeCase?.kind).toBe(SymbolKind.Property)
+    expect(activeCase?.parentId).toBe(statusEnum.id)
+
+    expect(inactiveCase).toBeDefined()
+    expect(inactiveCase?.kind).toBe(SymbolKind.Property)
+    expect(inactiveCase?.parentId).toBe(statusEnum.id)
+  })
+
+  it('sets container logical owner and parentId for properties and class constants in referenceFacts', () => {
+    const code = `<?php
+namespace App\\Models;
+
+class Order {
+    public string $orderId;
+    public const STATUS_NEW = 'new';
+}
+`
+    const session = new InMemoryIndexSession()
+    const draft = baseAdapter.analyzeFile('src/Models/Order.php', code, {
+      session,
+      workspaceName: 'php-app',
+    })
+
+    const orderClass = draft.symbols.find((s) => s.name === 'Order' && s.kind === SymbolKind.Class)!
+    const propSymbol = draft.symbols.find((s) => s.name === 'orderId')!
+    const constSymbol = draft.symbols.find((s) => s.name === 'STATUS_NEW')!
+
+    expect(propSymbol.parentId).toBe(orderClass.id)
+    expect(constSymbol.parentId).toBe(orderClass.id)
+
+    const declarations = draft.referenceFacts?.declarations ?? []
+    const logicals = declarations.map((d) => parseLogicalSymbol(d.logicalId))
+    const orderLogical = logicals.find((s) => s?.name === 'Order')
+    const propLogical = logicals.find((s) => s?.name === 'orderId')
+    const constLogical = logicals.find((s) => s?.name === 'STATUS_NEW')
+
+    expect(orderLogical).toBeDefined()
+    expect(propLogical).toBeDefined()
+    expect(propLogical?.ownerId).toBe(orderLogical?.id)
+
+    expect(constLogical).toBeDefined()
+    expect(constLogical?.ownerId).toBe(orderLogical?.id)
+  })
+})

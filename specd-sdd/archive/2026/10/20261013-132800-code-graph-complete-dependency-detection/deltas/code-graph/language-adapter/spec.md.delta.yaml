@@ -1,0 +1,55 @@
+- op: modified
+  description: 'Clarify container and routine lexical ownership and scope stack boundary management'
+  selector:
+    type: section
+    matches: 'Requirement: Scoped binding fact extraction'
+  content: |
+    `LanguageAdapter.analyzeFile()` SHALL expose deterministic scoped binding facts and call facts through the returned `FileAnalysisDraft`. Built-in adapters for TypeScript/TSX/JavaScript/JSX, Python, Go, and PHP MUST emit these facts for the deterministic cases defined by this spec.
+
+    Adapter-owned fact extraction SHALL include language-specific syntax and semantics only. Shared scope lookup, shadowing, receiver binding, and cross-language candidate filtering belong to the common code-graph pipeline, not to adapter-local full environment implementations.
+
+    Adapters SHALL extract deterministic facts for:
+
+    - lexical ownership of container scopes (classes, interfaces, structs, protocols, enums) and routine scopes (functions, methods), maintaining an active scope stack that pops enclosing scopes when AST traversal moves past the construct's end line
+    - typed parameters, including constructor parameters and constructor parameter properties where applicable
+    - typed properties and fields
+    - explicit construction expressions such as `new X()` or language-equivalent constructor calls that can produce `CONSTRUCTS`
+    - receiver identities such as `this`, `self`, `cls`, `parent`, `super`, and language equivalents when deterministic
+    - local aliases whose source binding is already deterministic
+    - imported or referenced type names that can produce `USES_TYPE` or affect receiver resolution
+    - framework-managed bindings that the adapter can identify through deterministic, registry-based rules
+
+    Adapters MUST silently drop binding facts whose target depends on runtime-only values, reflection, container identifiers, monkey patching, non-literal dynamic expressions, or whole-program data flow.
+
+- op: modified
+  description: 'Specify parentId assignment for container types and routines with scope boundary popping'
+  selector:
+    type: section
+    matches: 'Requirement: Member semantics and declaration parent'
+  content: |
+    An adapter that proves a member SHALL emit `MemberSemantics` (`kind`, `dispatch`, `accessor`, and `nativeKind` only when the grammar proves it) on the logical member. It MUST NOT emit the retired single-axis member form.
+
+    The same adapter SHALL set `parentId` on declaration occurrences according to lexical hierarchy:
+    - Member methods and properties enclosed within a container type (class, interface, struct, protocol, enum) SHALL have `parentId` set to the enclosing container's symbol ID.
+    - Local variables and nested functions enclosed within a routine body (function, method) SHALL have `parentId` set to the enclosing routine's symbol ID.
+    - Top-level declarations at file or module scope SHALL omit `parentId`.
+
+    The adapter MUST enforce strict scope boundaries when assigning `parentId`. As line numbers advance during AST processing, any scope whose `endLine` is strictly less than the candidate symbol's declaration line MUST be popped from the active scope stack, preventing trailing sibling or top-level declarations from inheriting stale parent IDs. The indexer MUST NOT recompute parent IDs from a hardcoded language list.
+
+- op: modified
+  description: 'Clarify adapter registry registration and composition initialization'
+  selector:
+    type: section
+    matches: 'Requirement: Adapter registry'
+  content: |
+    An `AdapterRegistry` SHALL map language identifiers to `LanguageAdapter` instances. It provides:
+
+    - **`register(adapter: LanguageAdapter): void`** — registers an adapter for all languages it declares and all file extensions from `adapter.extensions()`
+    - **`getAdapter(languageId: string): LanguageAdapter | undefined`** — returns the adapter for a language, or `undefined` if none registered
+    - **`getAdapterForFile(filePath: string): LanguageAdapter | undefined`** — resolves extension → language → adapter using the dynamically built extension map
+    - **`getLanguageForFile(filePath: string): string | undefined`** — resolves extension → language identifier (e.g. `'typescript'`, `'python'`), or `undefined` if no adapter handles the extension
+    - **`getAdapters(): LanguageAdapter[]`** — returns all unique registered adapters
+
+    The extension-to-language map is built dynamically from registered adapters — there is no hardcoded extension list in the registry. Adding a new language requires only registering a new adapter.
+
+    Adapters SHALL be registered via `register()`. Built-in adapters (such as TypeScript, Python, Go, and PHP) are registered into the registry through composition providers.

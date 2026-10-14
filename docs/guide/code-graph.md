@@ -22,7 +22,7 @@ In modern monorepos and growing codebases, code modifications frequently introdu
 
 The SpecD Code Graph eliminates these issues by maintaining a live relational graph connecting:
 
-- **Symbols:** Classes, functions, methods, interfaces, types, variables, and their public export routes.
+- **Symbols:** Classes, functions, methods, interfaces, types, variables, properties, and their public export routes.
 - **Dependencies:** Bi-directional import and call relations across files and workspaces.
 - **Specifications:** Canonical requirements linked directly to the code symbols and files that realize them.
 - **Documentation:** Markdown guides, architectural decision records (ADRs), and package references indexed for instant discovery.
@@ -210,13 +210,13 @@ When test or ignored files are omitted by default filters:
 
 ### 1. Symbol Search (`--symbols`)
 
-Searches for definitions of classes, functions, methods, interfaces, types, and variables:
+Searches for definitions of classes, functions, methods, interfaces, types, variables, and properties:
 
 ```bash
 # Search for symbol by name
 specd graph search "ArchiveRepository" --symbols --format toon
 
-# Filter by symbol kind (function, class, method, variable, type, interface, enum)
+# Filter by symbol kind (function, class, method, variable, type, interface, enum, property)
 specd graph search "validate" --symbols --kind function,method --format text
 
 # Filter by workspace
@@ -224,6 +224,26 @@ specd graph search "ConfigLoader" --symbols --workspace core --format toon
 ```
 
 Symbol search follows **public bindings and re-exports**. A declaration in an internal module that is re-exported from a barrel (for example `packages/core/src/public.ts`) is one logical symbol. Text output lists the declaration and any matched public export as `matched export: <surface>::<exportedName>`.
+
+#### Cross-Language Property Normalization
+
+Container properties and state members are normalized to `SymbolKind.Property` across all supported languages:
+
+- **TypeScript**: Interface property signatures, class property definitions/field declarations, and enum members.
+- **Go**: Struct field declarations in `struct_type`.
+- **Python**: Class-level attribute assignments, dataclass fields, and Protocol annotations.
+- **PHP**: Class/trait property declarations, class constants (`const`), and enum cases (`enum_case`).
+
+#### Kind-Tiered Ranking Tie-Breaker
+
+When multiple symbol candidates share identical textual relevance and identity match strength, SQLite search applies a deterministic kind-prominence tie-breaker:
+
+- **Tier 4**: `class`, `interface`
+- **Tier 3**: `function`, `method`
+- **Tier 2**: `type`, `enum`
+- **Tier 1**: `variable`, `property`
+
+This ensures that foundational types and callable routines are not displaced by high-volume fine-grained fields and properties during broad keyword queries.
 
 ### 2. Source File Content Search (`--files`)
 
@@ -371,7 +391,7 @@ Direct dependents are depth 1. Total dependents include later depths. Record `HI
 
 ## 6. Architectural Hotspots (`specd graph hotspots`)
 
-Hotspot analysis ranks symbols by structural coupling. The default view keeps kinds `class`, `method`, and `function`, score of at least 1, risk of at least `MEDIUM`, and the top 20 results. Symbols with no direct callers are omitted unless you pass `--include-importer-only`.
+Hotspot analysis ranks symbols by structural coupling. The default view keeps kinds `class`, `method`, `function`, and `interface` (architectural contracts and high-coupling boundaries), score of at least 1, risk of at least `MEDIUM`, and the top 20 results. Symbols with no direct callers are omitted unless you pass `--include-importer-only`.
 
 ```bash
 specd graph hotspots --min-risk HIGH --exclude-path "*:test/*" --format text
@@ -395,7 +415,7 @@ Hierarchy weight is `(extenders × 3) + (implementors × 4) + (overriders × 2)`
 - `--min-risk <level>`: `LOW`, `MEDIUM`, `HIGH`, or `CRITICAL`. Default: `MEDIUM`.
 - `--min-score <n>`: Minimum score. Default: `1`.
 - `--limit <n>`: Maximum results. Default: `20`.
-- `--kind <kinds>`: Replaces the default kind set (`class,method,function`). It does not merge with it. Example: `--kind interface,type`.
+- `--kind <kinds>`: Replaces the default kind set (`class,method,function,interface`). It does not merge with it. Example: `--kind interface,type`.
 - `--include-importer-only`: Include symbols whose score comes only from file importers.
 - `--include-tests`: Include test category files in caller metrics and candidate rankings.
 - `--include-ignored`: Include ignored category files in caller metrics and candidate rankings.

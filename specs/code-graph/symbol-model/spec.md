@@ -106,7 +106,7 @@ The graph SHALL support a `document` category for textual non-code nodes.
 
 ### Requirement: SymbolKind enum
 
-`SymbolKind` SHALL be a closed string enum with the following members:
+`SymbolKind` SHALL be a closed string enum with the following 8 members:
 
 - `function`
 - `class`
@@ -115,8 +115,15 @@ The graph SHALL support a `document` category for textual non-code nodes.
 - `type`
 - `interface`
 - `enum`
+- `property`
 
 No other values are permitted. Language adapters MUST map language-specific constructs to one of these kinds or skip the construct entirely.
+
+The semantic contract for state declarations SHALL be normalized across all supported languages as follows:
+
+- State declared at file or module scope SHALL be assigned `SymbolKind.Variable` with `parentId` undefined.
+- State declared local to a routine (function or method body) SHALL be assigned `SymbolKind.Variable` with `parentId` set to the enclosing routine's symbol ID.
+- State encapsulated within a type or container construct (class, interface, struct, protocol, or enum) SHALL be assigned `SymbolKind.Property` with `parentId` set to the enclosing container's symbol ID.
 
 ### Requirement: Relation types
 
@@ -228,7 +235,7 @@ By extending `SpecdError`, all code-graph errors automatically follow the "Specd
 
 - `InvalidSymbolKindError` — when a symbol kind value is not in the `SymbolKind` enum
 - `InvalidRelationTypeError` — when a relation type value is not in the defined set
-- `DuplicateSymbolIdError` — when two symbols in the same file produce the same deterministic id
+- `DuplicateSymbolIdError` — defined for unexpected symbol identity collision conditions during model validation
 - `StoreNotOpenError` — when an operation is attempted on a closed or uninitialized store
 
 ### Requirement: Logical symbol and canonical reference model
@@ -243,11 +250,11 @@ A logical symbol that has a declaring owner SHALL expose `qualified_name`: the g
 
 A logical symbol MUST NOT carry a package name. Workspace on the file id and the adapter's package-to-workspace map are the package identity.
 
-The existing location-based `SymbolNode.id` and closed `SymbolKind` remain valid. Symbol space and member semantics are additive dimensions and MUST NOT overload `SymbolKind`. `SymbolKind` stays the closed broad enum (`function`, `class`, `method`, `variable`, `type`, `interface`, `enum`). Namespace or module is an owner-path role and a surface, not a new `SymbolKind`.
+The existing location-based `SymbolNode.id` and closed `SymbolKind` remain valid. Symbol space and member semantics are additive dimensions and MUST NOT overload `SymbolKind`. `SymbolKind` stays the closed broad enum (`function`, `class`, `method`, `variable`, `type`, `interface`, `enum`, `property`). Namespace or module is an owner-path role and a surface, not a new `SymbolKind`.
 
 A logical member's `declaringOwner` SHALL be the canonical logical identity of the type, namespace, module, object, receiver type, trait, contract, or other language-defined owner that syntactically declares it. It MUST NOT contain a parser-node identifier, a location-based child or parent ID, or a display-only qualified name. Adapters SHALL create or locate the logical owner before constructing member identities. Only declarations that are top-level in their language surface MAY omit the owner.
 
-`parentId` on a declaration occurrence SHALL be emitted by the language adapter that analyzed the file. The shared model MUST NOT assign it from a hardcoded language list.
+`parentId` on a declaration occurrence SHALL be emitted by the language adapter that analyzed the file, establishing lexical hierarchy (container types owning methods and properties, routines owning local variables and nested functions). The shared model MUST NOT assign it from a hardcoded language list.
 
 Same-name members under different declaring owners SHALL always have different logical identities. Moving a declaration within the same logical owner without changing its semantic identity MUST NOT change its canonical reference merely because its source line or parser node changes.
 

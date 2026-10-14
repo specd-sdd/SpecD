@@ -12,9 +12,6 @@
     {
       "file": "code-graph:src/infrastructure/tree-sitter/php-language-adapter.ts",
       "symbols": ["PhpLanguageAdapter"]
-    },
-    {
-      "file": "code-graph:test/infrastructure/tree-sitter/php-language-adapter.spec.ts"
     }
   ],
   "optimizations": {

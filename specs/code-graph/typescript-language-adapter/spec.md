@@ -14,7 +14,9 @@ The draft SHALL contain symbols, imports, scoped binding facts, call facts, refe
 
 ### Requirement: Declaration extraction and ranges
 
-The adapter SHALL extract named function declarations, callable variable initializers including arrow and higher-order wrappers, classes, class and object methods, class fields, prototype/static assignments, namespace/member assignments, destructured bindings, exported variables, type aliases, interfaces, and enums. It SHALL classify each construct with the shared broad `SymbolKind` without using that kind as a substitute for symbol space or member form.
+The adapter SHALL extract named function declarations, callable variable initializers including arrow and higher-order wrappers, classes, class and object methods, class fields, prototype/static assignments, namespace/member assignments, destructured bindings, exported variables, type aliases, interfaces, and enums.
+
+It SHALL classify interface property signatures, class field definitions, and enum members as `SymbolKind.Property`. Function and method overload signatures along with their implementation declaration SHALL be united under a single logical symbol with multiple declaration occurrences.
 
 Each symbol SHALL use the complete parser node as its construct range and the declared identifier node as its `selectionRange`, following the shared half-open range convention. Immediately preceding JSDoc, block, or contiguous line comments SHALL be retained verbatim when attached to the declaration. Invalid or range-less candidates SHALL be omitted rather than approximated.
 
@@ -28,11 +30,11 @@ Filtering these property symbols MUST NOT remove or alter the file's indexed sou
 
 ### Requirement: Logical identity and declaring owners
 
-The adapter SHALL create logical declarations in the type or value space proven by the supported declaration kind. Supported class and interface method-like declarations SHALL carry the logical identity of their syntactically declaring class or interface; they MUST NOT use a raw parser-node ID or an optional `SymbolNode.parentId` as the canonical owner.
+The adapter SHALL create logical declarations in the type or value space proven by the supported declaration kind. Supported class and interface method-like declarations and property declarations SHALL carry the logical identity of their syntactically declaring class or interface; they MUST NOT use a raw parser-node ID or an optional `SymbolNode.parentId` as the canonical owner.
 
-The owner SHALL be derived from parser construct containment and mapped to the owner's logical symbol before the member logical ID is created. Same-name members declared by different owners MUST remain distinct, including compact same-line declarations. Top-level declarations SHALL have no declaring owner. Static, instance, constructor, getter, setter, interface-signature, and supported field-method forms SHALL remain distinguishable whenever syntax proves the form.
+The owner SHALL be derived from parser construct containment and mapped to the owner's logical symbol before the member logical ID is created. Same-name members declared by different owners MUST remain distinct, including compact same-line declarations. Top-level declarations SHALL have no declaring owner. Multiple overload signatures of the same member name within a declaring owner SHALL be retained as an overload set rather than overwriting prior signatures. Static, instance, constructor, getter, setter, interface-signature, and supported field-method forms SHALL remain distinguishable whenever syntax proves the form.
 
-Object-literal, prototype-assignment, namespace, enum-member, or other method-like symbols for which the current parser state does not retain one supported logical owner SHALL remain location-backed discovery symbols and MUST be omitted from logical member facts rather than represented as ownerless members. TypeScript declaration merging and dual type/value identities beyond the supported broad-kind projection remain unsupported.
+Object-literal, prototype-assignment, namespace, or other method-like symbols for which the current parser state does not retain one supported logical owner SHALL remain location-backed discovery symbols and MUST be omitted from logical member facts rather than represented as ownerless members. TypeScript declaration merging and dual type/value identities beyond the supported broad-kind projection remain unsupported.
 
 ### Requirement: Imports, exports, and public bindings
 
@@ -43,6 +45,8 @@ Public bindings SHALL preserve public surface, exported name, symbol space, cano
 ### Requirement: Scoped bindings, calls, types, and construction
 
 The adapter SHALL emit deterministic facts for lexical scopes, imports and aliases, typed parameters, constructor parameter properties, fields/properties, return types, type-alias right-hand sides, `this`/class receiver bindings, and explicit construction expressions. It SHALL build `IMPORTS`, `CALLS`, `CONSTRUCTS`, and `USES_TYPE` only when local declarations, resolved imports, receiver bindings, or other indexed facts prove the target.
+
+The adapter SHALL extract literal string dynamic `import(...)` expressions as file dependency import facts. It SHALL extract call expressions occurring in nested and chained expressions (such as `factory().method()` or callbacks).
 
 The caller of a call relation SHALL be the innermost enclosing callable symbol. Calls at module scope, ambiguous receivers, unresolved globals, computed dynamic members, and runtime-only aliases SHALL not produce guessed relations.
 

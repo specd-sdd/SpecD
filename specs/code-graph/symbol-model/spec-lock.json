@@ -10,16 +10,12 @@
   ],
   "implementation": [
     {
-      "file": "code-graph:src/domain/value-objects/symbol-node.ts",
-      "symbols": ["SymbolNode", "createSymbolNode"]
+      "file": "code-graph:src/domain/value-objects/symbol-kind.ts",
+      "symbols": ["SymbolKind", "isSymbolKind"]
     },
     {
-      "file": "code-graph:src/domain/value-objects/file-node.ts",
-      "symbols": ["FileNode", "createFileNode"]
-    },
-    {
-      "file": "code-graph:src/domain/value-objects/source-location.ts",
-      "symbols": ["SourceLocation"]
+      "file": "code-graph:src/domain/services/scoped-binding-environment.ts",
+      "symbols": ["buildScopedBindingEnvironment"]
     }
   ],
   "optimizations": {

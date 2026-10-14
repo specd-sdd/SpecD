@@ -283,25 +283,82 @@ export function withOwnerParents(
 }
 
 /**
- * Assigns the nearest preceding class or interface as the parent of a method.
- * Used by languages whose methods are nested in source order inside a type.
+ * Lexical scope frame tracked on the active scope stack during parent resolution.
+ */
+export interface LexicalScopeFrame {
+  readonly id: string
+  readonly kind: SymbolKind
+  readonly startLine: number
+  readonly startColumn: number
+  readonly endLine: number
+  readonly endColumn: number
+}
+
+const CONTAINER_KINDS = new Set<string>([
+  SymbolKind.Class,
+  SymbolKind.Interface,
+  SymbolKind.Type,
+  SymbolKind.Enum,
+])
+
+const ROUTINE_KINDS = new Set<string>([SymbolKind.Function, SymbolKind.Method])
+
+/**
+ * Assigns enclosing container or routine symbols as parents using a coordinate-popped scope stack.
+ * Container constructs (Class, Interface, Type, Enum) enclose methods and properties.
+ * Routine constructs (Function, Method) enclose local variables and nested functions.
  * @param symbols - Extracted declarations.
- * @returns Symbols with enclosing type parents applied.
+ * @returns Symbols with enclosing parents applied.
  */
 export function withEnclosingTypeParents(symbols: readonly SymbolNode[]): SymbolNode[] {
   const sorted = [...symbols].sort(
     (left, right) => left.line - right.line || left.column - right.column,
   )
   const parentById = new Map<string, string>()
-  let currentOwnerId: string | undefined
+  const scopeStack: LexicalScopeFrame[] = []
+
   for (const symbol of sorted) {
-    if (symbol.kind === SymbolKind.Class || symbol.kind === SymbolKind.Interface) {
-      currentOwnerId = symbol.id
-      continue
+    while (scopeStack.length > 0) {
+      const top = scopeStack[scopeStack.length - 1]!
+      if (
+        top.endLine < symbol.line ||
+        (top.endLine === symbol.line && top.endColumn <= symbol.column)
+      ) {
+        scopeStack.pop()
+      } else {
+        break
+      }
     }
-    if (symbol.kind === SymbolKind.Method && currentOwnerId !== undefined) {
-      parentById.set(symbol.id, currentOwnerId)
+
+    if (symbol.kind === SymbolKind.Method || symbol.kind === SymbolKind.Property) {
+      for (let i = scopeStack.length - 1; i >= 0; i--) {
+        const frame = scopeStack[i]!
+        if (CONTAINER_KINDS.has(frame.kind)) {
+          parentById.set(symbol.id, frame.id)
+          break
+        }
+      }
+    } else if (symbol.kind === SymbolKind.Variable || symbol.kind === SymbolKind.Function) {
+      for (let i = scopeStack.length - 1; i >= 0; i--) {
+        const frame = scopeStack[i]!
+        if (ROUTINE_KINDS.has(frame.kind)) {
+          parentById.set(symbol.id, frame.id)
+          break
+        }
+      }
+    }
+
+    if (CONTAINER_KINDS.has(symbol.kind) || ROUTINE_KINDS.has(symbol.kind)) {
+      scopeStack.push({
+        id: symbol.id,
+        kind: symbol.kind,
+        startLine: symbol.line,
+        startColumn: symbol.column,
+        endLine: symbol.endLine,
+        endColumn: symbol.endColumn,
+      })
     }
   }
+
   return withOwnerParents(symbols, parentById)
 }

@@ -19,6 +19,13 @@
 - **THEN** each supported construct has its expected broad kind
 - **AND** its exact name selection is contained by the parser construct range
 
+#### Scenario: Struct fields extract as Property kind
+
+- **GIVEN** a Go struct definition containing named fields
+- **WHEN** symbols are extracted
+- **THEN** each struct field is assigned `SymbolKind.Property`
+- **AND** its `parentId` is set to the enclosing struct's symbol ID
+
 ### Requirement: Package identity, exports, and imports
 
 #### Scenario: Import forms and package exports remain distinct
@@ -45,6 +52,18 @@
 - **THEN** each method uses its receiver type's logical identity as owner
 - **AND** no syntax `parentId` collapses the methods or pointer/value evidence
 
+#### Scenario: Method receiver parsed from AST receiver parameter node
+
+- **GIVEN** a receiver method `func (s *Service) Execute()`
+- **WHEN** the method declaration is analyzed
+- **THEN** receiver type `Service` and pointer semantics are derived directly from the AST receiver parameter node rather than regular expressions
+
+#### Scenario: Struct fields own struct as logical owner and parentId
+
+- **GIVEN** a Go struct declaring fields
+- **WHEN** logical member declarations are built
+- **THEN** each struct field has the struct type as its declaring owner and `parentId`
+
 ### Requirement: Scoped bindings, selectors, construction, and types
 
 #### Scenario: Proven package selector differs from interface dispatch
@@ -53,6 +72,13 @@
 - **WHEN** relations are built
 - **THEN** the package selector may produce deterministic call/type evidence
 - **AND** the unknown dispatch produces no guessed concrete call
+
+#### Scenario: Go buildRelations emits IMPORTS and CALLS relations
+
+- **GIVEN** a Go file importing a known indexed package and calling a function
+- **WHEN** `buildRelations()` executes
+- **THEN** an `IMPORTS` relation connects the importing file to the target package/file
+- **AND** a `CALLS` relation connects the caller to the resolved target function or receiver method
 
 ### Requirement: Go embedding and hierarchy provenance
 

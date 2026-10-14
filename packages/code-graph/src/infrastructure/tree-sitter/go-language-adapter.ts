@@ -45,6 +45,7 @@ import {
   createAdapterDeclarationDescriptor,
   type AdapterHierarchyDescriptor,
   withOwnerParents,
+  withEnclosingTypeParents,
 } from './reference-fact-helpers.js'
 
 /**
@@ -319,7 +320,7 @@ export class GoLanguageAdapter implements LanguageAdapter {
     const callFacts = this.extractCallFactsFromData(filePath, content, symbols)
 
     const typeInfos = this.collectTypeInfo(content, filePath, symbols)
-    const receiverFacts = this.collectMethodReceivers(content, filePath, symbols)
+    const receiverFacts = this.collectMethodReceivers(root, content, filePath, symbols)
     const methodReceivers = receiverFacts.methods
     const serializedMethodReceivers: Record<string, Record<string, string>> = {}
     for (const [receiver, methods] of methodReceivers.entries()) {
@@ -358,7 +359,7 @@ export class GoLanguageAdapter implements LanguageAdapter {
     }
     return {
       language: 'go',
-      symbols: withOwnerParents(symbols, ownerByMemberId),
+      symbols: withEnclosingTypeParents(withOwnerParents(symbols, ownerByMemberId)),
       imports,
       bindingFacts,
       callFacts,
@@ -538,14 +539,10 @@ export class GoLanguageAdapter implements LanguageAdapter {
   /**
    * Builds relations between symbols or files from the analyzed facts and resolved imports.
    * @param analysis - The file analysis.
-   * @param _context - The relation build context.
+   * @param context - The relation build context.
    * @returns The build relations.
    */
-  buildRelations(
-    analysis: FileAnalysis,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    _context: RelationBuildContext,
-  ): Relation[] {
+  buildRelations(analysis: FileAnalysis, context: RelationBuildContext): Relation[] {
     const relations: Relation[] = []
 
     for (const symbol of analysis.symbols) {
@@ -609,6 +606,47 @@ export class GoLanguageAdapter implements LanguageAdapter {
               metadata: { precedence: 0 },
             }),
           )
+        }
+      }
+    }
+
+    for (const imp of analysis.imports) {
+      const target = imp.specifier
+      const key = `${analysis.filePath}:${RelationType.Imports}:${target}`
+      if (!seen.has(key)) {
+        seen.add(key)
+        relations.push(
+          createRelation({
+            source: analysis.filePath,
+            target,
+            type: RelationType.Imports,
+            metadata: { specifier: imp.specifier },
+          }),
+        )
+      }
+    }
+
+    const localSymbolsByName = new Map<string, string>()
+    for (const s of analysis.symbols) {
+      localSymbolsByName.set(s.name, s.id)
+    }
+
+    for (const call of analysis.callFacts) {
+      if (call.callerSymbolId) {
+        const calleeId =
+          context?.resolvedImports?.importMap?.get(call.name) ?? localSymbolsByName.get(call.name)
+        if (calleeId) {
+          const key = `${call.callerSymbolId}:${RelationType.Calls}:${calleeId}`
+          if (!seen.has(key)) {
+            seen.add(key)
+            relations.push(
+              createRelation({
+                source: call.callerSymbolId,
+                target: calleeId,
+                type: RelationType.Calls,
+              }),
+            )
+          }
         }
       }
     }
@@ -681,28 +719,52 @@ export class GoLanguageAdapter implements LanguageAdapter {
   }
 
   /**
-   * Collects method receiver mappings from content.
+   * Collects method receiver mappings from AST nodes.
+   * @param root - The root SgNode of the parsed Go AST.
    * @param content - Source file content.
    * @param filePath - The path of the Go file.
    * @param symbols - Extracted symbol nodes.
    * @returns Receiver mappings and pointer receiver method identities.
    */
   private collectMethodReceivers(
+    root: SgNode,
     content: string,
     filePath: string,
     symbols: SymbolNode[],
   ): GoReceiverFacts {
     const methods = new Map<string, Map<string, string>>()
     const pointerMethodIds = new Set<string>()
-    const methodRegex =
-      /^func\s*\(\s*(?:[A-Za-z_][A-Za-z0-9_]*\s+)?(\*?)([A-Za-z_][A-Za-z0-9_]*)\s*\)\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(/gm
 
-    for (const match of content.matchAll(methodRegex)) {
-      const pointer = match[1] === '*'
-      const receiver = match[2]
-      const methodName = match[3]
-      if (!receiver || !methodName) continue
-      const line = content.slice(0, match.index ?? 0).split('\n').length
+    for (const child of root.children()) {
+      if (nodeKind(child) !== 'method_declaration') continue
+      const nameNode = child.field('name')
+      const methodName = nameNode?.text()
+      const receiverList = child.field('receiver')
+      if (!methodName || !receiverList) continue
+
+      let receiverName: string | undefined
+      let isPointer = false
+
+      for (const param of receiverList.children()) {
+        if (nodeKind(param) === 'parameter_declaration') {
+          const typeNode = param.field('type')
+          if (typeNode) {
+            const rawText = typeNode.text().trim()
+            if (rawText.startsWith('*')) {
+              isPointer = true
+              receiverName = rawText.slice(1).trim()
+            } else if (nodeKind(typeNode) === 'pointer_type') {
+              isPointer = true
+              receiverName = typeNode.text().replace(/^\*/, '').trim()
+            } else {
+              receiverName = rawText
+            }
+          }
+        }
+      }
+
+      if (!receiverName) continue
+      const line = child.range().start.line + 1
       const methodId = symbols.find(
         (symbol) =>
           symbol.filePath === filePath &&
@@ -711,10 +773,10 @@ export class GoLanguageAdapter implements LanguageAdapter {
           symbol.line === line,
       )?.id
       if (!methodId) continue
-      if (pointer) pointerMethodIds.add(methodId)
-      const receiverMethods = methods.get(receiver) ?? new Map<string, string>()
+      if (isPointer) pointerMethodIds.add(methodId)
+      const receiverMethods = methods.get(receiverName) ?? new Map<string, string>()
       receiverMethods.set(methodName, methodId)
-      methods.set(receiver, receiverMethods)
+      methods.set(receiverName, receiverMethods)
     }
 
     return { methods, pointerMethodIds }
@@ -986,7 +1048,50 @@ export class GoLanguageAdapter implements LanguageAdapter {
       addFact(CallForm.Constructor, name, undefined, match.index ?? 0)
     }
 
+    const freePattern = /(?<![.\w$])([A-Za-z_][A-Za-z0-9_]*)\s*\(/g
+    for (const match of content.matchAll(freePattern)) {
+      const name = match[1]
+      if (name === undefined || this.isExcludedFreeCall(content, match.index ?? 0, name)) continue
+      addFact(CallForm.Free, name, undefined, match.index ?? 0)
+    }
+
     return facts
+  }
+
+  /**
+   * Tests whether a free call candidate is actually a keyword or function declaration.
+   * @param content - File content.
+   * @param index - Index in content.
+   * @param name - Call target name.
+   * @returns Whether to exclude the candidate.
+   */
+  private isExcludedFreeCall(content: string, index: number, name: string): boolean {
+    const before = content.slice(Math.max(index - 64, 0), index)
+    return (
+      [
+        'func',
+        'var',
+        'const',
+        'type',
+        'import',
+        'package',
+        'if',
+        'for',
+        'switch',
+        'case',
+        'select',
+        'return',
+        'make',
+        'new',
+        'len',
+        'cap',
+        'append',
+        'copy',
+        'delete',
+        'panic',
+        'recover',
+      ].includes(name) || /\bfunc\s+(?:\([^)]*\)\s+)?$/.test(before)
+    )
   }
 
   /**
@@ -1019,6 +1124,42 @@ export class GoLanguageAdapter implements LanguageAdapter {
 
         if (typeKind === 'struct_type') {
           addSymbol(name, SymbolKind.Class, child, nameNode, extractComment(node))
+          for (const member of typeNode.children()) {
+            if (nodeKind(member) === 'field_declaration_list') {
+              for (const field of member.children()) {
+                if (nodeKind(field) !== 'field_declaration') continue
+                for (const fieldChild of field.children()) {
+                  if (nodeKind(fieldChild) === 'field_identifier') {
+                    const fieldName = fieldChild.text()
+                    if (fieldName) {
+                      addSymbol(
+                        fieldName,
+                        SymbolKind.Property,
+                        field,
+                        fieldChild,
+                        extractComment(field),
+                      )
+                    }
+                  }
+                }
+              }
+            } else if (nodeKind(member) === 'field_declaration') {
+              for (const fieldChild of member.children()) {
+                if (nodeKind(fieldChild) === 'field_identifier') {
+                  const fieldName = fieldChild.text()
+                  if (fieldName) {
+                    addSymbol(
+                      fieldName,
+                      SymbolKind.Property,
+                      member,
+                      fieldChild,
+                      extractComment(member),
+                    )
+                  }
+                }
+              }
+            }
+          }
         } else if (typeKind === 'interface_type') {
           addSymbol(name, SymbolKind.Interface, child, nameNode, extractComment(node))
           for (const member of typeNode.children()) {

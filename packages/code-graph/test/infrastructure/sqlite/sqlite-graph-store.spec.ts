@@ -2922,4 +2922,73 @@ describe('SQLiteGraphStore', () => {
 
     await store.close()
   })
+
+  it('applies kind-tiered ranking as a deterministic tie-breaker for equal relevance matches', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-tie-breaker-'))
+    const store = new SQLiteGraphStore(tempDir)
+    await store.open()
+
+    const file = createFileNode({
+      path: 'core:src/processor.ts',
+      projectRelativePath: 'packages/core/src/processor.ts',
+      language: 'typescript',
+      contentHash: 'sha256:processor',
+      workspace: 'core',
+    })
+    const classSymbol = createSymbolNode({
+      name: 'Processor',
+      kind: SymbolKind.Class,
+      filePath: file.path,
+      line: 1,
+      column: 0,
+    })
+    const funcSymbol = createSymbolNode({
+      name: 'Processor',
+      kind: SymbolKind.Function,
+      filePath: file.path,
+      line: 10,
+      column: 0,
+    })
+    const typeSymbol = createSymbolNode({
+      name: 'Processor',
+      kind: SymbolKind.Type,
+      filePath: file.path,
+      line: 20,
+      column: 0,
+    })
+    const propSymbol = createSymbolNode({
+      name: 'Processor',
+      kind: SymbolKind.Property,
+      filePath: file.path,
+      line: 30,
+      column: 0,
+    })
+    const varSymbol = createSymbolNode({
+      name: 'Processor',
+      kind: SymbolKind.Variable,
+      filePath: file.path,
+      line: 40,
+      column: 0,
+    })
+
+    await store.upsertFile(file, [varSymbol, propSymbol, typeSymbol, funcSymbol, classSymbol], [])
+
+    const hits = await store.searchSymbols({ query: 'Processor' })
+    const matchedKinds = hits.map((hit) => hit.symbol.kind)
+
+    expect(matchedKinds.indexOf(SymbolKind.Class)).toBeLessThan(
+      matchedKinds.indexOf(SymbolKind.Function),
+    )
+    expect(matchedKinds.indexOf(SymbolKind.Function)).toBeLessThan(
+      matchedKinds.indexOf(SymbolKind.Type),
+    )
+    expect(matchedKinds.indexOf(SymbolKind.Type)).toBeLessThan(
+      matchedKinds.indexOf(SymbolKind.Property),
+    )
+    expect(matchedKinds.indexOf(SymbolKind.Type)).toBeLessThan(
+      matchedKinds.indexOf(SymbolKind.Variable),
+    )
+
+    await store.close()
+  })
 })

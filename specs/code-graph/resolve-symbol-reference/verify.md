@@ -60,6 +60,13 @@
 - **WHEN** both satisfy the request
 - **THEN** the result is ambiguous with both candidates
 
+#### Scenario: Selector candidate declarations of same logical symbol resolve without ambiguity
+
+- **GIVEN** selector resolution evaluates candidate declarations that all belong to the same logical symbol or overload set
+- **WHEN** selector candidates are checked
+- **THEN** status is `resolved` rather than `ambiguous`
+- **AND** all declaration occurrences are retained on the resolved logical symbol
+
 ### Requirement: Public and local binding identity
 
 #### Scenario: Parallel reexports do not collapse

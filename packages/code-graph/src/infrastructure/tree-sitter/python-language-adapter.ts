@@ -208,11 +208,20 @@ interface SerializedPythonClassInfo {
 }
 
 /**
+ * Stored field type fact for RelationType.UsesType generation.
+ */
+interface PythonFieldTypeFact {
+  readonly fieldSymbolId: string
+  readonly typeName: string
+}
+
+/**
  * Parser state representation for Python.
  */
 interface PythonParserState {
   readonly kind: 'python'
   readonly classes: readonly SerializedPythonClassInfo[]
+  readonly fieldTypes?: readonly PythonFieldTypeFact[]
 }
 
 /**
@@ -318,18 +327,20 @@ export class PythonLanguageAdapter implements LanguageAdapter {
     const symbols: SymbolNode[] = []
     const seenSymbol = new Set<string>()
 
+    const fieldTypes: PythonFieldTypeFact[] = []
+
     const addSymbol = (
       name: string,
       kind: SymbolKind,
       node: SgNode,
       selectionNode: SgNode | null | undefined,
       comment: string | undefined,
-    ): void => {
-      if (!selectionNode) return
+    ): SymbolNode | undefined => {
+      if (!selectionNode) return undefined
       const line = node.range().start.line + 1
       const col = node.range().start.column
       const key = `${kind}:${name}:${line}:${col}`
-      if (seenSymbol.has(key)) return
+      if (seenSymbol.has(key)) return undefined
       try {
         const symbol = createSymbolNode({
           name,
@@ -349,12 +360,16 @@ export class PythonLanguageAdapter implements LanguageAdapter {
         })
         seenSymbol.add(key)
         symbols.push(symbol)
+        return symbol
       } catch (error) {
         if (!(error instanceof RangeError)) throw error
+        return undefined
       }
     }
 
-    this.walk(root, addSymbol)
+    this.walk(root, addSymbol, (fieldSymbolId, typeName) => {
+      fieldTypes.push({ fieldSymbolId, typeName })
+    })
 
     // Extract imports
     const imports: ImportDeclaration[] = []
@@ -451,7 +466,10 @@ export class PythonLanguageAdapter implements LanguageAdapter {
     }
 
     const bindingFacts = this.extractBindingFactsFromData(filePath, content, symbols, imports)
-    const callFacts = this.extractCallFactsFromData(filePath, content, symbols)
+    const callFacts = [
+      ...this.extractCallFactsFromData(filePath, content, symbols),
+      ...this.extractDecoratorCallFacts(root, filePath, symbols),
+    ]
 
     const classes = this.collectClassInfo(content, filePath, symbols)
     const serializedClasses = classes.map((cls) => {
@@ -485,6 +503,7 @@ export class PythonLanguageAdapter implements LanguageAdapter {
       parserState: {
         kind: 'python',
         classes: serializedClasses,
+        fieldTypes,
       },
     }
   }
@@ -526,11 +545,12 @@ export class PythonLanguageAdapter implements LanguageAdapter {
               ? SymbolSpace.Type
               : SymbolSpace.Value,
           ownerSymbolId: ownerByMemberId.get(symbol.id),
-          requiresOwner: symbol.kind === SymbolKind.Method,
+          requiresOwner: symbol.kind === SymbolKind.Method || symbol.kind === SymbolKind.Property,
           memberSemantics:
-            symbol.kind === SymbolKind.Method
+            symbol.kind === SymbolKind.Method || symbol.kind === SymbolKind.Property
               ? (formByMemberId.get(symbol.id) ?? {
-                  kind: MemberKind.Method,
+                  kind:
+                    symbol.kind === SymbolKind.Property ? MemberKind.Property : MemberKind.Method,
                   dispatch: MemberDispatch.Instance,
                 })
               : undefined,
@@ -798,6 +818,32 @@ export class PythonLanguageAdapter implements LanguageAdapter {
       }
     }
 
+    const fieldTypes = pythonState?.fieldTypes ?? []
+    for (const { fieldSymbolId, typeName } of fieldTypes) {
+      const importedId = context.resolvedImports.importMap.get(typeName)
+      const localCandidates = localSymbolsByName.get(typeName)
+      const localType = localCandidates?.find(
+        (s) =>
+          s.kind === SymbolKind.Class ||
+          s.kind === SymbolKind.Interface ||
+          s.kind === SymbolKind.Type,
+      )
+      const targetId = importedId ?? localType?.id
+      if (targetId) {
+        const key = `${fieldSymbolId}:${RelationType.UsesType}:${targetId}`
+        if (!seen.has(key)) {
+          seen.add(key)
+          relations.push(
+            createRelation({
+              source: fieldSymbolId,
+              target: targetId,
+              type: RelationType.UsesType,
+            }),
+          )
+        }
+      }
+    }
+
     return relations
   }
 
@@ -879,11 +925,22 @@ export class PythonLanguageAdapter implements LanguageAdapter {
       const memberSymbolIds: string[] = []
       const memberFormsById = new Map<string, MemberSemantics>()
       for (const symbol of symbols) {
-        if (symbol.filePath !== filePath || symbol.kind !== SymbolKind.Method) continue
+        if (
+          symbol.filePath !== filePath ||
+          (symbol.kind !== SymbolKind.Method && symbol.kind !== SymbolKind.Property)
+        )
+          continue
         if (!containsSymbolRange(ownerSymbol, symbol)) continue
         memberSymbolIds.push(symbol.id)
-        methodsByName.set(symbol.name, symbol.id)
-        memberFormsById.set(symbol.id, pythonMemberSemantics(symbol, lines))
+        if (symbol.kind === SymbolKind.Method) {
+          methodsByName.set(symbol.name, symbol.id)
+          memberFormsById.set(symbol.id, pythonMemberSemantics(symbol, lines))
+        } else if (symbol.kind === SymbolKind.Property) {
+          memberFormsById.set(symbol.id, {
+            kind: MemberKind.Property,
+            dispatch: MemberDispatch.Instance,
+          })
+        }
       }
 
       const baseNames = (match[3] ?? '')
@@ -1084,14 +1141,24 @@ export class PythonLanguageAdapter implements LanguageAdapter {
 
     const memberPattern = /\b([A-Za-z_]\w*)\.([A-Za-z_]\w*)\s*\(/g
     for (const match of content.matchAll(memberPattern)) {
+      const index = match.index ?? 0
+      const lineStart = content.lastIndexOf('\n', index) + 1
+      const linePrefix = content.slice(lineStart, index).trim()
+      if (linePrefix.startsWith('@')) continue
       const receiver = match[1]
       const name = match[2]
       if (receiver === undefined || name === undefined || receiver === 'importlib') continue
-      addFact(CallForm.Member, name, receiver, match.index ?? 0)
+      addFact(CallForm.Member, name, receiver, index)
     }
 
     const freePattern = /(?<![.\w])([A-Za-z_]\w*)\s*\(/g
     for (const match of content.matchAll(freePattern)) {
+      const index = match.index ?? 0
+      const lineStart = content.lastIndexOf('\n', index) + 1
+      const linePrefix = content.slice(lineStart, index).trim()
+      if (linePrefix.startsWith('@')) continue
+      const before = content.slice(Math.max(index - 16, 0), index)
+      if (/\b(?:def|class)\s+$/.test(before)) continue
       const name = match[1]
       if (
         name === undefined ||
@@ -1099,14 +1166,116 @@ export class PythonLanguageAdapter implements LanguageAdapter {
       ) {
         continue
       }
-      addFact(
-        /^[A-Z]/.test(name) ? CallForm.Constructor : CallForm.Free,
-        name,
-        undefined,
-        match.index ?? 0,
-      )
+      addFact(/^[A-Z]/.test(name) ? CallForm.Constructor : CallForm.Free, name, undefined, index)
     }
 
+    return facts
+  }
+
+  /**
+   * Extracts decorator invocations as call facts from AST.
+   * @param root - AST root node.
+   * @param filePath - File path being analyzed.
+   * @param symbols - Emitted symbol nodes.
+   * @returns Extracted call facts for decorators.
+   */
+  private extractDecoratorCallFacts(
+    root: SgNode,
+    filePath: string,
+    symbols: readonly SymbolNode[],
+  ): CallFact[] {
+    const facts: CallFact[] = []
+    const seen = new Set<string>()
+
+    const visit = (node: SgNode): void => {
+      if (nodeKind(node) === 'decorated_definition') {
+        const decorators: SgNode[] = []
+        let defNode: SgNode | undefined
+        for (const child of node.children()) {
+          const k = nodeKind(child)
+          if (k === 'decorator') {
+            decorators.push(child)
+          } else if (k === 'function_definition' || k === 'class_definition') {
+            defNode = child
+          }
+        }
+
+        if (defNode && decorators.length > 0) {
+          const defName = defNode.field('name')?.text()
+          const defLine = defNode.range().start.line + 1
+          const caller = symbols.find(
+            (s) => s.filePath === filePath && s.line === defLine && s.name === defName,
+          )
+
+          if (caller) {
+            for (const deco of decorators) {
+              for (const expr of deco.children()) {
+                if (expr.text() === '@') continue
+                const exprKind = nodeKind(expr)
+                let name: string | undefined
+                let receiverName: string | undefined
+                let form: CallForm = CallForm.Free
+
+                if (exprKind === 'call') {
+                  const fnNode = expr.field('function') ?? expr.child(0)
+                  if (fnNode) {
+                    const fnKind = nodeKind(fnNode)
+                    if (fnKind === 'identifier') {
+                      name = fnNode.text()
+                      form = /^[A-Z]/.test(name) ? CallForm.Constructor : CallForm.Free
+                    } else if (fnKind === 'attribute') {
+                      receiverName = fnNode.field('object')?.text()
+                      name = fnNode.field('attribute')?.text()
+                      form = CallForm.Member
+                    }
+                  }
+                } else if (exprKind === 'attribute') {
+                  receiverName = expr.field('object')?.text()
+                  name = expr.field('attribute')?.text()
+                  form = CallForm.Member
+                } else if (exprKind === 'identifier') {
+                  name = expr.text()
+                  form = /^[A-Z]/.test(name) ? CallForm.Constructor : CallForm.Free
+                }
+
+                if (name && !['staticmethod', 'classmethod', 'property', 'setter'].includes(name)) {
+                  const loc = deco.range().start
+                  const location: SourceLocation = {
+                    filePath,
+                    line: loc.line + 1,
+                    column: loc.column,
+                    endLine: undefined,
+                    endColumn: undefined,
+                  }
+                  const key = `${caller.id}:${name}:${location.line}:${location.column}`
+                  if (!seen.has(key)) {
+                    seen.add(key)
+                    facts.push({
+                      filePath,
+                      scopeId: filePath,
+                      callerSymbolId: caller.id,
+                      form,
+                      name,
+                      receiverName,
+                      targetName: name,
+                      arity: undefined,
+                      location,
+                      metadata: undefined,
+                    })
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
+      for (const child of node.children()) {
+        visit(child)
+      }
+    }
+
+    visit(root)
     return facts
   }
 
@@ -1114,6 +1283,7 @@ export class PythonLanguageAdapter implements LanguageAdapter {
    * Recursively walks the AST to extract symbols.
    * @param node - The current AST node.
    * @param addSymbol - Callback to register a discovered symbol.
+   * @param addFieldType - Optional callback to register field type annotation facts.
    */
   private walk(
     node: SgNode,
@@ -1123,7 +1293,8 @@ export class PythonLanguageAdapter implements LanguageAdapter {
       node: SgNode,
       selectionNode: SgNode | null | undefined,
       comment: string | undefined,
-    ) => void,
+    ) => SymbolNode | undefined,
+    addFieldType?: (fieldSymbolId: string, typeName: string) => void,
   ): void {
     for (const child of node.children()) {
       const kind = nodeKind(child)
@@ -1142,17 +1313,17 @@ export class PythonLanguageAdapter implements LanguageAdapter {
           if (name) {
             addSymbol(name, SymbolKind.Class, child, child.field('name'), extractComment(child))
           }
-          // Walk into class body (block) for methods
-          this.walk(child, addSymbol)
+          // Walk into class body (block) for methods and fields
+          this.walk(child, addSymbol, addFieldType)
           break
         }
         case 'block': {
-          // Recurse into block to find methods inside class bodies
-          this.walk(child, addSymbol)
+          // Recurse into block to find methods and fields inside class bodies
+          this.walk(child, addSymbol, addFieldType)
           break
         }
         case 'decorated_definition': {
-          this.walk(child, addSymbol)
+          this.walk(child, addSymbol, addFieldType)
           break
         }
         case 'expression_statement': {
@@ -1164,6 +1335,65 @@ export class PythonLanguageAdapter implements LanguageAdapter {
               const left = firstChild.field('left')
               if (left && nodeKind(left) === 'identifier') {
                 addSymbol(left.text(), SymbolKind.Variable, child, left, extractComment(child))
+              }
+            }
+          } else if (parent && nodeKind(parent) === 'block') {
+            const grandParent = parent.parent()
+            if (grandParent && nodeKind(grandParent) === 'class_definition') {
+              const firstChild = child.child(0)
+              if (firstChild && nodeKind(firstChild) === 'assignment') {
+                const left = firstChild.field('left')
+                if (left && nodeKind(left) === 'identifier') {
+                  const sym = addSymbol(
+                    left.text(),
+                    SymbolKind.Property,
+                    child,
+                    left,
+                    extractComment(child),
+                  )
+                  if (sym && addFieldType) {
+                    const typeNode = firstChild.field('type')
+                    if (typeNode) {
+                      const rawType = typeNode.text()
+                      const matches = rawType.match(/[A-Za-z_]\w*/g)
+                      if (matches) {
+                        for (const m of matches) {
+                          if (
+                            ![
+                              'int',
+                              'str',
+                              'float',
+                              'bool',
+                              'bytes',
+                              'None',
+                              'list',
+                              'dict',
+                              'set',
+                              'tuple',
+                              'Any',
+                              'Optional',
+                              'Union',
+                              'List',
+                              'Dict',
+                              'Set',
+                              'Tuple',
+                              'Callable',
+                              'Sequence',
+                              'Iterable',
+                              'Mapping',
+                              'TypeVar',
+                              'Generic',
+                              'Final',
+                              'ClassVar',
+                            ].includes(m)
+                          ) {
+                            addFieldType(sym.id, m)
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
               }
             }
           }

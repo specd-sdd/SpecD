@@ -1308,11 +1308,11 @@ export class PhpLanguageAdapter implements LanguageAdapter {
             ? SymbolSpace.Type
             : SymbolSpace.Value,
         ownerSymbolId: ownerByMemberSymbolId.get(symbol.id),
-        requiresOwner: symbol.kind === SymbolKind.Method,
+        requiresOwner: symbol.kind === SymbolKind.Method || symbol.kind === SymbolKind.Property,
         memberSemantics:
-          symbol.kind === SymbolKind.Method
+          symbol.kind === SymbolKind.Method || symbol.kind === SymbolKind.Property
             ? (formByMemberSymbolId.get(symbol.id) ?? {
-                kind: MemberKind.Method,
+                kind: symbol.kind === SymbolKind.Property ? MemberKind.Property : MemberKind.Method,
                 dispatch: MemberDispatch.Instance,
               })
             : undefined,
@@ -1775,15 +1775,23 @@ export class PhpLanguageAdapter implements LanguageAdapter {
       for (const symbol of symbols) {
         if (
           symbol.filePath !== filePath ||
-          (symbol.kind !== SymbolKind.Method && symbol.kind !== SymbolKind.Variable)
+          (symbol.kind !== SymbolKind.Method &&
+            symbol.kind !== SymbolKind.Variable &&
+            symbol.kind !== SymbolKind.Property)
         ) {
           continue
         }
         if (!containsSymbolRange(ownerSymbol, symbol)) continue
         memberSymbolIds.push(symbol.id)
-        if (symbol.kind !== SymbolKind.Method) continue
-        methodsByName.set(symbol.name, symbol.id)
-        memberFormsById.set(symbol.id, phpMemberSemantics(symbol, lines))
+        if (symbol.kind === SymbolKind.Method) {
+          methodsByName.set(symbol.name, symbol.id)
+          memberFormsById.set(symbol.id, phpMemberSemantics(symbol, lines))
+        } else if (symbol.kind === SymbolKind.Property) {
+          memberFormsById.set(symbol.id, {
+            kind: MemberKind.Property,
+            dispatch: MemberDispatch.Instance,
+          })
+        }
       }
 
       const traitNames = lines
@@ -2045,6 +2053,7 @@ export class PhpLanguageAdapter implements LanguageAdapter {
           const nameNode = child.field('name')
           const name = nameNode?.text()
           if (name) addSymbol(name, SymbolKind.Enum, child, nameNode, commentFor(child))
+          this.walkClassBody(child, addSymbol)
           break
         }
         case 'trait_declaration': {
@@ -2101,19 +2110,42 @@ export class PhpLanguageAdapter implements LanguageAdapter {
     const commentFor = (target: SgNode): string | undefined => extractComment(target)
 
     for (const child of classNode.children()) {
-      if (nodeKind(child) !== 'declaration_list') continue
+      if (nodeKind(child) !== 'declaration_list' && nodeKind(child) !== 'enum_declaration_list')
+        continue
       for (const member of child.children()) {
-        if (nodeKind(member) === 'method_declaration') {
+        const memberKind = nodeKind(member)
+        if (memberKind === 'method_declaration') {
           const nameNode = member.field('name')
           const name = nameNode?.text()
           if (name) addSymbol(name, SymbolKind.Method, member, nameNode, commentFor(member))
-        } else if (nodeKind(member) === 'property_declaration') {
+        } else if (memberKind === 'property_declaration') {
           for (const propChild of member.children()) {
             if (nodeKind(propChild) !== 'property_element') continue
             const varName = propChild.field('name')
             if (!varName) continue
             const name = varName.text().replace(/^\$/, '')
-            if (name) addSymbol(name, SymbolKind.Variable, member, varName, commentFor(member))
+            if (name) addSymbol(name, SymbolKind.Property, member, varName, commentFor(member))
+          }
+        } else if (memberKind === 'const_declaration') {
+          for (const constChild of member.children()) {
+            if (nodeKind(constChild) !== 'const_element') continue
+            const nameNode = constChild.child(0)
+            if (nameNode && nodeKind(nameNode) === 'name') {
+              addSymbol(
+                nameNode.text(),
+                SymbolKind.Property,
+                constChild,
+                nameNode,
+                commentFor(member),
+              )
+            }
+          }
+        } else if (memberKind === 'enum_case') {
+          const nameNode =
+            member.field('name') ?? member.children().find((c) => nodeKind(c) === 'name')
+          const name = nameNode?.text()
+          if (name) {
+            addSymbol(name, SymbolKind.Property, member, nameNode, commentFor(member))
           }
         }
       }

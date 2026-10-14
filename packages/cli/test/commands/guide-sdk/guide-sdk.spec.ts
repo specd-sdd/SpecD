@@ -106,9 +106,9 @@ describe('CLI guide-sdk command', () => {
       await makeSdkProgram().parseAsync(['guide-sdk', '--format', 'json'], { from: 'user' })
 
       const envelope = parseListing(getStdout(), 'json')
-      // 21 hand-written SDK documents; the catalog also holds 1348 generated topics.
+      // 21 hand-written SDK documents; the catalog also holds 1351 generated topics.
       expect(envelope.pagination?.total).toBe(21)
-      expect(envelope.hiddenByDefault?.generatedApiTopics).toBe(1348)
+      expect(envelope.hiddenByDefault?.generatedApiTopics).toBe(1351)
       expect(envelope.hiddenByDefault?.revealWith).toBe('specd guide-sdk --scope api')
     })
 
@@ -364,7 +364,7 @@ describe('CLI guide-sdk command', () => {
       expect(entries).toHaveLength(10)
       expect(entries.every((e) => String(e.topic).includes('/'))).toBe(true)
       // `--scope api` selects generated topics across every collection, not one.
-      expect(envelope.pagination?.total).toBe(1348)
+      expect(envelope.pagination?.total).toBe(1351)
       expect((envelope.collections ?? []).map((c) => c.collection).sort()).toEqual([
         'code-graph',
         'core',
@@ -383,7 +383,7 @@ describe('CLI guide-sdk command', () => {
       )
 
       const envelope = parseListing(getStdout(), 'json')
-      expect(envelope.pagination?.total).toBe(1369)
+      expect(envelope.pagination?.total).toBe(1372)
       expect(envelope.hiddenByDefault).toBeUndefined()
     })
 
@@ -465,8 +465,8 @@ describe('CLI guide-sdk command', () => {
       // Each collection is introduced by its own header instead of one run of entries.
       expect(out).toContain('── code-graph · 166 topics · page 1 ──')
       expect(out).toContain('── core · 544 topics · page 1 ──')
-      expect(out).toContain('── sdk · 638 topics · pages 1-2 ──')
-      expect(out).toContain('page 1 of 2 · 715 of 1348 topics')
+      expect(out).toContain('── sdk · 641 topics · pages 1-2 ──')
+      expect(out).toContain('page 1 of 2 · 715 of 1351 topics')
     })
 
     it('omits the page position when the result fits in a single page', async () => {
@@ -538,7 +538,7 @@ describe('CLI guide-sdk command', () => {
         { from: 'user' },
       )
       const out = text()
-      expect(out).toContain('hiddenByDefault: 1348 generated API topics withheld')
+      expect(out).toContain('hiddenByDefault: 1351 generated API topics withheld')
       expect(out).toContain('reveal with specd guide-sdk --scope api')
 
       const structured = captureStdout()
@@ -547,7 +547,7 @@ describe('CLI guide-sdk command', () => {
         { from: 'user' },
       )
       expect(parseListing(structured(), 'json').hiddenByDefault).toEqual({
-        generatedApiTopics: 1348,
+        generatedApiTopics: 1351,
         revealWith: 'specd guide-sdk --scope api',
       })
     })

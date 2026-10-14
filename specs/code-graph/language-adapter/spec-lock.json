@@ -6,24 +6,8 @@
   "dependsOn": ["code-graph:symbol-model"],
   "implementation": [
     {
-      "file": "code-graph:src/infrastructure/tree-sitter/typescript-language-adapter.ts",
-      "symbols": ["TypeScriptLanguageAdapter"]
-    },
-    {
-      "file": "code-graph:src/infrastructure/tree-sitter/php-language-adapter.ts",
-      "symbols": ["PhpLanguageAdapter"]
-    },
-    {
-      "file": "code-graph:src/infrastructure/tree-sitter/go-language-adapter.ts",
-      "symbols": ["GoLanguageAdapter"]
-    },
-    {
-      "file": "code-graph:src/infrastructure/tree-sitter/python-language-adapter.ts",
-      "symbols": ["PythonLanguageAdapter"]
-    },
-    {
       "file": "code-graph:src/infrastructure/tree-sitter/reference-fact-helpers.ts",
-      "symbols": ["withOwnerParents", "withEnclosingTypeParents"]
+      "symbols": ["withEnclosingTypeParents"]
     }
   ],
   "optimizations": {

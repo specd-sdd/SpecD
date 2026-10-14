@@ -12,6 +12,7 @@ import {
   buildLogicalDeclarationFacts,
   containsSymbolRange,
   createAdapterDeclarationDescriptor,
+  withEnclosingTypeParents,
 } from '../../../src/infrastructure/tree-sitter/reference-fact-helpers.js'
 
 function symbol(name: string, kind: SymbolKind, line: number) {
@@ -161,5 +162,92 @@ describe('reference fact helpers', () => {
         kind: 'extends:1',
       },
     ])
+  })
+
+  describe('withEnclosingTypeParents', () => {
+    it('pops scope when construct coordinates end so following top-level declarations have undefined parentId', () => {
+      const cls = createSymbolNode({
+        name: 'UserService',
+        kind: SymbolKind.Class,
+        filePath: 'ws:src/user.ts',
+        line: 1,
+        column: 0,
+        endLine: 5,
+        endColumn: 1,
+      })
+      const method = createSymbolNode({
+        name: 'save',
+        kind: SymbolKind.Method,
+        filePath: 'ws:src/user.ts',
+        line: 2,
+        column: 2,
+        endLine: 4,
+        endColumn: 3,
+      })
+      const fn = createSymbolNode({
+        name: 'helper',
+        kind: SymbolKind.Function,
+        filePath: 'ws:src/user.ts',
+        line: 7,
+        column: 0,
+        endLine: 10,
+        endColumn: 1,
+      })
+
+      const resolved = withEnclosingTypeParents([cls, method, fn])
+      const resMethod = resolved.find((s) => s.name === 'save')
+      const resFn = resolved.find((s) => s.name === 'helper')
+
+      expect(resMethod?.parentId).toBe(cls.id)
+      expect(resFn?.parentId).toBeUndefined()
+    })
+
+    it('assigns container parent to properties and methods, and routine parent to local variables', () => {
+      const cls = createSymbolNode({
+        name: 'Repository',
+        kind: SymbolKind.Class,
+        filePath: 'ws:src/repo.ts',
+        line: 1,
+        column: 0,
+        endLine: 15,
+        endColumn: 1,
+      })
+      const prop = createSymbolNode({
+        name: 'db',
+        kind: SymbolKind.Property,
+        filePath: 'ws:src/repo.ts',
+        line: 2,
+        column: 2,
+        endLine: 2,
+        endColumn: 10,
+      })
+      const method = createSymbolNode({
+        name: 'find',
+        kind: SymbolKind.Method,
+        filePath: 'ws:src/repo.ts',
+        line: 4,
+        column: 2,
+        endLine: 10,
+        endColumn: 3,
+      })
+      const local = createSymbolNode({
+        name: 'query',
+        kind: SymbolKind.Variable,
+        filePath: 'ws:src/repo.ts',
+        line: 5,
+        column: 4,
+        endLine: 5,
+        endColumn: 20,
+      })
+
+      const resolved = withEnclosingTypeParents([cls, prop, method, local])
+      const resProp = resolved.find((s) => s.name === 'db')
+      const resMethod = resolved.find((s) => s.name === 'find')
+      const resLocal = resolved.find((s) => s.name === 'query')
+
+      expect(resProp?.parentId).toBe(cls.id)
+      expect(resMethod?.parentId).toBe(cls.id)
+      expect(resLocal?.parentId).toBe(method.id)
+    })
   })
 })

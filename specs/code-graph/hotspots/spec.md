@@ -37,7 +37,7 @@ Each entry's `riskLevel` SHALL be computed using the existing `computeRiskLevel(
 Hotspot computation applies product defaults per option:
 
 - **categories = \['source']** — only production source code is ranked and contributes to caller/importer counts by default
-- **kinds = \['class', 'method', 'function']** — the default hotspot view focuses on callable or structural symbols
+- **kinds = \['class', 'method', 'function', 'interface']** — the default hotspot view focuses on callable, structural, and contract-defining symbols
 - **score > 0** — symbols with no caller signal, importer signal, or hierarchy signal are excluded
 - **risk >= MEDIUM** — LOW-risk symbols are filtered out
 - **limit 20** — only the top 20 results are returned
@@ -62,7 +62,7 @@ In other words, changing `minRisk`, `limit`, or `workspace` MUST NOT silently re
 
 Examples:
 
-- `specd graph hotspots` → defaults apply (categories = `source`, kinds = `class,method,function`, no importer-only entries, risk >= MEDIUM, limit 20)
+- `specd graph hotspots` → defaults apply (categories = `source`, kinds = `class,method,function,interface`, no importer-only entries, risk >= MEDIUM, limit 20)
 - `specd graph hotspots --min-risk HIGH` → risk >= HIGH, while default kinds, importer-only exclusion, and limit 20 remain active
 - `specd graph hotspots --limit 50` → limit 50, while default kinds, importer-only exclusion, and risk >= MEDIUM remain active
 - `specd graph hotspots --kind interface` → only `interface` symbols, with the rest of the default ranking policy still active

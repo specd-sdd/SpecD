@@ -277,6 +277,10 @@ When indexing specs into the code graph, the indexer SHALL prefer `optimizedDesc
 
 The indexing session SHALL persist the logical symbols, member semantics, declaration occurrences, public bindings, local bindings, hierarchy facts, and resolution steps emitted by language adapters. Each persisted logical symbol that has an owner SHALL store `qualified_name` as the generic dotted path rebuilt from the owner chain and the simple name. A symbol with no owner MUST NOT store a qualified name. The indexer MUST NOT treat full-text search text as that exact spelling. The indexer MUST NOT hardcode a language name, parser-state kind, package manifest, or syntax rule. It MUST NOT contain a TypeScript re-export pass and MUST NOT assign declaration parents from a fixed language set.
 
+When deriving cross-file override relations (`OVERRIDES`), the indexer SHALL iterate through all target method declaration IDs associated with each matching super method name (supporting overload sets and multi-declaration methods), rather than dropping targets beyond the first entry.
+
+`SymbolKind.Property` declarations SHALL be indexed and persisted alongside other symbol kinds, emitting `DEFINES` relations from the declaring file and preserving the enclosing container's `parentId`.
+
 The indexer SHALL persist a coverage outcome for every discovered or considered source target, including indexed content hash, excluded, unsupported capability, parse-failed, and partial states. Index errors required for later absence decisions MUST NOT exist only in the transient `IndexResult`.
 
 `COVERS_SYMBOL` relations SHALL resolve to logical-symbol identity rather than an arbitrary declaration occurrence. Ambiguous, runtime-only, or conditional-without-context references MUST NOT create guessed relations.

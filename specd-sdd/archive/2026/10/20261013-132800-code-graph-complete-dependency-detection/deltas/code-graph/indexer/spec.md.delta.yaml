@@ -1,0 +1,19 @@
+- op: modified
+  description: 'Derive cross-file override relations across all super method declarations and persist property symbols'
+  selector:
+    type: section
+    matches: 'Requirement: Reference fact indexing'
+  content: |
+    The indexing session SHALL persist the logical symbols, member semantics, declaration occurrences, public bindings, local bindings, hierarchy facts, and resolution steps emitted by language adapters. Each persisted logical symbol that has an owner SHALL store `qualified_name` as the generic dotted path rebuilt from the owner chain and the simple name. A symbol with no owner MUST NOT store a qualified name. The indexer MUST NOT treat full-text search text as that exact spelling. The indexer MUST NOT hardcode a language name, parser-state kind, package manifest, or syntax rule. It MUST NOT contain a TypeScript re-export pass and MUST NOT assign declaration parents from a fixed language set.
+
+    When deriving cross-file override relations (`OVERRIDES`), the indexer SHALL iterate through all target method declaration IDs associated with each matching super method name (supporting overload sets and multi-declaration methods), rather than dropping targets beyond the first entry.
+
+    `SymbolKind.Property` declarations SHALL be indexed and persisted alongside other symbol kinds, emitting `DEFINES` relations from the declaring file and preserving the enclosing container's `parentId`.
+
+    The indexer SHALL persist a coverage outcome for every discovered or considered source target, including indexed content hash, excluded, unsupported capability, parse-failed, and partial states. Index errors required for later absence decisions MUST NOT exist only in the transient `IndexResult`.
+
+    `COVERS_SYMBOL` relations SHALL resolve to logical-symbol identity rather than an arbitrary declaration occurrence. Ambiguous, runtime-only, or conditional-without-context references MUST NOT create guessed relations.
+
+    Every persisted source file SHALL retain the indexed textual content used for analysis. Every emitted symbol SHALL carry its parser-derived complete construct range and declared-name selection range through chunking, semantic reconstruction, backend persistence, and structured query results without recomputing ranges from neighboring symbols.
+
+    Relation construction SHALL build reusable declaration, logical-symbol, import, and public-binding lookup indexes once per indexing session. Resolving an individual call, dependency, import, or re-export MUST NOT scan the complete logical declaration or symbol collection. Persistence SHALL retain bounded chunk and batch writes so the work of building relations grows with the processed relation facts rather than multiplying them by the full graph size. Adapter-emitted reference facts SHALL be stored before spec-coverage projection.

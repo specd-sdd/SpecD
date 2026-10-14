@@ -39,6 +39,8 @@ export interface ResolvedSymbolSelector {
   readonly symbolId: string
   readonly filePath: string
   readonly matchKind: 'name' | 'qualified' | 'full-id'
+  readonly parentId?: string | undefined
+  readonly logicalId?: string | undefined
 }
 
 /** Deterministic outcome of resolving one symbol selector for impact. */
@@ -112,7 +114,12 @@ export async function resolveSymbolSelector(
   const direct = await options.store.getSymbol(trimmed)
   if (direct) {
     return resolvedResult([
-      { symbolId: direct.id, filePath: direct.filePath, matchKind: 'full-id' },
+      {
+        symbolId: direct.id,
+        filePath: direct.filePath,
+        matchKind: 'full-id',
+        ...(direct.parentId !== undefined ? { parentId: direct.parentId } : {}),
+      },
     ])
   }
 
@@ -134,6 +141,7 @@ export async function resolveSymbolSelector(
           symbolId: symbol.id,
           filePath: symbol.filePath,
           matchKind: 'full-id' as const,
+          ...(symbol.parentId !== undefined ? { parentId: symbol.parentId } : {}),
         })),
     )
   }
@@ -163,6 +171,7 @@ export async function resolveSymbolSelector(
                   symbolId: declaration.symbolId,
                   filePath: file.canonicalPath,
                   matchKind: 'qualified' as const,
+                  logicalId: candidate.target.id,
                 })),
             )
           }
@@ -177,6 +186,7 @@ export async function resolveSymbolSelector(
                 symbolId: declaration.symbolId,
                 filePath: file.canonicalPath,
                 matchKind: 'qualified' as const,
+                logicalId: resolution.target?.id,
               })) ?? []
           )
         },
@@ -195,6 +205,7 @@ export async function resolveSymbolSelector(
         symbolId: symbol.id,
         filePath: symbol.filePath,
         matchKind: 'qualified' as const,
+        ...(symbol.parentId !== undefined ? { parentId: symbol.parentId } : {}),
       })),
     )
   }
@@ -209,6 +220,7 @@ export async function resolveSymbolSelector(
       symbolId: symbol.id,
       filePath: symbol.filePath,
       matchKind: 'name' as const,
+      ...(symbol.parentId !== undefined ? { parentId: symbol.parentId } : {}),
     })),
   )
 }
@@ -234,9 +246,61 @@ async function resolveUnanchoredQualifiedSelector(
       symbolId: declaration.symbolId,
       filePath: declaration.location.filePath,
       matchKind: 'qualified' as const,
+      logicalId: candidate.target.id,
     })),
   )
   return resolvedResult(matches)
+}
+
+/**
+ * Extracts declared symbol name from a standard deterministic symbol id.
+ * @param symbolId - Deterministic symbol id (<filePath>:<kind>:<name>:<line>:<column>).
+ * @returns The simple symbol name, or undefined if unparseable.
+ */
+function extractSymbolNameFromId(symbolId: string): string | undefined {
+  const match = /:([^:]+):\d+:\d+$/.exec(symbolId)
+  return match?.[1]
+}
+
+/**
+ * Unifies candidate matches that belong to the same logical symbol or overload set.
+ * @param matches - Ordered candidate matches.
+ * @returns The primary candidate match if all candidates belong to the same overload set, or undefined.
+ */
+export function unifyOverloadSetCandidates(
+  matches: readonly ResolvedSymbolSelector[],
+): ResolvedSymbolSelector | undefined {
+  if (matches.length <= 1) {
+    return matches[0]
+  }
+
+  const first = matches[0]
+  if (!first) {
+    return undefined
+  }
+
+  // If all matches share the same logicalId, they represent the same logical symbol.
+  if (first.logicalId !== undefined && matches.every((m) => m.logicalId === first.logicalId)) {
+    return first
+  }
+
+  // If all matches share the same filePath, parentId (non-null), and same symbol name, they represent overloads of the same member.
+  const firstName = extractSymbolNameFromId(first.symbolId)
+  if (
+    first.parentId !== undefined &&
+    firstName !== undefined &&
+    matches.every(
+      (m) =>
+        m.filePath === first.filePath &&
+        m.parentId !== undefined &&
+        m.parentId === first.parentId &&
+        extractSymbolNameFromId(m.symbolId) === firstName,
+    )
+  ) {
+    return first
+  }
+
+  return undefined
 }
 
 /**
@@ -258,6 +322,10 @@ function resolvedResult(matches: readonly ResolvedSymbolSelector[]): ResolvedSym
   ]
   if (ordered.length === 0) return { status: 'missing', candidates: [] }
   if (ordered.length === 1) return { status: 'resolved', match: ordered[0]! }
+  const unified = unifyOverloadSetCandidates(ordered)
+  if (unified !== undefined) {
+    return { status: 'resolved', match: unified }
+  }
   return {
     status: 'ambiguous',
     candidates: ordered.slice(0, MAX_AMBIGUITY_CANDIDATES),

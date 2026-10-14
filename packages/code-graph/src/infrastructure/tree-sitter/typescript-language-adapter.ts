@@ -281,7 +281,7 @@ function findEnclosingSymbolIdByLine(
 interface TsTypeDeclarationInfo {
   readonly name: string
   readonly symbolId: string
-  readonly methodsByName: Record<string, string>
+  readonly memberIdsByName: Record<string, string[]>
   readonly memberSymbolIds: readonly string[]
   readonly memberSemanticsById: Readonly<Record<string, MemberSemantics>>
   readonly extendsNames: readonly string[]
@@ -490,6 +490,7 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
       'abstract_class_declaration',
       'method_definition',
       'method_signature',
+      'property_signature',
       'type_alias_declaration',
       'interface_declaration',
       'enum_declaration',
@@ -526,6 +527,14 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
             addSymbol(name, SymbolKind.Method, node, node.field('name'), extractComment(node))
           break
         }
+        case 'property_signature': {
+          const nameNode = node.field('name')
+          const name = nameNode ? nameNode.text().trim() : getName(node)
+          if (name) {
+            addSymbol(name, SymbolKind.Property, node, nameNode, extractComment(node))
+          }
+          break
+        }
         case 'type_alias_declaration': {
           const name = getName(node)
           if (name) addSymbol(name, SymbolKind.Type, node, node.field('name'), extractComment(node))
@@ -540,6 +549,29 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
         case 'enum_declaration': {
           const name = getName(node)
           if (name) addSymbol(name, SymbolKind.Enum, node, node.field('name'), extractComment(node))
+          const body = node.field('body')
+          if (body) {
+            for (const member of body.children()) {
+              if (nodeKind(member) === 'enum_assignment') {
+                const nameNode = member.field('name')
+                const memberName = nameNode?.text().trim()
+                if (memberName) {
+                  addSymbol(
+                    memberName,
+                    SymbolKind.Property,
+                    member,
+                    nameNode,
+                    extractComment(member),
+                  )
+                }
+              } else if (nodeKind(member) === 'property_identifier') {
+                const memberName = member.text().trim()
+                if (memberName) {
+                  addSymbol(memberName, SymbolKind.Property, member, member, extractComment(member))
+                }
+              }
+            }
+          }
           break
         }
         case 'lexical_declaration':
@@ -1345,7 +1377,7 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
     ) {
       addSymbol(fieldName, SymbolKind.Method, node, nameNode, extractComment(node))
     } else {
-      addSymbol(fieldName, SymbolKind.Variable, node, nameNode, extractComment(node))
+      addSymbol(fieldName, SymbolKind.Property, node, nameNode, extractComment(node))
     }
   }
 
@@ -1435,9 +1467,9 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
       }
     }
 
-    const dynamicImportPattern = /\bimport\s*\(\s*(['"])([^'"]+)\1\s*\)/g
+    const dynamicImportPattern = /\bimport\s*\(\s*[`'"]([^`'"]+)[`'"]\s*\)/g
     for (const match of content.matchAll(dynamicImportPattern)) {
-      const specifier = match[2]
+      const specifier = match[1]
       if (specifier === undefined) continue
       addImport({
         originalName: '',
@@ -1575,12 +1607,13 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
       addFact(CallForm.Constructor, name, match.groups?.receiver, match.index ?? 0)
     }
 
-    const memberPattern = /\b(?<receiver>[A-Za-z_$][\w$]*)\??\.\s*(?<name>[A-Za-z_$][\w$]*)\s*\(/g
+    const memberPattern =
+      /(?:(?:\b(?<receiver>[A-Za-z_$][\w$]*)|[)\]])\??\.)\s*(?<name>[A-Za-z_$][\w$]*)\s*\(/g
     for (const match of content.matchAll(memberPattern)) {
       const receiver = match.groups?.receiver
       const name = match.groups?.name
-      if (receiver === undefined || name === undefined) continue
-      const form = /^[A-Z]/.test(receiver) ? CallForm.Static : CallForm.Member
+      if (name === undefined) continue
+      const form = receiver && /^[A-Z]/.test(receiver) ? CallForm.Static : CallForm.Member
       addFact(form, name, receiver, match.index ?? 0)
     }
 
@@ -1813,12 +1846,15 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
       const header = node.text().split('{')[0] ?? node.text()
       const extendsMatch = header.match(/\bextends\s+([^{]+?)(?:\bimplements\b|$)/)
       const implementsMatch = header.match(/\bimplements\s+([^{]+)$/)
-      const methodsByName: Record<string, string> = {}
+      const memberIdsByName: Record<string, string[]> = Object.create(null) as Record<
+        string,
+        string[]
+      >
       const memberSymbolIds: string[] = []
       const memberSemanticsById: Record<string, MemberSemantics> = {}
 
       for (const symbol of symbols) {
-        if (symbol.kind !== SymbolKind.Method) continue
+        if (symbol.kind !== SymbolKind.Method && symbol.kind !== SymbolKind.Property) continue
         if (!containsSymbolRange(ownerSymbol, symbol)) continue
         const memberNode = memberNodes.find(
           (candidate) =>
@@ -1826,14 +1862,19 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
         )
         if (!memberNode) continue
         memberSymbolIds.push(symbol.id)
-        methodsByName[symbol.name] = symbol.id
+        const existing = memberIdsByName[symbol.name]
+        if (Array.isArray(existing)) {
+          existing.push(symbol.id)
+        } else {
+          memberIdsByName[symbol.name] = [symbol.id]
+        }
         memberSemanticsById[symbol.id] = typeScriptMemberSemantics(memberNode, symbol.name)
       }
 
       declarations.push({
         name,
         symbolId,
-        methodsByName,
+        memberIdsByName,
         memberSymbolIds,
         memberSemanticsById,
         extendsNames:
@@ -1863,19 +1904,26 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
     relations: Relation[],
     seen: Set<string>,
   ): void {
-    for (const [methodName, methodId] of Object.entries(source.methodsByName)) {
-      const targetMethodId = target.methodsByName[methodName]
-      if (!targetMethodId) continue
-      const key = `${methodId}:${relationType}:${targetMethodId}`
-      if (seen.has(key)) continue
-      seen.add(key)
-      relations.push(
-        createRelation({
-          source: methodId,
-          target: targetMethodId,
-          type: relationType,
-        }),
-      )
+    if (!source.memberIdsByName || !target.memberIdsByName) return
+    for (const [methodName, sourceMethodIds] of Object.entries(source.memberIdsByName)) {
+      if (methodName === 'constructor') continue
+      if (!Array.isArray(sourceMethodIds)) continue
+      const targetMethodIds = target.memberIdsByName[methodName]
+      if (!Array.isArray(targetMethodIds) || targetMethodIds.length === 0) continue
+      for (const sourceId of sourceMethodIds) {
+        for (const targetId of targetMethodIds) {
+          const key = `${sourceId}:${relationType}:${targetId}`
+          if (seen.has(key)) continue
+          seen.add(key)
+          relations.push(
+            createRelation({
+              source: sourceId,
+              target: targetId,
+              type: relationType,
+            }),
+          )
+        }
+      }
     }
   }
 

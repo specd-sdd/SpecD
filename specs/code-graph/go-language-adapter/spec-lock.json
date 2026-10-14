@@ -12,9 +12,6 @@
     {
       "file": "code-graph:src/infrastructure/tree-sitter/go-language-adapter.ts",
       "symbols": ["GoLanguageAdapter"]
-    },
-    {
-      "file": "code-graph:test/infrastructure/tree-sitter/go-language-adapter.spec.ts"
     }
   ],
   "optimizations": {

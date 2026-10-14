@@ -16,6 +16,7 @@ import { type Relation } from '../../../src/domain/value-objects/relation.js'
 import { type ImportDeclaration } from '../../../src/domain/value-objects/import-declaration.js'
 import { InMemoryIndexSession } from '../../../src/application/use-cases/in-memory-index-session.js'
 import { parseLogicalSymbol } from '../../../src/domain/value-objects/symbol-reference.js'
+import { type FileAnalysis } from '../../../src/domain/value-objects/file-analysis.js'
 
 interface TestAdapter {
   languages(): string[]
@@ -609,6 +610,119 @@ type HandlerFn func(event Event) Result`
       const subDir = join(tempDir, 'cmd', 'server')
       mkdirSync(subDir, { recursive: true })
       expect(adapter.getPackageIdentity(subDir, tempDir)).toBe('github.com/acme/auth')
+    })
+  })
+
+  describe('GoLanguageAdapter dependency detection enhancements', () => {
+    it('extracts struct fields as SymbolKind.Property with struct parentId', () => {
+      const code = `package models
+type User struct {
+    ID int
+    Name string
+}
+`
+      const session = new InMemoryIndexSession()
+      session.registerFile({
+        filePath: 'workspace:models/user.go',
+        projectRelativePath: 'models/user.go',
+        contentHash: 'hash',
+        workspace: 'workspace',
+        language: 'go',
+      })
+      const draft = baseAdapter.analyzeFile('workspace:models/user.go', code, {
+        session,
+        workspaceName: 'workspace',
+      })
+
+      const user = draft.symbols.find((s) => s.name === 'User')
+      const id = draft.symbols.find((s) => s.name === 'ID')
+      const name = draft.symbols.find((s) => s.name === 'Name')
+
+      expect(user?.kind).toBe(SymbolKind.Class)
+      expect(id?.kind).toBe(SymbolKind.Property)
+      expect(id?.parentId).toBe(user?.id)
+      expect(name?.kind).toBe(SymbolKind.Property)
+      expect(name?.parentId).toBe(user?.id)
+    })
+
+    it('extracts multiline method receivers via AST', () => {
+      const code = `package service
+type Engine struct {}
+
+func (
+    e *Engine
+) Start() {
+}
+`
+      const session = new InMemoryIndexSession()
+      session.registerFile({
+        filePath: 'workspace:service/engine.go',
+        projectRelativePath: 'service/engine.go',
+        contentHash: 'hash',
+        workspace: 'workspace',
+        language: 'go',
+      })
+      const draft = baseAdapter.analyzeFile('workspace:service/engine.go', code, {
+        session,
+        workspaceName: 'workspace',
+      })
+
+      const engine = draft.symbols.find((s) => s.name === 'Engine')
+      const start = draft.symbols.find((s) => s.name === 'Start')
+
+      expect(start?.parentId).toBe(engine?.id)
+    })
+
+    it('emits IMPORTS and CALLS relations in buildRelations', () => {
+      const code = `package main
+import "fmt"
+
+func helper() {}
+func run() {
+    helper()
+}
+`
+      const session = new InMemoryIndexSession()
+      session.registerFile({
+        filePath: 'workspace:main.go',
+        projectRelativePath: 'main.go',
+        contentHash: 'hash',
+        workspace: 'workspace',
+        language: 'go',
+      })
+      const draft = baseAdapter.analyzeFile('workspace:main.go', code, {
+        session,
+        workspaceName: 'workspace',
+      })
+      const analysis: FileAnalysis = {
+        fileId: 1,
+        filePath: 'workspace:main.go',
+        projectRelativePath: 'main.go',
+        contentHash: 'hash',
+        workspace: 'workspace',
+        language: 'go',
+        symbols: draft.symbols,
+        imports: draft.imports,
+        bindingFacts: draft.bindingFacts,
+        callFacts: draft.callFacts,
+        ...(draft.referenceFacts !== undefined ? { referenceFacts: draft.referenceFacts } : {}),
+        ...(draft.parserState !== undefined ? { parserState: draft.parserState } : {}),
+      }
+      const relations = baseAdapter.buildRelations(analysis, {
+        session,
+        resolvedImports: { importMap: new Map(), fileImports: [] },
+      })
+
+      const importRel = relations.find((r) => r.type === RelationType.Imports)
+      const callRel = relations.find((r) => r.type === RelationType.Calls)
+
+      expect(importRel).toBeDefined()
+      expect(importRel?.target).toBe('fmt')
+      expect(callRel).toBeDefined()
+      const run = draft.symbols.find((s) => s.name === 'run')
+      const helper = draft.symbols.find((s) => s.name === 'helper')
+      expect(callRel?.source).toBe(run?.id)
+      expect(callRel?.target).toBe(helper?.id)
     })
   })
 })

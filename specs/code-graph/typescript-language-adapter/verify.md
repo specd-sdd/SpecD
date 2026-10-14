@@ -20,6 +20,19 @@
 - **THEN** every supported declaration has its expected broad kind
 - **AND** each name selection is contained by its parser-derived complete construct range
 
+#### Scenario: Interface properties and class fields extract as Property kind
+
+- **GIVEN** a TypeScript interface with property signatures and a class with field definitions
+- **WHEN** symbols are extracted
+- **THEN** both the interface property signatures and class fields are assigned `SymbolKind.Property`
+- **AND** their `parentId` is set to the enclosing interface or class symbol ID
+
+#### Scenario: Overload signatures unite under one logical symbol
+
+- **GIVEN** a function or method with multiple overload signatures and one implementation declaration
+- **WHEN** symbols and logical declarations are extracted
+- **THEN** all occurrences unite under a single logical symbol with multiple declaration occurrences
+
 ### Requirement: Object properties in array data records
 
 #### Scenario: Direct and nested data-record properties are omitted
@@ -61,6 +74,13 @@
 - **THEN** each member points to its class logical owner rather than a syntax parent ID
 - **AND** owner and member form keep all three logical identities distinct
 
+#### Scenario: Overload members do not overwrite each other in owner
+
+- **GIVEN** a class declaring multiple method overloads for `find`
+- **WHEN** member facts are built
+- **THEN** all overload signatures share the declaring class owner
+- **AND** earlier signatures are retained in the member's overload set rather than overwritten
+
 #### Scenario: Unsupported method-like declarations remain location-backed
 
 - **GIVEN** an object-literal method and a prototype assignment without a supported logical owner
@@ -85,6 +105,13 @@
 - **WHEN** relations are built
 - **THEN** the typed construction and member call produce deterministic facts and relations
 - **AND** the computed receiver call is dropped
+
+#### Scenario: Dynamic imports and nested calls extract deterministic dependencies
+
+- **GIVEN** code containing literal string `import('./module.js')` and chained call `builder().build()`
+- **WHEN** `analyzeFile()` and `buildRelations()` execute
+- **THEN** an `IMPORTS` relation is emitted for `./module.js`
+- **AND** deterministic call facts are extracted for the nested and chained call sites
 
 ### Requirement: TypeScript hierarchy and provenance evidence
 

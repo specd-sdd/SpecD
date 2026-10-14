@@ -49,7 +49,8 @@
 #### Scenario: Default kind set focuses the hotspot view
 
 - **WHEN** `computeHotspots` is called with no explicit kind filter
-- **THEN** only `class`, `method`, and `function` symbols are eligible for the default hotspot view
+- **THEN** only `class`, `method`, `function`, and `interface` symbols are eligible for the default hotspot view
+- **AND** `property`, `variable`, and `enum` symbols are excluded from the default view
 
 #### Scenario: Default view excludes importer-only symbols
 

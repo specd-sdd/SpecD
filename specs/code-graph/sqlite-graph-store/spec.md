@@ -249,6 +249,12 @@ The adapter MUST:
   - spec-id prefix, suffix, substring, and real component matches
   - document canonical-path or project-relative-path prefix, suffix, substring, and real component matches
 - count how many expanded query tokens match the selected identity fields and use that token coverage to rank candidates that satisfy more of the query intent above candidates satisfying fewer identity tokens
+- use kind-tiered ranking as a deterministic tie-breaker when symbol identity and relevance scores are equal:
+  - Tier 4: `class` and `interface`
+  - Tier 3: `function` and `method`
+  - Tier 2: `type` and `enum`
+  - Tier 1: `variable` and `property`
+    This prevents high-volume fine-grained property and variable symbols from displacing foundational types and callable routines in broad keyword queries.
 - use BM25 ranking for remaining textual matches across searchable columns after identity preference is applied
 - sanitize and join multi-token queries using `OR` logic for broad discovery
 - derive match-aware snippets and the corresponding 1-based line range from persisted file source content or FTS matches
@@ -262,6 +268,7 @@ Observable SQLite ordering semantics MUST hold:
 - suffix token matches outrank arbitrary substring token matches
 - real identity-component matches outrank arbitrary substring-only hits on the same identity field
 - candidates matching more expanded identity tokens outrank candidates matching fewer expanded identity tokens when generic text relevance is otherwise competing
+- higher kind tiers outrank lower kind tiers as a tie-breaker when identity and relevance matches are equal
 - generic term frequency in spec/document body content MUST NOT outrank a stronger spec-id, symbol-name, or document-path match for the same query intent
 
 The SQLite FTS schema MUST include:

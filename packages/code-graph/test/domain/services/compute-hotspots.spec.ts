@@ -215,19 +215,20 @@ describe('computeHotspots', () => {
     expect(result.entries[0]?.score).toBe(2)
   })
 
-  it('uses class, method, and function as the default hotspot kinds', async () => {
+  it('uses class, method, function, and interface as the default hotspot kinds, excluding properties and variables', async () => {
     const fn = sym('fn', 'ws-a:targets.ts', 1, SymbolKind.Function)
     const cls = sym('Cls', 'ws-a:targets.ts', 5, SymbolKind.Class)
     const method = sym('method', 'ws-a:targets.ts', 9, SymbolKind.Method)
     const variable = sym('state', 'ws-a:targets.ts', 13, SymbolKind.Variable)
     const contract = sym('Contract', 'ws-a:targets.ts', 17, SymbolKind.Interface)
+    const prop = sym('prop', 'ws-a:targets.ts', 21, SymbolKind.Property)
     const callers = [
       sym('callerA', 'ws-a:callers.ts', 1),
       sym('callerB', 'ws-a:callers.ts', 2),
       sym('callerC', 'ws-a:callers.ts', 3),
     ]
 
-    await store.upsertFile(file('ws-a:targets.ts'), [fn, cls, method, variable, contract], [])
+    await store.upsertFile(file('ws-a:targets.ts'), [fn, cls, method, variable, contract, prop], [])
     await store.upsertFile(
       file('ws-a:callers.ts'),
       callers,
@@ -237,15 +238,17 @@ describe('computeHotspots', () => {
         createRelation({ source: caller.id, target: method.id, type: RelationType.Calls }),
         createRelation({ source: caller.id, target: variable.id, type: RelationType.Calls }),
         createRelation({ source: caller.id, target: contract.id, type: RelationType.Calls }),
+        createRelation({ source: caller.id, target: prop.id, type: RelationType.Calls }),
       ]),
     )
 
     const result = await computeHotspots(store)
 
-    expect(DEFAULT_HOTSPOT_KINDS).toEqual(['class', 'method', 'function'])
+    expect(DEFAULT_HOTSPOT_KINDS).toEqual(['class', 'method', 'function', 'interface'])
     expect(result.entries.map((entry) => entry.symbol.kind).sort()).toEqual([
       SymbolKind.Class,
       SymbolKind.Function,
+      SymbolKind.Interface,
       SymbolKind.Method,
     ])
   })

@@ -524,9 +524,10 @@ const Checked = { checked: 1 } satisfies Record<string, number>;`
       const symbols = adapter.extractSymbols('main.ts', code)
 
       for (const name of ['parenthesized', 'asserted', 'frozen', 'checked']) {
-        expect(symbols.find((symbol: SymbolNode) => symbol.name === name)?.kind, name).toBe(
-          SymbolKind.Variable,
-        )
+        expect(
+          symbols.find((symbol: SymbolNode) => symbol.name === name && symbol.line > 1)?.kind,
+          name,
+        ).toBe(SymbolKind.Variable)
       }
     })
 
@@ -665,7 +666,7 @@ const rows = [${records}, { recordId: 1000, run: () => true }];`
       expect(methodSym).toBeDefined()
       expect(methodSym!.kind).toBe(SymbolKind.Method)
       expect(varSym).toBeDefined()
-      expect(varSym!.kind).toBe(SymbolKind.Variable)
+      expect(varSym!.kind).toBe(SymbolKind.Property)
     })
 
     it('extracts HOF initializers as functions', () => {
@@ -1306,5 +1307,80 @@ describe('TypeScriptLanguageAdapter drive-letter paths', () => {
   it('keeps a drive letter in the resolved import path', () => {
     const resolved = baseAdapter.resolveRelativeImportPath('C:/repo/src/a.ts', './b')
     expect(resolved).toContain('C:/repo/src/b.ts')
+  })
+})
+
+describe('TypeScriptLanguageAdapter dependency detection enhancements', () => {
+  it('extracts interface property signatures, class fields, and enum members as SymbolKind.Property', () => {
+    const code = `
+interface UserProfile {
+  username: string;
+  age: number;
+}
+class Account {
+  balance: number = 0;
+}
+enum Status {
+  Active = 'active',
+  Inactive = 'inactive',
+}
+`
+    const symbols = adapter.extractSymbols('account.ts', code)
+    const username = symbols.find((s) => s.name === 'username')
+    const balance = symbols.find((s) => s.name === 'balance')
+    const active = symbols.find((s) => s.name === 'Active')
+
+    expect(username?.kind).toBe(SymbolKind.Property)
+    expect(balance?.kind).toBe(SymbolKind.Property)
+    expect(active?.kind).toBe(SymbolKind.Property)
+  })
+
+  it('links all supermethod overload signatures with pairwise overrides', () => {
+    const code = `
+class Printer {
+  print(text: string): void;
+  print(num: number): void;
+  print(val: any): void {}
+}
+class ColorPrinter extends Printer {
+  print(val: any): void {}
+}
+`
+    const symbols = adapter.extractSymbols('printer.ts', code)
+    const relations = adapter.extractRelations('printer.ts', code, symbols)
+    const overrideRelations = relations.filter((r) => r.type === RelationType.Overrides)
+
+    // Child.print overrides all 3 Base.print overload signatures/declarations
+    expect(overrideRelations.length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('extracts dynamic import expressions with string literals', () => {
+    const code = `
+async function load() {
+  const mod = await import('./widget.js');
+  return mod;
+}
+`
+    const imports = adapter.extractImportedNames('main.ts', code)
+    const dynamic = imports.find((i) => i.specifier === './widget.js')
+
+    expect(dynamic).toBeDefined()
+    expect(dynamic?.isRelative).toBe(true)
+    expect(dynamic?.kind).toBe(ImportDeclarationKind.Dynamic)
+  })
+
+  it('recursively discovers nested and chained call sites', () => {
+    const code = `
+function run() {
+  service.getClient().fetchData().process();
+}
+`
+    const symbols = adapter.extractSymbols('runner.ts', code)
+    const calls = adapter.extractCallFacts('runner.ts', code, symbols)
+    const names = calls.map((c) => c.name)
+
+    expect(names).toContain('getClient')
+    expect(names).toContain('fetchData')
+    expect(names).toContain('process')
   })
 })

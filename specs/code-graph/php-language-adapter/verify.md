@@ -18,7 +18,13 @@
 - **WHEN** symbols are extracted
 - **THEN** supported declarations have their expected broad kinds
 - **AND** exact name selections are contained by complete parser construct ranges
-- **AND** class constants and enum cases are not approximated as supported declaration symbols
+
+#### Scenario: Properties, class constants, and enum cases extract as Property kind
+
+- **GIVEN** a PHP class declaring properties and class constants, and a PHP enum declaring enum cases
+- **WHEN** symbols are extracted
+- **THEN** each property, class constant, and enum case is assigned `SymbolKind.Property`
+- **AND** its `parentId` is set to the enclosing class or enum symbol ID
 
 ### Requirement: PHP logical identity and declaring owners
 
@@ -29,6 +35,12 @@
 - **THEN** each member uses its class logical owner rather than a syntax parent ID
 - **AND** member form preserves distinct case-preserving identities
 - **AND** the adapter does not claim language-complete case-insensitive lookup
+
+#### Scenario: Properties and class constants have container logical owner and parentId
+
+- **GIVEN** a PHP class declaring properties and class constants
+- **WHEN** logical member declarations are built
+- **THEN** each property and class constant has the enclosing class as its logical owner and `parentId`
 
 ### Requirement: Namespaces, use aliases, and Composer resolution
 

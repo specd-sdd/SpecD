@@ -176,6 +176,19 @@
 - **WHEN** a `SymbolNode` is created with `kind: 'module'` (not in the enum)
 - **THEN** `InvalidSymbolKindError` is thrown
 
+#### Scenario: Property kind is valid
+
+- **WHEN** a `SymbolNode` is created with `kind: 'property'`
+- **THEN** it is accepted without error as a valid member of the closed `SymbolKind` enum
+
+#### Scenario: State declaration normalization across scopes
+
+- **GIVEN** a state declaration at module/file scope, a state declaration local to a function body, and a state declaration inside a class/struct container
+- **WHEN** symbols are extracted
+- **THEN** the module-level declaration is assigned `SymbolKind.Variable` with `parentId` undefined
+- **AND** the function-local declaration is assigned `SymbolKind.Variable` with `parentId` set to the enclosing function's symbol id
+- **AND** the container declaration is assigned `SymbolKind.Property` with `parentId` set to the enclosing container's symbol id
+
 ### Requirement: Relation types
 
 #### Scenario: Relation direction matters
@@ -363,11 +376,10 @@
 - **THEN** it extends `SpecdError` from `@specd/core`
 - **AND** it includes the `specd: true` discriminator
 
-#### Scenario: Duplicate symbol id detected
+#### Scenario: DuplicateSymbolIdError extends SpecdCodeGraphError
 
-- **GIVEN** two symbols in the same file produce the same ID
-- **WHEN** the symbol model validates the file
-- **THEN** `DuplicateSymbolIdError` (extending `SpecdCodeGraphError`) is thrown
+- **WHEN** `DuplicateSymbolIdError` is instantiated
+- **THEN** it extends `SpecdCodeGraphError` with code `DUPLICATE_SYMBOL_ID`
 
 ### Requirement: Document category
 

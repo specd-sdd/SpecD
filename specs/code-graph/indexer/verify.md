@@ -647,6 +647,21 @@
 - **AND** resolving each relation uses indexed lookup instead of scanning all declarations, logical symbols, or public bindings
 - **AND** relation persistence remains chunked and deduplicated
 
+#### Scenario: Cross-file overrides connect to all overloaded super methods
+
+- **GIVEN** a base class or interface with multiple overloaded declarations of a method
+- **AND** a child class declaring an overriding method
+- **WHEN** cross-file override relations are derived
+- **THEN** `OVERRIDES` relations connect the overriding method to all overloaded super method declaration IDs
+- **AND** candidate targets beyond the first overload are not dropped
+
+#### Scenario: Property symbols are persisted with DEFINES relations
+
+- **GIVEN** files declaring properties inside classes, interfaces, structs, or enums
+- **WHEN** indexing commits
+- **THEN** property symbols are persisted with `kind: 'property'` and their container's `parentId`
+- **AND** `DEFINES` relations connect each file to its contained property symbols
+
 #### Scenario: Source content and symbol ranges are indexed atomically
 
 - **GIVEN** a source file contains multi-line named declarations and searchable body text

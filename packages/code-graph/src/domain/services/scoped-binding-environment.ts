@@ -6,6 +6,7 @@ import {
 } from '../value-objects/binding-fact.js'
 import { CallForm, type CallFact, type ResolvedDependency } from '../value-objects/call-fact.js'
 import { RelationType } from '../value-objects/relation-type.js'
+import { SymbolKind } from '../value-objects/symbol-kind.js'
 import { type SymbolNode } from '../value-objects/symbol-node.js'
 import { type FileAnalysis } from '../value-objects/file-analysis.js'
 import { splitWorkspaceIdentity } from './split-workspace-identity.js'
@@ -103,6 +104,31 @@ export function buildScopedBindingEnvironment(
   }
 
   const scopesById = new Map<string, BindingScope>([[defaultFileScope.id, defaultFileScope]])
+  for (const symbol of input.analysis.symbols) {
+    if (!scopesById.has(symbol.id)) {
+      scopesById.set(symbol.id, {
+        id: symbol.id,
+        kind:
+          symbol.kind === SymbolKind.Class || symbol.kind === SymbolKind.Interface
+            ? BindingScopeKind.Class
+            : symbol.kind === SymbolKind.Method || symbol.kind === SymbolKind.Function
+              ? BindingScopeKind.Function
+              : BindingScopeKind.Block,
+        filePath,
+        parentId:
+          symbol.parentId ?? (symbol.id === defaultFileScope.id ? undefined : defaultFileScope.id),
+        ownerSymbolId: symbol.id,
+        start: {
+          filePath,
+          line: symbol.line,
+          column: symbol.column,
+          endLine: symbol.endLine,
+          endColumn: symbol.endColumn,
+        },
+        end: undefined,
+      })
+    }
+  }
   const factsByScopeAndName = groupFactsByScopeAndName([
     ...input.analysis.bindingFacts,
     ...buildImportBindingFacts(input.analysis, input.importMap, rootScopeId),

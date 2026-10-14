@@ -19,14 +19,6 @@
     {
       "file": "code-graph:src/application/use-cases/index-code-graph.ts",
       "symbols": ["IndexCodeGraph"]
-    },
-    {
-      "file": "code-graph:src/application/services/project-spec-coverage.ts",
-      "symbols": ["projectSpecCoverage"]
-    },
-    {
-      "file": "code-graph:src/application/use-cases/in-memory-index-session.ts",
-      "symbols": ["InMemoryIndexSession"]
     }
   ],
   "optimizations": {

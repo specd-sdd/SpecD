@@ -14,7 +14,7 @@ The adapter SHALL derive the declared package from source and package identity f
 
 ### Requirement: Declaration extraction and ranges
 
-The adapter SHALL extract functions, receiver methods, struct types, interface types, named types and aliases, variables, and constants. Structs SHALL use the shared class-like broad kind, interfaces the interface kind, and other named types the type kind without treating broad kind as the complete Go identity.
+The adapter SHALL extract functions, receiver methods, struct types, interface types, named types and aliases, variables, constants, and struct fields. Structs SHALL use the shared class-like broad kind, interfaces the interface kind, struct fields SHALL be extracted as `SymbolKind.Property`, and other named types the type kind without treating broad kind as the complete Go identity.
 
 Each symbol SHALL use its complete parser construct range and exact declared-name `selectionRange` under the shared half-open convention. Immediately preceding attached comments SHALL be retained verbatim. Candidates lacking authoritative parser ranges SHALL be omitted rather than approximated.
 
@@ -32,13 +32,17 @@ The adapter MUST NOT declare `go.work` or any other basename. Package identity c
 
 ### Requirement: Go logical identity and declaring owners
 
-A receiver method SHALL use the logical identity of its declared receiver type as owner when that receiver type is present in the supported file analysis, normalizing pointer syntax while retaining pointer/value receiver evidence in parser state. Interface methods SHALL use the declaring interface logical owner. Package functions, types, variables, and constants SHALL have no declaring owner beyond their package surface. A receiver method whose owner cannot be proven SHALL be omitted from logical member facts rather than represented as ownerless.
+A receiver method SHALL parse its receiver type and pointer/value semantics directly from AST receiver parameter nodes rather than regex text parsing. It SHALL use the logical identity of its declared receiver type as owner when that receiver type is present in the supported file analysis, normalizing pointer syntax while retaining pointer/value receiver evidence in parser state. Interface methods SHALL use the declaring interface logical owner.
 
-Owner identities SHALL be derived from receiver and interface syntax and mapped to logical symbols before member logical IDs are created. They MUST NOT use raw syntax IDs or optional `SymbolNode.parentId`. Same-name methods on different receiver types MUST remain distinct, and interface signatures MUST remain distinguishable from concrete receiver methods. Struct fields are not declaration symbols in the current adapter.
+Struct fields SHALL be extracted as declaration symbols with `SymbolKind.Property`, having their declaring struct type as their logical owner and `parentId`. Package functions, types, variables, and constants SHALL have no declaring owner beyond their package surface. A receiver method whose owner cannot be proven SHALL be omitted from logical member facts rather than represented as ownerless.
+
+Owner identities SHALL be derived from receiver and interface syntax and mapped to logical symbols before member logical IDs are created. They MUST NOT use raw syntax IDs or optional `SymbolNode.parentId`. Same-name methods on different receiver types MUST remain distinct, and interface signatures MUST remain distinguishable from concrete receiver methods.
 
 ### Requirement: Scoped bindings, selectors, construction, and types
 
 The adapter SHALL emit deterministic facts for import aliases, function scopes, typed parameters and results, receiver bindings, selector expressions, named composite literals, constructor-like calls, and type references. It SHALL build `IMPORTS`, `CALLS`, `CONSTRUCTS`, and `USES_TYPE` only when package aliases, receiver types, local declarations, or indexed imports prove the target.
+
+In `buildRelations()`, the adapter SHALL build concrete `IMPORTS` relations for resolved imported packages and concrete `CALLS` relations connecting callers to target functions and receiver methods.
 
 Unresolved selectors, reflection, interface dispatch without a proven concrete target, generic/type-set choices lacking instantiated context, and values requiring interprocedural flow SHALL not produce guessed relations.
 

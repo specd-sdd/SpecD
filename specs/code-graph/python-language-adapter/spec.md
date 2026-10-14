@@ -14,7 +14,9 @@ The adapter MUST NOT import or execute analyzed modules. Parser-runtime objects 
 
 ### Requirement: Declaration extraction and ranges
 
-The adapter SHALL extract module function definitions, class and nested-class definitions, methods declared in class bodies including decorated definitions, and module-level assignment targets. Nested function declarations inside function bodies and class assignment members remain unsupported. It SHALL preserve comments immediately attached to declarations and SHALL map constructs to the shared broad `SymbolKind` without losing supported language-specific identity dimensions.
+The adapter SHALL extract module function definitions, class and nested-class definitions, methods declared in class bodies including decorated definitions, module-level assignment targets, and class-level assignment targets.
+
+Class-level assignments, dataclass field definitions, and Protocol field annotations SHALL be extracted as `SymbolKind.Property`. Their declaring owner and `parentId` SHALL be set to the enclosing class symbol. Nested function declarations inside function bodies remain unsupported. It SHALL preserve comments immediately attached to declarations and SHALL map constructs to the shared broad `SymbolKind` without losing supported language-specific identity dimensions.
 
 Each extracted symbol SHALL use the complete parser construct range and exact declared-name `selectionRange` under the shared half-open convention. A symbol whose authoritative range or declared selection cannot be obtained SHALL be omitted rather than approximated.
 
@@ -38,9 +40,11 @@ The adapter MUST NOT declare `setup.cfg`, `setup.py`, or any other basename. Pac
 
 ### Requirement: Scoped bindings, calls, annotations, and construction
 
-The adapter SHALL emit deterministic facts for lexical scopes, imported aliases, parameter and return annotations, annotated assignments, type-alias right-hand sides, `self` and `cls` receiver bindings, explicit class construction calls, and locally proven aliases. It SHALL build `IMPORTS`, `CALLS`, `CONSTRUCTS`, and `USES_TYPE` only where these facts identify one indexed target.
+The adapter SHALL emit deterministic facts for lexical scopes, imported aliases, parameter and return annotations, annotated assignments, type-alias right-hand sides, `self` and `cls` receiver bindings, explicit class construction calls, and locally proven aliases.
 
-The caller SHALL be the innermost enclosing function or method. Module-level calls, monkey-patched attributes, descriptor results, reflection, computed imports, and aliases requiring runtime data flow SHALL not produce guessed relations.
+The adapter SHALL extract decorator invocations and references on functions and classes to emit `CALLS` or `USES_TYPE` relations when resolvable. It SHALL extract type annotations on class and dataclass fields to emit `USES_TYPE` relations. It SHALL build `IMPORTS`, `CALLS`, `CONSTRUCTS`, and `USES_TYPE` only where these facts identify one indexed target.
+
+The caller SHALL be the innermost enclosing function or method (or class for class-level decorators). Module-level calls, monkey-patched attributes, descriptor results, reflection, computed imports, and aliases requiring runtime data flow SHALL not produce guessed relations.
 
 ### Requirement: Python hierarchy and provenance evidence
 

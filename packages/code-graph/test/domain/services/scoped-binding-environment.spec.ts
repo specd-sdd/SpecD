@@ -212,4 +212,55 @@ describe('scoped binding environment', () => {
 
     expect(resolved).toHaveLength(0)
   })
+
+  it('detects circular parentId scope references and terminates without crashing', () => {
+    const symbolA = createSymbolNode({
+      name: 'ScopeA',
+      kind: SymbolKind.Class,
+      filePath,
+      line: 10,
+      column: 0,
+      endLine: 20,
+      endColumn: 1,
+      parentId: `${filePath}:class:ScopeB:30:0`,
+    })
+    const symbolB = createSymbolNode({
+      name: 'ScopeB',
+      kind: SymbolKind.Class,
+      filePath,
+      line: 30,
+      column: 0,
+      endLine: 40,
+      endColumn: 1,
+      parentId: symbolA.id,
+    })
+
+    const symbols = [symbolA, symbolB]
+    const symbolLookup = lookup(symbols)
+    const analysis = mockAnalysis({ symbols })
+
+    const environment = buildScopedBindingEnvironment({
+      analysis,
+      importMap: new Map(),
+      symbolLookup,
+    })
+
+    const facts = environment.lookup('nonExistentBinding', symbolA.id)
+    expect(facts).toEqual([])
+
+    const callFact: CallFact = {
+      filePath,
+      scopeId: symbolA.id,
+      callerSymbolId: symbolA.id,
+      form: CallForm.Member,
+      name: 'method',
+      receiverName: 'nonExistentReceiver',
+      targetName: 'method',
+      arity: undefined,
+      location: location(15),
+      metadata: undefined,
+    }
+    const receiverFacts = environment.resolveReceiver(callFact)
+    expect(receiverFacts).toEqual([])
+  })
 })

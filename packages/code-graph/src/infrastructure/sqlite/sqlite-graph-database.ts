@@ -1546,7 +1546,10 @@ export class SQLiteGraphDatabase {
           FROM candidates c
           INNER JOIN symbols s ON s.id = c.id
           LEFT JOIN files f ON s.file_path = f.path
-          ORDER BY identity_tier DESC, identity_token_hits DESC, identity_match_strength DESC, text_score DESC
+          ORDER BY identity_tier DESC, identity_token_hits DESC, identity_match_strength DESC, text_score DESC,
+            CASE s.kind WHEN 'class' THEN 4 WHEN 'interface' THEN 4 WHEN 'function' THEN 3 WHEN 'method' THEN 3 WHEN 'type' THEN 2 WHEN 'enum' THEN 2 ELSE 1 END DESC,
+            s.name ASC,
+            s.line ASC
         `,
       )
       .all(query.ftsQuery, ...identityCandidates.params, ...ranking.params) as Array<{

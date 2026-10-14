@@ -1,0 +1,104 @@
+- op: modified
+  description: 'Add scope boundary popping scenario to Scoped binding fact extraction'
+  selector:
+    type: section
+    matches: 'Requirement: Scoped binding fact extraction'
+  content: |
+    #### Scenario: TypeScript constructor parameter type becomes binding fact
+
+    - **GIVEN** TypeScript content containing `constructor(expander: TemplateExpander) {}`
+    - **WHEN** `analyzeFile()` is called
+    - **THEN** the returned binding facts associate `expander` with target type `TemplateExpander`
+    - **AND** no graph relation is emitted directly during fact extraction
+
+    #### Scenario: Receiver binding fact is extracted
+
+    - **GIVEN** a class method containing `this.repository.save()`
+    - **WHEN** `analyzeFile()` is called
+    - **THEN** the returned facts identify `this` as the enclosing class receiver
+    - **AND** the member call is represented as a call fact for shared resolution
+
+    #### Scenario: Runtime-only binding is dropped
+
+    - **GIVEN** source content fetches a service by a non-literal runtime identifier
+    - **WHEN** `analyzeFile()` is called
+    - **THEN** no binding fact is emitted for that service target
+
+    #### Scenario: Scope boundary pops when construct line range ends
+
+    - **GIVEN** a class construct followed by a top-level function on subsequent lines
+    - **WHEN** `analyzeFile()` processes declarations sequentially
+    - **THEN** the scope stack pops the class scope when line numbers exceed the class's `endLine`
+    - **AND** the top-level function does not inherit the preceding class as an enclosing scope
+
+- op: modified
+  description: 'Add container property and routine local variable parentId scenarios'
+  selector:
+    type: section
+    matches: 'Requirement: Member semantics and declaration parent'
+  content: |
+    #### Scenario: Instance getter keeps both axes
+
+    - **GIVEN** a TypeScript class declares an instance getter
+    - **WHEN** the adapter emits the member
+    - **THEN** `kind`, `dispatch`, and `accessor` are all present
+    - **AND** the retired member form is absent
+    - **AND** the declaration `parentId` is set by that adapter
+
+    #### Scenario: Top-level function has no parent
+
+    - **WHEN** the adapter emits a top-level function
+    - **THEN** `parentId` is omitted
+
+    #### Scenario: Go method parent is emitted
+
+    - **GIVEN** a Go method has a receiver type
+    - **WHEN** the Go adapter emits the declaration
+    - **THEN** `parentId` points at that receiver's declaration
+    - **AND** the indexer did not skip Go because it was absent from a language list
+
+    #### Scenario: Container properties set parentId to enclosing container
+
+    - **GIVEN** a class, interface, or struct declaring properties
+    - **WHEN** the adapter emits declarations
+    - **THEN** each property occurrence has `parentId` set to the enclosing container's symbol ID
+
+    #### Scenario: Routine local variables set parentId to enclosing routine
+
+    - **GIVEN** a function or method declaring local variables in its body
+    - **WHEN** the adapter emits declarations
+    - **THEN** each local variable occurrence has `parentId` set to the enclosing routine's symbol ID
+
+    #### Scenario: Cyclic owner is not invented
+
+    - **GIVEN** member ownership would cycle
+    - **WHEN** the adapter builds logical members
+    - **THEN** the cyclic member is dropped
+    - **AND** no synthetic owner id is stored
+
+- op: modified
+  description: 'Update Adapter registry scenarios to reflect explicit registration'
+  selector:
+    type: section
+    matches: 'Requirement: Adapter registry'
+  content: |
+    #### Scenario: Adapters registered via register API
+
+    - **GIVEN** a new `AdapterRegistry`
+    - **WHEN** an adapter is registered via `register(adapter)`
+    - **THEN** `getAdapter(languageId)` returns that adapter
+    - **AND** `getAdapterForFile(filePath)` resolves the adapter by file extension
+
+    #### Scenario: Custom adapter extends registry
+
+    - **GIVEN** a custom adapter declaring `languages(): ['python']` and `extensions(): { '.py': 'python' }`
+    - **WHEN** `register(adapter)` is called
+    - **THEN** `getAdapter('python')` returns that adapter
+    - **AND** `getAdapterForFile('main.py')` returns that adapter
+
+    #### Scenario: Extension map built from adapters
+
+    - **GIVEN** a fresh `AdapterRegistry` with no adapters registered
+    - **WHEN** an adapter with `extensions(): { '.rs': 'rust' }` is registered
+    - **THEN** `getAdapterForFile('main.rs')` returns that adapter
+    - **AND** `getLanguageForFile('main.rs')` returns `'rust'`

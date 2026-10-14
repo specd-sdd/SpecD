@@ -614,3 +614,91 @@ describe('PythonLanguageAdapter drive-letter paths', () => {
     expect(String(resolved)).toContain('C:/repo/src')
   })
 })
+
+describe('PythonLanguageAdapter dependency detection enhancements', () => {
+  it('extracts class attributes, dataclass fields, and Protocol annotations as SymbolKind.Property with class parentId', () => {
+    const code = `class User:
+    id: int
+    name: str = 'default'
+    active = True
+
+class Greeter(Protocol):
+    greeting: str
+`
+    const symbols = adapter.extractSymbols('models.py', code)
+    const userClass = symbols.find((s) => s.name === 'User' && s.kind === SymbolKind.Class)!
+    const greeterClass = symbols.find((s) => s.name === 'Greeter' && s.kind === SymbolKind.Class)!
+    expect(userClass).toBeDefined()
+    expect(greeterClass).toBeDefined()
+
+    const idProp = symbols.find((s) => s.name === 'id')
+    const nameProp = symbols.find((s) => s.name === 'name')
+    const activeProp = symbols.find((s) => s.name === 'active')
+    const greetingProp = symbols.find((s) => s.name === 'greeting')
+
+    expect(idProp).toBeDefined()
+    expect(idProp?.kind).toBe(SymbolKind.Property)
+    expect(idProp?.parentId).toBe(userClass.id)
+
+    expect(nameProp).toBeDefined()
+    expect(nameProp?.kind).toBe(SymbolKind.Property)
+    expect(nameProp?.parentId).toBe(userClass.id)
+
+    expect(activeProp).toBeDefined()
+    expect(activeProp?.kind).toBe(SymbolKind.Property)
+    expect(activeProp?.parentId).toBe(userClass.id)
+
+    expect(greetingProp).toBeDefined()
+    expect(greetingProp?.kind).toBe(SymbolKind.Property)
+    expect(greetingProp?.parentId).toBe(greeterClass.id)
+  })
+
+  it('extracts decorator invocations as call facts with callerSymbolId bound to decorated routine and emits Calls relation', () => {
+    const code = `def my_decorator(fn):
+    return fn
+
+@my_decorator
+def handle():
+    pass
+`
+    const symbols = adapter.extractSymbols('app.py', code)
+    const decoSym = symbols.find(
+      (s) => s.name === 'my_decorator' && s.kind === SymbolKind.Function,
+    )!
+    const handleSym = symbols.find((s) => s.name === 'handle' && s.kind === SymbolKind.Function)!
+    expect(decoSym).toBeDefined()
+    expect(handleSym).toBeDefined()
+
+    const callFacts = adapter.extractCallFacts('app.py', code, symbols)
+    const decoCallFact = callFacts.find((c) => c.name === 'my_decorator')
+    expect(decoCallFact).toBeDefined()
+    expect(decoCallFact?.callerSymbolId).toBe(handleSym.id)
+
+    const relations = adapter.extractRelations('app.py', code, symbols)
+    const callRel = relations.find(
+      (r) => r.type === RelationType.Calls && r.source === handleSym.id && r.target === decoSym.id,
+    )
+    expect(callRel).toBeDefined()
+  })
+
+  it('emits RelationType.UsesType for dataclass field type annotations', () => {
+    const code = `class Role:
+    name: str
+
+class User:
+    role: Role
+`
+    const symbols = adapter.extractSymbols('models.py', code)
+    const roleClass = symbols.find((s) => s.name === 'Role' && s.kind === SymbolKind.Class)!
+    const roleField = symbols.find((s) => s.name === 'role' && s.kind === SymbolKind.Property)!
+    expect(roleClass).toBeDefined()
+    expect(roleField).toBeDefined()
+
+    const relations = adapter.extractRelations('models.py', code, symbols)
+    const usesTypeRel = relations.find(
+      (r) =>
+        r.type === RelationType.UsesType && r.source === roleField.id && r.target === roleClass.id,
+    )
+    expect(usesTypeRel).toBeDefined()
+  })
+})

@@ -353,4 +353,177 @@ describe('resolve-graph-selector', () => {
       },
     ])
   })
+
+  it('unifies overloaded member declarations of the same container into a resolved outcome', async () => {
+    const file = createFileNode({
+      path: 'core:src/service.ts',
+      projectRelativePath: 'packages/core/src/service.ts',
+      language: 'typescript',
+      contentHash: 'sha256:service',
+      workspace: 'core',
+    })
+    const classSymbol = createSymbolNode({
+      name: 'Service',
+      kind: 'class',
+      filePath: file.path,
+      line: 1,
+      column: 0,
+    })
+    const overload1 = createSymbolNode({
+      name: 'send',
+      kind: 'method',
+      filePath: file.path,
+      line: 5,
+      column: 2,
+      parentId: classSymbol.id,
+    })
+    const overload2 = createSymbolNode({
+      name: 'send',
+      kind: 'method',
+      filePath: file.path,
+      line: 10,
+      column: 2,
+      parentId: classSymbol.id,
+    })
+    await store.upsertFile(file, [classSymbol, overload1, overload2], [])
+
+    const result = await resolveSymbolSelector('packages/core/src/service.ts:send', { store })
+    expect(result.status).toBe('resolved')
+    if (result.status === 'resolved') {
+      expect([overload1.id, overload2.id]).toContain(result.match.symbolId)
+      expect(result.match.filePath).toBe(file.path)
+    }
+  })
+
+  it('unifies candidates sharing the same logicalId into a resolved outcome', async () => {
+    const file = createFileNode({
+      path: 'core:src/logical-service.ts',
+      projectRelativePath: 'packages/core/src/logical-service.ts',
+      language: 'typescript',
+      contentHash: 'sha256:logical-service',
+      workspace: 'core',
+    })
+    const overload1 = createSymbolNode({
+      name: 'query',
+      kind: 'method',
+      filePath: file.path,
+      line: 5,
+      column: 2,
+    })
+    const overload2 = createSymbolNode({
+      name: 'query',
+      kind: 'method',
+      filePath: file.path,
+      line: 12,
+      column: 2,
+    })
+    const owner = createLogicalSymbol({
+      workspace: 'core',
+      surface: file.path,
+      name: 'LogicalService',
+      space: SymbolSpace.Type,
+      ownerId: undefined,
+      memberSemantics: undefined,
+    })
+    const member = createLogicalSymbol({
+      workspace: 'core',
+      surface: file.path,
+      name: 'query',
+      space: SymbolSpace.Value,
+      ownerId: owner.id,
+      memberSemantics: { kind: 'method', dispatch: 'instance' },
+    })
+
+    await store.upsertFile(file, [overload1, overload2], [])
+    await store.replaceReferenceFacts({
+      logicalSymbols: [owner, member],
+      declarations: [
+        {
+          logicalSymbolId: member.id,
+          declaration: {
+            logicalId: member.id,
+            symbolId: overload1.id,
+            location: { filePath: file.path, line: 5, column: 2, endLine: 5, endColumn: 7 },
+            kind: 'method',
+          },
+        },
+        {
+          logicalSymbolId: member.id,
+          declaration: {
+            logicalId: member.id,
+            symbolId: overload2.id,
+            location: { filePath: file.path, line: 12, column: 2, endLine: 12, endColumn: 7 },
+            kind: 'method',
+          },
+        },
+      ],
+      publicBindings: [],
+      localBindings: [],
+      steps: [],
+      coverage: [],
+    })
+    const resolveReference = (input: { workspace: string; requested: string }) =>
+      new ResolveSymbolReference(store, async () => ({
+        fresh: true,
+        complete: true,
+        reasonCodes: [],
+      })).execute(input)
+
+    const result = await resolveSymbolSelector('LogicalService.query', { store, resolveReference })
+    expect(result.status).toBe('resolved')
+    if (result.status === 'resolved') {
+      expect([overload1.id, overload2.id]).toContain(result.match.symbolId)
+      expect(result.match.logicalId).toBe(member.id)
+    }
+  })
+
+  it('treats member candidates with the same name across different parent classes as ambiguous', async () => {
+    const file = createFileNode({
+      path: 'core:src/dual.ts',
+      projectRelativePath: 'packages/core/src/dual.ts',
+      language: 'typescript',
+      contentHash: 'sha256:dual',
+      workspace: 'core',
+    })
+    const classA = createSymbolNode({
+      name: 'ClassA',
+      kind: 'class',
+      filePath: file.path,
+      line: 1,
+      column: 0,
+    })
+    const classB = createSymbolNode({
+      name: 'ClassB',
+      kind: 'class',
+      filePath: file.path,
+      line: 20,
+      column: 0,
+    })
+    const methodA = createSymbolNode({
+      name: 'render',
+      kind: 'method',
+      filePath: file.path,
+      line: 5,
+      column: 2,
+      parentId: classA.id,
+    })
+    const methodB = createSymbolNode({
+      name: 'render',
+      kind: 'method',
+      filePath: file.path,
+      line: 25,
+      column: 2,
+      parentId: classB.id,
+    })
+    await store.upsertFile(file, [classA, classB, methodA, methodB], [])
+
+    const result = await resolveSymbolSelector('packages/core/src/dual.ts:render', { store })
+    expect(result.status).toBe('ambiguous')
+    if (result.status === 'ambiguous') {
+      expect(result.totalCandidates).toBe(2)
+      expect(result.candidates.map((c) => c.symbolId).sort()).toEqual(
+        [methodA.id, methodB.id].sort(),
+      )
+    }
+  })
 })

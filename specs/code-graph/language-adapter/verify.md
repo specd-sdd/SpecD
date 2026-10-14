@@ -169,6 +169,13 @@
 - **WHEN** `analyzeFile()` is called
 - **THEN** no binding fact is emitted for that service target
 
+#### Scenario: Scope boundary pops when construct line range ends
+
+- **GIVEN** a class construct followed by a top-level function on subsequent lines
+- **WHEN** `analyzeFile()` processes declarations sequentially
+- **THEN** the scope stack pops the class scope when line numbers exceed the class's `endLine`
+- **AND** the top-level function does not inherit the preceding class as an enclosing scope
+
 ### Requirement: Built-in multi-language dependency coverage
 
 #### Scenario: TypeScript dynamic and CommonJS imports are represented in file analysis
@@ -259,10 +266,12 @@
 
 ### Requirement: Adapter registry
 
-#### Scenario: TypeScript adapter registered by default
+#### Scenario: Adapters registered via register API
 
-- **WHEN** a new `AdapterRegistry` is created
-- **THEN** `getAdapter('typescript')` returns the `TypeScriptLanguageAdapter`
+- **GIVEN** a new `AdapterRegistry`
+- **WHEN** an adapter is registered via `register(adapter)`
+- **THEN** `getAdapter(languageId)` returns that adapter
+- **AND** `getAdapterForFile(filePath)` resolves the adapter by file extension
 
 #### Scenario: Custom adapter extends registry
 
@@ -270,7 +279,6 @@
 - **WHEN** `register(adapter)` is called
 - **THEN** `getAdapter('python')` returns that adapter
 - **AND** `getAdapterForFile('main.py')` returns that adapter
-- **AND** `getAdapter('typescript')` still returns the TypeScript adapter
 
 #### Scenario: Extension map built from adapters
 
@@ -278,12 +286,6 @@
 - **WHEN** an adapter with `extensions(): { '.rs': 'rust' }` is registered
 - **THEN** `getAdapterForFile('main.rs')` returns that adapter
 - **AND** `getLanguageForFile('main.rs')` returns `'rust'`
-
-#### Scenario: Later registration overrides earlier
-
-- **GIVEN** two adapters both declaring `languages(): ['typescript']`
-- **WHEN** both are registered in sequence
-- **THEN** `getAdapter('typescript')` returns the second adapter
 
 ### Requirement: Package identity extraction
 
@@ -484,6 +486,18 @@
 - **WHEN** the Go adapter emits the declaration
 - **THEN** `parentId` points at that receiver's declaration
 - **AND** the indexer did not skip Go because it was absent from a language list
+
+#### Scenario: Container properties set parentId to enclosing container
+
+- **GIVEN** a class, interface, or struct declaring properties
+- **WHEN** the adapter emits declarations
+- **THEN** each property occurrence has `parentId` set to the enclosing container's symbol ID
+
+#### Scenario: Routine local variables set parentId to enclosing routine
+
+- **GIVEN** a function or method declaring local variables in its body
+- **WHEN** the adapter emits declarations
+- **THEN** each local variable occurrence has `parentId` set to the enclosing routine's symbol ID
 
 #### Scenario: Cyclic owner is not invented
 

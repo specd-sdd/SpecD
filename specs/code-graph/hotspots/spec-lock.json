@@ -7,15 +7,7 @@
   "implementation": [
     {
       "file": "code-graph:src/domain/value-objects/hotspot-result.ts",
-      "symbols": ["HotspotOptions", "HotspotResult"]
-    },
-    {
-      "file": "code-graph:src/domain/services/compute-hotspots.ts",
-      "symbols": ["computeHotspots"]
-    },
-    {
-      "file": "code-graph:test/domain/services/compute-hotspots.spec.ts",
-      "symbols": ["computeHotspots"]
+      "symbols": ["DEFAULT_HOTSPOT_KINDS"]
     }
   ]
 }

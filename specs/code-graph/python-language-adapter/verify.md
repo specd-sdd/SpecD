@@ -18,7 +18,14 @@
 - **WHEN** symbols are extracted
 - **THEN** supported constructs have the expected broad kinds
 - **AND** every selection range is contained by its complete parser range
-- **AND** nested functions and class assignment members are not approximated as supported declarations
+- **AND** nested functions inside function bodies are not approximated as supported declarations
+
+#### Scenario: Class attributes and dataclass fields extract as Property kind
+
+- **GIVEN** a Python class declaring class attributes, dataclass fields, and Protocol field annotations
+- **WHEN** symbols are extracted
+- **THEN** each field and class attribute is assigned `SymbolKind.Property`
+- **AND** its `parentId` is set to the enclosing class symbol ID
 
 ### Requirement: Python logical identity and declaring owners
 
@@ -60,6 +67,13 @@
 - **WHEN** scoped facts and relations are built
 - **THEN** the annotated target can produce type and call evidence
 - **AND** the monkey-patched target does not produce a guessed relation
+
+#### Scenario: Decorators and field annotations emit relations
+
+- **GIVEN** a function decorated with a resolvable decorator and a dataclass field annotated with a known type
+- **WHEN** relations are built
+- **THEN** the decorator emits a `CALLS` relation
+- **AND** the field annotation emits a `USES_TYPE` relation to the referenced type symbol
 
 ### Requirement: Python hierarchy and provenance evidence
 

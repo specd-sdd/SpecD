@@ -11,13 +11,7 @@
   "implementation": [
     {
       "file": "code-graph:src/infrastructure/tree-sitter/typescript-language-adapter.ts",
-      "symbols": ["isArrayDataRecordProperty", "TypeScriptLanguageAdapter.processPairNode"]
-    },
-    {
-      "file": "code-graph:test/infrastructure/tree-sitter/typescript-language-adapter.spec.ts"
-    },
-    {
-      "file": "code-graph:test/application/use-cases/index-project-graph-integration.spec.ts"
+      "symbols": ["TypeScriptLanguageAdapter"]
     }
   ],
   "optimizations": {

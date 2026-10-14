@@ -1,0 +1,71 @@
+- op: modified
+  description: 'Add cross-file overload OVERRIDES and property symbol persistence scenarios'
+  selector:
+    type: section
+    matches: 'Requirement: Reference fact indexing'
+  content: |
+    #### Scenario: Index run persists reference and coverage evidence
+
+    - **GIVEN** files contain overloads, reexports, shadowed aliases, hierarchy, parse failure, and ambiguous coverage links
+    - **WHEN** two-pass indexing completes
+    - **THEN** proven logical/binding/hierarchy facts and per-file outcomes are atomic
+    - **AND** guessed `COVERS_SYMBOL` relations are absent
+
+    #### Scenario: High-cardinality relation construction remains bounded
+
+    - **GIVEN** an indexing session with thousands of declarations, imports, calls, and re-export routes
+    - **WHEN** Pass 2 builds dependency and public-binding relations
+    - **THEN** declaration, logical-symbol, import, symbol, and binding indexes are built once for the session or file
+    - **AND** resolving each relation uses indexed lookup instead of scanning all declarations, logical symbols, or public bindings
+    - **AND** relation persistence remains chunked and deduplicated
+
+    #### Scenario: Cross-file overrides connect to all overloaded super methods
+
+    - **GIVEN** a base class or interface with multiple overloaded declarations of a method
+    - **AND** a child class declaring an overriding method
+    - **WHEN** cross-file override relations are derived
+    - **THEN** `OVERRIDES` relations connect the overriding method to all overloaded super method declaration IDs
+    - **AND** candidate targets beyond the first overload are not dropped
+
+    #### Scenario: Property symbols are persisted with DEFINES relations
+
+    - **GIVEN** files declaring properties inside classes, interfaces, structs, or enums
+    - **WHEN** indexing commits
+    - **THEN** property symbols are persisted with `kind: 'property'` and their container's `parentId`
+    - **AND** `DEFINES` relations connect each file to its contained property symbols
+
+    #### Scenario: Source content and symbol ranges are indexed atomically
+
+    - **GIVEN** a source file contains multi-line named declarations and searchable body text
+    - **WHEN** indexing completes
+    - **THEN** FileNode content, complete construct ranges, declared-name selection ranges, and semantic facts are committed in the same generation
+    - **AND** source-content candidates are available without reading the live filesystem
+
+    #### Scenario: Language-specific linking stays in the adapter
+
+    - **GIVEN** a TypeScript file re-exports a package specifier and a Go file declares a method
+    - **WHEN** reference facts are persisted
+    - **THEN** both bindings and `parentId` values come from the adapter payload
+    - **AND** the indexer has no TypeScript re-export pass and no hardcoded language allowlist for parents
+
+    #### Scenario: Owned members store a qualified name
+
+    - **GIVEN** `EditChange` owns `execute` and a top-level function has no owner
+    - **WHEN** reference facts are persisted
+    - **THEN** the member's `qualified_name` is `EditChange.execute`
+    - **AND** the top-level function has no `qualified_name`
+    - **AND** full-text search text is not the only copy of that spelling
+
+    #### Scenario: Relative re-export inside one workspace is kept
+
+    - **GIVEN** `code-graph:src/index.ts` re-exports a name from a relative specifier
+    - **WHEN** reference facts are persisted
+    - **THEN** the public binding surface is `code-graph:src/index.ts`
+    - **AND** the target is the logical id published by the relative source file
+
+    #### Scenario: Facts are stored before coverage reads them
+
+    - **GIVEN** a generation contains a new package re-export
+    - **WHEN** the index run reaches spec coverage
+    - **THEN** that generation's public bindings are already stored
+    - **AND** coverage does not read the pre-re-export declaration list only
