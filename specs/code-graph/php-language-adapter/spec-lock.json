@@ -11,41 +11,44 @@
   "implementation": [
     {
       "file": "code-graph:src/infrastructure/tree-sitter/php-language-adapter.ts",
-      "symbols": ["PhpLanguageAdapter"]
+      "symbols": ["PhpLanguageAdapter", "phpMemberSemantics", "phpNodeRange"]
+    },
+    {
+      "file": "code-graph:test/infrastructure/tree-sitter/php-language-adapter.spec.ts"
     }
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Translates PHP source (.php) into code-graph symbols, namespaces, Composer PSR-4 imports, framework loaders, and class/trait hierarchy.",
+      "value": "Translates PHP into deterministic symbols, scoped calls, Composer resolution, framework imports, and hierarchy evidence.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:06eddeddc58113de6af4ba2f18d10758793692ccf6c103fa7290d5d08df9449d",
-          "lastModified": "2026-08-16T08:12:49.064Z"
+          "hash": "sha256:2da08e56ec40552e39dd0318d8b31254d47c3f1880b2f335b0b435085d74183a",
+          "lastModified": "2026-10-14T08:50:27.881Z"
         },
         "verify.md": {
-          "hash": "sha256:f0a2d332e48ccc0cfeb916e8ce8573a6ae37900697c0016e6c71de8e7c17cc6f",
-          "lastModified": "2026-08-16T08:12:49.066Z"
+          "hash": "sha256:60c57c6f7317a3f4ae0b52cff1d76a37156fa1d266133d2830e4a696e650170d",
+          "lastModified": "2026-10-14T08:50:27.885Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# php-language-adapter\n\n## Rules\n\n### Scope & Analysis\n- Handles `.php` as `php`.\n- Single-pass parsing via Tree-sitter/ast-grep; outputs `FileAnalysisDraft` without AST retention or PHP execution/autoloading.\n\n### Declarations & Owners\n- Extracts functions, classes, interfaces, traits, enums, methods, properties, top-level constants. Drops class constants & enum cases.\n- Complete construct range; declared-name `selectionRange`. Preserves comments.\n- Declaring owner = namespace-qualified class/interface/trait. Same-name methods distinct across owners. Case-preserving identities.\n\n### Namespaces, Use & Composer\n- Namespace `use X as Y` creates namespace-scoped local binding (NO public export or hierarchy edge).\n- Resolves qualified names through Composer `composer.json` `name` & PSR-4 mappings via longest prefix.\n- Drops variable/concatenated `require`/`include` unless proven by registered rules.\n\n### Framework Loaders & Scoped Facts\n- Statically recognizes framework patterns (CakePHP, CodeIgniter, Yii, Laravel, Symfony, Zend).\n- Loader facts emit `IMPORTS` and receiver bindings only for literal values with proven indexed targets. Method-local instance aliases emit `CALLS` (no cross-method leakage).\n- Emits facts for `new`, ``, `self`, `static`, `parent` receivers, typed params/returns/properties. Emits `IMPORTS`, `CALLS`, `CONSTRUCTS`, `USES_TYPE` when target is proven.\n- Drops reflection, variable class names, dynamic properties, container lookups.\n\n### Hierarchy & Evidence\n- Emits `EXTENDS` (class/interface), `IMPLEMENTS` (class->interface), `OVERRIDES` (matching method replacement), trait composition.\n- Reference facts retain child owner, ancestor/trait owner, relation kind, provenance steps.\n- Trait conflict/adaptation (`insteadof`/aliases) unsupported -> remains `ambiguous` or `unresolved`. Bounded cycle termination.\n- Advertises `hierarchy: true`, `buildContext: false`.\n\n## Constraints\n- NO PHP execution, framework container instantiation, or autoloader invocation.\n- Dynamic reflection, dynamic container lookups -> prohibited.\n- PHP-specific namespace/loader/trait logic MUST stay inside adapter.",
+      "value": "# php-language-adapter\n\n## Rules\n\n### Analysis\n- `PhpLanguageAdapter` handles `.php` as `php`; parses content once with registered Tree-sitter/ast-grep grammar; returns complete `FileAnalysisDraft` plus compact serializable Pass 2 state.\n- Never execute PHP/autoload project code or persist AST nodes. Loader rules/parser keepalive stay indexing-session scoped.\n\n### Declarations and identity\n- Extract functions, classes, interfaces, traits, enums, methods, properties, top-level constants, class constants, enum cases. Map properties/class constants/enum cases to `SymbolKind.Property`.\n- Preserve namespace separately from simple name; retain distinct supported symbol spaces/member forms.\n- Use full construct range, exact declared-name half-open `selectionRange`, verbatim attached preceding comments. Omit declarations lacking authoritative ranges.\n- Top-level identity uses namespace-qualified module surface. Member owner = syntactically declaring class/interface/trait/enum logical identity; set `parentId` to container symbol ID.\n- Derive owners from parser containment before member IDs. Never use raw parser IDs or optional `SymbolNode.parentId` as canonical owner. Omit methods with unproven owner.\n- Keep same-name members distinct across owners, including same-line declarations. Preserve static/instance, constructor, property, contract-form evidence when syntax projection supports it. Preserve case; do not guess case-insensitive lookup/magic properties.\n\n### Namespaces and Composer\n- Class-like `use X as Y` creates namespace-scoped local binding to canonical target; never public export/hierarchy edge.\n- Package identity = nearest bounded Composer `name`. Resolve qualified names using precomputed PSR-4 mappings, longest prefix, indexed-file lookup; cache compact Pass 2 metadata.\n- `resolutionManifests()` returns exactly `[\"composer.json\"]`.\n- Composer classmap/files, runtime autoloader mutation, ambiguous case-sensitive filesystem alternatives remain unsupported.\n\n### Dependencies, bindings, calls\n- Extract literal `require`/`require_once`/`include`/`include_once`; drop variable/concatenated expressions unless deterministic registered rule proves path.\n- Preserve registry-based static framework loaders: CakePHP, CodeIgniter, Yii, Laravel, Symfony, Zend, equivalent configured class-literal/loader patterns.\n- Loader facts emit `IMPORTS` and receiver bindings only for proven literal/indexed targets. Constructed/loaded aliases and method-local assignments may emit `CALLS` only in proven lexical scope; never leak aliases across methods.\n- Emit deterministic facts for namespace aliases, callable scopes, typed parameters/returns/properties, `new`, `$this`, `self`, `static`, `parent`, explicit aliases, supported framework bindings.\n- Emit `IMPORTS`, `CALLS`, `CONSTRUCTS`, `USES_TYPE` only for proven targets. Caller = innermost enclosing function/method.\n- Drop runtime service IDs, arbitrary container lookups, variable loader arguments, unrelated same-shaped calls, reflection, variable class names, dynamic properties, container values, interprocedural aliases.\n\n### Hierarchy and public surface\n- Extract class/interface `extends`, class `implements`, trait composition when PHP semantics preserved. Emit `EXTENDS`, `IMPLEMENTS`, `OVERRIDES` only with proven logical owners/member forms.\n- Reference facts preserve logical owners, relation/composition kind, source ordering, ordered provenance. Resolver reaches owner then queries member; reached owner is not requested member. Cycles terminate deterministically.\n- Trait aliases/`insteadof` affect identity/precedence only when fully modeled; otherwise conflict/adaptation lookup stays ambiguous/unresolved. Never confuse namespace `use` with trait use.\n- Namespace declarations expose namespace-qualified logical surfaces; namespace aliases never module-style public re-exports.\n- Advertise `hierarchy: true` only while required hierarchy/provenance facts exist; `buildContext: false` while runtime/classmap/files/conditional autoload remain unsupported.\n- Represent parse failures, partial framework resolution, unsupported semantics through shared coverage; identical input/context yields deterministic output.\n\n## Constraints\n- No PHP execution, framework container instantiation, Composer autoloader invocation, runtime service inference, reflection, variable-class inference, or speculative trait precedence.\n- PHP-specific namespace, loader, ownership, trait semantics remain inside adapter.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:06eddeddc58113de6af4ba2f18d10758793692ccf6c103fa7290d5d08df9449d",
-          "lastModified": "2026-08-16T08:12:49.064Z"
+          "hash": "sha256:2da08e56ec40552e39dd0318d8b31254d47c3f1880b2f335b0b435085d74183a",
+          "lastModified": "2026-10-14T08:50:27.881Z"
         },
         "verify.md": {
-          "hash": "sha256:f0a2d332e48ccc0cfeb916e8ce8573a6ae37900697c0016e6c71de8e7c17cc6f",
-          "lastModified": "2026-08-16T08:12:49.066Z"
+          "hash": "sha256:60c57c6f7317a3f4ae0b52cff1d76a37156fa1d266133d2830e4a696e650170d",
+          "lastModified": "2026-10-14T08:50:27.885Z"
         }
       }
     }

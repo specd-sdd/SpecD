@@ -19,20 +19,27 @@ const graphHealth = {
 } as unknown as GetGraphHealthResult
 
 function resolution(requested: string, filePath: string): SymbolResolutionResult {
+  const target = {
+    id: `logical-${requested}`,
+    workspace: 'sdk',
+    surface: 'orchestration',
+    name: requested,
+    space: 'value' as const,
+    ownerId: undefined,
+    memberSemantics: undefined,
+  }
   return {
     request: { workspace: 'sdk', requested, filePath },
     status: 'resolved',
     reasonCode: null,
     health: { fresh: true, complete: true, reasonCodes: [] },
-    target: {
-      id: `logical-${requested}`,
-      workspace: 'sdk',
-      surface: 'orchestration',
-      name: requested,
-      space: 'value',
-      ownerId: undefined,
-      memberSemantics: undefined,
+    resolvedTarget: {
+      kind: 'logical-target',
+      logicalSymbol: target,
+      declarations: [],
+      path: [],
     },
+    target,
     candidates: [],
     path: [],
   }

@@ -27,6 +27,18 @@ When graph selector resolution produces multiple candidate declarations that all
 
 The target SHALL expose workspace, module or package, declaring owner, symbol space, simple name, member form, contributing declaration locations, and a stable canonical reference independent of line or column movement.
 
+### Requirement: Resolution target kind and declaration evidence
+
+A resolved result SHALL discriminate between a canonical logical target and an exact physical declaration occurrence. A logical-target result MUST include the canonical `LogicalSymbol`, the complete deterministic set of contributing declaration occurrences, and the ordered evidence that selected or unified them. An exact-declaration result MUST identify the selected `SymbolNode` and its logical target when one exists.
+
+Canonical IDs, owner-qualified names, and public semantic selectors SHALL resolve at the logical layer. File, line, column, or exact occurrence identifiers MAY select one physical declaration. A consumer MUST NOT infer target kind from a legacy `symbolId` field or reduce a logical result to an arbitrary first declaration.
+
+Ambiguity SHALL be evaluated at the target layer selected by the request. Multiple declarations of one logical overload or merge target are one semantic candidate, while multiple competing logical targets are ambiguous. An exact physical request MAY remain declaration-ambiguous even when the involved declarations share a logical target.
+
+Every selector-level resolution entry point (bare name, file-qualified name, location-backed symbol ID, canonical logical ID, owner-qualified member, and public export) SHALL return the discriminated typed target described above. A selector that matches several declarations of one logical overload or merge target MUST return one logical-target result carrying every contributing declaration, not one arbitrary physical match. A legacy physical `match` field MAY accompany the typed target only as a derived compatibility projection and MUST NOT be the only resolution output.
+
+Public compatibility changes to resolver result types MUST use an explicit discriminant and migration path. Existing fields MUST NOT silently change from physical to logical identity or vice versa.
+
 ### Requirement: Public and local binding identity
 
 A public export slot SHALL be selected by public surface, exported name, and symbol

@@ -1,0 +1,124 @@
+- op: added
+  description: 'Provide backend-neutral batch mappings between logical targets and physical declarations.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Reference and coverage persistence$'
+  content: |
+    ### Requirement: Logical and declaration batch lookup boundary
+
+    `GraphStore` SHALL expose bounded batch queries that:
+
+    - retrieve every physical declaration occurrence for a set of logical-symbol IDs;
+    - retrieve the logical-symbol mapping, when present, for a set of physical declaration IDs; and
+    - retrieve logical symbols and declaration occurrences without issuing one backend operation per identity.
+
+    Batch inputs SHALL deduplicate repeated identities by first occurrence, omit unknown identities, return deterministic ordering, and avoid backend work for an empty input. A declaration without a logical mapping SHALL be omitted from logical mappings but SHALL remain retrievable as a physical symbol.
+
+    Store APIs and DTOs MUST name identity parameters and result fields explicitly as logical IDs or declaration IDs. A generic `symbolId` field MUST NOT silently accept both identity domains where endpoint semantics differ.
+
+- op: added
+  description: 'Make reverse coverage queries unambiguously logical and evidence-preserving.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Logical-symbol coverage endpoints$'
+  content: |
+    ### Requirement: Batched logical coverage lookup
+
+    Reverse symbol-coverage queries SHALL accept canonical logical-symbol IDs only and SHALL return deterministic relations whose targets remain those logical IDs. Passing a physical declaration ID MUST NOT accidentally match, be retargeted, or be interpreted as a logical ID.
+
+    The store SHALL support one bounded batch reverse-coverage lookup for all logical targets reached by an impact operation. Coverage relation persistence and retrieval SHALL preserve metadata required to associate the logical target with physical declaration evidence assembled by traversal.
+
+- op: added
+  description: 'Add the project-relative lookup method.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: Query methods$'
+    before:
+      type: list-item
+      matches: 'findFilesByConfigRelativePath'
+  content: |
+    - **`findFilesByProjectRelativePath(projectRelativePath: string): Promise<FileNode[]>`** — retrieve all file nodes whose `projectRelativePath` exactly matches the given normalized project-relative path
+
+- op: removed
+  description: 'Remove the stale config-relative lookup method.'
+  selector:
+    type: list-item
+    matches: 'findFilesByConfigRelativePath'
+    parent:
+      type: section
+      matches: '^Requirement: Query methods$'
+
+- op: added
+  description: 'Name the project-relative alternate path identity in the documents index description.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: Search with primary-identity prioritization$'
+    before:
+      type: list-item
+      matches: 'persisted alternate path identity'
+  content: |
+    - **documents** — canonical `path`, and any persisted alternate path identity such as `projectRelativePath` when the backend exposes it to search
+
+- op: removed
+  description: 'Remove the stale alternate path identity description.'
+  selector:
+    type: list-item
+    matches: 'such as .?configRelativePath'
+
+- op: added
+  description: 'Resolve the error-base-class contradiction with the symbol-model error contract.'
+  position:
+    parent:
+      type: section
+      matches: '^Constraints$'
+    before:
+      type: list-item
+      matches: 'No dependency on .*specd/core'
+  content: |
+    - Error types extend `SpecdCodeGraphError`, which extends `SpecdError` from `@specd/core`, as required by `code-graph:symbol-model`
+
+- op: removed
+  description: 'Remove the stale CodeGraphError constraint.'
+  selector:
+    type: list-item
+    matches: 'No dependency on .*specd/core'
+    parent:
+      type: section
+      matches: '^Constraints$'
+
+- op: modified
+  description: 'Round 3: COVERS_SYMBOL never carries a stale flag; links to absent symbols are rejected.'
+  selector:
+    type: section
+    matches: '^Requirement: Minimum graph semantics$'
+  content: |
+    Every `GraphStore` implementation SHALL support the code-graph package's minimum persisted semantics, regardless of its backend-specific physical schema or file layout.
+
+    At minimum, the abstract store contract MUST support:
+
+    - file nodes carrying the `FileNode` data needed by indexing, traversal, and CLI queries, including both canonical workspace-prefixed paths and config-relative file paths, the full textual **content**, and semantic **category** (`source` | `test` | `ignored`)
+    - symbol nodes carrying the `SymbolNode` data needed by indexing, traversal, and CLI queries
+    - spec nodes carrying the `SpecNode` data needed by spec indexing and search
+    - **document nodes** carrying the `DocumentNode` data (textual non-code resources)
+    - persisted relations for the relation families used by the package: `IMPORTS`, `DEFINES`, `CALLS`, `CONSTRUCTS`, `USES_TYPE`, `EXPORTS`, `DEPENDS_ON`, `COVERS_FILE`, `COVERS_SYMBOL`, `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES`
+    - store-level metadata sufficient to satisfy abstract statistics and derivation-freshness fields such as `lastIndexedAt`, `lastIndexedRef`, and the persisted graph fingerprint
+
+    `COVERS_FILE` and `COVERS_SYMBOL` are the abstract relation families used for requirement-aware graph linkage. `COVERS_FILE` links a spec to a covered implementation file. `COVERS_SYMBOL` links a spec to a covered implementation symbol. A `COVERS_SYMBOL` relation never carries a `stale` flag: a symbol-level link whose symbol no longer resolves to a live logical symbol is not persisted, and the indexer reports it as a `SYMBOL_NOT_FOUND` coverage diagnostic instead.
+
+    The `files` storage SHALL persist the full textual content of indexed source files to enable match-aware snippet extraction without re-reading from disk at query time. It SHALL also persist and index the `category` attribute (defaulting to `'source'`) to support low-latency filtering during graph traversal and search.
+
+    The store MUST provide operations for upserting and removing `DocumentNode` entries, as well as searching them via full-text search.
+
+    The store SHALL support incremental indexing by matching `contentHash` values before updating node properties or relations.
+
+    Backends MAY represent those concepts differently internally, but they MUST preserve the observable semantics exposed by the `GraphStore` API. Storage-agnostic consumers MUST rely on these abstract semantics rather than any backend-specific table, label, or index shape.

@@ -144,12 +144,6 @@ Relations between nodes SHALL be represented as typed edges. Each relation has a
 | `IMPLEMENTS`    | Symbol | Symbol | Source type fulfills or implements target contract/type               | v2    |
 | `OVERRIDES`     | Symbol | Symbol | Source method overrides or concretely fulfills target one             | v2    |
 
-### Requirement: Relation staleness
-
-Relations MAY include a `stale` boolean flag in their `metadata`.
-
-For implementation traceability, `stale` applies specifically to `COVERS_SYMBOL` relations whose target symbol is no longer detectable in the current graph index. It is not the generic marker for workspace-boundary or archive-materialization failures.
-
 ### Requirement: Relation value object
 
 A `Relation` SHALL be a value object containing:
@@ -258,6 +252,20 @@ A logical member's `declaringOwner` SHALL be the canonical logical identity of t
 
 Same-name members under different declaring owners SHALL always have different logical identities. Moving a declaration within the same logical owner without changing its semantic identity MUST NOT change its canonical reference merely because its source line or parser node changes.
 
+### Requirement: Declaration, binding, and logical identity layers
+
+The graph SHALL distinguish three identity layers:
+
+- a declaration occurrence represented by a location-backed `SymbolNode`, which is physical source evidence and MAY exist without a logical target;
+- a `LocalBinding`, which identifies a visible name inside a lexical scope and MUST preserve its scope and source range; and
+- a `LogicalSymbol`, which identifies one language-defined semantic target and MAY own one or more declaration occurrences.
+
+These layers MUST NOT be treated as bijective. Parameters, receivers, aliases, ordinary local variables, and other scope-bound names SHALL remain local bindings unless the language adapter proves that the declaration is an addressable semantic target. A physical declaration that has no logical target MUST remain available for navigation and dependency evidence rather than being dropped.
+
+Logical identity MUST be independent of ordinary line and column movement. It SHALL include the canonical logical owner whenever the language defines an owner, and declarations in competing lexical scopes MUST NOT collapse merely because their simple name, broad `SymbolKind`, file, or surface matches.
+
+Multiple declarations SHALL share one logical identity only when the language adapter supplies positive, language-defined grouping evidence, such as a proven overload set or declaration merge. An absent, empty, or unknown grouping key is evidence of no group and MUST NOT cause equal-name declarations to merge. The logical target SHALL retain the complete deterministic declaration set. Declaration-level form, including signature versus implementation, MUST NOT change the logical member identity of a proven group.
+
 ### Requirement: Member semantics and symbol spaces
 
 The common model SHALL represent a member with `MemberSemantics`: `kind`, `dispatch`, `accessor`, and optional `nativeKind`. These axes MUST be representable together. An instance getter is both an accessor and instance-dispatched. A static getter is static and an accessor. `nativeKind` MAY retain a proven language nuance. The shared model MUST NOT depend on a TypeScript, Python, Go, or PHP enum for that nuance.
@@ -275,6 +283,14 @@ A public export slot SHALL be looked up by public surface, exported name, and sy
 A public binding's `surface` is the file that exports the name. Its `targetId` is the logical symbol that name publishes. That logical symbol MAY be declared in another workspace. The binding MUST NOT be created by choosing the first same-named symbol in the target workspace.
 
 A local binding SHALL preserve lexical scope and source range. Distinct aliases, shadowed bindings, multiple public routes between identical relation endpoints, and competing targets exposed through the same public slot MUST NOT collapse because ordinary `Relation` equality ignores metadata. Generic and native spellings MUST NOT be stored as alias rows.
+
+### Requirement: Evidence-preserving semantic projection
+
+Physical `CALLS`, `CONSTRUCTS`, `USES_TYPE`, `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES` relations SHALL remain the authoritative dependency evidence. A semantic projection MAY aggregate or deduplicate results by logical identity, but it MUST retain every physical declaration, relation, and source location that justifies the projected result.
+
+Physical declarations without a logical mapping SHALL remain representable in semantic query results as declaration-only evidence. Counts and risk summaries MUST identify whether their unit is physical occurrences, unique logical targets, or both; one field MUST NOT silently mix those units.
+
+`COVERS_SYMBOL` SHALL target a `LogicalSymbol.id`. Physical declaration traversal MUST be projected to its logical identity before reverse symbol-coverage lookup, and returned coverage evidence SHALL retain contributing declaration locations when available.
 
 ### Requirement: Index coverage facts
 

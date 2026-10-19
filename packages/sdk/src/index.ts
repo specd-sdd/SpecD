@@ -50,12 +50,20 @@ export {
   type MultiFileImpactResult,
   type ResolvedSymbolImpactResult,
   type SymbolNotFoundImpactResult,
+  type SymbolUnresolvedImpactResult,
   type SymbolAmbiguousImpactResult,
   type SpecImpactResult,
   type ResolvedPublicExportImpactResult,
   type UnresolvedPublicExportImpactResult,
   type ProjectedPublicImpactDetail,
   type GraphImpactDirection,
+  type ProjectedImpactDeclarationOccurrence,
+  type ProjectedPhysicalDependencyEvidence,
+  type ProjectedLogicalAffectedTarget,
+  type ProjectedPhysicalOnlyAffectedTarget,
+  type ProjectedSemanticAffectedTarget,
+  type ResolvedSymbolTarget,
+  type SemanticImpactCounts,
 } from './orchestration/index.js'
 
 export { InvalidProviderLifecycleError } from './domain/errors/index.js'

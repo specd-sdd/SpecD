@@ -92,7 +92,14 @@ export function createCodeGraphProvider(
       }
     : undefined
 
-  return new CodeGraphProviderImpl(store, indexer, projectRoot, graphHealth, registry)
+  return new CodeGraphProviderImpl(
+    store,
+    indexer,
+    projectRoot,
+    graphHealth,
+    registry,
+    graphOptions?.onWarning,
+  )
 }
 
 /**

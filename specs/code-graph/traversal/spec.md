@@ -208,6 +208,16 @@ Hierarchy traversal SHALL preserve edge direction and language precedence for co
 
 Traversal ordering SHALL be deterministic across backends and SHALL use indexed lookups and bounded cycle-safe traversal.
 
+### Requirement: Logical-target impact aggregation
+
+When symbol impact targets a logical symbol, traversal SHALL seed the requested direction from every physical declaration occurrence belonging to that logical target. It MUST NOT select one primary declaration and discard the remaining declaration routes.
+
+Dependency reachability SHALL continue over physical `CALLS`, `CONSTRUCTS`, `USES_TYPE`, `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES` relations. The result SHALL aggregate affected declarations by logical identity when a mapping exists, retain every contributing physical edge and location as evidence, and preserve declaration-only results when no logical mapping exists.
+
+One logical target SHALL appear once at its shallowest semantic depth even when several declarations or routes reach it. Physical occurrence counts and unique logical-target counts MUST use distinct result fields or explicitly named units. Risk SHALL be computed from the documented semantic unit and MUST NOT vary merely because one logical target has additional equivalent declarations.
+
+Exact public-binding impact SHALL continue to distinguish consumers of the selected route from dependents of the canonical logical target. Exact declaration impact SHALL remain available as a physical operation and MUST NOT be widened implicitly to every declaration of the logical target.
+
 ### Requirement: Owner-qualified impact target
 
 Symbol impact SHALL select its start symbol by calling the shared symbol resolver before traversal. An owner-qualified reference SHALL match stored `qualified_name` without requiring a file. Exactly one logical member SHALL traverse only that member. Several equal matches MUST all be reported and MUST NOT traverse one of them. Zero matches MUST NOT fall through to a terminal-name search. Public-binding and legacy location-backed selectors SHALL keep their existing exact outcomes.
@@ -223,6 +233,16 @@ The input file and its defined symbols have depth `0`. Files and symbols reached
 File coverage SHALL remain independently visible when no symbol-coverage relations exist. Symbol coverage SHALL augment, not gate or replace, file coverage. Reverse coverage retrieval MUST be batched over deduplicated file and symbol sets and MUST NOT issue one store query per affected result.
 
 Traversal remains read-only. It SHALL project the coverage present in the open graph; graph-health and freshness consumers remain responsible for reporting whether corpus-wide coverage is complete.
+
+### Requirement: Logical symbol coverage during impact
+
+Reverse `COVERS_SYMBOL` lookup SHALL use logical-symbol IDs. Before coverage lookup, traversal SHALL map every reached physical declaration to its logical target, deduplicate the logical IDs, and issue a bounded batch reverse-coverage query. It MUST NOT query logical coverage using a location-backed `SymbolNode.id`.
+
+The impact target's own declarations are part of the coverage frontier at depth 0: a spec that covers the target's logical symbol SHALL be reported for symbol impact, exactly as file impact reports a spec covering the target file at depth 0.
+
+A covering-spec result SHALL retain evidence connecting the spec's logical coverage target to each reached physical declaration that contributed the match. File coverage SHALL remain independent and visible.
+
+A physical declaration without a logical target SHALL be excluded from the logical coverage frontier before the store query and SHALL not be reported as uncovered merely because no logical lookup is applicable. Its physical ID MUST NOT be used as a fallback logical ID. If no declaration in the coverage frontier (the target's own declarations at depth 0 plus every reached declaration) maps to a logical target, traversal MUST skip the reverse logical-coverage store operation entirely and classify the evidence explicitly as physical-only or coverage-not-applicable unless a separate physical-coverage contract is introduced.
 
 ## Constraints
 

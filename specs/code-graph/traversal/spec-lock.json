@@ -11,53 +11,78 @@
   "implementation": [
     {
       "file": "code-graph:src/domain/value-objects/impact-result.ts",
-      "symbols": ["OmittedCounts", "ImpactResultFilter", "ImpactResult"]
+      "symbols": [
+        "PhysicalDependencyEvidence",
+        "LogicalAffectedTarget",
+        "PhysicalOnlyAffectedTarget",
+        "SemanticAffectedTarget",
+        "SemanticImpactCounts",
+        "ResolvedSymbolImpactResult"
+      ]
     },
     {
       "file": "code-graph:src/domain/services/analyze-impact.ts",
-      "symbols": ["analyzeImpact"]
+      "symbols": [
+        "analyzeResolvedSymbolImpact",
+        "analyzePublicBindingImpact",
+        "analyzeImpactDetails"
+      ]
+    },
+    {
+      "file": "code-graph:src/domain/services/collect-impact-specs.ts",
+      "symbols": ["collectLogicalCoveringSpecs"]
     },
     {
       "file": "code-graph:src/domain/services/analyze-file-impact.ts",
-      "symbols": ["analyzeFileImpact"]
+      "symbols": [
+        "collectFilteredCoveringSpecs",
+        "collectCoveringSpecs",
+        "analyzeFileImpactDetails"
+      ]
     },
     {
-      "file": "code-graph:test/domain/services/traversal.spec.ts",
-      "symbols": ["analyzeImpact"]
+      "file": "code-graph:test/domain/services/analyze-files-impact.spec.ts"
+    },
+    {
+      "file": "code-graph:src/domain/services/analyze-spec-impact.ts",
+      "symbols": ["loadCoveredSymbols", "analyzeSpecImpact"]
+    },
+    {
+      "file": "code-graph:test/domain/services/traversal.spec.ts"
     }
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Pure bounded traversal computes deterministic graph blast radius, risk, hierarchy, and requirement coverage.",
+      "value": "Pure bounded traversal computes filtered deterministic blast radius, risk, hierarchy, and requirement coverage.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:12f07dc15175530f5c3bc95bd87ecad72c361f88bc4ae179d9ea503619e0b3a3",
-          "lastModified": "2026-08-22T10:50:50.906Z"
+          "hash": "sha256:409b15db90f185c88673b54fc613d4701910f3f4e9052c27d30a4f1587c2177b",
+          "lastModified": "2026-10-12T15:40:16.439Z"
         },
         "verify.md": {
-          "hash": "sha256:08e772c613b9c757857c95ad2ee007978d5c746d771929d5610e44a662205ed6",
-          "lastModified": "2026-08-22T10:50:50.908Z"
+          "hash": "sha256:1faa96e65a974914f907141c7e6e7dae9b92389d0adff271e111dd5fdc4f40da",
+          "lastModified": "2026-10-12T15:47:34.873Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# Traversal\n\n## Rules\n\n- `getUpstream(store, symbolId, options)` traverses reverse `CALLS`; `getDownstream(...)` traverses forward `CALLS`. Default `maxDepth: 3`; results grouped 1-indexed by depth. Track visited symbols; retain shallowest visit; terminate cycles.\n- `TraversalOptions`: `maxDepth` default 3; `includeFiles` default true adds `IMPORTS`. `TraversalResult`: `root`, `levels: Map<number, SymbolNode[]>`, unique `totalCount`, and `truncated` when depth limit may hide results.\n- Breadth-first traversal MUST batch each frontier through `GraphStore` batch symbol/relation operations: no request per symbol or relation type; deduplicate reached ids before one logical node batch. File impact, multi-file impact, change detection, and per-symbol aggregation use fixed bounded concurrency independent of input/frontier size. Multi-file impact shares one memoized read view and budget. Preserve direction, depth, cycle semantics, deterministic order, sets, coverage evidence, counts, and risk; wide valid graphs MUST NOT fail with `StoreOverloadError` from symbol volume.\n- Hotspot hierarchy retrieval MUST make one logical `getIncomingSymbolRelations` call for all candidate ids and `EXTENDS`, `IMPLEMENTS`, `OVERRIDES`, then fold counts in memory. No per-candidate hierarchy query. Preserve scoring, filters, ranking, risk; wide valid graphs MUST NOT cause `StoreOverloadError`.\n- `analyzeImpact(store, target, direction, maxDepth?)` computes `target`, depth-1 `directDependents`, depth-2 `indirectDependents`, depth-3+ `transitiveDependents`, `riskLevel`, unique `affectedFiles`, depth-bearing `affectedSymbols`, and matching `affectedProcesses`. `AffectedSymbol`: `id`, `name`, workspace-prefixed `filePath`, 1-based `line`, `depth`. `maxDepth` defaults 3 and constrains symbol traversal plus `IMPORTS` BFS.\n- Impact treats `CALLS`, `CONSTRUCTS`, `USES_TYPE`, `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES` as first-class direction-aware edges. All contribute identically to depth counts, risk, symbols, and files. Higher-level requirement-aware views may add specs through `COVERS_SYMBOL`.\n- Risk thresholds: `LOW` = 0–2 direct and no indirect; `MEDIUM` = 3–5 direct or any indirect; `HIGH` = 6+ direct or 10+ total; `CRITICAL` = 20+ total or target in 3+ execution flows.\n- `analyzeFileImpact(...)` loads file symbols with `findSymbols({ filePath })`, analyzes each, deduplicates affected symbols at shallowest depth, unions files, retains per-symbol results, and takes maximum risk. Hierarchy/static-type impact participates normally. `analyzeFilesImpact(...)` combines file/symbol lists, sums direct/indirect/transitive counts, and takes maximum file risk.\n- `FileImpactResult.coveringSpecs` comes from batched reverse `COVERS_FILE` and `COVERS_SYMBOL`. Each spec appears once with minimum impact depth and every distinct `{ kind: 'file' | 'symbol', target, depth }` evidence. Inputs and defined symbols use depth 0; reached entities use shallowest depth 1..`maxDepth`. Multi-file inputs all use depth 0. Order by minimum depth, spec id, then evidence depth/kind/target. File coverage remains visible without symbol coverage; symbol coverage augments it. Batch deduplicated file/symbol reverse lookups; never query per affected item. Project open-graph evidence only; freshness consumers assess completeness.\n- `analyzeSpecImpact(...)` traverses `DEPENDS_ON` (`Spec -> Spec`), `COVERS_FILE`, and `COVERS_SYMBOL`. Upstream returns dependent specs plus files/symbols covered by target and transitively affected dependent specs. Downstream returns dependencies plus files/symbols reached within depth. Requirement relations may source `SpecImpactResult` affected sets.\n- `detectChanges(store, changedFiles, maxDepth?)` finds each changed file symbols, runs bounded upstream traversal, aggregates affected symbols/files, risk, and summary.\n- Resolve impact selector to one canonical logical target before traversal. Unqualified resolution: case-exact first, case-insensitive exact only if none; never prefix/component/text search. Unique candidate traverses; multiple candidates return bounded deterministic ambiguity without traversal. Qualified/full occurrence selectors retain exact semantics.\n- Public-export impact accepts one public-binding identity and separately returns exact-surface/export-name consumers, including downstream re-exports, and all canonical-symbol dependents through every route. Retain selected binding, canonical target, ordered binding chain. Ambiguous exports never merge or choose candidates.\n- Hierarchy traversal preserves edge direction and language precedence across contracts, overrides, inherited members, traits, mixins, embedding, promotion, and provable interface satisfaction. Count logical symbols once despite multiple declaration occurrences. All backend ordering deterministic; use indexed, bounded, cycle-safe traversal.\n- All traversal operations are stateless pure functions in `domain/services/`; read injected `GraphStore`; return value objects; never mutate, manage lifecycle, or retain state.\n\n## Constraints\n\n- Default depth 3; caller override allowed.\n- Fixed risk thresholds; not configurable.\n- Shallowest-depth cycle deduplication required.\n- Bounded batch/concurrency behavior required across graph width and input size.\n- Read-only `GraphStore`; no `@specd/core` dependency.",
+      "value": "# Traversal\n\n## Rules\n- `getUpstream` follows reverse `CALLS`; `getDownstream` follows forward `CALLS`. Default `maxDepth: 3`; group results 1-indexed by depth; cycle dedupe at shallowest visit.\n- `TraversalOptions`: `maxDepth`, `includeFiles` default true. `TraversalResult`: root, depth map, unique total, truncation flag.\n- BFS batches each frontier through `GraphStore` symbol/relation batch APIs; no call per symbol/type. File/multi-file/change aggregation uses fixed bounded concurrency. Multi-file shares memoized read view and budget. Width must not cause `StoreOverloadError`.\n- Hotspots fetch all candidates' incoming `EXTENDS`/`IMPLEMENTS`/`OVERRIDES` in one logical batch, fold counts in memory; preserve scoring, filtering, rank, risk.\n- `analyzeImpact` returns target; direct depth-1, indirect depth-2, transitive depth-3+ counts; risk; unique files; depth-bearing symbols; processes; required `affectedSpecs`; `omittedCounts: { tests, ignored }`.\n- Dependency traversal treats `CALLS`, `CONSTRUCTS`, `USES_TYPE`, `EXTENDS`, `IMPLEMENTS`, `OVERRIDES` as direction-aware equal blast-radius edges.\n- Optional typed impact filter applies across symbol/file/multi-file/spec/public-binding: result types `files|symbols|specs`, symbol kinds, included/excluded workspaces, admitted categories. Categories default `['source']`; exclusions win; empty inclusion admits all.\n- Backend filtered-impact queries enforce type/kind/category/workspace eligibility before collection/count/risk/limits. Never fetch unrestricted candidates for service/CLI post-filtering.\n- Upstream/bidirectional BFS stops at non-admitted file boundaries; excluded tests/ignored files cannot bridge production paths or inflate counts/risk. Explicit test/ignored target may traverse downstream.\n- Result-type selection controls materialized collections without changing required reachability. Specs-only still traverses admitted code evidence. `affectedSpecs` empty unless requested; then derive from admitted `COVERS_FILE`/`COVERS_SYMBOL`. Filtering precedes limits.\n- Risk: LOW=0–2 direct and no indirect; MEDIUM=3–5 direct or any indirect; HIGH=6+ direct or 10+ total; CRITICAL=20+ total or target in 3+ flows.\n- `analyzeFileImpact`: load file symbols, bounded per-symbol impact, dedupe shallowest symbols, union files/spec evidence, max risk. `analyzeFilesImpact`: aggregate files/symbols, sum depth counts, max risk; all inputs depth 0.\n- `coveringSpecs`: batch reverse coverage for input/reached files and symbols; one spec with minimum depth plus every distinct `{ kind, target, depth }`; deterministic depth/spec/evidence order. File evidence independent; symbol evidence augments.\n- `analyzeSpecImpact` traverses `DEPENDS_ON`, `COVERS_FILE`, `COVERS_SYMBOL`; upstream returns dependent specs and their covered code; downstream returns dependencies and reachable code within depth.\n- `detectChanges` finds changed-file symbols, bounded upstream impact, aggregate files/symbols/risk/summary.\n- Resolve selector to one canonical logical target before traversal. Unqualified: case-exact, then case-insensitive exact only; never fuzzy/prefix/component. Ambiguity returns bounded ordered candidates without traversal.\n- Owner-qualified selector uses resolver and stored `qualified_name`; zero matches never fall back to terminal name. Traversal consumes proven symbol ID and never parses human syntax.\n- Public-binding impact separates exact surface/export-name consumers (including re-exports) from all canonical-symbol dependents; retain selected binding, canonical target, ordered chain; never merge ambiguous exports.\n- Hierarchy traversal preserves language precedence/direction across contracts, overrides, inheritance, traits, mixins, embedding, promotion, provable interfaces; count logical symbol once; deterministic bounded cycle-safe order.\n- All operations are stateless read-only functions in `domain/services/`.\n\n## Constraints\n- Default depth 3; caller override allowed.\n- Fixed risk thresholds.\n- Shallowest-depth cycle deduplication required.\n- Bounded batching/concurrency required across width/input size.\n- No store mutation, lifecycle management, retained state, or `@specd/core` dependency.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:12f07dc15175530f5c3bc95bd87ecad72c361f88bc4ae179d9ea503619e0b3a3",
-          "lastModified": "2026-08-22T10:50:50.906Z"
+          "hash": "sha256:409b15db90f185c88673b54fc613d4701910f3f4e9052c27d30a4f1587c2177b",
+          "lastModified": "2026-10-12T15:40:16.439Z"
         },
         "verify.md": {
-          "hash": "sha256:08e772c613b9c757857c95ad2ee007978d5c746d771929d5610e44a662205ed6",
-          "lastModified": "2026-08-22T10:50:50.908Z"
+          "hash": "sha256:1faa96e65a974914f907141c7e6e7dae9b92389d0adff271e111dd5fdc4f40da",
+          "lastModified": "2026-10-12T15:47:34.873Z"
         }
       }
     }

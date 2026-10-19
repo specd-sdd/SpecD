@@ -11,41 +11,44 @@
   "implementation": [
     {
       "file": "code-graph:src/infrastructure/tree-sitter/go-language-adapter.ts",
-      "symbols": ["GoLanguageAdapter"]
+      "symbols": ["GoLanguageAdapter", "buildRelations"]
+    },
+    {
+      "file": "code-graph:test/infrastructure/tree-sitter/go-language-adapter.spec.ts"
     }
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Translates Go code (.go) into package-aware symbols, scoped facts, imports, selector calls, composite literals, and interface satisfaction.",
+      "value": "Translates Go source into package-aware declarations, scoped evidence, logical ownership, calls, imports, hierarchy, and types.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:3b97336261537520c1258e9680fd6c7cdd28d5a27e242e3b7df62e706f1b7f29",
-          "lastModified": "2026-08-16T08:12:49.032Z"
+          "hash": "sha256:e7bdc3aec0b3c49d1b1e07347c79ccc9904a666f620348bc3743201e119b2907",
+          "lastModified": "2026-10-14T08:50:27.826Z"
         },
         "verify.md": {
-          "hash": "sha256:cfedd53a091a889ed24a4519fbe1f45921be915070b92d1cc04582bdc628af0a",
-          "lastModified": "2026-08-16T08:12:49.034Z"
+          "hash": "sha256:9e9f622bc3735949d5d55f73fa480cd8306bb1cd743f2c21af113b92a7292a2f",
+          "lastModified": "2026-10-14T08:50:27.827Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# go-language-adapter\n\n## Rules\n\n### Scope & Analysis\n- Handles `.go` as `go`.\n- Single-pass parsing via Tree-sitter/ast-grep; outputs `FileAnalysisDraft` without AST retention or Go toolchain execution.\n\n### Declarations & Owners\n- Extracts functions, receiver methods, struct types (class kind), interface types (interface kind), named types/aliases (type kind), vars, consts.\n- Complete construct range; declared-name `selectionRange`. Attached comments preserved.\n- Declaring owner = receiver type (normalized pointer syntax) or interface. Same-name methods distinct across types. Package functions/types/consts have no owner.\n- Uppercase identifiers -> public export bindings; lowercase -> non-exported.\n\n### Imports & Package Resolution\n- Extracts single, grouped, aliased, dot, and blank imports (blank -> file dependency without symbol binding).\n- Resolves import specifiers by longest `go.mod` module prefix bounded by repo root.\n\n### Scoped Bindings, Calls & Relations\n- Emits facts for scope, typed params/results, receiver bindings, selector expressions, composite literals, constructor calls.\n- Emits `IMPORTS`, `CALLS`, `CONSTRUCTS`, `USES_TYPE` only when proven by package/receiver/import facts.\n- Drops unresolved selectors, reflection, dynamic interface dispatch, uninstantiated generics.\n\n### Embedding & Interface Satisfaction\n- Embedded named interface -> `EXTENDS`. Reference facts retain child owner, embedded owner, relation kind, provenance steps.\n- Emits `IMPLEMENTS` only when concrete receiver-method facts prove full interface method set (pointer/value receiver rules enforced; NO empty method sets / name-only guesses).\n- Member-level `OVERRIDES` unsupported. Bounded cycle termination.\n- Advertises `hierarchy: true`, `buildContext: false`.\n\n### Build Boundary\n- `go.work`, `replace`, vendoring, `internal/`, build tags (`GOOS`/`GOARCH`), cgo unsupported -> remains `unresolved`/`ambiguous`.\n\n## Constraints\n- NO `go list`, compiler execution, or runtime reflection.\n- Speculative interface satisfaction, build tag guesswork -> prohibited.\n- Go-specific package/receiver/method-set logic MUST stay inside adapter.",
+      "value": "# go-language-adapter\n\n## Rules\n\n### Files & analysis\n- `GoLanguageAdapter`: `.go` → `go`; parse content once via registered Tree-sitter/ast-grep grammar.\n- Return complete `FileAnalysisDraft`: symbols, imports, scoped/call/reference facts, compact serializable Pass 2 state; never persist AST.\n- Derive declared package from source; package identity from nearest bounded `go.mod`; `resolutionManifests()` exactly [`go.mod`], never `go.work`/other basename.\n\n### Declarations & ranges\n- Extract functions, receiver methods, structs (`SymbolKind.Class` broad kind), interfaces, named types/aliases, variables, constants, struct fields (`SymbolKind.Property`). Broad kind never complete Go identity.\n- Use complete parser construct range, exact declared-name `selectionRange`, shared half-open convention; retain immediately preceding attached comments verbatim; omit candidates lacking authoritative ranges.\n\n### Package surface & imports\n- Logical declarations expose indexed Go package; uppercase Unicode-leading package identifier → public binding; lowercase → non-exported. Public identity stays package-qualified across package files.\n- Extract single/grouped/aliased/dot/blank imports. Blank import → dependency evidence, no local binding. Dot import stays namespace form; bind unqualified name only with unique proven indexed target.\n- Resolve import specifiers by longest known `go.mod` module prefix.\n\n### Logical ownership\n- Parse receiver type and pointer/value semantics from AST receiver parameter nodes, never regex; retain pointer/value evidence in parser state.\n- Map receiver/interface syntax to logical symbols before member logical IDs. Receiver method owner = declared receiver logical identity; interface method owner = interface logical identity; normalize pointer syntax.\n- Struct field owner and `parentId` = declaring struct logical identity. Package functions/types/variables/constants have no owner beyond package surface.\n- Never derive owners from raw syntax IDs or optional `SymbolNode.parentId`. Omit unproven receiver-owner logical member facts. Preserve distinction between same-name methods on different receivers and interface signatures versus concrete methods.\n\n### Bindings, calls & types\n- Emit deterministic facts for import aliases, function scopes, typed parameters/results, receiver bindings, selectors, named composite literals, constructor-like calls, type references.\n- Build `IMPORTS`, `CALLS`, `CONSTRUCTS`, `USES_TYPE` only from proven package aliases, receiver types, local declarations, or indexed imports.\n- `buildRelations()` emits concrete `IMPORTS` for resolved packages and `CALLS` from caller declarations to target functions/receiver methods.\n- Never guess unresolved selectors, reflection, unproven interface dispatch, uninstantiated generic/type-set choices, or interprocedural-flow values.\n\n### Embedding & interface satisfaction\n- Local statically named interface embedding → ordered `EXTENDS`; unsupported: embedded struct fields, cross-file embedding closure, promoted-member depth selection.\n- Reference facts include child owner, embedded/contract owner, relation kind, ordered traversal steps. Reached owner must be queried for requested member; owner itself never member candidate. Cycles terminate deterministically.\n- `IMPLEMENTS` allowed only when one analyzed file contains complete known interface and receiver-method facts prove every direct method, respecting pointer/value evidence.\n- Never claim satisfaction for empty/unknown method set, missing method, embedded-interface requirements, build selection, unsupported generic type sets, or name-only coincidence.\n- Proven owner-level `IMPLEMENTS` plus ordered step enables contract-owner traversal; query requested interface signature/concrete member under reached owner. Member-level `OVERRIDES` unsupported.\n\n### Build boundary & capabilities\n- Module identity from `go.mod`; known module subpaths by longest prefix.\n- Unsupported until consumed: `go.work`, `replace`, vendoring, `internal`, build tags, `GOOS`/`GOARCH`, cgo, complete generic method sets. Dependent alternatives stay unresolved/ambiguous.\n- Advertise `buildContext: false`; `hierarchy: true` only while embedding/proven method-set facts use shared hierarchy/provenance model.\n- Parse failures, partial package coverage, unsupported semantics surface through shared coverage. Identical content/session context yields deterministic facts, relations, candidate ordering.\n\n## Constraints\n- MUST NOT run `go list`, compile code, retain parser ASTs, or infer runtime interface values.\n- MUST NOT guess build-dependent alternatives, reflection, or interface satisfaction.\n- Go-specific package, receiver, embedding, method-set semantics remain inside adapter.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:3b97336261537520c1258e9680fd6c7cdd28d5a27e242e3b7df62e706f1b7f29",
-          "lastModified": "2026-08-16T08:12:49.032Z"
+          "hash": "sha256:e7bdc3aec0b3c49d1b1e07347c79ccc9904a666f620348bc3743201e119b2907",
+          "lastModified": "2026-10-14T08:50:27.826Z"
         },
         "verify.md": {
-          "hash": "sha256:cfedd53a091a889ed24a4519fbe1f45921be915070b92d1cc04582bdc628af0a",
-          "lastModified": "2026-08-16T08:12:49.034Z"
+          "hash": "sha256:9e9f622bc3735949d5d55f73fa480cd8306bb1cd743f2c21af113b92a7292a2f",
+          "lastModified": "2026-10-14T08:50:27.827Z"
         }
       }
     }

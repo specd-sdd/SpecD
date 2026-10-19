@@ -6,7 +6,9 @@ import { type FileAnalysis } from '../../domain/value-objects/file-analysis.js'
 import {
   type DeclarationOccurrence,
   type HierarchyFact,
+  type HierarchyImportProvenance,
   type LocalBinding,
+  type LogicalDeclarationDiagnostic,
   type LogicalSymbol,
   assignQualifiedNames,
   parseLogicalSymbol,
@@ -20,6 +22,7 @@ import {
 } from '../../domain/value-objects/index-session.js'
 import { type ReferenceFactsWrite } from '../../domain/ports/graph-store.js'
 import { RelationType } from '../../domain/value-objects/relation-type.js'
+import { DuplicateDeclarationMappingError } from '../../domain/errors/duplicate-declaration-mapping-error.js'
 
 /**
  * Concrete in-memory implementation of the IndexSession interface.
@@ -43,6 +46,7 @@ export class InMemoryIndexSession implements IndexSession {
   private readonly logicalSymbolsById = new Map<string, LogicalSymbol>()
   private readonly publicBindingsById = new Map<string, PublicBinding>()
   private readonly localBindingsById = new Map<string, LocalBinding>()
+  private readonly logicalDiagnosticsByKey = new Map<string, LogicalDeclarationDiagnostic>()
   private readonly resolutionStepsByKey = new Map<string, ResolutionStep>()
   private readonly hierarchyFactsByKey = new Map<string, HierarchyFact>()
   private readonly logicalIdByDeclarationSymbolId = new Map<string, string>()
@@ -131,9 +135,11 @@ export class InMemoryIndexSession implements IndexSession {
   hydrateReferenceFacts(facts: ReferenceFactsWrite): void {
     for (const logical of facts.logicalSymbols) this.logicalSymbolsById.set(logical.id, logical)
     for (const item of facts.declarations) {
-      this.logicalIdByDeclarationSymbolId.set(item.declaration.symbolId, item.logicalSymbolId)
+      this.registerDeclarationMapping(item.declaration, item.logicalSymbolId)
       const declarations = this.declarationsByLogicalId.get(item.logicalSymbolId) ?? []
-      declarations.push(item.declaration)
+      if (!declarations.some((existing) => existing.symbolId === item.declaration.symbolId)) {
+        declarations.push(item.declaration)
+      }
       this.declarationsByLogicalId.set(item.logicalSymbolId, declarations)
     }
     for (const binding of facts.publicBindings) this.publicBindingsById.set(binding.id, binding)
@@ -168,7 +174,8 @@ export class InMemoryIndexSession implements IndexSession {
 
     this.analyses.set(input.filePath, fileAnalysis)
     for (const declaration of input.analysis.referenceFacts?.declarations ?? []) {
-      this.logicalIdByDeclarationSymbolId.set(declaration.symbolId, declaration.logicalId)
+      if (declaration.logicalId === undefined) continue
+      this.registerDeclarationMapping(declaration, declaration.logicalId)
       const declarations = this.declarationsByLogicalId.get(declaration.logicalId) ?? []
       if (!declarations.some((existing) => existing.symbolId === declaration.symbolId)) {
         declarations.push(declaration)
@@ -176,6 +183,15 @@ export class InMemoryIndexSession implements IndexSession {
       this.declarationsByLogicalId.set(declaration.logicalId, declarations)
       const logicalSymbol = parseLogicalSymbol(declaration.logicalId)
       if (logicalSymbol) this.logicalSymbolsById.set(logicalSymbol.id, logicalSymbol)
+    }
+    for (const logical of input.analysis.referenceFacts?.logicalSymbols ?? []) {
+      this.logicalSymbolsById.set(logical.id, logical)
+    }
+    for (const diagnostic of input.analysis.referenceFacts?.diagnostics ?? []) {
+      this.logicalDiagnosticsByKey.set(
+        JSON.stringify([diagnostic.code, diagnostic.logicalId]),
+        diagnostic,
+      )
     }
     for (const binding of input.analysis.referenceFacts?.publicBindings ?? []) {
       this.publicBindingsById.set(binding.id, binding)
@@ -213,13 +229,27 @@ export class InMemoryIndexSession implements IndexSession {
     // Populate qualified name mappings if a namespace exists
     if (input.analysis.namespace) {
       for (const symbol of input.analysis.symbols) {
-        const separator = input.analysis.language === 'php' ? '\\' : '.'
+        const separator = input.analysis.namespaceSeparator ?? '.'
         const qualifiedName = `${input.analysis.namespace}${separator}${symbol.name}`
         this.qualifiedNameSymbolMap.set(qualifiedName, symbol.id)
       }
     }
 
     return fileAnalysis
+  }
+
+  /**
+   * Registers one physical-to-logical declaration mapping without allowing remapping.
+   * @param declaration - Physical declaration occurrence.
+   * @param logicalId - Canonical logical target id.
+   * @throws {DuplicateDeclarationMappingError} When the declaration already maps elsewhere.
+   */
+  private registerDeclarationMapping(declaration: DeclarationOccurrence, logicalId: string): void {
+    const existing = this.logicalIdByDeclarationSymbolId.get(declaration.symbolId)
+    if (existing !== undefined && existing !== logicalId) {
+      throw new DuplicateDeclarationMappingError(declaration.symbolId, existing, logicalId)
+    }
+    this.logicalIdByDeclarationSymbolId.set(declaration.symbolId, logicalId)
   }
 
   /**
@@ -254,6 +284,17 @@ export class InMemoryIndexSession implements IndexSession {
    */
   getDeclarationsByLogicalId(): ReadonlyMap<string, readonly DeclarationOccurrence[]> {
     return this.declarationsByLogicalId
+  }
+
+  /**
+   * Returns collision diagnostics gathered from every analyzed file.
+   * @returns Diagnostics in deterministic order.
+   */
+  getLogicalDiagnostics(): readonly LogicalDeclarationDiagnostic[] {
+    return [...this.logicalDiagnosticsByKey.values()].sort(
+      (left, right) =>
+        left.logicalId.localeCompare(right.logicalId) || left.code.localeCompare(right.code),
+    )
   }
 
   /**
@@ -424,14 +465,32 @@ export class InMemoryIndexSession implements IndexSession {
       this.relationsKeys.add(key)
       this.relationsList.push(rel)
 
-      if (rel.type === RelationType.Extends || rel.type === RelationType.Implements) {
+      const hierarchyKind =
+        rel.type === RelationType.Extends
+          ? 'extends'
+          : rel.type === RelationType.Implements
+            ? 'implements'
+            : rel.type === RelationType.UsesType && rel.metadata?.['hierarchyKind'] === 'trait'
+              ? 'trait'
+              : undefined
+      if (hierarchyKind !== undefined) {
         const childId = this.logicalIdByDeclarationSymbolId.get(rel.source)
         const parentId = this.logicalIdByDeclarationSymbolId.get(rel.target)
         if (childId && parentId) {
           const rawPrecedence = rel.metadata?.['precedence']
           const precedence = typeof rawPrecedence === 'number' ? rawPrecedence : 0
-          const kind = rel.type === RelationType.Extends ? 'extends' : 'implements'
-          const fact: HierarchyFact = { childId, parentId, kind, precedence }
+          const sourceRange = parseHierarchySourceRange(rel.metadata?.['sourceRange'])
+          const importProvenance = parseHierarchyImportProvenance(
+            rel.metadata?.['importProvenance'],
+          )
+          const fact: HierarchyFact = {
+            childId,
+            parentId,
+            kind: hierarchyKind,
+            precedence,
+            ...(sourceRange === undefined ? {} : { sourceRange }),
+            ...(importProvenance === undefined ? {} : { importProvenance }),
+          }
           this.hierarchyFactsByKey.set(
             JSON.stringify([fact.childId, fact.parentId, fact.kind, fact.precedence]),
             fact,
@@ -499,5 +558,45 @@ export class InMemoryIndexSession implements IndexSession {
    */
   getQualifiedNames(): ReadonlyMap<string, string> {
     return this.qualifiedNameSymbolMap
+  }
+}
+
+/**
+ * Parses optional hierarchy range metadata without trusting adapter-specific values.
+ * @param value - Untrusted relation metadata value.
+ * @returns A complete source range, or undefined.
+ */
+function parseHierarchySourceRange(value: unknown): HierarchyFact['sourceRange'] | undefined {
+  if (typeof value !== 'object' || value === null) return undefined
+  const candidate = value as Record<string, unknown>
+  const fields = ['startLine', 'startColumn', 'endLine', 'endColumn'] as const
+  if (fields.some((field) => typeof candidate[field] !== 'number')) return undefined
+  return {
+    startLine: candidate['startLine'] as number,
+    startColumn: candidate['startColumn'] as number,
+    endLine: candidate['endLine'] as number,
+    endColumn: candidate['endColumn'] as number,
+  }
+}
+
+/**
+ * Parses optional imported-hierarchy provenance without accepting partial evidence.
+ * @param value - Untrusted relation metadata value.
+ * @returns Complete import provenance, or undefined.
+ */
+function parseHierarchyImportProvenance(value: unknown): HierarchyImportProvenance | undefined {
+  if (typeof value !== 'object' || value === null) return undefined
+  const candidate = value as Record<string, unknown>
+  if (
+    candidate['kind'] !== 'import' ||
+    typeof candidate['requestedName'] !== 'string' ||
+    typeof candidate['resolvedTargetSymbolId'] !== 'string'
+  ) {
+    return undefined
+  }
+  return {
+    kind: 'import',
+    requestedName: candidate['requestedName'],
+    resolvedTargetSymbolId: candidate['resolvedTargetSymbolId'],
   }
 }

@@ -8,6 +8,7 @@ import { CallForm, type CallFact, type ResolvedDependency } from '../value-objec
 import { RelationType } from '../value-objects/relation-type.js'
 import { SymbolKind } from '../value-objects/symbol-kind.js'
 import { type SymbolNode } from '../value-objects/symbol-node.js'
+import { type SourceLocation } from '../value-objects/source-location.js'
 import { type FileAnalysis } from '../value-objects/file-analysis.js'
 import { splitWorkspaceIdentity } from './split-workspace-identity.js'
 
@@ -129,9 +130,17 @@ export function buildScopedBindingEnvironment(
       })
     }
   }
+  const importFacts = buildImportBindingFacts(input.analysis, input.importMap, rootScopeId)
+  const resolvedImportKeys = new Set(importFacts.map((fact) => `${fact.scopeId}\0${fact.name}`))
   const factsByScopeAndName = groupFactsByScopeAndName([
-    ...input.analysis.bindingFacts,
-    ...buildImportBindingFacts(input.analysis, input.importMap, rootScopeId),
+    // A resolved import binding supersedes the adapter's unresolved declaration of the same name.
+    ...input.analysis.bindingFacts.filter(
+      (fact) =>
+        fact.sourceKind !== BindingSourceKind.ImportedType ||
+        fact.targetSymbolId !== undefined ||
+        !resolvedImportKeys.has(`${fact.scopeId}\0${fact.name}`),
+    ),
+    ...importFacts,
   ])
   const symbolsById = new Map(input.analysis.symbols.map((symbol) => [symbol.id, symbol]))
 
@@ -164,11 +173,7 @@ export function resolveDependencyFacts(
 
   for (const fact of input.analysis.bindingFacts) {
     if (!isTypeUseSource(fact.sourceKind)) continue
-    const sourceSymbol = findEnclosingSymbol(
-      fact.filePath,
-      fact.location.line,
-      input.analysis.symbols,
-    )
+    const sourceSymbol = findEnclosingSymbol(fact.filePath, fact.location, input.analysis.symbols)
     const targetSymbol = input.environment.resolveTargetSymbol(fact)
     if (sourceSymbol === undefined || targetSymbol === undefined) continue
     addDependency(dependencies, seen, {
@@ -181,9 +186,7 @@ export function resolveDependencyFacts(
   }
 
   for (const call of input.analysis.callFacts) {
-    const sourceSymbol =
-      findSymbolById(call.callerSymbolId, input.analysis.symbols) ??
-      findEnclosingSymbol(call.filePath, call.location.line, input.analysis.symbols)
+    const sourceSymbol = findSymbolById(call.callerSymbolId, input.analysis.symbols)
     const targetSymbol = resolveCallTarget(call, input.environment, input.symbolLookup)
     if (sourceSymbol === undefined || targetSymbol === undefined) continue
     const relationType =
@@ -407,6 +410,23 @@ function extractWorkspacePrefix(filePath: string): string | undefined {
 }
 
 /**
+ * Finds top-level declarations of one file by name; the only non-import resolution allowed.
+ * @param filePath - Workspace-prefixed file path of the reference.
+ * @param name - Declaration name.
+ * @param symbolLookup - In-memory symbol lookup.
+ * @returns Matching same-file top-level symbols.
+ */
+function findSameFileDeclarations(
+  filePath: string,
+  name: string,
+  symbolLookup: SymbolLookup,
+): readonly SymbolNode[] {
+  return symbolLookup
+    .findByFile(filePath)
+    .filter((symbol) => symbol.name === name && symbol.parentId === undefined)
+}
+
+/**
  * Resolves receiver binding facts for a member/static call.
  * @param call - Call fact with a receiver name.
  * @param scopeId - Effective starting scope id.
@@ -480,23 +500,37 @@ function findSymbolById(
 }
 
 /**
- * Finds the innermost symbol that starts before a source line in the same file.
+ * Finds the innermost declaration whose source range contains a location.
+ *
+ * Containment uses the complete construct range with line and column coordinates and a
+ * half-open end. A declaration that merely precedes the location is never a candidate, so an
+ * unproven source yields no dependency instead of a guessed one.
  * @param filePath - Workspace-prefixed file path.
- * @param line - One-based source line.
+ * @param location - Location of the binding syntax.
  * @param symbols - Symbols to inspect.
- * @returns Best enclosing symbol candidate.
+ * @returns The smallest containing symbol, or undefined when none contains the location.
  */
 function findEnclosingSymbol(
   filePath: string,
-  line: number,
+  location: SourceLocation,
   symbols: readonly SymbolNode[],
 ): SymbolNode | undefined {
-  return [...symbols]
-    .filter((symbol) => symbol.filePath === filePath && symbol.line <= line)
-    .sort((left, right) => {
-      if (left.line !== right.line) return right.line - left.line
-      return right.column - left.column
-    })[0]
+  const position = (line: number, column: number): number => line * 1_000_000 + column
+  const at = position(location.line, location.column)
+  const containing = symbols.filter((symbol) => {
+    if (symbol.filePath !== filePath) return false
+    const start = position(symbol.line, symbol.column)
+    const end = position(symbol.endLine, symbol.endColumn)
+    return start <= at && at < end
+  })
+  return containing.sort(
+    (left, right) =>
+      position(left.endLine, left.endColumn) -
+        position(left.line, left.column) -
+        (position(right.endLine, right.endColumn) - position(right.line, right.column)) ||
+      right.line - left.line ||
+      right.column - left.column,
+  )[0]
 }
 
 /**
@@ -531,9 +565,7 @@ function resolveCallTarget(
   const bindingTarget = selectSingleSymbol(bindingTargets)
   if (bindingTarget !== undefined) return bindingTarget
 
-  return selectSingleSymbol(
-    symbolLookup.findByName(targetName, extractWorkspacePrefix(call.filePath)),
-  )
+  return selectSingleSymbol(findSameFileDeclarations(call.filePath, targetName, symbolLookup))
 }
 
 /**

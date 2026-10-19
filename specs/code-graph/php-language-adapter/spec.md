@@ -12,6 +12,20 @@ The PHP language adapter translates PHP namespaces, declarations, Composer mappi
 
 The adapter MUST NOT execute PHP, autoload project code, or retain parser AST nodes in persisted analysis state. Registered loader rules and run-scoped parser keepalive state MAY be used only within the indexing session.
 
+### Requirement: PHP parser-authoritative structural extraction
+
+The adapter SHALL derive type declarations, traits and adaptations, parameters and return types, namespace uses, require/include expressions, calls, construction, hierarchy clauses, and literal loader invocations from PHP parser nodes whenever the grammar represents them. Brace counting or whole-source regular expressions MUST NOT determine a declaration body, scope, call, construction, or dependency.
+
+CakePHP, CodeIgniter, Yii, Laravel, Zend, Drupal, and other registered framework rules MAY interpret known callee names and literal argument conventions only after the adapter has established the call expression, receiver or static target, arguments, and containing scope from parser nodes. A matching string in a comment, literal, heredoc, or unrelated expression MUST NOT emit a loader, binding, import, or call fact.
+
+Pass 2 alias, construction, member-call, require/include, and loader relation extraction SHALL visit the retained AST or immutable parser-derived facts. It MUST NOT scan callable body text with regular expressions to rediscover those constructs.
+
+Parsing `composer.json` and bounded PSR-4 metadata MAY remain non-AST metadata processing, but that metadata SHALL be prepared once in run-scoped adapter session state before per-file Pass 2 analysis. Pass 2 MUST NOT read the filesystem or consult mutable adapter-instance caches whose contents can leak between indexing sessions. Token extraction MAY operate inside a parser-proven type or literal node, but neither exception permits unbounded reconstruction of PHP source structure.
+
+Namespace uses, require/include expressions, and registered loader calls SHALL emit dependency relations only when resolution evidence identifies a target. The adapter MUST NOT fall back to the first loader candidate when no candidate resolves.
+
+An imported `extends`, `implements`, or trait target SHALL emit its physical hierarchy relation together with exactly one matching shared hierarchy reference fact carrying the parser-derived range of the written `extends`, `implements`, or trait-use name, resolution provenance, and resolved target.
+
 ### Requirement: Declaration extraction and ranges
 
 The adapter SHALL extract functions, classes, interfaces, traits, enums, class/interface/trait methods and properties, top-level constant declarations, class constants, and enum cases.
@@ -51,6 +65,14 @@ Loader facts SHALL produce `IMPORTS` and receiver bindings only when their liter
 The adapter SHALL emit deterministic facts for namespace aliases, callable scopes, typed parameters and returns, typed properties, `new` expressions, `$this`, `self`, `static`, and `parent` receiver forms, explicit instance aliases, and supported framework-managed bindings. It SHALL build `IMPORTS`, `CALLS`, `CONSTRUCTS`, and `USES_TYPE` only when the target is proven by these facts or resolved imports.
 
 The caller SHALL be the innermost enclosing function or method. Reflection, variable class names, dynamic properties, container values, and interprocedural aliases SHALL not produce guessed relations.
+
+### Requirement: PHP caller containment and declaration classification
+
+The adapter SHALL select a call's caller as the innermost supported function, method, or explicitly modeled closure whose complete parser range contains the call. Namespace declarations, classes, traits, interfaces, enums, properties, local variables, or unrelated declarations that only precede the call MUST NOT be selected as callers.
+
+Parameters, namespace aliases, `$this`, local assignments, loaded-instance aliases, and framework-managed names SHALL be lexical bindings. They MAY support deterministic receiver resolution but MUST NOT become independent logical targets unless a PHP declaration rule proves an addressable semantic declaration.
+
+Top-level functions and type declarations SHALL use their namespace-qualified surface; members SHALL use their canonical declaring type owner. Closures or callable variables that receive physical declaration evidence SHALL remain lexical or physical-only unless the adapter defines a deterministic scope-qualified semantic identity. Same-name declarations in distinct namespaces, owners, or lexical scopes MUST remain distinct, and PHP declarations MUST NOT be grouped merely because their simple names match.
 
 ### Requirement: PHP hierarchy and provenance evidence
 

@@ -43,7 +43,7 @@ Files whose hash matches the stored hash are skipped entirely — no parsing, no
 
 When the persisted graph fingerprint differs from the current fingerprint, the indexer SHALL treat the run as a full rebuild of the active graph store rather than a normal incremental skip. The preferred behavior is to recreate the store and re-index every discovered file while surfacing this visible explanation: `Graph derivation fingerprint mismatch — code-graph version, workspace configuration, or resolution manifest content changed`. If a backend cannot safely recreate in-place, the caller MAY fail fast and require an explicit force-reindex command instead.
 
-Changed files are removed from the store before bulk load, because CSV `COPY FROM` cannot upsert — it can only insert. Removing changed files first ensures the bulk load inserts fresh data without conflicts.
+Changed files are removed from the store before their re-extracted data is written, so the replacement generation never conflicts with stale rows for the same file.
 
 A forced run SHALL reconsider every discovered input selected for that run. Persisted file nodes, document nodes, index-coverage hashes, observations, semantic lookup state, or any other reusable artifact MUST NOT authorize an unchanged-file or unchanged-spec skip during that run. The resulting committed generation SHALL contain the nodes, semantic state, coverage relations, coverage records, and derivation metadata produced from that complete reconsideration.
 
@@ -148,10 +148,11 @@ Extraction proceeds in two passes over the discovered files, using a shared in-m
 - **Pass 1 (Analyze files, per workspace)** — For each workspace, for each file in chunks: read content, derive a complete `FileAnalysis` through the language adapter, register the file analysis in the shared `IndexSession`, and emit `DEFINES` and `EXPORTS` relations from the registered symbols. The session owns common in-memory lookups for files, symbols, qualified names, and parser-emitted facts. No store queries are needed during extraction.
 - **Pass 2 (Resolve imports + scoped bindings + relations, all workspaces)** — For each analyzed file, resolve imports and cross-file targets from the facts stored in the `IndexSession`, then derive `IMPORTS`, `CALLS`, `CONSTRUCTS`, `USES_TYPE`, hierarchy, and other deterministic relations from the stored facts without re-parsing the file. Shared scoped resolution owns cross-language receiver, type-reference, constructor, and call-candidate lookup against the session indexes.
 - **Specs (per workspace)** — For each workspace: iterate through specs provided by the `SpecRepository`.
-- **Store commit** — After all passes complete, call `GraphStore.bulkLoad()` once.
-- **Search readiness** — After bulk load, call `GraphStore.rebuildFtsIndexes()`.
 
 This two-pass approach ensures all symbols exist in the shared session before import, binding, call, and hierarchy resolution, while avoiding store queries and repeated file analysis during indexing.
+
+- **Bulk commit** — After all passes complete, commit one bulk write session so the indexed generation is persisted atomically.
+- **Search index rebuild** — The commit rebuilds the semantic and content search indexes once before the store reports ready.
 
 ### Requirement: Shared indexing session
 
@@ -289,9 +290,17 @@ Every persisted source file SHALL retain the indexed textual content used for an
 
 Relation construction SHALL build reusable declaration, logical-symbol, import, and public-binding lookup indexes once per indexing session. Resolving an individual call, dependency, import, or re-export MUST NOT scan the complete logical declaration or symbol collection. Persistence SHALL retain bounded chunk and batch writes so the work of building relations grows with the processed relation facts rather than multiplying them by the full graph size. Adapter-emitted reference facts SHALL be stored before spec-coverage projection.
 
+### Requirement: Classification-aware logical identity construction
+
+The indexing session SHALL preserve each adapter's declaration classification and MUST NOT manufacture a logical target for a lexical-binding-only or physical-only declaration. It SHALL register canonical logical owners before constructing owned member identities and SHALL use the adapter-provided lexical occurrence parent only as physical containment evidence.
+
+Logical declaration groups SHALL be assembled from explicit language-provided grouping evidence. An absent or undefined group key SHALL mean that no group has been proven; it MUST NOT be normalized into a shared key. The indexer MUST NOT merge declarations by file, simple name, broad `SymbolKind`, or mutual absence of grouping evidence alone. Every logical target SHALL persist its complete deterministic declaration set, including declaration-level form metadata required to distinguish signatures, implementations, and other occurrences without changing target identity.
+
 ### Requirement: Incompatible derivation rebuild
 
 When package derivation fingerprint or backend schema is incompatible, project indexing SHALL perform a visible destructive full rebuild through provider-owned recreation, rotate storage generation, and report the rebuild reason. Ordinary read paths MUST NOT perform this repair or serve a silently empty graph.
+
+Recreation applies when the run replaces the whole graph, that is, when every stored workspace is indexed. A run that indexes only some stored workspaces SHALL clear and regenerate only those workspaces and MUST NOT recreate storage or alter the others. A caller that supplies an already-open provider cannot have it recreated; indexing then performs an in-place logical rebuild that clears the derived graph and reports the same reason.
 
 ### Requirement: Indexed-input observation capture
 
@@ -308,6 +317,14 @@ Re-export and public-binding propagation SHALL use indexed affected-route work q
 The indexer SHALL append bounded chunks to one Store bulk session, commit once, and request at most one final rebuild covering semantic, document, spec, and source-content indexes when searchable content changed. A fully unchanged generation SHALL preserve the existing semantic reference-fact snapshot while updating metadata and freshness state, without re-extracting files, replacing reference facts, constructing relations, or rebuilding search indexes. Persisted coverage hashes SHALL participate in diffing targets such as non-text content that intentionally has no File or Document node. Full and incremental indexing of equivalent source state MUST produce equivalent nodes, ranges, semantic facts, relations, and source-search behavior. Progress SHALL report separate counts and timings for import resolution, dependency facts, adapter relations, re-exports, hierarchy/overrides, persistence, and search-index rebuilding. Persistence timing SHALL include cleanup, staged writes, observation/reference-fact writes, relation writes, and non-search commit work; search-index timing SHALL be zero when no search rebuild is requested and SHALL cover only the backend search-index step when requested.
 
 `IndexResult` SHALL expose `fullRebuild: boolean` directly in addition to `fullRebuildReason`, so every Code Graph, SDK, and CLI caller receives the same rebuild truth without reconstructing it at a higher layer.
+
+### Requirement: Identity-sensitive incremental equivalence
+
+Given identical final source and configuration, an incremental indexing run SHALL produce the same logical symbols, declaration mappings, local bindings, dependency relations, public bindings, resolution evidence, and spec coverage as a clean full rebuild.
+
+The affected closure SHALL reconsider every consumer whose semantic result can change because of declaration movement, body edits, owner changes, overload or merge-group changes, renames, moves, additions, deletions, or a previously unresolved target becoming resolvable. Cleanup MUST NOT delete incident physical relations without either rebuilding every affected consumer or preserving equivalent committed evidence.
+
+Equivalence tests SHALL compare normalized semantic state after each identity-sensitive mutation rather than relying only on file or relation counts.
 
 ## Constraints
 

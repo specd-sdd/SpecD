@@ -34,6 +34,7 @@ import {
   createLogicalSymbol,
   assignQualifiedNames,
   createPublicBinding,
+  DeclarationOccurrenceForm,
   SymbolSpace,
 } from '../../../src/domain/value-objects/symbol-reference.js'
 import { SQLiteGraphStore } from '../../../src/infrastructure/sqlite/sqlite-graph-store.js'
@@ -41,9 +42,11 @@ import { SQLiteWorkerClient } from '../../../src/infrastructure/sqlite/sqlite-wo
 import { GraphStoreRecreateRequiresClosedError } from '../../../src/domain/errors/graph-store-recreate-requires-closed-error.js'
 import { GraphStorageRecoveryRequiredError } from '../../../src/domain/errors/graph-storage-recovery-required-error.js'
 import {
+  REQUIRED_COLUMNS,
   SQLITE_SCHEMA_DDL,
   SQLITE_SCHEMA_VERSION,
 } from '../../../src/infrastructure/sqlite/schema.js'
+import { readStorageGeneration } from '../../../src/infrastructure/storage-generation.js'
 import { graphStoreContractTests } from '../../domain/ports/graph-store.contract.js'
 
 let tempDir: string | undefined
@@ -182,18 +185,50 @@ describe('SQLiteGraphStore', () => {
           target: targetSpec.specId,
           type: RelationType.DependsOn,
         }),
-        createRelation({
-          source: targetSpec.specId,
-          target: targetFile.path,
-          type: RelationType.CoversFile,
-        }),
-        createRelation({
-          source: targetSpec.specId,
-          target: targetSymbol.id,
-          type: RelationType.CoversSymbol,
-        }),
       ],
     })
+
+    // Symbol coverage targets the logical symbol, as indexing writes it. Replacing reference
+    // facts resets coverage, so file coverage is recorded together with it.
+    const targetLogical = createLogicalSymbol({
+      workspace: 'code-graph',
+      surface: targetFile.path,
+      name: 'target',
+      space: SymbolSpace.Value,
+      ownerId: undefined,
+      memberSemantics: undefined,
+    })
+    await store.replaceReferenceFacts({
+      logicalSymbols: [targetLogical],
+      declarations: [
+        {
+          logicalSymbolId: targetLogical.id,
+          declaration: {
+            symbolId: targetSymbol.id,
+            logicalId: targetLogical.id,
+            location: { filePath: targetFile.path, line: 1, column: 0, endLine: 1, endColumn: 10 },
+            kind: SymbolKind.Function,
+            form: DeclarationOccurrenceForm.Definition,
+          },
+        },
+      ],
+      publicBindings: [],
+      localBindings: [],
+      steps: [],
+      coverage: [],
+    })
+    await store.addRelations([
+      createRelation({
+        source: targetSpec.specId,
+        target: targetFile.path,
+        type: RelationType.CoversFile,
+      }),
+      createRelation({
+        source: targetSpec.specId,
+        target: targetLogical.id,
+        type: RelationType.CoversSymbol,
+      }),
+    ])
 
     return {
       coreFile,
@@ -415,6 +450,7 @@ describe('SQLiteGraphStore', () => {
     await expect(store.findLogicalSymbolsByQualifiedNames([])).resolves.toEqual([])
     await expect(store.findLogicalSymbolsByIds([])).resolves.toEqual([])
     await expect(store.findDeclarations([])).resolves.toEqual([])
+    await expect(store.findLogicalDeclarationsByDeclarationIds([])).resolves.toEqual([])
     await expect(store.findPublicBindings([])).resolves.toEqual([])
     await expect(store.findPublicBindingsByExportedNames([])).resolves.toEqual([])
     await expect(store.findResolutionSteps([])).resolves.toEqual([])
@@ -535,20 +571,38 @@ describe('SQLiteGraphStore', () => {
         column: 0,
       }),
     )
+    const logicalSymbols = symbols.map((symbol) =>
+      createLogicalSymbol({
+        workspace: 'core',
+        surface: 'src/covered.ts',
+        name: symbol.name,
+        space: SymbolSpace.Value,
+        ownerId: undefined,
+        memberSemantics: undefined,
+      }),
+    )
     const relations = [
       ...files.map((file) =>
         createRelation({ source: spec.specId, target: file.path, type: RelationType.CoversFile }),
       ),
-      ...symbols.map((symbol) =>
+      ...logicalSymbols.map((symbol) =>
         createRelation({ source: spec.specId, target: symbol.id, type: RelationType.CoversSymbol }),
       ),
     ]
+    await store.replaceReferenceFacts({
+      logicalSymbols,
+      declarations: [],
+      publicBindings: [],
+      localBindings: [],
+      steps: [],
+      coverage: [],
+    })
     await store.bulkLoad({ files, symbols, specs: [spec], relations })
 
     const fileTargets = [...files.map((file) => file.path).reverse(), files[0]!.path, 'missing']
     const symbolTargets = [
-      ...symbols.map((symbol) => symbol.id).reverse(),
-      symbols[0]!.id,
+      ...logicalSymbols.map((symbol) => symbol.id).reverse(),
+      logicalSymbols[0]!.id,
       'missing',
     ]
     const fileCoverage = await store.getCoveringSpecsForFiles(fileTargets)
@@ -710,7 +764,7 @@ describe('SQLiteGraphStore', () => {
       .sort((left, right) => left.name.localeCompare(right.name) || left.id.localeCompare(right.id))
       .map((symbol) => symbol.id)
     const expectedDeclarationIds = [...declarations]
-      .sort((left, right) => left.logicalSymbolId.localeCompare(right.logicalSymbolId))
+      .reverse()
       .map((declaration) => declaration.declaration.symbolId)
     const expectedBindingIds = [...publicBindings]
       .sort(
@@ -751,6 +805,82 @@ describe('SQLiteGraphStore', () => {
     expect(
       (await store.findLogicalSymbolsByIds([...ids].reverse())).map((symbol) => symbol.id),
     ).toEqual(expectedLogicalIds)
+    await store.close()
+  })
+
+  it('round-trips declaration occurrence forms, preserves reverse mapping order, and chunks reverse lookups', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-occurrence-forms-'))
+    const store = new SQLiteGraphStore(tempDir)
+    await store.open()
+
+    const count = 1200
+    const logicalSymbols = Array.from({ length: count }, (_, index) =>
+      createLogicalSymbol({
+        workspace: 'core',
+        surface: 'src/items.ts',
+        name: `item${String(index)}`,
+        space: SymbolSpace.Value,
+        ownerId: undefined,
+        memberSemantics: undefined,
+      }),
+    )
+
+    const forms = [
+      DeclarationOccurrenceForm.Definition,
+      DeclarationOccurrenceForm.Signature,
+      DeclarationOccurrenceForm.Implementation,
+    ] as const
+
+    const declarations = logicalSymbols.map((logical, index) => {
+      const form = forms[index % forms.length]!
+      return {
+        logicalSymbolId: logical.id,
+        declaration: {
+          symbolId: `core:src/items.ts:function:item${String(index)}:${String(index + 1)}:0`,
+          logicalId: logical.id,
+          location: {
+            filePath: 'core:src/items.ts',
+            line: index + 1,
+            column: 0,
+            endLine: index + 1,
+            endColumn: 10,
+          },
+          kind: SymbolKind.Function,
+          form,
+          occurrenceForm: form,
+        },
+      }
+    })
+
+    await store.replaceReferenceFacts({
+      logicalSymbols,
+      declarations,
+      publicBindings: [],
+      localBindings: [],
+      steps: [],
+      coverage: [],
+    })
+
+    // Forward mapping round-trip with occurrenceForm
+    const forward = await store.findDeclarations([logicalSymbols[0]!.id, logicalSymbols[1]!.id])
+    expect(forward).toHaveLength(2)
+    expect(forward[0]!.declaration.form).toBe(DeclarationOccurrenceForm.Definition)
+    expect(forward[0]!.declaration.occurrenceForm).toBe(DeclarationOccurrenceForm.Definition)
+    expect(forward[1]!.declaration.form).toBe(DeclarationOccurrenceForm.Signature)
+    expect(forward[1]!.declaration.occurrenceForm).toBe(DeclarationOccurrenceForm.Signature)
+
+    // Reverse mapping order preservation across chunked input (>900)
+    const reversedDeclIds = [...declarations.map((d) => d.declaration.symbolId)].reverse()
+    const reverseResults = await store.findLogicalDeclarationsByDeclarationIds(reversedDeclIds)
+    expect(reverseResults).toHaveLength(count)
+    expect(reverseResults.map((r) => r.declaration.symbolId)).toEqual(reversedDeclIds)
+    expect(reverseResults[0]!.declaration.form).toBe(
+      declarations[declarations.length - 1]!.declaration.form,
+    )
+    expect(reverseResults[0]!.declaration.occurrenceForm).toBe(
+      declarations[declarations.length - 1]!.declaration.occurrenceForm,
+    )
+
     await store.close()
   })
 
@@ -1430,6 +1560,56 @@ describe('SQLiteGraphStore', () => {
     expect(existsSync(join(tempDir, 'graph', 'index.lock'))).toBe(true)
   })
 
+  it('recreate removes only the database files and rotates the storage epoch', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-test-'))
+    const store = new SQLiteGraphStore(tempDir)
+    await store.open()
+    await store.close()
+    const graphDir = join(tempDir, 'graph')
+    writeFileSync(join(graphDir, 'code-graph.sqlite-wal'), 'wal')
+    writeFileSync(join(graphDir, 'code-graph.sqlite-shm'), 'shm')
+    writeFileSync(join(graphDir, 'index.lock'), 'lease\n')
+    const generationBefore = readStorageGeneration(tempDir)
+
+    await store.recreate()
+
+    expect(existsSync(join(graphDir, 'code-graph.sqlite'))).toBe(false)
+    expect(existsSync(join(graphDir, 'code-graph.sqlite-wal'))).toBe(false)
+    expect(existsSync(join(graphDir, 'code-graph.sqlite-shm'))).toBe(false)
+    expect(existsSync(join(graphDir, 'index.lock'))).toBe(true)
+    expect(existsSync(join(graphDir, 'storage.epoch'))).toBe(true)
+    expect(readStorageGeneration(tempDir).token).not.toBe(generationBefore.token)
+  })
+
+  it('rejects a same-version database whose table lost a required column, then recovers', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-shape-'))
+    const databasePath = join(tempDir, 'graph', 'code-graph.sqlite')
+    const initialStore = new SQLiteGraphStore(tempDir)
+    await initialStore.open()
+    await initialStore.close()
+    const db = new Database(databasePath)
+    db.exec('ALTER TABLE logical_declarations DROP COLUMN occurrence_form')
+    db.close()
+
+    const brokenStore = new SQLiteGraphStore(tempDir)
+    await expect(brokenStore.open()).rejects.toMatchObject({ reason: 'SCHEMA_INCOMPATIBLE' })
+
+    await brokenStore.recreate()
+    await brokenStore.open()
+    await brokenStore.close()
+  })
+
+  it('derives REQUIRED_COLUMNS from the DDL for every ordinary table', () => {
+    expect(REQUIRED_COLUMNS['logical_declarations']).toContain('occurrence_form')
+    expect(REQUIRED_COLUMNS['symbols']).toContain('selection_end_column')
+    expect(REQUIRED_COLUMNS['local_bindings']).toContain('end_column')
+    expect(Object.keys(REQUIRED_COLUMNS)).not.toContain('symbol_fts')
+    for (const columns of Object.values(REQUIRED_COLUMNS)) {
+      expect(columns).not.toContain('PRIMARY')
+      expect(columns).not.toContain('FOREIGN')
+    }
+  })
+
   it('retries a locked WAL file while recreating the store', async () => {
     tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-test-'))
     const store = new SQLiteGraphStore(tempDir)
@@ -1500,7 +1680,7 @@ describe('SQLiteGraphStore', () => {
   })
 
   it('declares sqlite schema version and fts-backed ddl', () => {
-    expect(SQLITE_SCHEMA_VERSION).toBe(14)
+    expect(SQLITE_SCHEMA_VERSION).toBe(15)
     expect(SQLITE_SCHEMA_DDL).toContain('CREATE TABLE IF NOT EXISTS files')
     expect(SQLITE_SCHEMA_DDL).toContain('project_relative_path TEXT NOT NULL')
     expect(SQLITE_SCHEMA_DDL).not.toContain('config_relative_path')
@@ -1512,6 +1692,7 @@ describe('SQLiteGraphStore', () => {
     expect(SQLITE_SCHEMA_DDL).toContain('CREATE VIRTUAL TABLE IF NOT EXISTS spec_fts')
     expect(SQLITE_SCHEMA_DDL).toContain('CREATE VIRTUAL TABLE IF NOT EXISTS document_fts')
     expect(SQLITE_SCHEMA_DDL).toContain('CREATE TABLE IF NOT EXISTS logical_declarations')
+    expect(SQLITE_SCHEMA_DDL).toContain('occurrence_form TEXT NOT NULL')
     expect(SQLITE_SCHEMA_DDL).toContain('CREATE TABLE IF NOT EXISTS public_bindings')
     expect(SQLITE_SCHEMA_DDL).toContain('CREATE TABLE IF NOT EXISTS local_bindings')
     expect(SQLITE_SCHEMA_DDL).toContain('CREATE TABLE IF NOT EXISTS resolution_steps')
@@ -1528,6 +1709,7 @@ describe('SQLiteGraphStore', () => {
       'CREATE INDEX IF NOT EXISTS idx_logical_symbols_qualified_name ON logical_symbols(qualified_name)',
     )
     expect(SQLITE_SCHEMA_DDL).not.toContain('member_form')
+    expect(SQLITE_SCHEMA_DDL).not.toContain('ALTER TABLE')
     expect(SQLITE_SCHEMA_DDL).toContain(
       'CREATE TABLE IF NOT EXISTS public_bindings (\n  id TEXT PRIMARY KEY,\n  surface TEXT NOT NULL,\n  exported_name TEXT NOT NULL,\n  space TEXT NOT NULL,\n  target_id TEXT\n);',
     )
@@ -1536,7 +1718,7 @@ describe('SQLiteGraphStore', () => {
     )
   })
 
-  it.each(['10', '11', '12', '13', '15'])(
+  it.each(['10', '11', '12', '13', '14', '16'])(
     'rejects schema version %s without altering the table',
     async (version) => {
       const dir = mkdtempSync(join(tmpdir(), `code-graph-sqlite-schema-v${version}-`))
@@ -1572,8 +1754,8 @@ describe('SQLiteGraphStore', () => {
     },
   )
 
-  it('reopens schema 12 without rebuilding stored member rows', async () => {
-    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-schema-v11-'))
+  it('reopens current schema 15 without rebuilding stored member rows', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-schema-v15-'))
     const owner = createLogicalSymbol({
       workspace: 'core',
       surface: 'core:src/edit.ts',
@@ -1673,6 +1855,50 @@ describe('SQLiteGraphStore', () => {
       expect(top).toEqual({ member_kind: null, member_dispatch: null })
     } finally {
       db.close()
+    }
+  })
+
+  it('rejects schema 14 for reads and recreates it as schema 15 with a new storage epoch', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-schema-v14-rebuild-'))
+    const databasePath = join(tempDir, 'graph', 'code-graph.sqlite')
+    const initialStore = new SQLiteGraphStore(tempDir)
+    await initialStore.open()
+    await initialStore.close()
+    const generationBefore = readStorageGeneration(tempDir)
+
+    const oldDb = new Database(databasePath)
+    oldDb.prepare("UPDATE meta SET value = '14' WHERE key = 'schemaVersion'").run()
+    const columnsBefore = oldDb.prepare('PRAGMA table_info(logical_declarations)').all()
+    oldDb.close()
+
+    const incompatibleStore = new SQLiteGraphStore(tempDir)
+    await expect(incompatibleStore.open()).rejects.toMatchObject({
+      reason: 'SCHEMA_INCOMPATIBLE',
+    })
+    expect(readStorageGeneration(tempDir).token).toBe(generationBefore.token)
+
+    const rejectedDb = new Database(databasePath, { readonly: true })
+    expect(rejectedDb.prepare('PRAGMA table_info(logical_declarations)').all()).toEqual(
+      columnsBefore,
+    )
+    rejectedDb.close()
+
+    await incompatibleStore.recreate()
+    expect(readStorageGeneration(tempDir).token).not.toBe(generationBefore.token)
+    await incompatibleStore.open()
+    await incompatibleStore.close()
+
+    const rebuiltDb = new Database(databasePath, { readonly: true })
+    try {
+      expect(rebuiltDb.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get()).toEqual(
+        { value: '15' },
+      )
+      const rebuiltColumns = rebuiltDb
+        .prepare('PRAGMA table_info(logical_declarations)')
+        .all() as Array<{ name: string }>
+      expect(rebuiltColumns.map((column) => column.name)).toContain('occurrence_form')
+    } finally {
+      rebuiltDb.close()
     }
   })
 

@@ -98,4 +98,74 @@ describe('projectSpecCoverage', () => {
       },
     ])
   })
+
+  it('emits coverage relations without a stale flag and reports absent symbols as SYMBOL_NOT_FOUND', async () => {
+    const filePath = 'code-graph:src/service.ts'
+    const present = createSymbolNode({
+      name: 'present',
+      kind: SymbolKind.Function,
+      filePath,
+      line: 1,
+      column: 0,
+    })
+
+    const result = await projectSpecCoverage({
+      specs: [
+        {
+          specId: 'code-graph:coverage',
+          implementation: [{ file: filePath, symbols: ['present', 'gone'] }],
+        },
+      ],
+      indexedFilePaths: new Set([filePath]),
+      symbolsByFile: () => [present],
+      logicalIdByDeclarationSymbolId: new Map([[present.id, 'logical:present']]),
+    })
+
+    const symbolRelations = result.relations.filter((relation) => relation.type === 'COVERS_SYMBOL')
+    expect(symbolRelations).toHaveLength(1)
+    for (const relation of result.relations) {
+      expect(relation.metadata ?? {}).not.toHaveProperty('stale')
+    }
+    expect(result.diagnostics).toEqual([
+      {
+        specId: 'code-graph:coverage',
+        filePath,
+        symbolName: 'gone',
+        reason: 'SYMBOL_NOT_FOUND',
+      },
+    ])
+  })
+
+  it('classifies a matched physical-only declaration as coverage not applicable', async () => {
+    const filePath = 'code-graph:src/service.ts'
+    const physicalOnly = createSymbolNode({
+      name: '<anonymous>',
+      kind: SymbolKind.Function,
+      filePath,
+      line: 3,
+      column: 2,
+    })
+
+    const result = await projectSpecCoverage({
+      specs: [
+        {
+          specId: 'code-graph:coverage',
+          implementation: [{ file: filePath, symbols: ['<anonymous>'] }],
+        },
+      ],
+      indexedFilePaths: new Set([filePath]),
+      symbolsByFile: () => [physicalOnly],
+      logicalIdByDeclarationSymbolId: new Map(),
+    })
+
+    expect(result.relations).toEqual([])
+    expect(result.diagnostics).toEqual([
+      {
+        specId: 'code-graph:coverage',
+        filePath,
+        symbolName: '<anonymous>',
+        reason: 'COVERAGE_NOT_APPLICABLE',
+      },
+    ])
+  })
 })

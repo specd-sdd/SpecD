@@ -1,0 +1,2937 @@
+{
+  "name": "cross-language-symbol-semantics",
+  "createdAt": "2026-10-14T12:07:44.405Z",
+  "updatedAt": "2026-10-19T14:50:01.625Z",
+  "description": "Unify symbol semantics across TypeScript, Python, Go and PHP in the code graph: logical vs physical symbol identity, public/local bindings, resolution steps and hierarchy provenance (clause ranges), with covering-spec evidence on exports. Hardens the graph runtime: index lock v2 with stale recovery, schema-shape validation with SCHEMA_INCOMPATIBLE recovery, typed selector targets with an unresolved status, and updated SDK/CLI impact output and docs.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "code-graph:symbol-model",
+    "code-graph:language-adapter",
+    "code-graph:typescript-language-adapter",
+    "code-graph:python-language-adapter",
+    "code-graph:go-language-adapter",
+    "code-graph:php-language-adapter",
+    "code-graph:resolve-symbol-reference",
+    "code-graph:traversal",
+    "code-graph:graph-store",
+    "code-graph:sqlite-graph-store",
+    "code-graph:indexer",
+    "code-graph:composition",
+    "sdk:run-graph-impact",
+    "cli:graph-impact",
+    "code-graph:staleness-detection",
+    "code-graph:isolated-index-worker"
+  ],
+  "specDependsOn": {
+    "code-graph:symbol-model": [
+      "default:_global/conventions",
+      "default:_global/error-handling-conventions",
+      "code-graph:document-model"
+    ],
+    "code-graph:language-adapter": ["code-graph:symbol-model"],
+    "code-graph:typescript-language-adapter": [
+      "code-graph:language-adapter",
+      "code-graph:symbol-model",
+      "code-graph:workspace-integration"
+    ],
+    "code-graph:python-language-adapter": [
+      "code-graph:language-adapter",
+      "code-graph:symbol-model",
+      "code-graph:workspace-integration"
+    ],
+    "code-graph:go-language-adapter": [
+      "code-graph:language-adapter",
+      "code-graph:symbol-model",
+      "code-graph:workspace-integration"
+    ],
+    "code-graph:php-language-adapter": [
+      "code-graph:language-adapter",
+      "code-graph:symbol-model",
+      "code-graph:workspace-integration"
+    ],
+    "code-graph:resolve-symbol-reference": [
+      "code-graph:symbol-model",
+      "code-graph:graph-store",
+      "code-graph:language-adapter",
+      "code-graph:workspace-integration"
+    ],
+    "code-graph:traversal": [
+      "code-graph:symbol-model",
+      "code-graph:graph-store",
+      "code-graph:resolve-symbol-reference"
+    ],
+    "code-graph:graph-store": [
+      "code-graph:symbol-model",
+      "default:_global/architecture",
+      "code-graph:staleness-detection",
+      "code-graph:document-model"
+    ],
+    "code-graph:sqlite-graph-store": [
+      "code-graph:graph-store",
+      "core:config",
+      "code-graph:symbol-model",
+      "code-graph:workspace-integration"
+    ],
+    "code-graph:indexer": [
+      "code-graph:graph-store",
+      "code-graph:language-adapter",
+      "code-graph:symbol-model",
+      "code-graph:workspace-integration",
+      "core:config",
+      "core:spec-repository-port",
+      "core:list-workspaces",
+      "code-graph:document-model",
+      "core:get-spec-metadata",
+      "code-graph:sqlite-graph-store"
+    ],
+    "code-graph:composition": [
+      "code-graph:symbol-model",
+      "code-graph:graph-store",
+      "code-graph:indexer",
+      "code-graph:traversal",
+      "default:_global/architecture",
+      "code-graph:get-graph-health",
+      "code-graph:index-project-graph",
+      "code-graph:get-spec-coverage",
+      "code-graph:get-change-spec-coverage",
+      "code-graph:resolve-symbol-reference",
+      "code-graph:isolated-index-worker"
+    ],
+    "sdk:run-graph-impact": [
+      "sdk:host-context",
+      "sdk:with-open-graph-provider",
+      "core:config",
+      "code-graph:traversal",
+      "code-graph:workspace-integration"
+    ],
+    "cli:graph-impact": [
+      "cli:entrypoint",
+      "cli:graph-cli-context",
+      "core:config",
+      "code-graph:traversal",
+      "code-graph:workspace-integration",
+      "code-graph:resolve-symbol-reference",
+      "sdk:run-graph-impact"
+    ],
+    "code-graph:staleness-detection": [
+      "code-graph:graph-store",
+      "code-graph:indexer",
+      "code-graph:get-graph-health",
+      "code-graph:language-adapter"
+    ],
+    "code-graph:isolated-index-worker": ["code-graph:sqlite-graph-store"]
+  },
+  "invalidationPolicy": "downstream",
+  "implementationTrackingStartedAt": "2026-10-15T05:34:28.589Z",
+  "trackedImplementationFiles": [
+    {
+      "file": "SpecD — Análisis de identidad LogicalSymbol, dependencias y casos de uso.md",
+      "state": "ignored"
+    },
+    {
+      "file": "dev/scripts/graph-file-doc.js",
+      "state": "ignored"
+    },
+    {
+      "file": "dev/scripts/symbol-inspect-poc.mjs",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/graph-impact/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/document-model/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/go-language-adapter/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/graph-store/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/indexer/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/isolated-index-worker/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/language-adapter/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/php-language-adapter/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/python-language-adapter/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/resolve-symbol-reference/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/sqlite-graph-store/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/symbol-model/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/traversal/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/typescript-language-adapter/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/workspace-integration/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/change/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/config/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/sdk/run-graph-impact/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/symbol-reference.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/impact-result.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/call-fact.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/language-adapter.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/ports/graph-store.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/sqlite/schema.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/sqlite/sqlite-worker-protocol.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/public.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/sqlite/sqlite-worker.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/sqlite/sqlite-graph-store.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/sqlite/sqlite-graph-database.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/helpers/in-memory-graph-store.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/reference-fact-helpers.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/services/scoped-binding-environment.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/adapter-registry.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/typescript-language-adapter.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/typescript-language-adapter.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/domain/services/scoped-binding-environment.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/reference-fact-helpers.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/python-language-adapter.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/python-language-adapter.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/go-language-adapter.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/go-language-adapter.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/php-language-adapter.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/php-language-adapter.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/use-cases/resolve-symbol-reference.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/resolve-symbol-reference.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/services/resolve-graph-selector.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/services/analyze-impact.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/services/collect-impact-specs.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/services/analyze-file-impact.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/composition/code-graph-provider.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/orchestration/run-graph-impact.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/impact.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/domain/value-objects/symbol-reference.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/language-adapter-conformance.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/domain/ports/graph-store.contract.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/sqlite/sqlite-graph-store.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/graph-impact.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/use-cases/in-memory-index-session.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/domain/ports/graph-store.contract.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/domain/services/traversal.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/orchestration/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/orchestration/run-graph-search.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/test/orchestration/run-graph-impact.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/errors/duplicate-declaration-mapping-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/services/project-spec-coverage.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/services/session-reference-store.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/symbol-index.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/services/project-spec-coverage.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/adr/0029-cross-language-symbol-semantics.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/code-graph/index.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/sdk/index.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/cli/graph.md",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/documentation-coverage.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/sqlite/sqlite-worker-protocol.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/composition/code-graph-provider.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/use-cases/index-code-graph.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/index-project-graph-integration.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/guide-sdk/guide-sdk.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/errors/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/index-result.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/generated/guides-sdk.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/test/integration/sdk-catalog.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/source-location.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/domain/services/analyze-files-impact.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/test/orchestration/build-implementation-review.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change-implementation-tracking.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "dev/scripts/spec-metadata-diff-poc/index.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "dev/scripts/spec-metadata-diff-poc/vcs-spec-repository.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "dev/scripts/spec-metadata-diff-poc/working-copy-spec-repository.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "EXPLORATION_KERNEL_PLUGINS.md",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/workspace-indexing.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/services/resolve-graph-selector.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/services/analyze-spec-impact.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/file-analysis.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/barrel.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/adapter-registry.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/errors/graph-derivation-mismatch-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/services/replaces-whole-graph.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/orchestration/run-index-project-graph.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/use-cases/index-project-graph.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/import-declaration.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/index-options.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/test/orchestration/run-index-project-graph.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/index-lock.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/isolated-index-worker/supervisor.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/services/exact-lane-query.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/use-cases/_shared/compute-graph-fingerprint.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/ports/isolated-graph-index-runner.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/composition/create-code-graph-provider.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/composition/graph-store-factory.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/index-session.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/index-project-graph.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/index-lock.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/isolated-index-worker/supervisor.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/search-code-graph.spec.ts",
+      "state": "resolved"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "code-graph:symbol-model",
+      "file": "packages/code-graph/src/domain/value-objects/symbol-reference.ts",
+      "fileLinkExplicit": true,
+      "symbols": [
+        "DeclarationOccurrence",
+        "SourcePosition",
+        "LogicalResolutionTarget",
+        "DeclarationResolutionTarget",
+        "PublicBindingResolutionTarget",
+        "ResolvedSymbolTarget",
+        "ResolveSymbolReferenceInput",
+        "SymbolResolutionResult"
+      ]
+    },
+    {
+      "specId": "code-graph:resolve-symbol-reference",
+      "file": "packages/code-graph/src/domain/value-objects/symbol-reference.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["ResolvedSymbolTarget", "ResolveSymbolReferenceInput", "SymbolResolutionResult"]
+    },
+    {
+      "specId": "code-graph:traversal",
+      "file": "packages/code-graph/src/domain/value-objects/impact-result.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "PhysicalDependencyEvidence",
+        "LogicalAffectedTarget",
+        "PhysicalOnlyAffectedTarget",
+        "SemanticAffectedTarget",
+        "SemanticImpactCounts",
+        "ResolvedSymbolImpactResult"
+      ]
+    },
+    {
+      "specId": "code-graph:language-adapter",
+      "file": "packages/code-graph/src/domain/value-objects/call-fact.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["CallFact"]
+    },
+    {
+      "specId": "code-graph:language-adapter",
+      "file": "packages/code-graph/src/domain/value-objects/language-adapter.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["AdapterDeclarationPolicy", "LanguageAdapter"]
+    },
+    {
+      "specId": "code-graph:graph-store",
+      "file": "packages/code-graph/src/domain/ports/graph-store.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["GraphStore"]
+    },
+    {
+      "specId": "code-graph:sqlite-graph-store",
+      "file": "packages/code-graph/src/infrastructure/sqlite/schema.ts",
+      "fileLinkExplicit": true,
+      "symbols": ["SQLITE_SCHEMA_VERSION", "SQLITE_SCHEMA_DDL", "REQUIRED_COLUMNS"]
+    },
+    {
+      "specId": "code-graph:sqlite-graph-store",
+      "file": "packages/code-graph/src/infrastructure/sqlite/sqlite-worker-protocol.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["SQLiteWorkerOperationMap"]
+    },
+    {
+      "specId": "code-graph:sqlite-graph-store",
+      "file": "packages/code-graph/src/infrastructure/sqlite/sqlite-worker.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["handleMessage"]
+    },
+    {
+      "specId": "code-graph:sqlite-graph-store",
+      "file": "packages/code-graph/src/infrastructure/sqlite/sqlite-graph-database.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "findDeclarations",
+        "relationEndpointsExist",
+        "queryImpactFrontierDirection",
+        "SQLiteGraphDatabase"
+      ]
+    },
+    {
+      "specId": "code-graph:graph-store",
+      "file": "packages/code-graph/test/helpers/in-memory-graph-store.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["InMemoryGraphStore"]
+    },
+    {
+      "specId": "code-graph:symbol-model",
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/reference-fact-helpers.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["AdapterDeclarationDecision", "buildLogicalDeclarationFacts"]
+    },
+    {
+      "specId": "code-graph:language-adapter",
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/reference-fact-helpers.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "AdapterSyntaxCandidate",
+        "findContainingCallableSymbol",
+        "createImportedHierarchyMetadata"
+      ]
+    },
+    {
+      "specId": "code-graph:language-adapter",
+      "file": "packages/code-graph/src/domain/services/scoped-binding-environment.ts",
+      "fileLinkExplicit": true,
+      "symbols": ["resolveDependencyFacts", "buildScopedBindingEnvironment"]
+    },
+    {
+      "specId": "code-graph:language-adapter",
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/adapter-registry.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["AdapterRegistry"]
+    },
+    {
+      "specId": "code-graph:typescript-language-adapter",
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/typescript-language-adapter.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "TypeScriptLanguageAdapter",
+        "TypeScriptLanguageAdapter.buildReferenceFacts",
+        "TypeScriptLanguageAdapter.extractCallFactsFromData",
+        "TypeScriptLanguageAdapter.extractBindingFactsFromData",
+        "TypeScriptLanguageAdapter.processPairNode",
+        "buildRelations",
+        "heritageExpressionRanges"
+      ]
+    },
+    {
+      "specId": "code-graph:python-language-adapter",
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/python-language-adapter.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "PythonLanguageAdapter",
+        "collectClassInfo",
+        "buildRelations",
+        "headerHasParseError"
+      ]
+    },
+    {
+      "specId": "code-graph:go-language-adapter",
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/go-language-adapter.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["GoLanguageAdapter", "buildRelations"]
+    },
+    {
+      "specId": "code-graph:go-language-adapter",
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/go-language-adapter.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:php-language-adapter",
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/php-language-adapter.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["PhpLanguageAdapter", "phpMemberSemantics", "phpNodeRange"]
+    },
+    {
+      "specId": "code-graph:php-language-adapter",
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/php-language-adapter.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:resolve-symbol-reference",
+      "file": "packages/code-graph/src/application/use-cases/resolve-symbol-reference.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["ResolveSymbolReference"]
+    },
+    {
+      "specId": "code-graph:resolve-symbol-reference",
+      "file": "packages/code-graph/test/application/use-cases/resolve-symbol-reference.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:resolve-symbol-reference",
+      "file": "packages/code-graph/src/application/services/resolve-graph-selector.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "ResolvedGraphSymbolSelector",
+        "resolveSymbolSelector",
+        "promoteToLogicalTarget",
+        "ResolvedGraphDeclarationSelector",
+        "ResolveSelectorOptions"
+      ]
+    },
+    {
+      "specId": "code-graph:traversal",
+      "file": "packages/code-graph/src/domain/services/analyze-impact.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "analyzeResolvedSymbolImpact",
+        "analyzePublicBindingImpact",
+        "analyzeImpactDetails"
+      ]
+    },
+    {
+      "specId": "code-graph:traversal",
+      "file": "packages/code-graph/src/domain/services/collect-impact-specs.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["collectLogicalCoveringSpecs"]
+    },
+    {
+      "specId": "code-graph:traversal",
+      "file": "packages/code-graph/src/domain/services/analyze-file-impact.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "collectFilteredCoveringSpecs",
+        "collectCoveringSpecs",
+        "analyzeFileImpactDetails"
+      ]
+    },
+    {
+      "specId": "sdk:run-graph-impact",
+      "file": "packages/sdk/src/orchestration/run-graph-impact.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "runGraphImpact",
+        "projectCoveringSpecs",
+        "projectSymbolResolution",
+        "ResolvedPublicExportImpactResult",
+        "ProjectedPublicImpactDetail"
+      ]
+    },
+    {
+      "specId": "cli:graph-impact",
+      "file": "packages/cli/src/commands/graph/impact.ts",
+      "fileLinkExplicit": true,
+      "symbols": ["handleSymbolImpact", "registerGraphImpact", "handlePublicExportImpact"]
+    },
+    {
+      "specId": "code-graph:language-adapter",
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/language-adapter-conformance.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:graph-store",
+      "file": "packages/code-graph/test/domain/ports/graph-store.contract.ts",
+      "fileLinkExplicit": true,
+      "symbols": ["graphStoreContractTests"]
+    },
+    {
+      "specId": "code-graph:indexer",
+      "file": "packages/code-graph/src/application/use-cases/in-memory-index-session.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["InMemoryIndexSession"]
+    },
+    {
+      "specId": "code-graph:indexer",
+      "file": "packages/code-graph/src/domain/errors/duplicate-declaration-mapping-error.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["DuplicateDeclarationMappingError"]
+    },
+    {
+      "specId": "code-graph:indexer",
+      "file": "packages/code-graph/src/application/services/project-spec-coverage.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["projectSpecCoverage"]
+    },
+    {
+      "specId": "code-graph:graph-store",
+      "file": "packages/code-graph/src/application/services/session-reference-store.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["SessionReferenceStore"]
+    },
+    {
+      "specId": "code-graph:indexer",
+      "file": "packages/code-graph/test/application/use-cases/symbol-index.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:indexer",
+      "file": "packages/code-graph/test/application/services/project-spec-coverage.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:graph-impact",
+      "file": "packages/cli/test/documentation-coverage.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:sqlite-graph-store",
+      "file": "packages/code-graph/test/infrastructure/sqlite/sqlite-worker-protocol.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:composition",
+      "file": "packages/code-graph/test/composition/code-graph-provider.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:indexer",
+      "file": "packages/code-graph/src/application/use-cases/index-code-graph.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["IndexCodeGraph"]
+    },
+    {
+      "specId": "code-graph:indexer",
+      "file": "packages/code-graph/test/application/use-cases/index-project-graph-integration.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:symbol-model",
+      "file": "packages/code-graph/src/domain/value-objects/source-location.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:traversal",
+      "file": "packages/code-graph/test/domain/services/analyze-files-impact.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "sdk:run-graph-impact",
+      "file": "packages/sdk/test/orchestration/build-implementation-review.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:graph-impact",
+      "file": "packages/cli/test/commands/change-implementation-tracking.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:indexer",
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/reference-fact-helpers.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["buildLogicalDeclarationFacts"]
+    },
+    {
+      "specId": "code-graph:indexer",
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/reference-fact-helpers.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:indexer",
+      "file": "packages/code-graph/test/application/use-cases/workspace-indexing.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:composition",
+      "file": "packages/code-graph/src/public.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:traversal",
+      "file": "packages/code-graph/src/domain/services/analyze-spec-impact.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["loadCoveredSymbols", "analyzeSpecImpact"]
+    },
+    {
+      "specId": "code-graph:language-adapter",
+      "file": "packages/code-graph/src/application/use-cases/in-memory-index-session.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:graph-store",
+      "file": "packages/code-graph/src/domain/errors/graph-derivation-mismatch-error.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:indexer",
+      "file": "packages/code-graph/src/domain/services/replaces-whole-graph.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "sdk:run-graph-impact",
+      "file": "packages/sdk/src/orchestration/run-index-project-graph.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:staleness-detection",
+      "file": "packages/code-graph/src/infrastructure/index-lock.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "classifyGraphIndexLock",
+        "readProcessStartTime",
+        "acquireGraphIndexLockLeaseByStoragePath",
+        "assertGraphIndexUnlockedByStoragePath"
+      ]
+    },
+    {
+      "specId": "code-graph:isolated-index-worker",
+      "file": "packages/code-graph/src/infrastructure/isolated-index-worker/supervisor.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["runIsolatedGraphIndexWithRuntime"]
+    },
+    {
+      "specId": "code-graph:composition",
+      "file": "packages/code-graph/src/composition/code-graph-provider.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:indexer",
+      "file": "packages/code-graph/src/domain/value-objects/index-result.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["IndexResult"]
+    },
+    {
+      "specId": "code-graph:typescript-language-adapter",
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/typescript-language-adapter.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:resolve-symbol-reference",
+      "file": "packages/code-graph/src/domain/services/exact-lane-query.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["qualifiedLookupText", "isExactLaneQuery"]
+    },
+    {
+      "specId": "code-graph:indexer",
+      "file": "packages/code-graph/src/application/use-cases/_shared/compute-graph-fingerprint.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["detectFingerprintMismatch"]
+    },
+    {
+      "specId": "code-graph:graph-store",
+      "file": "packages/code-graph/test/application/use-cases/search-code-graph.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:traversal",
+      "file": "packages/code-graph/test/domain/services/traversal.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:staleness-detection",
+      "file": "packages/code-graph/test/infrastructure/index-lock.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:graph-impact",
+      "file": "packages/cli/test/commands/graph-impact.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "sdk:run-graph-impact",
+      "file": "packages/sdk/test/orchestration/run-index-project-graph.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:isolated-index-worker",
+      "file": "packages/code-graph/src/application/ports/isolated-graph-index-runner.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:isolated-index-worker",
+      "file": "packages/code-graph/test/infrastructure/isolated-index-worker/supervisor.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:indexer",
+      "file": "packages/code-graph/src/application/use-cases/index-project-graph.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:indexer",
+      "file": "packages/code-graph/src/domain/value-objects/index-options.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:indexer",
+      "file": "packages/code-graph/src/domain/value-objects/index-session.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:indexer",
+      "file": "packages/code-graph/test/application/use-cases/index-project-graph.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:composition",
+      "file": "packages/code-graph/src/composition/create-code-graph-provider.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:composition",
+      "file": "packages/code-graph/src/composition/graph-store-factory.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:composition",
+      "file": "packages/code-graph/test/barrel.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:language-adapter",
+      "file": "packages/code-graph/src/domain/value-objects/file-analysis.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:language-adapter",
+      "file": "packages/code-graph/src/domain/value-objects/import-declaration.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:language-adapter",
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/adapter-registry.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:resolve-symbol-reference",
+      "file": "packages/code-graph/test/application/services/resolve-graph-selector.spec.ts",
+      "fileLinkExplicit": true
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:6e76920efb1b1617bbbfece9b6cabb2a2ef6abbdf796fcf987e302c1f6e4ce20"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "code-graph:symbol-model",
+          "filename": "deltas/code-graph/symbol-model/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:85f7e7be9e163ef98860224473cc5e9ee2a4c728aab58fd6ee7fdb4ecc9ac78e"
+        },
+        {
+          "key": "code-graph:language-adapter",
+          "filename": "deltas/code-graph/language-adapter/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:5b821c6bf5d8be429f03466cfe38813a86c4d4d83271adaa95251d33bccfca25"
+        },
+        {
+          "key": "code-graph:typescript-language-adapter",
+          "filename": "deltas/code-graph/typescript-language-adapter/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c81c5180ad0bf85483d3ed3386808675669542512e57f3ee417b9d2279919416"
+        },
+        {
+          "key": "code-graph:python-language-adapter",
+          "filename": "deltas/code-graph/python-language-adapter/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:e757b52a3a549a4f65de98c94ad52aaa5a6ae033746ea0b341529d8e30da3c73"
+        },
+        {
+          "key": "code-graph:go-language-adapter",
+          "filename": "deltas/code-graph/go-language-adapter/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c1a9d1098a5848a3a7278112d7121d79b14103841b950816b577b78e6b3f5cd5"
+        },
+        {
+          "key": "code-graph:php-language-adapter",
+          "filename": "deltas/code-graph/php-language-adapter/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:95249bc9851177d4fbc77cc798a42bca293f17b4d25674d838ecf30d368cdbe6"
+        },
+        {
+          "key": "code-graph:resolve-symbol-reference",
+          "filename": "deltas/code-graph/resolve-symbol-reference/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:175ea5af75b709ec1b86dae30e4e52fb0150391eb8a6838f42eb3083b1199e9c"
+        },
+        {
+          "key": "code-graph:traversal",
+          "filename": "deltas/code-graph/traversal/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c2173ca51ce1ee57e3272329193bbb12f1492a049b60507de6c43736dd3a71e1"
+        },
+        {
+          "key": "code-graph:graph-store",
+          "filename": "deltas/code-graph/graph-store/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c421553a558680157c321cb3ace9c8bb90b3e735f06007e74e5c76bdfe4ec9cf"
+        },
+        {
+          "key": "code-graph:sqlite-graph-store",
+          "filename": "deltas/code-graph/sqlite-graph-store/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:2e540a322ee4c16afd570d5f9d267e90988d337000829b3a54043e4c50b3c1ed"
+        },
+        {
+          "key": "code-graph:indexer",
+          "filename": "deltas/code-graph/indexer/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:8571c8f64bf87c3e6a4850c1000ea2036732be8719719e15d905549bf011786d"
+        },
+        {
+          "key": "code-graph:composition",
+          "filename": "deltas/code-graph/composition/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:9f0844a5c96d57a901603a8b01759eef6b6621c07f7b281c1ac519ba3f233d40"
+        },
+        {
+          "key": "sdk:run-graph-impact",
+          "filename": "deltas/sdk/run-graph-impact/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:7610344e153e705e3efd1337741783a18ad36d1b5de9142f5f7cfe2026b94a08"
+        },
+        {
+          "key": "cli:graph-impact",
+          "filename": "deltas/cli/graph-impact/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:02d9e637c178a6451d116ad43198d00a897d41b6c3328cabfd65339a20d0ccb9"
+        },
+        {
+          "key": "code-graph:staleness-detection",
+          "filename": "deltas/code-graph/staleness-detection/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:a1b4e0a1f180a548dbfc86870304d30aa947a063f3a8e0e58c4bcd8f40882392"
+        },
+        {
+          "key": "code-graph:isolated-index-worker",
+          "filename": "deltas/code-graph/isolated-index-worker/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:603e7e77c034176bff7863780de5b450520b9ddaa712f287f7a71a4b9ccf5793"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "code-graph:symbol-model",
+          "filename": "deltas/code-graph/symbol-model/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:ed9e788a3a4195e6efd9bfd0e009c6b56d6a8bfbc66603e3d0b91e789867fb10"
+        },
+        {
+          "key": "code-graph:language-adapter",
+          "filename": "deltas/code-graph/language-adapter/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:3c24e0e51b5b666970895b0a9c5f2f1d375fe7c5b1998f95511cc2ed5f5e24f4"
+        },
+        {
+          "key": "code-graph:typescript-language-adapter",
+          "filename": "deltas/code-graph/typescript-language-adapter/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:306064f4a185ea2d27c1dc4d81aa1aec115ae5766ac723e092389f556d7a8d96"
+        },
+        {
+          "key": "code-graph:python-language-adapter",
+          "filename": "deltas/code-graph/python-language-adapter/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:28cc130b1c02e4999c9280b0cd19bd898a4a8899820be156b41f5718601e3ff4"
+        },
+        {
+          "key": "code-graph:go-language-adapter",
+          "filename": "deltas/code-graph/go-language-adapter/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:7d44f04c7cce0bf9884920ce6e735d6364c7159dc0df4e98424fc08400544181"
+        },
+        {
+          "key": "code-graph:php-language-adapter",
+          "filename": "deltas/code-graph/php-language-adapter/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:7acf10c237280917988587e018fe020fa809b558ec45eb05d08a0acfffbf8820"
+        },
+        {
+          "key": "code-graph:resolve-symbol-reference",
+          "filename": "deltas/code-graph/resolve-symbol-reference/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:8f722be148ebe27e0338075153172eaba1193cc23b238d20297ac5019b4c7e9d"
+        },
+        {
+          "key": "code-graph:traversal",
+          "filename": "deltas/code-graph/traversal/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:69d7f875c804eda93b5910dad5d99feab82487aab212dfd5e05becbbaa9696cf"
+        },
+        {
+          "key": "code-graph:graph-store",
+          "filename": "deltas/code-graph/graph-store/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:2e1eab15a0a65c47adef4a5e740383077b486286a316eae3774e236cd7593f38"
+        },
+        {
+          "key": "code-graph:sqlite-graph-store",
+          "filename": "deltas/code-graph/sqlite-graph-store/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:be6f24114ffacc8cf692c6aa7a59aaea546f1454eb5032bbc2be3f215ec198fc"
+        },
+        {
+          "key": "code-graph:indexer",
+          "filename": "deltas/code-graph/indexer/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:71b57470b78ed621c192f2b9d654cc0d05d5cd08f66108fe1dba4d1491175a8b"
+        },
+        {
+          "key": "code-graph:composition",
+          "filename": "deltas/code-graph/composition/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:6e146bec368985b04de88ac685a4371574cfaab6b66cf00ebe37a5917202589a"
+        },
+        {
+          "key": "sdk:run-graph-impact",
+          "filename": "deltas/sdk/run-graph-impact/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:bf8fb9106d6d2143e6910fad15d355ac8a8afa5751a775430c1053a3fb077a69"
+        },
+        {
+          "key": "cli:graph-impact",
+          "filename": "deltas/cli/graph-impact/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:32af39f3c4022afea05f175bc48ae3e5aecb365e9c225bad401edf5a90928fb4"
+        },
+        {
+          "key": "code-graph:staleness-detection",
+          "filename": "deltas/code-graph/staleness-detection/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:3f74148297b7f6c40d31d0d8b7d41475b26570ebf9d344b12e1be0e5f7e0b518"
+        },
+        {
+          "key": "code-graph:isolated-index-worker",
+          "filename": "deltas/code-graph/isolated-index-worker/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:4151fb4556d5f6566380e686165f29f725793c52a459b745339b89769d78c625"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:b315a9326f9fc5f8b862c1844f6f4ac8bc1e861f5111ca751413f474b428a789"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "verify", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:36c137aa205c121b5d111dc54469f35e4c3c6e06362f6a6d733a22a05e59cb4d"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-10-14T12:07:44.405Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": [
+        "code-graph:symbol-model",
+        "code-graph:language-adapter",
+        "code-graph:typescript-language-adapter",
+        "code-graph:python-language-adapter",
+        "code-graph:go-language-adapter",
+        "code-graph:php-language-adapter",
+        "code-graph:resolve-symbol-reference",
+        "code-graph:traversal",
+        "code-graph:graph-store",
+        "code-graph:sqlite-graph-store",
+        "code-graph:indexer",
+        "code-graph:composition",
+        "sdk:run-graph-impact",
+        "cli:graph-impact"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-14T12:07:44.434Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:symbol-model"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:language-adapter"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:typescript-language-adapter"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:python-language-adapter"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:go-language-adapter"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:php-language-adapter"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:resolve-symbol-reference"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:traversal"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:graph-store"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:sqlite-graph-store"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:indexer"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:composition"
+        },
+        {
+          "type": "specs",
+          "key": "sdk:run-graph-impact"
+        },
+        {
+          "type": "specs",
+          "key": "cli:graph-impact"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:symbol-model"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:language-adapter"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:typescript-language-adapter"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:python-language-adapter"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:go-language-adapter"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:php-language-adapter"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:resolve-symbol-reference"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:traversal"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:graph-store"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:sqlite-graph-store"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:indexer"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:composition"
+        },
+        {
+          "type": "verify",
+          "key": "sdk:run-graph-impact"
+        },
+        {
+          "type": "verify",
+          "key": "cli:graph-impact"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-14T13:35:18.878Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-15T04:50:03.036Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-15T05:08:47.331Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:typescript-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:go-language-adapter",
+            "code-graph:php-language-adapter",
+            "code-graph:resolve-symbol-reference",
+            "code-graph:traversal",
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:indexer",
+            "code-graph:composition",
+            "sdk:run-graph-impact",
+            "cli:graph-impact"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:typescript-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:go-language-adapter",
+            "code-graph:php-language-adapter",
+            "code-graph:resolve-symbol-reference",
+            "code-graph:traversal",
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:indexer",
+            "code-graph:composition",
+            "sdk:run-graph-impact",
+            "cli:graph-impact"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-15T05:08:47.331Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-15T05:15:15.252Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:typescript-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:go-language-adapter",
+            "code-graph:php-language-adapter",
+            "code-graph:resolve-symbol-reference",
+            "code-graph:traversal",
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:indexer",
+            "code-graph:composition",
+            "sdk:run-graph-impact",
+            "cli:graph-impact"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:typescript-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:go-language-adapter",
+            "code-graph:php-language-adapter",
+            "code-graph:resolve-symbol-reference",
+            "code-graph:traversal",
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:indexer",
+            "code-graph:composition",
+            "sdk:run-graph-impact",
+            "cli:graph-impact"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-15T05:22:46.340Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-15T05:34:28.589Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-16T05:42:31.631Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-16T06:09:01.068Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:typescript-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:go-language-adapter",
+            "code-graph:php-language-adapter",
+            "code-graph:resolve-symbol-reference",
+            "code-graph:traversal",
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:indexer",
+            "code-graph:composition",
+            "sdk:run-graph-impact",
+            "cli:graph-impact"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:typescript-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:go-language-adapter",
+            "code-graph:php-language-adapter",
+            "code-graph:resolve-symbol-reference",
+            "code-graph:traversal",
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:indexer",
+            "code-graph:composition",
+            "sdk:run-graph-impact",
+            "cli:graph-impact"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-16T06:09:01.068Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-16T06:17:52.813Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-16T11:07:12.905Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-16T11:17:04.984Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-16T17:52:37.069Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-16T18:08:18.544Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:typescript-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:go-language-adapter",
+            "code-graph:php-language-adapter",
+            "code-graph:resolve-symbol-reference",
+            "code-graph:traversal",
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:indexer",
+            "code-graph:composition",
+            "sdk:run-graph-impact",
+            "cli:graph-impact"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:typescript-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:go-language-adapter",
+            "code-graph:php-language-adapter",
+            "code-graph:resolve-symbol-reference",
+            "code-graph:traversal",
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:indexer",
+            "code-graph:composition",
+            "sdk:run-graph-impact",
+            "cli:graph-impact"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-16T18:08:18.544Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-16T18:23:44.024Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-16T18:24:08.446Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-17T07:05:30.729Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:typescript-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:go-language-adapter",
+            "code-graph:php-language-adapter",
+            "code-graph:resolve-symbol-reference",
+            "code-graph:traversal",
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:indexer",
+            "code-graph:composition",
+            "sdk:run-graph-impact",
+            "cli:graph-impact"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:typescript-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:go-language-adapter",
+            "code-graph:php-language-adapter",
+            "code-graph:resolve-symbol-reference",
+            "code-graph:traversal",
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:indexer",
+            "code-graph:composition",
+            "sdk:run-graph-impact",
+            "cli:graph-impact"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-17T07:05:30.729Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-17T07:06:24.285Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-17T07:06:25.904Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-17T08:02:20.480Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:typescript-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:go-language-adapter",
+            "code-graph:php-language-adapter",
+            "code-graph:resolve-symbol-reference",
+            "code-graph:traversal",
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:indexer",
+            "code-graph:composition",
+            "sdk:run-graph-impact",
+            "cli:graph-impact"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:typescript-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:go-language-adapter",
+            "code-graph:php-language-adapter",
+            "code-graph:resolve-symbol-reference",
+            "code-graph:traversal",
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:indexer",
+            "code-graph:composition",
+            "sdk:run-graph-impact",
+            "cli:graph-impact"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-17T08:02:20.480Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-17T08:03:27.057Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-17T08:03:28.664Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-17T23:38:38.796Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-18T09:05:13.309Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:typescript-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:go-language-adapter",
+            "code-graph:php-language-adapter",
+            "code-graph:resolve-symbol-reference",
+            "code-graph:traversal",
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:indexer",
+            "code-graph:composition",
+            "sdk:run-graph-impact",
+            "cli:graph-impact"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:typescript-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:go-language-adapter",
+            "code-graph:php-language-adapter",
+            "code-graph:resolve-symbol-reference",
+            "code-graph:traversal",
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:indexer",
+            "code-graph:composition",
+            "sdk:run-graph-impact",
+            "cli:graph-impact"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-18T09:05:13.309Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-18T09:12:15.640Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:typescript-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:go-language-adapter",
+            "code-graph:php-language-adapter",
+            "code-graph:resolve-symbol-reference",
+            "code-graph:traversal",
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:indexer",
+            "code-graph:composition",
+            "sdk:run-graph-impact",
+            "cli:graph-impact"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:typescript-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:go-language-adapter",
+            "code-graph:php-language-adapter",
+            "code-graph:resolve-symbol-reference",
+            "code-graph:traversal",
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:indexer",
+            "code-graph:composition",
+            "sdk:run-graph-impact",
+            "cli:graph-impact"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-18T09:12:15.643Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "code-graph:staleness-detection"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:staleness-detection"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-18T09:12:18.508Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:typescript-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:go-language-adapter",
+            "code-graph:php-language-adapter",
+            "code-graph:resolve-symbol-reference",
+            "code-graph:traversal",
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:indexer",
+            "code-graph:composition",
+            "sdk:run-graph-impact",
+            "cli:graph-impact",
+            "code-graph:staleness-detection"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:typescript-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:go-language-adapter",
+            "code-graph:php-language-adapter",
+            "code-graph:resolve-symbol-reference",
+            "code-graph:traversal",
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:indexer",
+            "code-graph:composition",
+            "sdk:run-graph-impact",
+            "cli:graph-impact",
+            "code-graph:staleness-detection"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-18T09:12:18.510Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "code-graph:isolated-index-worker"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:isolated-index-worker"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-18T09:12:19.340Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:typescript-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:go-language-adapter",
+            "code-graph:php-language-adapter",
+            "code-graph:resolve-symbol-reference",
+            "code-graph:traversal",
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:indexer",
+            "code-graph:composition",
+            "sdk:run-graph-impact",
+            "cli:graph-impact",
+            "code-graph:staleness-detection",
+            "code-graph:isolated-index-worker"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:typescript-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:go-language-adapter",
+            "code-graph:php-language-adapter",
+            "code-graph:resolve-symbol-reference",
+            "code-graph:traversal",
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:indexer",
+            "code-graph:composition",
+            "sdk:run-graph-impact",
+            "cli:graph-impact",
+            "code-graph:staleness-detection",
+            "code-graph:isolated-index-worker"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-18T09:12:19.342Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "cli:graph-index"
+        },
+        {
+          "type": "verify",
+          "key": "cli:graph-index"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-18T09:12:43.043Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:typescript-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:go-language-adapter",
+            "code-graph:php-language-adapter",
+            "code-graph:resolve-symbol-reference",
+            "code-graph:traversal",
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:indexer",
+            "code-graph:composition",
+            "sdk:run-graph-impact",
+            "cli:graph-impact",
+            "code-graph:staleness-detection",
+            "code-graph:isolated-index-worker",
+            "cli:graph-index"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:typescript-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:go-language-adapter",
+            "code-graph:php-language-adapter",
+            "code-graph:resolve-symbol-reference",
+            "code-graph:traversal",
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:indexer",
+            "code-graph:composition",
+            "sdk:run-graph-impact",
+            "cli:graph-impact",
+            "code-graph:staleness-detection",
+            "code-graph:isolated-index-worker",
+            "cli:graph-index"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-18T09:12:43.048Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": [
+        {
+          "type": "specs",
+          "key": "cli:graph-index"
+        },
+        {
+          "type": "verify",
+          "key": "cli:graph-index"
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-18T09:15:46.333Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [code-graph:graph-store]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:graph-store"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:typescript-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:go-language-adapter",
+            "code-graph:php-language-adapter",
+            "code-graph:resolve-symbol-reference",
+            "code-graph:traversal",
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:indexer",
+            "code-graph:composition",
+            "sdk:run-graph-impact",
+            "cli:graph-impact",
+            "code-graph:staleness-detection",
+            "code-graph:isolated-index-worker"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-18T09:16:06.229Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:graph-impact]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:graph-impact"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:typescript-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:go-language-adapter",
+            "code-graph:php-language-adapter",
+            "code-graph:resolve-symbol-reference",
+            "code-graph:traversal",
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:indexer",
+            "code-graph:composition",
+            "sdk:run-graph-impact",
+            "cli:graph-impact",
+            "code-graph:staleness-detection",
+            "code-graph:isolated-index-worker"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-18T09:17:07.151Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [code-graph:sqlite-graph-store, code-graph:symbol-model]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["code-graph:sqlite-graph-store", "code-graph:symbol-model"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-18T09:17:52.002Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [code-graph:composition]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["code-graph:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-18T09:29:30.291Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-18T09:30:12.544Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-18T16:26:11.828Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-18T16:39:25.256Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:typescript-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:go-language-adapter",
+            "code-graph:php-language-adapter",
+            "code-graph:resolve-symbol-reference",
+            "code-graph:traversal",
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:indexer",
+            "code-graph:composition",
+            "sdk:run-graph-impact",
+            "cli:graph-impact",
+            "code-graph:staleness-detection",
+            "code-graph:isolated-index-worker"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:typescript-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:go-language-adapter",
+            "code-graph:php-language-adapter",
+            "code-graph:resolve-symbol-reference",
+            "code-graph:traversal",
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:indexer",
+            "code-graph:composition",
+            "sdk:run-graph-impact",
+            "cli:graph-impact",
+            "code-graph:staleness-detection",
+            "code-graph:isolated-index-worker"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-18T16:39:25.256Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-19T09:29:03.833Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-19T09:32:08.619Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-19T14:17:41.503Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-19T14:28:56.773Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-19T14:29:06.932Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-10-19T14:39:24.507Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "description": "Unify symbol semantics across TypeScript, Python, Go and PHP in the code graph: logical vs physical symbol identity, public/local bindings, resolution steps and hierarchy provenance (clause ranges), with covering-spec evidence on exports. Hardens the graph runtime: index lock v2 with stale recovery, schema-shape validation with SCHEMA_INCOMPATIBLE recovery, typed selector targets with an unresolved status, and updated SDK/CLI impact output and docs."
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-10-19T14:47:21.294Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Tracked implementation files remain open for change \"cross-language-symbol-semantics\". Resolve or ignore them first.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-10-19T14:48:33.263Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Implementation link \"code-graph:symbol-model\" points outside workspace \"code-graph\" codeRoot.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-10-19T14:49:21.138Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Implementation link \"code-graph:symbol-model\" points outside workspace \"code-graph\" codeRoot.",
+      "commitStarted": false
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-19T14:50:01.620Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-10-19T14:50:02.491Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

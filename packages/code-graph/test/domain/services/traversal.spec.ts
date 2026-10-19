@@ -2,15 +2,26 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { InMemoryGraphStore } from '../../helpers/in-memory-graph-store.js'
 import { getUpstream } from '../../../src/domain/services/get-upstream.js'
 import { getDownstream } from '../../../src/domain/services/get-downstream.js'
-import { analyzeImpact } from '../../../src/domain/services/analyze-impact.js'
+import {
+  analyzeImpact,
+  analyzePublicBindingImpact,
+  analyzeResolvedSymbolImpact,
+} from '../../../src/domain/services/analyze-impact.js'
 import { analyzeFileImpact } from '../../../src/domain/services/analyze-file-impact.js'
 import { analyzeSpecImpact } from '../../../src/domain/services/analyze-spec-impact.js'
 import { detectChanges } from '../../../src/domain/services/detect-changes.js'
 import { createFileNode } from '../../../src/domain/value-objects/file-node.js'
 import { createSymbolNode } from '../../../src/domain/value-objects/symbol-node.js'
 import { createRelation } from '../../../src/domain/value-objects/relation.js'
+import { createSpecNode } from '../../../src/domain/value-objects/spec-node.js'
 import { SymbolKind } from '../../../src/domain/value-objects/symbol-kind.js'
 import { RelationType } from '../../../src/domain/value-objects/relation-type.js'
+import {
+  createLogicalSymbol,
+  createPublicBinding,
+  DeclarationOccurrenceForm,
+  type ResolvedSymbolTarget,
+} from '../../../src/domain/value-objects/symbol-reference.js'
 
 function sym(name: string, filePath: string, line: number) {
   return createSymbolNode({ name, kind: SymbolKind.Function, filePath, line, column: 0 })
@@ -26,6 +37,36 @@ function file(path: string) {
   })
 }
 
+/**
+ * Records spec -> symbol coverage the way indexing does: through the symbol's logical target.
+ * @param store - Store that already holds the spec and symbol.
+ * @param specId - Covering spec.
+ * @param symbol - Covered physical declaration.
+ */
+async function coverSymbolLogically(
+  store: InMemoryGraphStore,
+  specId: string,
+  symbol: ReturnType<typeof sym>,
+): Promise<void> {
+  const logical = createLogicalSymbol({
+    workspace: 'default',
+    surface: symbol.filePath,
+    name: symbol.name,
+    space: 'value',
+  })
+  await store.replaceReferenceFacts({
+    logicalSymbols: [logical],
+    declarations: [{ logicalSymbolId: logical.id, declaration: declOcc(symbol, logical.id) }],
+    steps: [],
+    publicBindings: [],
+    localBindings: [],
+    coverage: [],
+  })
+  await store.addRelations([
+    createRelation({ source: specId, target: logical.id, type: RelationType.CoversSymbol }),
+  ])
+}
+
 function fileInWorkspace(path: string, workspace: string) {
   return createFileNode({
     path,
@@ -34,6 +75,22 @@ function fileInWorkspace(path: string, workspace: string) {
     contentHash: 'sha256:x',
     workspace,
   })
+}
+
+function declOcc(symbol: ReturnType<typeof sym>, logicalId?: string) {
+  return {
+    logicalId,
+    symbolId: symbol.id,
+    location: {
+      filePath: symbol.filePath,
+      line: symbol.line,
+      column: symbol.column,
+      endLine: symbol.endLine,
+      endColumn: symbol.endColumn,
+    },
+    kind: symbol.kind,
+    form: DeclarationOccurrenceForm.Definition,
+  }
 }
 
 describe('Traversal services', () => {
@@ -152,6 +209,32 @@ describe('Traversal services', () => {
 
       const result = await getUpstream(store, a.id)
       expect(result.totalCount).toBe(1)
+      // The cycle neither re-reports the start symbol nor loops into extra levels.
+      expect([...result.levels.keys()]).toEqual([1])
+      expect(result.levels.get(1)!.map((symbol) => symbol.id)).toEqual([b.id])
+    })
+
+    it('breaks a three-symbol cycle after visiting each member once', async () => {
+      const a = sym('a', 'x.ts', 1)
+      const b = sym('b', 'x.ts', 2)
+      const c = sym('c', 'x.ts', 3)
+
+      await store.upsertFile(
+        file('x.ts'),
+        [a, b, c],
+        [
+          createRelation({ source: b.id, target: a.id, type: RelationType.Calls }),
+          createRelation({ source: c.id, target: b.id, type: RelationType.Calls }),
+          createRelation({ source: a.id, target: c.id, type: RelationType.Calls }),
+        ],
+      )
+
+      const result = await getUpstream(store, a.id, { maxDepth: 10 })
+
+      expect(result.totalCount).toBe(2)
+      expect(result.levels.get(1)!.map((symbol) => symbol.id)).toEqual([b.id])
+      expect(result.levels.get(2)!.map((symbol) => symbol.id)).toEqual([c.id])
+      expect(result.levels.has(3)).toBe(false)
     })
 
     it('respects maxDepth', async () => {
@@ -700,6 +783,12 @@ describe('Traversal services', () => {
     it('derives specs-only symbol impact from root and admitted coverage', async () => {
       const target = sym('SpecRepository', 'core:src/spec-repository.ts', 1)
       const caller = sym('caller', 'cli:src/command.ts', 1)
+      const targetLogical = createLogicalSymbol({
+        workspace: 'core',
+        surface: target.filePath,
+        name: target.name,
+        space: 'value',
+      })
       await store.bulkLoad({
         files: [fileInWorkspace(target.filePath, 'core'), fileInWorkspace(caller.filePath, 'cli')],
         symbols: [target, caller],
@@ -728,17 +817,37 @@ describe('Traversal services', () => {
         relations: [
           createRelation({ source: caller.id, target: target.id, type: RelationType.Calls }),
           createRelation({
-            source: 'core:spec-repository',
-            target: target.id,
-            type: RelationType.CoversSymbol,
-          }),
-          createRelation({
             source: 'cli:graph-impact',
             target: caller.filePath,
             type: RelationType.CoversFile,
           }),
         ],
       })
+      await store.replaceReferenceFacts({
+        logicalSymbols: [targetLogical],
+        declarations: [
+          {
+            logicalSymbolId: targetLogical.id,
+            declaration: declOcc(target, targetLogical.id),
+          },
+        ],
+        steps: [],
+        publicBindings: [],
+        localBindings: [],
+        coverage: [],
+      })
+      await store.addRelations([
+        createRelation({
+          source: 'core:spec-repository',
+          target: targetLogical.id,
+          type: RelationType.CoversSymbol,
+        }),
+        createRelation({
+          source: 'cli:graph-impact',
+          target: caller.filePath,
+          type: RelationType.CoversFile,
+        }),
+      ])
 
       const result = await analyzeImpact(store, target.id, 'upstream', 3, undefined, {
         types: ['specs'],
@@ -844,29 +953,27 @@ describe('Traversal services', () => {
             dependsOn: [],
           },
         ],
-        relations: [
-          createRelation({
-            source: 'core:get-status',
-            target: 'core:change',
-            type: RelationType.DependsOn,
-          }),
-          createRelation({
-            source: 'core:change',
-            target: 'core:src/change.ts',
-            type: RelationType.CoversFile,
-          }),
-          createRelation({
-            source: 'core:get-status',
-            target: 'core:src/status.ts',
-            type: RelationType.CoversFile,
-          }),
-          createRelation({
-            source: 'core:change',
-            target: coveredSymbol.id,
-            type: RelationType.CoversSymbol,
-          }),
-        ],
+        relations: [],
       })
+      await coverSymbolLogically(store, 'core:change', coveredSymbol)
+      // Reference-fact replacement resets coverage, so file coverage and dependencies follow it.
+      await store.addRelations([
+        createRelation({
+          source: 'core:get-status',
+          target: 'core:change',
+          type: RelationType.DependsOn,
+        }),
+        createRelation({
+          source: 'core:change',
+          target: 'core:src/change.ts',
+          type: RelationType.CoversFile,
+        }),
+        createRelation({
+          source: 'core:get-status',
+          target: 'core:src/status.ts',
+          type: RelationType.CoversFile,
+        }),
+      ])
 
       const result = await analyzeSpecImpact(store, 'core:change', 'upstream', 3)
 
@@ -894,14 +1001,9 @@ describe('Traversal services', () => {
             dependsOn: [],
           },
         ],
-        relations: [
-          createRelation({
-            source: 'core:change',
-            target: coveredSymbol.id,
-            type: RelationType.CoversSymbol,
-          }),
-        ],
+        relations: [],
       })
+      await coverSymbolLogically(store, 'core:change', coveredSymbol)
 
       const result = await analyzeSpecImpact(store, 'core:change', 'upstream', 3, undefined, {
         types: ['files'],
@@ -1106,6 +1208,570 @@ describe('Traversal services', () => {
       expect(statsAfter.fileCount).toBe(statsBefore.fileCount)
       expect(statsAfter.symbolCount).toBe(statsBefore.symbolCount)
       expect(statsAfter.specCount).toBe(statsBefore.specCount)
+    })
+  })
+
+  describe('analyzeResolvedSymbolImpact', () => {
+    it('seeds traversal from every contributing declaration of a logical target', async () => {
+      const decl1 = sym('target', 'a.ts', 1)
+      const decl2 = sym('target', 'a2.ts', 1)
+      const caller1 = sym('caller1', 'b.ts', 1)
+      const caller2 = sym('caller2', 'c.ts', 1)
+
+      await store.upsertFile(file('a.ts'), [decl1], [])
+      await store.upsertFile(file('a2.ts'), [decl2], [])
+      await store.upsertFile(
+        file('b.ts'),
+        [caller1],
+        [createRelation({ source: caller1.id, target: decl1.id, type: RelationType.Calls })],
+      )
+      await store.upsertFile(
+        file('c.ts'),
+        [caller2],
+        [createRelation({ source: caller2.id, target: decl2.id, type: RelationType.Calls })],
+      )
+
+      const targetLogical = createLogicalSymbol({
+        workspace: 'default',
+        surface: 'surface:test',
+        name: 'target',
+        space: 'value',
+      })
+
+      await store.replaceReferenceFacts({
+        logicalSymbols: [targetLogical],
+        declarations: [
+          { logicalSymbolId: targetLogical.id, declaration: declOcc(decl1, targetLogical.id) },
+          { logicalSymbolId: targetLogical.id, declaration: declOcc(decl2, targetLogical.id) },
+        ],
+        steps: [],
+        publicBindings: [],
+        localBindings: [],
+        coverage: [],
+      })
+
+      const target: ResolvedSymbolTarget = {
+        kind: 'logical-target',
+        logicalSymbol: targetLogical,
+        declarations: [declOcc(decl1, targetLogical.id), declOcc(decl2, targetLogical.id)],
+        path: [],
+      }
+
+      const result = await analyzeResolvedSymbolImpact(store, target, 'upstream')
+
+      expect(result.resolvedTarget).toBe(target)
+      expect(result.directDependents).toBe(2)
+      expect(result.physicalEvidence).toHaveLength(2)
+      expect(result.physicalEvidence.map((e) => e.sourceDeclarationId).sort()).toEqual([
+        caller1.id,
+        caller2.id,
+      ])
+    })
+
+    it('reports a logical target reached at two depths once, at the shallower depth, with one deduplicated coverage frontier', async () => {
+      const targetDecl = sym('target', 'a.ts', 1)
+      const nearDecl = sym('caller', 'b.ts', 1)
+      const farDecl = sym('caller', 'b.ts', 10)
+
+      await store.upsertFile(file('a.ts'), [targetDecl], [])
+      await store.upsertFile(
+        file('b.ts'),
+        [nearDecl, farDecl],
+        [
+          createRelation({ source: nearDecl.id, target: targetDecl.id, type: RelationType.Calls }),
+          createRelation({ source: farDecl.id, target: nearDecl.id, type: RelationType.Calls }),
+        ],
+      )
+      const targetLogical = createLogicalSymbol({
+        workspace: 'default',
+        surface: 'surface:test',
+        name: 'target',
+        space: 'value',
+      })
+      const callerLogical = createLogicalSymbol({
+        workspace: 'default',
+        surface: 'surface:test',
+        name: 'caller',
+        space: 'value',
+      })
+      await store.replaceReferenceFacts({
+        logicalSymbols: [targetLogical, callerLogical],
+        declarations: [
+          { logicalSymbolId: targetLogical.id, declaration: declOcc(targetDecl, targetLogical.id) },
+          { logicalSymbolId: callerLogical.id, declaration: declOcc(nearDecl, callerLogical.id) },
+          { logicalSymbolId: callerLogical.id, declaration: declOcc(farDecl, callerLogical.id) },
+        ],
+        steps: [],
+        publicBindings: [],
+        localBindings: [],
+        coverage: [],
+      })
+      const frontier = vi.spyOn(store, 'queryImpactFrontier')
+
+      const result = await analyzeResolvedSymbolImpact(
+        store,
+        {
+          kind: 'logical-target',
+          logicalSymbol: targetLogical,
+          declarations: [declOcc(targetDecl, targetLogical.id)],
+          path: [],
+        },
+        'upstream',
+      )
+
+      expect(result.semanticAffectedTargets).toHaveLength(1)
+      expect(result.semanticAffectedTargets[0]).toMatchObject({ kind: 'logical-target', depth: 1 })
+      const coverageQueries = frontier.mock.calls
+        .map(([input]) => input)
+        .filter((input) => input.relationTypes.includes(RelationType.CoversSymbol))
+      expect(coverageQueries).toHaveLength(1)
+      const logicalFrontier = coverageQueries[0]!.frontier
+      expect([...logicalFrontier].sort()).toEqual([callerLogical.id, targetLogical.id].sort())
+      expect(logicalFrontier.some((id) => id === nearDecl.id || id === farDecl.id)).toBe(false)
+    })
+
+    it('aggregates multiple declarations of a reached target into one logical target and preserves physical counts', async () => {
+      const targetDecl = sym('target', 'a.ts', 1)
+      const callerDecl1 = sym('caller', 'b.ts', 1)
+      const callerDecl2 = sym('caller', 'b.ts', 10)
+
+      await store.upsertFile(file('a.ts'), [targetDecl], [])
+      await store.upsertFile(
+        file('b.ts'),
+        [callerDecl1, callerDecl2],
+        [
+          createRelation({
+            source: callerDecl1.id,
+            target: targetDecl.id,
+            type: RelationType.Calls,
+          }),
+          createRelation({
+            source: callerDecl2.id,
+            target: targetDecl.id,
+            type: RelationType.Calls,
+          }),
+        ],
+      )
+
+      const targetLogical = createLogicalSymbol({
+        workspace: 'default',
+        surface: 'surface:test',
+        name: 'target',
+        space: 'value',
+      })
+      const callerLogical = createLogicalSymbol({
+        workspace: 'default',
+        surface: 'surface:test',
+        name: 'caller',
+        space: 'value',
+      })
+
+      await store.replaceReferenceFacts({
+        logicalSymbols: [targetLogical, callerLogical],
+        declarations: [
+          { logicalSymbolId: targetLogical.id, declaration: declOcc(targetDecl, targetLogical.id) },
+          {
+            logicalSymbolId: callerLogical.id,
+            declaration: declOcc(callerDecl1, callerLogical.id),
+          },
+          {
+            logicalSymbolId: callerLogical.id,
+            declaration: declOcc(callerDecl2, callerLogical.id),
+          },
+        ],
+        steps: [],
+        publicBindings: [],
+        localBindings: [],
+        coverage: [],
+      })
+
+      const target: ResolvedSymbolTarget = {
+        kind: 'logical-target',
+        logicalSymbol: targetLogical,
+        declarations: [declOcc(targetDecl, targetLogical.id)],
+        path: [],
+      }
+
+      const result = await analyzeResolvedSymbolImpact(store, target, 'upstream')
+
+      expect(result.semanticAffectedTargets).toHaveLength(1)
+      const reachedTarget = result.semanticAffectedTargets[0]!
+      expect(reachedTarget.kind).toBe('logical-target')
+      if (reachedTarget.kind === 'logical-target') {
+        expect(reachedTarget.logicalSymbol.id).toBe(callerLogical.id)
+        expect(reachedTarget.declarations).toHaveLength(2)
+      }
+      expect(result.semanticCounts.directLogicalTargets).toBe(1)
+      expect(result.semanticCounts.physicalDeclarationOccurrences).toBe(2)
+      expect(result.directDependents).toBe(1)
+      expect(result.riskLevel).toBe('LOW')
+    })
+
+    it('does not implicitly widen exact declaration impact to other declarations', async () => {
+      const decl1 = sym('target', 'a.ts', 1)
+      const decl2 = sym('target', 'a2.ts', 1)
+      const caller1 = sym('caller1', 'b.ts', 1)
+      const caller2 = sym('caller2', 'c.ts', 1)
+
+      await store.upsertFile(file('a.ts'), [decl1], [])
+      await store.upsertFile(file('a2.ts'), [decl2], [])
+      await store.upsertFile(
+        file('b.ts'),
+        [caller1],
+        [createRelation({ source: caller1.id, target: decl1.id, type: RelationType.Calls })],
+      )
+      await store.upsertFile(
+        file('c.ts'),
+        [caller2],
+        [createRelation({ source: caller2.id, target: decl2.id, type: RelationType.Calls })],
+      )
+
+      const targetLogical = createLogicalSymbol({
+        workspace: 'default',
+        surface: 'surface:test',
+        name: 'target',
+        space: 'value',
+      })
+
+      await store.replaceReferenceFacts({
+        logicalSymbols: [targetLogical],
+        declarations: [
+          { logicalSymbolId: targetLogical.id, declaration: declOcc(decl1, targetLogical.id) },
+          { logicalSymbolId: targetLogical.id, declaration: declOcc(decl2, targetLogical.id) },
+        ],
+        steps: [],
+        publicBindings: [],
+        localBindings: [],
+        coverage: [],
+      })
+
+      const exactTarget: ResolvedSymbolTarget = {
+        kind: 'declaration',
+        declaration: declOcc(decl1, targetLogical.id),
+        logicalSymbol: targetLogical,
+        path: [],
+      }
+
+      const result = await analyzeResolvedSymbolImpact(store, exactTarget, 'upstream')
+
+      expect(result.target).toBe(decl1.id)
+      expect(result.directDependents).toBe(1)
+      expect(result.physicalEvidence).toHaveLength(1)
+      expect(result.physicalEvidence[0]!.sourceDeclarationId).toBe(caller1.id)
+    })
+
+    it('classifies unmapped physical declarations as physical-only', async () => {
+      const targetDecl = sym('target', 'a.ts', 1)
+      const anonCaller = sym('anon', 'b.ts', 5)
+      const coverageQuerySpy = vi.spyOn(store, 'queryImpactFrontier')
+
+      await store.upsertFile(file('a.ts'), [targetDecl], [])
+      await store.upsertFile(
+        file('b.ts'),
+        [anonCaller],
+        [
+          createRelation({
+            source: anonCaller.id,
+            target: targetDecl.id,
+            type: RelationType.Calls,
+          }),
+        ],
+      )
+
+      const targetLogical = createLogicalSymbol({
+        workspace: 'default',
+        surface: 'surface:test',
+        name: 'target',
+        space: 'value',
+      })
+
+      // Neither the target declaration nor the reached caller has a stored logical mapping.
+      const target: ResolvedSymbolTarget = {
+        kind: 'logical-target',
+        logicalSymbol: targetLogical,
+        declarations: [declOcc(targetDecl, targetLogical.id)],
+        path: [],
+      }
+
+      const result = await analyzeResolvedSymbolImpact(store, target, 'upstream')
+
+      expect(result.semanticAffectedTargets).toHaveLength(1)
+      const reached = result.semanticAffectedTargets[0]!
+      expect(reached.kind).toBe('physical-only')
+      if (reached.kind === 'physical-only') {
+        expect(reached.declaration.id).toBe(anonCaller.id)
+      }
+      expect(result.semanticCounts.physicalOnlyTargets).toBe(1)
+      expect(result.semanticCounts.directLogicalTargets).toBe(0)
+      expect(result.coveringSpecs).toEqual([])
+      expect(
+        coverageQuerySpy.mock.calls.filter(
+          ([input]) =>
+            input.resource === 'spec' && input.relationTypes?.includes(RelationType.CoversSymbol),
+        ),
+      ).toHaveLength(0)
+    })
+
+    it('collects covering specs with contributing declaration evidence', async () => {
+      const targetDecl = sym('target', 'a.ts', 1)
+      const callerDecl = sym('caller', 'b.ts', 1)
+
+      await store.upsertFile(file('a.ts'), [targetDecl], [])
+      await store.upsertFile(
+        file('b.ts'),
+        [callerDecl],
+        [
+          createRelation({
+            source: callerDecl.id,
+            target: targetDecl.id,
+            type: RelationType.Calls,
+          }),
+        ],
+      )
+
+      const targetLogical = createLogicalSymbol({
+        workspace: 'default',
+        surface: 'surface:test',
+        name: 'target',
+        space: 'value',
+      })
+      const callerLogical = createLogicalSymbol({
+        workspace: 'default',
+        surface: 'surface:test',
+        name: 'caller',
+        space: 'value',
+      })
+
+      await store.replaceReferenceFacts({
+        logicalSymbols: [targetLogical, callerLogical],
+        declarations: [
+          { logicalSymbolId: targetLogical.id, declaration: declOcc(targetDecl, targetLogical.id) },
+          { logicalSymbolId: callerLogical.id, declaration: declOcc(callerDecl, callerLogical.id) },
+        ],
+        steps: [],
+        publicBindings: [],
+        localBindings: [],
+        coverage: [],
+      })
+
+      const spec = createSpecNode({
+        specId: 'spec:caller-spec',
+        path: 'specs/caller.md',
+        title: 'Caller Spec',
+        description: '',
+        content: '',
+        contentHash: 'hash:1',
+        workspace: 'default',
+      })
+      await store.upsertSpec(spec, [
+        createRelation({
+          source: 'spec:caller-spec',
+          target: callerLogical.id,
+          type: RelationType.CoversSymbol,
+        }),
+      ])
+
+      const target: ResolvedSymbolTarget = {
+        kind: 'logical-target',
+        logicalSymbol: targetLogical,
+        declarations: [declOcc(targetDecl, targetLogical.id)],
+        path: [],
+      }
+
+      const result = await analyzeResolvedSymbolImpact(store, target, 'upstream')
+
+      expect(result.affectedSpecs).toEqual(['spec:caller-spec'])
+      expect(result.coveringSpecs).toHaveLength(1)
+      expect(result.coveringSpecs[0]!.specId).toBe('spec:caller-spec')
+      expect(result.coveringSpecs[0]!.evidence).toEqual([
+        {
+          kind: 'symbol',
+          target: callerLogical.id,
+          depth: 1,
+          declarations: [callerDecl.id],
+        },
+      ])
+    })
+
+    it("given a logical target whose dependents are all physical-only, when impact runs, then it still reports the target's own covering spec at depth 0 with one coverage query", async () => {
+      const targetDecl = sym('target', 'a.ts', 1)
+      const anonCaller = sym('anon', 'b.ts', 5)
+      const coverageQuerySpy = vi.spyOn(store, 'queryImpactFrontier')
+
+      await store.upsertFile(file('a.ts'), [targetDecl], [])
+      await store.upsertFile(
+        file('b.ts'),
+        [anonCaller],
+        [
+          createRelation({
+            source: anonCaller.id,
+            target: targetDecl.id,
+            type: RelationType.Calls,
+          }),
+        ],
+      )
+      const targetLogical = createLogicalSymbol({
+        workspace: 'default',
+        surface: 'surface:test',
+        name: 'target',
+        space: 'value',
+      })
+      await store.replaceReferenceFacts({
+        logicalSymbols: [targetLogical],
+        declarations: [
+          { logicalSymbolId: targetLogical.id, declaration: declOcc(targetDecl, targetLogical.id) },
+        ],
+        steps: [],
+        publicBindings: [],
+        localBindings: [],
+        coverage: [],
+      })
+      await store.upsertSpec(
+        createSpecNode({
+          specId: 'spec:target-spec',
+          path: 'specs/target.md',
+          title: 'Target Spec',
+          description: '',
+          content: '',
+          contentHash: 'hash:target',
+          workspace: 'default',
+        }),
+        [
+          createRelation({
+            source: 'spec:target-spec',
+            target: targetLogical.id,
+            type: RelationType.CoversSymbol,
+          }),
+        ],
+      )
+
+      const result = await analyzeResolvedSymbolImpact(
+        store,
+        {
+          kind: 'logical-target',
+          logicalSymbol: targetLogical,
+          declarations: [declOcc(targetDecl, targetLogical.id)],
+          path: [],
+        },
+        'upstream',
+      )
+
+      expect(result.coveringSpecs).toHaveLength(1)
+      expect(result.coveringSpecs[0]!.specId).toBe('spec:target-spec')
+      expect(result.coveringSpecs[0]!.minDepth).toBe(0)
+      expect(result.coveringSpecs[0]!.evidence).toEqual([
+        { kind: 'symbol', target: targetLogical.id, depth: 0, declarations: [targetDecl.id] },
+      ])
+      expect(
+        coverageQuerySpy.mock.calls.filter(
+          ([input]) =>
+            input.resource === 'spec' && input.relationTypes?.includes(RelationType.CoversSymbol),
+        ),
+      ).toHaveLength(1)
+    })
+
+    it('given a public export whose canonical target has two declarations reached by one caller, when binding impact runs, then the canonical view counts the caller once logically', async () => {
+      const decl1 = sym('exported', 'a.ts', 1)
+      const decl2 = sym('exported', 'a.ts', 9)
+      const caller = sym('caller', 'b.ts', 1)
+      await store.upsertFile(file('a.ts'), [decl1, decl2], [])
+      await store.upsertFile(
+        file('b.ts'),
+        [caller],
+        [
+          createRelation({ source: caller.id, target: decl1.id, type: RelationType.Calls }),
+          createRelation({ source: caller.id, target: decl2.id, type: RelationType.Calls }),
+        ],
+      )
+      const targetLogical = createLogicalSymbol({
+        workspace: 'default',
+        surface: 'surface:test',
+        name: 'exported',
+        space: 'value',
+      })
+      const callerLogical = createLogicalSymbol({
+        workspace: 'default',
+        surface: 'surface:test',
+        name: 'caller',
+        space: 'value',
+      })
+      await store.replaceReferenceFacts({
+        logicalSymbols: [targetLogical, callerLogical],
+        declarations: [
+          { logicalSymbolId: targetLogical.id, declaration: declOcc(decl1, targetLogical.id) },
+          { logicalSymbolId: targetLogical.id, declaration: declOcc(decl2, targetLogical.id) },
+          { logicalSymbolId: callerLogical.id, declaration: declOcc(caller, callerLogical.id) },
+        ],
+        steps: [],
+        publicBindings: [],
+        localBindings: [],
+        coverage: [],
+      })
+      const binding = createPublicBinding({
+        surface: 'a.ts',
+        exportedName: 'exported',
+        space: 'value',
+        targetId: targetLogical.id,
+      })
+
+      const result = await analyzePublicBindingImpact(
+        store,
+        {
+          binding,
+          target: targetLogical,
+          declarations: [declOcc(decl1, targetLogical.id), declOcc(decl2, targetLogical.id)],
+          path: [],
+        },
+        'upstream',
+      )
+
+      expect(result.canonicalImpact.semanticAffectedTargets).toHaveLength(1)
+      expect(result.canonicalImpact.semanticCounts.directLogicalTargets).toBe(1)
+      expect(result.canonicalImpact.semanticCounts.physicalDeclarationOccurrences).toBe(1)
+      expect(result.canonicalImpact.target).toBe(targetLogical.id)
+      expect(result.bindingImpact.target).toBe(binding.id)
+    })
+
+    it('given a reached declaration mapped to a logical id with no stored logical symbol, when impact runs, then it stays visible as declaration-only evidence', async () => {
+      const targetDecl = sym('target', 'a.ts', 1)
+      const callerDecl = sym('caller', 'b.ts', 1)
+      await store.upsertFile(file('a.ts'), [targetDecl], [])
+      await store.upsertFile(
+        file('b.ts'),
+        [callerDecl],
+        [
+          createRelation({
+            source: callerDecl.id,
+            target: targetDecl.id,
+            type: RelationType.Calls,
+          }),
+        ],
+      )
+      const targetLogical = createLogicalSymbol({
+        workspace: 'default',
+        surface: 'surface:test',
+        name: 'target',
+        space: 'value',
+      })
+      vi.spyOn(store, 'findLogicalDeclarationsByDeclarationIds').mockResolvedValue([
+        { logicalSymbolId: 'logical:missing', declaration: declOcc(callerDecl, 'logical:missing') },
+      ])
+
+      const result = await analyzeResolvedSymbolImpact(
+        store,
+        {
+          kind: 'logical-target',
+          logicalSymbol: targetLogical,
+          declarations: [declOcc(targetDecl, targetLogical.id)],
+          path: [],
+        },
+        'upstream',
+      )
+
+      expect(result.semanticAffectedTargets).toHaveLength(1)
+      const reached = result.semanticAffectedTargets[0]!
+      expect(reached.kind).toBe('physical-only')
+      if (reached.kind === 'physical-only') expect(reached.declaration.id).toBe(callerDecl.id)
     })
   })
 })

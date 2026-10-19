@@ -10,6 +10,53 @@
 - **THEN** namespace and complete draft facts are deterministic
 - **AND** Pass 2 neither executes PHP nor invokes an autoloader
 
+### Requirement: PHP parser-authoritative structural extraction
+
+#### Scenario: Framework call requires a proven PHP call node
+
+- **GIVEN** comments, strings, and heredocs contain text matching registered CakePHP, CodeIgniter, Yii, Laravel, Zend, or Drupal loader patterns
+- **AND** one real registered loader invocation has parser-proven callee and literal arguments
+- **WHEN** framework dependency facts are extracted
+- **THEN** only the real call node may produce loader, binding, import, or call facts
+- **AND** the textual lookalikes produce none
+
+#### Scenario: PHP bodies and hierarchy do not use brace scans
+
+- **GIVEN** compact and multiline PHP declarations contain nested braces, traits, adaptations, types, calls, and hierarchy clauses
+- **WHEN** the adapter analyzes them
+- **THEN** bodies, owners, scopes, types, calls, and hierarchy evidence follow parser nodes and ancestry
+- **AND** raw brace counts do not define declaration ranges
+
+#### Scenario: Composer metadata remains separate
+
+- **GIVEN** package and PSR-4 metadata is read from `composer.json`
+- **WHEN** PHP source facts are extracted
+- **THEN** the metadata may qualify deterministic resolution
+- **AND** source declarations and dependencies still require PHP AST evidence
+
+#### Scenario: Pass 2 uses AST facts and performs no filesystem I/O
+
+- **GIVEN** aliases, constructions, and member calls appear in real PHP nodes and as lookalike text in strings or heredocs
+- **AND** PSR-4 maps were prepared in run-scoped session state
+- **WHEN** Pass 2 relation extraction runs
+- **THEN** only parser-proven constructs emit relations
+- **AND** no callable-body regex scan or filesystem metadata read occurs
+- **AND** a second session cannot observe mutable cache state from the first
+
+#### Scenario: Unresolved PHP loader emits no guessed relation
+
+- **GIVEN** a parser-proven loader call has candidate targets but none resolves
+- **WHEN** loader and import relations are emitted
+- **THEN** no relation targets the first candidate
+- **AND** unresolved evidence remains non-relational
+
+#### Scenario: Imported PHP hierarchy retains provenance
+
+- **GIVEN** an imported parent, interface, or trait resolves deterministically
+- **WHEN** hierarchy evidence is emitted
+- **THEN** the physical hierarchy relation and shared hierarchy reference fact identify the same target
+- **AND** the fact retains the written clause-name range and resolution provenance
+
 ### Requirement: Declaration extraction and ranges
 
 #### Scenario: Class-like and member declarations retain parser ranges
@@ -75,6 +122,29 @@
 - **WHEN** calls and type relations are built
 - **THEN** the explicit instance can produce construction, type, and call evidence
 - **AND** the runtime service lookup produces no guessed relation
+
+### Requirement: PHP caller containment and declaration classification
+
+#### Scenario: Method-local binding is not the caller
+
+- **GIVEN** a PHP method contains an assignment or framework alias followed by a call
+- **WHEN** caller identity is extracted
+- **THEN** the containing method is the caller
+- **AND** the assignment or alias remains lexical evidence rather than a callable declaration
+
+#### Scenario: Compact declarations retain distinct owners
+
+- **GIVEN** multiple PHP methods or classes share a source line
+- **WHEN** containment and ownership are evaluated
+- **THEN** exact parser ranges and columns select the enclosing callable
+- **AND** declarations with distinct owners remain distinct
+
+#### Scenario: Closures require proven semantic identity
+
+- **GIVEN** a closure or local callable is observed without a stable language-level declaration identity
+- **WHEN** logical identity is constructed
+- **THEN** its physical and lexical evidence is preserved
+- **AND** no stable semantic declaration identity is invented
 
 ### Requirement: PHP hierarchy and provenance evidence
 

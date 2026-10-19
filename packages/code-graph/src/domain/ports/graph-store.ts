@@ -423,6 +423,20 @@ export abstract class GraphStore {
   }
 
   /**
+   * Batch-retrieves logical declaration mappings by physical declaration symbol IDs.
+   * Duplicate IDs are ignored, unknown IDs are omitted, and results follow the first requested ID order.
+   * Empty input returns [] without backend work.
+   * @param declarationSymbolIds - Physical declaration symbol identifiers to map.
+   * @returns Matching logical declarations in deterministic order.
+   */
+  findLogicalDeclarationsByDeclarationIds(
+    declarationSymbolIds: readonly string[],
+  ): Promise<LogicalDeclaration[]> {
+    void declarationSymbolIds
+    return Promise.reject(new Error('Reference facts are not supported by this graph store'))
+  }
+
+  /**
    * Batch-looks up public bindings by surface, exported spelling, and space.
    * @param lookups - Public route keys to resolve in one backend operation.
    * @returns Matching public bindings in deterministic order.
@@ -739,19 +753,21 @@ export abstract class GraphStore {
   abstract getCoveredSymbols(specId: string): Promise<Relation[]>
 
   /**
-   * Returns all symbol-coverage relations targeting the given symbol.
-   * @param symbolId - The symbol id to find covering specs for.
+   * Returns all symbol-coverage relations targeting the given logical symbol.
+   * Physical declaration IDs are not valid targets.
+   * @param logicalSymbolId - The logical symbol identifier to find covering specs for.
    * @returns An array of COVERS_SYMBOL relations.
    */
-  abstract getCoveringSpecsForSymbol(symbolId: string): Promise<Relation[]>
+  abstract getCoveringSpecsForSymbol(logicalSymbolId: string): Promise<Relation[]>
 
   /**
-   * Returns symbol-coverage relations targeting any requested symbol in one batch.
+   * Returns symbol-coverage relations targeting any requested logical symbol in one batch.
    * Empty input must return without backend work.
-   * @param symbolIds - Symbol identifiers.
+   * Physical declaration IDs are not valid targets.
+   * @param logicalSymbolIds - Logical symbol identifiers.
    * @returns Deterministically ordered COVERS_SYMBOL relations.
    */
-  abstract getCoveringSpecsForSymbols(symbolIds: readonly string[]): Promise<Relation[]>
+  abstract getCoveringSpecsForSymbols(logicalSymbolIds: readonly string[]): Promise<Relation[]>
 
   /**
    * Returns all symbols exported by the given file.

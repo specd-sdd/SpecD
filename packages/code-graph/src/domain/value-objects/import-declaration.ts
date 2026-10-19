@@ -1,4 +1,5 @@
 import { type ImportDeclarationKind } from './import-declaration-kind.js'
+import { type SourceRange } from './symbol-node.js'
 
 /**
  * A parsed import declaration extracted from source code by a language adapter.
@@ -15,4 +16,6 @@ export interface ImportDeclaration {
   readonly isRelative: boolean
   /** Optional normalized import form used by shared resolution. */
   readonly kind?: ImportDeclarationKind | undefined
+  /** Source range of the import syntax, when the adapter records it. */
+  readonly range?: SourceRange | undefined
 }

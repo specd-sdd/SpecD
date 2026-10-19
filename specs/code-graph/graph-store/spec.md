@@ -25,7 +25,7 @@ At minimum, the abstract store contract MUST support:
 - persisted relations for the relation families used by the package: `IMPORTS`, `DEFINES`, `CALLS`, `CONSTRUCTS`, `USES_TYPE`, `EXPORTS`, `DEPENDS_ON`, `COVERS_FILE`, `COVERS_SYMBOL`, `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES`
 - store-level metadata sufficient to satisfy abstract statistics and derivation-freshness fields such as `lastIndexedAt`, `lastIndexedRef`, and the persisted graph fingerprint
 
-`COVERS_FILE` and `COVERS_SYMBOL` are the abstract relation families used for requirement-aware graph linkage. `COVERS_FILE` links a spec to a covered implementation file. `COVERS_SYMBOL` links a spec to a covered implementation symbol and MAY carry `metadata.stale` when the archived symbol-level link no longer resolves to a live indexed symbol.
+`COVERS_FILE` and `COVERS_SYMBOL` are the abstract relation families used for requirement-aware graph linkage. `COVERS_FILE` links a spec to a covered implementation file. `COVERS_SYMBOL` links a spec to a covered implementation symbol. A `COVERS_SYMBOL` relation never carries a `stale` flag: a symbol-level link whose symbol no longer resolves to a live logical symbol is not persisted, and the indexer reports it as a `SYMBOL_NOT_FOUND` coverage diagnostic instead.
 
 The `files` storage SHALL persist the full textual content of indexed source files to enable match-aware snippet extraction without re-reading from disk at query time. It SHALL also persist and index the `category` attribute (defaulting to `'source'`) to support low-latency filtering during graph traversal and search.
 
@@ -104,7 +104,6 @@ Unlike `upsertFile` which replaces all data for a file, `addRelations` is purely
 `GraphStore` SHALL provide the following query methods:
 
 - **`getFile(path: string): Promise<FileNode | undefined>`** — retrieve a file node by canonical workspace-prefixed path
-- **`findFilesByConfigRelativePath(path: string): Promise<FileNode[]>`** — retrieve all file nodes whose `configRelativePath` exactly matches the given normalized config-relative path
 - **`getSymbol(id: string): Promise<SymbolNode | undefined>`** — retrieve a symbol by id
 - **`getCallers(symbolId: string): Promise<Relation[]>`** — all incoming symbol dependency relations where `target` matches. At minimum this includes `CALLS`, `CONSTRUCTS`, and `USES_TYPE`.
 - **`getCallees(symbolId: string): Promise<Relation[]>`** — all outgoing symbol dependency relations where `source` matches. At minimum this includes `CALLS`, `CONSTRUCTS`, and `USES_TYPE`.
@@ -126,6 +125,8 @@ Unlike `upsertFile` which replaces all data for a file, `addRelations` is purely
 - **`findSymbols(query: SymbolQuery): Promise<SymbolNode[]>`** — search symbols by name pattern, kind, file path, or category
 
 `SymbolQuery` is a value object with optional fields: `name` (glob or regex), `kinds` (array of `SymbolKind` for filtering by one or more kinds), `filePath` (exact match or glob), `comment` (substring match for full-text search within symbol comments), `caseSensitive` (boolean, defaults to `false` — when `false`, `name` and `comment` matching is case insensitive), and `categories` (array of `FileCategory` for filtering symbols by the category of their declaring file).
+
+- **`findFilesByProjectRelativePath(projectRelativePath: string): Promise<FileNode[]>`** — retrieve all file nodes whose `projectRelativePath` exactly matches the given normalized project-relative path
 
 ### Requirement: Filtered impact query contract
 
@@ -225,7 +226,6 @@ Primary identity fields are:
 
 - **specs** — canonical `specId`
 - **symbols** — declared symbol `name` and canonical symbol `id`
-- **documents** — canonical `path`, and any persisted alternate path identity such as `configRelativePath` when the backend exposes it to search
 
 Search ranking MUST prioritize primary-identity matches ahead of generic content-only matches, but MUST NOT narrow candidate retrieval to identity fields only. Generic text matching across the backend's searchable fields remains part of discovery.
 
@@ -283,6 +283,8 @@ All filters (kind, filePattern, workspace, excludePaths, excludeWorkspaces) are 
 
 Generic text matching (BM25 or equivalent) SHALL still participate in retrieval and SHALL rank the remaining hits after primary-identity preference is applied.
 
+- **documents** — canonical `path`, and any persisted alternate path identity such as `projectRelativePath` when the backend exposes it to search
+
 ### Requirement: Bulk operations
 
 `GraphStore` SHALL provide `clear(): Promise<void>` to remove all nodes and relations (full re-index), `getAllFiles(): Promise<FileNode[]>` to retrieve all file nodes, and `getAllSpecs(): Promise<SpecNode[]>` to retrieve all spec nodes (both for incremental diff computation).
@@ -299,6 +301,18 @@ Search SHALL index structured simple name, owner, symbol space, member form, pub
 
 Reverse coverage queries SHALL accept batches of canonical file paths and symbol ids and return all matching `COVERS_FILE` or `COVERS_SYMBOL` relations in deterministic source/type/target order. Empty batches SHALL return empty results without backend work. File-impact traversal MUST be able to retrieve coverage for its complete deduplicated blast radius without one call per resource.
 
+### Requirement: Logical and declaration batch lookup boundary
+
+`GraphStore` SHALL expose bounded batch queries that:
+
+- retrieve every physical declaration occurrence for a set of logical-symbol IDs;
+- retrieve the logical-symbol mapping, when present, for a set of physical declaration IDs; and
+- retrieve logical symbols and declaration occurrences without issuing one backend operation per identity.
+
+Batch inputs SHALL deduplicate repeated identities by first occurrence, omit unknown identities, return deterministic ordering, and avoid backend work for an empty input. A declaration without a logical mapping SHALL be omitted from logical mappings but SHALL remain retrievable as a physical symbol.
+
+Store APIs and DTOs MUST name identity parameters and result fields explicitly as logical IDs or declaration IDs. A generic `symbolId` field MUST NOT silently accept both identity domains where endpoint semantics differ.
+
 ### Requirement: Member-semantics persistence
 
 `GraphStore` SHALL persist and look up logical symbols by workspace, surface, simple name, symbol space, owner id, and `MemberSemantics` (`kind`, `dispatch`, `accessor`, optional `nativeKind`). Lookups MUST be equality queries on those structured fields. The store MUST NOT keep a `memberForm` field beside those axes and MUST NOT parse a serialized canonical id to recover them.
@@ -314,6 +328,12 @@ Public bindings SHALL remain addressable by surface, exported name, symbol space
 Relation endpoint validation, bulk persistence, reverse-coverage indexes, statistics, and coverage query methods MUST recognize an existing logical symbol as a valid `COVERS_SYMBOL` target. They MUST reject a relation whose spec source or logical-symbol target does not exist in the committed generation.
 
 Coverage queries SHALL preserve the logical target ID without requiring callers to know the declaration occurrence or backend schema used to represent it.
+
+### Requirement: Batched logical coverage lookup
+
+Reverse symbol-coverage queries SHALL accept canonical logical-symbol IDs only and SHALL return deterministic relations whose targets remain those logical IDs. Passing a physical declaration ID MUST NOT accidentally match, be retargeted, or be interpreted as a logical ID.
+
+The store SHALL support one bounded batch reverse-coverage lookup for all logical targets reached by an impact operation. Coverage relation persistence and retrieval SHALL preserve metadata required to associate the logical target with physical declaration evidence assembled by traversal.
 
 ### Requirement: Source-content search candidates
 
@@ -351,7 +371,7 @@ Relation endpoint validation and hierarchy/method lookup SHALL have batch operat
 - The abstract store contract does not prescribe a specific backend, physical schema, or filesystem layout
 - Destructive reset behavior is modeled through `recreate()` as a backend capability owned by provider/indexing flows, not through caller-managed backend file deletion
 - Persisted storage generation markers exist to support provider-owned stale detection across processes
-- No dependency on `@specd/core` — error types extend `CodeGraphError`
+- Error types extend `SpecdCodeGraphError`, which extends `SpecdError` from `@specd/core`, as required by `code-graph:symbol-model`
 
 ## Spec Dependencies
 

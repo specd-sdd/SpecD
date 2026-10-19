@@ -72,7 +72,7 @@
 - **AND** the persisted graph fingerprint matches the fingerprint for the current run
 - **WHEN** `IndexCodeGraph.execute()` is called
 - **THEN** `core:src/utils.ts` is removed from the store before bulk load
-- **AND** the re-extracted data is inserted via `bulkLoad()`
+- **AND** the re-extracted data is written through the bulk write session
 
 #### Scenario: Forced run ignores orphaned incremental state
 
@@ -161,23 +161,23 @@
 - **WHEN** file discovery runs
 - **THEN** `node_modules/lodash/index.js` is not in the discovered files
 
-#### Scenario: Paths prefixed with workspace name and config-relative path
+#### Scenario: Paths prefixed with workspace name and project-relative path
 
 - **GIVEN** the active `specd.yaml` lives at `/project/specd.yaml`
 - **AND** a workspace named `core` with codeRoot `/project/packages/core`
 - **AND** a file at `/project/packages/core/src/index.ts`
 - **WHEN** the indexer processes this workspace
 - **THEN** `FileNode.path` is `core:src/index.ts`
-- **AND** `FileNode.configRelativePath` is `packages/core/src/index.ts`
+- **AND** `FileNode.projectRelativePath` is `packages/core/src/index.ts`
 - **AND** `FileNode.workspace` is `core`
 
-#### Scenario: Config-relative path normalizes absolute parent traversal
+#### Scenario: Project-relative path normalizes absolute parent traversal
 
 - **GIVEN** the active `specd.yaml` lives at `/project/apps/web/specd.yaml`
 - **AND** a workspace named `core` with codeRoot `/project/packages/core`
 - **AND** a file at `/project/packages/core/src/index.ts`
 - **WHEN** the indexer processes this workspace
-- **THEN** `FileNode.configRelativePath` is `../../packages/core/src/index.ts`
+- **THEN** `FileNode.projectRelativePath` is `../../packages/core/src/index.ts`
 - **AND** it has forward slashes and no leading `./`
 
 ### Requirement: Portable graph paths
@@ -367,8 +367,8 @@
 
 - **GIVEN** scoped binding resolution returns a dependency where `sourceSymbolId` equals `targetSymbolId`
 - **WHEN** Pass 2 converts resolved dependencies into graph relations
-- **THEN** that dependency is not staged for `bulkLoad()`
 - **AND** no self-edge is persisted in the graph store
+- **THEN** the bulk write session receives no staged row for that dependency
 
 #### Scenario: Indexer stays language-agnostic
 
@@ -626,10 +626,6 @@
 - **WHEN** indexing the spec
 - **THEN** the resulting `SpecNode` in the graph has `description: "AI Summary"`
 
-\[object Object]
-
-\[object Object]
-
 ### Requirement: Reference fact indexing
 
 #### Scenario: Index run persists reference and coverage evidence
@@ -698,6 +694,29 @@
 - **THEN** that generation's public bindings are already stored
 - **AND** coverage does not read the pre-re-export declaration list only
 
+### Requirement: Classification-aware logical identity construction
+
+#### Scenario: Lexical bindings do not become logical symbols
+
+- **GIVEN** an adapter classifies a declaration as lexical-binding-only or physical-only
+- **WHEN** the indexing session registers declarations
+- **THEN** its physical evidence is retained
+- **AND** no canonical logical target is manufactured
+
+#### Scenario: Members use canonical logical owners
+
+- **GIVEN** an owned member and its container declaration
+- **WHEN** logical identities are constructed
+- **THEN** the canonical owner is registered before the member
+- **AND** lexical parent identity is used only as physical containment evidence
+
+#### Scenario: Declaration groups require explicit language evidence
+
+- **GIVEN** same-name declarations with similar broad kinds but no grouping evidence
+- **WHEN** logical targets are assembled
+- **THEN** they remain distinct
+- **AND** valid groups retain every declaration and its occurrence form metadata
+
 ### Requirement: Incompatible derivation rebuild
 
 #### Scenario: Incompatibility triggers visible full rebuild
@@ -711,6 +730,22 @@
 - **WHEN** incompatible derivation forces a rebuild
 - **THEN** semantic and source-content indexes are rebuilt after the single committed bulk session
 - **AND** no partially indexed generation becomes readable
+
+#### Scenario: Subset rebuild preserves other workspaces
+
+- **GIVEN** a store indexed for workspaces `core` and `cli`
+- **AND** a forced or fingerprint-mismatch run targets only workspace `core`
+- **WHEN** `IndexCodeGraph.execute()` completes
+- **THEN** every file, symbol, relation, and coverage record of `cli` is still present
+- **AND** only `core` data is cleared and regenerated
+
+#### Scenario: Whole-graph derivation mismatch recreates storage and rotates generation
+
+- **GIVEN** a stored derivation fingerprint that differs from the current one
+- **AND** the run indexes every stored workspace and owns its provider
+- **WHEN** project indexing runs
+- **THEN** storage is physically recreated and its generation rotates before extraction
+- **AND** the result reports the fingerprint-mismatch reason
 
 ### Requirement: Indexed-input observation capture
 
@@ -766,3 +801,25 @@
 - **THEN** persistence includes all non-search transactional work
 - **AND** search-index timing covers only the backend search-index step in the changed run
 - **AND** the unchanged run reports zero search-index items and zero search-index duration
+
+### Requirement: Identity-sensitive incremental equivalence
+
+#### Scenario: Declaration mutation matches a clean rebuild
+
+- **GIVEN** a declaration is moved, renamed, added, deleted, regrouped, or assigned a different owner
+- **WHEN** incremental indexing and a clean rebuild reach identical final source and configuration
+- **THEN** their normalized logical symbols, declaration mappings, bindings, relations, evidence, and coverage are equal
+
+#### Scenario: Body edits rebuild affected consumers
+
+- **GIVEN** a body edit or newly resolvable target changes dependency semantics without changing a declaration header
+- **WHEN** incremental indexing computes its affected closure
+- **THEN** every semantically affected consumer is reconsidered
+- **AND** cleanup does not leave missing or stale incident relations
+
+#### Scenario: Incremental mutation matrix matches clean semantic state
+
+- **GIVEN** independent fixtures for body edits, declaration moves, signature changes, overload or merge-group changes, owner changes, renames, deletes, additions, and newly resolvable references
+- **WHEN** each fixture is indexed incrementally and from a clean database to the same final source
+- **THEN** normalized physical symbols, logical symbols, declaration mappings, bindings, public bindings, dependency relations, provenance, and coverage are identical
+- **AND** equality is checked by semantic content rather than aggregate row counts

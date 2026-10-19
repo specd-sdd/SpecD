@@ -3,6 +3,7 @@ import { type SgNode } from '@ast-grep/napi'
 import {
   type LanguageAdapter,
   type AdapterAnalyzeContext,
+  type AdapterDeclarationPolicy,
   type ImportResolutionContext,
   type ResolvedImports,
   type RelationBuildContext,
@@ -17,6 +18,7 @@ import {
   parseDottedMemberReference,
   renderDottedMemberReference,
 } from '../../domain/services/parse-member-reference.js'
+import { type IndexSession } from '../../domain/value-objects/index-session.js'
 import { type ImportDeclaration } from '../../domain/value-objects/import-declaration.js'
 import { ImportDeclarationKind } from '../../domain/value-objects/import-declaration-kind.js'
 import { BindingSourceKind, type BindingFact } from '../../domain/value-objects/binding-fact.js'
@@ -43,10 +45,15 @@ import {
   buildLogicalDeclarationFacts,
   containsSymbolRange,
   createAdapterDeclarationDescriptor,
+  createPhysicalOnlyDeclarationDescriptor,
+  findContainingCallableSymbol,
   type AdapterHierarchyDescriptor,
   withOwnerParents,
   withEnclosingTypeParents,
+  WHOLE_FILE_START,
 } from './reference-fact-helpers.js'
+
+const GO_CALLABLE_KINDS = new Set<SymbolKind>([SymbolKind.Function, SymbolKind.Method])
 
 /**
  * Determines whether an import declaration is file-only/side-effect only.
@@ -60,6 +67,76 @@ function isFileOnlyImport(declaration: ImportDeclaration): boolean {
     declaration.kind === ImportDeclarationKind.Require ||
     declaration.kind === ImportDeclarationKind.Blank
   )
+}
+
+/**
+ * Collects identifiers bound by a Go parameter list or declaration left-hand side.
+ * @param node - Parameter list, expression list, or var spec subtree.
+ * @param names - Accumulator of bound names.
+ */
+function collectGoBoundNames(node: SgNode, names: Set<string>): void {
+  const kind = nodeKind(node)
+  if (kind === 'identifier') {
+    names.add(node.text().trim())
+    return
+  }
+  if (kind === 'type_identifier' || kind === 'qualified_type') return
+  if (kind === 'parameter_declaration' || kind === 'variadic_parameter_declaration') {
+    for (const child of node.children()) {
+      if (nodeKind(child) === 'identifier') names.add(child.text().trim())
+    }
+    return
+  }
+  for (const child of node.children()) collectGoBoundNames(child, names)
+}
+
+/**
+ * Returns whether a bare call target is rebound by a parameter or function-local declaration
+ * enclosing the call, so it cannot reach a package-level or imported callable.
+ * @param node - Call node.
+ * @param name - Callee identifier.
+ * @returns True when an enclosing parameter, `:=`, or `var` binds the name.
+ */
+function isGoShadowedByEnclosingScope(node: SgNode, name: string): boolean {
+  let current = node.parent()
+  while (current !== null) {
+    const kind = nodeKind(current)
+    if (
+      kind === 'function_declaration' ||
+      kind === 'method_declaration' ||
+      kind === 'func_literal'
+    ) {
+      const names = new Set<string>()
+      const parameters = current.field('parameters')
+      if (parameters !== null) collectGoBoundNames(parameters, names)
+      const receiver = current.field('receiver')
+      if (receiver !== null) collectGoBoundNames(receiver, names)
+      if (names.has(name)) return true
+    } else if (kind === 'block') {
+      const statements = current
+        .children()
+        .flatMap((child) => (nodeKind(child) === 'statement_list' ? child.children() : [child]))
+      for (const statement of statements) {
+        const statementKind = nodeKind(statement)
+        const names = new Set<string>()
+        if (statementKind === 'short_var_declaration') {
+          const left = statement.field('left')
+          if (left !== null) collectGoBoundNames(left, names)
+        } else if (statementKind === 'var_declaration' || statementKind === 'const_declaration') {
+          for (const spec of statement.children()) {
+            const specKind = nodeKind(spec)
+            if (specKind !== 'var_spec' && specKind !== 'const_spec') continue
+            for (const child of spec.children()) {
+              if (nodeKind(child) === 'identifier') names.add(child.text().trim())
+            }
+          }
+        }
+        if (names.has(name)) return true
+      }
+    }
+    current = current.parent()
+  }
+  return false
 }
 
 /**
@@ -104,24 +181,6 @@ function locationFromIndex(filePath: string, content: string, index: number): So
 }
 
 /**
- * Finds the innermost Go symbol starting before a source line.
- * @param symbols - Symbols extracted from the current file.
- * @param line - One-based source line.
- * @returns Matching symbol id, or undefined.
- */
-function findEnclosingSymbolIdByLine(
-  symbols: readonly SymbolNode[],
-  line: number,
-): string | undefined {
-  return [...symbols]
-    .filter((symbol) => symbol.line <= line)
-    .sort((left, right) => {
-      if (left.line !== right.line) return right.line - left.line
-      return right.column - left.column
-    })[0]?.id
-}
-
-/**
  * Represents a local Go type declaration relevant to hierarchy extraction.
  */
 interface GoTypeInfo {
@@ -131,6 +190,42 @@ interface GoTypeInfo {
   readonly line: number
   readonly interfaceEmbeds: readonly string[]
   readonly interfaceMethodIds: Readonly<Record<string, string>>
+}
+
+/** Session state key for the directory index of indexed Go files. */
+const GO_PACKAGE_DIRECTORIES_KEY = 'go:package-directories'
+
+/**
+ * Lists the non-test Go files that make up one package directory of a workspace.
+ * The directory index is built once per run from the files already registered in the session.
+ * @param session - Session that holds every analyzed file of the run.
+ * @param workspace - Workspace that owns the module.
+ * @param relativeDir - Package directory relative to the workspace root; empty for the root.
+ * @returns Workspace-prefixed paths of the package files, in deterministic order.
+ */
+function goPackageFiles(
+  session: IndexSession,
+  workspace: string,
+  relativeDir: string,
+): readonly string[] {
+  let directories = session.getAdapterState<Map<string, string[]>>(GO_PACKAGE_DIRECTORIES_KEY)
+  if (directories === undefined) {
+    directories = new Map<string, string[]>()
+    for (const filePath of [...session.getAllFilePaths()].sort()) {
+      if (!filePath.endsWith('.go') || filePath.endsWith('_test.go')) continue
+      const separator = filePath.lastIndexOf('/')
+      const directory =
+        separator === -1
+          ? filePath.slice(0, filePath.indexOf(':') + 1)
+          : filePath.slice(0, separator)
+      const files = directories.get(directory) ?? []
+      files.push(filePath)
+      directories.set(directory, files)
+    }
+    session.setAdapterState(GO_PACKAGE_DIRECTORIES_KEY, directories)
+  }
+  const key = relativeDir === '' ? `${workspace}:` : `${workspace}:${relativeDir}`
+  return directories.get(key) ?? []
 }
 
 /**
@@ -179,6 +274,20 @@ export class GoLanguageAdapter implements LanguageAdapter {
       localBindings: true,
       hierarchy: true,
       buildContext: false,
+    }
+  }
+
+  /**
+   * Declares deterministic Go declaration and containment semantics.
+   * @returns Declaration classification and parser-authoritative policy.
+   */
+  declarationPolicy(): AdapterDeclarationPolicy {
+    return {
+      languageIds: ['go'],
+      supportsLogicalDeclarationGroups: false,
+      supportsPhysicalOnlyDeclarations: true,
+      callableContainerKinds: GO_CALLABLE_KINDS,
+      structuralFactsAreParserAuthoritative: true,
     }
   }
   /**
@@ -316,10 +425,10 @@ export class GoLanguageAdapter implements LanguageAdapter {
     }
 
     const imports = this.extractImportedNamesFromData(content, root)
-    const bindingFacts = this.extractBindingFactsFromData(filePath, content, symbols, imports)
-    const callFacts = this.extractCallFactsFromData(filePath, content, symbols)
+    const bindingFacts = this.extractBindingFactsFromData(root, filePath, content, symbols, imports)
+    const callFacts = this.extractCallFactsFromData(root, filePath, content, symbols)
 
-    const typeInfos = this.collectTypeInfo(content, filePath, symbols)
+    const typeInfos = this.collectTypeInfo(root, filePath, symbols)
     const receiverFacts = this.collectMethodReceivers(root, content, filePath, symbols)
     const methodReceivers = receiverFacts.methods
     const serializedMethodReceivers: Record<string, Record<string, string>> = {}
@@ -331,8 +440,8 @@ export class GoLanguageAdapter implements LanguageAdapter {
     }
     const interfaceMethods: Record<string, string[]> = {}
     for (const info of typeInfos) {
-      if (info.kind === SymbolKind.Interface) {
-        interfaceMethods[info.name] = this.collectInterfaceMethodNames(content, info.line)
+      if (info.kind === 'interface') {
+        interfaceMethods[info.name] = Object.keys(info.interfaceMethodIds)
       }
     }
 
@@ -407,28 +516,70 @@ export class GoLanguageAdapter implements LanguageAdapter {
         ownerByMemberId.set(methodId, info.symbolId)
       }
     }
+
+    // Struct fields are identified through their declaring struct, so equal field names in
+    // different structs remain distinct logical members.
+    for (const symbol of withEnclosingTypeParents(symbols)) {
+      if (symbol.kind === SymbolKind.Property && symbol.parentId !== undefined) {
+        ownerByMemberId.set(symbol.id, symbol.parentId)
+      }
+    }
+
+    const symbolCountByKey = new Map<string, number>()
+    for (const symbol of symbols) {
+      const ownerId = ownerByMemberId.get(symbol.id)
+      const space =
+        symbol.kind === SymbolKind.Class ||
+        symbol.kind === SymbolKind.Interface ||
+        symbol.kind === SymbolKind.Type
+          ? SymbolSpace.Type
+          : SymbolSpace.Value
+      const key = `${surface}:${ownerId ?? ''}:${space}:${symbol.name}`
+      symbolCountByKey.set(key, (symbolCountByKey.get(key) ?? 0) + 1)
+    }
+
     const logicalFacts = buildLogicalDeclarationFacts({
       workspace,
-      declarations: symbols.map((symbol) =>
-        createAdapterDeclarationDescriptor({
+      declarations: symbols.map((symbol) => {
+        const ownerId = ownerByMemberId.get(symbol.id)
+        const space =
+          symbol.kind === SymbolKind.Class ||
+          symbol.kind === SymbolKind.Interface ||
+          symbol.kind === SymbolKind.Type
+            ? SymbolSpace.Type
+            : SymbolSpace.Value
+        if (
+          symbol.kind === SymbolKind.Variable &&
+          ownerId === undefined &&
+          !/^\p{Lu}/u.test(symbol.name)
+        ) {
+          // Unexported package-level state is not part of the package's logical surface.
+          return createPhysicalOnlyDeclarationDescriptor({ symbol, reason: 'module-state' })
+        }
+        const key = `${surface}:${ownerId ?? ''}:${space}:${symbol.name}`
+        if ((symbolCountByKey.get(key) ?? 0) > 1) {
+          return createPhysicalOnlyDeclarationDescriptor({
+            symbol,
+            reason: 'conflicting-declaration',
+          })
+        }
+        return createAdapterDeclarationDescriptor({
           symbol,
           surface,
-          space:
-            symbol.kind === SymbolKind.Class ||
-            symbol.kind === SymbolKind.Interface ||
-            symbol.kind === SymbolKind.Type
-              ? SymbolSpace.Type
-              : SymbolSpace.Value,
-          ownerSymbolId: ownerByMemberId.get(symbol.id),
-          requiresOwner: symbol.kind === SymbolKind.Method,
+          space,
+          ownerSymbolId: ownerId,
+          requiresOwner: symbol.kind === SymbolKind.Method || symbol.kind === SymbolKind.Property,
+          groupKey: symbol.id,
           memberSemantics:
             symbol.kind === SymbolKind.Method
               ? typeInfos.some((info) => info.interfaceMethodIds[symbol.name] === symbol.id)
                 ? { kind: MemberKind.Signature }
                 : { kind: MemberKind.Method, dispatch: MemberDispatch.Instance }
-              : undefined,
-        }),
-      ),
+              : symbol.kind === SymbolKind.Property
+                ? { kind: MemberKind.Field, dispatch: MemberDispatch.Instance }
+                : undefined,
+        })
+      }),
     })
     const hierarchyDescriptors: AdapterHierarchyDescriptor[] = []
     for (const child of typeInfos) {
@@ -486,10 +637,13 @@ export class GoLanguageAdapter implements LanguageAdapter {
           localName: item.localName,
           space: SymbolSpace.Namespace,
           targetId: undefined,
+          range: item.range ?? WHOLE_FILE_START,
         }),
       )
     return {
       declarations: logicalFacts.declarations,
+      logicalSymbols: logicalFacts.retainedLogicalSymbols,
+      diagnostics: logicalFacts.diagnostics,
       publicBindings,
       localBindings,
       hierarchy: hierarchyFacts.hierarchy,
@@ -511,29 +665,34 @@ export class GoLanguageAdapter implements LanguageAdapter {
     const { session, qualifiedNames, packageToWorkspace } = context
 
     for (const imp of analysis.imports) {
-      if (isFileOnlyImport(imp)) {
+      // Blank and side-effect imports bind no name but still depend on the package.
+      if (
+        imp.kind === ImportDeclarationKind.Dynamic ||
+        imp.kind === ImportDeclarationKind.Require
+      ) {
         continue
       }
 
-      const qualifiedId = qualifiedNames.get(imp.specifier)
+      const qualifiedId = isFileOnlyImport(imp) ? undefined : qualifiedNames.get(imp.specifier)
       if (qualifiedId) {
         importMap.set(imp.localName, qualifiedId)
         continue
       }
 
+      // A Go import names a package directory, not a symbol. It resolves to the non-test files
+      // of that directory inside the workspace whose `go.mod` module owns the specifier.
       const pkgName = this.resolvePackageFromSpecifier(imp.specifier, knownPackages)
       if (pkgName) {
-        const wsPrefix = packageToWorkspace.get(pkgName)
-        if (wsPrefix !== undefined) {
-          const candidates = session.findSymbolsByName(imp.originalName, wsPrefix + ':')
-          if (candidates.length > 0) {
-            importMap.set(imp.localName, candidates[0]!.id)
-          }
+        const workspace = packageToWorkspace.get(pkgName)
+        if (workspace !== undefined) {
+          const relativeDir =
+            imp.specifier === pkgName ? '' : imp.specifier.slice(pkgName.length + 1)
+          fileImports.push(...goPackageFiles(session, workspace, relativeDir))
         }
       }
     }
 
-    return { importMap, fileImports }
+    return { importMap, fileImports: [...new Set(fileImports)] }
   }
 
   /**
@@ -587,11 +746,33 @@ export class GoLanguageAdapter implements LanguageAdapter {
 
     const interfaces = typeInfos.filter((info) => info.kind === SymbolKind.Interface)
     const structs = typeInfos.filter((info) => info.kind === SymbolKind.Class)
+    // An interface's method set includes the methods of every embedded interface. When an
+    // embedded interface cannot be resolved locally the set is unknown and nothing is claimed.
+    const completeMethodSet = (
+      name: string,
+      visiting = new Set<string>(),
+    ): string[] | undefined => {
+      if (visiting.has(name)) return undefined
+      const info = typeByName.get(name)
+      if (info === undefined || info.kind !== SymbolKind.Interface) return undefined
+      visiting.add(name)
+      const methods = new Set(interfaceMethods[name] ?? [])
+      for (const embedded of info.interfaceEmbeds) {
+        const embeddedMethods = completeMethodSet(embedded, visiting)
+        if (embeddedMethods === undefined) {
+          visiting.delete(name)
+          return undefined
+        }
+        for (const method of embeddedMethods) methods.add(method)
+      }
+      visiting.delete(name)
+      return [...methods]
+    }
     for (const structInfo of structs) {
       const receiverMethods = methodReceivers[structInfo.name] ?? {}
       for (const iface of interfaces) {
-        const ifaceMethods = interfaceMethods[iface.name] ?? []
-        if (ifaceMethods.length === 0) continue
+        const ifaceMethods = completeMethodSet(iface.name)
+        if (ifaceMethods === undefined || ifaceMethods.length === 0) continue
         const implementsAll = ifaceMethods.every((methodName) => methodName in receiverMethods)
         if (!implementsAll) continue
 
@@ -610,31 +791,26 @@ export class GoLanguageAdapter implements LanguageAdapter {
       }
     }
 
-    for (const imp of analysis.imports) {
-      const target = imp.specifier
-      const key = `${analysis.filePath}:${RelationType.Imports}:${target}`
-      if (!seen.has(key)) {
-        seen.add(key)
-        relations.push(
-          createRelation({
-            source: analysis.filePath,
-            target,
-            type: RelationType.Imports,
-            metadata: { specifier: imp.specifier },
-          }),
-        )
-      }
-    }
-
-    const localSymbolsByName = new Map<string, string>()
+    // Only a bare call can reach a package-level callable by name. A selector call
+    // (`value.Name()`) has a receiver whose static type is unknown here, so it is never
+    // matched to a same-named method or function.
+    const packageCallablesByName = new Map<string, string>()
     for (const s of analysis.symbols) {
-      localSymbolsByName.set(s.name, s.id)
+      if (
+        s.parentId === undefined &&
+        (s.kind === SymbolKind.Function ||
+          s.kind === SymbolKind.Variable ||
+          s.kind === SymbolKind.Class)
+      ) {
+        packageCallablesByName.set(s.name, s.id)
+      }
     }
 
     for (const call of analysis.callFacts) {
       if (call.callerSymbolId) {
         const calleeId =
-          context?.resolvedImports?.importMap?.get(call.name) ?? localSymbolsByName.get(call.name)
+          context?.resolvedImports?.importMap?.get(call.name) ??
+          (call.form === CallForm.Free ? packageCallablesByName.get(call.name) : undefined)
         if (calleeId) {
           const key = `${call.callerSymbolId}:${RelationType.Calls}:${calleeId}`
           if (!seen.has(key)) {
@@ -655,64 +831,99 @@ export class GoLanguageAdapter implements LanguageAdapter {
   }
 
   /**
-   * Collects Go type declarations from content.
-   * @param content - Source file content.
+   * Collects Go type declarations from AST.
+   * @param root - The root SgNode of the parsed Go AST.
    * @param filePath - The path of the Go file.
    * @param symbols - Extracted symbol nodes.
    * @returns Array of type info objects.
    */
-  private collectTypeInfo(content: string, filePath: string, symbols: SymbolNode[]): GoTypeInfo[] {
+  private collectTypeInfo(
+    root: SgNode,
+    filePath: string,
+    symbols: readonly SymbolNode[],
+  ): GoTypeInfo[] {
     const infos: GoTypeInfo[] = []
-    const lines = content.split('\n')
-    const typeRegex = /^type\s+([A-Za-z_][A-Za-z0-9_]*)\s+(interface|struct)\s*\{/gm
 
-    for (const match of content.matchAll(typeRegex)) {
-      const name = match[1]
-      const typeKind = match[2]
-      if (!name || !typeKind) continue
-      const line = content.slice(0, match.index ?? 0).split('\n').length
-      const kind = typeKind === 'interface' ? SymbolKind.Interface : SymbolKind.Class
-      const ownerSymbol = symbols.find(
-        (symbol) =>
-          symbol.filePath === filePath &&
-          symbol.kind === kind &&
-          symbol.name === name &&
-          symbol.line === line,
-      )
-      if (!ownerSymbol) continue
-      const symbolId = ownerSymbol.id
+    for (const child of root.children()) {
+      if (nodeKind(child) !== 'type_declaration') continue
+      for (const spec of child.children()) {
+        if (nodeKind(spec) !== 'type_spec') continue
+        const nameNode = spec.field('name')
+        const name = nameNode?.text()
+        const typeNode = spec.field('type')
+        if (!name || !typeNode) continue
+        const typeKind = nodeKind(typeNode)
+        const line = spec.range().start.line + 1
 
-      let endLine = lines.length
-      let braceDepth = 0
-      for (let idx = line - 1; idx < lines.length; idx++) {
-        const current = lines[idx] ?? ''
-        braceDepth += (current.match(/\{/g) ?? []).length
-        braceDepth -= (current.match(/\}/g) ?? []).length
-        if (idx >= line && braceDepth === 0) {
-          endLine = idx + 1
-          break
-        }
-      }
-
-      const blockLines = lines.slice(line, endLine - 1)
-      const interfaceEmbeds =
-        kind === SymbolKind.Interface
-          ? blockLines
-              .map((entry) => entry.trim())
-              .filter((entry) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(entry))
-          : []
-
-      const interfaceMethodIds: Record<string, string> = {}
-      if (kind === SymbolKind.Interface) {
-        for (const symbol of symbols) {
-          if (symbol.kind !== SymbolKind.Method || !containsSymbolRange(ownerSymbol, symbol)) {
-            continue
+        if (typeKind === 'struct_type') {
+          const ownerSymbol = symbols.find(
+            (symbol) =>
+              symbol.filePath === filePath &&
+              symbol.kind === SymbolKind.Class &&
+              symbol.name === name &&
+              symbol.line === line,
+          )
+          if (ownerSymbol) {
+            infos.push({
+              name,
+              symbolId: ownerSymbol.id,
+              kind: 'class',
+              line,
+              interfaceEmbeds: [],
+              interfaceMethodIds: {},
+            })
           }
-          interfaceMethodIds[symbol.name] = symbol.id
+        } else if (typeKind === 'interface_type') {
+          const ownerSymbol = symbols.find(
+            (symbol) =>
+              symbol.filePath === filePath &&
+              symbol.kind === SymbolKind.Interface &&
+              symbol.name === name &&
+              symbol.line === line,
+          )
+          if (ownerSymbol) {
+            const interfaceEmbeds: string[] = []
+            const interfaceMethodIds: Record<string, string> = {}
+
+            for (const elem of typeNode.children()) {
+              const elemKind = nodeKind(elem)
+              if (elemKind === 'type_elem') {
+                const typeIdent =
+                  elem
+                    .children()
+                    .find((sub) => nodeKind(sub) === 'type_identifier')
+                    ?.text() ?? elem.text().trim()
+                // A package-qualified embed is kept: its methods are unknown, so it blocks IMPLEMENTS.
+                if (/^[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)?$/.test(typeIdent)) {
+                  interfaceEmbeds.push(typeIdent)
+                }
+              } else if (elemKind === 'method_elem') {
+                const methodName = elem.field('name')?.text()
+                if (methodName) {
+                  const methodSymbol = symbols.find(
+                    (s) =>
+                      s.kind === SymbolKind.Method &&
+                      s.name === methodName &&
+                      containsSymbolRange(ownerSymbol, s),
+                  )
+                  if (methodSymbol) {
+                    interfaceMethodIds[methodName] = methodSymbol.id
+                  }
+                }
+              }
+            }
+
+            infos.push({
+              name,
+              symbolId: ownerSymbol.id,
+              kind: 'interface',
+              line,
+              interfaceEmbeds,
+              interfaceMethodIds,
+            })
+          }
         }
       }
-
-      infos.push({ name, symbolId, kind, line, interfaceEmbeds, interfaceMethodIds })
     }
 
     return infos
@@ -783,39 +994,12 @@ export class GoLanguageAdapter implements LanguageAdapter {
   }
 
   /**
-   * Collects interface method names declared in an interface block.
-   * @param content - Source file content.
-   * @param line - Starting line number.
-   * @returns Array of method name strings.
-   */
-  private collectInterfaceMethodNames(content: string, line: number): string[] {
-    const lines = content.split('\n')
-    const startIndex = line - 1
-    let braceDepth = 0
-    const methods: string[] = []
-
-    for (let idx = startIndex; idx < lines.length; idx++) {
-      const current = lines[idx] ?? ''
-      braceDepth += (current.match(/\{/g) ?? []).length
-      braceDepth -= (current.match(/\}/g) ?? []).length
-      if (idx > startIndex) {
-        const trimmed = current.trim()
-        const methodName = trimmed.match(/^([A-Za-z_][A-Za-z0-9_]*)\s*\(/)?.[1]
-        if (methodName) methods.push(methodName)
-      }
-      if (idx > startIndex && braceDepth === 0) break
-    }
-
-    return methods
-  }
-
-  /**
    * Extracts imported package names from AST.
-   * @param content - Source file content.
+   * @param _content - Source file content.
    * @param root - AST grep root node.
    * @returns Array of import declarations.
    */
-  private extractImportedNamesFromData(content: string, root: SgNode): ImportDeclaration[] {
+  private extractImportedNamesFromData(_content: string, root: SgNode): ImportDeclaration[] {
     const results: ImportDeclaration[] = []
 
     for (const child of root.children()) {
@@ -834,52 +1018,7 @@ export class GoLanguageAdapter implements LanguageAdapter {
       }
     }
 
-    const textImports = this.extractGoImportsFromText(content)
-    return textImports.length > 0 ? textImports : results
-  }
-
-  /**
-   * Extracts Go imports directly from text via regexp matching.
-   * @param content - Source file content.
-   * @returns Array of import declarations.
-   */
-  private extractGoImportsFromText(content: string): ImportDeclaration[] {
-    const declarations: ImportDeclaration[] = []
-    const addImport = (alias: string | undefined, specifier: string): void => {
-      const lastSegment = specifier.split('/').pop() ?? specifier
-      const isBlank = alias === '_'
-      const isDot = alias === '.'
-      declarations.push({
-        originalName: lastSegment,
-        localName: isBlank ? '' : (alias ?? lastSegment),
-        specifier,
-        isRelative: false,
-        kind: isBlank
-          ? ImportDeclarationKind.Blank
-          : isDot
-            ? ImportDeclarationKind.Namespace
-            : ImportDeclarationKind.Named,
-      })
-    }
-
-    for (const block of content.matchAll(/\bimport\s*\(([\s\S]*?)\)/g)) {
-      const body = block[1] ?? ''
-      for (const line of body.split('\n')) {
-        const match = line.trim().match(/^(?:(\.|_|\w+)\s+)?["`]([^"`]+)["`]$/)
-        if (match?.[2] !== undefined) {
-          addImport(match[1], match[2])
-        }
-      }
-    }
-
-    const singleImportPattern = /^\s*import\s+(?:(\.|_|\w+)\s+)?["`]([^"`]+)["`]/gm
-    for (const match of content.matchAll(singleImportPattern)) {
-      if (match[2] !== undefined) {
-        addImport(match[1], match[2])
-      }
-    }
-
-    return declarations
+    return results
   }
 
   /**
@@ -895,8 +1034,14 @@ export class GoLanguageAdapter implements LanguageAdapter {
       const specChildKind = nodeKind(specChild)
       if (specChildKind === 'package_identifier') {
         alias = specChild.text()
+      } else if (specChildKind === 'dot') {
+        alias = '.'
+      } else if (specChildKind === 'blank_identifier') {
+        alias = '_'
       } else if (specChildKind === 'interpreted_string_literal') {
-        pathLiteral = specChild.text().replace(/"/g, '')
+        pathLiteral = specChild.text().replace(/^"|"$/g, '')
+      } else if (specChildKind === 'raw_string_literal') {
+        pathLiteral = specChild.text().replace(/^`|`$/g, '')
       }
     }
 
@@ -919,7 +1064,8 @@ export class GoLanguageAdapter implements LanguageAdapter {
   }
 
   /**
-   * Extracts binding facts from Go content.
+   * Extracts binding facts from Go AST.
+   * @param root - The root SgNode of the parsed Go AST.
    * @param filePath - The path of the Go file.
    * @param content - Source file content.
    * @param _symbols - Extracted symbol nodes.
@@ -927,6 +1073,7 @@ export class GoLanguageAdapter implements LanguageAdapter {
    * @returns Array of binding facts.
    */
   private extractBindingFactsFromData(
+    root: SgNode,
     filePath: string,
     content: string,
     _symbols: SymbolNode[],
@@ -963,45 +1110,92 @@ export class GoLanguageAdapter implements LanguageAdapter {
       addFact(declaration.localName, BindingSourceKind.ImportedType, declaration.originalName, 0)
     }
 
-    const typeReferencePattern =
-      /\b(?:func\s+\w+\s*\([^)]*|type\s+\w+\s+struct\s*\{[^}]*|interface\s*\{[^}]*)\b([A-Z][A-Za-z0-9_]*)\b/gms
-    for (const match of content.matchAll(typeReferencePattern)) {
-      const targetName = match[1]
-      if (targetName === undefined) continue
-      addFact(targetName, BindingSourceKind.Parameter, targetName, match.index ?? 0)
+    const findTypeIdentifiers = (node: SgNode): SgNode[] => {
+      const result: SgNode[] = []
+      const walk = (n: SgNode): void => {
+        if (nodeKind(n) === 'type_identifier') {
+          result.push(n)
+        }
+        for (const child of n.children()) {
+          walk(child)
+        }
+      }
+      walk(node)
+      return result
     }
 
-    const fieldPattern = /^\s*[A-Za-z_][A-Za-z0-9_]*\s+([A-Z][A-Za-z0-9_]*)\b/gm
-    for (const match of content.matchAll(fieldPattern)) {
-      const targetName = match[1]
-      if (targetName === undefined) continue
-      addFact(targetName, BindingSourceKind.Property, targetName, match.index ?? 0)
-    }
+    const walkBindings = (node: SgNode): void => {
+      const kind = nodeKind(node)
+      if (kind === 'parameter_declaration') {
+        const typeNode = node.field('type')
+        if (typeNode) {
+          for (const typeId of findTypeIdentifiers(typeNode)) {
+            const targetName = typeId.text()
+            if (/^[A-Z][A-Za-z0-9_]*$/.test(targetName)) {
+              addFact(
+                targetName,
+                BindingSourceKind.Parameter,
+                targetName,
+                typeId.range().start.index,
+              )
+            }
+          }
+        }
+      } else if (kind === 'field_declaration') {
+        const typeNode = node.field('type')
+        if (typeNode) {
+          for (const typeId of findTypeIdentifiers(typeNode)) {
+            const targetName = typeId.text()
+            if (/^[A-Z][A-Za-z0-9_]*$/.test(targetName)) {
+              addFact(
+                targetName,
+                BindingSourceKind.Property,
+                targetName,
+                typeId.range().start.index,
+              )
+            }
+          }
+        }
+      } else if (kind === 'type_alias' || kind === 'type_spec') {
+        const aliasName = node.field('name')?.text()
+        const typeNode = node.field('type')
+        if (aliasName && typeNode) {
+          const typeNodeKind = nodeKind(typeNode)
+          if (typeNodeKind !== 'struct_type' && typeNodeKind !== 'interface_type') {
+            for (const typeId of findTypeIdentifiers(typeNode)) {
+              const targetName = typeId.text()
+              if (targetName !== aliasName && /^[A-Z][A-Za-z0-9_]*$/.test(targetName)) {
+                addFact(
+                  aliasName,
+                  BindingSourceKind.ImportedType,
+                  targetName,
+                  typeId.range().start.index,
+                )
+              }
+            }
+          }
+        }
+      }
 
-    const typeAliasPattern = /\btype\s+([A-Z][A-Za-z0-9_]*)\s*(?:=\s*|=)\s*([^\n{]+)/g
-    for (const match of content.matchAll(typeAliasPattern)) {
-      const aliasName = match[1]
-      const rhsText = match[2]
-      if (aliasName === undefined || rhsText === undefined) continue
-      const identPattern = /[A-Z][A-Za-z0-9_]*/g
-      for (const refMatch of rhsText.matchAll(identPattern)) {
-        const targetName = refMatch[0]
-        if (targetName === undefined || targetName === aliasName) continue
-        addFact(aliasName, BindingSourceKind.ImportedType, targetName, match.index ?? 0)
+      for (const child of node.children()) {
+        walkBindings(child)
       }
     }
 
+    walkBindings(root)
     return facts
   }
 
   /**
-   * Extracts call facts from Go content.
+   * Extracts call facts from Go AST.
+   * @param root - The root SgNode of the parsed Go AST.
    * @param filePath - The path of the Go file.
    * @param content - Source file content.
    * @param symbols - Extracted symbol nodes.
    * @returns Array of call facts.
    */
   private extractCallFactsFromData(
+    root: SgNode,
     filePath: string,
     content: string,
     symbols: SymbolNode[],
@@ -1019,10 +1213,15 @@ export class GoLanguageAdapter implements LanguageAdapter {
       const key = `${form}:${receiverName ?? ''}:${name}:${location.line}:${location.column}`
       if (seen.has(key)) return
       seen.add(key)
+      const caller = findContainingCallableSymbol(
+        symbols,
+        { line: location.line, column: location.column },
+        { callableKinds: GO_CALLABLE_KINDS },
+      )
       facts.push({
         filePath,
         scopeId: filePath,
-        callerSymbolId: findEnclosingSymbolIdByLine(symbols, location.line),
+        callerSymbolId: caller?.id,
         form,
         name,
         receiverName,
@@ -1033,65 +1232,103 @@ export class GoLanguageAdapter implements LanguageAdapter {
       })
     }
 
-    const selectorPattern = /\b([A-Za-z_][A-Za-z0-9_]*)\.([A-Za-z_][A-Za-z0-9_]*)\s*\(/g
-    for (const match of content.matchAll(selectorPattern)) {
-      const receiver = match[1]
-      const name = match[2]
-      if (receiver === undefined || name === undefined) continue
-      addFact(CallForm.Static, name, receiver, match.index ?? 0)
+    const walkCalls = (node: SgNode): void => {
+      const kind = nodeKind(node)
+      if (kind === 'call_expression') {
+        const fn = node.field('function')
+        if (fn) {
+          const fnKind = nodeKind(fn)
+          if (fnKind === 'selector_expression') {
+            const receiverNode = fn.field('operand')
+            const fieldNode = fn.field('field')
+            const receiver = receiverNode?.text()
+            const name = fieldNode?.text()
+            if (name) {
+              addFact(CallForm.Static, name, receiver, node.range().start.index)
+            }
+          } else if (fnKind === 'identifier') {
+            const name = fn.text()
+            if (!this.isExcludedFreeCall(name) && !isGoShadowedByEnclosingScope(node, name)) {
+              addFact(CallForm.Free, name, undefined, node.range().start.index)
+            }
+          }
+        }
+      } else if (kind === 'composite_literal') {
+        const typeNode = node.field('type')
+        if (typeNode) {
+          const rawName = typeNode.text()
+          const name = rawName.split('.').pop() ?? rawName
+          if (/^[A-Z][A-Za-z0-9_]*$/.test(name)) {
+            addFact(CallForm.Constructor, name, undefined, node.range().start.index)
+          }
+        }
+      }
+
+      for (const child of node.children()) {
+        walkCalls(child)
+      }
     }
 
-    const compositePattern = /(?:^|[^\w])&?\s*([A-Z][A-Za-z0-9_]*)\s*\{/g
-    for (const match of content.matchAll(compositePattern)) {
-      const name = match[1]
-      if (name === undefined) continue
-      addFact(CallForm.Constructor, name, undefined, match.index ?? 0)
-    }
-
-    const freePattern = /(?<![.\w$])([A-Za-z_][A-Za-z0-9_]*)\s*\(/g
-    for (const match of content.matchAll(freePattern)) {
-      const name = match[1]
-      if (name === undefined || this.isExcludedFreeCall(content, match.index ?? 0, name)) continue
-      addFact(CallForm.Free, name, undefined, match.index ?? 0)
-    }
-
+    walkCalls(root)
     return facts
   }
 
   /**
-   * Tests whether a free call candidate is actually a keyword or function declaration.
-   * @param content - File content.
-   * @param index - Index in content.
+   * Tests whether a free call candidate is actually a built-in function or keyword.
    * @param name - Call target name.
    * @returns Whether to exclude the candidate.
    */
-  private isExcludedFreeCall(content: string, index: number, name: string): boolean {
-    const before = content.slice(Math.max(index - 64, 0), index)
-    return (
-      [
-        'func',
-        'var',
-        'const',
-        'type',
-        'import',
-        'package',
-        'if',
-        'for',
-        'switch',
-        'case',
-        'select',
-        'return',
-        'make',
-        'new',
-        'len',
-        'cap',
-        'append',
-        'copy',
-        'delete',
-        'panic',
-        'recover',
-      ].includes(name) || /\bfunc\s+(?:\([^)]*\)\s+)?$/.test(before)
-    )
+  private isExcludedFreeCall(name: string): boolean {
+    return [
+      'func',
+      'var',
+      'const',
+      'type',
+      'import',
+      'package',
+      'if',
+      'for',
+      'switch',
+      'case',
+      'select',
+      'return',
+      'make',
+      'new',
+      'len',
+      'cap',
+      'append',
+      'copy',
+      'delete',
+      'panic',
+      'recover',
+      'close',
+      'complex',
+      'real',
+      'imag',
+      'print',
+      'println',
+      'string',
+      'int',
+      'int8',
+      'int16',
+      'int32',
+      'int64',
+      'uint',
+      'uint8',
+      'uint16',
+      'uint32',
+      'uint64',
+      'uintptr',
+      'float32',
+      'float64',
+      'complex64',
+      'complex128',
+      'byte',
+      'rune',
+      'bool',
+      'error',
+      'any',
+    ].includes(name)
   }
 
   /**

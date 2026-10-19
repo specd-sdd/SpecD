@@ -139,6 +139,15 @@ export interface IndexOptions {
   readonly force?: boolean
 
   /**
+   * How to repair a stored graph derived with an incompatible fingerprint.
+   *
+   * `rebuild` (the default) clears and regenerates the derived graph in place. `fail` throws
+   * `GraphDerivationMismatchError` before any write when the run would replace the whole graph,
+   * so a caller that owns the provider can recreate storage physically and index again.
+   */
+  readonly derivationMismatch?: 'rebuild' | 'fail'
+
+  /**
    * Materialized spec metadata source used for semantic fingerprinting during spec indexing.
    */
   readonly getSpecMetadata?: GetSpecMetadata

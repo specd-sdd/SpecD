@@ -36,6 +36,14 @@ The owner SHALL be derived from parser construct containment and mapped to the o
 
 Object-literal, prototype-assignment, namespace, or other method-like symbols for which the current parser state does not retain one supported logical owner SHALL remain location-backed discovery symbols and MUST be omitted from logical member facts rather than represented as ownerless members. TypeScript declaration merging and dual type/value identities beyond the supported broad-kind projection remain unsupported.
 
+### Requirement: TypeScript overload and declaration-group identity
+
+Overload signatures and their implementation SHALL contribute declaration occurrences to one logical function or method target when TypeScript syntax proves that they form one overload group. Adding, removing, or reordering overload signatures MUST NOT change the logical target's canonical identity while its semantic owner, name, space, dispatch, and member kind remain unchanged.
+
+Signature versus implementation form SHALL be retained as declaration-occurrence evidence and MUST NOT replace the logical member kind with a signature-only kind. Selectors and semantic impact SHALL receive the complete ordered declaration set for the overload group.
+
+Same-name declarations that are not one TypeScript overload or merge group MUST remain competing logical targets, including declarations separated by distinct lexical owners or scopes. Missing group evidence MUST be represented as no group; it MUST NOT be normalized into a shared empty key that merges unrelated declarations.
+
 ### Requirement: Imports, exports, and public bindings
 
 The adapter SHALL extract named, default, namespace, type-only, side-effect, and aliased static imports; literal `import()` and literal `require()` dependencies; ESM declarations and export clauses; CommonJS exports; named re-exports; and star re-exports. Non-literal dynamic imports and requires SHALL be dropped.
@@ -49,6 +57,18 @@ The adapter SHALL emit deterministic facts for lexical scopes, imports and alias
 The adapter SHALL extract literal string dynamic `import(...)` expressions as file dependency import facts. It SHALL extract call expressions occurring in nested and chained expressions (such as `factory().method()` or callbacks).
 
 The caller of a call relation SHALL be the innermost enclosing callable symbol. Calls at module scope, ambiguous receivers, unresolved globals, computed dynamic members, and runtime-only aliases SHALL not produce guessed relations.
+
+### Requirement: TypeScript caller and local-binding semantics
+
+The adapter SHALL select a call's caller by applying the common semantic-containment contract to complete parser ranges. Eligible callers SHALL be functions, methods, constructors, arrow functions, function expressions, or another TypeScript construct whose syntax proves that it is executable and contains the call.
+
+A variable declarator initialized by an ordinary `call_expression` MUST NOT be classified as a callable function merely because its initializer is a call. Ordinary variables, parameters, aliases, and block-scoped bindings SHALL remain lexical bindings and MAY retain physical declaration evidence without receiving a logical target.
+
+Nested named functions or callable variables that the adapter exposes as logical targets MUST include deterministic lexical ownership sufficient to distinguish equal names in different functions or blocks. Alternate branches and sibling lexical scopes MUST NOT collapse into one logical identity.
+
+The key of an anonymous object literal used as an expression or call argument MUST NOT become a `SymbolNode` or `LocalBinding` merely because its value is a scalar or nested object. A property of an object literal owned by a supported named declaration MAY remain physical declaration evidence under that named owner according to the existing object-property policy.
+
+An anonymous arrow function or function expression that contains calls MAY be represented as a deterministic, range-backed physical-only callable container. It MUST NOT receive a stable logical identity solely from its location, but it SHALL remain eligible as the physical caller of calls in its body. If the adapter does not represent that executable container, those calls SHALL remain caller-unresolved rather than being assigned to an argument key, local binding, or preceding declaration.
 
 ### Requirement: TypeScript hierarchy and provenance evidence
 
@@ -67,6 +87,16 @@ Until the adapter consumes the relevant project configuration, `tsconfig` inheri
 ### Requirement: Capability truthfulness and failure behavior
 
 The adapter SHALL advertise only capabilities backed by its emitted facts. Parse failure, unsupported syntax, or incomplete semantic coverage SHALL be surfaced through shared coverage and MUST NOT be replaced by name-only inference. Every output collection and provenance path SHALL be deterministic for identical content and context.
+
+### Requirement: TypeScript parser-authoritative structural extraction
+
+The adapter SHALL derive static and dynamic imports, CommonJS `require` calls, calls, construction, parameters, return and property types, type aliases, class receivers, and extends or implements clauses from TypeScript/TSX/JavaScript/JSX parser nodes whenever the grammar represents them. Optional chaining, computed members, nested and multiline expressions, generic call syntax, and template or comment lookalikes MUST be distinguished through node type and ancestry rather than whole-source regular expressions.
+
+Text tokenization MAY be applied to the bounded text of a parser-proven type node when the grammar does not expose a finer named child required by the supported type-reference policy. It MUST remain within that node and MUST NOT infer a call, declaration, scope, owner, or hierarchy relation from unbounded source text.
+
+Import resolution SHALL emit a dependency relation only when the configured workspace and module-resolution evidence identifies a target. The adapter MUST NOT persist a relation to the first syntactic candidate merely because no candidate resolves.
+
+An imported `extends` or `implements` target SHALL emit its physical hierarchy relation together with exactly one matching shared hierarchy reference fact. That fact MUST retain the source range of the heritage-clause type expression, import-resolution provenance, and resolved target used by the relation.
 
 ## Constraints
 

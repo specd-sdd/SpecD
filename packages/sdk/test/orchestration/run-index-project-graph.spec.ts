@@ -2,7 +2,11 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { GraphStorageRecoveryRequiredError, type CodeGraphProvider } from '@specd/code-graph'
+import {
+  GraphDerivationMismatchError,
+  GraphStorageRecoveryRequiredError,
+  type CodeGraphProvider,
+} from '@specd/code-graph'
 import { type SdkHostContext } from '../../src/composition/host-context.js'
 import { InvalidProviderLifecycleError } from '../../src/domain/errors/invalid-provider-lifecycle-error.js'
 
@@ -238,6 +242,33 @@ describe('runIndexProjectGraph', () => {
     })
   })
 
+  it('recreates and rebuilds an incompatible schema shape without --force', async () => {
+    openProvider.mockRejectedValueOnce(
+      new GraphStorageRecoveryRequiredError(
+        'SQLite graph storage table logical_declarations is missing columns occurrence_form',
+        'SCHEMA_INCOMPATIBLE',
+      ),
+    )
+    indexExecute.mockResolvedValue({ filesIndexed: 3, fullRebuild: false })
+
+    const result = await runIndexProjectGraph(ctx, {})
+
+    expect(recreateProvider).toHaveBeenCalledOnce()
+    expect(openProvider).toHaveBeenCalledTimes(2)
+    expect(indexExecute).toHaveBeenCalledOnce()
+    expect(result).toMatchObject({ fullRebuild: true, fullRebuildReason: 'SCHEMA_INCOMPATIBLE' })
+  })
+
+  it('does not recreate storage without --force for any other recovery reason', async () => {
+    const other = new GraphStorageRecoveryRequiredError('corrupt database', 'CORRUPT')
+    openProvider.mockRejectedValueOnce(other)
+
+    await expect(runIndexProjectGraph(ctx, {})).rejects.toBe(other)
+
+    expect(recreateProvider).not.toHaveBeenCalled()
+    expect(indexExecute).not.toHaveBeenCalled()
+  })
+
   it('recovers a typed storage-open failure only for a transient forced index', async () => {
     const openError = new GraphStorageRecoveryRequiredError(
       'schema cannot be migrated',
@@ -263,6 +294,36 @@ describe('runIndexProjectGraph', () => {
       fullRebuild: true,
       fullRebuildReason: 'SCHEMA_INCOMPATIBLE',
     })
+  })
+
+  it('given a derivation mismatch on the first attempt, when it owns the provider, then it recreates the closed store and indexes again', async () => {
+    indexExecute
+      .mockRejectedValueOnce(
+        new GraphDerivationMismatchError('Graph derivation fingerprint mismatch'),
+      )
+      .mockResolvedValueOnce({ filesIndexed: 5 })
+
+    const result = await runIndexProjectGraph(ctx, {})
+
+    expect(indexExecute).toHaveBeenCalledTimes(2)
+    expect(indexExecute.mock.calls[0]![0]).toMatchObject({ derivationMismatch: 'fail' })
+    expect(indexExecute.mock.calls[1]![0]).toMatchObject({ derivationMismatch: 'rebuild' })
+    expect(recreateProvider).toHaveBeenCalledOnce()
+    expect(recreateProvider.mock.invocationCallOrder[0]!).toBeLessThan(
+      openProvider.mock.invocationCallOrder[1]!,
+    )
+    expect(result).toEqual({
+      filesIndexed: 5,
+      fullRebuild: true,
+      fullRebuildReason: 'Graph derivation fingerprint mismatch',
+    })
+  })
+
+  it('given a caller-owned provider, when indexing runs, then it never asks to fail on a derivation mismatch', async () => {
+    await runIndexProjectGraph(ctx, { provider: {} as CodeGraphProvider })
+
+    expect(indexExecute.mock.calls[0]![0]).toMatchObject({ derivationMismatch: 'rebuild' })
+    expect(recreateProvider).not.toHaveBeenCalled()
   })
 
   it('does not recreate storage for non-forced or non-recoverable open failures', async () => {

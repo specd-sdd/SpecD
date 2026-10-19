@@ -4,12 +4,17 @@ import {
   MemberDispatch,
   MemberKind,
   SymbolSpace,
+  createLocalBinding,
   createLogicalSymbol,
   assignQualifiedNames,
   createPublicBinding,
   deriveQualifiedName,
+  DeclarationOccurrenceForm,
+  type DeclarationOccurrence,
+  type ResolvedSymbolTarget,
   parseLogicalSymbol,
 } from '../../../src/domain/value-objects/symbol-reference.js'
+import { SymbolKind } from '../../../src/domain/value-objects/symbol-kind.js'
 import { type FileAnalysisDraft } from '../../../src/domain/value-objects/file-analysis.js'
 
 describe('LogicalSymbol', () => {
@@ -262,5 +267,153 @@ describe('LogicalSymbol', () => {
     expect(namedMember?.qualifiedName).toBe('EditChange.execute')
     expect(namedMember?.id).toBe(member.id)
     expect(member).not.toHaveProperty('package')
+  })
+})
+
+describe('Identity layers and occurrence invariants', () => {
+  it('owner change creates distinct logical target for same member name', () => {
+    const classA = createLogicalSymbol({
+      workspace: 'core',
+      surface: 'core:src/models.ts',
+      name: 'ClassA',
+      space: SymbolSpace.Type,
+    })
+    const classB = createLogicalSymbol({
+      workspace: 'core',
+      surface: 'core:src/models.ts',
+      name: 'ClassB',
+      space: SymbolSpace.Type,
+    })
+
+    const memberA = createLogicalSymbol({
+      workspace: 'core',
+      surface: 'core:src/models.ts',
+      name: 'save',
+      space: SymbolSpace.Value,
+      ownerId: classA.id,
+      memberSemantics: { kind: MemberKind.Method, dispatch: MemberDispatch.Instance },
+    })
+    const memberB = createLogicalSymbol({
+      workspace: 'core',
+      surface: 'core:src/models.ts',
+      name: 'save',
+      space: SymbolSpace.Value,
+      ownerId: classB.id,
+      memberSemantics: { kind: MemberKind.Method, dispatch: MemberDispatch.Instance },
+    })
+
+    expect(memberA.id).not.toBe(memberB.id)
+    expect(memberA.ownerId).toBe(classA.id)
+    expect(memberB.ownerId).toBe(classB.id)
+  })
+
+  it('signature and implementation forms are independent but share one logical target', () => {
+    const logical = createLogicalSymbol({
+      workspace: 'core',
+      surface: 'core:src/api.ts',
+      name: 'fetchData',
+      space: SymbolSpace.Value,
+    })
+
+    const signatureOccurrence: DeclarationOccurrence = {
+      symbolId: 'core:src/api.ts:function:fetchData:5:0',
+      location: { filePath: 'core:src/api.ts', line: 5, column: 0, endLine: 5, endColumn: 40 },
+      kind: SymbolKind.Function,
+      form: DeclarationOccurrenceForm.Signature,
+      logicalId: logical.id,
+    }
+
+    const definitionOccurrence: DeclarationOccurrence = {
+      symbolId: 'core:src/api.ts:function:fetchData:10:0',
+      location: { filePath: 'core:src/api.ts', line: 10, column: 0, endLine: 20, endColumn: 1 },
+      kind: SymbolKind.Function,
+      form: DeclarationOccurrenceForm.Definition,
+      logicalId: logical.id,
+    }
+
+    expect(signatureOccurrence.form).toBe(DeclarationOccurrenceForm.Signature)
+    expect(definitionOccurrence.form).toBe(DeclarationOccurrenceForm.Definition)
+    expect(signatureOccurrence.logicalId).toBe(definitionOccurrence.logicalId)
+  })
+
+  it('discriminates ResolvedSymbolTarget kind unions correctly', () => {
+    const logicalSymbol = createLogicalSymbol({
+      workspace: 'core',
+      surface: 'core:src/engine.ts',
+      name: 'Engine',
+      space: SymbolSpace.Type,
+    })
+
+    const declOccurrence: DeclarationOccurrence = {
+      symbolId: 'core:src/engine.ts:class:Engine:1:0',
+      location: { filePath: 'core:src/engine.ts', line: 1, column: 0 },
+      kind: SymbolKind.Class,
+      form: DeclarationOccurrenceForm.Definition,
+      logicalId: logicalSymbol.id,
+    }
+
+    const logicalTarget: ResolvedSymbolTarget = {
+      kind: 'logical-target',
+      logicalSymbol,
+      declarations: [declOccurrence],
+      path: [],
+    }
+
+    const declarationTarget: ResolvedSymbolTarget = {
+      kind: 'declaration',
+      declaration: declOccurrence,
+      logicalSymbol,
+      path: [],
+    }
+
+    const publicBindingTarget: ResolvedSymbolTarget = {
+      kind: 'public-binding',
+      binding: {
+        id: 'core:src/index.ts::Engine',
+        surface: 'core:src/index.ts',
+        exportedName: 'Engine',
+        space: SymbolSpace.Type,
+        targetId: logicalSymbol.id,
+      },
+      logicalSymbol,
+      declarations: [declOccurrence],
+      path: [],
+    }
+
+    expect(logicalTarget.kind).toBe('logical-target')
+    expect(declarationTarget.kind).toBe('declaration')
+    expect(publicBindingTarget.kind).toBe('public-binding')
+    if (logicalTarget.kind === 'logical-target') {
+      expect(logicalTarget.logicalSymbol.id).toBe(logicalSymbol.id)
+      expect(logicalTarget.declarations).toHaveLength(1)
+    }
+    if (declarationTarget.kind === 'declaration') {
+      expect(declarationTarget.declaration.symbolId).toBe(declOccurrence.symbolId)
+    }
+    if (publicBindingTarget.kind === 'public-binding') {
+      expect(publicBindingTarget.binding.exportedName).toBe('Engine')
+    }
+  })
+
+  it('given two local bindings with the same name and scope at different ranges, when identities are built, then they differ and keep their ranges', () => {
+    const base = {
+      filePath: 'ws:a.ts',
+      scopeId: 'fn',
+      localName: 'x',
+      space: SymbolSpace.Value,
+      targetId: undefined,
+    }
+    const first = createLocalBinding({
+      ...base,
+      range: { startLine: 2, startColumn: 4, endLine: 2, endColumn: 5 },
+    })
+    const second = createLocalBinding({
+      ...base,
+      range: { startLine: 6, startColumn: 4, endLine: 6, endColumn: 5 },
+    })
+
+    expect(first.id).not.toBe(second.id)
+    expect(first.range.startLine).toBe(2)
+    expect(second.range.startLine).toBe(6)
   })
 })

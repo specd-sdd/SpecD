@@ -150,10 +150,13 @@ export interface SQLiteWorkerOperationMap {
   getCoveringSpecsForFiles: { payload: { filePaths: readonly string[] }; result: Relation[] }
   /** Retrieves symbols covered by spec. */
   getCoveredSymbols: { payload: { specId: string }; result: Relation[] }
-  /** Retrieves specs covering symbol. */
-  getCoveringSpecsForSymbol: { payload: { symbolId: string }; result: Relation[] }
-  /** Retrieves specs covering any symbol in list. */
-  getCoveringSpecsForSymbols: { payload: { symbolIds: readonly string[] }; result: Relation[] }
+  /** Retrieves specs covering logical symbol. */
+  getCoveringSpecsForSymbol: { payload: { logicalSymbolId: string }; result: Relation[] }
+  /** Retrieves specs covering any logical symbol in list. */
+  getCoveringSpecsForSymbols: {
+    payload: { logicalSymbolIds: readonly string[] }
+    result: Relation[]
+  }
   /** Retrieves callers of symbol. */
   getCallers: { payload: { symbolId: string }; result: Relation[] }
   /** Retrieves callees of symbol. */
@@ -201,6 +204,11 @@ export interface SQLiteWorkerOperationMap {
   /** Finds declarations for logical symbols. */
   findDeclarations: {
     payload: { logicalSymbolIds: readonly string[] }
+    result: LogicalDeclaration[]
+  }
+  /** Finds logical declarations by physical declaration symbol IDs. */
+  findLogicalDeclarationsByDeclarationIds: {
+    payload: { declarationSymbolIds: readonly string[] }
     result: LogicalDeclaration[]
   }
   /** Finds public bindings by exported names. */

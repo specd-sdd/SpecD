@@ -39,6 +39,7 @@ import {
   type MemberSemantics,
   type PublicBinding,
   type ResolutionStep,
+  DeclarationOccurrenceForm,
 } from '../../domain/value-objects/symbol-reference.js'
 import { type IndexCoverage } from '../../domain/value-objects/index-session.js'
 import {
@@ -62,7 +63,7 @@ import {
   type ReferenceFactsWrite,
   type StorageGenerationSnapshot,
 } from '../../domain/ports/graph-store.js'
-import { SQLITE_SCHEMA_DDL, SQLITE_SCHEMA_VERSION } from './schema.js'
+import { REQUIRED_COLUMNS, SQLITE_SCHEMA_DDL, SQLITE_SCHEMA_VERSION } from './schema.js'
 import {
   ensureStorageGeneration,
   readStorageGeneration,
@@ -215,6 +216,7 @@ interface LogicalDeclarationRow {
   readonly end_line: number | null
   readonly end_column: number | null
   readonly kind: LogicalDeclaration['declaration']['kind']
+  readonly occurrence_form: string
 }
 
 /**
@@ -238,6 +240,10 @@ interface LocalBindingRow {
   readonly local_name: string
   readonly space: LocalBinding['space']
   readonly target_id: string | null
+  readonly start_line: number
+  readonly start_column: number
+  readonly end_line: number
+  readonly end_column: number
 }
 
 /**
@@ -360,6 +366,7 @@ export class SQLiteGraphDatabase {
       db = new DatabaseModule(this.dbPath) as SqliteDatabase
       this.assertExistingSchemaCompatible(db)
       this.configureDatabase(db)
+      this.assertSchemaShape(db)
       this.db = db
       this.ensureSchemaVersion()
     } catch (error: unknown) {
@@ -871,21 +878,36 @@ export class SQLiteGraphDatabase {
   /**
    * Retrieves covering specs for symbol.
    *
-   * @param symbolId - Symbol id parameter.
+   * @param logicalSymbolId - Canonical logical symbol identifier.
    * @returns The result of get covering specs for symbol.
    */
-  getCoveringSpecsForSymbol(symbolId: string): Relation[] {
-    return this.getRelationsByTarget(RelationType.CoversSymbol, symbolId)
+  getCoveringSpecsForSymbol(logicalSymbolId: string): Relation[] {
+    return this.readRelations(
+      this.statement(
+        'SELECT r.source, r.target, r.type, r.metadata_json FROM relations r JOIN logical_symbols ls ON r.target = ls.id WHERE r.type = ? AND r.target = ?',
+      ).all(RelationType.CoversSymbol, logicalSymbolId) as RelationRow[],
+    )
   }
 
   /**
    * Retrieves covering specs for symbols.
    *
-   * @param symbolIds - Symbol ids parameter.
+   * @param logicalSymbolIds - Logical symbol ids parameter.
    * @returns The result of get covering specs for symbols.
    */
-  getCoveringSpecsForSymbols(symbolIds: readonly string[]): Relation[] {
-    return this.getRelationsByTargets(RelationType.CoversSymbol, symbolIds)
+  getCoveringSpecsForSymbols(logicalSymbolIds: readonly string[]): Relation[] {
+    const uniqueTargets = [...new Set(logicalSymbolIds)].sort()
+    if (uniqueTargets.length === 0) return []
+    const rowsByKey = new Map<string, RelationRow>()
+    for (const chunk of chunksOf(uniqueTargets, getSqliteInputChunkSize(1))) {
+      const placeholders = chunk.map(() => '?').join(', ')
+      const rows = this.statement(
+        `SELECT r.source, r.target, r.type, r.metadata_json FROM relations r JOIN logical_symbols ls ON r.target = ls.id WHERE r.type = ? AND r.target IN (${placeholders}) ORDER BY r.source, r.type, r.target`,
+      ).all(RelationType.CoversSymbol, ...chunk) as RelationRow[]
+      for (const row of rows)
+        rowsByKey.set(`${row.source}\u0000${row.type}\u0000${row.target}`, row)
+    }
+    return this.readRelations([...rowsByKey.values()]).sort(compareRelations)
   }
 
   /**
@@ -1224,7 +1246,7 @@ export class SQLiteGraphDatabase {
       .sort(compareLogicalSymbols)
     const declarations = (
       this.statement(
-        'SELECT logical_symbol_id, symbol_id, file_path, line, column_number, end_line, end_column, kind FROM logical_declarations',
+        'SELECT logical_symbol_id, symbol_id, file_path, line, column_number, end_line, end_column, kind, occurrence_form FROM logical_declarations',
       ).all() as LogicalDeclarationRow[]
     )
       .map((row) => this.mapLogicalDeclarationRow(row))
@@ -1238,7 +1260,7 @@ export class SQLiteGraphDatabase {
       .sort(comparePublicBindings)
     const localBindings = (
       this.statement(
-        'SELECT id, file_path, scope_id, local_name, space, target_id FROM local_bindings',
+        'SELECT id, file_path, scope_id, local_name, space, target_id, start_line, start_column, end_line, end_column FROM local_bindings',
       ).all() as LocalBindingRow[]
     )
       .map((row) => this.mapLocalBindingRow(row))
@@ -1289,21 +1311,65 @@ export class SQLiteGraphDatabase {
    */
   findDeclarations(logicalSymbolIds: readonly string[]): LogicalDeclaration[] {
     if (logicalSymbolIds.length === 0) return []
-    const rowsByKey = new Map<string, LogicalDeclarationRow>()
-    for (const chunk of chunksOf(
-      [...new Set(logicalSymbolIds)].sort(),
-      getSqliteInputChunkSize(0),
-    )) {
+    const orderedIds = [...new Set(logicalSymbolIds)]
+    const rowsByLogicalId = new Map<string, LogicalDeclarationRow[]>()
+    for (const chunk of chunksOf(orderedIds, getSqliteInputChunkSize(0))) {
       const placeholders = chunk.map(() => '?').join(', ')
       const rows = this.statement(
-        `SELECT logical_symbol_id, symbol_id, file_path, line, column_number, end_line, end_column, kind FROM logical_declarations WHERE logical_symbol_id IN (${placeholders})`,
+        `SELECT logical_symbol_id, symbol_id, file_path, line, column_number, end_line, end_column, kind, occurrence_form FROM logical_declarations WHERE logical_symbol_id IN (${placeholders})`,
       ).all(...chunk) as LogicalDeclarationRow[]
-      for (const row of rows)
-        rowsByKey.set(`${row.logical_symbol_id}\u0000${row.symbol_id}\u0000${row.kind}`, row)
+      for (const row of rows) {
+        let list = rowsByLogicalId.get(row.logical_symbol_id)
+        if (!list) {
+          list = []
+          rowsByLogicalId.set(row.logical_symbol_id, list)
+        }
+        list.push(row)
+      }
     }
-    return [...rowsByKey.values()]
-      .map((row) => this.mapLogicalDeclarationRow(row))
-      .sort(compareLogicalDeclarations)
+    const result: LogicalDeclaration[] = []
+    for (const id of orderedIds) {
+      const rows = rowsByLogicalId.get(id)
+      if (!rows) continue
+      const mapped = rows
+        .map((row) => this.mapLogicalDeclarationRow(row))
+        .sort(compareDeclarationsWithinTarget)
+      result.push(...mapped)
+    }
+    return result
+  }
+
+  /**
+   * Finds logical declarations by physical declaration symbol IDs.
+   *
+   * @param declarationSymbolIds - Physical declaration symbol identifiers to map.
+   * @returns Logical declarations following requested order with unknowns omitted.
+   */
+  findLogicalDeclarationsByDeclarationIds(
+    declarationSymbolIds: readonly string[],
+  ): LogicalDeclaration[] {
+    if (declarationSymbolIds.length === 0) return []
+    const orderedIds = [...new Set(declarationSymbolIds)]
+    const rowsBySymbolId = new Map<string, LogicalDeclarationRow>()
+    for (const chunk of chunksOf(orderedIds, getSqliteInputChunkSize(0))) {
+      const placeholders = chunk.map(() => '?').join(', ')
+      const rows = this.statement(
+        `SELECT logical_symbol_id, symbol_id, file_path, line, column_number, end_line, end_column, kind, occurrence_form FROM logical_declarations WHERE symbol_id IN (${placeholders})`,
+      ).all(...chunk) as LogicalDeclarationRow[]
+      for (const row of rows) {
+        if (!rowsBySymbolId.has(row.symbol_id)) {
+          rowsBySymbolId.set(row.symbol_id, row)
+        }
+      }
+    }
+    const result: LogicalDeclaration[] = []
+    for (const id of orderedIds) {
+      const row = rowsBySymbolId.get(id)
+      if (row) {
+        result.push(this.mapLogicalDeclarationRow(row))
+      }
+    }
+    return result
   }
 
   /**
@@ -2411,7 +2477,7 @@ export class SQLiteGraphDatabase {
   findLocalBindings(lookups: readonly LocalBindingLookup[]): LocalBinding[] {
     if (lookups.length === 0) return []
     const rows = this.statement(
-      `SELECT id, file_path, scope_id, local_name, space, target_id FROM local_bindings
+      `SELECT id, file_path, scope_id, local_name, space, target_id, start_line, start_column, end_line, end_column FROM local_bindings
        WHERE file_path = ? AND local_name = ?
          AND (? IS NULL OR scope_id = ?)
          AND (? IS NULL OR space = ?)`,
@@ -2619,6 +2685,30 @@ export class SQLiteGraphDatabase {
       throw new GraphSchemaIncompatibleError(
         `SQLite graph storage schema ${current.value} is incompatible with expected ${SQLITE_SCHEMA_VERSION}; reindex to recreate derived storage`,
       )
+    }
+  }
+
+  /**
+   * Asserts that every ordinary table exposes the columns the current DDL declares.
+   * A same-version database created by an older build can lack columns that
+   * `CREATE TABLE IF NOT EXISTS` never adds.
+   *
+   * @param db - The SQLite database instance to check after the DDL ran.
+   * @throws {GraphSchemaIncompatibleError} When a required table or column is missing.
+   */
+  private assertSchemaShape(db: SqliteDatabase): void {
+    for (const [table, required] of Object.entries(REQUIRED_COLUMNS)) {
+      const present = new Set(
+        (db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]).map(
+          (column) => column.name,
+        ),
+      )
+      const missing = required.filter((column) => !present.has(column))
+      if (missing.length > 0) {
+        throw new GraphSchemaIncompatibleError(
+          `SQLite graph storage table ${table} is missing columns ${missing.join(', ')}; reindex to recreate derived storage`,
+        )
+      }
     }
   }
 
@@ -3137,8 +3227,25 @@ export class SQLiteGraphDatabase {
     let categoryColumn: string | undefined
     let filePathColumn: string | undefined
 
+    // Spec -> symbol coverage targets canonical logical symbols; expose their physical declarations
+    // so symbol admission (kind, workspace, category) applies to real source declarations.
+    const coversLogicalSymbols =
+      input.resource === 'symbol' &&
+      direction === 'downstream' &&
+      relationTypes.length === 1 &&
+      relationTypes[0] === RelationType.CoversSymbol
+    const selectedTarget = coversLogicalSymbols ? 'ld.symbol_id' : 'r.target'
+
     if (input.resource === 'symbol') {
-      joins.push(`JOIN symbols n ON n.id = ${endpoint}`, 'JOIN files f ON f.path = n.file_path')
+      if (coversLogicalSymbols) {
+        joins.push(
+          'JOIN logical_declarations ld ON ld.logical_symbol_id = r.target',
+          'JOIN symbols n ON n.id = ld.symbol_id',
+        )
+      } else {
+        joins.push(`JOIN symbols n ON n.id = ${endpoint}`)
+      }
+      joins.push('JOIN files f ON f.path = n.file_path')
       workspaceColumn = 'f.workspace'
       categoryColumn = 'f.category'
       filePathColumn = 'f.path'
@@ -3197,11 +3304,11 @@ export class SQLiteGraphDatabase {
       ].join(' AND ')
       rows.push(
         ...(this.statement(
-          `SELECT r.source, r.target, r.type, r.metadata_json
+          `SELECT r.source, ${selectedTarget} AS target, r.type, r.metadata_json
            FROM relations r
            ${joins.join('\n')}
            WHERE ${predicateSql}
-           ORDER BY r.source, r.type, r.target`,
+           ORDER BY r.source, r.type, target`,
         ).all(...frontierChunk, ...relationTypes, ...filterParams) as RelationRow[]),
       )
 
@@ -3424,7 +3531,7 @@ export class SQLiteGraphDatabase {
     executeBatchedInsert(
       db,
       `INSERT INTO logical_declarations (
-        logical_symbol_id, symbol_id, file_path, line, column_number, end_line, end_column, kind
+        logical_symbol_id, symbol_id, file_path, line, column_number, end_line, end_column, kind, occurrence_form
       )`,
       facts.declarations.map(({ logicalSymbolId, declaration }) => [
         logicalSymbolId,
@@ -3435,6 +3542,7 @@ export class SQLiteGraphDatabase {
         declaration.location.endLine ?? null,
         declaration.location.endColumn ?? null,
         declaration.kind,
+        declaration.form ?? declaration.occurrenceForm ?? DeclarationOccurrenceForm.Definition,
       ]),
     )
 
@@ -3452,7 +3560,7 @@ export class SQLiteGraphDatabase {
 
     executeBatchedInsert(
       db,
-      'INSERT INTO local_bindings (id, file_path, scope_id, local_name, space, target_id)',
+      'INSERT INTO local_bindings (id, file_path, scope_id, local_name, space, target_id, start_line, start_column, end_line, end_column)',
       facts.localBindings.map((binding) => [
         binding.id,
         binding.filePath,
@@ -3460,6 +3568,10 @@ export class SQLiteGraphDatabase {
         binding.localName,
         binding.space,
         binding.targetId ?? null,
+        binding.range.startLine,
+        binding.range.startColumn,
+        binding.range.endLine,
+        binding.range.endColumn,
       ]),
     )
 
@@ -3829,6 +3941,12 @@ export class SQLiteGraphDatabase {
           endColumn: row.end_column ?? row.column_number,
         },
         kind: row.kind,
+        form:
+          (row.occurrence_form as DeclarationOccurrenceForm) ??
+          DeclarationOccurrenceForm.Definition,
+        occurrenceForm:
+          (row.occurrence_form as DeclarationOccurrenceForm) ??
+          DeclarationOccurrenceForm.Definition,
       },
     }
   }
@@ -3863,6 +3981,12 @@ export class SQLiteGraphDatabase {
       localName: row.local_name,
       space: row.space,
       targetId: row.target_id ?? undefined,
+      range: {
+        startLine: row.start_line,
+        startColumn: row.start_column,
+        endLine: row.end_line,
+        endColumn: row.end_column,
+      },
     }
   }
 
@@ -4087,6 +4211,24 @@ function compareLogicalDeclarations(left: LogicalDeclaration, right: LogicalDecl
       String(right.declaration.location.column),
       right.declaration.symbolId,
     ],
+  )
+}
+
+/**
+ * Sorts declaration occurrences within one logical target by filePath, line, column, symbolId.
+ * @param left - First logical declaration to compare.
+ * @param right - Second logical declaration to compare.
+ * @returns Negative, zero, or positive ordering value.
+ */
+function compareDeclarationsWithinTarget(
+  left: LogicalDeclaration,
+  right: LogicalDeclaration,
+): number {
+  return (
+    left.declaration.location.filePath.localeCompare(right.declaration.location.filePath) ||
+    left.declaration.location.line - right.declaration.location.line ||
+    left.declaration.location.column - right.declaration.location.column ||
+    left.declaration.symbolId.localeCompare(right.declaration.symbolId)
   )
 }
 
@@ -4652,10 +4794,8 @@ function relationEndpointsExist(relation: Relation, ids: RelationEndpointIds): b
     case RelationType.CoversFile:
       return ids.specs.has(relation.source) && ids.files.has(relation.target)
     case RelationType.CoversSymbol:
-      return (
-        ids.specs.has(relation.source) &&
-        (ids.symbols.has(relation.target) || ids.logicalSymbols.has(relation.target))
-      )
+      // Coverage targets are canonical logical symbols; a physical declaration ID is rejected.
+      return ids.specs.has(relation.source) && ids.logicalSymbols.has(relation.target)
     default:
       return false
   }

@@ -13,6 +13,7 @@ import {
   createLocalBinding,
   createLogicalSymbol,
   createPublicBinding,
+  DeclarationOccurrenceForm,
   MemberAccessor,
   MemberDispatch,
   MemberKind,
@@ -839,7 +840,18 @@ export function graphStoreContractTests(
           localName: 'Alias',
           space: SymbolSpace.Value,
           targetId: primary.id,
+          range: { startLine: 1, startColumn: 0, endLine: 1, endColumn: 8 },
         })
+        // Same name and scope at a different range: a shadowing binding stays a distinct row.
+        const shadowingBinding = createLocalBinding({
+          filePath: 'code-graph:src/consumer.ts',
+          scopeId: 'module',
+          localName: 'Alias',
+          space: SymbolSpace.Value,
+          targetId: primary.id,
+          range: { startLine: 9, startColumn: 2, endLine: 9, endColumn: 10 },
+        })
+        expect(shadowingBinding.id).not.toBe(localBinding.id)
         const facts: ReferenceFactsWrite = {
           logicalSymbols: [member, primary],
           declarations: [
@@ -856,6 +868,8 @@ export function graphStoreContractTests(
                   endColumn: 1,
                 },
                 kind: SymbolKind.Class,
+                form: DeclarationOccurrenceForm.Definition,
+                occurrenceForm: DeclarationOccurrenceForm.Definition,
               },
             },
             {
@@ -871,11 +885,13 @@ export function graphStoreContractTests(
                   endColumn: 1,
                 },
                 kind: SymbolKind.Class,
+                form: DeclarationOccurrenceForm.Definition,
+                occurrenceForm: DeclarationOccurrenceForm.Definition,
               },
             },
           ],
           publicBindings: [parallelBinding, alternateSurfaceBinding, directBinding],
-          localBindings: [localBinding],
+          localBindings: [localBinding, shadowingBinding],
           steps: [
             { fromId: parallelBinding.id, toId: primary.id, kind: 'reexport' },
             { fromId: directBinding.id, toId: primary.id, kind: 'export' },
@@ -921,6 +937,13 @@ export function graphStoreContractTests(
           reasonCode: null,
           health: { fresh: true, complete: true, reasonCodes: [] },
           target: primary,
+          resolvedTarget: {
+            kind: 'public-binding',
+            logicalSymbol: primary,
+            binding: directBinding,
+            declarations: facts.declarations.map((entry) => entry.declaration),
+            path: [{ fromId: directBinding.id, toId: primary.id, kind: 'export' }],
+          },
           candidates: [
             {
               target: primary,
@@ -991,7 +1014,7 @@ export function graphStoreContractTests(
               space: SymbolSpace.Value,
             },
           ]),
-        ).toEqual([localBinding])
+        ).toEqual(expect.arrayContaining([localBinding, shadowingBinding]))
         expect(await store.findResolutionSteps([parallelBinding.id])).toEqual([
           { fromId: parallelBinding.id, toId: primary.id, kind: 'reexport' },
         ])
@@ -1039,6 +1062,257 @@ export function graphStoreContractTests(
           ]),
         ).toEqual([])
         expect(await store.findDeclarations([primary.id])).toEqual([])
+      })
+
+      referenceFactsIt(
+        'supports bidirectional logical declaration mapping with duplicates, unknowns, ordering, and empty batches',
+        async () => {
+          const logicalA = createLogicalSymbol({
+            workspace: 'code-graph',
+            surface: 'src/alpha.ts',
+            name: 'AlphaFunc',
+            space: SymbolSpace.Value,
+            ownerId: undefined,
+            memberSemantics: undefined,
+          })
+          const logicalB = createLogicalSymbol({
+            workspace: 'code-graph',
+            surface: 'src/beta.ts',
+            name: 'BetaFunc',
+            space: SymbolSpace.Value,
+            ownerId: undefined,
+            memberSemantics: undefined,
+          })
+
+          const declA1 = {
+            logicalSymbolId: logicalA.id,
+            declaration: {
+              symbolId: 'code-graph:src/alpha.ts:function:AlphaFunc:1:0',
+              logicalId: logicalA.id,
+              location: {
+                filePath: 'code-graph:src/alpha.ts',
+                line: 1,
+                column: 0,
+                endLine: 1,
+                endColumn: 20,
+              },
+              kind: SymbolKind.Function,
+              form: DeclarationOccurrenceForm.Signature,
+              occurrenceForm: DeclarationOccurrenceForm.Signature,
+            },
+          }
+          const declA2 = {
+            logicalSymbolId: logicalA.id,
+            declaration: {
+              symbolId: 'code-graph:src/alpha.ts:function:AlphaFunc:3:0',
+              logicalId: logicalA.id,
+              location: {
+                filePath: 'code-graph:src/alpha.ts',
+                line: 3,
+                column: 0,
+                endLine: 5,
+                endColumn: 1,
+              },
+              kind: SymbolKind.Function,
+              form: DeclarationOccurrenceForm.Implementation,
+              occurrenceForm: DeclarationOccurrenceForm.Implementation,
+            },
+          }
+          const declB1 = {
+            logicalSymbolId: logicalB.id,
+            declaration: {
+              symbolId: 'code-graph:src/beta.ts:function:BetaFunc:10:0',
+              logicalId: logicalB.id,
+              location: {
+                filePath: 'code-graph:src/beta.ts',
+                line: 10,
+                column: 0,
+                endLine: 12,
+                endColumn: 1,
+              },
+              kind: SymbolKind.Function,
+              form: DeclarationOccurrenceForm.Definition,
+              occurrenceForm: DeclarationOccurrenceForm.Definition,
+            },
+          }
+
+          await store.replaceReferenceFacts({
+            logicalSymbols: [logicalA, logicalB],
+            declarations: [declA1, declA2, declB1],
+            publicBindings: [],
+            localBindings: [],
+            steps: [],
+            coverage: [],
+          })
+
+          // 1. Empty batch
+          expect(await store.findDeclarations([])).toEqual([])
+          expect(await store.findLogicalDeclarationsByDeclarationIds([])).toEqual([])
+
+          // 2. Forward direction: findDeclarations (by logicalSymbolIds)
+          // Preserves requested order: logicalB then logicalA
+          const forwardOrdered = await store.findDeclarations([logicalB.id, logicalA.id])
+          expect(forwardOrdered.map((item) => item.declaration.symbolId)).toEqual([
+            declB1.declaration.symbolId,
+            declA1.declaration.symbolId,
+            declA2.declaration.symbolId,
+          ])
+          // Duplicates in input are ignored
+          const forwardDeduped = await store.findDeclarations([logicalA.id, logicalA.id])
+          expect(forwardDeduped.map((item) => item.declaration.symbolId)).toEqual([
+            declA1.declaration.symbolId,
+            declA2.declaration.symbolId,
+          ])
+          // Unknown IDs are omitted
+          const forwardUnknown = await store.findDeclarations(['nonexistent:logical', logicalB.id])
+          expect(forwardUnknown.map((item) => item.declaration.symbolId)).toEqual([
+            declB1.declaration.symbolId,
+          ])
+
+          // 3. Reverse direction: findLogicalDeclarationsByDeclarationIds (by declarationSymbolIds)
+          // Preserves requested order
+          const reverseOrdered = await store.findLogicalDeclarationsByDeclarationIds([
+            declB1.declaration.symbolId,
+            declA2.declaration.symbolId,
+            declA1.declaration.symbolId,
+          ])
+          expect(reverseOrdered.map((item) => item.declaration.symbolId)).toEqual([
+            declB1.declaration.symbolId,
+            declA2.declaration.symbolId,
+            declA1.declaration.symbolId,
+          ])
+          expect(reverseOrdered[0]!.declaration.form).toBe(DeclarationOccurrenceForm.Definition)
+          expect(reverseOrdered[1]!.declaration.form).toBe(DeclarationOccurrenceForm.Implementation)
+          expect(reverseOrdered[2]!.declaration.form).toBe(DeclarationOccurrenceForm.Signature)
+
+          // Duplicates in input are ignored
+          const reverseDeduped = await store.findLogicalDeclarationsByDeclarationIds([
+            declA1.declaration.symbolId,
+            declA1.declaration.symbolId,
+          ])
+          expect(reverseDeduped).toHaveLength(1)
+          expect(reverseDeduped[0]!.declaration.symbolId).toBe(declA1.declaration.symbolId)
+
+          // Unknown IDs are omitted
+          const reverseUnknown = await store.findLogicalDeclarationsByDeclarationIds([
+            'nonexistent:decl',
+            declA2.declaration.symbolId,
+          ])
+          expect(reverseUnknown.map((item) => item.declaration.symbolId)).toEqual([
+            declA2.declaration.symbolId,
+          ])
+        },
+      )
+
+      it('isolates logical symbol coverage from physical declarations and supports batch lookup invariants', async () => {
+        const file = createFileNode({
+          path: 'root:service.ts',
+          projectRelativePath: 'service.ts',
+          language: 'typescript',
+          contentHash: 'hash',
+          workspace: 'root',
+        })
+        const physicalSymbol = createSymbolNode({
+          name: 'Service',
+          kind: SymbolKind.Class,
+          filePath: file.path,
+          line: 1,
+          column: 0,
+        })
+        const logicalSymbol = createLogicalSymbol({
+          workspace: 'root',
+          surface: 'service.ts',
+          name: 'Service',
+          space: SymbolSpace.Value,
+          ownerId: undefined,
+          memberSemantics: undefined,
+        })
+        const specService = createSpecNode({
+          specId: 'spec:service',
+          path: 'specs/service',
+          title: 'Service spec',
+          contentHash: 'hash:service',
+          workspace: 'root',
+        })
+        const specPhysical = createSpecNode({
+          specId: 'spec:physical-leak',
+          path: 'specs/physical-leak',
+          title: 'Physical spec',
+          contentHash: 'hash:physical',
+          workspace: 'root',
+        })
+
+        await store.bulkLoad({
+          files: [file],
+          documents: [],
+          symbols: [physicalSymbol],
+          specs: [specService, specPhysical],
+          relations: [],
+        })
+        if (options.supportsReferenceFacts) {
+          await store.replaceReferenceFacts({
+            logicalSymbols: [logicalSymbol],
+            declarations: [
+              {
+                logicalSymbolId: logicalSymbol.id,
+                declaration: {
+                  symbolId: physicalSymbol.id,
+                  logicalId: logicalSymbol.id,
+                  location: { filePath: file.path, line: 1, column: 0, endLine: 5, endColumn: 1 },
+                  kind: SymbolKind.Class,
+                  form: DeclarationOccurrenceForm.Definition,
+                },
+              },
+            ],
+            publicBindings: [],
+            localBindings: [],
+            steps: [],
+            coverage: [],
+          })
+        }
+
+        const logicalSpecRelation = createRelation({
+          source: 'spec:service',
+          target: logicalSymbol.id,
+          type: RelationType.CoversSymbol,
+        })
+        const physicalSpecRelation = createRelation({
+          source: 'spec:physical-leak',
+          target: physicalSymbol.id,
+          type: RelationType.CoversSymbol,
+        })
+
+        await store.addRelations([logicalSpecRelation, physicalSpecRelation])
+
+        // Querying for logicalSymbol.id returns only relations targeting logicalSymbol.id
+        const logicalCovering = await store.getCoveringSpecsForSymbols([logicalSymbol.id])
+        expect(logicalCovering).toEqual([
+          expect.objectContaining({ source: 'spec:service', target: logicalSymbol.id }),
+        ])
+        expect(logicalCovering.some((rel) => rel.target === physicalSymbol.id)).toBe(false)
+
+        // The physical-target relation was rejected rather than persisted under any identity.
+        expect(await store.getCoveringSpecsForSymbols([physicalSymbol.id])).toEqual([])
+        const relationsByType = await store.getStatistics()
+        expect(relationsByType.relationCounts[RelationType.CoversSymbol] ?? 0).toBe(1)
+
+        // Single lookup matches batch lookup
+        const singleCovering = await store.getCoveringSpecsForSymbol(logicalSymbol.id)
+        expect(singleCovering).toEqual(logicalCovering)
+
+        // Duplicate inputs handled cleanly
+        const dedupedCovering = await store.getCoveringSpecsForSymbols([
+          logicalSymbol.id,
+          logicalSymbol.id,
+        ])
+        expect(dedupedCovering).toEqual(logicalCovering)
+
+        // Unknown logical IDs return empty array
+        expect(await store.getCoveringSpecsForSymbols(['nonexistent:logical:target'])).toEqual([])
+        expect(await store.getCoveringSpecsForSymbol('nonexistent:logical:target')).toEqual([])
+
+        // Empty batch returns empty array
+        expect(await store.getCoveringSpecsForSymbols([])).toEqual([])
       })
 
       it('finds directly affected importer and symbol-dependent files in one operation', async () => {
@@ -1695,7 +1969,7 @@ export function graphStoreContractTests(
           line: 1,
           column: 0,
         })
-        const metadata = { stale: true, reason: 'symbol removed' }
+        const metadata = { origin: 'implementation-link' }
         const logicalSymbol = createLogicalSymbol({
           workspace: 'test',
           surface: 'src/auth.ts',
@@ -1755,6 +2029,32 @@ export function graphStoreContractTests(
         const retrieved = await store.getCoveredSymbols(spec.specId)
         expect(retrieved).toHaveLength(1)
         expect(retrieved[0]!.metadata).toEqual(metadata)
+        expect(retrieved[0]!.metadata).not.toHaveProperty('stale')
+      })
+
+      it('keeps a physical-only declaration retrievable without inventing a logical mapping', async () => {
+        const physicalOnly = createSymbolNode({
+          name: '<anonymous>',
+          kind: SymbolKind.Function,
+          filePath: 'src/physical.ts',
+          line: 3,
+          column: 2,
+        })
+        await store.upsertFile(
+          createFileNode({
+            path: 'src/physical.ts',
+            projectRelativePath: 'src/physical.ts',
+            language: 'typescript',
+            contentHash: 'sha256:physical',
+            workspace: 'test',
+          }),
+          [physicalOnly],
+          [],
+        )
+
+        expect((await store.getSymbol(physicalOnly.id))?.id).toBe(physicalOnly.id)
+        expect(await store.findLogicalDeclarationsByDeclarationIds([physicalOnly.id])).toEqual([])
+        expect((await store.getAllReferenceFacts()).declarations).toEqual([])
       })
 
       it('batch-queries covering specs for files and symbols deterministically', async () => {

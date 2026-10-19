@@ -185,14 +185,13 @@ live child, or open IPC channel after a terminal outcome.
 ## Constraints
 
 - Only a child process provides the required native-crash containment.
-- The capability MUST NOT implement queueing, lock waiting, automatic retry, stale-lock
-  PID recovery, scheduled indexing, or background indexing.
 - The capability MUST NOT depend on `@specd/sdk`, `@specd/cli`, Commander, or a delivery
   output formatter.
 - Inputs, progress values, results, and IPC payloads MUST be JSON-serializable and
   runtime-validated at the process boundary.
 - Direct lock helpers and raw IPC DTOs MUST remain internal package implementation
   details.
+- The capability MUST NOT implement queueing, lock waiting, automatic retry, scheduled indexing, or background indexing. It MUST NOT implement stale-lock detection or PID recovery itself: acquiring the lock through the lock helper of `code-graph:staleness-detection` recovers a dead owner's lock, and the supervisor only consumes the outcome (acquired or typed busy error).
 
 ## Spec Dependencies
 

@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { tmpdir } from 'node:os'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, expectTypeOf, it } from 'vitest'
 import {
   BulkSessionStateError,
   CODE_GRAPH_VERSION,
@@ -50,7 +50,8 @@ describe('@specd/code-graph barrel', () => {
   it('keeps InMemoryIndexSession on the internal barrel only', async () => {
     const publicModule = await import('../src/public.js')
     expect('InMemoryIndexSession' in publicModule).toBe(false)
-    expect(InMemoryIndexSession).toBeDefined()
+    expect(InMemoryIndexSession).toBeTypeOf('function')
+    expect(new InMemoryIndexSession().getAllFilePaths().size).toBe(0)
   })
 
   it('keeps concrete store adapters on the internal barrel only', async () => {
@@ -110,17 +111,13 @@ describe('@specd/code-graph barrel', () => {
     const factory: GraphStoreFactory = createSqliteGraphStoreFactory()
     expect(factory.create).toBeTypeOf('function')
 
-    let options: GraphStoreFactoryOptions | undefined
-    let compositionOptions: CodeGraphCompositionOptions | undefined
-    let codeGraphOptions: CodeGraphOptions | undefined
-    let runtimeDescriptor: SqliteRuntimeDescriptor | undefined
-    let sqliteStoreOptions: SQLiteGraphStoreOptions | undefined
-
-    expect(options).toBeUndefined()
-    expect(compositionOptions).toBeUndefined()
-    expect(codeGraphOptions).toBeUndefined()
-    expect(runtimeDescriptor).toBeUndefined()
-    expect(sqliteStoreOptions).toBeUndefined()
+    // The option types must keep the members hosts rely on; a removed member fails typecheck.
+    expectTypeOf<GraphStoreFactoryOptions>().toHaveProperty('storagePath')
+    expectTypeOf<CodeGraphCompositionOptions>().toHaveProperty('graphStoreId')
+    expectTypeOf<CodeGraphCompositionOptions>().toHaveProperty('onWarning')
+    expectTypeOf<CodeGraphOptions>().toHaveProperty('storagePath')
+    expectTypeOf<SqliteRuntimeDescriptor>().toBeObject()
+    expectTypeOf<SQLiteGraphStoreOptions>().toBeObject()
   })
 
   it('exports resolver selector result types from the public barrel', async () => {
@@ -130,21 +127,24 @@ describe('@specd/code-graph barrel', () => {
     expect('ResolvedSymbolSelectorResult' in publicModule).toBe(false)
     expect('normalizeFileSelectorPath' in publicModule).toBe(true)
 
-    let fileSelector: import('../src/public.js').ResolvedFileSelector | undefined
-    let symbolSelector: import('../src/public.js').ResolvedSymbolSelector | undefined
-    let symbolResult: import('../src/public.js').ResolvedSymbolSelectorResult | undefined
-
-    expect(fileSelector).toBeUndefined()
-    expect(symbolSelector).toBeUndefined()
-    expect(symbolResult).toBeUndefined()
+    type PublicModule = typeof import('../src/public.js')
+    expectTypeOf<import('../src/public.js').ResolvedFileSelector>().toHaveProperty('canonicalPath')
+    expectTypeOf<import('../src/public.js').ResolvedSymbolSelector>().toHaveProperty('symbolId')
+    expectTypeOf<import('../src/public.js').ResolvedSymbolSelectorResult['status']>().toEqualTypeOf<
+      'resolved' | 'ambiguous' | 'missing' | 'unresolved'
+    >()
+    expectTypeOf<PublicModule['normalizeFileSelectorPath']>().toBeFunction()
   })
 
   it('exports language adapter and model vocabulary types', () => {
-    let adapter: LanguageAdapter | undefined
-    expect(adapter).toBeUndefined()
-    expect(SymbolKind).toBeDefined()
-    expect(RelationType).toBeDefined()
-    expect(typeof SymbolKind.Function).toBe('string')
+    expectTypeOf<LanguageAdapter>().toHaveProperty('analyzeFile')
+    expectTypeOf<LanguageAdapter>().toHaveProperty('resolveImports')
+    expect(Object.values(SymbolKind)).toEqual(
+      expect.arrayContaining(['function', 'class', 'method', 'interface', 'property']),
+    )
+    expect(Object.values(RelationType)).toEqual(
+      expect.arrayContaining(['CALLS', 'IMPORTS', 'EXTENDS', 'IMPLEMENTS', 'COVERS_SYMBOL']),
+    )
   })
 
   it('exports the public impact filter vocabulary without SQLite internals', async () => {
@@ -157,7 +157,7 @@ describe('@specd/code-graph barrel', () => {
       workspaces: ['code-graph'],
       excludeWorkspaces: ['external'],
     }
-    expect(filter.types).toEqual(['symbols'])
+    expect(IMPACT_RESULT_TYPES).toContain(filter.types?.[0])
 
     const publicModule = await import('../src/public.js')
     expect('IMPACT_RESULT_TYPES' in publicModule).toBe(true)
@@ -199,6 +199,95 @@ describe('@specd/code-graph barrel', () => {
     )
     expect(new SpecNotFoundError('ws:cap').code).toBe('SPEC_NOT_FOUND')
     expect(new SpecNotFoundError('ws:cap').specId).toBe('ws:cap')
+  })
+
+  it('given the public barrel, when its runtime exports are listed, then they equal the enumerated Package exports allow-list', async () => {
+    // Keep in sync with the "Package exports" requirement of code-graph:composition.
+    const allowed = [
+      'BindingScopeKind',
+      'BindingSourceKind',
+      'BulkSessionStateError',
+      'CODE_GRAPH_VERSION',
+      'CallForm',
+      'DEFAULT_EXCLUDE_PATHS',
+      'DEFAULT_HOTSPOT_KINDS',
+      'DeclarationOccurrenceForm',
+      'DuplicateSymbolIdError',
+      'FILE_CATEGORIES',
+      'FreshnessMode',
+      'FreshnessState',
+      'GetChangeSpecCoverage',
+      'GetGraphHealth',
+      'GetSpecCoverage',
+      'GraphBusyError',
+      'GraphDerivationMismatchError',
+      'GraphIndexProgressHandlerError',
+      'GraphIndexTaskContractError',
+      'GraphIndexTaskExecutionError',
+      'GraphIndexWorkerExitError',
+      'GraphIndexWorkerProtocolError',
+      'GraphIndexWorkerSignalError',
+      'GraphIndexWorkerStartError',
+      'GraphProviderStaleError',
+      'GraphSchemaIncompatibleError',
+      'GraphStorageRecoveryRequiredError',
+      'GraphStoreRecreateRequiresClosedError',
+      'IMPACT_RESULT_TYPES',
+      'ImportDeclarationKind',
+      'IndexCoverageStatus',
+      'IndexProjectGraph',
+      'IndexedInputKind',
+      'IndexedResourceKind',
+      'InvalidGraphSelectorError',
+      'InvalidGraphStoreConfigurationError',
+      'InvalidRelationTypeError',
+      'InvalidSymbolKindError',
+      'MemberAccessor',
+      'MemberDispatch',
+      'MemberKind',
+      'RelationType',
+      'SpecNotFoundError',
+      'SpecdCodeGraphError',
+      'StoreNotOpenError',
+      'StoreOverloadError',
+      'StoreWorkerError',
+      'SymbolKind',
+      'SymbolSpace',
+      'analyzeFilesImpact',
+      'analyzeImpact',
+      'analyzePublicBindingImpact',
+      'analyzeResolvedSymbolImpact',
+      'buildProjectGraphConfig',
+      'classifyFileCategory',
+      'collectImpactSpecIds',
+      'collectLogicalCoveringSpecs',
+      'computeGraphFingerprint',
+      'computeRootFingerprint',
+      'computeWorkspaceFingerprint',
+      'createBootstrapGraphConfig',
+      'createCodeGraphProvider',
+      'createGetChangeSpecCoverage',
+      'createGetGraphHealth',
+      'createGetSpecCoverage',
+      'createIndexProjectGraph',
+      'createLocalBinding',
+      'createLogicalSymbol',
+      'createPublicBinding',
+      'createSqliteGraphStoreFactory',
+      'detectFingerprintMismatch',
+      'expandSearchQuery',
+      'expandSearchToken',
+      'expandSymbolName',
+      'isGraphStale',
+      'normalizeFileSelectorPath',
+      'parseFingerprintMap',
+      'parseLogicalSymbol',
+      'runIsolatedGraphIndex',
+      'serializeFingerprintMap',
+    ]
+    const publicModule = await import('../src/public.js')
+
+    expect(Object.keys(publicModule).sort()).toEqual([...allowed].sort())
   })
 
   it('exposes only the curated isolated-worker surface', async () => {

@@ -98,11 +98,57 @@ specd graph impact [options]
 
 ### Output Schema
 
+Symbol impact identifies whether the selector resolved to a logical target, an exact
+declaration, or a public binding. Logical impact lists every contributing declaration,
+reports unique semantic target counts separately from physical declaration evidence,
+and includes covering specs resolved through logical IDs. Exact declaration impact
+uses one physical seed and does not widen to sibling overload declarations.
+
+JSON and TOON preserve `targetKind`, `resolvedTarget`, `declarations`,
+`semanticAffectedTargets`, `physicalEvidence`, `semanticCounts`, and
+`coveringSpecs`. Text output labels the target kind and summarizes declaration
+locations. Ambiguous selectors list deterministic candidates and perform no traversal.
+A bare or file-qualified name that matches several declarations of one overload set is a
+single logical target, not an ambiguity. For an ambiguous public export, text output
+lists each candidate route with its project-relative declaration locations, and JSON and
+TOON expose the same `candidates` with projected paths.
+
+JSON and TOON symbol output always carries `kind: "symbol"` and a `status`:
+
+| `status`     | Meaning                                                                                       |
+| ------------ | --------------------------------------------------------------------------------------------- |
+| `resolved`   | One logical target, declaration or public binding was impacted.                               |
+| `ambiguous`  | Several distinct logical targets match; `candidates` lists one entry per logical target.      |
+| `unresolved` | The graph cannot decide (stale or partial evidence); `reasonCode` explains why. No traversal. |
+| `not_found`  | A healthy graph proves no such symbol exists.                                                 |
+
+Ambiguity is counted in logical targets, so the overloads of one logical symbol are a
+single candidate and `totalCandidates` equals the number of logical targets.
+`directDepsCount`, `indirectDepsCount` and `transitiveDepsCount` count distinct dependents
+per depth (logical targets for `--symbol`, files for `--file`); `affectedFilesCount`
+counts files; `semanticCounts.physicalDeclarationOccurrences` counts physical
+declarations and can exceed the logical-target counts. A `--from` value that starts with
+a Windows drive letter (`C:\repo\src\index.ts`) is resolved as a file selector, not as a
+workspace-qualified path.
+
+For `--export`, text output appends the canonical target's covering specs and JSON/TOON
+include them as `coveringSpecs`.
+
+Covering specs include the symbol's own coverage at depth 0, not only the specs that
+cover the symbols it affects. File evidence in `coveringSpecs[].evidence` carries
+`projectRelativePath`.
+
+Structured output passes SDK path projection through unchanged. In particular,
+`resolvedTarget.declarations[].location.projectRelativePath`, semantic-target declaration
+locations, and nested `physicalEvidence[].sourceLocation.projectRelativePath` and
+`targetLocation.projectRelativePath` are present whenever those locations exist. The CLI
+performs no graph read or canonical-path reconstruction for these fields.
+
 In JSON and TOON formats, all targets and affected file paths are exposed as `projectRelativePath` (or `projectRelativeTargets` for multi-file impact). Legacy properties (`displayPath` and `displayTargets`) have been removed:
 
 - **Single-file impact:** `canonicalPath`, `projectRelativePath`, `affectedFiles` (array of `projectRelativePath`), `affectedSymbols[].filePath` (`projectRelativePath`).
 - **Multi-file impact:** `targets` (canonical), `projectRelativeTargets` (repository-relative), `perFile[].projectRelativePath`.
-- **Symbol impact:** `canonicalPath`, `projectRelativePath`, `impact.affectedFiles` (array of `projectRelativePath`).
+- **Symbol impact:** `canonicalPath`, `projectRelativePath`, `impact.affectedFiles` (array of `projectRelativePath`), plus every nested declaration and physical-evidence location described above.
 - **Spec impact:** `spec`, `impact.affectedFiles` (array of `projectRelativePath`).
 
 ### Examples
@@ -110,6 +156,9 @@ In JSON and TOON formats, all targets and affected file paths are exposed as `pr
 ```bash
 # Blast radius of a symbol across all dependents
 specd graph impact --symbol "SpecRepository" --direction dependents --format toon
+
+# Logical impact for every declaration in an overload group
+specd graph impact --symbol "Change.execute" --direction dependents --format json
 
 # Find all specs covering a modified file
 specd graph impact --file "packages/core/src/change.ts" --direction dependents --type specs

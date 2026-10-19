@@ -23,7 +23,7 @@
 
 - **GIVEN** a symbol selector
 - **WHEN** `runGraphImpact(ctx, { symbol: "createKernel" })` is executed
-- **THEN** `analyzeSymbolImpact` is executed and affected paths are projected to `projectRelativePath`
+- **THEN** the typed `analyzeResolvedSymbolImpact` operation is executed and affected paths are projected to `projectRelativePath`
 
 #### Scenario: Spec impact analysis
 
@@ -57,6 +57,44 @@
 - **WHEN** `runGraphImpact(ctx, { files: ["src/auth.ts"], provider })` is executed
 - **THEN** execution runs on the supplied provider without closing it
 
+### Requirement: Resolution-preserving symbol impact orchestration
+
+#### Scenario: Logical target is not collapsed to one declaration
+
+- **GIVEN** a symbol selector resolves to one logical target with multiple declarations
+- **WHEN** runGraphImpact executes
+- **THEN** it passes the complete discriminated resolution to provider impact
+- **AND** the result retains canonical identity, all declarations, evidence, coverage, and explicit count units
+
+#### Scenario: Legacy first-declaration provider fallback is unavailable
+
+- **GIVEN** a provider implements the public typed impact contract
+- **AND** a logical target contains multiple declarations
+- **WHEN** runGraphImpact executes
+- **THEN** it invokes the discriminated logical-target operation
+- **AND** it never selects `declarations[0]` or calls physical impact as a compatibility fallback
+
+#### Scenario: Ambiguous or unresolved selector does not traverse
+
+- **GIVEN** a symbol selector is ambiguous or unresolved
+- **WHEN** runGraphImpact executes
+- **THEN** no impact traversal starts
+- **AND** the resolution outcome remains available to the caller
+
+#### Scenario: Every evidence path is projected without graph reads
+
+- **GIVEN** an impact result contains locations nested under resolvedTarget, declarations, resolution evidence, affected targets, public surfaces, and covering-spec evidence
+- **WHEN** SDK path projection runs
+- **THEN** every retained location receives projectRelativePath
+- **AND** projection performs no additional provider reads
+
+#### Scenario: Legacy summary fields are derived after traversal
+
+- **GIVEN** a logical target with several declarations
+- **WHEN** `runGraphImpact` returns its result
+- **THEN** `impact.target` carries the canonical logical identity rather than a physical declaration ID
+- **AND** the deprecated `symbol` summary was derived only after the typed traversal completed
+
 ### Requirement: Elimination of displayPath and displayTargets
 
 #### Scenario: displayPath and displayTargets are omitted
@@ -70,6 +108,13 @@
 
 - **WHEN** impact paths are projected to `projectRelativePath`
 - **THEN** projection uses project and workspace configuration without additional provider reads
+
+#### Scenario: Export and covering-spec locations are projected
+
+- **GIVEN** a public export impact result with resolution evidence and file-based covering-spec evidence
+- **WHEN** paths are projected
+- **THEN** every nested location in `resolution`, `binding`, `target`, `path`, and covering-spec evidence exposes `projectRelativePath`
+- **AND** no additional graph read is performed
 
 ### Requirement: No presenter formatting
 

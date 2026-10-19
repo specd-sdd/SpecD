@@ -5,6 +5,7 @@ import { type SgNode } from '@ast-grep/napi'
 import {
   type LanguageAdapter,
   type AdapterAnalyzeContext,
+  type AdapterDeclarationPolicy,
   type ImportResolutionContext,
   type ResolvedImports,
   type RelationBuildContext,
@@ -14,7 +15,11 @@ import { ImportDeclarationKind } from '../../domain/value-objects/import-declara
 import { BindingSourceKind, type BindingFact } from '../../domain/value-objects/binding-fact.js'
 import { CallForm, type CallFact } from '../../domain/value-objects/call-fact.js'
 import { type SourceLocation } from '../../domain/value-objects/source-location.js'
-import { type SymbolNode, createSymbolNode } from '../../domain/value-objects/symbol-node.js'
+import {
+  type SymbolNode,
+  type SourceRange,
+  createSymbolNode,
+} from '../../domain/value-objects/symbol-node.js'
 import { type Relation, createRelation } from '../../domain/value-objects/relation.js'
 import { SymbolKind } from '../../domain/value-objects/symbol-kind.js'
 import { RelationType } from '../../domain/value-objects/relation-type.js'
@@ -30,6 +35,7 @@ import {
 } from '../../domain/value-objects/file-analysis.js'
 import { type IndexSession } from '../../domain/value-objects/index-session.js'
 import {
+  DeclarationOccurrenceForm,
   MemberAccessor,
   MemberDispatch,
   MemberKind,
@@ -49,8 +55,12 @@ import {
   buildLogicalDeclarationFacts,
   containsSymbolRange,
   createAdapterDeclarationDescriptor,
+  createImportedHierarchyMetadata,
+  createPhysicalOnlyDeclarationDescriptor,
+  findContainingCallableSymbol,
   type AdapterHierarchyDescriptor,
   withEnclosingTypeParents,
+  WHOLE_FILE_START,
 } from './reference-fact-helpers.js'
 
 /**
@@ -176,15 +186,123 @@ function collectByKind(node: SgNode, kinds: Set<string>, results: SgNode[]): voi
   }
 }
 
+const FUNCTION_SCOPE_KINDS = new Set([
+  'function_declaration',
+  'function_expression',
+  'function',
+  'generator_function',
+  'generator_function_declaration',
+  'arrow_function',
+  'method_definition',
+])
+
+/**
+ * Collects binding identifiers introduced by a parameter list or declaration pattern.
+ * Type annotations and default values are skipped because they do not bind names.
+ * @param node - Pattern or parameter subtree.
+ * @param names - Accumulator of bound names.
+ */
+function collectBoundNames(node: SgNode, names: Set<string>): void {
+  const kind = nodeKind(node)
+  if (kind === 'type_annotation' || kind === 'type_parameters') return
+  if (kind === 'identifier' || kind === 'shorthand_property_identifier_pattern') {
+    names.add(node.text().trim())
+    return
+  }
+  if (kind === 'required_parameter' || kind === 'optional_parameter') {
+    const pattern = node.field('pattern')
+    if (pattern !== null) collectBoundNames(pattern, names)
+    return
+  }
+  if (kind === 'assignment_pattern' || kind === 'object_assignment_pattern') {
+    const left = node.field('left')
+    if (left !== null) collectBoundNames(left, names)
+    return
+  }
+  if (kind === 'pair_pattern') {
+    const value = node.field('value')
+    if (value !== null) collectBoundNames(value, names)
+    return
+  }
+  for (const child of node.children()) collectBoundNames(child, names)
+}
+
+/**
+ * Returns whether a call target name is rebound by a parameter or block-local declaration
+ * that encloses the call, so the call cannot refer to an imported or outer declaration.
+ * Module-level declarations never shadow, they are ordinary same-file targets.
+ * @param node - Call or construction node.
+ * @param name - Callee identifier.
+ * @returns True when an enclosing function parameter or local declaration binds the name.
+ */
+function isShadowedByEnclosingScope(node: SgNode, name: string): boolean {
+  let current = node.parent()
+  while (current !== null) {
+    const kind = nodeKind(current)
+    if (FUNCTION_SCOPE_KINDS.has(kind)) {
+      const names = new Set<string>()
+      const params = current.field('parameters') ?? current.field('parameter')
+      if (params !== null) collectBoundNames(params, names)
+      if (names.has(name)) return true
+    } else if (kind === 'statement_block') {
+      for (const statement of current.children()) {
+        const statementKind = nodeKind(statement)
+        if (statementKind === 'lexical_declaration' || statementKind === 'variable_declaration') {
+          for (const declarator of statement.children()) {
+            if (nodeKind(declarator) !== 'variable_declarator') continue
+            const names = new Set<string>()
+            const target = declarator.field('name')
+            if (target !== null) collectBoundNames(target, names)
+            if (names.has(name)) return true
+          }
+        }
+      }
+    } else if (kind === 'catch_clause') {
+      const names = new Set<string>()
+      const parameter = current.field('parameter')
+      if (parameter !== null) collectBoundNames(parameter, names)
+      if (names.has(name)) return true
+    }
+    current = current.parent()
+  }
+  return false
+}
+
 /**
  * Removes generic arguments and namespace qualifiers from a type reference.
  * @param reference - Raw type reference text.
  * @returns The normalized type name.
  */
 function normalizeTypeReference(reference: string): string {
-  const withoutGenerics = reference.replace(/<[^>]+>/g, '').trim()
-  const tail = withoutGenerics.split('.').at(-1) ?? withoutGenerics
-  return tail.replace(/\[\]$/g, '').trim()
+  // The written spelling is kept: `ns.Base` must not collapse into an unrelated `Base`.
+  return reference
+    .replace(/<[^>]+>/g, '')
+    .trim()
+    .replace(/\[\]$/g, '')
+    .trim()
+}
+
+/**
+ * Returns the parser range of each written type expression in a heritage clause.
+ * Keywords, commas and type arguments are skipped; the ranges follow source order, the
+ * same order as the parsed names. A clause whose expressions cannot be told apart yields
+ * the whole clause range for every entry.
+ * @param clause - `extends_clause`, `extends_type_clause` or `implements_clause` node.
+ * @param count - Number of names parsed from the clause.
+ * @returns One range per parsed name.
+ */
+function heritageExpressionRanges(clause: SgNode, count: number): SourceRange[] {
+  const toRange = (node: SgNode): SourceRange => ({
+    startLine: node.range().start.line + 1,
+    startColumn: node.range().start.column,
+    endLine: node.range().end.line + 1,
+    endColumn: node.range().end.column,
+  })
+  const expressions = clause
+    .children()
+    .filter((child) => child.isNamed() && nodeKind(child) !== 'type_arguments')
+  if (expressions.length >= count) return expressions.slice(0, count).map(toRange)
+  return Array.from({ length: count }, () => toRange(clause))
 }
 
 /**
@@ -222,22 +340,46 @@ const BUILTIN_TYPE_NAMES = new Set([
 ])
 
 /**
- * Computes a source location from a string offset.
- * @param filePath - Workspace-prefixed file path.
- * @param content - Source content.
- * @param index - Zero-based string offset.
- * @returns Source location for the offset.
+ * Converts an AST node range into a source location.
+ * @param node - AST node to locate.
+ * @param filePath - Workspace-prefixed source path.
+ * @returns Source location for the node.
  */
-function locationFromIndex(filePath: string, content: string, index: number): SourceLocation {
-  const prefix = content.slice(0, Math.max(index, 0))
-  const lines = prefix.split('\n')
+function locationOf(node: SgNode, filePath: string): SourceLocation {
+  const r = node.range()
   return {
     filePath,
-    line: lines.length,
-    column: lines.at(-1)?.length ?? 0,
-    endLine: undefined,
-    endColumn: undefined,
+    line: r.start.line + 1,
+    column: r.start.column,
+    endLine: r.end.line + 1,
+    endColumn: r.end.column,
   }
+}
+
+/**
+ * Converts an AST node range into a source range.
+ * @param node - AST node to locate.
+ * @returns Source range for the node.
+ */
+function rangeOf(node: SgNode): SourceRange {
+  const r = node.range()
+  return {
+    startLine: r.start.line + 1,
+    startColumn: r.start.column,
+    endLine: r.end.line + 1,
+    endColumn: r.end.column,
+  }
+}
+
+/**
+ * Tests whether a subtree contains a call or construction expression.
+ * @param node - Subtree root.
+ * @returns Whether a call-like expression is present.
+ */
+function containsCallExpression(node: SgNode): boolean {
+  const calls: SgNode[] = []
+  collectByKind(node, new Set(['call_expression', 'new_expression']), calls)
+  return calls.length > 0
 }
 
 /**
@@ -257,22 +399,98 @@ function extractTypeReferenceNames(typeText: string): string[] {
   return [...names]
 }
 
+const TS_CALLABLE_KINDS = new Set<SymbolKind>([SymbolKind.Function, SymbolKind.Method])
+
 /**
- * Finds the innermost symbol starting before a source line.
- * @param symbols - Symbols extracted from the current file.
- * @param line - One-based source line.
- * @returns Matching symbol id, or undefined.
+ * Counts arguments in an AST arguments node, excluding punctuation and comments.
+ * @param argsNode - Arguments node to inspect.
+ * @returns Number of semantic arguments.
  */
-function findEnclosingSymbolIdByLine(
-  symbols: readonly SymbolNode[],
-  line: number,
-): string | undefined {
-  return [...symbols]
-    .filter((symbol) => symbol.line <= line)
-    .sort((left, right) => {
-      if (left.line !== right.line) return right.line - left.line
-      return right.column - left.column
-    })[0]?.id
+function countAstArguments(argsNode: SgNode): number {
+  let count = 0
+  for (const child of argsNode.children()) {
+    const k = nodeKind(child)
+    if (k !== '(' && k !== ')' && k !== ',' && k !== 'comment') {
+      count++
+    }
+  }
+  return count
+}
+
+/**
+ * Determines whether a pair/property-definition belongs to a supported named object declaration.
+ * A property under an anonymous object used as an expression, return value, or argument is unsupported.
+ * @param node - Pair or property-definition node.
+ * @returns Whether the property has a supported named object owner.
+ */
+function isNamedObjectProperty(node: SgNode): boolean {
+  let current = node.parent()
+  while (current) {
+    const kind = nodeKind(current)
+    if (
+      kind === 'arguments' ||
+      kind === 'call_expression' ||
+      kind === 'new_expression' ||
+      kind === 'return_statement' ||
+      kind === 'array' ||
+      kind === 'binary_expression' ||
+      kind === 'unary_expression' ||
+      kind === 'await_expression'
+    ) {
+      return false
+    }
+    if (kind === 'variable_declarator') {
+      const nameNode = current.field('name')
+      return nameNode ? nodeKind(nameNode) === 'identifier' : false
+    }
+    if (kind === 'export_statement') {
+      return true
+    }
+    current = current.parent()
+  }
+  return false
+}
+
+/**
+ * Checks whether an arrow function or function expression is anonymous.
+ * @param node - Callable node to inspect.
+ * @returns Whether the callable lacks a stable declared owner.
+ */
+function isAnonymousCallable(node: SgNode): boolean {
+  const parent = node.parent()
+  if (!parent) return true
+  const parentKind = nodeKind(parent)
+  if (parentKind === 'variable_declarator') return false
+  if (parentKind === 'assignment_expression') return false
+  if (parentKind === 'public_field_definition' || parentKind === 'field_definition') return false
+  if (parentKind === 'pair') return false
+  return true
+}
+
+/**
+ * Determines whether a call expression is a higher-order function invocation wrapping a function.
+ * @param node - Call expression to inspect.
+ * @returns Whether an argument contains a callable expression.
+ */
+function isHofCall(node: SgNode): boolean {
+  if (nodeKind(node) !== 'call_expression') return false
+  const args = node.field('arguments')
+  if (!args) return false
+  for (const child of args.children()) {
+    const k = nodeKind(child)
+    if (
+      k === 'function' ||
+      k === 'arrow_function' ||
+      k === 'function_expression' ||
+      k === 'generator_function'
+    ) {
+      return true
+    }
+    if (k === 'call_expression' && isHofCall(child)) {
+      return true
+    }
+  }
+  return false
 }
 
 /**
@@ -286,6 +504,10 @@ interface TsTypeDeclarationInfo {
   readonly memberSemanticsById: Readonly<Record<string, MemberSemantics>>
   readonly extendsNames: readonly string[]
   readonly implementsNames: readonly string[]
+  /** Parser range of each written `extends` type expression, aligned with `extendsNames`. */
+  readonly extendsRanges: readonly SourceRange[]
+  /** Parser range of each written `implements` type expression, aligned with `implementsNames`. */
+  readonly implementsRanges: readonly SourceRange[]
 }
 
 /**
@@ -297,26 +519,77 @@ interface TsTypeDeclarationInfo {
 function typeScriptMemberSemantics(node: SgNode, name: string): MemberSemantics {
   if (name === 'constructor') return { kind: MemberKind.Constructor }
   if (nodeKind(node) === 'method_signature') return { kind: MemberKind.Signature }
-  const source = node.text().trimStart()
-  const isStatic =
-    /^(?:(?:public|protected|private|readonly|declare|abstract|override)\s+)*static\b/.test(source)
-  const dispatch = isStatic ? MemberDispatch.Static : MemberDispatch.Instance
-  if (
-    /\bget\b/.test(source) &&
-    /^(?:(?:public|protected|private|static|readonly|declare|abstract|override)\s+)*get\b/.test(
-      source,
-    )
-  ) {
+  // Modifier keywords are parser tokens that precede the member name. A member merely named
+  // `get`, `set`, or `static` has the name node first and no such token.
+  const nameStart = node.field('name')?.range().start.index ?? Number.POSITIVE_INFINITY
+  const leadingTokens = new Set<string>()
+  for (const child of node.children()) {
+    if (child.range().start.index >= nameStart) break
+    leadingTokens.add(nodeKind(child))
+  }
+  const dispatch = leadingTokens.has('static') ? MemberDispatch.Static : MemberDispatch.Instance
+  if (leadingTokens.has('get')) {
     return { kind: MemberKind.Property, dispatch, accessor: MemberAccessor.Get }
   }
-  if (
-    /^(?:(?:public|protected|private|static|readonly|declare|abstract|override)\s+)*set\b/.test(
-      source,
-    )
-  ) {
+  if (leadingTokens.has('set')) {
     return { kind: MemberKind.Property, dispatch, accessor: MemberAccessor.Set }
   }
   return { kind: MemberKind.Method, dispatch }
+}
+
+/** Session state key holding workspace code roots for the current indexing run. */
+const WORKSPACE_CODE_ROOTS_KEY = 'typescript:workspace-code-roots'
+
+/** Session state key holding package manifests already read in the current indexing run. */
+const PACKAGE_MANIFESTS_KEY = 'typescript:package-manifests'
+
+/** Fields of a package manifest that decide its published entry. */
+interface PackageEntryManifest {
+  readonly exports?: unknown
+  readonly main?: string
+}
+
+/**
+ * Returns run-scoped state kept on the index session rather than on the adapter instance.
+ * @param session - Session owned by one indexing run.
+ * @param key - State key.
+ * @param create - Factory used the first time the key is requested.
+ * @returns The session-scoped state value.
+ */
+function sessionScopedState<T>(session: IndexSession, key: string, create: () => T): T {
+  const existing = session.getAdapterState<T>(key)
+  if (existing !== undefined) return existing
+  const created = create()
+  session.setAdapterState(key, created)
+  return created
+}
+
+/**
+ * Reads a workspace package manifest once per run, before pass 2, and stores it on the session.
+ * @param session - Session owned by one indexing run.
+ * @param codeRoot - Workspace code root that may contain `package.json`.
+ */
+function prepareWorkspaceManifest(session: IndexSession, codeRoot: string): void {
+  const manifests = sessionScopedState(
+    session,
+    PACKAGE_MANIFESTS_KEY,
+    () => new Map<string, PackageEntryManifest | null>(),
+  )
+  if (manifests.has(codeRoot)) return
+  try {
+    manifests.set(
+      codeRoot,
+      JSON.parse(readFileSync(join(codeRoot, 'package.json'), 'utf8')) as PackageEntryManifest,
+    )
+  } catch {
+    manifests.set(codeRoot, null)
+  }
+}
+
+/** A local declaration published under an exported name (alias, default, or same name). */
+interface TsExportBinding {
+  readonly exportedName: string
+  readonly localName: string
 }
 
 /** A statically named or star re-export retained for pass-2 target linking. */
@@ -341,8 +614,6 @@ interface TypeScriptParserState {
  * Uses tree-sitter via ast-grep to extract symbols and relations from source code.
  */
 export class TypeScriptLanguageAdapter implements LanguageAdapter {
-  private readonly workspaceCodeRoots = new Map<string, string>()
-
   /**
    * Declares deterministic TypeScript and JavaScript reference semantics.
    * @returns Supported reference capabilities.
@@ -355,6 +626,20 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
       localBindings: true,
       hierarchy: true,
       buildContext: false,
+    }
+  }
+
+  /**
+   * Declares parser authority and callable container policy for TypeScript/JavaScript.
+   * @returns TypeScript and JavaScript declaration policy.
+   */
+  declarationPolicy(): AdapterDeclarationPolicy {
+    return {
+      languageIds: this.languages(),
+      callableContainerKinds: TS_CALLABLE_KINDS,
+      supportsLogicalDeclarationGroups: true,
+      supportsPhysicalOnlyDeclarations: true,
+      structuralFactsAreParserAuthoritative: true,
     }
   }
   /**
@@ -439,13 +724,20 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
     }
     keepAlive.push(sgRoot)
     if (context.codeRoot !== undefined) {
-      this.workspaceCodeRoots.set(context.workspaceName, context.codeRoot)
+      sessionScopedState(
+        context.session,
+        WORKSPACE_CODE_ROOTS_KEY,
+        () => new Map<string, string>(),
+      ).set(context.workspaceName, context.codeRoot)
+      prepareWorkspaceManifest(context.session, context.codeRoot)
     }
     const root = sgRoot.root()
     const symbols: SymbolNode[] = []
     const seenSymbol = new Set<string>()
     const exportedNames = new Set<string>()
+    const exportBindings: TsExportBinding[] = []
     const reExports: TsReExportInfo[] = []
+    const signatureSymbolIds = new Set<string>()
 
     const addSymbol = (
       name: string,
@@ -453,12 +745,12 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
       node: SgNode,
       selectionNode: SgNode | null | undefined,
       comment: string | undefined,
-    ): void => {
-      if (!selectionNode) return
+    ): SymbolNode | undefined => {
+      if (!selectionNode) return undefined
       const line = node.range().start.line + 1
       const col = node.range().start.column
       const key = `${kind}:${name}:${line}:${col}`
-      if (seenSymbol.has(key)) return
+      if (seenSymbol.has(key)) return undefined
       try {
         const symbol = createSymbolNode({
           name,
@@ -478,8 +770,10 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
         })
         seenSymbol.add(key)
         symbols.push(symbol)
+        return symbol
       } catch (error) {
         if (!(error instanceof RangeError)) throw error
+        return undefined
       }
     }
 
@@ -502,6 +796,8 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
       'public_field_definition',
       'pair',
       'property_definition',
+      'arrow_function',
+      'function_expression',
     ])
     collectByKind(root, targetKinds, allNodes)
 
@@ -509,8 +805,18 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
       switch (nodeKind(node)) {
         case 'function_declaration': {
           const name = getName(node)
-          if (name)
-            addSymbol(name, SymbolKind.Function, node, node.field('name'), extractComment(node))
+          if (name) {
+            const sym = addSymbol(
+              name,
+              SymbolKind.Function,
+              node,
+              node.field('name'),
+              extractComment(node),
+            )
+            if (sym && node.field('body') === null) {
+              signatureSymbolIds.add(sym.id)
+            }
+          }
           break
         }
         case 'class_declaration':
@@ -520,11 +826,36 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
             addSymbol(name, SymbolKind.Class, node, node.field('name'), extractComment(node))
           break
         }
-        case 'method_definition':
+        case 'method_definition': {
+          const name = getName(node)
+          if (name) {
+            const sym = addSymbol(
+              name,
+              SymbolKind.Method,
+              node,
+              node.field('name'),
+              extractComment(node),
+            )
+            if (sym && node.field('body') === null) {
+              signatureSymbolIds.add(sym.id)
+            }
+          }
+          break
+        }
         case 'method_signature': {
           const name = getName(node)
-          if (name)
-            addSymbol(name, SymbolKind.Method, node, node.field('name'), extractComment(node))
+          if (name) {
+            const sym = addSymbol(
+              name,
+              SymbolKind.Method,
+              node,
+              node.field('name'),
+              extractComment(node),
+            )
+            if (sym) {
+              signatureSymbolIds.add(sym.id)
+            }
+          }
           break
         }
         case 'property_signature': {
@@ -603,22 +934,37 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
           this.processPairNode(node, filePath, addSymbol)
           break
         }
+        case 'arrow_function':
+        case 'function_expression': {
+          if (isAnonymousCallable(node) && containsCallExpression(node)) {
+            addSymbol('<anonymous>', SymbolKind.Function, node, node, extractComment(node))
+          }
+          break
+        }
       }
     }
 
     const imports = this.extractImportedNamesFromData(content, root)
-    const bindingFacts = this.extractBindingFactsFromData(filePath, content, symbols, imports)
-    const callFacts = this.extractCallFactsFromData(filePath, content, symbols)
+    const bindingFacts = this.extractBindingFactsFromData(filePath, content, symbols, imports, root)
+    const callFacts = this.extractCallFactsFromData(filePath, symbols, root)
 
     const declarations = this.collectTypeDeclarations(root, symbols)
 
     for (const child of root.children()) {
       if (nodeKind(child) !== 'export_statement') continue
 
+      const isDefaultExport = child
+        .children()
+        .some((candidate) => nodeKind(candidate) === 'default')
       const decl = child.field('declaration')
       if (decl) {
         const name = getName(decl)
-        if (name) exportedNames.add(name)
+        if (isDefaultExport) {
+          // `export default function foo() {}` publishes `default`, not `foo`.
+          if (name) exportBindings.push({ exportedName: 'default', localName: name })
+        } else if (name) {
+          exportedNames.add(name)
+        }
 
         if (nodeKind(decl) === 'lexical_declaration' || nodeKind(decl) === 'variable_declaration') {
           for (const declarator of decl.children()) {
@@ -628,16 +974,22 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
             }
           }
         }
+      } else if (isDefaultExport) {
+        const value = child.field('value')
+        if (value !== null && nodeKind(value) === 'identifier') {
+          exportBindings.push({ exportedName: 'default', localName: value.text() })
+        }
       }
 
-      for (const specChild of child.children()) {
-        if (nodeKind(specChild) === 'export_clause') {
+      if (child.field('source') === null) {
+        for (const specChild of child.children()) {
+          if (nodeKind(specChild) !== 'export_clause') continue
           for (const specifier of specChild.children()) {
-            if (nodeKind(specifier) === 'export_specifier') {
-              const nameNode = specifier.field('name')
-              const aliasNode = specifier.field('alias')
-              const exportedName = aliasNode?.text() ?? nameNode?.text()
-              if (exportedName) exportedNames.add(exportedName)
+            if (nodeKind(specifier) !== 'export_specifier') continue
+            const localName = specifier.field('name')?.text()
+            const exportedName = specifier.field('alias')?.text() ?? localName
+            if (localName !== undefined && exportedName !== undefined) {
+              exportBindings.push({ exportedName, localName })
             }
           }
         }
@@ -670,19 +1022,20 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
       symbols,
       imports,
       exportedNames,
+      exportBindings,
       reExports,
       declarations,
+      signatureSymbolIds,
     )
 
     return {
-      language:
-        lang === Lang.TypeScript
+      language: filePath.endsWith('.jsx')
+        ? 'jsx'
+        : lang === Lang.TypeScript
           ? 'typescript'
           : lang === Lang.Tsx
             ? 'tsx'
-            : lang === Lang.JavaScript
-              ? 'javascript'
-              : 'jsx',
+            : 'javascript',
       symbols: withEnclosingTypeParents(symbols),
       imports,
       bindingFacts,
@@ -704,8 +1057,10 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
    * @param symbols - Extracted declarations.
    * @param imports - Extracted static imports.
    * @param exportedNames - Names proven to be exported by this module.
+   * @param exportBindings - Local declarations published under an alias or `default`.
    * @param _reExports - Re-exports are linked later from parser state, not stored unresolved.
    * @param typeDeclarations - Syntax-proven local type owners and base clauses.
+   * @param signatureSymbolIds - Symbol IDs that represent signatures rather than definitions.
    * @returns Additive reference facts.
    */
   private buildReferenceFacts(
@@ -714,8 +1069,10 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
     symbols: readonly SymbolNode[],
     imports: readonly ImportDeclaration[],
     exportedNames: ReadonlySet<string>,
+    exportBindings: readonly TsExportBinding[],
     _reExports: readonly TsReExportInfo[],
     typeDeclarations: readonly TsTypeDeclarationInfo[],
+    signatureSymbolIds: ReadonlySet<string> = new Set(),
   ): ReferenceFacts {
     const ownerByMemberId = new Map<string, string>()
     const semanticsByMemberId = new Map<string, MemberSemantics>()
@@ -727,24 +1084,130 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
         semanticsByMemberId.set(methodId, semantics)
       }
     }
-    const logicalFacts = buildLogicalDeclarationFacts({
-      workspace,
-      declarations: symbols.map((symbol) =>
-        createAdapterDeclarationDescriptor({
+    const lexicalParentById = new Map(
+      withEnclosingTypeParents(symbols).map((symbol) => [symbol.id, symbol.parentId]),
+    )
+    const symbolKindById = new Map(symbols.map((symbol) => [symbol.id, symbol.kind]))
+    const descriptors = symbols.map((symbol) => {
+      if (symbol.name === '<anonymous>') {
+        return createPhysicalOnlyDeclarationDescriptor({
+          symbol,
+          reason: 'anonymous-callable',
+        })
+      }
+
+      // A callable declared inside another routine is lexically scoped: equal names in sibling
+      // routines or blocks are different functions, so no stable logical target exists for them.
+      const lexicalParentId = lexicalParentById.get(symbol.id)
+      const lexicalParentKind =
+        lexicalParentId === undefined ? undefined : symbolKindById.get(lexicalParentId)
+      if (
+        symbol.kind === SymbolKind.Function &&
+        (lexicalParentKind === SymbolKind.Function || lexicalParentKind === SymbolKind.Method)
+      ) {
+        return createPhysicalOnlyDeclarationDescriptor({
+          symbol,
+          reason: 'routine-local-callable',
+        })
+      }
+
+      const isSignature =
+        signatureSymbolIds.has(symbol.id) || symbol.comment?.includes('@signature')
+
+      if (symbol.kind === SymbolKind.Method) {
+        const ownerId = ownerByMemberId.get(symbol.id)
+        let sem = semanticsByMemberId.get(symbol.id) ?? this.memberSemantics(symbol)
+
+        // Check if this owner has an implementation for this method name
+        const ownerDecl = typeDeclarations.find((d) => d.symbolId === ownerId)
+        const hasImplementation = ownerDecl?.memberSymbolIds.some(
+          (id) =>
+            ownerDecl.memberIdsByName[symbol.name]?.includes(id) &&
+            !signatureSymbolIds.has(id) &&
+            semanticsByMemberId.get(id)?.kind === MemberKind.Method,
+        )
+
+        // Normalize overload member semantics if there's an implementation in the class
+        if (hasImplementation && sem?.kind === MemberKind.Signature) {
+          sem = { kind: MemberKind.Method, dispatch: MemberDispatch.Instance }
+        }
+
+        const occurrenceForm = isSignature
+          ? DeclarationOccurrenceForm.Signature
+          : DeclarationOccurrenceForm.Definition
+        const groupKey = ownerId ? `method:${ownerId}:${symbol.name}` : undefined
+
+        return createAdapterDeclarationDescriptor({
           symbol,
           surface: filePath,
           space: this.symbolSpace(symbol.kind),
-          ownerSymbolId: ownerByMemberId.get(symbol.id),
-          requiresOwner: symbol.kind === SymbolKind.Method,
-          memberSemantics: semanticsByMemberId.get(symbol.id) ?? this.memberSemantics(symbol),
-        }),
-      ),
+          ownerSymbolId: ownerId,
+          requiresOwner: true,
+          memberSemantics: sem,
+          occurrenceForm,
+          ...(groupKey === undefined ? {} : { groupKey }),
+        })
+      }
+
+      if (symbol.kind === SymbolKind.Function) {
+        const occurrenceForm = isSignature
+          ? DeclarationOccurrenceForm.Signature
+          : DeclarationOccurrenceForm.Definition
+        const sameName = symbols.filter(
+          (s) =>
+            s.kind === SymbolKind.Function && s.name === symbol.name && s.name !== '<anonymous>',
+        )
+        const groupKey = sameName.length > 1 ? `function:${filePath}:${symbol.name}` : undefined
+
+        return createAdapterDeclarationDescriptor({
+          symbol,
+          surface: filePath,
+          space: this.symbolSpace(symbol.kind),
+          ownerSymbolId: undefined,
+          requiresOwner: false,
+          memberSemantics: undefined,
+          occurrenceForm,
+          ...(groupKey === undefined ? {} : { groupKey }),
+        })
+      }
+
+      if (symbol.kind === SymbolKind.Property) {
+        // Fields, interface properties, and enum members are identified through their declaring
+        // owner, so equal names in different owners never share a logical target.
+        return createAdapterDeclarationDescriptor({
+          symbol,
+          surface: filePath,
+          space: this.symbolSpace(symbol.kind),
+          ownerSymbolId: ownerByMemberId.get(symbol.id) ?? lexicalParentId,
+          requiresOwner: true,
+          memberSemantics: semanticsByMemberId.get(symbol.id) ?? {
+            kind: MemberKind.Property,
+            dispatch: MemberDispatch.Instance,
+          },
+          occurrenceForm: DeclarationOccurrenceForm.Definition,
+        })
+      }
+
+      return createAdapterDeclarationDescriptor({
+        symbol,
+        surface: filePath,
+        space: this.symbolSpace(symbol.kind),
+        ownerSymbolId: ownerByMemberId.get(symbol.id),
+        requiresOwner: false,
+        memberSemantics: semanticsByMemberId.get(symbol.id) ?? this.memberSemantics(symbol),
+        occurrenceForm: DeclarationOccurrenceForm.Definition,
+      })
+    })
+
+    const logicalFacts = buildLogicalDeclarationFacts({
+      workspace,
+      declarations: descriptors,
     })
     const localTypeByName = new Map(typeDeclarations.map((item) => [item.name, item]))
     const hierarchyDescriptors: AdapterHierarchyDescriptor[] = []
     for (const child of typeDeclarations) {
       child.extendsNames.forEach((name, precedence) => {
-        const parent = localTypeByName.get(name)
+        const parent = name.includes('.') ? undefined : localTypeByName.get(name)
         if (parent) {
           hierarchyDescriptors.push({
             childSymbolId: child.symbolId,
@@ -755,7 +1218,7 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
         }
       })
       child.implementsNames.forEach((name, precedence) => {
-        const parent = localTypeByName.get(name)
+        const parent = name.includes('.') ? undefined : localTypeByName.get(name)
         if (parent) {
           hierarchyDescriptors.push({
             childSymbolId: child.symbolId,
@@ -770,16 +1233,22 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
       hierarchy: hierarchyDescriptors,
       logicalBySymbolId: logicalFacts.logicalBySymbolId,
     })
-    const publicBindings = symbols
-      .filter((symbol) => !ownerByMemberId.has(symbol.id) && exportedNames.has(symbol.name))
-      .map((symbol) =>
-        createPublicBinding({
-          surface: filePath,
-          exportedName: symbol.name,
-          space: this.symbolSpace(symbol.kind),
-          targetId: logicalFacts.logicalBySymbolId.get(symbol.id)?.id,
-        }),
-      )
+    const routes: readonly TsExportBinding[] = [
+      ...[...exportedNames].map((name) => ({ exportedName: name, localName: name })),
+      ...exportBindings,
+    ]
+    const publicBindings = routes.flatMap((route) =>
+      symbols
+        .filter((symbol) => !ownerByMemberId.has(symbol.id) && symbol.name === route.localName)
+        .map((symbol) =>
+          createPublicBinding({
+            surface: filePath,
+            exportedName: route.exportedName,
+            space: this.symbolSpace(symbol.kind),
+            targetId: logicalFacts.logicalBySymbolId.get(symbol.id)?.id,
+          }),
+        ),
+    )
     const localBindings = imports
       .filter((item) => item.localName.length > 0)
       .map((item) =>
@@ -792,10 +1261,13 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
           // the value space until a later, proven binding fact selects otherwise.
           space: SymbolSpace.Value,
           targetId: undefined,
+          range: item.range ?? WHOLE_FILE_START,
         }),
       )
     return {
       declarations: logicalFacts.declarations,
+      logicalSymbols: logicalFacts.retainedLogicalSymbols,
+      diagnostics: logicalFacts.diagnostics,
       publicBindings,
       localBindings,
       hierarchy: hierarchyFacts.hierarchy,
@@ -855,12 +1327,30 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
       if (imp.isRelative) {
         const resolved = this.resolveRelativeImportPath(analysis.filePath, imp.specifier)
         const candidates = Array.isArray(resolved) ? resolved : [resolved]
+        if (
+          imp.kind === ImportDeclarationKind.Namespace ||
+          imp.kind === ImportDeclarationKind.Default
+        ) {
+          const moduleFiles = candidates.filter(
+            (candidate) => session.getFileId(candidate) !== undefined,
+          )
+          if (moduleFiles.length !== 1) continue
+          const moduleFile = moduleFiles[0]!
+          // A namespace or default import depends on the module itself.
+          fileImports.push(moduleFile)
+          if (imp.kind === ImportDeclarationKind.Default) {
+            const target = this.findDefaultExportDeclaration(session, moduleFile)
+            if (target !== undefined) importMap.set(imp.localName, target)
+          }
+          continue
+        }
         for (const candidatePath of candidates) {
           const target =
             session.findSymbolsByFile(candidatePath).find((s) => s.name === imp.originalName) ??
             this.resolveReExportedSymbol(session, candidatePath, imp.originalName, new Set())
           if (target) {
             importMap.set(imp.localName, target.id)
+            fileImports.push(target.filePath)
             break
           }
         }
@@ -876,8 +1366,9 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
           const wsPrefix = packageToWorkspace.get(pkgName)
           if (wsPrefix !== undefined) {
             const candidates = session.findSymbolsByName(imp.originalName, wsPrefix + ':')
-            if (candidates.length > 0) {
+            if (candidates.length === 1) {
               importMap.set(imp.localName, candidates[0]!.id)
+              fileImports.push(candidates[0]!.filePath)
             }
           }
         }
@@ -892,7 +1383,65 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
       }
     }
 
-    return { importMap, fileImports }
+    return { importMap, fileImports: [...new Set(fileImports)] }
+  }
+
+  /**
+   * Resolves a heritage type name through imports using its written spelling.
+   * An unqualified name uses the import map. `ns.Type` resolves only through a namespace
+   * import of an indexed relative module, never through an unrelated simple name.
+   * @param written - Type name as written in the `extends`/`implements` clause.
+   * @param analysis - Analyzed file carrying its import declarations.
+   * @param context - Relation build context holding resolved imports and the session.
+   * @returns The imported declaration id, or undefined when no import proves it.
+   */
+  private resolveImportedTypeName(
+    written: string,
+    analysis: FileAnalysis,
+    context: RelationBuildContext,
+  ): string | undefined {
+    if (!written.includes('.')) return context.resolvedImports.importMap.get(written)
+    const [namespaceName, ...rest] = written.split('.')
+    if (rest.length !== 1 || namespaceName === undefined) return undefined
+    const typeName = rest[0]!
+    const namespaceImport = analysis.imports.find(
+      (declaration) =>
+        declaration.kind === ImportDeclarationKind.Namespace &&
+        declaration.localName === namespaceName &&
+        declaration.isRelative,
+    )
+    if (namespaceImport === undefined) return undefined
+    const resolved = this.resolveRelativeImportPath(analysis.filePath, namespaceImport.specifier)
+    const candidates = (Array.isArray(resolved) ? resolved : [resolved]).filter(
+      (candidate) => context.session.getFileId(candidate) !== undefined,
+    )
+    if (candidates.length !== 1) return undefined
+    const file = candidates[0]!
+    return (
+      context.session.findSymbolsByFile(file).find((symbol) => symbol.name === typeName)?.id ??
+      this.resolveReExportedSymbol(context.session, file, typeName, new Set())?.id
+    )
+  }
+
+  /**
+   * Finds the declaration published under `default` by one module.
+   * @param session - Index session holding public bindings and declarations.
+   * @param moduleFile - Indexed module file id.
+   * @returns The default export's declaration id, or undefined for anonymous or absent defaults.
+   */
+  private findDefaultExportDeclaration(
+    session: IndexSession,
+    moduleFile: string,
+  ): string | undefined {
+    const binding = session
+      .getPublicBindings()
+      .find((item) => item.surface === moduleFile && item.exportedName === 'default')
+    if (binding?.targetId === undefined) return undefined
+    const fileSymbolIds = new Set(session.findSymbolsByFile(moduleFile).map((symbol) => symbol.id))
+    return session
+      .getDeclarationsByLogicalId()
+      .get(binding.targetId)
+      ?.find((declaration) => fileSymbolIds.has(declaration.symbolId))?.symbolId
   }
 
   /**
@@ -996,21 +1545,6 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
       }
     }
 
-    for (const imp of analysis.imports) {
-      if (imp.isRelative) {
-        const resolved = this.resolveRelativeImportPath(analysis.filePath, imp.specifier)
-        const target = Array.isArray(resolved) ? resolved[0]! : resolved
-        relations.push(
-          createRelation({
-            source: analysis.filePath,
-            target,
-            type: RelationType.Imports,
-            metadata: { specifier: imp.specifier },
-          }),
-        )
-      }
-    }
-
     const declarations = tsState?.declarations ?? []
     const declarationsByName = new Map<string, TsTypeDeclarationInfo>(
       declarations.map((declaration) => [declaration.name, declaration]),
@@ -1019,9 +1553,8 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
 
     for (const declaration of declarations) {
       for (const [precedence, parentName] of declaration.extendsNames.entries()) {
-        const targetId =
-          context.resolvedImports.importMap.get(parentName) ??
-          declarationsByName.get(parentName)?.symbolId
+        const importedId = this.resolveImportedTypeName(parentName, analysis, context)
+        const targetId = importedId ?? declarationsByName.get(parentName)?.symbolId
         if (!targetId) continue
 
         const key = `${declaration.symbolId}:${RelationType.Extends}:${targetId}`
@@ -1032,7 +1565,15 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
               source: declaration.symbolId,
               target: targetId,
               type: RelationType.Extends,
-              metadata: { precedence },
+              metadata:
+                importedId === targetId && declaration.extendsRanges[precedence] !== undefined
+                  ? createImportedHierarchyMetadata({
+                      clauseRange: declaration.extendsRanges[precedence],
+                      precedence,
+                      requestedName: parentName,
+                      resolvedTargetSymbolId: targetId,
+                    })
+                  : { precedence },
             }),
           )
         }
@@ -1050,9 +1591,8 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
       }
 
       for (const [precedence, contractName] of declaration.implementsNames.entries()) {
-        const targetId =
-          context.resolvedImports.importMap.get(contractName) ??
-          declarationsByName.get(contractName)?.symbolId
+        const importedId = this.resolveImportedTypeName(contractName, analysis, context)
+        const targetId = importedId ?? declarationsByName.get(contractName)?.symbolId
         if (!targetId) continue
 
         const key = `${declaration.symbolId}:${RelationType.Implements}:${targetId}`
@@ -1063,7 +1603,15 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
               source: declaration.symbolId,
               target: targetId,
               type: RelationType.Implements,
-              metadata: { precedence },
+              metadata:
+                importedId === targetId && declaration.implementsRanges[precedence] !== undefined
+                  ? createImportedHierarchyMetadata({
+                      clauseRange: declaration.implementsRanges[precedence],
+                      precedence,
+                      requestedName: contractName,
+                      resolvedTargetSymbolId: targetId,
+                    })
+                  : { precedence },
             }),
           )
         }
@@ -1081,15 +1629,11 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
       }
     }
 
-    const localSymbolsByName = new Map<string, string>()
-    for (const s of analysis.symbols) {
-      localSymbolsByName.set(s.name, s.id)
-    }
-
     for (const call of analysis.callFacts) {
       if (call.form === CallForm.Free && call.callerSymbolId) {
         const calleeId =
-          context.resolvedImports.importMap.get(call.name) ?? localSymbolsByName.get(call.name)
+          context.resolvedImports.importMap.get(call.name) ??
+          this.resolveVisibleFreeCallee(analysis.symbols, call.callerSymbolId, call.name)
         if (calleeId) {
           const key = `${call.callerSymbolId}->${calleeId}`
           if (!seen.has(key)) {
@@ -1106,7 +1650,51 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
       }
     }
 
+    context.session.addRelations(
+      relations.filter(
+        (relation) =>
+          relation.type === RelationType.Extends || relation.type === RelationType.Implements,
+      ),
+    )
     return relations
+  }
+
+  /**
+   * Resolves a bare-name call to a declaration that is lexically visible to its caller.
+   *
+   * Only a module-level callable, or a callable declared inside the caller or one of its
+   * enclosing routines, can be the target of a free call. Members of classes and interfaces
+   * are reached through a receiver, never by a bare name, and are never candidates.
+   * @param symbols - Symbols declared in the file.
+   * @param callerSymbolId - Routine that contains the call.
+   * @param name - Called identifier.
+   * @returns The visible callee symbol ID, or undefined when none is provable.
+   */
+  private resolveVisibleFreeCallee(
+    symbols: readonly SymbolNode[],
+    callerSymbolId: string,
+    name: string,
+  ): string | undefined {
+    const byId = new Map(symbols.map((symbol) => [symbol.id, symbol]))
+    const enclosingRoutines = new Set<string | undefined>([undefined])
+    for (
+      let current = byId.get(callerSymbolId);
+      current !== undefined;
+      current = current.parentId === undefined ? undefined : byId.get(current.parentId)
+    ) {
+      if (current.kind === SymbolKind.Function || current.kind === SymbolKind.Method) {
+        enclosingRoutines.add(current.id)
+      }
+    }
+    const visible = symbols.filter(
+      (symbol) =>
+        symbol.name === name &&
+        (symbol.kind === SymbolKind.Function ||
+          symbol.kind === SymbolKind.Variable ||
+          symbol.kind === SymbolKind.Class) &&
+        enclosingRoutines.has(symbol.parentId),
+    )
+    return visible.at(-1)?.id
   }
 
   /**
@@ -1168,10 +1756,9 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
           valKind === 'arrow_function' ||
           valKind === 'function' ||
           valKind === 'function_expression' ||
-          valKind === 'generator_function'
+          valKind === 'generator_function' ||
+          (valKind === 'call_expression' && isHofCall(valueNode))
         ) {
-          addSymbol(name, SymbolKind.Function, child, nameNode, extractComment(child))
-        } else if (valKind === 'call_expression') {
           addSymbol(name, SymbolKind.Function, child, nameNode, extractComment(child))
         } else {
           if (isExported) {
@@ -1340,6 +1927,7 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
       valKind === 'boolean_literal'
     ) {
       if (isArrayDataRecordProperty(node)) return
+      if (!isNamedObjectProperty(node)) return
       addSymbol(keyName, SymbolKind.Variable, node, keyNode, extractComment(node))
     }
   }
@@ -1467,41 +2055,50 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
       }
     }
 
-    const dynamicImportPattern = /\bimport\s*\(\s*[`'"]([^`'"]+)[`'"]\s*\)/g
-    for (const match of content.matchAll(dynamicImportPattern)) {
-      const specifier = match[1]
-      if (specifier === undefined) continue
-      addImport({
-        originalName: '',
-        localName: '',
-        specifier,
-        isRelative: specifier.startsWith('.'),
-        kind: ImportDeclarationKind.Dynamic,
-      })
-    }
+    const callNodes: SgNode[] = []
+    collectByKind(root, new Set(['call_expression']), callNodes)
+    for (const callNode of callNodes) {
+      const fn = callNode.field('function')
+      if (!fn) continue
+      const fnKind = nodeKind(fn)
+      const fnText = fn.text().trim()
+      const isDynamic = fnKind === 'import' || fnText === 'import'
+      const isRequire = fnKind === 'identifier' && fnText === 'require'
+      if (!isDynamic && !isRequire) continue
 
-    const requirePattern = /(?<!\.)\brequire\s*\(\s*(['"])([^'"]+)\1\s*\)/g
-    for (const match of content.matchAll(requirePattern)) {
-      const specifier = match[2]
-      if (specifier === undefined) continue
-      addImport({
-        originalName: '',
-        localName: '',
-        specifier,
-        isRelative: specifier.startsWith('.'),
-        kind: ImportDeclarationKind.Require,
-      })
+      const args = callNode.field('arguments')
+      if (!args) continue
+      for (const arg of args.children()) {
+        const ak = nodeKind(arg)
+        if (ak === 'string' || ak === 'template_string' || ak === 'string_fragment') {
+          const specifier = arg
+            .text()
+            .replace(/^[`'"]|[`'"]$/g, '')
+            .trim()
+          if (specifier) {
+            addImport({
+              originalName: '',
+              localName: '',
+              specifier,
+              isRelative: specifier.startsWith('.'),
+              kind: isDynamic ? ImportDeclarationKind.Dynamic : ImportDeclarationKind.Require,
+            })
+          }
+          break
+        }
+      }
     }
 
     return results
   }
 
   /**
-   * Extracts binding facts from TS content.
+   * Extracts binding facts from TS AST.
    * @param filePath - Path of the file.
    * @param content - TS content.
    * @param symbols - SymbolNode array.
    * @param imports - ImportDeclaration array.
+   * @param root - SgNode root.
    * @returns Array of binding facts.
    */
   private extractBindingFactsFromData(
@@ -1509,6 +2106,7 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
     content: string,
     symbols: SymbolNode[],
     imports: ImportDeclaration[],
+    root: SgNode,
   ): BindingFact[] {
     const facts: BindingFact[] = []
     const seen = new Set<string>()
@@ -1517,11 +2115,10 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
       name: string,
       sourceKind: BindingSourceKind,
       targetName: string | undefined,
-      index: number,
+      location: SourceLocation,
       metadata?: Readonly<Record<string, unknown>>,
     ): void => {
       if (targetName !== undefined && BUILTIN_TYPE_NAMES.has(targetName)) return
-      const location = locationFromIndex(filePath, content, index)
       const key = `${name}:${sourceKind}:${targetName ?? ''}:${location.line}:${location.column}`
       if (seen.has(key)) return
       seen.add(key)
@@ -1544,275 +2141,383 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
         declaration.originalName === '*' || declaration.originalName === 'default'
           ? declaration.localName
           : declaration.originalName
-      addFact(declaration.localName, BindingSourceKind.ImportedType, targetName, 0, {
-        specifier: declaration.specifier,
-        kind: declaration.kind ?? ImportDeclarationKind.Named,
-      })
+      addFact(
+        declaration.localName,
+        BindingSourceKind.ImportedType,
+        targetName,
+        {
+          filePath,
+          line: 1,
+          column: 0,
+          endLine: undefined,
+          endColumn: undefined,
+        },
+        {
+          specifier: declaration.specifier,
+          kind: declaration.kind ?? ImportDeclarationKind.Named,
+        },
+      )
     }
 
-    this.extractClassReceiverFacts(filePath, content, addFact)
-    this.extractTypedParameterFacts(content, addFact)
-    this.extractReturnTypeFacts(content, addFact)
-    this.extractPropertyTypeFacts(content, addFact)
-    this.extractConstructionAliasFacts(content, addFact)
-    this.extractTypeAliasRhsFacts(content, addFact)
+    this.extractClassReceiverFacts(filePath, root, addFact)
+    this.extractTypedParameterFacts(filePath, root, addFact)
+    this.extractReturnTypeFacts(filePath, root, addFact)
+    this.extractPropertyTypeFacts(filePath, root, addFact)
+    this.extractConstructionAliasFacts(filePath, root, addFact)
+    this.extractTypeAliasRhsFacts(filePath, root, addFact)
 
     return facts
   }
 
   /**
-   * Extracts call facts from TS content.
+   * Extracts call facts from TS AST.
    * @param filePath - Path of the file.
-   * @param content - TS content.
    * @param symbols - SymbolNode array.
+   * @param root - SgNode root.
    * @returns Array of call facts.
    */
   private extractCallFactsFromData(
     filePath: string,
-    content: string,
     symbols: SymbolNode[],
+    root: SgNode,
   ): CallFact[] {
     const facts: CallFact[] = []
     const seen = new Set<string>()
 
-    const addFact = (
-      form: CallForm,
-      name: string,
-      receiverName: string | undefined,
-      index: number,
-    ): void => {
-      const location = locationFromIndex(filePath, content, index)
-      const key = `${form}:${receiverName ?? ''}:${name}:${location.line}:${location.column}`
-      if (seen.has(key)) return
-      seen.add(key)
-      facts.push({
+    const callNodes: SgNode[] = []
+    collectByKind(root, new Set(['call_expression', 'new_expression']), callNodes)
+
+    for (const node of callNodes) {
+      const k = nodeKind(node)
+      const range = rangeOf(node)
+      const caller = findContainingCallableSymbol(
+        symbols,
+        { line: range.startLine, column: range.startColumn },
+        { callableKinds: TS_CALLABLE_KINDS },
+      )
+      const callerSymbolId = caller?.id
+      const argsNode = node.field('arguments')
+      const arity = argsNode ? countAstArguments(argsNode) : 0
+      const location: SourceLocation = {
         filePath,
-        scopeId: filePath,
-        callerSymbolId: findEnclosingSymbolIdByLine(symbols, location.line),
-        form,
-        name,
-        receiverName,
-        targetName: name,
-        arity: undefined,
-        location,
-        metadata: undefined,
-      })
-    }
+        line: range.startLine,
+        column: range.startColumn,
+        endLine: range.endLine,
+        endColumn: range.endColumn,
+      }
 
-    const constructorPattern =
-      /\bnew\s+(?:(?<receiver>[A-Za-z_$][\w$]*)\.)?(?<name>[A-Za-z_$][\w$]*)\s*\(/g
-    for (const match of content.matchAll(constructorPattern)) {
-      const name = match.groups?.name
-      if (name === undefined) continue
-      addFact(CallForm.Constructor, name, match.groups?.receiver, match.index ?? 0)
-    }
+      if (k === 'new_expression') {
+        const ctor = node.field('constructor')
+        if (!ctor) continue
+        let name: string
+        let receiverName: string | undefined
+        const ctorKind = nodeKind(ctor)
+        if (ctorKind === 'identifier') {
+          name = ctor.text().trim()
+          if (isShadowedByEnclosingScope(node, name)) continue
+        } else if (ctorKind === 'member_expression') {
+          name = ctor.field('property')?.text().trim() ?? ctor.text().trim()
+          const obj = ctor.field('object')
+          receiverName = obj?.field('property')?.text().trim() ?? obj?.text().trim()
+        } else {
+          name = ctor.text().trim()
+        }
+        if (!name) continue
+        const key = `${CallForm.Constructor}:${receiverName ?? ''}:${name}:${location.line}:${location.column}`
+        if (seen.has(key)) continue
+        seen.add(key)
+        facts.push({
+          filePath,
+          scopeId: filePath,
+          callerSymbolId,
+          form: CallForm.Constructor,
+          name,
+          receiverName,
+          targetName: name,
+          arity,
+          location,
+          metadata: undefined,
+        })
+      } else if (k === 'call_expression') {
+        const fn = node.field('function')
+        if (!fn) continue
+        const fnKind = nodeKind(fn)
 
-    const memberPattern =
-      /(?:(?:\b(?<receiver>[A-Za-z_$][\w$]*)|[)\]])\??\.)\s*(?<name>[A-Za-z_$][\w$]*)\s*\(/g
-    for (const match of content.matchAll(memberPattern)) {
-      const receiver = match.groups?.receiver
-      const name = match.groups?.name
-      if (name === undefined) continue
-      const form = receiver && /^[A-Z]/.test(receiver) ? CallForm.Static : CallForm.Member
-      addFact(form, name, receiver, match.index ?? 0)
-    }
+        // Skip dynamic imports and literal require calls — handled as import declarations
+        if (fnKind === 'import' || fn.text().trim() === 'import') continue
+        if (fnKind === 'identifier' && fn.text().trim() === 'require') continue
 
-    const freePattern = /(?<![.\w$])(?<name>[A-Za-z_$][\w$]*)\s*\(/g
-    for (const match of content.matchAll(freePattern)) {
-      const name = match.groups?.name
-      if (name === undefined || this.isExcludedFreeCall(content, match.index ?? 0, name)) continue
-      addFact(CallForm.Free, name, undefined, match.index ?? 0)
+        let name: string | undefined
+        let receiverName: string | undefined
+        let form: CallForm
+
+        if (fnKind === 'identifier') {
+          name = fn.text().trim()
+          if (isShadowedByEnclosingScope(node, name)) continue
+          form = CallForm.Free
+        } else if (fnKind === 'member_expression') {
+          const prop = fn.field('property')
+          name = prop?.text().trim()
+          if (!name) continue
+          const obj = fn.field('object')
+          if (obj) {
+            const objKind = nodeKind(obj)
+            if (objKind === 'identifier' || objKind === 'this') {
+              receiverName = obj.text().trim()
+            } else if (objKind === 'member_expression') {
+              receiverName = obj.field('property')?.text().trim() ?? obj.text().trim()
+            }
+          }
+          const isStatic =
+            receiverName !== undefined &&
+            symbols.some(
+              (s) =>
+                s.name === receiverName &&
+                (s.kind === SymbolKind.Class || s.kind === SymbolKind.Enum),
+            )
+          form = isStatic ? CallForm.Static : CallForm.Member
+        } else if (fnKind === 'super' || fn.text().trim() === 'super') {
+          name = 'super'
+          form = CallForm.Free
+        } else {
+          name = fn.field('property')?.text().trim() ?? fn.text().trim()
+          form = CallForm.Free
+        }
+
+        if (!name) continue
+        const key = `${form}:${receiverName ?? ''}:${name}:${location.line}:${location.column}`
+        if (seen.has(key)) continue
+        seen.add(key)
+        facts.push({
+          filePath,
+          scopeId: filePath,
+          callerSymbolId,
+          form,
+          name,
+          receiverName,
+          targetName: name,
+          arity,
+          location,
+          metadata: undefined,
+        })
+      }
     }
 
     return facts
   }
 
   /**
-   * Extracts class receiver facts.
+   * Extracts class receiver facts using AST traversal.
    * @param filePath - Path of the file.
-   * @param content - TS content.
+   * @param root - SgNode root.
    * @param addFact - Callback to add fact.
    */
   private extractClassReceiverFacts(
     filePath: string,
-    content: string,
+    root: SgNode,
     addFact: (
       name: string,
       sourceKind: BindingSourceKind,
       targetName: string | undefined,
-      index: number,
+      location: SourceLocation,
       metadata?: Readonly<Record<string, unknown>>,
     ) => void,
   ): void {
-    const classPattern = /\bclass\s+([A-Za-z_$][\w$]*)/g
-    for (const match of content.matchAll(classPattern)) {
-      const className = match[1]
-      if (className === undefined) continue
-      addFact('this', BindingSourceKind.Receiver, className, match.index ?? 0, {
+    const classNodes: SgNode[] = []
+    collectByKind(root, new Set(['class_declaration', 'abstract_class_declaration']), classNodes)
+    for (const node of classNodes) {
+      const className = getName(node)
+      if (!className) continue
+      addFact('this', BindingSourceKind.Receiver, className, locationOf(node, filePath), {
         filePath,
       })
     }
   }
 
   /**
-   * Extracts typed parameter facts.
-   * @param content - TS content.
+   * Extracts typed parameter facts using AST traversal.
+   * @param filePath - Path of the file.
+   * @param root - SgNode root.
    * @param addFact - Callback to add fact.
    */
   private extractTypedParameterFacts(
-    content: string,
+    filePath: string,
+    root: SgNode,
     addFact: (
       name: string,
       sourceKind: BindingSourceKind,
       targetName: string | undefined,
-      index: number,
+      location: SourceLocation,
       metadata?: Readonly<Record<string, unknown>>,
     ) => void,
   ): void {
-    const parameterPattern =
-      /(?:^|[,(]\s*)(?:public|private|protected|readonly|static|\s)*([A-Za-z_$][\w$]*)\??\s*:\s*([^,)=;{}]+)/gm
-    for (const match of content.matchAll(parameterPattern)) {
-      const name = match[1]
-      const typeText = match[2]
-      if (name === undefined || typeText === undefined) continue
-      for (const targetName of extractTypeReferenceNames(typeText)) {
-        addFact(name, BindingSourceKind.Parameter, targetName, match.index ?? 0)
+    const paramNodes: SgNode[] = []
+    collectByKind(root, new Set(['required_parameter', 'optional_parameter']), paramNodes)
+    for (const node of paramNodes) {
+      const patternNode = node.field('pattern') ?? node.field('name')
+      const name = patternNode?.text().trim()
+      const typeNode = node.field('type')
+      if (!name || !typeNode) continue
+      for (const targetName of extractTypeReferenceNames(typeNode.text())) {
+        addFact(name, BindingSourceKind.Parameter, targetName, locationOf(node, filePath))
       }
     }
   }
 
   /**
-   * Extracts return type facts.
-   * @param content - TS content.
+   * Extracts return type facts using AST traversal.
+   * @param filePath - Path of the file.
+   * @param root - SgNode root.
    * @param addFact - Callback to add fact.
    */
   private extractReturnTypeFacts(
-    content: string,
+    filePath: string,
+    root: SgNode,
     addFact: (
       name: string,
       sourceKind: BindingSourceKind,
       targetName: string | undefined,
-      index: number,
+      location: SourceLocation,
       metadata?: Readonly<Record<string, unknown>>,
     ) => void,
   ): void {
-    const returnPattern = /\)\s*:\s*([^={;]+)\s*(?:=>|\{)/g
-    for (const match of content.matchAll(returnPattern)) {
-      const typeText = match[1]
-      if (typeText === undefined) continue
-      for (const targetName of extractTypeReferenceNames(typeText)) {
-        addFact(targetName, BindingSourceKind.ReturnType, targetName, match.index ?? 0)
+    const fnNodes: SgNode[] = []
+    collectByKind(
+      root,
+      new Set([
+        'function_declaration',
+        'method_definition',
+        'method_signature',
+        'arrow_function',
+        'function_expression',
+      ]),
+      fnNodes,
+    )
+    for (const node of fnNodes) {
+      const returnTypeNode = node.field('return_type')
+      if (!returnTypeNode) continue
+      for (const targetName of extractTypeReferenceNames(returnTypeNode.text())) {
+        addFact(
+          targetName,
+          BindingSourceKind.ReturnType,
+          targetName,
+          locationOf(returnTypeNode, filePath),
+        )
       }
     }
   }
 
   /**
-   * Extracts property type facts.
-   * @param content - TS content.
+   * Extracts property type facts using AST traversal.
+   * @param filePath - Path of the file.
+   * @param root - SgNode root.
    * @param addFact - Callback to add fact.
    */
   private extractPropertyTypeFacts(
-    content: string,
+    filePath: string,
+    root: SgNode,
     addFact: (
       name: string,
       sourceKind: BindingSourceKind,
       targetName: string | undefined,
-      index: number,
+      location: SourceLocation,
       metadata?: Readonly<Record<string, unknown>>,
     ) => void,
   ): void {
-    const propertyPattern =
-      /(?:^|\n)\s*(?:public|private|protected|readonly|static|\s)*([A-Za-z_$][\w$]*)\??\s*:\s*([^=;,\n]+)/g
-    for (const match of content.matchAll(propertyPattern)) {
-      const name = match[1]
-      const typeText = match[2]
-      if (name === undefined || typeText === undefined) continue
-      for (const targetName of extractTypeReferenceNames(typeText)) {
-        addFact(name, BindingSourceKind.Property, targetName, match.index ?? 0)
+    const propNodes: SgNode[] = []
+    collectByKind(
+      root,
+      new Set(['property_signature', 'field_definition', 'public_field_definition']),
+      propNodes,
+    )
+    for (const node of propNodes) {
+      const nameNode = node.field('name')
+      const typeNode = node.field('type')
+      if (!nameNode || !typeNode) continue
+      const name = nameNode.text().trim()
+      for (const targetName of extractTypeReferenceNames(typeNode.text())) {
+        addFact(name, BindingSourceKind.Property, targetName, locationOf(node, filePath))
       }
     }
   }
 
   /**
-   * Extracts construction alias facts.
-   * @param content - TS content.
+   * Extracts construction alias facts using AST traversal.
+   * @param filePath - Path of the file.
+   * @param root - SgNode root.
    * @param addFact - Callback to add fact.
    */
   private extractConstructionAliasFacts(
-    content: string,
+    filePath: string,
+    root: SgNode,
     addFact: (
       name: string,
       sourceKind: BindingSourceKind,
       targetName: string | undefined,
-      index: number,
+      location: SourceLocation,
       metadata?: Readonly<Record<string, unknown>>,
     ) => void,
   ): void {
-    const aliasPattern =
-      /\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*new\s+(?:(?:[A-Za-z_$][\w$]*)\.)?([A-Za-z_$][\w$]*)\s*\(/g
-    for (const match of content.matchAll(aliasPattern)) {
-      const name = match[1]
-      const targetName = match[2]
-      if (name === undefined || targetName === undefined) continue
-      addFact(name, BindingSourceKind.ConstructorCall, targetName, match.index ?? 0)
+    const declNodes: SgNode[] = []
+    collectByKind(root, new Set(['variable_declarator']), declNodes)
+    for (const node of declNodes) {
+      const nameNode = node.field('name')
+      const valueNode = node.field('value')
+      if (!nameNode || !valueNode) continue
+      if (nodeKind(nameNode) !== 'identifier' || nodeKind(valueNode) !== 'new_expression') continue
+      const ctorNode = valueNode.field('constructor')
+      if (!ctorNode) continue
+      let targetName: string | undefined
+      const ctorKind = nodeKind(ctorNode)
+      if (ctorKind === 'identifier') {
+        targetName = ctorNode.text().trim()
+      } else if (ctorKind === 'member_expression') {
+        targetName = ctorNode.field('property')?.text().trim() ?? ctorNode.text().trim()
+      } else {
+        targetName = ctorNode.text().trim()
+      }
+      if (!targetName) continue
+      addFact(
+        nameNode.text().trim(),
+        BindingSourceKind.ConstructorCall,
+        targetName,
+        locationOf(node, filePath),
+      )
     }
   }
 
   /**
-   * Extracts type alias RHS facts.
-   * @param content - TS content.
+   * Extracts type alias RHS facts using AST traversal.
+   * @param filePath - Path of the file.
+   * @param root - SgNode root.
    * @param addFact - Callback to add fact.
    */
   private extractTypeAliasRhsFacts(
-    content: string,
+    filePath: string,
+    root: SgNode,
     addFact: (
       name: string,
       sourceKind: BindingSourceKind,
       targetName: string | undefined,
-      index: number,
+      location: SourceLocation,
       metadata?: Readonly<Record<string, unknown>>,
     ) => void,
   ): void {
-    const typeAliasPattern = /\btype\s+([A-Za-z_$][\w$]*)\s*=\s*([^;\n]+)/g
-    for (const match of content.matchAll(typeAliasPattern)) {
-      const aliasName = match[1]
-      const rhsText = match[2]
-      if (aliasName === undefined || rhsText === undefined) continue
-      for (const targetName of extractTypeReferenceNames(rhsText)) {
-        if (targetName === aliasName) continue
-        addFact(aliasName, BindingSourceKind.ImportedType, targetName, match.index ?? 0)
+    const aliasNodes: SgNode[] = []
+    collectByKind(root, new Set(['type_alias_declaration']), aliasNodes)
+    for (const node of aliasNodes) {
+      const name = getName(node)
+      const valueNode = node.field('value')
+      if (!name || !valueNode) continue
+      for (const targetName of extractTypeReferenceNames(valueNode.text())) {
+        if (targetName === name) continue
+        addFact(name, BindingSourceKind.ImportedType, targetName, locationOf(node, filePath))
       }
     }
   }
 
   /**
-   * Checks if call is excluded.
-   * @param content - TS content.
-   * @param index - Index.
-   * @param name - Name.
-   * @returns True if excluded.
-   */
-  private isExcludedFreeCall(content: string, index: number, name: string): boolean {
-    const before = content.slice(Math.max(index - 16, 0), index)
-    return (
-      [
-        'if',
-        'for',
-        'while',
-        'switch',
-        'catch',
-        'function',
-        'constructor',
-        'import',
-        'require',
-      ].includes(name) ||
-      /\b(function|class|new)\s+$/.test(before) ||
-      /\brequire\.resolve\s*$/.test(before)
-    )
-  }
-
-  /**
-   * Collects type declarations.
+   * Collects type declarations using AST traversal.
    * @param root - SgNode root.
    * @param symbols - SymbolNode array.
    * @returns Array of type declarations.
@@ -1843,9 +2548,38 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
       if (!ownerSymbol) continue
       const symbolId = ownerSymbol.id
 
-      const header = node.text().split('{')[0] ?? node.text()
-      const extendsMatch = header.match(/\bextends\s+([^{]+?)(?:\bimplements\b|$)/)
-      const implementsMatch = header.match(/\bimplements\s+([^{]+)$/)
+      let extendsNames: string[] = []
+      let implementsNames: string[] = []
+      let extendsRanges: SourceRange[] = []
+      let implementsRanges: SourceRange[] = []
+
+      if (nodeKind(node) === 'interface_declaration') {
+        const extendsClause = node.children().find((c) => nodeKind(c) === 'extends_type_clause')
+        if (extendsClause) {
+          extendsNames = parseTypeNames(extendsClause.text().replace(/^extends\s+/, ''))
+          extendsRanges = heritageExpressionRanges(extendsClause, extendsNames.length)
+        }
+      } else {
+        const heritage = node.children().find((c) => nodeKind(c) === 'class_heritage')
+        if (heritage) {
+          const extendsClause = heritage.children().find((c) => nodeKind(c) === 'extends_clause')
+          if (extendsClause) {
+            extendsNames = parseTypeNames(extendsClause.text().replace(/^extends\s+/, '')).slice(
+              0,
+              1,
+            )
+            extendsRanges = heritageExpressionRanges(extendsClause, extendsNames.length)
+          }
+          const implementsClause = heritage
+            .children()
+            .find((c) => nodeKind(c) === 'implements_clause')
+          if (implementsClause) {
+            implementsNames = parseTypeNames(implementsClause.text().replace(/^implements\s+/, ''))
+            implementsRanges = heritageExpressionRanges(implementsClause, implementsNames.length)
+          }
+        }
+      }
+
       const memberIdsByName: Record<string, string[]> = Object.create(null) as Record<
         string,
         string[]
@@ -1877,12 +2611,10 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
         memberIdsByName,
         memberSymbolIds,
         memberSemanticsById,
-        extendsNames:
-          nodeKind(node) === 'interface_declaration'
-            ? parseTypeNames(extendsMatch?.[1])
-            : parseTypeNames(extendsMatch?.[1]).slice(0, 1),
-        implementsNames:
-          nodeKind(node) === 'interface_declaration' ? [] : parseTypeNames(implementsMatch?.[1]),
+        extendsNames,
+        implementsNames,
+        extendsRanges,
+        implementsRanges,
       })
     }
 
@@ -2069,7 +2801,7 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
   ): string | undefined {
     const candidates = specifier.startsWith('.')
       ? this.relativeCandidates(fromFile, specifier)
-      : this.packageEntryCandidates(specifier, packageToWorkspace)
+      : this.packageEntryCandidates(specifier, packageToWorkspace, session)
     const indexed = candidates.filter((candidate) => session.getFileId(candidate) !== undefined)
     return indexed.length === 1 ? indexed[0] : undefined
   }
@@ -2089,26 +2821,33 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
    * Maps a package specifier through `exports` or `main` to source candidates.
    * @param specifier - Non-relative specifier.
    * @param packageToWorkspace - Package name to workspace name.
+   * @param session - Session holding the manifests prepared during file analysis.
    * @returns Source file ids to test against the session. Empty when the package is unknown.
    */
   private packageEntryCandidates(
     specifier: string,
     packageToWorkspace: ReadonlyMap<string, string>,
+    session: IndexSession,
   ): readonly string[] {
     const packageName = this.resolvePackageFromSpecifier(specifier, [...packageToWorkspace.keys()])
     if (packageName === undefined) return []
     const workspace = packageToWorkspace.get(packageName)
-    const codeRoot = workspace === undefined ? undefined : this.workspaceCodeRoots.get(workspace)
+    const codeRoot =
+      workspace === undefined
+        ? undefined
+        : sessionScopedState(
+            session,
+            WORKSPACE_CODE_ROOTS_KEY,
+            () => new Map<string, string>(),
+          ).get(workspace)
     if (workspace === undefined || codeRoot === undefined) return []
-    let manifest: { exports?: unknown; main?: string }
-    try {
-      manifest = JSON.parse(readFileSync(join(codeRoot, 'package.json'), 'utf8')) as {
-        exports?: unknown
-        main?: string
-      }
-    } catch {
-      return []
-    }
+    // Manifests were prepared during file analysis; this pass performs no filesystem reads.
+    const manifest = sessionScopedState(
+      session,
+      PACKAGE_MANIFESTS_KEY,
+      () => new Map<string, PackageEntryManifest | null>(),
+    ).get(codeRoot)
+    if (manifest === undefined || manifest === null) return []
     const subpath = specifier === packageName ? '.' : `./${specifier.slice(packageName.length + 1)}`
     const published =
       subpath === '.'
@@ -2208,23 +2947,19 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
 
 /**
  * Reads the published relative path from an exports target.
- * @param raw - String target or conditional exports object.
- * @returns The published relative path, or undefined when the target is not a string path.
+ *
+ * A plain string path, or a subpath map whose `.` entry is a plain string path, is read.
+ * Conditional exports (`import`, `require`, `default`, and other conditions) depend on the
+ * consumer's platform and resolution conditions, which this adapter cannot prove, so they
+ * remain unsupported and select nothing.
+ * @param raw - String target or subpath map.
+ * @returns The published relative path, or undefined when the target is not a plain string path.
  */
 function publishedTarget(raw: unknown): string | undefined {
   if (typeof raw === 'string') return raw
   if (raw === null || typeof raw !== 'object') return undefined
   const record = raw as Record<string, unknown>
-  if (
-    typeof record['.'] === 'string' ||
-    (record['.'] !== null && typeof record['.'] === 'object')
-  ) {
-    return publishedTarget(record['.'])
-  }
-  for (const key of ['import', 'default', 'require']) {
-    if (typeof record[key] === 'string') return record[key]
-  }
-  return undefined
+  return typeof record['.'] === 'string' ? record['.'] : undefined
 }
 
 /**

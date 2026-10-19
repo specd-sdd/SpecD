@@ -88,6 +88,30 @@
 - **THEN** both declarations remain available as location-backed symbols
 - **AND** neither produces an ownerless logical member fact or package-level public binding
 
+### Requirement: TypeScript overload and declaration-group identity
+
+#### Scenario: Adding overload signatures does not change method identity
+
+- **GIVEN** a class method has one implementation and no overload signatures
+- **WHEN** overload signatures are added above the unchanged implementation
+- **THEN** the canonical logical method ID is unchanged
+- **AND** every signature and the implementation appear in its declaration set
+- **AND** the logical member kind remains `method`
+
+#### Scenario: Same-name functions in different lexical owners do not group
+
+- **GIVEN** two nested functions with the same name are declared under different enclosing functions
+- **WHEN** logical groups are built
+- **THEN** they produce distinct logical targets
+- **AND** neither is treated as an overload of the other
+
+#### Scenario: Equal names without an overload key remain separate
+
+- **GIVEN** two TypeScript declarations have equal owner, name, and broad kind but no proven overload or merge-group evidence
+- **WHEN** logical declaration facts are built
+- **THEN** an absent group key does not merge them
+- **AND** each declaration remains a competing target
+
 ### Requirement: Imports, exports, and public bindings
 
 #### Scenario: Competing barrel routes remain competing bindings
@@ -110,8 +134,40 @@
 
 - **GIVEN** code containing literal string `import('./module.js')` and chained call `builder().build()`
 - **WHEN** `analyzeFile()` and `buildRelations()` execute
-- **THEN** an `IMPORTS` relation is emitted for `./module.js`
 - **AND** deterministic call facts are extracted for the nested and chained call sites
+- **THEN** the literal dynamic import of `./module.js` is returned as a resolvable import so the indexer can derive its `IMPORTS` relation
+
+### Requirement: TypeScript caller and local-binding semantics
+
+#### Scenario: Call initializer remains a variable inside its function
+
+- **GIVEN** `function process() { const result = Service.run() }`
+- **WHEN** the adapter extracts declarations and the `Service.run()` call fact
+- **THEN** `process` is the caller
+- **AND** `result` is a lexical variable binding rather than a callable function target
+
+#### Scenario: Block-local callable names do not collide
+
+- **GIVEN** alternate branches each declare a callable local named `result`
+- **WHEN** declaration and binding identities are created
+- **THEN** their physical declarations and lexical bindings are distinct
+- **AND** they do not collapse into one ownerless logical target
+
+#### Scenario: Anonymous argument key is not a declaration or caller
+
+- **GIVEN** an anonymous test callback contains `await expect(uc.execute({ name: 'my-change' })).rejects.toThrow()`
+- **WHEN** TypeScript declarations and call facts are extracted
+- **THEN** the anonymous object key `name` produces no `SymbolNode`, `LocalBinding`, or logical target
+- **AND** the real `uc.execute()` call targets `ArchiveChange.execute`
+- **AND** its caller is the range-containing physical callback when that callback is represented, otherwise caller-unresolved
+- **AND** no `CALLS` relation uses `variable:name` as its source
+
+#### Scenario: Named object property remains eligible physical evidence
+
+- **GIVEN** a supported named object declaration contains a scalar property named `name`
+- **WHEN** declarations are classified
+- **THEN** the property may remain physical declaration evidence under the named owner
+- **AND** this policy does not apply to the key of an anonymous argument object
 
 ### Requirement: TypeScript hierarchy and provenance evidence
 
@@ -140,3 +196,33 @@
 - **WHEN** the adapter reports `hierarchy: true`
 - **THEN** non-empty ordered hierarchy and provenance evidence is emitted
 - **AND** parse failure is reported as coverage rather than a same-name guess
+
+### Requirement: TypeScript parser-authoritative structural extraction
+
+#### Scenario: Calls use TypeScript syntax nodes
+
+- **GIVEN** a file contains optional, computed, generic, chained, nested, multiline, and constructor call forms plus equivalent text in comments and templates
+- **WHEN** call and construction facts are extracted
+- **THEN** each supported parser call or construction node yields at most its corresponding fact with exact range and ancestry
+- **AND** comment and template contents yield none
+
+#### Scenario: Imports, types, and heritage use bounded nodes
+
+- **GIVEN** static imports, literal dynamic imports, literal `require`, parameters, returns, properties, aliases, and heritage clauses span multiple lines
+- **WHEN** reference and import facts are extracted
+- **THEN** each fact is bounded by its parser-proven construct or type node
+- **AND** text outside those nodes cannot add an import, type, owner, or hierarchy edge
+
+#### Scenario: Unresolved TypeScript import produces no relation
+
+- **GIVEN** an import specifier has candidate paths but no resolvable target
+- **WHEN** import relations are emitted
+- **THEN** no relation targets the first candidate
+- **AND** the unresolved import remains diagnostic evidence only
+
+#### Scenario: Imported TypeScript heritage retains provenance
+
+- **GIVEN** a class extends or implements an imported target
+- **WHEN** hierarchy evidence is emitted
+- **THEN** the physical hierarchy relation and shared hierarchy reference fact identify the same target
+- **AND** the fact retains the heritage-clause expression range and import-resolution provenance

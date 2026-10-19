@@ -20,7 +20,9 @@ import { type ImpactResultFilter } from '../../src/domain/value-objects/impact-r
 import {
   createLogicalSymbol,
   createPublicBinding,
+  DeclarationOccurrenceForm,
   SymbolSpace,
+  type ResolvedSymbolTarget,
 } from '../../src/domain/value-objects/symbol-reference.js'
 import { SymbolKind } from '../../src/domain/value-objects/symbol-kind.js'
 import { PhpLanguageAdapter } from '../../src/infrastructure/tree-sitter/php-language-adapter.js'
@@ -113,6 +115,99 @@ describe('CodeGraphProvider', () => {
     })
 
     expect(provider).toBeDefined()
+    await provider.close()
+  })
+
+  it('delegates resolved impact with the complete logical declaration set', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-resolved-impact-'))
+    const store = new InMemoryGraphStore(tempDir)
+    const provider = createCodeGraphProvider({
+      storagePath: tempDir,
+      projectRoot: tempDir,
+      graphStoreFactories: { custom: { create: () => store } },
+      graphStoreId: 'custom',
+    })
+    await provider.open()
+
+    const first = createSymbolNode({
+      name: 'run',
+      kind: SymbolKind.Function,
+      filePath: 'ws:first.ts',
+      line: 1,
+      column: 0,
+    })
+    const second = createSymbolNode({
+      name: 'run',
+      kind: SymbolKind.Function,
+      filePath: 'ws:second.ts',
+      line: 1,
+      column: 0,
+    })
+    await store.upsertFile(
+      createFileNode({
+        path: 'ws:first.ts',
+        language: 'typescript',
+        contentHash: 'a',
+        workspace: 'ws',
+      }),
+      [first],
+      [],
+    )
+    await store.upsertFile(
+      createFileNode({
+        path: 'ws:second.ts',
+        language: 'typescript',
+        contentHash: 'b',
+        workspace: 'ws',
+      }),
+      [second],
+      [],
+    )
+
+    const logical = createLogicalSymbol({
+      workspace: 'ws',
+      surface: 'ws:public.ts',
+      name: 'run',
+      space: SymbolSpace.Value,
+    })
+    const declarations = [first, second].map((symbol) => ({
+      logicalId: logical.id,
+      symbolId: symbol.id,
+      location: {
+        filePath: symbol.filePath,
+        line: symbol.line,
+        column: symbol.column,
+        endLine: symbol.endLine,
+        endColumn: symbol.endColumn,
+      },
+      kind: symbol.kind,
+      form: DeclarationOccurrenceForm.Definition,
+    }))
+    await store.replaceReferenceFacts({
+      logicalSymbols: [logical],
+      declarations: declarations.map((declaration) => ({
+        logicalSymbolId: logical.id,
+        declaration,
+      })),
+      publicBindings: [],
+      localBindings: [],
+      steps: [],
+      coverage: [],
+    })
+    const target: ResolvedSymbolTarget = {
+      kind: 'logical-target',
+      logicalSymbol: logical,
+      declarations,
+      path: [],
+    }
+
+    const result = await provider.analyzeResolvedSymbolImpact(target, 'upstream')
+
+    expect(result.resolvedTarget).toBe(target)
+    expect(result.resolvedTarget.kind).toBe('logical-target')
+    if (result.resolvedTarget.kind === 'logical-target') {
+      expect(result.resolvedTarget.declarations).toHaveLength(2)
+    }
     await provider.close()
   })
 
@@ -269,8 +364,9 @@ describe('CodeGraphProvider', () => {
     const previousToken = process.env['SPECD_GRAPH_INDEX_LOCK_TOKEN']
     const release = acquireGraphIndexLockByStoragePath(tempDir)
     const lockPath = join(tempDir, 'graph', 'index.lock')
-    const lock = JSON.parse(readFileSync(lockPath, 'utf8')) as { version: 1; token: string }
-    writeFileSync(lockPath, JSON.stringify({ ...lock, pid: process.ppid }))
+    const lock = JSON.parse(readFileSync(lockPath, 'utf8')) as { token: string }
+    // The handoff parent owns the lock: its pid is alive and no start time is recorded for it.
+    writeFileSync(lockPath, JSON.stringify({ version: 1, pid: process.ppid, token: lock.token }))
     process.env['SPECD_GRAPH_INDEX_LOCK_ROOT'] = tempDir
     process.env['SPECD_GRAPH_INDEX_LOCK_TOKEN'] = lock.token
     const store = new InMemoryGraphStore(tempDir)

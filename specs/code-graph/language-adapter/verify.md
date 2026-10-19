@@ -70,6 +70,57 @@
 - **THEN** the retained state uses plain compact data structures
 - **AND** it does not retain AST nodes or parser-runtime objects
 
+### Requirement: Parser-authoritative structural fact extraction
+
+#### Scenario: Lookalike text creates no structural fact
+
+- **GIVEN** comments, strings, and template-like literals contain text shaped like imports, calls, declarations, and hierarchy clauses
+- **WHEN** a language adapter analyzes the file
+- **THEN** no graph fact is emitted for the lookalike text
+- **AND** facts are emitted only for corresponding parser nodes
+
+#### Scenario: Complex syntax retains exact parser structure
+
+- **GIVEN** supported calls and declarations use multiline, nested, chained, optional, computed, generic, or same-line syntax available in the language
+- **WHEN** the adapter emits facts
+- **THEN** their kinds, arguments, owners, scopes, callers, and ranges match the typed parser nodes and ancestry
+- **AND** no unbounded raw-source match supplies missing structure
+
+#### Scenario: Auxiliary manifest parsing remains bounded
+
+- **GIVEN** an adapter declares a resolution manifest for which no configured parser exists
+- **WHEN** it parses package identity or resolution metadata textually
+- **THEN** the resulting metadata is accepted
+- **AND** the exception cannot create source declarations, calls, callers, or dependency facts outside parser-proven source constructs
+
+#### Scenario: Parser cannot prove a construct
+
+- **GIVEN** source is erroneous, ambiguous, runtime-only, or unsupported by the configured grammar
+- **WHEN** a textual pattern resembles a supported structural construct
+- **THEN** the adapter emits no guessed structural fact or an explicit unresolved fact
+- **AND** textual proximity is not used as substitute evidence
+
+#### Scenario: Unresolved import emits no guessed relation
+
+- **GIVEN** a parser-proven import has several syntactic candidates but none resolves
+- **WHEN** reference facts and persisted relations are produced
+- **THEN** unresolved diagnostic evidence may be retained
+- **AND** no dependency relation targets the first candidate or raw specifier
+
+#### Scenario: Imported hierarchy relation has shared provenance
+
+- **GIVEN** an imported base or contract resolves deterministically
+- **WHEN** the adapter emits an `EXTENDS` or `IMPLEMENTS` relation
+- **THEN** exactly one matching shared hierarchy reference fact is emitted
+- **AND** it carries the parser range of the hierarchy-clause expression, resolution provenance, and same resolved target
+
+#### Scenario: Pass 2 performs no metadata I/O
+
+- **GIVEN** package and module maps were prepared in run-scoped session state
+- **WHEN** per-file relation extraction runs for several concurrent or consecutive sessions
+- **THEN** it performs no filesystem metadata reads
+- **AND** no mutable adapter-instance cache leaks resolution state between sessions
+
 ### Requirement: Unified built-in adapter migration
 
 #### Scenario: All built-in adapters implement the unified contract
@@ -146,6 +197,30 @@
 - **GIVEN** a call expression `init()` at module top level (not inside any function or class)
 - **WHEN** `analyzeFile()` extracts call facts and `buildRelations()` runs
 - **THEN** no `CALLS` relation is created for that call
+
+### Requirement: Semantic caller containment
+
+#### Scenario: Preceding non-callable cannot usurp the caller
+
+- **GIVEN** a function contains a local declaration followed by a call
+- **AND** the local declaration starts closer to the call than the function does
+- **WHEN** caller identity is extracted
+- **THEN** the containing function is selected
+- **AND** the local declaration is not selected
+
+#### Scenario: Same-line containment uses columns
+
+- **GIVEN** two supported callable constructs occupy the same source line
+- **WHEN** a call lies inside the second construct's half-open column range
+- **THEN** the second construct is selected as the caller
+- **AND** line order alone does not select the first construct
+
+#### Scenario: No proven container remains unresolved
+
+- **GIVEN** a call is outside every language-approved executable range
+- **WHEN** caller extraction runs
+- **THEN** `callerSymbolId` is absent
+- **AND** no speculative dependency edge is emitted
 
 ### Requirement: Scoped binding fact extraction
 
@@ -629,3 +704,35 @@
 - **GIVEN** a third-party parser cannot provide a valid construct or selection range
 - **WHEN** the adapter translates the declaration
 - **THEN** it omits the symbol instead of fabricating coordinates
+
+### Requirement: Declaration classification policy
+
+#### Scenario: Broad kind does not determine semantic identity
+
+- **GIVEN** a property-like declaration and a callable declaration share a broad parser category and simple name
+- **WHEN** the adapter classifies them using role, scope, owner, and visibility
+- **THEN** only declarations proven to be semantic targets receive logical identities
+- **AND** lexical-only declarations remain bindings or physical evidence
+
+#### Scenario: Owners are available before member IDs
+
+- **GIVEN** two owners each declare a same-name member
+- **WHEN** member logical identities are constructed
+- **THEN** each identity contains its canonical logical owner
+- **AND** the member IDs are distinct
+
+### Requirement: Cross-language semantic conformance suite
+
+#### Scenario: Every built-in adapter runs the shared fixture matrix
+
+- **GIVEN** TypeScript, Python, Go, and PHP adapters are registered
+- **WHEN** the shared semantic adapter contract suite runs
+- **THEN** every adapter executes caller-containment, scope-isolation, ownership, physical-only, logical-resolution, coverage, and incremental-equivalence fixtures
+- **AND** adapter-specific expectations may specialize but not skip common invariants
+
+#### Scenario: New first-party adapter lacks required semantics
+
+- **GIVEN** a new adapter implements the TypeScript interface but uses nearest-preceding caller selection
+- **WHEN** the conformance suite runs
+- **THEN** the adapter fails the common caller-containment scenarios
+- **AND** it is not accepted as conformant

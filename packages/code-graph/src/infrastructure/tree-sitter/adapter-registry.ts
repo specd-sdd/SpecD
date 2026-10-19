@@ -1,4 +1,7 @@
-import { type LanguageAdapter } from '../../domain/value-objects/language-adapter.js'
+import {
+  type AdapterDeclarationPolicy,
+  type LanguageAdapter,
+} from '../../domain/value-objects/language-adapter.js'
 import { type AdapterRegistryPort } from '../../domain/ports/adapter-registry-port.js'
 import { type AdapterCapabilities } from '../../domain/value-objects/symbol-reference.js'
 
@@ -15,9 +18,25 @@ export class AdapterRegistry implements AdapterRegistryPort {
 
   /**
    * Registers a language adapter for all languages and extensions it supports.
+   * Validates declaration policy when defined.
    * @param adapter - The language adapter to register.
+   * @throws {Error} When the adapter declares an invalid parser policy.
    */
   register(adapter: LanguageAdapter): void {
+    const policy = adapter.declarationPolicy?.()
+    if (policy !== undefined) {
+      if (policy.structuralFactsAreParserAuthoritative !== true) {
+        throw new Error(
+          `Adapter for [${adapter.languages().join(', ')}] must declare structuralFactsAreParserAuthoritative: true`,
+        )
+      }
+      if (!policy.callableContainerKinds || !(policy.callableContainerKinds instanceof Set)) {
+        throw new Error(
+          `Adapter for [${adapter.languages().join(', ')}] must declare callableContainerKinds Set`,
+        )
+      }
+    }
+
     for (const lang of adapter.languages()) {
       this.adapters.set(lang, adapter)
     }
@@ -43,6 +62,15 @@ export class AdapterRegistry implements AdapterRegistryPort {
    */
   getCapabilities(languageId: string): AdapterCapabilities | undefined {
     return this.adapters.get(languageId)?.capabilities?.()
+  }
+
+  /**
+   * Returns the declaration policy declared by a registered adapter.
+   * @param languageId - Registered language identifier.
+   * @returns Declared declaration policy, or undefined when unsupported or unregistered.
+   */
+  getDeclarationPolicy(languageId: string): AdapterDeclarationPolicy | undefined {
+    return this.adapters.get(languageId)?.declarationPolicy?.()
   }
 
   /**

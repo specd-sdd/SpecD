@@ -18,12 +18,22 @@
   ],
   "implementation": [
     {
-      "file": "code-graph:src/composition/code-graph-provider.ts",
-      "symbols": ["CodeGraphProviderImpl"]
+      "file": "code-graph:test/composition/code-graph-provider.spec.ts"
     },
     {
-      "file": "code-graph:src/composition/create-code-graph-provider.ts",
-      "symbols": ["createCodeGraphProvider"]
+      "file": "code-graph:src/public.ts"
+    },
+    {
+      "file": "code-graph:src/composition/code-graph-provider.ts"
+    },
+    {
+      "file": "code-graph:src/composition/create-code-graph-provider.ts"
+    },
+    {
+      "file": "code-graph:src/composition/graph-store-factory.ts"
+    },
+    {
+      "file": "code-graph:test/barrel.spec.ts"
     }
   ],
   "optimizations": {

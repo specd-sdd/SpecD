@@ -1,4 +1,4 @@
-export const SQLITE_SCHEMA_VERSION = 14
+export const SQLITE_SCHEMA_VERSION = 15
 
 export const SQLITE_SCHEMA_DDL = `
 PRAGMA foreign_keys = ON;
@@ -89,6 +89,7 @@ CREATE TABLE IF NOT EXISTS logical_declarations (
   end_line INTEGER,
   end_column INTEGER,
   kind TEXT NOT NULL,
+  occurrence_form TEXT NOT NULL,
   PRIMARY KEY (logical_symbol_id, symbol_id),
   FOREIGN KEY (logical_symbol_id) REFERENCES logical_symbols(id) ON DELETE CASCADE
 );
@@ -107,7 +108,11 @@ CREATE TABLE IF NOT EXISTS local_bindings (
   scope_id TEXT NOT NULL,
   local_name TEXT NOT NULL,
   space TEXT NOT NULL,
-  target_id TEXT
+  target_id TEXT,
+  start_line INTEGER NOT NULL,
+  start_column INTEGER NOT NULL,
+  end_line INTEGER NOT NULL,
+  end_column INTEGER NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS resolution_steps (
@@ -198,3 +203,33 @@ CREATE VIRTUAL TABLE IF NOT EXISTS file_content_fts USING fts5(
   tokenize = 'trigram'
 );
 `
+
+/**
+ * Extracts the declared column names of every ordinary table from the DDL text.
+ * @param ddl - Schema DDL containing `CREATE TABLE IF NOT EXISTS` statements.
+ * @returns Column names keyed by table name; virtual tables are excluded.
+ */
+function deriveRequiredColumns(ddl: string): Readonly<Record<string, readonly string[]>> {
+  const result: Record<string, readonly string[]> = {}
+  const tablePattern = /CREATE TABLE IF NOT EXISTS (\w+) \(\n([\s\S]*?)\n\);/g
+  for (const match of ddl.matchAll(tablePattern)) {
+    const [, table, body] = match
+    if (table === undefined || body === undefined) continue
+    const columns: string[] = []
+    for (const line of body.split('\n')) {
+      const column = /^\s{2}(\w+)\s/.exec(line)?.[1]
+      if (column === undefined) continue
+      if (['PRIMARY', 'FOREIGN', 'UNIQUE', 'CHECK', 'CONSTRAINT'].includes(column)) continue
+      columns.push(column)
+    }
+    result[table] = Object.freeze(columns)
+  }
+  return Object.freeze(result)
+}
+
+/**
+ * Column names every ordinary table must expose, derived from {@link SQLITE_SCHEMA_DDL}
+ * so the DDL and the post-open shape check cannot drift apart.
+ */
+export const REQUIRED_COLUMNS: Readonly<Record<string, readonly string[]>> =
+  deriveRequiredColumns(SQLITE_SCHEMA_DDL)

@@ -17,6 +17,7 @@ import {
   type FileImpactResult,
   type ImpactResultFilter,
   type SpecImpactResult,
+  type ResolvedSymbolImpactResult,
 } from '../domain/value-objects/impact-result.js'
 import { type ChangeDetectionResult } from '../domain/value-objects/change-detection-result.js'
 import { type HotspotOptions, type HotspotResult } from '../domain/value-objects/hotspot-result.js'
@@ -41,6 +42,7 @@ import { getUpstream } from '../domain/services/get-upstream.js'
 import { getDownstream } from '../domain/services/get-downstream.js'
 import {
   analyzeImpact,
+  analyzeResolvedSymbolImpact,
   analyzePublicBindingImpact,
   type PublicBindingImpactResult,
   type ResolvedPublicBindingImpactInput,
@@ -52,6 +54,7 @@ import { computeHotspots } from '../domain/services/compute-hotspots.js'
 import { analyzeFilesImpact } from '../domain/services/analyze-files-impact.js'
 import { StoreNotOpenError } from '../domain/errors/store-not-open-error.js'
 import { GraphProviderStaleError } from '../domain/errors/graph-provider-stale-error.js'
+import { replacesWholeGraph } from '../domain/services/replaces-whole-graph.js'
 import { GraphStoreRecreateRequiresClosedError } from '../domain/errors/graph-store-recreate-requires-closed-error.js'
 import {
   assertGraphIndexUnlockedByStoragePath,
@@ -65,6 +68,7 @@ import {
   type ResolutionHealth,
   type SymbolSpace,
   type SymbolResolutionResult,
+  type ResolvedSymbolTarget,
 } from '../domain/value-objects/symbol-reference.js'
 import { ResolveSymbolReference } from '../application/use-cases/resolve-symbol-reference.js'
 import {
@@ -145,6 +149,12 @@ export interface CodeGraphProvider {
     maxDepth?: number,
     filter?: ImpactResultFilter,
   ): Promise<ImpactResult>
+  analyzeResolvedSymbolImpact(
+    target: ResolvedSymbolTarget,
+    direction: 'upstream' | 'downstream' | 'both',
+    maxDepth?: number,
+    filter?: ImpactResultFilter,
+  ): Promise<ResolvedSymbolImpactResult>
   analyzePublicBindingImpact(
     input: ResolvedPublicBindingImpactInput,
     direction: 'upstream' | 'downstream' | 'both',
@@ -217,6 +227,7 @@ export class CodeGraphProviderImpl implements CodeGraphProvider {
    * @param graphHealth.useCase - Canonical health use case.
    * @param graphHealth.input - Config-bound health input excluding the provider.
    * @param registry - Adapter registry shared by indexing and resolution.
+   * @param onWarning - Optional host receiver for non-fatal warnings such as stale lock recovery.
    */
   constructor(
     private readonly store: GraphStore,
@@ -227,6 +238,7 @@ export class CodeGraphProviderImpl implements CodeGraphProvider {
       readonly input: Omit<GetGraphHealthInput, 'provider'>
     },
     private readonly registry?: AdapterRegistryPort,
+    private readonly onWarning?: (message: string) => void,
   ) {
     this.resolver = new ResolveSymbolReference(
       store,
@@ -290,13 +302,32 @@ export class CodeGraphProviderImpl implements CodeGraphProvider {
   async index(options: IndexOptions): Promise<IndexResult> {
     this.assertProviderOpen()
     return this.withIndexLock(async () => {
-      if (options.force === true) {
+      if (options.force === true && (await this.runReplacesWholeGraph(options))) {
+        // A forced run over a subset of stored workspaces must leave the other workspaces intact.
         await this.store.clear()
       }
       const result = await this.indexer.execute(options)
       this._storageGeneration = await this.store.getStorageGeneration()
       return result
     })
+  }
+
+  /**
+   * Tells whether an indexing run covers every workspace that owns stored files or documents.
+   * @param options - Options of the indexing run.
+   * @returns True when the run may replace the whole derived graph.
+   */
+  private async runReplacesWholeGraph(options: IndexOptions): Promise<boolean> {
+    const indexed = new Set(options.workspaces.map((workspace) => workspace.name))
+    if ((options.graphConfig.includePaths?.length ?? 0) > 0) indexed.add('root')
+    const [files, documents] = await Promise.all([
+      this.store.getAllFiles(),
+      this.store.getAllDocuments(),
+    ])
+    return replacesWholeGraph(
+      [...files, ...documents].map((entry) => entry.workspace),
+      indexed,
+    )
   }
 
   /**
@@ -771,6 +802,25 @@ export class CodeGraphProviderImpl implements CodeGraphProvider {
   }
 
   /**
+   * Analyzes impact for a resolved symbol target, aggregating reached declarations
+   * by their logical target while retaining physical evidence.
+   * @param target - The resolved symbol target to analyze.
+   * @param direction - Direction of impact analysis.
+   * @param maxDepth - Maximum traversal depth.
+   * @param filter - Optional result membership filter applied by the graph store.
+   * @returns Complete resolved symbol impact result.
+   */
+  async analyzeResolvedSymbolImpact(
+    target: ResolvedSymbolTarget,
+    direction: 'upstream' | 'downstream' | 'both',
+    maxDepth?: number,
+    filter?: ImpactResultFilter,
+  ): Promise<ResolvedSymbolImpactResult> {
+    await this.assertAvailable()
+    return analyzeResolvedSymbolImpact(this.store, target, direction, maxDepth, filter)
+  }
+
+  /**
    * Analyzes exact public-route impact separately from canonical implementation impact.
    * @param input - Proven public binding and logical target evidence.
    * @param direction - Direction of impact analysis.
@@ -1004,7 +1054,14 @@ export class CodeGraphProviderImpl implements CodeGraphProvider {
     if (isGraphIndexLockHandoffForStoragePath(this.store.storagePath)) {
       return fn()
     }
-    const release = acquireGraphIndexLockByStoragePath(this.store.storagePath)
+    const onWarning = this.onWarning
+    const release = acquireGraphIndexLockByStoragePath(
+      this.store.storagePath,
+      onWarning === undefined
+        ? undefined
+        : (info) =>
+            onWarning(`Recovered a stale graph index lock (${info.reason}) at ${info.lockPath}.`),
+    )
     try {
       return await fn()
     } finally {

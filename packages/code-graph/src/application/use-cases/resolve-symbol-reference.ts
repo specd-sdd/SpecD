@@ -16,16 +16,21 @@ import {
   type IndexedResourceFreshnessResult,
   type IndexedResourceKey,
 } from '../../domain/value-objects/indexed-input-freshness.js'
+import { type SymbolNode } from '../../domain/value-objects/symbol-node.js'
 import {
   parseLogicalSymbol,
   deriveQualifiedName,
+  DeclarationOccurrenceForm,
   type DeclarationOccurrence,
+  type DeclarationResolutionTarget,
   type LogicalSymbol,
   type MemberSemantics,
+  type PublicBinding,
   type ResolutionCandidate,
   type ResolutionHealth,
   type ResolutionStep,
   type ResolveSymbolReferenceInput,
+  type ResolvedSymbolTarget,
   type SymbolResolutionResult,
 } from '../../domain/value-objects/symbol-reference.js'
 
@@ -70,7 +75,40 @@ export class ResolveSymbolReference {
     if (inputs.length === 0) return []
 
     const health = await this.getHealth()
-    const requests = inputs.map(normalizeRequest)
+
+    const validated = inputs.map((input) => ({
+      input,
+      error: validateRequest(input),
+    }))
+
+    const exactInputs: Array<{ index: number; input: ResolveSymbolReferenceInput }> = []
+    const semanticInputs: Array<{ index: number; input: ResolveSymbolReferenceInput }> = []
+
+    validated.forEach(({ input, error }, index) => {
+      if (error !== null) return
+      if (isExactDeclarationRequest(input)) {
+        exactInputs.push({ index, input })
+      } else {
+        semanticInputs.push({ index, input: normalizeRequest(input) })
+      }
+    })
+
+    const exactDeclarationSymbolIds = [
+      ...new Set(
+        exactInputs
+          .map(({ input }) => input.declarationSymbolId)
+          .filter((id): id is string => id !== undefined),
+      ),
+    ]
+    const positionFilePaths = [
+      ...new Set(
+        exactInputs
+          .map(({ input }) => (input.position ? input.filePath : undefined))
+          .filter((fp): fp is string => fp !== undefined),
+      ),
+    ]
+
+    const requests = semanticInputs.map(({ input }) => input)
     const logicalLookups = deduplicateLogicalLookups(requests.flatMap(expandedLookups))
     const qualifiedNames = [
       ...new Set(
@@ -85,7 +123,20 @@ export class ResolveSymbolReference {
       .map(toPublicLookup)
     const localLookups = requests.filter((input) => input.filePath !== undefined).map(toLocalLookup)
 
-    const [logicalSymbols, publicBindings, localBindings, qualifiedTargets] = await Promise.all([
+    const [
+      exactSymbolsById,
+      positionSymbols,
+      logicalSymbols,
+      publicBindings,
+      localBindings,
+      qualifiedTargets,
+    ] = await Promise.all([
+      exactDeclarationSymbolIds.length === 0
+        ? []
+        : this.store.getSymbolsByIds(exactDeclarationSymbolIds),
+      positionFilePaths.length === 0
+        ? []
+        : this.store.findSymbols({ filePaths: positionFilePaths }),
       this.store.findLogicalSymbols(logicalLookups),
       publicLookups.length === 0 ? [] : this.store.findPublicBindings(publicLookups),
       localLookups.length === 0 ? [] : this.store.findLocalBindings(localLookups),
@@ -93,6 +144,48 @@ export class ResolveSymbolReference {
         ? []
         : this.store.findLogicalSymbolsByQualifiedNames(qualifiedNames),
     ])
+
+    const exactMatchesByRequestIndex = new Map<number, SymbolNode[]>()
+    for (const { index, input } of exactInputs) {
+      if (input.declarationSymbolId !== undefined) {
+        const found = exactSymbolsById.find((s) => s.id === input.declarationSymbolId)
+        exactMatchesByRequestIndex.set(
+          index,
+          found && (input.kind === undefined || found.kind === input.kind) ? [found] : [],
+        )
+      } else if (input.position !== undefined && input.filePath !== undefined) {
+        const matches = positionSymbols.filter(
+          (s) =>
+            s.filePath === input.filePath &&
+            s.line === input.position!.line &&
+            s.column === input.position!.column &&
+            (input.kind === undefined || s.kind === input.kind),
+        )
+        exactMatchesByRequestIndex.set(index, matches)
+      }
+    }
+
+    const uniquelyMatchedSymbols = [...exactMatchesByRequestIndex.values()]
+      .filter((matches) => matches.length === 1)
+      .map((matches) => matches[0]!)
+    const uniqueExactSymbolIds = [...new Set(uniquelyMatchedSymbols.map((s) => s.id))]
+
+    const mappedExactDeclarations =
+      uniqueExactSymbolIds.length === 0
+        ? []
+        : await this.store.findLogicalDeclarationsByDeclarationIds(uniqueExactSymbolIds)
+    const mappedExactDeclBySymbolId = new Map(
+      mappedExactDeclarations.map((d) => [d.declaration.symbolId, d]),
+    )
+
+    const exactLogicalSymbolIds = [
+      ...new Set(mappedExactDeclarations.map((d) => d.logicalSymbolId)),
+    ]
+    const exactLogicalSymbols =
+      exactLogicalSymbolIds.length === 0
+        ? []
+        : await this.store.findLogicalSymbolsByIds(exactLogicalSymbolIds)
+    const exactLogicalSymbolById = new Map(exactLogicalSymbols.map((s) => [s.id, s]))
 
     const pathSources = [
       ...publicBindings.map((binding) => binding.id),
@@ -141,8 +234,11 @@ export class ResolveSymbolReference {
         return addressedResource === undefined ? [] : [addressedResource]
       }),
       ...declarations.map((declaration) => declaration.declaration.location.filePath),
+      ...exactInputs.flatMap(({ input }) => (input.filePath !== undefined ? [input.filePath] : [])),
+      ...uniquelyMatchedSymbols.map((s) => s.filePath),
     ]
-    const resources = deduplicateFileResources(resourceFiles, requests)
+    const allRequestsForResources = [...requests, ...exactInputs.map(({ input }) => input)]
+    const resources = deduplicateFileResources(resourceFiles, allRequestsForResources)
     const [coverage, resourceFreshness] = await Promise.all([
       this.store.findIndexCoverage([...new Set(resourceFiles)].sort()),
       this.assessResources === undefined || resources.length === 0
@@ -153,9 +249,180 @@ export class ResolveSymbolReference {
       resourceFreshness.map((result) => [resourceKey(result.workspace, result.resourceId), result]),
     )
 
-    return requests.map((request) =>
-      resolvePrepared(this.registry, {
-        request,
+    const results = new Array<SymbolResolutionResult>(inputs.length)
+
+    validated.forEach(({ input, error }, index) => {
+      if (error !== null) {
+        results[index] = {
+          request: input,
+          status: 'unresolved',
+          reasonCode: error,
+          health,
+          resolvedTarget: null,
+          target: null,
+          candidates: [],
+          path: [],
+        }
+      }
+    })
+
+    for (const { index, input } of exactInputs) {
+      const matches = exactMatchesByRequestIndex.get(index) ?? []
+      if (matches.length === 0) {
+        const addressedResource = input.filePath
+        const targetedFreshness =
+          addressedResource !== undefined
+            ? freshnessMap.get(resourceKey(input.workspace, addressedResource))
+            : undefined
+        const targetedCurrent = targetedFreshness?.state === FreshnessState.Current
+        const targetedReason = targetedFreshness?.reasons[0]
+        const graphReason =
+          targetedFreshness !== undefined && !targetedCurrent
+            ? (targetedReason ?? 'RESOURCE_FRESHNESS_UNKNOWN')
+            : !targetedCurrent && health.fresh !== true
+              ? (health.reasonCodes[0] ?? 'GRAPH_FRESHNESS_UNKNOWN')
+              : health.complete !== true
+                ? (health.reasonCodes[0] ?? 'GRAPH_COVERAGE_INCOMPLETE')
+                : null
+        if (graphReason !== null) {
+          results[index] = {
+            request: input,
+            status: 'unresolved',
+            reasonCode: graphReason,
+            health,
+            resolvedTarget: null,
+            target: null,
+            candidates: [],
+            path: [],
+          }
+        } else {
+          results[index] = {
+            request: input,
+            status: 'missing',
+            reasonCode: 'DECLARATION_NOT_FOUND',
+            health,
+            resolvedTarget: null,
+            target: null,
+            candidates: [],
+            path: [],
+          }
+        }
+      } else if (matches.length > 1) {
+        results[index] = {
+          request: input,
+          status: 'ambiguous',
+          reasonCode: 'AMBIGUOUS_DECLARATION',
+          health,
+          resolvedTarget: null,
+          target: null,
+          candidates: [],
+          path: [],
+        }
+      } else {
+        const symbolNode = matches[0]!
+        if (this.assessResources !== undefined) {
+          const workspace = workspaceFromFilePath(symbolNode.filePath, input.workspace)
+          const freshness = freshnessMap.get(resourceKey(workspace, symbolNode.filePath))
+          if (freshness === undefined) {
+            results[index] = {
+              request: input,
+              status: 'unresolved',
+              reasonCode: 'RESOURCE_FRESHNESS_UNKNOWN',
+              health,
+              resolvedTarget: null,
+              target: null,
+              candidates: [],
+              path: [],
+            }
+            continue
+          }
+          if (freshness.state !== FreshnessState.Current) {
+            results[index] = {
+              request: input,
+              status: 'unresolved',
+              reasonCode: freshness.reasons[0] ?? 'RESOURCE_FRESHNESS_UNKNOWN',
+              health,
+              resolvedTarget: null,
+              target: null,
+              candidates: [],
+              path: [],
+            }
+            continue
+          }
+          const fileCoverage = coverage.find((entry) => entry.filePath === symbolNode.filePath)
+          if (fileCoverage === undefined) {
+            results[index] = {
+              request: input,
+              status: 'unresolved',
+              reasonCode: 'COVERAGE_UNKNOWN',
+              health,
+              resolvedTarget: null,
+              target: null,
+              candidates: [],
+              path: [],
+            }
+            continue
+          }
+          if (fileCoverage.status !== IndexCoverageStatus.Indexed) {
+            results[index] = {
+              request: input,
+              status: 'unresolved',
+              reasonCode:
+                fileCoverage.reason ??
+                `COVERAGE_${fileCoverage.status.replace('-', '_').toUpperCase()}`,
+              health,
+              resolvedTarget: null,
+              target: null,
+              candidates: [],
+              path: [],
+            }
+            continue
+          }
+        }
+
+        const mapped = mappedExactDeclBySymbolId.get(symbolNode.id)
+        const logicalSymbol = mapped
+          ? exactLogicalSymbolById.get(mapped.logicalSymbolId)
+          : undefined
+        const declaration: DeclarationOccurrence = mapped
+          ? mapped.declaration
+          : {
+              logicalId: undefined,
+              symbolId: symbolNode.id,
+              location: {
+                filePath: symbolNode.filePath,
+                line: symbolNode.line,
+                column: symbolNode.column,
+                endLine: symbolNode.endLine,
+                endColumn: symbolNode.endColumn,
+              },
+              kind: symbolNode.kind,
+              form: DeclarationOccurrenceForm.Declaration,
+            }
+        const resolvedTarget: DeclarationResolutionTarget = {
+          kind: 'declaration',
+          declaration,
+          logicalSymbol,
+          path: [],
+        }
+        results[index] = {
+          request: input,
+          status: 'resolved',
+          reasonCode: null,
+          health,
+          resolvedTarget,
+          target: logicalSymbol ?? null,
+          candidates: logicalSymbol
+            ? [{ target: logicalSymbol, declarations: [declaration], path: [] }]
+            : [],
+          path: [],
+        }
+      }
+    }
+
+    for (const { index, input } of semanticInputs) {
+      results[index] = resolvePrepared(this.registry, {
+        request: input,
         health,
         logicalSymbols,
         publicBindings,
@@ -165,15 +432,17 @@ export class ResolveSymbolReference {
         steps,
         coverage,
         targetedFreshness: (() => {
-          const addressedResource = request.filePath ?? request.publicSurface
+          const addressedResource = input.filePath ?? input.publicSurface
           return addressedResource === undefined
             ? undefined
-            : freshnessMap.get(resourceKey(request.workspace, addressedResource))
+            : freshnessMap.get(resourceKey(input.workspace, addressedResource))
         })(),
         resourceFreshness: freshnessMap,
         freshnessAssessmentEnabled: this.assessResources !== undefined,
-      }),
-    )
+      })
+    }
+
+    return results
   }
 }
 
@@ -227,7 +496,8 @@ function resolvePrepared(
   )
   const publicCandidates = candidatesFromBindingTargets(prepared, publicBindings)
   if (publicCandidates.length > 0) {
-    return outcomeFromCandidates(prepared, publicCandidates)
+    const publicBinding = publicBindings.length === 1 ? publicBindings[0] : undefined
+    return outcomeFromCandidates(prepared, publicCandidates, publicBinding)
   }
 
   const localBindings = prepared.localBindings.filter(
@@ -272,22 +542,40 @@ function outcomeFromTargets(
  * Selects a resolved or ambiguous outcome from candidates.
  * @param prepared - Prepared request and indexed facts.
  * @param candidates - Candidate targets with evidence.
+ * @param publicBinding - Optional public binding that led to the candidates.
  * @returns Resolution outcome.
  */
 function outcomeFromCandidates(
   prepared: PreparedResolution,
   candidates: readonly ResolutionCandidate[],
+  publicBinding?: PublicBinding,
 ): SymbolResolutionResult {
   const unique = deduplicateCandidates(candidates)
   const evidenceIssue = candidateEvidenceIssue(prepared, unique)
   if (evidenceIssue !== null) return unresolved(prepared, evidenceIssue)
   if (unique.length === 1) {
     const candidate = unique[0]!
+    const resolvedTarget: ResolvedSymbolTarget =
+      publicBinding !== undefined
+        ? {
+            kind: 'public-binding',
+            binding: publicBinding,
+            logicalSymbol: candidate.target,
+            declarations: candidate.declarations,
+            path: candidate.path,
+          }
+        : {
+            kind: 'logical-target',
+            logicalSymbol: candidate.target,
+            declarations: candidate.declarations,
+            path: candidate.path,
+          }
     return {
       request: prepared.request,
       status: 'resolved',
       reasonCode: null,
       health: prepared.health,
+      resolvedTarget,
       target: candidate.target,
       candidates: unique,
       path: candidate.path,
@@ -296,8 +584,9 @@ function outcomeFromCandidates(
   return {
     request: prepared.request,
     status: 'ambiguous',
-    reasonCode: 'AMBIGUOUS_MULTIPLE_TARGETS',
+    reasonCode: 'AMBIGUOUS_LOGICAL_TARGET',
     health: prepared.health,
+    resolvedTarget: null,
     target: null,
     candidates: unique,
     path: [],
@@ -401,15 +690,36 @@ function resourceKey(workspace: string, resourceId: string): string {
 function absenceOutcome(prepared: PreparedResolution): SymbolResolutionResult {
   const targetedCurrent = prepared.targetedFreshness?.state === FreshnessState.Current
   const targetedReason = prepared.targetedFreshness?.reasons[0]
+  const addressed = prepared.request.filePath ?? prepared.request.publicSurface
+  const addressedCoverage =
+    addressed === undefined
+      ? undefined
+      : prepared.coverage.find((entry) => entry.filePath === addressed)
+  // Coverage gaps elsewhere in the graph do not weaken absence in a resource that is
+  // itself current and fully indexed.
+  const addressedProven = addressedCoverage?.status === IndexCoverageStatus.Indexed
   const graphReason =
     prepared.targetedFreshness !== undefined && !targetedCurrent
       ? (targetedReason ?? 'RESOURCE_FRESHNESS_UNKNOWN')
       : !targetedCurrent && prepared.health.fresh !== true
         ? (prepared.health.reasonCodes[0] ?? 'GRAPH_FRESHNESS_UNKNOWN')
-        : prepared.health.complete !== true
+        : !addressedProven && prepared.health.complete !== true
           ? (prepared.health.reasonCodes[0] ?? 'GRAPH_COVERAGE_INCOMPLETE')
           : null
   if (graphReason !== null) return unresolved(prepared, graphReason)
+
+  if (prepared.request.logicalId !== undefined) {
+    return {
+      request: prepared.request,
+      status: 'missing',
+      reasonCode: 'LOGICAL_TARGET_NOT_FOUND',
+      health: prepared.health,
+      resolvedTarget: null,
+      target: null,
+      candidates: [],
+      path: [],
+    }
+  }
 
   const addressedResource = prepared.request.filePath ?? prepared.request.publicSurface
   if (addressedResource === undefined) {
@@ -434,6 +744,7 @@ function absenceOutcome(prepared: PreparedResolution): SymbolResolutionResult {
     status: 'missing',
     reasonCode: 'REFERENCE_ABSENT',
     health: prepared.health,
+    resolvedTarget: null,
     target: null,
     candidates: [],
     path: [],
@@ -452,6 +763,7 @@ function unresolved(prepared: PreparedResolution, reasonCode: string): SymbolRes
     status: 'unresolved',
     reasonCode,
     health: prepared.health,
+    resolvedTarget: null,
     target: null,
     candidates: [],
     path: [],
@@ -502,10 +814,47 @@ function hierarchyCandidatesForRequest(prepared: PreparedResolution): Resolution
     return path === undefined ? [] : [{ target, path }]
   })
   const minimumDepth = Math.min(...matches.map(({ path }) => path.length))
-  return matches
-    .filter(({ path }) => path.length === minimumDepth)
+  const nearest = matches.filter(({ path }) => path.length === minimumDepth)
+  return preferEarlierBase(nearest)
     .map(({ target, path }) => candidateFor(prepared, target, path))
     .sort(compareCandidates)
+}
+
+/**
+ * Applies adapter-emitted base-class precedence to equally distant hierarchy candidates.
+ * `class C(A, B)` records `extends:0` for A and `extends:1` for B, so a tie between members
+ * of A and B resolves to A, as Python's MRO does. Candidates reached through any other
+ * relation, or with identical precedence, stay tied and therefore ambiguous.
+ * @param candidates - Equally distant candidates with their provenance paths.
+ * @returns The single preferred candidate, or all of them when precedence cannot decide.
+ */
+function preferEarlierBase<T extends { readonly path: readonly ResolutionStep[] }>(
+  candidates: readonly T[],
+): readonly T[] {
+  if (candidates.length < 2) return candidates
+  const keys = candidates.map((candidate) => {
+    const precedences: number[] = []
+    for (const step of candidate.path) {
+      const [kind, order] = step.kind.split(':')
+      if (kind !== 'extends' || order === undefined || !/^\d+$/.test(order)) return undefined
+      precedences.push(Number(order))
+    }
+    return precedences
+  })
+  if (keys.some((key) => key === undefined)) return candidates
+  const compare = (left: readonly number[], right: readonly number[]): number => {
+    for (let index = 0; index < Math.min(left.length, right.length); index += 1) {
+      const difference = left[index]! - right[index]!
+      if (difference !== 0) return difference
+    }
+    return 0
+  }
+  let best = 0
+  for (let index = 1; index < keys.length; index += 1) {
+    if (compare(keys[index]!, keys[best]!) < 0) best = index
+  }
+  const winners = candidates.filter((_candidate, index) => compare(keys[index]!, keys[best]!) === 0)
+  return winners.length === 1 ? winners : candidates
 }
 
 /**
@@ -678,6 +1027,11 @@ function resolveQualifiedMember(
   const spelling = qualifiedLookupText(request.requested)
   const anchored = request.filePath ?? request.publicSurface
   if (spelling !== undefined) {
+    // Without an anchoring file or surface nothing proves the graph still contains this
+    // target uniquely, so known staleness blocks the answer.
+    if (anchored === undefined && prepared.health.fresh === false) {
+      return unresolved(prepared, prepared.health.reasonCodes[0] ?? 'GRAPH_STALE')
+    }
     const byId = new Map(prepared.allTargets.map((target) => [target.id, target]))
     const matches = prepared.allTargets.filter((target) => {
       const stored = target.qualifiedName ?? deriveQualifiedName(target, byId)
@@ -697,8 +1051,9 @@ function resolveQualifiedMember(
     return {
       request,
       status: 'ambiguous',
-      reasonCode: 'AMBIGUOUS_MULTIPLE_TARGETS',
+      reasonCode: 'AMBIGUOUS_LOGICAL_TARGET',
       health: prepared.health,
+      resolvedTarget: null,
       target: null,
       candidates: [],
       path: [],
@@ -1027,4 +1382,39 @@ function compareSteps(left: ResolutionStep, right: ResolutionStep): number {
   return `${left.fromId}\u0000${left.kind}\u0000${left.toId}`.localeCompare(
     `${right.fromId}\u0000${right.kind}\u0000${right.toId}`,
   )
+}
+
+/**
+ * Validates request selectors for mutual exclusivity and valid coordinates.
+ * @param input - The structured reference request.
+ * @returns Stable reason code when invalid, or null when valid.
+ */
+function validateRequest(input: ResolveSymbolReferenceInput): string | null {
+  const parsedLogical = parseLogicalSymbol(input.requested)
+  const hasLogicalId = input.logicalId !== undefined || parsedLogical !== undefined
+  const hasDeclarationId = input.declarationSymbolId !== undefined
+  const hasPosition = input.position !== undefined
+
+  const count = (hasLogicalId ? 1 : 0) + (hasDeclarationId ? 1 : 0) + (hasPosition ? 1 : 0)
+  if (count > 1) {
+    return 'INVALID_SELECTOR'
+  }
+
+  if (hasPosition) {
+    const { position, filePath } = input
+    if (position === undefined || position.line < 1 || position.column < 0 || !filePath) {
+      return 'INVALID_SELECTOR'
+    }
+  }
+
+  return null
+}
+
+/**
+ * Tests whether a request specifically addresses one physical declaration occurrence.
+ * @param input - The structured reference request.
+ * @returns True when the request uses an exact declaration identifier or file position.
+ */
+function isExactDeclarationRequest(input: ResolveSymbolReferenceInput): boolean {
+  return input.declarationSymbolId !== undefined || input.position !== undefined
 }

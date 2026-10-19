@@ -17,6 +17,8 @@ export interface IndexProjectGraphInput {
   readonly vcsRoot: string | null
   readonly vcsRef?: string
   readonly force?: boolean
+  /** Repair strategy for an incompatible stored derivation; defaults to in-place rebuild. */
+  readonly derivationMismatch?: 'rebuild' | 'fail'
   readonly onProgress?: IndexProgressCallback
   /** Materialized spec metadata source used for spec-content fingerprinting. */
   readonly getSpecMetadata?: GetSpecMetadata
@@ -40,6 +42,9 @@ export class IndexProjectGraph {
       codeGraphVersion: input.codeGraphVersion,
       vcsRoot: input.vcsRoot,
       ...(input.force === true ? { force: true } : {}),
+      ...(input.derivationMismatch !== undefined
+        ? { derivationMismatch: input.derivationMismatch }
+        : {}),
       ...(input.vcsRef !== undefined ? { vcsRef: input.vcsRef } : {}),
       ...(input.onProgress !== undefined ? { onProgress: input.onProgress } : {}),
       ...(input.getSpecMetadata !== undefined ? { getSpecMetadata: input.getSpecMetadata } : {}),

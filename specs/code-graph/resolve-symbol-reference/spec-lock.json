@@ -11,42 +11,66 @@
   ],
   "implementation": [
     {
+      "file": "code-graph:src/domain/value-objects/symbol-reference.ts",
+      "symbols": ["ResolvedSymbolTarget", "ResolveSymbolReferenceInput", "SymbolResolutionResult"]
+    },
+    {
+      "file": "code-graph:src/application/use-cases/resolve-symbol-reference.ts",
+      "symbols": ["ResolveSymbolReference"]
+    },
+    {
+      "file": "code-graph:test/application/use-cases/resolve-symbol-reference.spec.ts"
+    },
+    {
       "file": "code-graph:src/application/services/resolve-graph-selector.ts",
-      "symbols": ["unifyOverloadSetCandidates", "resolveSymbolSelector"]
+      "symbols": [
+        "ResolvedGraphSymbolSelector",
+        "resolveSymbolSelector",
+        "promoteToLogicalTarget",
+        "ResolvedGraphDeclarationSelector",
+        "ResolveSelectorOptions"
+      ]
+    },
+    {
+      "file": "code-graph:src/domain/services/exact-lane-query.ts",
+      "symbols": ["qualifiedLookupText", "isExactLaneQuery"]
+    },
+    {
+      "file": "code-graph:test/application/services/resolve-graph-selector.spec.ts"
     }
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Language-neutral resolution contract for identifying symbols deterministically across declarations, aliases, public bindings, and hierarchies.",
+      "value": "Conservative deterministic resolution across logical declarations, qualified names, bindings, exports, and hierarchies.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:16cfb65d0ab63dc05ba94d65f822425ee3a2b742c639ce6822744560559f1dae",
-          "lastModified": "2026-08-16T08:12:47.176Z"
+          "hash": "sha256:a1a5999379d74972898b5c71786b7cda1a61023910403767bb8dc4994b5b6ed6",
+          "lastModified": "2026-10-14T08:50:27.913Z"
         },
         "verify.md": {
-          "hash": "sha256:7f7112eb5d8bce05ab35eb25ef695e5e9194293acbf072bb93deb506910f1d9b",
-          "lastModified": "2026-08-16T08:12:47.177Z"
+          "hash": "sha256:3f31b96ebe42b1100774eefeebb9aa3cab6fde809eab9e0b18496589cff71d2d",
+          "lastModified": "2026-10-14T09:19:31.725Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# resolve-symbol-reference\n\n## Rules\n\n### Input & Identity\n- `ResolveSymbolReference` accepts workspace, symbol text, optional constraints (file, public surface, symbol-space, broad kind, member-form, build-context).\n- Structured identity authoritative. Rendered canonical references round-trip with escaping, no ad hoc delimiter splitting.\n- Identifier case/normalization follow language. Path/workspace normalization separate.\n\n### Canonical Targets\n- Return single logical symbol as canonical target, retaining all contributing declaration locations (overloads/merges resolve as 1 target; competing declarations separate).\n- Target exposes: workspace, module/package, owner, symbol space, simple name, member form, contributing locations, stable canonical reference (line/column independent).\n\n### Bindings\n- Public export slot selected by public surface, exported name, symbol space. Distinct aliases, duplicate re-exports, competing targets remain distinct for ambiguity reporting.\n- Local bindings retain lexical scope + source provenance (shadowed aliases non-merged; local alias resolution != public export).\n- Anonymous/default exports addressable via public binding identity.\n\n### Precedence\n1. Exact declaration in explicitly addressed file/owner\n2. Exact public binding in explicitly addressed public surface\n3. Statically proven scoped import/alias\n4. Statically proven hierarchy path (language rules)\n- Same-name symbol without proven path fails resolution. Build-context selects platform/conditional alternatives. Cyclic paths terminate without duplicates.\n\n### Outcomes\n- `resolved`: 1 target proven.\n- `ambiguous`: multiple valid targets, none selected.\n- `unresolved`: proof unsafe/unavailable (stale/dirty/parse-failed/unsupported evidence -> `unresolved`, not `missing`; unknown freshness -> `freshness-unknown`).\n- `missing`: current + complete index proves target absent in addressed file/surface.\n- Non-resolved includes machine-readable reason code, ordered candidates, typed evidence path.\n\n### Freshness & Coverage\n- VCS ref equality insufficient. Call batch `AssessIndexedResourceFreshness` on addressed resources/declaration files. Deduplicate shared inputs. No direct filesystem/hash/repo logic in resolver.\n- Exact file-anchored resolution can proceed if file fresh despite global staleness. Workspace-wide fallback/absence/ambiguity requires global completeness; if global stale/unknown -> `unresolved`.\n\n### Hierarchy Members\n- Declared/overriding member > inherited member. Contract-qualified -> contract member.\n- Traversing ancestor owner queries requested member under ancestor (owner != member). Evidence retains path + ancestor-member declaration.\n- Competing inherited members -> `ambiguous`. Getter/setter requires member-form constraint if ambiguous. Implicit interfaces require proven method sets. Bounded cycle termination.\n\n### Batch & Backend\n- Batch resolution shares health snapshot + provider lifecycle. Bounded index lookups, no whole-graph scans per query.\n- Candidate/provenance ordering, status, reason codes identical across graph backends.\n\n## Constraints\n- NO mutation of stored links or sidecars.\n- Prohibit fuzzy matching, edit distance, best-guess.\n- Runtime reflection, computed imports, monkey patching, unproven value flow -> unresolved.\n- Language syntax analysis belongs to language adapters.",
+      "value": "# Resolve Symbol Reference\n\n## Rules\n- `ResolveSymbolReference` accepts workspace, text, optional file/public surface/symbol space/broad kind/member semantics/owner/build context. Structured fields and escaped round-tripping canonical references are authoritative; no ad hoc delimiter splitting.\n- `Tipo.miembro` or `Tipo::miembro` compares equality on stored dotted `qualified_name`; no file/language required, no adapter sweep/default. Return every match; optional file/surface filters visibility; none→unresolved.\n- Other human owner-qualified text selects adapter from explicit language, anchored file language, then public-surface metadata; none→unresolved. Language controls identifier case/normalization; path/workspace normalization stays separate. No `MemberForm` input.\n- Canonical target is one logical symbol retaining every contributing declaration. Same logical overload/merge resolves; genuinely competing logical symbols are ambiguous. Target exposes workspace, module/package, owner, symbol space, simple name, member form, locations, stable location-independent canonical reference.\n- Public slot = surface+exported name+space; each target/provenance route remains independently addressable. Local bindings retain scope/range; shadowing stays separate. Default/anonymous exports remain binding-addressable.\n- Precedence: (1) exact canonical logical ID; (2) exact `qualified_name`; (3) exact declaration in addressed file/owner; (4) exact public binding on addressed surface; (5) proven scoped import/alias; (6) proven hierarchy path.\n- Owner resolves before member. Never terminal-name/rank inference. File path alone cannot select public binding. Build context may select alternatives; cycles terminate without duplicate candidates.\n- Outcomes exactly `resolved`, `ambiguous`, `unresolved`, `missing`. Non-resolved includes stable reason, ordered candidates, typed ordered evidence. `missing` only with current complete addressed evidence.\n- Batch `AssessIndexedResourceFreshness` evaluates addressed resources and every contributing declaration file; deduplicate inputs. Resolver embeds no filesystem/repository/hash/persistence logic.\n- Exact fresh file-anchored resolution may proceed despite unrelated global staleness. Workspace-wide fallback, uniqueness, ambiguity, or absence needing corpus completeness becomes unresolved when global state stale/unknown.\n- Dirty/stale/incompatible/excluded/unsupported/parse-failed/partial evidence→unresolved, never missing. Assessment failure→`freshness-unknown`. Fresh complete addressed file/surface may prove missing. Provider/generation failures remain infrastructure errors.\n- Declared/overriding member beats inherited; contract-qualified selects contract member. Language precedence governs inherited/trait/mixin/embedded/promoted/abstract/default members.\n- Ancestor traversal queries requested member under reached owner; owner alone is not member evidence. Preserve owner path and ancestor-member declaration. Competing inheritance→ambiguous; same-name accessor forms require semantics when language cannot select; implicit interfaces require proven method sets; cycles terminate.\n- Batch resolution shares one health snapshot/provider lifecycle, indexed bounded traversal, no full-graph scan per query. Ordering/status/reasons identical across backends.\n\n## Constraints\n- No stored-link or sidecar mutation.\n- No fuzzy matching, edit distance, rank-based guess, runtime reflection, computed imports, monkey patching, unproven value flow.\n- Adapter syntax analysis stays in language adapters.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:16cfb65d0ab63dc05ba94d65f822425ee3a2b742c639ce6822744560559f1dae",
-          "lastModified": "2026-08-16T08:12:47.176Z"
+          "hash": "sha256:a1a5999379d74972898b5c71786b7cda1a61023910403767bb8dc4994b5b6ed6",
+          "lastModified": "2026-10-14T08:50:27.913Z"
         },
         "verify.md": {
-          "hash": "sha256:7f7112eb5d8bce05ab35eb25ef695e5e9194293acbf072bb93deb506910f1d9b",
-          "lastModified": "2026-08-16T08:12:47.177Z"
+          "hash": "sha256:3f31b96ebe42b1100774eefeebb9aa3cab6fde809eab9e0b18496589cff71d2d",
+          "lastModified": "2026-10-14T09:19:31.725Z"
         }
       }
     }

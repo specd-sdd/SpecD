@@ -11,41 +11,46 @@
   "implementation": [
     {
       "file": "code-graph:src/infrastructure/tree-sitter/python-language-adapter.ts",
-      "symbols": ["PythonLanguageAdapter"]
+      "symbols": [
+        "PythonLanguageAdapter",
+        "collectClassInfo",
+        "buildRelations",
+        "headerHasParseError"
+      ]
     }
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Translates Python source (.py) and stubs (.pyi) into shared code-graph symbols, scoped bindings, imports, calls, and inheritance facts.",
+      "value": "Translates Python source and stubs into deterministic symbols, bindings, references, imports, calls, construction, and hierarchy facts.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:6e9374a9bba7b27141c3dc87532813d9138d129ea0b6ac9ba47dec2cbdf35351",
-          "lastModified": "2026-08-16T08:12:48.966Z"
+          "hash": "sha256:d0390485eb8bae24e3ce007a7e59a732646e724366e96dafb0f8194fe0464fea",
+          "lastModified": "2026-10-14T08:50:27.854Z"
         },
         "verify.md": {
-          "hash": "sha256:0025a62cb07d9af889bd5b7387b5d3839c95b23abef39b667b29a7edf737168d",
-          "lastModified": "2026-08-16T08:12:48.969Z"
+          "hash": "sha256:ced8dc660c565f88c0180a8ea114b387cec451ef793d931fee8e78134e47a4a2",
+          "lastModified": "2026-10-14T08:50:27.855Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# python-language-adapter\n\n## Rules\n\n### Scope & Analysis\n- Handles `.py`, `.pyi` as `python`.\n- Single-pass parsing via Tree-sitter/ast-grep; returns `FileAnalysisDraft` without AST retention or module execution.\n\n### Declarations & Owners\n- Extracts module functions, classes, nested classes, methods, module assignments. Drops nested functions in function bodies & class assignments.\n- Complete construct range; declared-name `selectionRange`. Attached comments preserved.\n- Declaring owner = nearest enclosing class. Same-name methods distinct across classes. Top-level declarations have no owner.\n- Classifies `@classmethod`, `@staticmethod`, properties, setters; omits unknown decorators.\n\n### Imports & Package Resolution\n- Extracts `import`, `from ... import ...`, aliases, relative imports, literal `importlib.import_module()` & `__import__()`. Drops variable dynamic imports.\n- Relative imports handle leading dots, package `__init__.py`, stubs, `src/` layouts.\n- Reads `pyproject.toml` `name` (with `_`/`-` normalization) bounded by repo root.\n\n### Scoped Bindings, Calls & Relations\n- Emits facts for scope, params, return/assignment annotations, `self`/`cls` receivers, `new` construction calls.\n- Emits `IMPORTS`, `CALLS`, `CONSTRUCTS`, `USES_TYPE` only when proven by indexed facts.\n- Innermost function/method = caller. Drops module-scope calls, monkey patching, reflection, dynamic attributes.\n\n### Hierarchy & Evidence\n- Preserves declared base order. Emits `EXTENDS` (class), `IMPLEMENTS` (protocol/interface), `OVERRIDES` (method replacement).\n- Reference facts retain child owner, base order, ancestor/contract owner, relation kind, provenance steps.\n- C3 MRO / descriptors / `__mro_entries__` unsupported -> complex dynamic bases remain `ambiguous` or `unresolved`. Cycle-safe.\n- Advertises `hierarchy: true`, `buildContext: false`.\n\n### Public Surface & Stubs\n- `.pyi` stubs participate without runtime execution. `__all__`, star exports, namespace packages unsupported unless explicitly proven. No underscore-name heuristic guessing.\n\n## Constraints\n- NO Python module execution, imports, or runtime inspection.\n- Monkey patching, dynamic attribute hooks, reflection, interprocedural flow -> unsupported.\n- Python-specific logic MUST stay inside adapter.",
+      "value": "# python-language-adapter\n\n## Rules\n\n### Files & analysis\n- PythonLanguageAdapter handles .py and .pyi as python.\n- Parse supplied content once via registered Tree-sitter/ast-grep grammar; return complete FileAnalysisDraft: symbols, imports, binding/call/reference facts, compact serializable Pass 2 state.\n- Never import/execute analyzed modules. Parser objects only run-scoped keepalive; never persisted.\n\n### Declarations & identity\n- Extract module functions, classes/nested classes, class-body methods including decorated definitions, module/class assignment targets.\n- Class assignments, dataclass fields, Protocol annotations become SymbolKind.Property with enclosing class owner and parentId. Nested functions unsupported.\n- Preserve attached comments. Use complete construct range and exact declared-name selectionRange, half-open; omit when authoritative range unavailable.\n- Owner from syntactic nesting: method -> nearest class; nested class -> nearest class; module declaration -> no owner. Omit unprovable-owner methods from logical member facts.\n- Create/map owner identities before member logical IDs; never copy raw parser IDs or optional SymbolNode.parentId. Same-name methods across classes remain distinct.\n- Preserve distinct evidence for instance/class/static methods, properties, setters, other recognized forms; never guess unknown decorators.\n\n### Imports & resolution\n- Extract import, from-import, aliases, relative imports, literal importlib.import_module() and __import__(); drop computed arguments.\n- For import package.module, retain local binding and original qualified module.\n- Resolve relative imports using leading-dot traversal and indexed proof across modules, package __init__.py, stubs, known src layouts. Ambiguous namespace/layout routes unresolved.\n- resolutionManifests() returns only pyproject.toml. Package identity only nearest bounded [project].name, underscore/hyphen normalized; never setup.cfg, setup.py, or other tables.\n\n### Bindings, calls & types\n- Emit deterministic lexical scope, import alias, parameter/return annotation, annotated assignment, type-alias RHS, self/cls receiver, explicit construction, and proven local-alias facts.\n- Extract function/class decorator calls/references and class/dataclass field annotations; emit CALLS or USES_TYPE when resolvable.\n- Emit IMPORTS, CALLS, CONSTRUCTS, USES_TYPE only for one proven indexed target.\n- Caller = innermost enclosing function/method, or class for class decorator. No guessed module calls, monkey patches, descriptors, reflection, computed imports, runtime-flow aliases.\n\n### Hierarchy & provenance\n- Retain bases in source order; resolve via local declarations/proven imports.\n- Proven ordinary inheritance -> EXTENDS; proven protocol/interface-like base MAY -> IMPLEMENTS; known matching member -> OVERRIDES.\n- Reference facts identify child/ancestor logical owners, relation kind, base order, ordered provenance; resolver traverses ancestor owner then queries member. Never emit ancestor owner as member candidate.\n- Preserve only provable multiple-inheritance precedence. C3 MRO, descriptors, dynamic __mro_entries__, metaclass-dependent selection remain ambiguous/unresolved. Cycles terminate deterministically.\n\n### Public surface, stubs & capabilities\n- Module declarations addressable through module surface. Imports/aliases remain local unless supported syntax/metadata proves public route.\n- .pyi declarations participate without speculative runtime merge/execution.\n- Static __all__, star expansion, namespace aggregation, runtime mutation unsupported. Never infer export from missing leading underscore.\n- Advertise hierarchy: true only while required hierarchy/provenance emitted; build-context false until environment/platform/interpreter/layout policy consumed.\n- Parse failure/unsupported semantics become shared coverage outcomes, never name-only guesses.\n- Identical content/index context produces deterministic facts, relations, provenance.\n\n## Constraints\n- MUST NOT execute Python, import analyzed modules, or inspect runtime objects.\n- Monkey patching, dynamic attribute hooks, reflection, whole-program alias flow unsupported.\n- Python-specific import, ownership, hierarchy semantics remain inside adapter.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:6e9374a9bba7b27141c3dc87532813d9138d129ea0b6ac9ba47dec2cbdf35351",
-          "lastModified": "2026-08-16T08:12:48.966Z"
+          "hash": "sha256:d0390485eb8bae24e3ce007a7e59a732646e724366e96dafb0f8194fe0464fea",
+          "lastModified": "2026-10-14T08:50:27.854Z"
         },
         "verify.md": {
-          "hash": "sha256:0025a62cb07d9af889bd5b7387b5d3839c95b23abef39b667b29a7edf737168d",
-          "lastModified": "2026-08-16T08:12:48.969Z"
+          "hash": "sha256:ced8dc660c565f88c0180a8ea114b387cec451ef793d931fee8e78134e47a4a2",
+          "lastModified": "2026-10-14T08:50:27.855Z"
         }
       }
     }

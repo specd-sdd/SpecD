@@ -17,7 +17,8 @@ import {
 } from '../value-objects/relation-type.js'
 import { type SpecNode } from '../value-objects/spec-node.js'
 import { type SymbolNode } from '../value-objects/symbol-node.js'
-import { analyzeImpact, type ImpactResolutionProvider } from './analyze-impact.js'
+import { analyzeImpactDetails, type ImpactResolutionProvider } from './analyze-impact.js'
+import { collectLogicalCoveringSpecs } from './collect-impact-specs.js'
 import { mapWithConcurrency } from './map-with-concurrency.js'
 
 /** Maximum active impact analyses in one top-level file-impact operation. */
@@ -114,8 +115,8 @@ export async function analyzeFileImpactDetails(
 
   // Symbol-level impact via CALLS
   const symbols = await cachedStore.findSymbols({ filePath })
-  const symbolResults = await mapWithConcurrency(symbols, symbolConcurrency, async (symbol) =>
-    analyzeImpact(
+  const symbolDetails = await mapWithConcurrency(symbols, symbolConcurrency, async (symbol) =>
+    analyzeImpactDetails(
       cachedStore,
       symbol.id,
       direction,
@@ -124,6 +125,7 @@ export async function analyzeFileImpactDetails(
       filter,
     ),
   )
+  const symbolResults = symbolDetails.map((details) => details.result)
 
   // File-level impact via IMPORTS (BFS)
   const fileImpact = await analyzeFileImportImpact(
@@ -173,12 +175,16 @@ export async function analyzeFileImpactDetails(
   }
   const symbolDepths = new Map<string, number>()
   for (const symbol of symbols) symbolDepths.set(symbol.id, 0)
-  if (materializesImpactType(filter, 'symbols')) {
-    for (const result of symbolResults) {
-      for (const symbol of result.affectedSymbols) {
-        setMinimumDepth(symbolDepths, symbol.id, symbol.depth)
-        setMinimumDepth(fileDepths, symbol.filePath, symbol.depth)
-      }
+  // Coverage evidence and depths come from the traversal itself, so they stay complete even
+  // when the caller materializes only specs.
+  const reachedDepths = new Map<string, number>()
+  for (const details of symbolDetails) {
+    for (const [id, depth] of details.reachedSymbolDepths) setMinimumDepth(reachedDepths, id, depth)
+  }
+  for (const [id, depth] of reachedDepths) setMinimumDepth(symbolDepths, id, depth)
+  if (reachedDepths.size > 0 && materializesImpactType(filter, 'specs')) {
+    for (const reached of await cachedStore.getSymbolsByIds([...reachedDepths.keys()])) {
+      setMinimumDepth(fileDepths, reached.filePath, reachedDepths.get(reached.id) ?? 1)
     }
   }
 
@@ -379,15 +385,45 @@ export async function collectCoveringSpecs(
   fileDepths: ReadonlyMap<string, number>,
   symbolDepths: ReadonlyMap<string, number>,
 ): Promise<CoveringSpecImpact[]> {
+  const physicalDeclIds = [...symbolDepths.keys()]
+  const mappedDecls =
+    physicalDeclIds.length > 0
+      ? await store.findLogicalDeclarationsByDeclarationIds(physicalDeclIds)
+      : []
+
+  const declsByLogicalId = new Map<string, string[]>()
+  const logicalDepths = new Map<string, number>()
+
+  for (const item of mappedDecls) {
+    const list = declsByLogicalId.get(item.logicalSymbolId) ?? []
+    list.push(item.declaration.symbolId)
+    declsByLogicalId.set(item.logicalSymbolId, list)
+
+    const depth = symbolDepths.get(item.declaration.symbolId) ?? 0
+    const existing = logicalDepths.get(item.logicalSymbolId)
+    if (existing === undefined || depth < existing) {
+      logicalDepths.set(item.logicalSymbolId, depth)
+    }
+  }
+
+  // COVERS_SYMBOL targets are canonical logical symbols; a physical declaration id is never
+  // queried as one, so unmapped (physical-only) declarations contribute no symbol coverage.
+  const querySymbols = [...logicalDepths.keys()]
+
   const [fileRelations, symbolRelations] = await Promise.all([
     store.getCoveringSpecsForFiles([...fileDepths.keys()]),
-    store.getCoveringSpecsForSymbols([...symbolDepths.keys()]),
+    querySymbols.length > 0 ? store.getCoveringSpecsForSymbols(querySymbols) : Promise.resolve([]),
   ])
   const evidenceBySpec = new Map<
     string,
     Map<
       string,
-      { readonly kind: 'file' | 'symbol'; readonly target: string; readonly depth: number }
+      {
+        readonly kind: 'file' | 'symbol'
+        readonly target: string
+        readonly depth: number
+        readonly declarations?: readonly string[]
+      }
     >
   >()
   for (const relation of fileRelations) {
@@ -396,28 +432,20 @@ export async function collectCoveringSpecs(
       addCoverageEvidence(evidenceBySpec, relation.source, 'file', relation.target, depth)
   }
   for (const relation of symbolRelations) {
-    const depth = symbolDepths.get(relation.target)
+    const depth = logicalDepths.get(relation.target)
     if (depth !== undefined) {
-      addCoverageEvidence(evidenceBySpec, relation.source, 'symbol', relation.target, depth)
+      const decls = declsByLogicalId.get(relation.target)
+      addCoverageEvidence(
+        evidenceBySpec,
+        relation.source,
+        'symbol',
+        relation.target,
+        depth,
+        decls !== undefined && decls.length > 0 ? [...new Set(decls)].sort() : undefined,
+      )
     }
   }
-  return [...evidenceBySpec]
-    .map(([specId, evidenceMap]) => {
-      const evidence = [...evidenceMap.values()].sort(
-        (left, right) =>
-          left.depth - right.depth ||
-          left.kind.localeCompare(right.kind) ||
-          left.target.localeCompare(right.target),
-      )
-      return {
-        specId,
-        minDepth: Math.min(...evidence.map((item) => item.depth)),
-        evidence,
-      }
-    })
-    .sort(
-      (left, right) => left.minDepth - right.minDepth || left.specId.localeCompare(right.specId),
-    )
+  return formatCoveringSpecs(evidenceBySpec)
 }
 
 /**
@@ -439,50 +467,7 @@ export async function collectFilteredCoveringSpecs(
   symbolDepths: ReadonlyMap<string, number>,
   filter?: ImpactResultFilter,
 ): Promise<CoveringSpecImpact[]> {
-  const [fileResult, symbolResult] = await Promise.all([
-    store.queryImpactFrontier({
-      resource: 'spec',
-      frontier: [...fileDepths.keys()],
-      direction: 'upstream',
-      depth: 0,
-      maxDepth: 0,
-      relationTypes: [RelationType.CoversFile],
-      ...(filter === undefined ? {} : { filter }),
-    }),
-    store.queryImpactFrontier({
-      resource: 'spec',
-      frontier: [...symbolDepths.keys()],
-      direction: 'upstream',
-      depth: 0,
-      maxDepth: 0,
-      relationTypes: [RelationType.CoversSymbol],
-      ...(filter === undefined ? {} : { filter }),
-    }),
-  ])
-  const admittedSpecIds = new Set(
-    [...fileResult.specs, ...symbolResult.specs].map((spec) => spec.specId),
-  )
-  const evidenceBySpec = new Map<
-    string,
-    Map<
-      string,
-      { readonly kind: 'file' | 'symbol'; readonly target: string; readonly depth: number }
-    >
-  >()
-
-  for (const relation of fileResult.relations) {
-    const depth = fileDepths.get(relation.target)
-    if (depth !== undefined && admittedSpecIds.has(relation.source)) {
-      addCoverageEvidence(evidenceBySpec, relation.source, 'file', relation.target, depth)
-    }
-  }
-  for (const relation of symbolResult.relations) {
-    const depth = symbolDepths.get(relation.target)
-    if (depth !== undefined && admittedSpecIds.has(relation.source)) {
-      addCoverageEvidence(evidenceBySpec, relation.source, 'symbol', relation.target, depth)
-    }
-  }
-  return formatCoveringSpecs(evidenceBySpec)
+  return collectLogicalCoveringSpecs(store, fileDepths, symbolDepths, filter)
 }
 
 /**
@@ -495,7 +480,12 @@ function formatCoveringSpecs(
     string,
     ReadonlyMap<
       string,
-      { readonly kind: 'file' | 'symbol'; readonly target: string; readonly depth: number }
+      {
+        readonly kind: 'file' | 'symbol'
+        readonly target: string
+        readonly depth: number
+        readonly declarations?: readonly string[]
+      }
     >
   >,
 ): CoveringSpecImpact[] {
@@ -525,28 +515,45 @@ function formatCoveringSpecs(
  * @param kind - Covered resource kind.
  * @param resource - Covered resource identity.
  * @param depth - Shallowest impact depth.
+ * @param declarations - Physical declarations supporting logical coverage.
  */
 function addCoverageEvidence(
   target: Map<
     string,
     Map<
       string,
-      { readonly kind: 'file' | 'symbol'; readonly target: string; readonly depth: number }
+      {
+        readonly kind: 'file' | 'symbol'
+        readonly target: string
+        readonly depth: number
+        readonly declarations?: readonly string[]
+      }
     >
   >,
   specId: string,
   kind: 'file' | 'symbol',
   resource: string,
   depth: number,
+  declarations?: readonly string[],
 ): void {
   const evidence =
     target.get(specId) ??
     new Map<
       string,
-      { readonly kind: 'file' | 'symbol'; readonly target: string; readonly depth: number }
+      {
+        readonly kind: 'file' | 'symbol'
+        readonly target: string
+        readonly depth: number
+        readonly declarations?: readonly string[]
+      }
     >()
   const key = `${kind}:${resource}:${String(depth)}`
-  evidence.set(key, { kind, target: resource, depth })
+  evidence.set(key, {
+    kind,
+    target: resource,
+    depth,
+    ...(declarations === undefined ? {} : { declarations }),
+  })
   target.set(specId, evidence)
 }
 

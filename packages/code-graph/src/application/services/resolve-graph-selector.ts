@@ -7,6 +7,9 @@ import { type FileNode } from '../../domain/value-objects/file-node.js'
 import { isSymbolKind, type SymbolKind } from '../../domain/value-objects/symbol-kind.js'
 import { isExactLaneQuery, qualifiedLookupText } from '../../domain/services/exact-lane-query.js'
 import {
+  type DeclarationResolutionTarget,
+  type LogicalResolutionTarget,
+  type PublicBindingResolutionTarget,
   type ResolveSymbolReferenceInput,
   type SymbolResolutionResult,
 } from '../../domain/value-objects/symbol-reference.js'
@@ -14,12 +17,17 @@ import {
 /**
  * Resolution options for file and symbol selector normalization.
  */
-export interface ResolveSelectorOptions {
+export interface ResolveFileSelectorOptions {
   readonly store: GraphStore
   readonly projectRoot?: string
-  readonly resolveReference?: (
-    input: ResolveSymbolReferenceInput,
-  ) => Promise<SymbolResolutionResult>
+}
+
+/**
+ * Resolution options for symbol selector normalization; symbol selectors always
+ * resolve through the shared reference resolver so the result carries a typed target.
+ */
+export interface ResolveSelectorOptions extends ResolveFileSelectorOptions {
+  readonly resolveReference: (input: ResolveSymbolReferenceInput) => Promise<SymbolResolutionResult>
 }
 
 /**
@@ -43,15 +51,65 @@ export interface ResolvedSymbolSelector {
   readonly logicalId?: string | undefined
 }
 
+/** A selector resolved to a canonical logical symbol. */
+export interface ResolvedGraphLogicalSelector {
+  readonly status: 'resolved'
+  readonly kind: 'logical-target'
+  readonly target: LogicalResolutionTarget
+  readonly match: ResolvedSymbolSelector
+}
+
+/** A selector resolved to one physical declaration. */
+export interface ResolvedGraphDeclarationSelector {
+  readonly status: 'resolved'
+  readonly kind: 'declaration'
+  readonly target: DeclarationResolutionTarget
+  readonly match: ResolvedSymbolSelector
+}
+
+/** A selector resolved to a public binding. */
+export interface ResolvedGraphPublicBindingSelector {
+  readonly status: 'resolved'
+  readonly kind: 'public-binding'
+  readonly target: PublicBindingResolutionTarget
+  readonly match: ResolvedSymbolSelector
+}
+
+/** A selector with multiple equally valid matches. */
+export interface ResolvedGraphAmbiguousSelector {
+  readonly status: 'ambiguous'
+  readonly kind?: 'ambiguous'
+  readonly candidates: readonly ResolvedSymbolSelector[]
+  readonly totalCandidates: number
+}
+
+/** A selector for which no indexed match exists. */
+export interface ResolvedGraphMissingSelector {
+  readonly status: 'missing'
+  readonly kind?: 'missing'
+  readonly candidates: readonly []
+}
+
+/** A selector the resolver could not decide because the graph evidence is not trustworthy. */
+export interface ResolvedGraphUnresolvedSelector {
+  readonly status: 'unresolved'
+  readonly kind?: 'unresolved'
+  /** Stable reason from the shared resolver, for example a freshness or coverage code. */
+  readonly reasonCode: string
+  readonly candidates: readonly []
+}
+
+/** Discriminated union of graph selector resolution outcomes. */
+export type ResolvedGraphSymbolSelector =
+  | ResolvedGraphLogicalSelector
+  | ResolvedGraphDeclarationSelector
+  | ResolvedGraphPublicBindingSelector
+  | ResolvedGraphAmbiguousSelector
+  | ResolvedGraphMissingSelector
+  | ResolvedGraphUnresolvedSelector
+
 /** Deterministic outcome of resolving one symbol selector for impact. */
-export type ResolvedSymbolSelectorResult =
-  | { readonly status: 'resolved'; readonly match: ResolvedSymbolSelector }
-  | {
-      readonly status: 'ambiguous'
-      readonly candidates: readonly ResolvedSymbolSelector[]
-      readonly totalCandidates: number
-    }
-  | { readonly status: 'missing'; readonly candidates: readonly [] }
+export type ResolvedSymbolSelectorResult = ResolvedGraphSymbolSelector
 
 const MAX_AMBIGUITY_CANDIDATES = 10
 
@@ -67,7 +125,7 @@ const RESOLVER_CONCURRENCY = 16
  */
 export async function resolveFileSelector(
   input: string,
-  options: ResolveSelectorOptions,
+  options: ResolveFileSelectorOptions,
 ): Promise<ResolvedFileSelector[]> {
   const trimmed = input.trim()
   if (trimmed.length === 0) {
@@ -113,14 +171,17 @@ export async function resolveSymbolSelector(
 
   const direct = await options.store.getSymbol(trimmed)
   if (direct) {
-    return resolvedResult([
-      {
-        symbolId: direct.id,
-        filePath: direct.filePath,
-        matchKind: 'full-id',
-        ...(direct.parentId !== undefined ? { parentId: direct.parentId } : {}),
-      },
-    ])
+    return resolveMatches(
+      [
+        {
+          symbolId: direct.id,
+          filePath: direct.filePath,
+          matchKind: 'full-id',
+          ...(direct.parentId !== undefined ? { parentId: direct.parentId } : {}),
+        },
+      ],
+      options,
+    )
   }
 
   const fullId = parseFullIdSelector(trimmed)
@@ -133,7 +194,7 @@ export async function resolveSymbolSelector(
         name: fullId.name,
       }),
     )
-    return resolvedResult(
+    return resolveMatches(
       symbolMatches
         .flat()
         .filter((symbol) => symbol.line === fullId.line && symbol.column === fullId.column)
@@ -143,6 +204,7 @@ export async function resolveSymbolSelector(
           matchKind: 'full-id' as const,
           ...(symbol.parentId !== undefined ? { parentId: symbol.parentId } : {}),
         })),
+      options,
     )
   }
 
@@ -152,46 +214,28 @@ export async function resolveSymbolSelector(
   const qualified = parseQualifiedSelector(trimmed)
   if (qualified !== null) {
     const fileMatches = await resolveFileSelector(qualified.fileSelector, options)
-    if (isExactLaneQuery(qualified.name) && options.resolveReference !== undefined) {
-      const resolvedMembers = await mapWithConcurrency(
+    if (isExactLaneQuery(qualified.name)) {
+      const resolutions = await mapWithConcurrency(
         fileMatches,
         RESOLVER_CONCURRENCY,
-        async (file) => {
-          const resolution = await options.resolveReference!({
+        async (file) =>
+          options.resolveReference({
             workspace: file.workspace,
             requested: qualified.name,
             filePath: file.canonicalPath,
             publicSurface: file.canonicalPath,
-          })
-          if (resolution.status === 'ambiguous') {
-            return resolution.candidates.flatMap((candidate) =>
-              candidate.declarations
-                .filter((declaration) => declaration.location.filePath === file.canonicalPath)
-                .map((declaration) => ({
-                  symbolId: declaration.symbolId,
-                  filePath: file.canonicalPath,
-                  matchKind: 'qualified' as const,
-                  logicalId: candidate.target.id,
-                })),
-            )
-          }
-          if (resolution.status !== 'resolved' || resolution.target === null) return []
-          return (
-            resolution.candidates
-              .find((candidate) => candidate.target.id === resolution.target?.id)
-              ?.declarations.filter(
-                (declaration) => declaration.location.filePath === file.canonicalPath,
-              )
-              .map((declaration) => ({
-                symbolId: declaration.symbolId,
-                filePath: file.canonicalPath,
-                matchKind: 'qualified' as const,
-                logicalId: resolution.target?.id,
-              })) ?? []
-          )
-        },
+          }),
       )
-      return resolvedResult(resolvedMembers.flat())
+      const resolved = resolutions.filter(
+        (r) => r.status === 'resolved' && r.resolvedTarget !== null,
+      )
+      if (resolved.length === 1) return fromResolvedTarget(resolved[0]!.resolvedTarget!)
+      if (resolved.length > 1 || resolutions.some((r) => r.status === 'ambiguous')) {
+        return ambiguousFromCandidates(resolutions.flatMap((r) => candidateMatches(r)))
+      }
+      const unresolvedResolution = resolutions.find((r) => r.status === 'unresolved')
+      if (unresolvedResolution !== undefined) return unresolvedSelector(unresolvedResolution)
+      return { status: 'missing', candidates: [] }
     }
     const symbolMatches = await mapWithConcurrency(fileMatches, RESOLVER_CONCURRENCY, (file) =>
       options.store.findSymbols({
@@ -200,13 +244,14 @@ export async function resolveSymbolSelector(
         name: qualified.name,
       }),
     )
-    return resolvedResult(
+    return resolveMatches(
       symbolMatches.flat().map((symbol) => ({
         symbolId: symbol.id,
         filePath: symbol.filePath,
         matchKind: 'qualified' as const,
         ...(symbol.parentId !== undefined ? { parentId: symbol.parentId } : {}),
       })),
+      options,
     )
   }
 
@@ -215,14 +260,156 @@ export async function resolveSymbolSelector(
     caseExact.length > 0
       ? caseExact
       : await options.store.findSymbols({ name: trimmed, caseSensitive: false })
-  return resolvedResult(
+  return resolveMatches(
     symbols.map((symbol) => ({
       symbolId: symbol.id,
       filePath: symbol.filePath,
       matchKind: 'name' as const,
       ...(symbol.parentId !== undefined ? { parentId: symbol.parentId } : {}),
     })),
+    options,
   )
+}
+
+/**
+ * Reports a resolver `unresolved` outcome without pretending the symbol does not exist.
+ * @param resolution - Resolver outcome with status `unresolved`.
+ * @returns Unresolved selector carrying the resolver's reason code, or missing for plain absence.
+ */
+function unresolvedSelector(
+  resolution: SymbolResolutionResult,
+): ResolvedGraphUnresolvedSelector | ResolvedGraphMissingSelector {
+  // "Nothing matched" with a healthy graph is plain absence; only a graph-evidence reason
+  // (staleness, partial coverage, unsupported context) makes the selector undecided.
+  if (resolution.reasonCode === 'REFERENCE_UNPROVEN') return { status: 'missing', candidates: [] }
+  return {
+    status: 'unresolved',
+    reasonCode: resolution.reasonCode ?? 'REFERENCE_UNPROVEN',
+    candidates: [],
+  }
+}
+
+/**
+ * Builds the typed selector outcome for one resolved reference target.
+ * @param target - Typed target returned by the shared reference resolver.
+ * @returns A logical, declaration, or public-binding selector outcome.
+ */
+function fromResolvedTarget(
+  target: NonNullable<SymbolResolutionResult['resolvedTarget']>,
+): ResolvedGraphSymbolSelector {
+  const firstDecl = target.kind === 'declaration' ? target.declaration : target.declarations[0]
+  const logicalId =
+    target.kind === 'declaration' ? target.logicalSymbol?.id : target.logicalSymbol.id
+  const match: ResolvedSymbolSelector = {
+    symbolId: firstDecl?.symbolId ?? '',
+    filePath: firstDecl?.location.filePath ?? '',
+    matchKind: 'qualified',
+    ...(logicalId !== undefined ? { logicalId } : {}),
+  }
+  if (target.kind === 'logical-target') {
+    return { status: 'resolved', kind: 'logical-target', target, match }
+  }
+  if (target.kind === 'public-binding') {
+    return { status: 'resolved', kind: 'public-binding', target, match }
+  }
+  return { status: 'resolved', kind: 'declaration', target, match }
+}
+
+/**
+ * Flattens resolver candidates into one selector match per declaration.
+ * @param resolution - Resolver outcome carrying logical candidates.
+ * @returns Declaration matches tagged with their logical id.
+ */
+function candidateMatches(resolution: SymbolResolutionResult): ResolvedSymbolSelector[] {
+  return resolution.candidates.flatMap((candidate) =>
+    candidate.declarations.map((declaration) => ({
+      symbolId: declaration.symbolId,
+      filePath: declaration.location.filePath,
+      matchKind: 'qualified' as const,
+      logicalId: candidate.target.id,
+    })),
+  )
+}
+
+/**
+ * Builds a bounded ambiguity outcome whose candidates count logical targets, not overloads.
+ * @param matches - Candidate declaration matches, each optionally tagged with a logical id.
+ * @returns Missing, or an ambiguous result with one candidate per logical target.
+ */
+function ambiguousFromCandidates(
+  matches: readonly ResolvedSymbolSelector[],
+): ResolvedGraphAmbiguousSelector | ResolvedGraphMissingSelector {
+  const groups = groupByLogicalTarget(matches)
+  if (groups.length === 0) return { status: 'missing', candidates: [] }
+  return {
+    status: 'ambiguous',
+    candidates: groups.slice(0, MAX_AMBIGUITY_CANDIDATES),
+    totalCandidates: groups.length,
+  }
+}
+
+/**
+ * Collapses matches to one deterministic representative per logical target.
+ * @param matches - Candidate matches.
+ * @returns Representatives ordered by file path then symbol id.
+ */
+function groupByLogicalTarget(
+  matches: readonly ResolvedSymbolSelector[],
+): ResolvedSymbolSelector[] {
+  const ordered = [...matches].sort(
+    (left, right) =>
+      left.filePath.localeCompare(right.filePath) || left.symbolId.localeCompare(right.symbolId),
+  )
+  const byKey = new Map<string, ResolvedSymbolSelector>()
+  for (const match of ordered) {
+    const key = match.logicalId ?? `physical:${match.symbolId}`
+    if (!byKey.has(key)) byKey.set(key, match)
+  }
+  return [...byKey.values()]
+}
+
+/**
+ * Resolves selector matches into one typed outcome through the shared resolver.
+ *
+ * Matches are grouped by logical symbol, so overload sets and multi-declaration
+ * targets resolve to one logical target. Physical-only declarations resolve as exact
+ * declarations. Several distinct targets are reported as a bounded ambiguity.
+ * @param matches - Physical declaration matches.
+ * @param options - Graph resolution options.
+ * @returns A typed resolved outcome, a bounded ambiguity, or missing.
+ */
+async function resolveMatches(
+  matches: readonly ResolvedSymbolSelector[],
+  options: ResolveSelectorOptions,
+): Promise<ResolvedSymbolSelectorResult> {
+  const symbolIds = [...new Set(matches.map((match) => match.symbolId))]
+  if (symbolIds.length === 0) return { status: 'missing', candidates: [] }
+  const declarations = await options.store.findLogicalDeclarationsByDeclarationIds(symbolIds)
+  const logicalBySymbol = new Map(
+    declarations.map((entry) => [entry.declaration.symbolId, entry.logicalSymbolId]),
+  )
+  const tagged = matches.map((match) => {
+    const logicalId = logicalBySymbol.get(match.symbolId)
+    return logicalId === undefined ? match : { ...match, logicalId }
+  })
+  const groups = groupByLogicalTarget(tagged)
+  if (groups.length > 1) return ambiguousFromCandidates(tagged)
+  const only = groups[0]!
+  const resolution = await options.resolveReference(
+    only.logicalId !== undefined
+      ? { workspace: '', requested: only.logicalId }
+      : { workspace: '', requested: only.symbolId, declarationSymbolId: only.symbolId },
+  )
+  const target = resolution.resolvedTarget
+  if (resolution.status !== 'resolved' || target === null) {
+    if (resolution.status === 'ambiguous')
+      return ambiguousFromCandidates(candidateMatches(resolution))
+    if (resolution.status === 'unresolved') return unresolvedSelector(resolution)
+    return { status: 'missing', candidates: [] }
+  }
+  const resolved = fromResolvedTarget(target)
+  if (resolved.status !== 'resolved') return resolved
+  return { ...resolved, match: { ...resolved.match, matchKind: only.matchKind } }
 }
 
 /**
@@ -236,101 +423,15 @@ async function resolveUnanchoredQualifiedSelector(
   trimmed: string,
   options: ResolveSelectorOptions,
 ): Promise<ResolvedSymbolSelectorResult | undefined> {
-  if (options.resolveReference === undefined) return undefined
   const spelling = qualifiedLookupText(trimmed)
   if (spelling === undefined && !trimmed.startsWith('logical|2|')) return undefined
   const resolution = await options.resolveReference({ workspace: '', requested: trimmed })
-  if (resolution.status === 'unresolved') return { status: 'missing', candidates: [] }
-  const matches = resolution.candidates.flatMap((candidate) =>
-    candidate.declarations.map((declaration) => ({
-      symbolId: declaration.symbolId,
-      filePath: declaration.location.filePath,
-      matchKind: 'qualified' as const,
-      logicalId: candidate.target.id,
-    })),
-  )
-  return resolvedResult(matches)
-}
-
-/**
- * Extracts declared symbol name from a standard deterministic symbol id.
- * @param symbolId - Deterministic symbol id (<filePath>:<kind>:<name>:<line>:<column>).
- * @returns The simple symbol name, or undefined if unparseable.
- */
-function extractSymbolNameFromId(symbolId: string): string | undefined {
-  const match = /:([^:]+):\d+:\d+$/.exec(symbolId)
-  return match?.[1]
-}
-
-/**
- * Unifies candidate matches that belong to the same logical symbol or overload set.
- * @param matches - Ordered candidate matches.
- * @returns The primary candidate match if all candidates belong to the same overload set, or undefined.
- */
-export function unifyOverloadSetCandidates(
-  matches: readonly ResolvedSymbolSelector[],
-): ResolvedSymbolSelector | undefined {
-  if (matches.length <= 1) {
-    return matches[0]
+  if (resolution.status === 'unresolved') return unresolvedSelector(resolution)
+  if (resolution.status === 'missing') return { status: 'missing', candidates: [] }
+  if (resolution.status === 'resolved' && resolution.resolvedTarget !== null) {
+    return fromResolvedTarget(resolution.resolvedTarget)
   }
-
-  const first = matches[0]
-  if (!first) {
-    return undefined
-  }
-
-  // If all matches share the same logicalId, they represent the same logical symbol.
-  if (first.logicalId !== undefined && matches.every((m) => m.logicalId === first.logicalId)) {
-    return first
-  }
-
-  // If all matches share the same filePath, parentId (non-null), and same symbol name, they represent overloads of the same member.
-  const firstName = extractSymbolNameFromId(first.symbolId)
-  if (
-    first.parentId !== undefined &&
-    firstName !== undefined &&
-    matches.every(
-      (m) =>
-        m.filePath === first.filePath &&
-        m.parentId !== undefined &&
-        m.parentId === first.parentId &&
-        extractSymbolNameFromId(m.symbolId) === firstName,
-    )
-  ) {
-    return first
-  }
-
-  return undefined
-}
-
-/**
- * Converts exact selector candidates into one bounded public outcome.
- * @param matches - Exact candidates returned by structured store queries.
- * @returns Resolved, ambiguous, or missing selector result.
- */
-function resolvedResult(matches: readonly ResolvedSymbolSelector[]): ResolvedSymbolSelectorResult {
-  const ordered = [
-    ...new Map(
-      [...matches]
-        .sort(
-          (left, right) =>
-            left.filePath.localeCompare(right.filePath) ||
-            left.symbolId.localeCompare(right.symbolId),
-        )
-        .map((match) => [match.symbolId, match]),
-    ).values(),
-  ]
-  if (ordered.length === 0) return { status: 'missing', candidates: [] }
-  if (ordered.length === 1) return { status: 'resolved', match: ordered[0]! }
-  const unified = unifyOverloadSetCandidates(ordered)
-  if (unified !== undefined) {
-    return { status: 'resolved', match: unified }
-  }
-  return {
-    status: 'ambiguous',
-    candidates: ordered.slice(0, MAX_AMBIGUITY_CANDIDATES),
-    totalCandidates: ordered.length,
-  }
+  return ambiguousFromCandidates(candidateMatches(resolution))
 }
 
 /**

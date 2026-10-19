@@ -352,6 +352,43 @@ describe('SearchCodeGraph', () => {
     expect(result.files[0]).toMatchObject({ totalMatches: 4, omittedMatches: 0 })
   })
 
+  it('serves non-symbol source text only through the files category', async () => {
+    const holder = createSymbolNode({
+      name: 'Holder',
+      kind: SymbolKind.Class,
+      filePath: 'code-graph:src/note.ts',
+      line: 1,
+      column: 0,
+    })
+    await store.upsertFile(
+      createFileNode({
+        path: 'code-graph:src/note.ts',
+        projectRelativePath: 'src/note.ts',
+        language: 'typescript',
+        contentHash: 'hash',
+        workspace: 'code-graph',
+        content: 'class Holder {}\nconst note = "zebrafinch"\n',
+      }),
+      [holder],
+      [],
+    )
+    const sourceContent = vi.spyOn(store, 'searchSourceContentCandidates')
+
+    const result = await new SearchCodeGraph(store).execute({
+      query: 'zebrafinch',
+      categories: ['symbols', 'files', 'specs', 'documents'],
+      limit: 10,
+      includeSnippet: false,
+    })
+
+    expect(result.files.map((file) => file.file.path)).toEqual(['code-graph:src/note.ts'])
+    expect(result.symbols).toEqual([])
+    expect(sourceContent).toHaveBeenCalled()
+    // The GraphStore search contract itself has no persisted-file result method.
+    expect('searchFiles' in store).toBe(false)
+    expect(await store.searchSymbols({ query: 'zebrafinch', limit: 10 })).toEqual([])
+  })
+
   it('expands multi-word and CamelCase queries inside Code Graph', async () => {
     await store.upsertFile(
       createFileNode({

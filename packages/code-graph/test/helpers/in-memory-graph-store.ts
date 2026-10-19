@@ -110,6 +110,7 @@ export class InMemoryGraphStore extends GraphStore {
   private relations: Relation[] = []
   private logicalSymbols = new Map<string, LogicalSymbol>()
   private declarationsByLogicalSymbol = new Map<string, LogicalDeclaration[]>()
+  private declarationsByPhysicalSymbol = new Map<string, LogicalDeclaration>()
   private publicBindings = new Map<string, PublicBinding>()
   private localBindings = new Map<string, LocalBinding>()
   private resolutionStepsBySource = new Map<string, ResolutionStep[]>()
@@ -230,7 +231,16 @@ export class InMemoryGraphStore extends GraphStore {
 
   async addRelations(relations: Relation[]): Promise<void> {
     this.ensureOpen()
-    this.relations.push(...relations)
+    this.relations.push(...relations.filter((relation) => !this.isPhysicalCoverageTarget(relation)))
+  }
+
+  /**
+   * Mirrors persistent stores: symbol coverage targets logical symbols only.
+   * @param relation - Candidate relation.
+   * @returns True when the relation covers a physical declaration symbol.
+   */
+  private isPhysicalCoverageTarget(relation: Relation): boolean {
+    return relation.type === RelationType.CoversSymbol && this.symbols.has(relation.target)
   }
 
   async bulkLoad(data: {
@@ -252,7 +262,9 @@ export class InMemoryGraphStore extends GraphStore {
     for (const d of data.documents ?? []) this.documents.set(d.path, d)
     for (const s of data.symbols) this.symbols.set(s.id, s)
     for (const sp of data.specs) this.specs.set(sp.specId, sp)
-    this.relations.push(...data.relations)
+    this.relations.push(
+      ...data.relations.filter((relation) => !this.isPhysicalCoverageTarget(relation)),
+    )
     this._lastIndexedAt = new Date().toISOString()
     if (data.vcsRef !== undefined) {
       this._lastIndexedRef = data.vcsRef
@@ -337,10 +349,12 @@ export class InMemoryGraphStore extends GraphStore {
 
     const logicalSymbols = new Map(facts.logicalSymbols.map((symbol) => [symbol.id, symbol]))
     const declarationsByLogicalSymbol = new Map<string, LogicalDeclaration[]>()
+    const declarationsByPhysicalSymbol = new Map<string, LogicalDeclaration>()
     for (const declaration of facts.declarations) {
       const existing = declarationsByLogicalSymbol.get(declaration.logicalSymbolId) ?? []
       existing.push(declaration)
       declarationsByLogicalSymbol.set(declaration.logicalSymbolId, existing)
+      declarationsByPhysicalSymbol.set(declaration.declaration.symbolId, declaration)
     }
     const resolutionStepsBySource = new Map<string, ResolutionStep[]>()
     for (const step of facts.steps) {
@@ -351,12 +365,21 @@ export class InMemoryGraphStore extends GraphStore {
 
     this.logicalSymbols = logicalSymbols
     this.declarationsByLogicalSymbol = declarationsByLogicalSymbol
+    this.declarationsByPhysicalSymbol = declarationsByPhysicalSymbol
     this.publicBindings = new Map(facts.publicBindings.map((binding) => [binding.id, binding]))
     this.localBindings = new Map(facts.localBindings.map((binding) => [binding.id, binding]))
     this.resolutionStepsBySource = resolutionStepsBySource
     this.coverageByFilePath = new Map(
       facts.coverage.map((coverage) => [coverage.filePath, coverage]),
     )
+  }
+
+  /**
+   * Returns every stored relation in deterministic order, for semantic-state comparisons in tests.
+   * @returns Stored relations.
+   */
+  allRelationsForTest(): Relation[] {
+    return [...this.relations].sort(compareRelations)
   }
 
   async getAllReferenceFacts(): Promise<ReferenceFactsWrite> {
@@ -405,10 +428,32 @@ export class InMemoryGraphStore extends GraphStore {
   async findDeclarations(logicalSymbolIds: readonly string[]): Promise<LogicalDeclaration[]> {
     this.ensureOpen()
     const results: LogicalDeclaration[] = []
-    for (const logicalSymbolId of new Set(logicalSymbolIds)) {
-      results.push(...(this.declarationsByLogicalSymbol.get(logicalSymbolId) ?? []))
+    const seen = new Set<string>()
+    for (const logicalSymbolId of logicalSymbolIds) {
+      if (seen.has(logicalSymbolId)) continue
+      seen.add(logicalSymbolId)
+      const declarations = (this.declarationsByLogicalSymbol.get(logicalSymbolId) ?? []).slice()
+      declarations.sort(compareDeclarationsWithinTarget)
+      results.push(...declarations)
     }
-    return results.sort(compareLogicalDeclarations)
+    return results
+  }
+
+  async findLogicalDeclarationsByDeclarationIds(
+    declarationSymbolIds: readonly string[],
+  ): Promise<LogicalDeclaration[]> {
+    this.ensureOpen()
+    const results: LogicalDeclaration[] = []
+    const seen = new Set<string>()
+    for (const declarationSymbolId of declarationSymbolIds) {
+      if (seen.has(declarationSymbolId)) continue
+      seen.add(declarationSymbolId)
+      const declaration = this.declarationsByPhysicalSymbol.get(declarationSymbolId)
+      if (declaration !== undefined) {
+        results.push(declaration)
+      }
+    }
+    return results
   }
 
   async findPublicBindings(lookups: readonly PublicBindingLookup[]): Promise<PublicBinding[]> {
@@ -581,7 +626,28 @@ export class InMemoryGraphStore extends GraphStore {
         neighbors.push(relation.target)
       }
 
+      // Downstream spec -> symbol coverage targets logical symbols; expose their declarations.
+      const expandsLogicalCoverage =
+        input.resource === 'symbol' &&
+        input.direction === 'downstream' &&
+        relation.type === RelationType.CoversSymbol
+
       for (const neighbor of neighbors) {
+        if (expandsLogicalCoverage) {
+          for (const declaration of this.declarationsByLogicalSymbol.get(neighbor) ?? []) {
+            const declarationId = declaration.declaration.symbolId
+            const declarationEvaluation = this.evaluateImpactResource(input, declarationId)
+            if (declarationEvaluation.status === 'admitted') {
+              const expanded = { ...relation, target: declarationId }
+              admittedRelations.set(
+                `${expanded.source}\u0000${expanded.type}\u0000${expanded.target}`,
+                expanded,
+              )
+              neighboringIds.add(declarationId)
+            }
+          }
+          continue
+        }
         const evaluation = this.evaluateImpactResource(input, neighbor)
         if (evaluation.status === 'admitted') {
           admittedRelations.set(
@@ -898,13 +964,18 @@ export class InMemoryGraphStore extends GraphStore {
 
   async getCoveringSpecsForSymbol(symbolId: string): Promise<Relation[]> {
     this.ensureOpen()
+    if (this.logicalSymbols.size > 0 && !this.logicalSymbols.has(symbolId)) return []
     return this.getRelationsByTarget(RelationType.CoversSymbol, symbolId)
   }
 
   async getCoveringSpecsForSymbols(symbolIds: readonly string[]): Promise<Relation[]> {
     this.ensureOpen()
     if (symbolIds.length === 0) return []
-    const targets = new Set(symbolIds)
+    const targets =
+      this.logicalSymbols.size > 0
+        ? new Set(symbolIds.filter((id) => this.logicalSymbols.has(id)))
+        : new Set(symbolIds)
+    if (targets.size === 0) return []
     return this.relations
       .filter(
         (relation) => relation.type === RelationType.CoversSymbol && targets.has(relation.target),
@@ -1234,6 +1305,7 @@ export class InMemoryGraphStore extends GraphStore {
     this.relations = []
     this.logicalSymbols.clear()
     this.declarationsByLogicalSymbol.clear()
+    this.declarationsByPhysicalSymbol.clear()
     this.publicBindings.clear()
     this.localBindings.clear()
     this.resolutionStepsBySource.clear()
@@ -1256,6 +1328,7 @@ export class InMemoryGraphStore extends GraphStore {
     this.relations = []
     this.logicalSymbols.clear()
     this.declarationsByLogicalSymbol.clear()
+    this.declarationsByPhysicalSymbol.clear()
     this.publicBindings.clear()
     this.localBindings.clear()
     this.resolutionStepsBySource.clear()
@@ -1456,6 +1529,26 @@ function compareLogicalDeclarations(left: LogicalDeclaration, right: LogicalDecl
     ],
     [
       right.logicalSymbolId,
+      right.declaration.location.filePath,
+      String(right.declaration.location.line),
+      String(right.declaration.location.column),
+      right.declaration.symbolId,
+    ],
+  )
+}
+
+function compareDeclarationsWithinTarget(
+  left: LogicalDeclaration,
+  right: LogicalDeclaration,
+): number {
+  return compareStrings(
+    [
+      left.declaration.location.filePath,
+      String(left.declaration.location.line),
+      String(left.declaration.location.column),
+      left.declaration.symbolId,
+    ],
+    [
       right.declaration.location.filePath,
       String(right.declaration.location.line),
       String(right.declaration.location.column),

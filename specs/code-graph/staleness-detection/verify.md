@@ -157,6 +157,51 @@
 - **THEN** the lock file is created containing the current process PID
 - **AND** calling the returned release callback removes the lock file
 
+### Requirement: Stale index lock recovery
+
+#### Scenario: Lock of a dead process is recovered
+
+- **GIVEN** `index.lock` records a pid that no longer exists
+- **WHEN** indexing acquires the lock
+- **THEN** the stale lock is removed and indexing proceeds
+- **AND** a warning is logged and command output and exit code are unchanged
+
+#### Scenario: Reused pid with a different start time is stale
+
+- **GIVEN** `index.lock` records a live pid whose recorded `startedAt` differs from that pid's current start time
+- **WHEN** indexing acquires the lock
+- **THEN** the lock is treated as stale and recovered
+
+#### Scenario: Live owner keeps the lock
+
+- **GIVEN** `index.lock` is owned by a live process with matching start time
+- **WHEN** another process acquires the lock
+- **THEN** it fails with the typed busy error and the lock file is unchanged
+
+#### Scenario: Assert unlocked does not remove a stale lock
+
+- **GIVEN** a stale `index.lock`
+- **WHEN** `assertGraphIndexUnlocked()` runs
+- **THEN** it does not throw and the lock file still exists
+
+#### Scenario: Concurrent recovery elects one owner
+
+- **GIVEN** one stale `index.lock` and two processes acquiring at once
+- **WHEN** both recover it
+- **THEN** exactly one acquires the lock and the other receives the typed busy error
+
+#### Scenario: Unknown liveness is treated as live
+
+- **GIVEN** `index.lock` records a pid that cannot be signalled because of permissions
+- **WHEN** indexing acquires the lock
+- **THEN** the lock is treated as live and the typed busy error is raised
+
+#### Scenario: Version-one record is judged by pid
+
+- **GIVEN** a `index.lock` with only `pid` and `token` whose pid is dead
+- **WHEN** indexing acquires the lock
+- **THEN** it is recovered as stale
+
 ### Requirement: Health orchestration use case
 
 #### Scenario: Hosts use GetGraphHealth for diagnostics assembly

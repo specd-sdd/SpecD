@@ -55,11 +55,22 @@ When `--symbol` is provided:
 2. Opens the provider through `withProvider`.
 3. Resolves the selector through the provider's shared symbol resolver, which still accepts bare names, file-qualified selectors, location-backed graph symbol ids, canonical logical ids, and owner-qualified member references.
 4. If no symbol matches, outputs `No symbol found matching "<selector>".` and exits with code 0.
-5. If one symbol matches, calls `analyzeImpact(symbolId, direction)` and outputs the result.
-6. If a bare or file-qualified selector matches multiple symbols, analyzes each one and outputs all results.
-7. If an owner-qualified selector matches stored `qualified_name`, one match analyzes that member. Several matches report every candidate and MUST NOT analyze a guessed member. Zero matches output `No symbol found matching "<selector>".` A file in the selector only filters those matches.
+5. If an owner-qualified selector matches stored `qualified_name`, one match analyzes that member. Several matches report every candidate and MUST NOT analyze a guessed member. Zero matches output `No symbol found matching "<selector>".` A file in the selector only filters those matches.
 
 The CLI MUST NOT split owner and member syntax and MUST NOT query storage. Platform symbols MUST come from `@specd/sdk`. The CLI MUST NOT open or close the provider outside `withProvider`.
+
+5. If the selector resolves to one typed target (logical target, exact declaration, or public binding), delegates to `sdk:run-graph-impact` and outputs the result as specified by "Logical and declaration symbol-impact presentation".
+6. If a bare or file-qualified selector matches several distinct semantic targets, reports every candidate as ambiguous and MUST NOT traverse any of them. Several declarations that belong to one logical target are one target, not several matches.
+
+### Requirement: Logical and declaration symbol-impact presentation
+
+The CLI SHALL delegate symbol selector resolution and impact orchestration to `sdk:run-graph-impact` and SHALL preserve its resolved target kind. For a logical selector, the command MUST request one canonical logical-target analysis covering every contributing declaration; it MUST NOT call impact separately for one arbitrary declaration or for each overload occurrence.
+
+For an exact physical selector, the command SHALL identify the result as declaration impact. For an ambiguous selector, it SHALL display deterministic semantic candidates and MUST NOT traverse any candidate. This requirement supersedes legacy behaviour that inferred the operation solely from one `symbolId`.
+
+Text output for logical impact SHALL identify the canonical logical target and summarize its declaration locations. It SHALL distinguish unique affected logical targets from declaration-only evidence and SHALL show covering specs derived from logical coverage. JSON and TOON SHALL expose the SDK result without removing its target discriminant, declarations, physical evidence, semantic affected targets, coverage evidence, explicitly named count units, or `projectRelativePath` on every nested location supplied by the SDK. The CLI MUST NOT reconstruct or omit nested path projections under `resolvedTarget` or its declaration and evidence collections.
+
+The CLI MUST NOT compute declaration grouping, logical deduplication, coverage projection, or risk. It MAY format those provider-owned results for human output while projecting paths through the SDK contract.
 
 ### Requirement: Spec impact analysis
 
@@ -152,7 +163,7 @@ Impact analysis for spec core:change (depth=3)
 
 Spec impact output MUST surface files reached through `COVERS_FILE` and symbols reached through `COVERS_SYMBOL` in the same result structure used by other impact targets.
 
-When multiple symbols match, each analysis is listed sequentially.
+When several logical targets exactly match the requested symbol, the command lists each candidate with its project-relative declaration locations and performs no impact traversal. Overloads of one logical symbol are one target and are analyzed.
 
 **Omission notices:**
 When `omittedCounts` indicates that results were filtered out (`tests > 0` or `ignored > 0`), text mode output SHALL display an omission notice:

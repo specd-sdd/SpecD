@@ -12,6 +12,14 @@ The Go language adapter translates Go source into package-aware code-graph symbo
 
 The adapter SHALL derive the declared package from source and package identity from the nearest bounded `go.mod`. It MUST NOT invoke the Go toolchain, compile packages, or retain parser AST objects in persisted analysis state.
 
+### Requirement: Go parser-authoritative structural extraction
+
+The adapter SHALL derive type and interface declarations, interface methods, import specs, fields, aliases, type references, selector calls, function calls, construction-like composite literals, receivers, and embedding or hierarchy evidence from Go parser nodes whenever the grammar represents them. Brace counting or whole-source regular expressions MUST NOT determine a declaration body, scope, call, or composite literal.
+
+Token extraction MAY operate inside a parser-proven type-expression node when required by the supported reference policy. Parsing `go.mod` MAY remain textual because it is an auxiliary resolution manifest, but that exception MUST NOT authorize regex reconstruction of Go source structure.
+
+Import specs SHALL emit dependency relations only when package-resolution evidence identifies a workspace or supported external target. An unresolved raw import specifier MAY remain diagnostic evidence, but MUST NOT itself be persisted as a resolved relation target.
+
 ### Requirement: Declaration extraction and ranges
 
 The adapter SHALL extract functions, receiver methods, struct types, interface types, named types and aliases, variables, constants, and struct fields. Structs SHALL use the shared class-like broad kind, interfaces the interface kind, struct fields SHALL be extracted as `SymbolKind.Property`, and other named types the type kind without treating broad kind as the complete Go identity.
@@ -40,11 +48,19 @@ Owner identities SHALL be derived from receiver and interface syntax and mapped 
 
 ### Requirement: Scoped bindings, selectors, construction, and types
 
-The adapter SHALL emit deterministic facts for import aliases, function scopes, typed parameters and results, receiver bindings, selector expressions, named composite literals, constructor-like calls, and type references. It SHALL build `IMPORTS`, `CALLS`, `CONSTRUCTS`, and `USES_TYPE` only when package aliases, receiver types, local declarations, or indexed imports prove the target.
+The adapter SHALL emit deterministic facts for import aliases, function scopes, typed parameters and results, receiver bindings, selector expressions, named composite literals, constructor-like calls, and type references. It SHALL build `CALLS`, `CONSTRUCTS`, and `USES_TYPE` only when package aliases, receiver types, local declarations, or indexed imports prove the target. Resolved imports SHALL be exposed through `resolveImports()` so the indexer derives file-level `IMPORTS`.
 
-In `buildRelations()`, the adapter SHALL build concrete `IMPORTS` relations for resolved imported packages and concrete `CALLS` relations connecting callers to target functions and receiver methods.
+In `buildRelations()`, the adapter SHALL build concrete `CALLS` relations connecting callers to target functions and receiver methods. Resolved imported packages SHALL be returned from `resolveImports()` so the indexer derives the file-level `IMPORTS` relations.
 
 Unresolved selectors, reflection, interface dispatch without a proven concrete target, generic/type-set choices lacking instantiated context, and values requiring interprocedural flow SHALL not produce guessed relations.
+
+### Requirement: Go caller containment and declaration classification
+
+The adapter SHALL select a call's caller as the innermost supported function, receiver method, or explicitly modeled function literal whose complete parser range contains the call. A package declaration, type, field, local variable, constant, parameter, or preceding declaration MUST NOT become the caller based only on source order.
+
+Parameters, result names, receivers, import aliases, short-variable declarations, and routine-local variables SHALL be lexical bindings. Package functions and language-defined type or package declarations MAY be logical targets under the existing package surface policy. Function literals SHALL remain physical or lexical callable evidence unless the adapter defines a deterministic semantic identity that cannot collide across lexical scopes.
+
+Receiver methods SHALL continue to use the canonical receiver-type owner. Same-name methods on distinct receiver types and same-name declarations in competing lexical scopes MUST remain distinct. Go declarations MUST NOT be grouped as overloads because Go does not define overload sets by simple name.
 
 ### Requirement: Go embedding and hierarchy provenance
 

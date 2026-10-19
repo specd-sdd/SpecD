@@ -1,5 +1,5 @@
 import { EventEmitter } from 'node:events'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -14,7 +14,10 @@ import {
   GraphIndexWorkerSignalError,
   GraphIndexWorkerStartError,
 } from '../../../src/domain/errors/isolated-graph-index-errors.js'
-import { acquireGraphIndexLockLeaseByStoragePath } from '../../../src/infrastructure/index-lock.js'
+import {
+  acquireGraphIndexLockLeaseByStoragePath,
+  getGraphIndexLockPathForStoragePath,
+} from '../../../src/infrastructure/index-lock.js'
 import {
   runIsolatedGraphIndexWithRuntime,
   type IsolatedGraphIndexRuntime,
@@ -305,5 +308,46 @@ describe('isolated graph-index supervisor', () => {
     expect(events.listenerCount('SIGBREAK')).toBe(0)
     expect(events.listenerCount('exit')).toBe(0)
     expect(() => current.acquireLock(root!)).not.toThrow()
+  })
+
+  it('forks the child after a crashed run left a stale lock and warns the host', async () => {
+    const child = fakeChild()
+    const current = runtime(child)
+    const lockPath = getGraphIndexLockPathForStoragePath(root!)
+    acquireGraphIndexLockLeaseByStoragePath(root!, { signalCleanup: 'exit-only' }).release()
+    writeFileSync(lockPath, JSON.stringify({ version: 1, pid: 2_147_483_646, token: 'dead' }))
+    const warnings: string[] = []
+    const withRecovery: IsolatedGraphIndexRuntime = {
+      ...current,
+      acquireLock: (storageRoot, onStaleLockRecovered) =>
+        acquireGraphIndexLockLeaseByStoragePath(storageRoot, {
+          signalCleanup: 'exit-only',
+          ...(onStaleLockRecovered !== undefined ? { onStaleLockRecovered } : {}),
+        }),
+    }
+
+    const pending = runIsolatedGraphIndexWithRuntime(
+      {
+        storageRoot: root!,
+        taskModule: taskModuleUrl,
+        taskInput: null,
+        onWarning: (message) => warnings.push(message),
+      },
+      withRecovery,
+    )
+    child.emit('message', { protocol: 'specd.graph-index.v1', type: 'result', value: null })
+    child.emit('exit', 0, null)
+    await expect(pending).resolves.toBeNull()
+    expect(withRecovery.fork).toHaveBeenCalledOnce()
+    expect(warnings).toHaveLength(1)
+    expect(warnings[0]).toContain('stale graph index lock')
+  })
+
+  it('keeps pid and liveness logic out of the supervisor source', () => {
+    const source = readFileSync(
+      new URL('../../../src/infrastructure/isolated-index-worker/supervisor.ts', import.meta.url),
+      'utf-8',
+    )
+    expect(source).not.toContain('process.kill')
   })
 })

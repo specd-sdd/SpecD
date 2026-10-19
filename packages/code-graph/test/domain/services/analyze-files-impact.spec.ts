@@ -4,6 +4,7 @@ import { analyzeFilesImpact } from '../../../src/domain/services/analyze-files-i
 import {
   analyzeImpact,
   analyzePublicBindingImpact,
+  analyzeResolvedSymbolImpact,
 } from '../../../src/domain/services/analyze-impact.js'
 import { createFileNode } from '../../../src/domain/value-objects/file-node.js'
 import { createSymbolNode } from '../../../src/domain/value-objects/symbol-node.js'
@@ -160,6 +161,12 @@ describe('analyzeFilesImpact service', () => {
       status: 'resolved',
       reasonCode: null,
       health: { fresh: true, complete: true, reasonCodes: [] },
+      resolvedTarget: {
+        kind: 'logical-target',
+        logicalSymbol: logical,
+        declarations,
+        path: [],
+      },
       target: logical,
       candidates: [{ target: logical, declarations, path: [] }],
       path: [],
@@ -226,17 +233,83 @@ describe('analyzeFilesImpact service', () => {
       'upstream',
     )
 
-    expect(result.bindingImpact.affectedSymbols.map((symbol) => symbol.id)).toEqual([
-      routeConsumer.id,
-    ])
+    // The exact-route view is seeded from the route's declarations and its binding id, so it
+    // reports consumers of the route and the target's physical dependents.
+    expect(result.bindingImpact.affectedSymbols.map((symbol) => symbol.id).sort()).toEqual(
+      [routeConsumer.id, directConsumer.id].sort(),
+    )
+    expect(result.bindingImpact.target).toBe(binding.id)
     expect(result.canonicalImpact.affectedSymbols.map((symbol) => symbol.id)).toEqual([
       directConsumer.id,
     ])
+    expect(result.canonicalImpact.semanticCounts.directLogicalTargets).toBeGreaterThanOrEqual(0)
+  })
+
+  it('builds a non-empty exact-route view without any relation targeting the binding id', async () => {
+    const target = sym('target', 'a.ts', 1)
+    const consumer = sym('consumer', 'direct.ts', 1)
+    const logical = createLogicalSymbol({
+      workspace: 'code-graph',
+      surface: 'a.ts',
+      name: 'target',
+      space: SymbolSpace.Value,
+      ownerId: undefined,
+      memberSemantics: undefined,
+    })
+    const binding = createPublicBinding({
+      surface: 'public.ts',
+      exportedName: 'target',
+      space: SymbolSpace.Value,
+      targetId: logical.id,
+    })
+    await store.upsertFile(file('a.ts'), [target], [])
+    await store.upsertFile(
+      file('direct.ts'),
+      [consumer],
+      [createRelation({ source: consumer.id, target: target.id, type: RelationType.Calls })],
+    )
+
+    const result = await analyzePublicBindingImpact(
+      store,
+      {
+        binding,
+        target: logical,
+        declarations: [
+          {
+            logicalId: logical.id,
+            symbolId: target.id,
+            location: {
+              filePath: target.filePath,
+              line: target.line,
+              column: target.column,
+              endLine: undefined,
+              endColumn: undefined,
+            },
+            kind: target.kind,
+          },
+        ],
+        path: [{ fromId: binding.id, toId: logical.id, kind: 're-export:named' }],
+      },
+      'upstream',
+    )
+
+    expect(result.bindingImpact.affectedSymbols.map((symbol) => symbol.id)).toEqual([consumer.id])
   })
 
   it('returns covering specs for inputs and impacted resources using two batch reads', async () => {
     const target = sym('target', 'a.ts', 1)
     const caller = sym('caller', 'b.ts', 1)
+    const logicalOf = (symbol: typeof target): ReturnType<typeof createLogicalSymbol> =>
+      createLogicalSymbol({
+        workspace: 'core',
+        surface: symbol.filePath,
+        name: symbol.name,
+        space: SymbolSpace.Value,
+        ownerId: undefined,
+        memberSemantics: undefined,
+      })
+    const targetLogical = logicalOf(target)
+    const callerLogical = logicalOf(caller)
     await store.upsertFile(file('a.ts'), [target], [])
     await store.upsertFile(
       file('b.ts'),
@@ -246,6 +319,33 @@ describe('analyzeFilesImpact service', () => {
         createRelation({ source: caller.id, target: target.id, type: RelationType.Calls }),
       ],
     )
+    await store.replaceReferenceFacts({
+      logicalSymbols: [targetLogical, callerLogical],
+      declarations: [
+        [targetLogical, target],
+        [callerLogical, caller],
+      ].map(([logical, symbol]) => ({
+        logicalSymbolId: (logical as typeof targetLogical).id,
+        declaration: {
+          logicalId: (logical as typeof targetLogical).id,
+          symbolId: (symbol as typeof target).id,
+          location: {
+            filePath: (symbol as typeof target).filePath,
+            line: 1,
+            column: 0,
+            endLine: undefined,
+            endColumn: undefined,
+          },
+          kind: SymbolKind.Function,
+          form: 'definition' as const,
+          occurrenceForm: 'definition' as const,
+        },
+      })),
+      publicBindings: [],
+      localBindings: [],
+      steps: [],
+      coverage: [],
+    })
     const spec = (specId: string) =>
       createSpecNode({
         specId,
@@ -262,7 +362,7 @@ describe('analyzeFilesImpact service', () => {
     await store.upsertSpec(spec('spec:input-symbol'), [
       createRelation({
         source: 'spec:input-symbol',
-        target: target.id,
+        target: targetLogical.id,
         type: RelationType.CoversSymbol,
       }),
     ])
@@ -270,7 +370,7 @@ describe('analyzeFilesImpact service', () => {
       createRelation({ source: 'spec:impacted', target: 'b.ts', type: RelationType.CoversFile }),
       createRelation({
         source: 'spec:impacted',
-        target: caller.id,
+        target: callerLogical.id,
         type: RelationType.CoversSymbol,
       }),
     ])
@@ -290,20 +390,22 @@ describe('analyzeFilesImpact service', () => {
       {
         specId: 'spec:input-symbol',
         minDepth: 0,
-        evidence: [{ kind: 'symbol', target: target.id, depth: 0 }],
+        evidence: [
+          { kind: 'symbol', target: targetLogical.id, depth: 0, declarations: [target.id] },
+        ],
       },
       {
         specId: 'spec:impacted',
         minDepth: 1,
         evidence: [
           { kind: 'file', target: 'b.ts', depth: 1 },
-          { kind: 'symbol', target: caller.id, depth: 1 },
+          { kind: 'symbol', target: callerLogical.id, depth: 1, declarations: [caller.id] },
         ],
       },
     ])
   })
 
-  it('deduplicates file-only coverage across multiple input files in constant batch reads', async () => {
+  it('deduplicates file-only coverage across multiple input files without a symbol read', async () => {
     await store.upsertFile(file('a.ts'), [], [])
     await store.upsertFile(
       file('b.ts'),
@@ -329,7 +431,8 @@ describe('analyzeFilesImpact service', () => {
     const result = await analyzeFilesImpact(store, ['a.ts', 'c.ts', 'a.ts'], 'upstream')
 
     expect(fileCoverage).toHaveBeenCalledTimes(1)
-    expect(symbolCoverage).toHaveBeenCalledTimes(1)
+    // No file declares a logical symbol, so no physical id is ever queried as a coverage target.
+    expect(symbolCoverage).not.toHaveBeenCalled()
     expect(result.coveringSpecs).toEqual([
       {
         specId: 'spec:files',
@@ -432,6 +535,14 @@ describe('analyzeFilesImpact service', () => {
   it('retains call-affected symbol spec coverage in specs-only file and multi-file impact (D-3)', async () => {
     const targetA = sym('targetA', 'a.ts', 1)
     const callerB = sym('callerB', 'b.ts', 1)
+    const callerLogical = createLogicalSymbol({
+      workspace: 'core',
+      surface: 'b.ts',
+      name: 'callerB',
+      space: SymbolSpace.Value,
+      ownerId: undefined,
+      memberSemantics: undefined,
+    })
     const spec = createSpecNode({
       specId: 'core:caller-spec',
       workspace: '/p',
@@ -449,8 +560,38 @@ describe('analyzeFilesImpact service', () => {
       [callerB],
       [createRelation({ source: callerB.id, target: targetA.id, type: RelationType.Calls })],
     )
+    await store.replaceReferenceFacts({
+      logicalSymbols: [callerLogical],
+      declarations: [
+        {
+          logicalSymbolId: callerLogical.id,
+          declaration: {
+            logicalId: callerLogical.id,
+            symbolId: callerB.id,
+            location: {
+              filePath: callerB.filePath,
+              line: callerB.line,
+              column: callerB.column,
+              endLine: callerB.endLine,
+              endColumn: callerB.endColumn,
+            },
+            kind: callerB.kind,
+            form: 'definition',
+            occurrenceForm: 'definition',
+          },
+        },
+      ],
+      publicBindings: [],
+      localBindings: [],
+      steps: [],
+      coverage: [],
+    })
     await store.upsertSpec(spec, [
-      createRelation({ source: spec.specId, target: callerB.id, type: RelationType.CoversSymbol }),
+      createRelation({
+        source: spec.specId,
+        target: callerLogical.id,
+        type: RelationType.CoversSymbol,
+      }),
     ])
 
     const result = await analyzeFilesImpact(store, ['a.ts'], 'upstream', 3, undefined, {
@@ -460,5 +601,77 @@ describe('analyzeFilesImpact service', () => {
     expect(result.affectedSpecs).toEqual(['core:caller-spec'])
     expect(result.affectedFiles).toEqual([])
     expect(result.affectedSymbols).toEqual([])
+    // Under a specs-only filter the coverage keeps its real depth and evidence.
+    expect(result.coveringSpecs).toEqual([
+      expect.objectContaining({
+        specId: 'core:caller-spec',
+        minDepth: 1,
+        evidence: [expect.objectContaining({ kind: 'symbol', target: callerLogical.id, depth: 1 })],
+      }),
+    ])
+  })
+
+  it('collects covering specs of dependents reached only through calls', async () => {
+    const target = sym('target', 'a.ts', 1)
+    const consumer = sym('consumer', 'b.ts', 1)
+    const spec = createSpecNode({
+      specId: 'core:consumer-file-spec',
+      workspace: '/p',
+      path: 'consumer-file-spec',
+      title: 'Consumer file spec',
+      description: '',
+      contentHash: 'sha256:consumer-file-spec',
+      content: '',
+      dependsOn: [],
+    })
+    await store.upsertFile(file('a.ts'), [target], [])
+    await store.upsertFile(
+      file('b.ts'),
+      [consumer],
+      [createRelation({ source: consumer.id, target: target.id, type: RelationType.Calls })],
+    )
+    await store.upsertSpec(spec, [
+      createRelation({ source: spec.specId, target: 'b.ts', type: RelationType.CoversFile }),
+    ])
+    const logical = createLogicalSymbol({
+      workspace: 'core',
+      surface: 'a.ts',
+      name: 'target',
+      space: SymbolSpace.Value,
+      ownerId: undefined,
+      memberSemantics: undefined,
+    })
+
+    const result = await analyzeResolvedSymbolImpact(
+      store,
+      {
+        kind: 'logical-target',
+        logicalSymbol: logical,
+        declarations: [
+          {
+            logicalId: logical.id,
+            symbolId: target.id,
+            location: {
+              filePath: target.filePath,
+              line: target.line,
+              column: target.column,
+              endLine: undefined,
+              endColumn: undefined,
+            },
+            kind: target.kind,
+          },
+        ],
+        path: [],
+      },
+      'upstream',
+    )
+
+    expect(result.coveringSpecs).toEqual([
+      expect.objectContaining({
+        specId: 'core:consumer-file-spec',
+        minDepth: 1,
+        evidence: [expect.objectContaining({ kind: 'file', target: 'b.ts', depth: 1 })],
+      }),
+    ])
   })
 })

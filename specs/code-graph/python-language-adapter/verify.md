@@ -10,6 +10,37 @@
 - **THEN** both map to Python and produce deterministic complete drafts
 - **AND** Pass 2 does not execute, import, or reparse either module
 
+### Requirement: Python parser-authoritative structural extraction
+
+#### Scenario: Multiline Python syntax uses node ancestry
+
+- **GIVEN** imports, annotations, class bases, aliases, decorators, and calls use multiline or nested syntax
+- **AND** strings and comments contain equivalent textual patterns
+- **WHEN** the adapter analyzes the file
+- **THEN** structural facts follow Python parser nodes, fields, ranges, and ancestry
+- **AND** strings and comments produce no lookalike facts
+
+#### Scenario: Pyproject parsing does not bypass source parsing
+
+- **GIVEN** package metadata is read textually from `pyproject.toml`
+- **WHEN** Python source in that package is analyzed
+- **THEN** the metadata may affect package resolution
+- **AND** declarations, scopes, calls, and dependencies still require Python AST evidence
+
+#### Scenario: Unresolved Python import produces no relation
+
+- **GIVEN** a static or literal dynamic import has syntactic candidates but none resolves
+- **WHEN** import relations are emitted
+- **THEN** no relation targets the first candidate
+- **AND** unresolved evidence does not masquerade as a resolved dependency
+
+#### Scenario: Imported Python base retains provenance
+
+- **GIVEN** a class base resolves through an import
+- **WHEN** hierarchy evidence is emitted
+- **THEN** the physical hierarchy relation and shared hierarchy reference fact identify the same target
+- **AND** the fact retains the base-expression range and resolution provenance
+
 ### Requirement: Declaration extraction and ranges
 
 #### Scenario: Nested declarations retain parser ranges
@@ -74,6 +105,28 @@
 - **WHEN** relations are built
 - **THEN** the decorator emits a `CALLS` relation
 - **AND** the field annotation emits a `USES_TYPE` relation to the referenced type symbol
+
+### Requirement: Python caller containment and declaration classification
+
+#### Scenario: Local assignment does not replace the function caller
+
+- **GIVEN** a Python function assigns the result of `Service.run()` to a local name
+- **WHEN** the call fact is extracted
+- **THEN** the containing function is the caller
+- **AND** the assignment target remains a lexical binding
+
+#### Scenario: Class decorator and method call use different containers
+
+- **GIVEN** a class has a resolvable class decorator and a method containing a call
+- **WHEN** caller facts are extracted
+- **THEN** the class is used only for the class-level decorator call
+- **AND** the method is used for the call inside its body
+
+#### Scenario: Unsupported nested function is not flattened into module identity
+
+- **GIVEN** two outer functions each contain an unsupported nested function named `work`
+- **WHEN** declarations are analyzed
+- **THEN** no ownerless module-level logical target named `work` is fabricated
 
 ### Requirement: Python hierarchy and provenance evidence
 

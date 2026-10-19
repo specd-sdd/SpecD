@@ -7,6 +7,39 @@ import {
 import { computeRiskLevel } from '../value-objects/risk-level.js'
 import { type ImpactResolutionProvider } from './analyze-impact.js'
 import { RelationType } from '../value-objects/relation-type.js'
+import { type SymbolNode } from '../value-objects/symbol-node.js'
+
+/**
+ * Loads the physical declarations behind `COVERS_SYMBOL` targets.
+ *
+ * Coverage targets are canonical logical symbol IDs. Each is expanded to its contributing
+ * declarations; a target that is already a physical symbol ID (stores without reference
+ * facts) is loaded directly.
+ *
+ * @param store - Graph store to query.
+ * @param targetIds - Coverage relation targets.
+ * @returns Distinct physical symbols in deterministic order.
+ */
+async function loadCoveredSymbols(
+  store: GraphStore,
+  targetIds: readonly string[],
+): Promise<SymbolNode[]> {
+  const uniqueTargets = [...new Set(targetIds)].sort()
+  if (uniqueTargets.length === 0) return []
+  let declarations: Awaited<ReturnType<GraphStore['findDeclarations']>> = []
+  try {
+    declarations = await store.findDeclarations(uniqueTargets)
+  } catch {
+    // Stores without reference facts only hold physical coverage targets.
+  }
+  const mapped = new Set(declarations.map((declaration) => declaration.logicalSymbolId))
+  const symbolIds = new Set<string>([
+    ...declarations.map((declaration) => declaration.declaration.symbolId),
+    ...uniqueTargets.filter((id) => !mapped.has(id)),
+  ])
+  const symbols = await store.getSymbolsByIds([...symbolIds].sort())
+  return [...symbols].sort((a, b) => a.filePath.localeCompare(b.filePath) || a.line - b.line)
+}
 
 /**
  * Computes requirement-aware impact for a spec using spec, file, and symbol coverage relations.
@@ -78,9 +111,10 @@ export async function analyzeSpecImpact(
     for (const relation of fileRelations) {
       affectedFiles.add(relation.target)
     }
-    for (const relation of symbolRelations) {
-      const symbol = await store.getSymbol(relation.target)
-      if (symbol === undefined) continue
+    for (const symbol of await loadCoveredSymbols(
+      store,
+      symbolRelations.map((relation) => relation.target),
+    )) {
       const resolution = resolve === undefined ? undefined : await resolve(symbol.id)
       if (resolution !== undefined && resolution.status !== 'resolved') continue
       const canonicalId = resolution?.target?.id ?? symbol.id

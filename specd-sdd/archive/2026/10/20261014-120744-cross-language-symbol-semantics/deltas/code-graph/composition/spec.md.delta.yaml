@@ -1,0 +1,118 @@
+- op: added
+  description: 'Propagate discriminated resolution into provider impact without collapsing declarations.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Symbol-reference provider surface$'
+  content: |
+    ### Requirement: Resolution-aware impact provider surface
+
+    `CodeGraphProvider` SHALL expose an impact operation that accepts or internally preserves the discriminated resolution produced for the requested selector. For a logical-target resolution, the provider MUST pass the canonical target, complete declaration set, and ordered evidence to traversal. It MUST NOT load one primary declaration and call physical impact with only that `SymbolNode.id`.
+
+    For an exact-declaration resolution, the provider SHALL preserve exact physical impact semantics. For a public-binding resolution, it SHALL preserve the selected binding and separate exact-route impact from canonical-target impact.
+
+    Provider result types SHALL expose the semantic target and physical evidence required by SDK and delivery hosts. Deprecated compatibility fields MAY remain during a documented migration only as display projections derived explicitly from the typed result after traversal. They MUST NOT select what is traversed and MUST NOT obscure whether an identifier is logical or physical.
+
+    The provider SHALL delegate aggregation, coverage projection, counts, and risk to domain traversal. Composition MUST NOT reimplement semantic identity or language-specific rules.
+
+- op: modified
+  description: 'Align the closed export list with the published barrel: semantic identity, reference facts, freshness, coverage, selector, search, and impact vocabularies.'
+  selector:
+    type: section
+    matches: '^Requirement: Package exports$'
+  content: |
+    The `@specd/code-graph` `"."` public barrel SHALL export only the runtime values
+    below plus the type-only contracts of the same areas:
+
+    - composition and wiring: `createCodeGraphProvider`,
+      `createSqliteGraphStoreFactory`, and type-only `CodeGraphProvider`,
+      `CodeGraphCompositionOptions` (including the optional `onWarning` receiver),
+      `CodeGraphOptions`, `GraphStoreFactory`, `GraphStoreFactoryOptions`,
+      `SqliteGraphStoreFactoryOptions`, `SqliteRuntimeDescriptor`, and
+      `SQLiteGraphStoreOptions`;
+    - isolated graph indexing: `runIsolatedGraphIndex` plus its host-facing input,
+      progress, result, and typed worker failure contracts;
+    - host use cases: `GetGraphHealth`, `createGetGraphHealth`,
+      `IndexProjectGraph`, `createIndexProjectGraph`, `GetSpecCoverage`,
+      `createGetSpecCoverage`, `GetChangeSpecCoverage`,
+      `createGetChangeSpecCoverage`, and their input and result types;
+    - VCS and config: `buildProjectGraphConfig`, `createBootstrapGraphConfig`, and
+      `GraphConfigOverrides`;
+    - public indexer and discovery: `DEFAULT_EXCLUDE_PATHS`, `FILE_CATEGORIES`,
+      `classifyFileCategory`, and the types `IndexOptions`,
+      `IndexProgressCallback`, `ProjectGraphConfig`, `WorkspaceIndexTarget`,
+      `DiscoveredSpec`, `IndexResult` (including `logicalDiagnostics`),
+      `IndexError`, `WorkspaceIndexBreakdown`, `DiscoverFilesOptions`,
+      `FileCategory`, and the index phase, coverage, and diagnostic summaries;
+    - traversal and impact: `analyzeFilesImpact`, `analyzeImpact`,
+      `analyzeResolvedSymbolImpact`, `analyzePublicBindingImpact`,
+      `collectImpactSpecIds`, `collectLogicalCoveringSpecs`,
+      `IMPACT_RESULT_TYPES`, and the types `TraversalOptions`, `TraversalResult`,
+      `ImpactResult`, `FileImpactResult`, `ChangeDetectionResult`, `RiskLevel`,
+      `ImpactResultFilter`, `ImpactResultType`, `CoveringSpecImpact`,
+      `CoveringSpecEvidence`, `PhysicalDependencyEvidence`,
+      `LogicalAffectedTarget`, `PhysicalOnlyAffectedTarget`,
+      `SemanticAffectedTarget`, `SemanticImpactCounts`,
+      `ResolvedSymbolImpactResult`, `ResolvedPublicBindingImpactInput`, and
+      `PublicBindingImpactResult`;
+    - semantic identity and reference facts: `createLogicalSymbol`,
+      `createPublicBinding`, `createLocalBinding`, `parseLogicalSymbol`,
+      `SymbolSpace`, `MemberKind`, `MemberDispatch`, `MemberAccessor`,
+      `DeclarationOccurrenceForm`, and the types `LogicalSymbol`,
+      `MemberSemantics`, `DeclarationOccurrence`, `PublicBinding`,
+      `LocalBinding`, `HierarchyFact`, `ResolutionStep`, `ReferenceFacts`,
+      `AdapterCapabilities`, and `AdapterDeclarationPolicy`;
+    - symbol resolution and selectors: `normalizeFileSelectorPath` and the types
+      `ResolveSymbolReferenceInput`, `SourcePosition`, `SymbolResolutionResult`,
+      `ResolutionStatus`, `ResolutionHealth`, `ResolutionCandidate`,
+      `ResolvedSymbolTarget`, `LogicalResolutionTarget`,
+      `DeclarationResolutionTarget`, `PublicBindingResolutionTarget`,
+      `ExactPublicBindingSelector`, `ExactPublicBindingResult`,
+      `ResolvedFileSelector`, `ResolvedSymbolSelector`, and
+      `ResolvedSymbolSelectorResult`;
+    - freshness and coverage: `FreshnessMode`, `FreshnessState`,
+      `IndexCoverageStatus`, `IndexedInputKind`, `IndexedResourceKind`, and the
+      types for indexed input observations, resource keys, freshness results,
+      freshness latches, and coverage health summaries;
+    - hotspots: `DEFAULT_HOTSPOT_KINDS`, `HotspotEntry`, `HotspotOptions`, and
+      `HotspotResult`;
+    - search: `expandSymbolName`, `expandSearchQuery`, `expandSearchToken`, and the
+      types `SearchOptions`, `SearchCategory`, `SearchCodeGraphInput`,
+      `SearchCodeGraphResult`, the reference-aware symbol results, and the
+      source-content, spec, and document search results;
+    - staleness and fingerprint: `isGraphStale`, `computeGraphFingerprint`,
+      `computeRootFingerprint`, `computeWorkspaceFingerprint`,
+      `parseFingerprintMap`, `serializeFingerprintMap`,
+      `detectFingerprintMismatch`, and `GraphFingerprintInput`;
+    - language adapter: `LanguageAdapter`;
+    - model vocabulary: `SymbolKind`, `RelationType`, `ImportDeclarationKind`,
+      `BindingScopeKind`, `BindingSourceKind`, `CallForm`, and the types
+      `FileNode`, `DocumentNode`, `SymbolNode`, `SpecNode`, `Relation`,
+      `SymbolQuery`, `GraphStatistics`, `ImportDeclaration`, `SourceLocation`,
+      `BindingScope`, `BindingFact`, `CallFact`, and `ResolvedDependency`;
+    - `SpecdCodeGraphError` and public subclasses including `StoreNotOpenError`,
+      `InvalidSymbolKindError`, `InvalidRelationTypeError`,
+      `DuplicateSymbolIdError`, `SpecNotFoundError`, `GraphProviderStaleError`,
+      `StoreOverloadError`, `StoreWorkerError`, `BulkSessionStateError`,
+      `InvalidGraphStoreConfigurationError`, `InvalidGraphSelectorError`,
+      `GraphSchemaIncompatibleError`, `GraphStorageRecoveryRequiredError`,
+      `GraphStoreRecreateRequiresClosedError`, `GraphDerivationMismatchError`,
+      `GraphBusyError`, and the isolated-worker failure subclasses;
+    - `CODE_GRAPH_VERSION`.
+
+    The runtime value list above is exact: the barrel test compares the barrel's
+    runtime exports with it. Type-only contracts are limited to the areas listed.
+
+    Raw index-lock acquisition, release, path, and unlocked-assertion helpers MUST
+    NOT be available from `"."`. Raw IPC envelopes, child bootstrap commands,
+    process-launcher adapters, the executable child implementation, concrete store
+    classes, and test-only worker protocol helpers MUST also remain internal.
+    Host-facing isolated-worker input/progress/result/error contracts are not raw IPC
+    DTOs and SHALL remain public.
+
+    `InMemoryIndexSession`, the concrete SQLite adapter, and other composition
+    internals SHALL remain available only from `"./internal"` where currently
+    supported. Removed Ladybug symbols MUST NOT be reintroduced.

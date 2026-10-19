@@ -1,4 +1,6 @@
 import { readFileSync, statSync, rmSync, existsSync, mkdirSync, writeFileSync } from 'node:fs'
+import { GraphDerivationMismatchError } from '../../domain/errors/graph-derivation-mismatch-error.js'
+import { replacesWholeGraph } from '../../domain/services/replaces-whole-graph.js'
 import { join, relative } from 'node:path'
 import { setImmediate } from 'node:timers'
 import { performance } from 'node:perf_hooks'
@@ -586,6 +588,13 @@ export class IndexCodeGraph {
         }
       }
 
+      // A rebuild may replace the whole graph only when this run indexes every workspace the
+      // store holds. A subset run clears and regenerates just its own workspaces.
+      const runReplacesWholeGraph = replacesWholeGraph(
+        [...existingFiles, ...existingDocuments].map((entry) => entry.workspace),
+        indexedWorkspaceNames,
+      )
+
       // ── Fingerprint comparison ──
       const version = options.codeGraphVersion ?? readInstalledCodeGraphVersion()
       const adapters = this.registry.getAdapters()
@@ -628,7 +637,15 @@ export class IndexCodeGraph {
         adapters,
         options.vcsRoot,
         this.manifestSource,
+        runReplacesWholeGraph,
       )
+
+      // A subset run keeps the stored project-global entry: it cannot be recomputed from a
+      // partial workspace list without making the next whole-graph run look mismatched.
+      const storedRootFingerprint = storedFingerprintMap.get('root')
+      if (!runReplacesWholeGraph && storedRootFingerprint !== undefined) {
+        currentFingerprintMap.set('root', storedRootFingerprint)
+      }
 
       // Merge stored fingerprints for workspaces NOT being indexed into the current map
       for (const [wsName, fp] of storedFingerprintMap) {
@@ -646,10 +663,25 @@ export class IndexCodeGraph {
       const skippedFiles: string[] = []
       const fingerprintInvalidatedPaths = new Set<string>()
 
+      if (
+        fingerprintMismatch &&
+        options.force !== true &&
+        options.derivationMismatch === 'fail' &&
+        runReplacesWholeGraph
+      ) {
+        // Nothing has been written yet: the caller can recreate storage and index again.
+        throw new GraphDerivationMismatchError(FULL_REBUILD_FINGERPRINT_REASON)
+      }
+
       if (options.force === true || fingerprintMismatch) {
         fullRebuild = true
         if (options.force === true) {
           progress(5, 'Forced reindex', 'Reconsidering every selected input')
+          if (!runReplacesWholeGraph) {
+            for (const ef of [...existingFiles, ...existingDocuments]) {
+              if (indexedWorkspaceNames.has(ef.workspace)) fingerprintInvalidatedPaths.add(ef.path)
+            }
+          }
         } else {
           fullRebuildReason = FULL_REBUILD_FINGERPRINT_REASON
           progress(5, 'Fingerprint mismatch', 'Forcing re-index of mismatched workspaces')
@@ -1108,6 +1140,7 @@ export class IndexCodeGraph {
       // ── Pass 2: Resolve imports + extract relations (50-80%) ──
       let resolvedImportsProcessed = 0
       let relationsProcessed = 0
+      const importedSymbolByLocalName = new Map<string, string>()
       for (const [chunkIndex, chunk] of chunks.entries()) {
         const chunkRelations: Relation[] = []
         const resolvedImportsMap = new Map<string, ResolvedImports>()
@@ -1142,6 +1175,9 @@ export class IndexCodeGraph {
               repoRoot: options.projectRoot,
             })
             resolvedImportsMap.set(prefixedPath, resolvedImports)
+            for (const [localName, symbolId] of resolvedImports.importMap) {
+              importedSymbolByLocalName.set(`${prefixedPath}\0${localName}`, symbolId)
+            }
             phaseMetrics.importResolution.count += resolvedImports.fileImports.length
           } catch (err) {
             errors.push({ filePath: prefixedPath, message: String(err) })
@@ -1622,13 +1658,27 @@ export class IndexCodeGraph {
             ? binding.targetId
             : undefined,
       }))
-      const localBindings = session.getLocalBindings().map((binding) => ({
-        ...binding,
-        targetId:
-          binding.targetId !== undefined && logicalIds.has(binding.targetId)
-            ? binding.targetId
-            : undefined,
-      }))
+      const logicalIdByDeclaration = new Map<string, string>()
+      for (const [logicalId, declarations] of session.getDeclarationsByLogicalId()) {
+        for (const declaration of declarations) {
+          logicalIdByDeclaration.set(declaration.symbolId, logicalId)
+        }
+      }
+      const localBindings = session.getLocalBindings().map((binding) => {
+        // An import local binding takes its target from the import resolved in pass 2.
+        const importedSymbolId = importedSymbolByLocalName.get(
+          `${binding.filePath}\0${binding.localName}`,
+        )
+        const targetId =
+          binding.targetId ??
+          (importedSymbolId === undefined
+            ? undefined
+            : logicalIdByDeclaration.get(importedSymbolId))
+        return {
+          ...binding,
+          targetId: targetId !== undefined && logicalIds.has(targetId) ? targetId : undefined,
+        }
+      })
       const knownReferenceIds = new Set([
         ...logicalIds,
         ...publicBindings.map((binding) => binding.id),
@@ -1675,7 +1725,7 @@ export class IndexCodeGraph {
       }
       const writeSession = this.store.beginBulkIndexSession({
         onProgress: onBulkStep,
-        replaceCodeGraph: fullRebuild,
+        replaceCodeGraph: fullRebuild && runReplacesWholeGraph,
         rebuildSearchIndexes,
         ...(options.vcsRef === undefined ? {} : { vcsRef: options.vcsRef }),
         graphFingerprint: serializedFingerprintMap,
@@ -1784,6 +1834,7 @@ export class IndexCodeGraph {
         phaseMetrics,
         coverage: summarizeCoverage(referenceFacts.coverage),
         coverageDiagnostics: coverageProjection.diagnostics,
+        logicalDiagnostics: session.getLogicalDiagnostics(),
       }
     } finally {
       rmSync(stageDir, { recursive: true, force: true })

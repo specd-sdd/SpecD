@@ -11,41 +11,52 @@
   "implementation": [
     {
       "file": "code-graph:src/infrastructure/tree-sitter/typescript-language-adapter.ts",
-      "symbols": ["TypeScriptLanguageAdapter"]
+      "symbols": [
+        "TypeScriptLanguageAdapter",
+        "TypeScriptLanguageAdapter.buildReferenceFacts",
+        "TypeScriptLanguageAdapter.extractCallFactsFromData",
+        "TypeScriptLanguageAdapter.extractBindingFactsFromData",
+        "TypeScriptLanguageAdapter.processPairNode",
+        "buildRelations",
+        "heritageExpressionRanges"
+      ]
+    },
+    {
+      "file": "code-graph:test/infrastructure/tree-sitter/typescript-language-adapter.spec.ts"
     }
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Maps TS/TSX/JS/JSX to deterministic code-graph facts; filters anonymous array-data properties but preserves callable and named-object symbols.",
+      "value": "Deterministic TS/JS adapter emits exact symbols, bindings, ranges, imports, exports, hierarchy, and proven relations.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:31aa0ef3ab8be515ea451bf29bf8fc9cdb4446d6388eeac7e495933b024b8de2",
-          "lastModified": "2026-10-09T15:18:44.663Z"
+          "hash": "sha256:d675d5db12592c94a504a91f9ea3b78ff0d3d30f5a0d246109f9d746c68d27f2",
+          "lastModified": "2026-10-14T08:50:27.795Z"
         },
         "verify.md": {
-          "hash": "sha256:1e40f6567f1da93e1c44307be2ae0ad94636b556bd65258d627a003e67799b8c",
-          "lastModified": "2026-10-09T15:18:44.664Z"
+          "hash": "sha256:8ce197a32f4d12d49b1b78f72a75f2b98e503111794a1f5a0d924aa0b89b4394",
+          "lastModified": "2026-10-14T08:50:27.796Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# TypeScript language adapter\n\n## Rules\n- `TypeScriptLanguageAdapter`: `.ts`→`typescript`, `.tsx`→`tsx`, `.js`→`javascript`, `.jsx`→`jsx`; parse content once via registered Tree-sitter/ast-grep; return complete `FileAnalysisDraft`; no source reads or persisted AST.\n- Emit deterministic symbols, imports, scoped bindings, calls, references, compact serializable parser state; parser runtime keepalive only indexing session.\n- Extract functions; callable variables/arrows/HOF wrappers; classes; class/object methods, fields; prototype/static, namespace/member assignments; destructuring; exported variables; aliases, interfaces, enums. Shared broad `SymbolKind` never substitutes symbol-space/member form.\n- Symbol construct range = full parser node; `selectionRange` = declared identifier; retain attached JSDoc/block/contiguous-line comments verbatim; omit invalid/rangeless candidates.\n- Omit non-callable property when anonymous enclosing object crosses array boundary before supported named declaration; include direct/nested array records. Preserve scalar properties on named object declarations through parentheses, assertions, `as const`, `satisfies`; always preserve callable values/methods. Filtering never alters indexed source content; preserved properties keep parser ranges; analysis deterministic.\n- Logical declaration space follows proven kind. Class/interface method logical owner derives parser containment then owner logical symbol, never parser ID/`SymbolNode.parentId`; distinct same-name owners remain distinct; top-level no owner; preserve proven member forms. Unsupported-owner method-like symbols remain location-backed, omitted logical-member facts.\n- Extract static imports (named/default/namespace/type-only/side-effect/aliased), literal `import()`/`require()`, ESM/CJS exports, named/star re-exports; drop nonliteral dynamic loads. Public bindings preserve surface, exported name, space, known target, every re-export route; Pass 2 routes never collapse; relative candidates include extensions/index; package imports use known identities.\n- Emit deterministic scope/import/alias/typed-param/constructor-property/field/return/type-RHS/`this`/construction facts. Emit `IMPORTS`, `CALLS`, `CONSTRUCTS`, `USES_TYPE` only proven locally/import/receiver/indexed; caller = innermost callable; drop module-scope, ambiguous, unresolved, computed, runtime-only.\n- Resolve class/interface `extends`, class `implements`, same-form proven member replacement: `EXTENDS`, `IMPLEMENTS`, `OVERRIDES`. Reference facts include child, ancestor/contract, relation, precedence, ordered provenance; separate alternate routes; terminate cycles. `hierarchy: true` only with supported evidence.\n- Package identity: nearest bounded `package.json` `name`; bare/scoped package longest known prefix; filesystem search stops repo root. `buildContext: false`; no tsconfig inheritance/references/`baseUrl`/`paths`, conditions/conditional `exports`/`imports`.\n- Advertise only emitted-fact capabilities. Parse failure, unsupported/incomplete semantics use coverage; no name-only guesses; all output/provenance deterministic.\n\n## Constraints\n- No project-code execution or implicit TypeScript compiler fallback.\n- Runtime reflection, computed exports, monkey patching, unproven interprocedural value flow unsupported.\n- TypeScript syntax logic stays adapter; generic resolution consumes shared facts only.",
+      "value": "# TypeScript Language Adapter\n\n## Rules\n- `TypeScriptLanguageAdapter`: `.ts`→`typescript`, `.tsx`→`tsx`, `.js`→`javascript`, `.jsx`→`jsx`. Parse content once through registered Tree-sitter/ast-grep; emit complete `FileAnalysisDraft`; no source reread or persisted AST.\n- Emit deterministic symbols, imports, scopes/bindings/calls/references, compact serializable parser state; parser runtime survives only indexing session.\n- Extract functions; callable variables/arrows/HOF wrappers; classes; class/object methods and fields; prototype/static and namespace/member assignments; destructuring; exported variables; aliases; interfaces; enums; properties.\n- Construct range = full parser node; `selectionRange` = declared identifier; retain attached JSDoc/block/contiguous-line comments verbatim; omit invalid/rangeless candidates.\n- Omit non-callable property when anonymous enclosing object crosses array boundary before supported named declaration, including direct/nested array records. Preserve scalar properties under named objects through parentheses/assertions/`as const`/`satisfies`; always preserve callable values/methods. Never alter source; preserve parser ranges.\n- Logical declaration space follows proven kind. Member owner derives parser containment then logical owner, never parser ID/`parentId`; distinct same-name owners stay distinct; top-level has none. Preserve proven `MemberSemantics`; unsupported-owner method-like occurrences remain location-backed without logical-member facts.\n- Extract static named/default/namespace/type-only/side-effect/aliased imports, literal `import()`/`require()`, ESM/CJS exports, named/star re-exports; discard nonliteral dynamic loads.\n- Public bindings preserve surface, exported name, space, target, every ordered re-export route; Pass 2 never collapses routes. Relative candidates include extensions/index; package imports use known identities.\n- Emit deterministic typed parameter, constructor property, field, return, type-RHS, `this`, construction, alias, scope facts. Emit `IMPORTS`, `CALLS`, `CONSTRUCTS`, `USES_TYPE` only from proven local/import/receiver/index evidence; caller = innermost callable; drop module-scope, ambiguous, computed, runtime-only.\n- Resolve class/interface `extends`, class `implements`, proven same-form replacement into `EXTENDS`, `IMPLEMENTS`, `OVERRIDES`. Preserve child/ancestor/contract, relation, precedence, ordered provenance, alternate routes; cycles terminate. `hierarchy: true` only with sufficient evidence.\n- Package identity = nearest bounded `package.json.name`; bare/scoped package uses longest known prefix; filesystem walk stops at repo root.\n- `buildContext: false`: no tsconfig inheritance/references/`baseUrl`/`paths`, platform conditions, conditional `exports`/`imports`.\n- Advertise only actually emitted shared capabilities. Unsupported/incomplete/parse-failed semantics produce coverage, never name-only guesses. Output/provenance ordering deterministic.\n\n## Constraints\n- No project-code execution or implicit TypeScript compiler fallback.\n- Runtime reflection, computed exports, monkey patching, unproven interprocedural flow unsupported.\n- TypeScript syntax stays adapter; generic resolver consumes shared facts only.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:31aa0ef3ab8be515ea451bf29bf8fc9cdb4446d6388eeac7e495933b024b8de2",
-          "lastModified": "2026-10-09T15:18:44.663Z"
+          "hash": "sha256:d675d5db12592c94a504a91f9ea3b78ff0d3d30f5a0d246109f9d746c68d27f2",
+          "lastModified": "2026-10-14T08:50:27.795Z"
         },
         "verify.md": {
-          "hash": "sha256:1e40f6567f1da93e1c44307be2ae0ad94636b556bd65258d627a003e67799b8c",
-          "lastModified": "2026-10-09T15:18:44.664Z"
+          "hash": "sha256:8ce197a32f4d12d49b1b78f72a75f2b98e503111794a1f5a0d924aa0b89b4394",
+          "lastModified": "2026-10-14T08:50:27.796Z"
         }
       }
     }

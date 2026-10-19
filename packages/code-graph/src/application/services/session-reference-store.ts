@@ -124,14 +124,37 @@ export class SessionReferenceStore {
    * @returns Logical declarations.
    */
   findDeclarations(logicalIds: readonly string[]): Promise<readonly LogicalDeclaration[]> {
+    const orderedIds = [...new Set(logicalIds)]
     const grouped = this.session.getDeclarationsByLogicalId()
     return Promise.resolve(
-      logicalIds.flatMap((logicalSymbolId) =>
-        (grouped.get(logicalSymbolId) ?? []).map((declaration) => ({
-          logicalSymbolId,
-          declaration,
-        })),
+      orderedIds.flatMap((logicalSymbolId) =>
+        [...(grouped.get(logicalSymbolId) ?? [])]
+          .sort(compareDeclarations)
+          .map((declaration) => ({ logicalSymbolId, declaration })),
       ),
+    )
+  }
+
+  /**
+   * Finds logical mappings for physical declaration ids.
+   * @param declarationSymbolIds - Physical declaration ids.
+   * @returns Mapped declarations in first-request order.
+   */
+  findLogicalDeclarationsByDeclarationIds(
+    declarationSymbolIds: readonly string[],
+  ): Promise<readonly LogicalDeclaration[]> {
+    const requested = [...new Set(declarationSymbolIds)]
+    const mappings = new Map<string, LogicalDeclaration>()
+    for (const [logicalSymbolId, declarations] of this.session.getDeclarationsByLogicalId()) {
+      for (const declaration of declarations) {
+        mappings.set(declaration.symbolId, { logicalSymbolId, declaration })
+      }
+    }
+    return Promise.resolve(
+      requested.flatMap((declarationId) => {
+        const mapping = mappings.get(declarationId)
+        return mapping === undefined ? [] : [mapping]
+      }),
     )
   }
 
@@ -153,6 +176,24 @@ export class SessionReferenceStore {
         })),
     )
   }
+}
+
+/**
+ * Orders declarations deterministically by source position and identity.
+ * @param left - First declaration to compare.
+ * @param right - Second declaration to compare.
+ * @returns Negative, zero, or positive ordering value.
+ */
+function compareDeclarations(
+  left: LogicalDeclaration['declaration'],
+  right: LogicalDeclaration['declaration'],
+): number {
+  return (
+    left.location.filePath.localeCompare(right.location.filePath) ||
+    left.location.line - right.location.line ||
+    left.location.column - right.location.column ||
+    left.symbolId.localeCompare(right.symbolId)
+  )
 }
 
 /**

@@ -1,0 +1,96 @@
+- op: added
+  description: 'Require owner-first, classification-aware semantic indexing.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Reference fact indexing$'
+  content: |
+    ### Requirement: Classification-aware logical identity construction
+
+    The indexing session SHALL preserve each adapter's declaration classification and MUST NOT manufacture a logical target for a lexical-binding-only or physical-only declaration. It SHALL register canonical logical owners before constructing owned member identities and SHALL use the adapter-provided lexical occurrence parent only as physical containment evidence.
+
+    Logical declaration groups SHALL be assembled from explicit language-provided grouping evidence. An absent or undefined group key SHALL mean that no group has been proven; it MUST NOT be normalized into a shared key. The indexer MUST NOT merge declarations by file, simple name, broad `SymbolKind`, or mutual absence of grouping evidence alone. Every logical target SHALL persist its complete deterministic declaration set, including declaration-level form metadata required to distinguish signatures, implementations, and other occurrences without changing target identity.
+
+- op: added
+  description: 'Make incremental indexing equivalent to a clean rebuild for semantic identity and relations.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Bounded incremental relation construction$'
+  content: |
+    ### Requirement: Identity-sensitive incremental equivalence
+
+    Given identical final source and configuration, an incremental indexing run SHALL produce the same logical symbols, declaration mappings, local bindings, dependency relations, public bindings, resolution evidence, and spec coverage as a clean full rebuild.
+
+    The affected closure SHALL reconsider every consumer whose semantic result can change because of declaration movement, body edits, owner changes, overload or merge-group changes, renames, moves, additions, deletions, or a previously unresolved target becoming resolvable. Cleanup MUST NOT delete incident physical relations without either rebuilding every affected consumer or preserving equivalent committed evidence.
+
+    Equivalence tests SHALL compare normalized semantic state after each identity-sensitive mutation rather than relying only on file or relation counts.
+
+- op: added
+  description: 'Replace Kuzu-era bulk-load wording with the removal-before-rewrite contract.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: Incremental indexing$'
+    before:
+      type: paragraph
+      contains: 'CSV `?COPY FROM`? cannot upsert'
+  content: |
+    Changed files are removed from the store before their re-extracted data is written, so the replacement generation never conflicts with stale rows for the same file.
+
+- op: removed
+  description: 'Remove the stale CSV COPY FROM rationale.'
+  selector:
+    type: paragraph
+    contains: 'CSV `?COPY FROM`? cannot upsert'
+    parent:
+      type: section
+      matches: '^Requirement: Incremental indexing$'
+
+- op: added
+  description: 'Describe the store commit as one bulk write session.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: Two-pass extraction with in-memory index$'
+    before:
+      type: list-item
+      matches: 'Store commit'
+  content: |
+    - **Bulk commit** — After all passes complete, commit one bulk write session so the indexed generation is persisted atomically.
+    - **Search index rebuild** — The commit rebuilds the semantic and content search indexes once before the store reports ready.
+
+- op: removed
+  description: 'Remove the stale bulkLoad commit step.'
+  selector:
+    type: list-item
+    matches: 'Store commit'
+    parent:
+      type: section
+      matches: '^Requirement: Two-pass extraction with in-memory index$'
+
+- op: removed
+  description: 'Remove the stale rebuildFtsIndexes step.'
+  selector:
+    type: list-item
+    matches: 'Search readiness'
+    parent:
+      type: section
+      matches: '^Requirement: Two-pass extraction with in-memory index$'
+
+- op: modified
+  description: 'Scope destructive recreation to runs that replace the whole graph.'
+  selector:
+    type: section
+    matches: '^Requirement: Incompatible derivation rebuild$'
+  content: |
+
+    When package derivation fingerprint or backend schema is incompatible, project indexing SHALL perform a visible destructive full rebuild through provider-owned recreation, rotate storage generation, and report the rebuild reason. Ordinary read paths MUST NOT perform this repair or serve a silently empty graph.
+
+    Recreation applies when the run replaces the whole graph, that is, when every stored workspace is indexed. A run that indexes only some stored workspaces SHALL clear and regenerate only those workspaces and MUST NOT recreate storage or alter the others. A caller that supplies an already-open provider cannot have it recreated; indexing then performs an in-place logical rebuild that clears the derived graph and reports the same reason.

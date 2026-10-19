@@ -566,24 +566,25 @@ export class SQLiteGraphStore extends GraphStore {
   }
 
   /**
-   * Retrieves specs covering the given symbol.
+   * Retrieves specs covering the given logical symbol.
    *
-   * @param symbolId - Symbol ID.
+   * @param logicalSymbolId - Logical symbol ID.
    * @returns Promise resolving to covering spec relations.
    */
-  async getCoveringSpecsForSymbol(symbolId: string): Promise<Relation[]> {
-    return this.client.sendRequest('getCoveringSpecsForSymbol', { symbolId })
+  async getCoveringSpecsForSymbol(logicalSymbolId: string): Promise<Relation[]> {
+    return this.client.sendRequest('getCoveringSpecsForSymbol', { logicalSymbolId })
   }
 
   /**
-   * Retrieves specs covering any of the given symbols.
+   * Retrieves specs covering any of the given logical symbols.
    *
-   * @param symbolIds - Symbol IDs.
+   * @param logicalSymbolIds - Logical symbol IDs.
    * @returns Promise resolving to covering spec relations.
    */
-  async getCoveringSpecsForSymbols(symbolIds: readonly string[]): Promise<Relation[]> {
-    if (symbolIds.length === 0) return []
-    return this.client.sendRequest('getCoveringSpecsForSymbols', { symbolIds })
+  async getCoveringSpecsForSymbols(logicalSymbolIds: readonly string[]): Promise<Relation[]> {
+    if (logicalSymbolIds.length === 0) return []
+    const deduped = [...new Set(logicalSymbolIds)]
+    return this.client.sendRequest('getCoveringSpecsForSymbols', { logicalSymbolIds: deduped })
   }
 
   /**
@@ -899,7 +900,24 @@ export class SQLiteGraphStore extends GraphStore {
     logicalSymbolIds: readonly string[],
   ): Promise<LogicalDeclaration[]> {
     if (logicalSymbolIds.length === 0) return []
-    return this.client.sendRequest('findDeclarations', { logicalSymbolIds })
+    const deduped = [...new Set(logicalSymbolIds)]
+    return this.client.sendRequest('findDeclarations', { logicalSymbolIds: deduped })
+  }
+
+  /**
+   * Finds logical declarations by physical declaration symbol IDs.
+   *
+   * @param declarationSymbolIds - Physical declaration symbol IDs.
+   * @returns Promise resolving to logical declarations.
+   */
+  override async findLogicalDeclarationsByDeclarationIds(
+    declarationSymbolIds: readonly string[],
+  ): Promise<LogicalDeclaration[]> {
+    if (declarationSymbolIds.length === 0) return []
+    const deduped = [...new Set(declarationSymbolIds)]
+    return this.client.sendRequest('findLogicalDeclarationsByDeclarationIds', {
+      declarationSymbolIds: deduped,
+    })
   }
 
   /**

@@ -35,6 +35,8 @@ export interface CodeGraphCompositionOptions {
   readonly graphStoreFactories?: Readonly<Record<string, GraphStoreFactory>>
   /** Additional language adapters to register beyond the built-ins. */
   readonly adapters?: readonly LanguageAdapter[]
+  /** Optional host receiver for non-fatal warnings, such as stale index lock recovery. */
+  readonly onWarning?: (message: string) => void
 }
 
 /**

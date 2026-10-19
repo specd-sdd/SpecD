@@ -13,8 +13,47 @@ import {
 } from '../../../src/domain/value-objects/symbol-reference.js'
 import { createRelation } from '../../../src/domain/value-objects/relation.js'
 import { RelationType } from '../../../src/domain/value-objects/relation-type.js'
+import { DuplicateDeclarationMappingError } from '../../../src/domain/errors/duplicate-declaration-mapping-error.js'
 
 describe('InMemoryIndexSession', () => {
+  it('rejects remapping one physical declaration to a competing logical target', () => {
+    const session = new InMemoryIndexSession()
+    const declaration = createSymbolNode({
+      name: 'run',
+      kind: SymbolKind.Function,
+      filePath: 'ws:file.ts',
+      line: 1,
+      column: 0,
+    })
+
+    session.hydrateReferenceFacts({
+      logicalSymbols: [],
+      declarations: [
+        { logicalSymbolId: 'logical:first', declaration: occurrence('logical:first', declaration) },
+      ],
+      publicBindings: [],
+      localBindings: [],
+      steps: [],
+      coverage: [],
+    })
+
+    expect(() =>
+      session.hydrateReferenceFacts({
+        logicalSymbols: [],
+        declarations: [
+          {
+            logicalSymbolId: 'logical:second',
+            declaration: occurrence('logical:second', declaration),
+          },
+        ],
+        publicBindings: [],
+        localBindings: [],
+        steps: [],
+        coverage: [],
+      }),
+    ).toThrow(DuplicateDeclarationMappingError)
+  })
+
   it('stores and retrieves symbols by file path', () => {
     const session = new InMemoryIndexSession()
     const sym1 = createSymbolNode({
@@ -256,6 +295,7 @@ describe('InMemoryIndexSession', () => {
       localName: 'runAlias',
       space: SymbolSpace.Value,
       targetId: member.id,
+      range: { startLine: 1, startColumn: 0, endLine: 1, endColumn: 8 },
     })
     const declaration = createSymbolNode({
       name: 'run',

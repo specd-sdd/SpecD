@@ -368,9 +368,11 @@ File selectors:
 
 JSON/TOON output schema:
   --symbol (single match):
-    { symbol: { id, name, kind, filePath, line, column, comment }, projectRelativePath: string, riskLevel, directDepsCount, indirectDepsCount, transitiveDepsCount, affectedFilesCount, omittedCounts, impact: ImpactResult }
+    { kind: "symbol", status: "resolved", targetKind, resolvedTarget, declarations, semanticCounts, symbol: { id, name, kind, filePath, line, column, comment }, projectRelativePath: string, riskLevel, directDepsCount, indirectDepsCount, transitiveDepsCount, affectedFilesCount, omittedCounts, impact: ImpactResult }
   --symbol (multiple matches):
-    { error: "ambiguous", symbol: string, totalCandidates: number, candidates: Array<{ symbol, projectRelativePath: string }> }
+    { kind: "symbol", status: "ambiguous", error: "ambiguous", symbol: string, totalCandidates: number, candidates: Array<{ symbol, projectRelativePath: string }> }
+  --symbol (graph cannot decide, e.g. stale or partial coverage):
+    { kind: "symbol", status: "unresolved", error: "unresolved", symbol: string, reasonCode: string }
   --file (single):
     { canonicalPath: string, projectRelativePath: string, riskLevel, directDepsCount, indirectDepsCount, transitiveDepsCount, affectedFilesCount, directDependents, indirectDependents, transitiveDependents, affectedFiles: string[], affectedSymbols: Array<{ id, name, filePath, depth }>, symbols: any[], coveringSpecs: any[], omittedCounts }
   --file (multiple):
@@ -378,7 +380,13 @@ JSON/TOON output schema:
   --spec:
     { spec: string, riskLevel, directDepsCount, indirectDepsCount, transitiveDepsCount, affectedFilesCount, omittedCounts, impact: SpecImpactResult }
   --symbol (no match):
-    { error: "not_found", symbol: string }
+    { kind: "symbol", status: "not_found", error: "not_found", symbol: string }
+
+  Count units:
+    directDepsCount / indirectDepsCount / transitiveDepsCount count distinct dependents per depth
+      (logical targets for --symbol, files for --file); overloads of one logical target count once.
+    affectedFilesCount counts files. semanticCounts.physicalDeclarationOccurrences counts
+      physical declarations, so it can exceed the logical-target counts.
 
   ImpactResult: { target, directDependents, indirectDependents, transitiveDependents,
     riskLevel: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL", affectedFiles: string[],
@@ -537,8 +545,18 @@ async function handlePublicExportImpact(
       if (result.status === 'ambiguous') {
         const candidates = result.candidates ?? []
         if (fmt === 'text') {
+          const lines = candidates.flatMap((candidate) => [
+            `  - ${candidate.target.id}`,
+            ...candidate.declarations.map(
+              (declaration) =>
+                `      ${declaration.projectRelativePath}:${String(declaration.location.line)}`,
+            ),
+          ])
           output(
-            `Public export ${surface}::${exportedName}: ambiguous (${String(candidates.length)} routes)`,
+            [
+              `Public export ${surface}::${exportedName}: ambiguous (${String(candidates.length)} routes)`,
+              ...lines,
+            ].join('\n'),
             'text',
           )
         } else {
@@ -585,6 +603,7 @@ async function handlePublicExportImpact(
           (line) => `  ${line}`,
         ),
       ]
+      lines.push(...formatCoveringSpecs(result.coveringSpecs))
       const omissionNotice =
         formatOmissionNotice(result.canonicalImpact.omittedCounts) ??
         formatOmissionNotice(result.bindingImpact.omittedCounts)
@@ -605,6 +624,7 @@ async function handlePublicExportImpact(
           path: result.path,
           bindingImpact: result.bindingImpact,
           canonicalImpact: result.canonicalImpact,
+          coveringSpecs: result.coveringSpecs,
           omittedCounts: result.omittedCounts,
         },
         fmt,
@@ -804,7 +824,31 @@ async function handleSymbolImpact(
       if (fmt === 'text') {
         output(`No symbol found matching "${symbolSelector}".`, 'text')
       } else {
-        output({ error: 'not_found', symbol: symbolSelector }, fmt)
+        output(
+          { kind: 'symbol', status: 'not_found', error: 'not_found', symbol: symbolSelector },
+          fmt,
+        )
+      }
+      return
+    }
+
+    if (result.status === 'unresolved') {
+      if (fmt === 'text') {
+        output(
+          `Cannot decide "${symbolSelector}": the graph evidence is not sufficient (${result.reasonCode}). Re-run \`specd graph index\` and try again.`,
+          'text',
+        )
+      } else {
+        output(
+          {
+            kind: 'symbol',
+            status: 'unresolved',
+            error: 'unresolved',
+            symbol: symbolSelector,
+            reasonCode: result.reasonCode,
+          },
+          fmt,
+        )
       }
       return
     }
@@ -828,6 +872,8 @@ async function handleSymbolImpact(
       } else {
         output(
           {
+            kind: 'symbol',
+            status: 'ambiguous',
             error: 'ambiguous',
             symbol: symbolSelector,
             totalCandidates: result.totalCandidates,
@@ -841,11 +887,75 @@ async function handleSymbolImpact(
 
     if (result.status === 'resolved') {
       if (fmt === 'text') {
-        const lines = formatImpact(
-          `${result.symbol.kind} ${result.symbol.name} (${result.projectRelativePath}:${String(result.symbol.line)})`,
-          result.impact,
-          maxDepth,
-        )
+        const isLogical = result.targetKind === 'logical-target'
+        const label = isLogical
+          ? `logical symbol ${result.logicalSymbol?.name ?? result.symbol.name} (${result.logicalSymbol?.id ?? result.symbol.name})`
+          : `${result.symbol.kind} ${result.symbol.name} (${result.projectRelativePath}:${String(result.symbol.line)})`
+
+        const lines = formatImpact(label, result.impact, maxDepth)
+
+        const targetKindLabel =
+          result.targetKind === 'logical-target'
+            ? 'logical impact'
+            : result.targetKind === 'declaration'
+              ? 'declaration impact'
+              : 'public binding impact'
+        lines.splice(1, 0, `  Target kind:      ${targetKindLabel}`)
+
+        if (result.semanticCounts !== undefined) {
+          lines.push('')
+          lines.push('Semantic counts:')
+          lines.push(
+            `  Logical targets:   ${String(result.semanticCounts.directLogicalTargets + result.semanticCounts.indirectLogicalTargets + result.semanticCounts.transitiveLogicalTargets)} (direct=${String(result.semanticCounts.directLogicalTargets)}, indirect=${String(result.semanticCounts.indirectLogicalTargets)}, transitive=${String(result.semanticCounts.transitiveLogicalTargets)})`,
+          )
+          lines.push(`  Physical only:     ${String(result.semanticCounts.physicalOnlyTargets)}`)
+          lines.push(
+            `  Physical decls:    ${String(result.semanticCounts.physicalDeclarationOccurrences)}`,
+          )
+        }
+
+        if (result.declarations && result.declarations.length > 0) {
+          lines.push('')
+          lines.push('Declarations:')
+          for (const decl of result.declarations) {
+            const loc = decl.location
+            const locStr = `${decl.projectRelativePath}:${String(loc.line)}:${String(loc.column)}`
+            const formStr = decl.form ? ` [${decl.form}]` : ''
+            lines.push(`  ${decl.kind} ${locStr}${formStr}`)
+          }
+        }
+
+        if (result.semanticAffectedTargets && result.semanticAffectedTargets.length > 0) {
+          lines.push('')
+          lines.push('Semantic affected targets:')
+          for (const target of result.semanticAffectedTargets) {
+            if (target.kind === 'logical-target') {
+              const declSummary = target.declarations
+                .map((d) => `${d.projectRelativePath}:${String(d.location.line)}`)
+                .join(', ')
+              lines.push(
+                `  [logical] ${target.logicalSymbol.name} (${target.logicalSymbol.id}) depth=${String(target.depth)}: ${declSummary}`,
+              )
+            } else {
+              lines.push(
+                `  [physical-only] ${target.declaration.name} (${target.projectRelativePath}:${String(target.declaration.line)}) depth=${String(target.depth)}`,
+              )
+            }
+          }
+        }
+
+        if (result.physicalEvidence && result.physicalEvidence.length > 0) {
+          lines.push('')
+          lines.push('Physical dependency evidence:')
+          for (const ev of result.physicalEvidence) {
+            const src = ev.sourceProjectRelativePath ?? ev.sourceDeclarationId
+            const tgt = ev.targetProjectRelativePath ?? ev.targetDeclarationId
+            lines.push(`  ${ev.relationType} ${src} -> ${tgt} (depth=${String(ev.depth)})`)
+          }
+        }
+
+        lines.push(...formatCoveringSpecs(result.coveringSpecs))
+
         const omissionNotice = formatOmissionNotice(result.omittedCounts)
         if (omissionNotice !== undefined) {
           lines.push('')
@@ -855,6 +965,16 @@ async function handleSymbolImpact(
       } else {
         output(
           {
+            kind: 'symbol',
+            status: 'resolved',
+            targetKind: result.targetKind,
+            resolvedTarget: result.resolvedTarget,
+            ...(result.logicalSymbol !== undefined ? { logicalSymbol: result.logicalSymbol } : {}),
+            declarations: result.declarations,
+            semanticCounts: result.semanticCounts,
+            semanticAffectedTargets: result.semanticAffectedTargets,
+            physicalEvidence: result.physicalEvidence,
+            coveringSpecs: result.coveringSpecs,
             symbol: result.symbol,
             projectRelativePath: result.projectRelativePath,
             riskLevel: result.riskLevel,
@@ -862,6 +982,10 @@ async function handleSymbolImpact(
             indirectDepsCount: result.indirectDepsCount,
             transitiveDepsCount: result.transitiveDepsCount,
             affectedFilesCount: result.affectedFilesCount,
+            directDependents: result.impact.directDependents,
+            indirectDependents: result.impact.indirectDependents,
+            transitiveDependents: result.impact.transitiveDependents,
+            affectedFiles: result.impact.affectedFiles,
             omittedCounts: result.omittedCounts,
             impact: result.impact,
           },

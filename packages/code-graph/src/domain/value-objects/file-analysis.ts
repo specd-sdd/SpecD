@@ -30,6 +30,8 @@ export interface AdapterSessionState {
 export interface FileAnalysisDraft {
   readonly language: string
   readonly namespace?: string
+  /** Separator joining `namespace` and a symbol name in qualified names; defaults to `.`. */
+  readonly namespaceSeparator?: string
   readonly fileNode?: FileNode
   readonly documentNode?: DocumentNode
   readonly symbols: readonly SymbolNode[]

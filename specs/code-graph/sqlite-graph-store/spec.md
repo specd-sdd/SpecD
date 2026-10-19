@@ -106,6 +106,14 @@ deterministic bounded SQL parameter chunks inside the worker. Results MUST
 deduplicate repeated identities, omit unknown identities, preserve first
 requested-identity order, and return an empty array for empty input without RPC.
 
+### Requirement: Worker-backed logical declaration mapping
+
+SQLite SHALL implement the abstract logical-to-declaration and declaration-to-logical batch lookups as set-based worker operations. Each logical batch MUST cross the worker boundary as one typed RPC and MUST NOT issue one RPC per logical symbol or declaration.
+
+The database SHALL query `logical_symbols`, `logical_declarations`, and physical symbol rows using bounded parameter chunks inside the worker. Merged results MUST preserve first-request ordering, deterministic declaration ordering, deduplication, unknown-value omission, and empty-input no-RPC semantics.
+
+Worker protocol payloads and database row DTOs MUST distinguish `logicalSymbolIds` from `declarationSymbolIds`. The implementation MUST NOT parse canonical IDs or infer an identity domain from string shape.
+
 ### Requirement: Config-derived persistence layout
 
 `SQLiteGraphStore` SHALL use the project-level `configPath` as the root for its
@@ -137,13 +145,12 @@ SQLite defines its own storage layout, query behavior, and output contract. If a
 ### Requirement: Destructive recreation
 
 `SQLiteGraphStore.recreate()` SHALL implement physical recovery only after the
-SQLite worker and database are closed. It MUST reject while open, remove the graph
-persistence directory including SQLite companion files, rotate the storage
-generation, and return with no worker or database handle reopened.
+SQLite worker and database are closed. It MUST reject while open, remove the SQLite database file and its `-wal` and `-shm` companion files, rotate the storage
+generation, and return with no worker or database handle reopened. It MUST NOT remove `index.lock`, and `storage.epoch` MUST be rotated rather than deleted.
 
 SQLite open validation SHALL translate only known corruption and non-migratable
 schema conditions to the abstract typed recoverable storage-open error after closing
-any partial database resources. Permission, configuration, native-runtime, and
+any partial database resources. A non-migratable schema condition includes both a persisted schema version other than the expected one and a persisted table shape that lacks a column required by the expected version. Permission, configuration, native-runtime, and
 unrelated I/O errors MUST propagate without recreation authority.
 
 A healthy forced reindex SHALL use the existing opened-store logical clear path and
@@ -230,6 +237,12 @@ SQLite bulk relation validation SHALL treat a logical-symbol row as the required
 The same committed transaction SHALL persist logical symbols before validating and inserting their coverage relations. Valid logical coverage MUST survive relation deduplication, reverse-coverage indexing, statistics, worker serialization, and subsequent abstract `GraphStore` reads with its target ID and metadata unchanged.
 
 A `COVERS_SYMBOL` relation with a missing spec source or missing logical-symbol target SHALL be rejected from the committed relation set and reported through the indexing diagnostic contract rather than being silently accepted or retargeted.
+
+### Requirement: SQLite batched logical coverage reads
+
+Reverse `COVERS_SYMBOL` reads SHALL join and filter against committed logical-symbol targets and SHALL accept only logical-symbol IDs. A physical symbol row with an equal-looking identifier MUST NOT satisfy, shadow, or widen the logical endpoint.
+
+The host store, worker protocol, dispatcher, and database SHALL carry one serializable batch request for all requested logical IDs. SQL parameter chunking MAY divide the database query, but the logical operation MUST remain one worker RPC and its merged output MUST preserve deterministic abstract-store ordering.
 
 ### Requirement: SQLite full-text search
 
@@ -321,15 +334,17 @@ the run stable. Any scratch artifacts MUST remain under `{configPath}/tmp`.
 `SQLiteGraphStore` SHALL track a backend-specific schema version for its persisted
 SQLite schema.
 
-When the adapter opens a database:
+When the adapter opens a database it SHALL, in this order:
 
-1. it executes the current SQLite schema definition
-2. it verifies or records the current schema version in persisted metadata
-3. it prepares any required FTS structures
+1. read the persisted schema version, if any, and reject a mismatch before any DDL runs;
+2. execute the current SQLite schema definition;
+3. verify the table shape: for every table that the current definition creates, every column that the current version requires MUST exist (as reported by `PRAGMA table_info`); a missing column MUST be rejected with `GraphSchemaIncompatibleError` and recovery reason `SCHEMA_INCOMPATIBLE` after closing partial resources;
+4. record the current schema version in persisted metadata; and
+5. prepare any required FTS structures.
 
-If the persisted SQLite schema version is incompatible with the expected version, the
-implementation MAY require a destructive rebuild rather than attempting incremental
-migration.
+If the persisted SQLite schema version or table shape is incompatible with the expected one, the
+implementation SHALL require a destructive rebuild rather than attempting incremental
+migration, and ordinary reads and `graph index` (including `--force`) MUST reach the recreate-and-retry recovery path rather than a raw SQLite error.
 
 ### Requirement: Backend-specific companion files
 
@@ -341,23 +356,26 @@ abstract `GraphStore` contract.
 
 ### Requirement: Reference schema upgrade
 
-SQLite SHALL persist the logical-symbol, declaration, member-semantics, symbol-space, binding, provenance, coverage, construct-range, and selection-range fields required by `GraphStore`. Structured lookup columns SHALL be indexed. Serialized canonical ids MUST NOT be parsed or substring-ranked to implement semantic lookup. Canonical ids remain unique external identities; backend-local integer row keys MAY be used for physical joins when provider-visible ids do not change.
+SQLite SHALL persist the logical-symbol, declaration, member-semantics, symbol-space, binding, provenance, coverage, construct-range, selection-range, and declaration-occurrence-form fields required by `GraphStore`. Structured lookup columns SHALL be indexed. Serialized canonical ids MUST NOT be parsed or substring-ranked to implement semantic lookup. Canonical ids remain unique external identities; backend-local integer row keys MAY be used for physical joins when provider-visible ids do not change.
 
-The reference schema version MUST be **14**. `SQLITE_SCHEMA_VERSION` MUST change to 14 in the same revision as the DDL. `CREATE TABLE IF NOT EXISTS` does not alter an existing database, so the version mismatch MUST reject ordinary reads with `GraphSchemaIncompatibleError` and recovery reason `SCHEMA_INCOMPATIBLE`. `graph index` SHALL recreate derived storage, rotate `storage.epoch`, and rebuild search indexes before readiness. The implementation MUST NOT use `ALTER TABLE` and MUST NOT read version 13 or older rows beside version 14 rows.
+The reference schema version MUST be **15**. `SQLITE_SCHEMA_VERSION` MUST be 15 in the same revision as the DDL that persists declaration `occurrence_form`. `CREATE TABLE IF NOT EXISTS` does not alter an existing database, so a persisted version 14 database MUST reject ordinary reads with `GraphSchemaIncompatibleError` and recovery reason `SCHEMA_INCOMPATIBLE`; `graph index` SHALL recreate derived storage as version 15, rotate `storage.epoch`, and rebuild search indexes before readiness. Versions older than 14 and versions newer than 15 MUST also be rejected. The implementation MUST NOT mix rows from different schema versions or use an in-place `ALTER TABLE` migration.
 
-In schema version 14:
+In schema version 15:
 
-- `files` SHALL persist `project_relative_path` and drop `config_relative_path`.
-- `documents` SHALL persist `project_relative_path` and drop `config_relative_path`.
-- `symbols` SHALL persist `project_relative_path` (denormalized at index time to achieve zero-join query speed across symbol searches and hotspot calculations).
+- `files` SHALL persist `project_relative_path` and omit `config_relative_path`.
+- `documents` SHALL persist `project_relative_path` and omit `config_relative_path`.
+- `symbols` SHALL persist `project_relative_path`.
+- `logical_declarations` SHALL persist the declaration `occurrence_form` used to distinguish signature, implementation, and other physical occurrence roles without changing logical identity. A physical-only declaration has no `logical_declarations` row and therefore persists no occurrence form; it remains navigable by physical symbol ID and range.
 
 `logical_symbols` SHALL keep `member_kind`, `member_dispatch`, `member_accessor`, `native_kind`, and `qualified_name`. `qualified_name` stores the generic dotted owner path and MUST have an equality index. `idx_logical_symbols_member_lookup` SHALL use the member-semantics columns. `id`, `workspace`, `surface`, `name`, `space`, and `owner_id` stay. Stored `id` text MUST use the versioned canonical encoding.
 
-`public_bindings`, `resolution_steps`, `symbols.parent_id`, `symbols.search_text`, `logical_declarations`, `local_bindings`, `index_coverage`, `relations`, and `symbol_fts` (`id`, `search_text`, `comment`) MUST keep their current columns. New re-export bindings and resolution steps are new rows. `symbol_fts.search_text` MAY still contain a qualified spelling for discovery. It MUST NOT be the exact-match key. `symbols.search_text` remains the expanded bare name.
+`public_bindings`, `resolution_steps`, `symbols.parent_id`, `symbols.search_text`, the non-form columns of `logical_declarations`, `index_coverage`, `relations`, and `symbol_fts` (`id`, `search_text`, `comment`) MUST keep their current columns. New re-export bindings and resolution steps are new rows. `symbol_fts.search_text` MAY still contain a qualified spelling for discovery. It MUST NOT be the exact-match key. `symbols.search_text` remains the expanded bare name.
+
+`local_bindings` SHALL keep its current columns and additionally persist the binding's source range as `start_line`, `start_column`, `end_line`, and `end_column`. A local binding's identity MUST include its scope and source range, so shadowed bindings that share a name within one scope remain distinct rows. These columns belong to schema version 15, which this change introduces; no separate version is created for them.
 
 SQLite SHALL maintain the substring-capable source-content index and bounded short-query fallback required by the abstract store. Reverse coverage and traversal batch reads SHALL use set-based predicates and deterministic ordering.
 
-Indexed-input observations, freshness latches, VCS evidence, and compact unchanged-file facts SHALL remain persisted. One indexing run SHALL use one transaction, set-based endpoint validation, bounded writes, one commit, and one semantic and content index rebuild. Inserts, selects, and the worker row shape MUST use the version 14 columns in the same revision.
+Indexed-input observations, freshness latches, VCS evidence, and compact unchanged-file facts SHALL remain persisted. One indexing run SHALL use one transaction, set-based endpoint validation, bounded writes, one commit, and one semantic and content index rebuild. Inserts, selects, and the worker row shape MUST use the version 15 columns in the same revision.
 
 ## Constraints
 

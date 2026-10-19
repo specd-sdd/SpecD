@@ -33,6 +33,8 @@ export interface RunIsolatedGraphIndexInput<TInput, TProgress> {
   readonly taskInput: TInput
   /** Optional presentation-neutral progress receiver. */
   readonly onProgress?: (progress: TProgress) => void
+  /** Optional receiver for non-fatal warnings such as recovery of a stale index lock. */
+  readonly onWarning?: (message: string) => void
 }
 
 /** Application port for process-isolated graph-index task execution. */

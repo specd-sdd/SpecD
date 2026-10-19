@@ -10,46 +10,58 @@
   ],
   "implementation": [
     {
-      "file": "code-graph:src/domain/value-objects/symbol-kind.ts",
-      "symbols": ["SymbolKind", "isSymbolKind"]
+      "file": "code-graph:src/domain/value-objects/symbol-reference.ts",
+      "symbols": [
+        "DeclarationOccurrence",
+        "SourcePosition",
+        "LogicalResolutionTarget",
+        "DeclarationResolutionTarget",
+        "PublicBindingResolutionTarget",
+        "ResolvedSymbolTarget",
+        "ResolveSymbolReferenceInput",
+        "SymbolResolutionResult"
+      ]
     },
     {
-      "file": "code-graph:src/domain/services/scoped-binding-environment.ts",
-      "symbols": ["buildScopedBindingEnvironment"]
+      "file": "code-graph:src/infrastructure/tree-sitter/reference-fact-helpers.ts",
+      "symbols": ["AdapterDeclarationDecision", "buildLogicalDeclarationFacts"]
+    },
+    {
+      "file": "code-graph:src/domain/value-objects/source-location.ts"
     }
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Language-agnostic immutable domain model for code graph files, symbols, relations, logical identities, and member semantics.",
+      "value": "Immutable language-neutral model for files, symbols, logical identity, bindings, relations, ranges, and coverage.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:a7fa9c173421d6b97fecb8d67df429f61158d6495fcba9c896d0f5fd72ad1fcb",
-          "lastModified": "2026-09-28T07:27:44.390Z"
+          "hash": "sha256:7d9b3aa00557fdce9d70289a33d7fd0f004eb3067a45dc227356005391e445de",
+          "lastModified": "2026-10-14T08:50:27.709Z"
         },
         "verify.md": {
-          "hash": "sha256:d99e928446663c3e04da37da6da0b38a10bc75bbef94007270a9cfdc14d37ac7",
-          "lastModified": "2026-09-28T08:41:52.058Z"
+          "hash": "sha256:3d63ea3122996cb5bef981b3d62d867d798ff1890ee39842cf899201319556d3",
+          "lastModified": "2026-10-14T09:19:31.861Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# Symbol Model\n\n## Rules\n- FileNode, SymbolNode, Relation, SpecNode, DocumentNode: immutable value objects (`readonly`).\n- FileNode: canonical `workspace:path`, config path, hash, workspace.\n- Closed SymbolKind: `function`, `class`, `method`, `variable`, `type`, `interface`, `enum`.\n- Closed RelationType: `IMPORTS`, `DEPENDS_ON`, `DEFINES`, `EXPORTS`, `CALLS`, `CONSTRUCTS`, `USES_TYPE`, `EXTENDS`, `IMPLEMENTS`, `OVERRIDES`, `COVERS_FILE`, `COVERS_SYMBOL`.\n- Logical symbols vs occurrences: distinct from syntax-level declaration occurrences (`SymbolNode.id`).\n- Logical symbol: workspace, declaring surface, declaring owner, symbol space, simple name, member semantics (`kind`, `dispatch`, `accessor`, optional `nativeKind`), versioned canonical reference. Stable across line/col shifts.\n- Qualified name: generic dotted path for owned symbols (e.g. `Class.method`). Stored exact-match spelling; not in canonical ID; no alias rows.\n- Symbol spaces: preserve type, value, namespace/module, property. Language-sensitive case comparison.\n- First-class bindings: public export slots addressable by surface, exported name, symbol space. Local bindings preserve lexical scope.\n- Coverage facts: indexed, excluded, unsupported, parse-failed, partial states with indexed content hash.\n- Errors: `SpecdCodeGraphError` extends `SpecdError`.\n\n## Constraints\n- Structural value equality except deterministic `SymbolNode.id`.\n- Immutable value objects; updates exclusively via `GraphStore` atomic upserts.\n- Runtime dependency on `@specd/core`.\n- Closed SymbolKind and RelationType sets.",
+      "value": "# Symbol Model\n\n## Rules\n- `FileNode`: canonical forward-slash `{workspace}:{relativeToCodeRoot}` `path`; `projectRelativePath`; language, content hash, workspace, optional deferred embedding. Equality by `path`.\n- `SpecNode`: `specId`, path, title, description, artifact-derived content/hash, ordered `dependsOn`, workspace. Equality by `specId`.\n- `SymbolNode`: deterministic location identity `filePath + kind + name + line + column`; name, `SymbolKind`, canonical file path, denormalized `projectRelativePath`, full construct range, exact `selectionRange`, optional comment. Ranges: 1-based lines, 0-based half-open columns; construct non-empty and contains selection.\n- Specs, Files, Symbols, Documents use workspace-qualified canonical primary identities.\n- Immutable runtime `FileAnalysisDraft`, `FileAnalysis`, `ParserState`, `AdapterSessionState` carry compact symbols, imports, binding/call facts, namespace context, normalized metadata. Distinct from persistence; no AST/tree/cursor retention after per-file analysis.\n- Run-scoped lookup contract supports files by canonical path/run ID; symbols by file/simple/qualified name; file↔symbol; specs/documents; spec↔covered symbol; relation deduplication.\n- `DocumentNode`: searchable textual non-code node; file identity format including reserved `root:`.\n- Closed `SymbolKind`: `function`, `class`, `method`, `variable`, `type`, `interface`, `enum`, `property`. Module/file state→Variable; routine-local state→Variable with routine `parentId`; container state→Property with container `parentId`.\n- Closed `RelationType`: `IMPORTS`, `DEFINES`, `CALLS`, `CONSTRUCTS`, `USES_TYPE`, `EXPORTS`, `DEPENDS_ON`, `COVERS_FILE`, `COVERS_SYMBOL`, `EXTENDS`, `IMPLEMENTS`, `OVERRIDES`. Relation equality = source+target+type. `metadata.stale` specifically marks unresolved archived `COVERS_SYMBOL`.\n- Hierarchy normalization: type→ancestor `EXTENDS`; type→contract `IMPLEMENTS`; replacing/fulfilling method→base/contract method `OVERRIDES`.\n- `ImportDeclaration`: local/original names, raw specifier, relative flag, optional kind. File-only side-effect/dynamic/require/blank forms use empty names; resolution occurs later.\n- Scoped immutable facts model scope ownership, source-aware bindings and source kinds, calls, and resolution evidence. Cycle aborts scope lookup. Deterministic facts emit persisted dependency/hierarchy relations; self-relations and unresolved/speculative edges never persist.\n- `SpecdCodeGraphError extends SpecdError`; package errors include `InvalidSymbolKindError`, `InvalidRelationTypeError`, `DuplicateSymbolIdError`, `StoreNotOpenError`.\n- Logical symbol differs from declaration occurrence; language-defined overload/merge may contribute multiple declarations. Structured workspace, surface, logical owner, symbol space, simple name, `MemberSemantics`, versioned escaped canonical reference are authoritative. Canonical reference stable across location movement; retired single-form encoding rejected.\n- Owned logical symbol stores exact dotted `qualified_name`; top-level omits it. Not canonical ID, alias row, simple-name replacement, or FTS surrogate. `::` queries compare as dotted spelling.\n- Logical identity carries no package name. `SymbolKind` remains broad; symbol space/member semantics add independent axes.\n- `declaringOwner` is canonical logical owner, never parser/location/display ID. Adapter establishes owners before members and emits lexical occurrence `parentId`; shared model has no language list.\n- `MemberSemantics`: `kind`, `dispatch`, `accessor`, optional `nativeKind`; retired `MemberForm` absent. Preserve language-defined type/value/namespace-module/property spaces and language-sensitive case; never globally lowercase or collapse differing axes.\n- Public binding slot = surface+exported name+symbol space; each target/provenance route has distinct identity, including default/anonymous exports. Local bindings preserve scope/range; aliases, shadowing, competing routes never collapse.\n- Persist coverage state and indexed hash for indexed, excluded, unsupported, parse-failed, partial inputs.\n\n## Constraints\n- All model/aggregate properties `readonly`; graph changes only through atomic `GraphStore` replacement.\n- Structural value equality except deterministic `SymbolNode.id`.\n- Adding `SymbolKind` or `RelationType` requires spec change.\n- Runtime dependency on `@specd/core`; embedding deferred.\n- No runtime/reflection/container/interprocedural/whole-program guessing.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:a7fa9c173421d6b97fecb8d67df429f61158d6495fcba9c896d0f5fd72ad1fcb",
-          "lastModified": "2026-09-28T07:27:44.390Z"
+          "hash": "sha256:7d9b3aa00557fdce9d70289a33d7fd0f004eb3067a45dc227356005391e445de",
+          "lastModified": "2026-10-14T08:50:27.709Z"
         },
         "verify.md": {
-          "hash": "sha256:d99e928446663c3e04da37da6da0b38a10bc75bbef94007270a9cfdc14d37ac7",
-          "lastModified": "2026-09-28T08:41:52.058Z"
+          "hash": "sha256:3d63ea3122996cb5bef981b3d62d867d798ff1890ee39842cf899201319556d3",
+          "lastModified": "2026-10-14T09:19:31.861Z"
         }
       }
     }

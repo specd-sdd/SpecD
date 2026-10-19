@@ -138,7 +138,87 @@ Both are pure synchronous functions: no I/O, no kernel access, no process side e
 | `runGraphHotspots`           | Architectural hotspot ranking with provider lifecycle and `projectRelativePath` projection             |
 | `runGraphImpact`             | Target/multi-target blast radius impact analysis with `projectRelativePath` projection                 |
 | `toProjectRelativePath`      | Pure projection mapping canonical graph paths (`<workspace>:<relPath>`) to project-root relative paths |
-| `splitWorkspaceIdentity`     | Pure helper decomposing canonical identities into workspace name and relative path                     |
+
+### Resolution-preserving symbol impact
+
+`runGraphImpact` preserves the resolved identity layer. Hosts receive
+`targetKind` and `resolvedTarget` as `logical-target`, `declaration`, or
+`public-binding`; ambiguous and unresolved selectors never start traversal.
+
+```typescript
+import { openSpecdHost, runGraphImpact } from '@specd/sdk'
+
+const host = await openSpecdHost({ startDir: process.cwd() })
+const result = await runGraphImpact(host, {
+  symbol: 'Change.execute',
+  direction: 'dependents',
+})
+
+if (result.kind === 'symbol' && result.status === 'resolved') {
+  console.log(result.targetKind)
+  console.log(result.declarations)
+  console.log(result.semanticCounts)
+  console.log(result.physicalEvidence)
+}
+```
+
+`runGraphImpact` reports every selector outcome with its own status instead of folding
+them into `not_found`:
+
+```typescript
+import { openSpecdHost, runGraphImpact } from '@specd/sdk'
+
+const host = await openSpecdHost({
+  options: { graph: { onWarning: (message) => console.warn(message) } },
+})
+const result = await runGraphImpact(host, { symbol: 'Change.execute' })
+
+if (result.kind === 'symbol') {
+  switch (result.status) {
+    case 'resolved':
+      console.log(result.targetKind, result.semanticCounts)
+      break
+    case 'ambiguous':
+      // One candidate per logical target; no traversal was started.
+      console.log(result.totalCandidates, result.candidates)
+      break
+    case 'unresolved':
+      // Stale or partial graph evidence, for example CONTENT_DIRTY or COVERAGE_PARTIAL.
+      console.log(result.reasonCode)
+      break
+    case 'not_found':
+      console.log('no such symbol')
+      break
+  }
+}
+```
+
+Public export results use the same statuses (`not_found`, `ambiguous` with `candidates`,
+`unresolved`). A resolved export result carries `coveringSpecs` (also on
+`canonicalImpact`), the specs covering the canonical target and its dependents, with
+file evidence projected to `projectRelativePath`; the exact-route `bindingImpact` has none. A `from` value that begins with a Windows drive letter is a file selector;
+only `workspace:path` values are treated as canonical surfaces. The `onWarning` callback
+receives non-fatal events such as recovery of a stale graph index lock.
+
+Selector resolution returns the typed logical target for an overload set, so a name that
+matches several declarations of one logical symbol is analysed once with all of them.
+`impact.target` carries the canonical logical identity for a logical target; the
+deprecated `symbol` summary is derived after traversal and never selects what is
+traversed. Public export results (`resolution`, `binding.projectRelativeSurface`,
+ambiguous `candidates`) and `coveringSpecs[].evidence[].projectRelativePath` are
+projected like every other nested location.
+
+Logical results contain every contributing declaration. `semanticCounts` counts
+unique logical and physical-only targets, while `physicalEvidence` retains concrete
+declaration edges and locations. Exact declaration results use one physical seed.
+Every retained path is projected to `projectRelativePath` without additional graph
+reads. Projection is recursive: it covers top-level declarations,
+`resolvedTarget.declarations[].location`, semantic affected-target declarations, and
+every nested source/target location in physical evidence. Delivery hosts receive those
+paths unchanged and must not reconstruct them from canonical IDs. Deprecated aggregate
+and primary-symbol projections remain for one compatibility release and must not be used
+to drive traversal.
+| `splitWorkspaceIdentity` | Pure helper decomposing canonical identities into workspace name and relative path |
 
 All return structured data — formatting stays in delivery presenters.
 

@@ -53,6 +53,13 @@
 - **THEN** its input and result contain no lock path, token, release callback, or
   unlocked assertion
 
+#### Scenario: Isolated run proceeds after a crashed previous run
+
+- **GIVEN** `index.lock` left by a killed process
+- **WHEN** `runIsolatedGraphIndex` starts for that storage root
+- **THEN** acquisition recovers the stale lock through the lock helper and the child is forked
+- **AND** the supervisor itself contains no pid inspection
+
 ### Requirement: Process isolation
 
 #### Scenario: Task executes in a forked process

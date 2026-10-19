@@ -244,7 +244,7 @@ func (Second) Read() {}
     ).referenceFacts!
 
     const reads = facts.declarations
-      .map((declaration) => parseLogicalSymbol(declaration.logicalId))
+      .map((declaration) => parseLogicalSymbol(declaration.logicalId!))
       .filter((logical) => logical?.name === 'Read')
     expect(reads).toHaveLength(3)
     expect(new Set(reads.map((logical) => logical?.ownerId)).size).toBe(3)
@@ -282,7 +282,7 @@ func (p *Partial) Read() {}
       { session: new InMemoryIndexSession(), workspaceName: 'workspace' },
     ).referenceFacts!
     const read = facts.declarations
-      .map((declaration) => parseLogicalSymbol(declaration.logicalId))
+      .map((declaration) => parseLogicalSymbol(declaration.logicalId!))
       .find((logical) => logical?.name === 'Read')
 
     expect(read?.ownerId).toBeDefined()
@@ -673,7 +673,7 @@ func (
       expect(start?.parentId).toBe(engine?.id)
     })
 
-    it('emits IMPORTS and CALLS relations in buildRelations', () => {
+    it('given a bare call to a package function, when buildRelations runs, then it emits CALLS and leaves IMPORTS to the indexer', () => {
       const code = `package main
 import "fmt"
 
@@ -716,13 +716,503 @@ func run() {
       const importRel = relations.find((r) => r.type === RelationType.Imports)
       const callRel = relations.find((r) => r.type === RelationType.Calls)
 
-      expect(importRel).toBeDefined()
-      expect(importRel?.target).toBe('fmt')
+      expect(importRel).toBeUndefined()
       expect(callRel).toBeDefined()
       const run = draft.symbols.find((s) => s.name === 'run')
       const helper = draft.symbols.find((s) => s.name === 'helper')
       expect(callRel?.source).toBe(run?.id)
       expect(callRel?.target).toBe(helper?.id)
     })
+  })
+
+  describe('call relations require proof', () => {
+    it('given a selector call on an unknown value, when relations are built, then it does not link to a same-named package function', () => {
+      const code = `package main
+type Store interface { Save() }
+func Save() {}
+func run(s Store) {
+    s.Save()
+}
+`
+      const symbols = adapter.extractSymbols('main.go', code)
+      const relations = adapter.extractRelations('main.go', code, symbols)
+      expect(relations.filter((r) => r.type === RelationType.Calls)).toHaveLength(0)
+    })
+
+    it('given a bare call whose only same-named declaration is a method, when relations are built, then it does not link to the method', () => {
+      const code = `package main
+type Box struct{}
+func (b Box) Open() {}
+func run() {
+    Open()
+}
+`
+      const symbols = adapter.extractSymbols('main.go', code)
+      const relations = adapter.extractRelations('main.go', code, symbols)
+      expect(relations.filter((r) => r.type === RelationType.Calls)).toHaveLength(0)
+    })
+  })
+
+  describe('import resolution', () => {
+    it('given an import of a module package directory, when imports resolve, then it lists the non-test files of that directory only', () => {
+      const session = new InMemoryIndexSession()
+      const register = (filePath: string, code: string) => {
+        session.registerFile({
+          filePath,
+          projectRelativePath: filePath.slice(filePath.indexOf(':') + 1),
+          language: 'go',
+          contentHash: 'hash',
+          workspace: 'ws',
+        })
+        return baseAdapter.analyzeFile(filePath, code, { session, workspaceName: 'ws' })
+      }
+      register('ws:pkg/utils/helper.go', 'package utils\nfunc Help() {}\n')
+      register('ws:pkg/utils/helper_test.go', 'package utils\nfunc TestHelp() {}\n')
+      register('ws:pkg/other/x.go', 'package other\nfunc X() {}\n')
+      const draft = register(
+        'ws:main.go',
+        'package main\nimport "example.com/app/pkg/utils"\nfunc main() { utils.Help() }\n',
+      )
+      const analysis: FileAnalysis = {
+        fileId: 1,
+        filePath: 'ws:main.go',
+        projectRelativePath: 'main.go',
+        contentHash: 'hash',
+        workspace: 'ws',
+        language: 'go',
+        symbols: draft.symbols,
+        imports: draft.imports,
+        bindingFacts: draft.bindingFacts,
+        callFacts: draft.callFacts,
+      }
+
+      const resolved = baseAdapter.resolveImports(analysis, {
+        session,
+        qualifiedNames: new Map(),
+        packageToWorkspace: new Map([['example.com/app', 'ws']]),
+      })
+
+      expect(resolved.fileImports).toEqual(['ws:pkg/utils/helper.go'])
+      expect(resolved.importMap.size).toBe(0)
+    })
+
+    it('given an import outside every known module, when imports resolve, then nothing is guessed', () => {
+      const session = new InMemoryIndexSession()
+      session.registerFile({
+        filePath: 'ws:main.go',
+        projectRelativePath: 'main.go',
+        language: 'go',
+        contentHash: 'hash',
+        workspace: 'ws',
+      })
+      const draft = baseAdapter.analyzeFile(
+        'ws:main.go',
+        'package main\nimport "fmt"\nfunc main() { fmt.Println() }\n',
+        { session, workspaceName: 'ws' },
+      )
+      const analysis: FileAnalysis = {
+        fileId: 1,
+        filePath: 'ws:main.go',
+        projectRelativePath: 'main.go',
+        contentHash: 'hash',
+        workspace: 'ws',
+        language: 'go',
+        symbols: draft.symbols,
+        imports: draft.imports,
+        bindingFacts: draft.bindingFacts,
+        callFacts: draft.callFacts,
+      }
+
+      const resolved = baseAdapter.resolveImports(analysis, {
+        session,
+        qualifiedNames: new Map(),
+        packageToWorkspace: new Map([['example.com/app', 'ws']]),
+      })
+
+      expect(resolved.fileImports).toEqual([])
+    })
+  })
+
+  describe('struct field identity', () => {
+    it('given equally named fields in two structs, when facts are built, then each field has its own owner-qualified logical id', () => {
+      const code = `package main
+type A struct {
+    Name string
+}
+type B struct {
+    Name string
+}
+`
+      const draft = baseAdapter.analyzeFile('workspace:main.go', code, {
+        session: new InMemoryIndexSession(),
+        workspaceName: 'workspace',
+      })
+      const fieldLogicalIds = (draft.referenceFacts?.declarations ?? [])
+        .filter((d) => draft.symbols.find((s) => s.id === d.symbolId)?.name === 'Name')
+        .map((d) => d.logicalId)
+
+      expect(fieldLogicalIds).toHaveLength(2)
+      expect(new Set(fieldLogicalIds).size).toBe(2)
+    })
+  })
+
+  describe('semantic containment and classification regressions (Task 8.6)', () => {
+    it('short-variable declaration before a call does not become caller', () => {
+      const code = `package main
+func process() {
+    tmp := 42
+    execute(tmp)
+}
+func execute(n int) {}
+`
+      const session = new InMemoryIndexSession()
+      session.registerFile({
+        filePath: 'workspace:main.go',
+        projectRelativePath: 'main.go',
+        language: 'go',
+        contentHash: 'hash',
+        workspace: 'workspace',
+      })
+      const draft = baseAdapter.analyzeFile('workspace:main.go', code, {
+        session,
+        workspaceName: 'workspace',
+      })
+
+      const processFn = draft.symbols.find((s) => s.name === 'process')!
+      expect(processFn).toBeDefined()
+      const execCall = draft.callFacts.find((c) => c.name === 'execute')!
+      expect(execCall).toBeDefined()
+      expect(execCall.callerSymbolId).toBe(processFn.id)
+      expect(draft.symbols.some((s) => s.name === 'tmp')).toBe(false)
+    })
+
+    it('receiver method owns calls in its body and is not usurped by adjacent package function', () => {
+      const code = `package main
+type Reader struct{}
+func (r *Reader) Read() {
+    helper()
+}
+func Unrelated() {}
+func helper() {}
+`
+      const session = new InMemoryIndexSession()
+      session.registerFile({
+        filePath: 'workspace:main.go',
+        projectRelativePath: 'main.go',
+        language: 'go',
+        contentHash: 'hash',
+        workspace: 'workspace',
+      })
+      const draft = baseAdapter.analyzeFile('workspace:main.go', code, {
+        session,
+        workspaceName: 'workspace',
+      })
+
+      const readMethod = draft.symbols.find(
+        (s) => s.name === 'Read' && s.kind === SymbolKind.Method,
+      )!
+      expect(readMethod).toBeDefined()
+      const helperCall = draft.callFacts.find((c) => c.name === 'helper')!
+      expect(helperCall).toBeDefined()
+      expect(helperCall.callerSymbolId).toBe(readMethod.id)
+    })
+
+    it('competing same-name package declarations are not grouped into an overload set', () => {
+      const code = `package main
+func Conflict() string {
+    return "a"
+}
+func Conflict() int {
+    return 1
+}
+`
+      const session = new InMemoryIndexSession()
+      session.registerFile({
+        filePath: 'workspace:main.go',
+        projectRelativePath: 'main.go',
+        language: 'go',
+        contentHash: 'hash',
+        workspace: 'workspace',
+      })
+      const draft = baseAdapter.analyzeFile('workspace:main.go', code, {
+        session,
+        workspaceName: 'workspace',
+      })
+
+      const refFacts = draft.referenceFacts
+      expect(refFacts).toBeDefined()
+      // Duplicate declarations must not be grouped into an overload set (they have 0 logical occurrences)
+      const conflictOccurrences = refFacts!.declarations.filter((d) =>
+        draft.symbols.some((s) => s.id === d.symbolId && s.name === 'Conflict'),
+      )
+      expect(conflictOccurrences).toHaveLength(0)
+    })
+
+    it('receiver methods on distinct types remain distinct and owned by respective types', () => {
+      const code = `package main
+type Alpha struct{}
+type Beta struct{}
+func (a Alpha) Handle() {}
+func (b Beta) Handle() {}
+`
+      const session = new InMemoryIndexSession()
+      session.registerFile({
+        filePath: 'workspace:main.go',
+        projectRelativePath: 'main.go',
+        language: 'go',
+        contentHash: 'hash',
+        workspace: 'workspace',
+      })
+      const draft = baseAdapter.analyzeFile('workspace:main.go', code, {
+        session,
+        workspaceName: 'workspace',
+      })
+
+      const alpha = draft.symbols.find((s) => s.name === 'Alpha')!
+      const beta = draft.symbols.find((s) => s.name === 'Beta')!
+      const alphaHandle = draft.symbols.find((s) => s.name === 'Handle' && s.parentId === alpha.id)!
+      const betaHandle = draft.symbols.find((s) => s.name === 'Handle' && s.parentId === beta.id)!
+      expect(alphaHandle).toBeDefined()
+      expect(betaHandle).toBeDefined()
+      expect(alphaHandle.id).not.toBe(betaHandle.id)
+
+      const refFacts = draft.referenceFacts!
+      const alphaOcc = refFacts.declarations.find((d) => d.symbolId === alphaHandle.id)!
+      const betaOcc = refFacts.declarations.find((d) => d.symbolId === betaHandle.id)!
+      expect(alphaOcc).toBeDefined()
+      expect(betaOcc).toBeDefined()
+      expect(alphaOcc.logicalId).not.toBe(betaOcc.logicalId)
+    })
+  })
+
+  describe('parser-authoritative extraction regressions (Task 12.14)', () => {
+    it('comments, strings, braces, and call lookalikes produce zero spurious facts', () => {
+      const code = `package main
+// type FakeInterface interface {
+//     MethodInComment()
+// }
+// fake.CommentCall()
+// &FakeComposite{}
+
+var doc = \`
+type FakeStringInterface interface {
+    MethodInString()
+}
+import "fake/string/import"
+fake.StringCall()
+FakeLiteral{}
+\`
+
+import (
+    alias "real/pkg"
+)
+
+type RealInterface interface {
+    RealMethod()
+}
+
+type RealService struct {
+    Field string
+}
+
+func Execute() {
+    alias.RealCall()
+    v := RealService{}
+    _ = v
+}
+`
+      const session = new InMemoryIndexSession()
+      session.registerFile({
+        filePath: 'workspace:main.go',
+        projectRelativePath: 'main.go',
+        language: 'go',
+        contentHash: 'hash',
+        workspace: 'workspace',
+      })
+      const draft = baseAdapter.analyzeFile('workspace:main.go', code, {
+        session,
+        workspaceName: 'workspace',
+      })
+
+      // Zero spurious symbols from comments/strings
+      expect(draft.symbols.some((s) => s.name.includes('Fake'))).toBe(false)
+      expect(draft.symbols.some((s) => s.name.includes('MethodIn'))).toBe(false)
+
+      // Zero spurious imports
+      expect(draft.imports.some((i) => i.specifier.includes('fake'))).toBe(false)
+      expect(draft.imports.some((i) => i.specifier === 'real/pkg')).toBe(true)
+
+      // Zero spurious call facts
+      expect(
+        draft.callFacts.some(
+          (c) =>
+            c.name.includes('Fake') || c.name.includes('Comment') || c.name.includes('StringCall'),
+        ),
+      ).toBe(false)
+
+      // Real symbols, imports, and calls are extracted
+      expect(draft.symbols.some((s) => s.name === 'RealInterface')).toBe(true)
+      expect(draft.symbols.some((s) => s.name === 'RealMethod')).toBe(true)
+      expect(draft.symbols.some((s) => s.name === 'RealService')).toBe(true)
+      expect(draft.callFacts.some((c) => c.name === 'RealCall' && c.receiverName === 'alias')).toBe(
+        true,
+      )
+      expect(
+        draft.callFacts.some((c) => c.name === 'RealService' && c.form === CallForm.Constructor),
+      ).toBe(true)
+    })
+  })
+})
+
+describe('Go routine-local and module state classification', () => {
+  it('keeps locals out and unexported package variables physical-only', () => {
+    const session = new InMemoryIndexSession()
+    session.registerFile({
+      filePath: 'ws:s.go',
+      projectRelativePath: 'ws:s.go',
+      language: 'go',
+      contentHash: 'x',
+      workspace: 'ws',
+    })
+    const draft = baseAdapter.analyzeFile(
+      'ws:s.go',
+      'package a\nvar moduleState = 1\nvar Exposed = 2\nfunc Run() {\n\tlocalVar := 1\n\t_ = localVar\n}\n',
+      { session, workspaceName: 'ws' },
+    )
+    const logical = (draft.referenceFacts?.declarations ?? []).map(
+      (declaration) => parseLogicalSymbol(declaration.logicalId ?? '')?.name,
+    )
+
+    expect(draft.symbols.some((symbol) => symbol.name === 'moduleState')).toBe(true)
+    expect(logical.sort()).toEqual(['Exposed', 'Run'])
+    expect(draft.symbols.some((symbol) => symbol.name === 'localVar')).toBe(false)
+  })
+})
+
+describe('Go embedded interfaces, blank imports and shadowing', () => {
+  const analyze = (
+    files: Record<string, string>,
+    main: string,
+    packageToWorkspace: ReadonlyMap<string, string> = new Map(),
+  ): { relations: Relation[]; fileImports: readonly string[] } => {
+    const session = new InMemoryIndexSession()
+    let analysis: FileAnalysis | undefined
+    for (const [filePath, content] of Object.entries(files)) {
+      session.registerFile({
+        filePath,
+        projectRelativePath: filePath,
+        language: 'go',
+        contentHash: 'x',
+        workspace: 'ws',
+      })
+      const registered = session.registerAnalysis({
+        filePath,
+        analysis: baseAdapter.analyzeFile(filePath, content, { session, workspaceName: 'ws' }),
+      })
+      if (filePath === main) analysis = registered
+    }
+    const resolvedImports = baseAdapter.resolveImports(analysis!, {
+      session,
+      qualifiedNames: new Map(),
+      packageToWorkspace,
+    })
+    return {
+      relations: baseAdapter.buildRelations(analysis!, { session, resolvedImports }),
+      fileImports: resolvedImports.fileImports,
+    }
+  }
+
+  const implementsOf = (relations: readonly Relation[]): string[] =>
+    relations
+      .filter((relation) => relation.type === RelationType.Implements)
+      .map((relation) => relation.source.split(':').slice(-3, -1).join(':'))
+
+  it('requires the embedded interface methods before claiming IMPLEMENTS', () => {
+    const { relations } = analyze(
+      {
+        'ws:a.go': [
+          'package a',
+          'type Reader interface { Read() }',
+          'type RW interface {',
+          '\tReader',
+          '\tWrite()',
+          '}',
+          'type OnlyWrite struct{}',
+          'func (o OnlyWrite) Write() {}',
+          'type Both struct{}',
+          'func (b Both) Read() {}',
+          'func (b Both) Write() {}',
+        ].join('\n'),
+      },
+      'ws:a.go',
+    )
+
+    const implementors = relations
+      .filter((relation) => relation.type === RelationType.Implements)
+      .map((relation) => [relation.source, relation.target])
+    expect(implementors).toContainEqual([
+      expect.stringContaining('class:Both'),
+      expect.stringContaining('interface:RW'),
+    ])
+    expect(implementors.some(([source]) => source!.includes('class:OnlyWrite') && true)).toBe(false)
+    expect(implementsOf(relations)).not.toContain('class:OnlyWrite')
+  })
+
+  it('claims nothing when an embedded interface cannot be resolved locally', () => {
+    const { relations } = analyze(
+      {
+        'ws:a.go': [
+          'package a',
+          'type RW interface {',
+          '\tio.Reader',
+          '\tWrite()',
+          '}',
+          'type Impl struct{}',
+          'func (i Impl) Write() {}',
+        ].join('\n'),
+      },
+      'ws:a.go',
+    )
+
+    expect(relations.filter((relation) => relation.type === RelationType.Implements)).toEqual([])
+  })
+
+  it('records a package dependency for a blank import without binding a name', () => {
+    const { fileImports } = analyze(
+      {
+        'ws:driver/driver.go': 'package driver\nfunc Register() {}\n',
+        'ws:main.go': 'package main\nimport _ "example.com/app/driver"\nfunc main() {}\n',
+      },
+      'ws:main.go',
+      new Map([['example.com/app', 'ws']]),
+    )
+
+    expect(fileImports).toEqual(['ws:driver/driver.go'])
+  })
+
+  it('emits no CALLS when a parameter or local binds the called name', () => {
+    const { relations } = analyze(
+      {
+        'ws:a.go': [
+          'package a',
+          'func Helper() {}',
+          'func ViaParam(Helper func()) { Helper() }',
+          'func ViaLocal() { Helper := func() {}; Helper() }',
+          'func ViaVar() { var Helper = func() {}; Helper() }',
+        ].join('\n'),
+      },
+      'ws:a.go',
+    )
+
+    expect(relations.filter((relation) => relation.type === RelationType.Calls)).toEqual([])
+  })
+
+  it('still emits CALLS for an unshadowed package-level function', () => {
+    const { relations } = analyze(
+      { 'ws:a.go': 'package a\nfunc Helper() {}\nfunc Run() { Helper() }\n' },
+      'ws:a.go',
+    )
+
+    expect(relations.filter((relation) => relation.type === RelationType.Calls)).toHaveLength(1)
   })
 })

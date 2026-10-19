@@ -80,7 +80,10 @@ export { SymbolKind } from './domain/value-objects/symbol-kind.js'
 export { RelationType } from './domain/value-objects/relation-type.js'
 export { type SymbolQuery } from './domain/value-objects/symbol-query.js'
 export { type GraphStatistics } from './domain/value-objects/graph-statistics.js'
-export { type LanguageAdapter } from './domain/value-objects/language-adapter.js'
+export {
+  type LanguageAdapter,
+  type AdapterDeclarationPolicy,
+} from './domain/value-objects/language-adapter.js'
 export { type ImportDeclaration } from './domain/value-objects/import-declaration.js'
 export { ImportDeclarationKind } from './domain/value-objects/import-declaration-kind.js'
 export { type SourceLocation } from './domain/value-objects/source-location.js'
@@ -89,10 +92,12 @@ export {
   MemberKind,
   MemberDispatch,
   MemberAccessor,
+  DeclarationOccurrenceForm,
   createLogicalSymbol,
   parseLogicalSymbol,
   createPublicBinding,
   createLocalBinding,
+  type SourcePosition,
   type DeclarationOccurrence,
   type MemberSemantics,
   type LogicalSymbol,
@@ -106,6 +111,10 @@ export {
   type ResolutionStatus,
   type ResolutionHealth,
   type ResolutionCandidate,
+  type LogicalResolutionTarget,
+  type DeclarationResolutionTarget,
+  type PublicBindingResolutionTarget,
+  type ResolvedSymbolTarget,
   type SymbolResolutionResult,
 } from './domain/value-objects/symbol-reference.js'
 export { IndexCoverageStatus, type IndexCoverage } from './domain/value-objects/index-session.js'
@@ -152,6 +161,12 @@ export {
   type ImpactResult,
   type FileImpactResult,
   type OmittedCounts,
+  type PhysicalDependencyEvidence,
+  type LogicalAffectedTarget,
+  type PhysicalOnlyAffectedTarget,
+  type SemanticAffectedTarget,
+  type SemanticImpactCounts,
+  type ResolvedSymbolImpactResult,
 } from './domain/value-objects/impact-result.js'
 export { type ChangeDetectionResult } from './domain/value-objects/change-detection-result.js'
 export { type RiskLevel } from './domain/value-objects/risk-level.js'
@@ -198,6 +213,15 @@ export { expandSearchQuery, expandSearchToken } from './domain/services/expand-s
 export { isGraphStale } from './domain/services/is-graph-stale.js'
 export { analyzeFilesImpact } from './domain/services/analyze-files-impact.js'
 export {
+  analyzeImpact,
+  analyzeResolvedSymbolImpact,
+  analyzePublicBindingImpact,
+} from './domain/services/analyze-impact.js'
+export {
+  collectImpactSpecIds,
+  collectLogicalCoveringSpecs,
+} from './domain/services/collect-impact-specs.js'
+export {
   computeGraphFingerprint,
   computeRootFingerprint,
   computeWorkspaceFingerprint,
@@ -235,6 +259,7 @@ export { StoreWorkerError } from './domain/errors/store-worker-error.js'
 export { BulkSessionStateError } from './domain/errors/bulk-session-state-error.js'
 export { InvalidGraphStoreConfigurationError } from './domain/errors/invalid-graph-store-configuration-error.js'
 export { GraphSchemaIncompatibleError } from './domain/errors/graph-schema-incompatible-error.js'
+export { GraphDerivationMismatchError } from './domain/errors/graph-derivation-mismatch-error.js'
 export {
   GraphStorageRecoveryRequiredError,
   type GraphStorageRecoveryReason,

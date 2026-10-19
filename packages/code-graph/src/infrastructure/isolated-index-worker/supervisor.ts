@@ -19,6 +19,7 @@ import {
   acquireGraphIndexLockLeaseByStoragePath,
   createGraphIndexLockHandoffEnv,
   type GraphIndexLockLease,
+  type StaleGraphIndexLockInfo,
 } from '../index-lock.js'
 import { assertGraphIndexJsonValue } from './json-value.js'
 import {
@@ -40,7 +41,10 @@ export interface IsolatedGraphIndexRuntime {
   /** Installed child entrypoint URL. */
   readonly workerUrl: URL
   /** Acquires the internal exclusive graph-index lease. */
-  readonly acquireLock: (storageRoot: string) => GraphIndexLockLease
+  readonly acquireLock: (
+    storageRoot: string,
+    onStaleLockRecovered?: (info: StaleGraphIndexLockInfo) => void,
+  ) => GraphIndexLockLease
 }
 
 /** Node implementation of the application process-isolation runner port. */
@@ -95,7 +99,12 @@ export function runIsolatedGraphIndexWithRuntime<
 
     let lease: GraphIndexLockLease
     try {
-      lease = runtime.acquireLock(storageRoot)
+      lease = runtime.acquireLock(
+        storageRoot,
+        input.onWarning === undefined
+          ? undefined
+          : (info) => input.onWarning?.(formatStaleLockWarning(info)),
+      )
     } catch (error) {
       rejectPromise(
         error instanceof Error
@@ -344,9 +353,21 @@ export function createNodeIsolatedGraphIndexRunner(workerUrl: URL): NodeIsolated
     fork: nodeFork,
     process,
     workerUrl,
-    acquireLock: (storageRoot) =>
-      acquireGraphIndexLockLeaseByStoragePath(storageRoot, { signalCleanup: 'exit-only' }),
+    acquireLock: (storageRoot, onStaleLockRecovered) =>
+      acquireGraphIndexLockLeaseByStoragePath(storageRoot, {
+        signalCleanup: 'exit-only',
+        ...(onStaleLockRecovered !== undefined ? { onStaleLockRecovered } : {}),
+      }),
   })
+}
+
+/**
+ * Formats the host warning emitted when a stale index lock is recovered.
+ * @param info - Recovery details reported by the lock module.
+ * @returns Human-readable warning text.
+ */
+function formatStaleLockWarning(info: StaleGraphIndexLockInfo): string {
+  return `Recovered a stale graph index lock (${info.reason}) at ${info.lockPath}.`
 }
 
 /**

@@ -1,18 +1,26 @@
 import {
   type CodeGraphProvider,
+  type CoveringSpecEvidence,
   type CoveringSpecImpact,
   type FileImpactResult,
   type ImpactResult,
   type ImpactResultFilter,
   type LogicalSymbol,
   type PublicBinding,
+  type ResolutionCandidate,
   type ResolutionStep,
   type RiskLevel,
   SpecNotFoundError as GraphSpecNotFoundError,
   type SymbolNode,
   type SymbolResolutionResult,
+  type DeclarationOccurrence,
+  type PhysicalDependencyEvidence,
+  type SemanticImpactCounts,
+  type ResolvedSymbolImpactResult as DomainResolvedSymbolImpactResult,
+  type ResolvedSymbolTarget,
+  type SourceLocation,
 } from '@specd/code-graph'
-import { SpecdError } from '@specd/core'
+import { SpecdError, type SpecdConfig } from '@specd/core'
 import { type SdkHostContext } from '../composition/host-context.js'
 import { withOpenGraphProvider } from '../composition/with-open-graph-provider.js'
 import { splitWorkspaceIdentity, toProjectRelativePath } from './project-relative-path.js'
@@ -75,6 +83,35 @@ export interface ProjectedAffectedSymbol {
   readonly depth: number
 }
 
+/** Covering-spec evidence with a repository-relative path for file evidence. */
+export interface ProjectedCoveringSpecEvidence extends CoveringSpecEvidence {
+  readonly projectRelativePath?: string | undefined
+}
+
+/** Covering spec whose file evidence exposes `projectRelativePath`. */
+export interface ProjectedCoveringSpecImpact extends Omit<CoveringSpecImpact, 'evidence'> {
+  readonly evidence: readonly ProjectedCoveringSpecEvidence[]
+}
+
+/** Public binding with the project-relative form of its surface. */
+export interface ProjectedPublicBinding extends PublicBinding {
+  readonly projectRelativeSurface: string
+}
+
+/** Resolution candidate whose declaration locations are projected. */
+export interface ProjectedResolutionCandidate extends Omit<ResolutionCandidate, 'declarations'> {
+  readonly declarations: readonly ProjectedImpactDeclarationOccurrence[]
+}
+
+/** Symbol resolution whose nested locations are projected to `projectRelativePath`. */
+export interface ProjectedSymbolResolutionResult extends Omit<
+  SymbolResolutionResult,
+  'resolvedTarget' | 'candidates'
+> {
+  readonly resolvedTarget: ProjectedResolvedSymbolTarget | null
+  readonly candidates: readonly ProjectedResolutionCandidate[]
+}
+
 /** Single file impact result with unified projectRelativePath. */
 export interface SingleFileImpactResult {
   readonly kind: 'file'
@@ -92,7 +129,7 @@ export interface SingleFileImpactResult {
   readonly affectedFiles: readonly string[]
   readonly affectedSymbols: readonly ProjectedAffectedSymbol[]
   readonly symbols: readonly ImpactResult[]
-  readonly coveringSpecs: readonly CoveringSpecImpact[]
+  readonly coveringSpecs: readonly ProjectedCoveringSpecImpact[]
   readonly omittedCounts: { readonly tests: number; readonly ignored: number }
 }
 
@@ -110,7 +147,7 @@ export interface MultiFileImpactResult {
   readonly indirectDependents: number
   readonly transitiveDependents: number
   readonly affectedFiles: readonly string[]
-  readonly coveringSpecs: readonly CoveringSpecImpact[]
+  readonly coveringSpecs: readonly ProjectedCoveringSpecImpact[]
   readonly omittedCounts: { readonly tests: number; readonly ignored: number }
   readonly perFile: readonly {
     readonly file: string
@@ -133,6 +170,14 @@ export interface SymbolNotFoundImpactResult {
   readonly symbol: string
 }
 
+/** Symbol selector the graph could not decide, with the resolver's stable reason. */
+export interface SymbolUnresolvedImpactResult {
+  readonly kind: 'symbol'
+  readonly status: 'unresolved'
+  readonly symbol: string
+  readonly reasonCode: string
+}
+
 /** Ambiguous symbol candidates outcome. */
 export interface SymbolAmbiguousImpactResult {
   readonly kind: 'symbol'
@@ -145,10 +190,89 @@ export interface SymbolAmbiguousImpactResult {
   }[]
 }
 
+/** Contributing declaration occurrence projected with project-relative location path. */
+export interface ProjectedImpactDeclarationOccurrence extends Omit<
+  DeclarationOccurrence,
+  'location'
+> {
+  readonly location: ProjectedSourceLocation
+  readonly projectRelativePath: string
+}
+
+/** Source location whose repository-relative projection is guaranteed. */
+export interface ProjectedSourceLocation extends SourceLocation {
+  readonly projectRelativePath: string
+}
+
+/** Physical dependency evidence projected with optional project-relative paths. */
+export interface ProjectedPhysicalDependencyEvidence extends Omit<
+  PhysicalDependencyEvidence,
+  'sourceLocation' | 'targetLocation'
+> {
+  readonly sourceLocation: ProjectedSourceLocation | undefined
+  readonly targetLocation: ProjectedSourceLocation | undefined
+  readonly sourceProjectRelativePath?: string | undefined
+  readonly targetProjectRelativePath?: string | undefined
+}
+
+/** Resolution target with every declaration location projected for public consumption. */
+export type ProjectedResolvedSymbolTarget =
+  | {
+      readonly kind: 'logical-target'
+      readonly logicalSymbol: LogicalSymbol
+      readonly declarations: readonly ProjectedImpactDeclarationOccurrence[]
+      readonly path: readonly ResolutionStep[]
+    }
+  | {
+      readonly kind: 'declaration'
+      readonly declaration: ProjectedImpactDeclarationOccurrence
+      readonly logicalSymbol: LogicalSymbol | undefined
+      readonly path: readonly ResolutionStep[]
+    }
+  | {
+      readonly kind: 'public-binding'
+      readonly binding: PublicBinding
+      readonly logicalSymbol: LogicalSymbol
+      readonly declarations: readonly ProjectedImpactDeclarationOccurrence[]
+      readonly path: readonly ResolutionStep[]
+    }
+
+/** Logical affected target projected with project-relative locations. */
+export interface ProjectedLogicalAffectedTarget {
+  readonly kind: 'logical-target'
+  readonly logicalSymbol: LogicalSymbol
+  readonly declarations: readonly ProjectedImpactDeclarationOccurrence[]
+  readonly depth: number
+  readonly evidence: readonly ProjectedPhysicalDependencyEvidence[]
+}
+
+/** Physical-only affected target projected with project-relative paths. */
+export interface ProjectedPhysicalOnlyAffectedTarget {
+  readonly kind: 'physical-only'
+  readonly declaration: SymbolNode
+  readonly projectRelativePath: string
+  readonly depth: number
+  readonly evidence: readonly ProjectedPhysicalDependencyEvidence[]
+}
+
+/** Discriminated union of projected semantic affected targets. */
+export type ProjectedSemanticAffectedTarget =
+  | ProjectedLogicalAffectedTarget
+  | ProjectedPhysicalOnlyAffectedTarget
+
 /** Resolved symbol impact result with unified projectRelativePath. */
 export interface ResolvedSymbolImpactResult {
   readonly kind: 'symbol'
   readonly status: 'resolved'
+  /** Target kind from resolution. */
+  readonly targetKind: 'logical-target' | 'declaration' | 'public-binding'
+  /** Discriminated resolution target. */
+  readonly resolvedTarget: ProjectedResolvedSymbolTarget
+  /** Canonical logical symbol when present. */
+  readonly logicalSymbol?: LogicalSymbol | undefined
+  /** Contributing declarations projected with projectRelativePath. */
+  readonly declarations: readonly ProjectedImpactDeclarationOccurrence[]
+  /** @deprecated Read declarations[0] or resolvedTarget; retained for backwards compatibility. */
   readonly symbol: SymbolNode
   readonly projectRelativePath: string
   readonly riskLevel: RiskLevel
@@ -157,6 +281,10 @@ export interface ResolvedSymbolImpactResult {
   readonly transitiveDepsCount: number
   readonly affectedFilesCount: number
   readonly omittedCounts: { readonly tests: number; readonly ignored: number }
+  readonly semanticCounts: SemanticImpactCounts
+  readonly semanticAffectedTargets: readonly ProjectedSemanticAffectedTarget[]
+  readonly physicalEvidence: readonly ProjectedPhysicalDependencyEvidence[]
+  readonly coveringSpecs?: readonly ProjectedCoveringSpecImpact[] | undefined
   readonly impact: {
     readonly target: string
     readonly riskLevel: RiskLevel
@@ -165,7 +293,9 @@ export interface ResolvedSymbolImpactResult {
     readonly transitiveDependents: number
     readonly affectedFiles: readonly string[]
     readonly affectedSymbols: readonly ProjectedAffectedSymbol[]
-    readonly coveringSpecs?: readonly CoveringSpecImpact[] | undefined
+    readonly affectedSpecs?: readonly string[] | undefined
+    readonly affectedProcesses?: readonly string[] | undefined
+    readonly coveringSpecs?: readonly ProjectedCoveringSpecImpact[] | undefined
     readonly omittedCounts?: { readonly tests: number; readonly ignored: number } | undefined
   }
 }
@@ -205,6 +335,8 @@ export interface ProjectedPublicImpactDetail {
   readonly affectedSpecs?: readonly string[] | undefined
   readonly affectedProcesses?: readonly string[] | undefined
   readonly omittedCounts?: { readonly tests: number; readonly ignored: number } | undefined
+  /** Covering specs with projected evidence; present on the canonical view only. */
+  readonly coveringSpecs?: readonly ProjectedCoveringSpecImpact[] | undefined
 }
 
 /** Resolved public export impact result with unified projectRelativePath. */
@@ -215,12 +347,14 @@ export interface ResolvedPublicExportImpactResult {
   readonly from: string
   readonly surface: string
   readonly projectRelativeSurface: string
-  readonly resolution: SymbolResolutionResult
-  readonly binding: PublicBinding
+  readonly resolution: ProjectedSymbolResolutionResult
+  readonly binding: ProjectedPublicBinding
   readonly target: LogicalSymbol
   readonly path: readonly ResolutionStep[]
   readonly bindingImpact: ProjectedPublicImpactDetail
   readonly canonicalImpact: ProjectedPublicImpactDetail
+  /** Specs covering the canonical target and its dependents, with projected evidence. */
+  readonly coveringSpecs: readonly ProjectedCoveringSpecImpact[]
   readonly riskLevel: RiskLevel
   readonly directDepsCount: number
   readonly indirectDepsCount: number
@@ -237,8 +371,8 @@ export interface UnresolvedPublicExportImpactResult {
   readonly from: string
   readonly surface: string
   readonly projectRelativeSurface: string
-  readonly resolution: SymbolResolutionResult
-  readonly candidates?: readonly never[] | undefined
+  readonly resolution: ProjectedSymbolResolutionResult
+  readonly candidates?: readonly ProjectedResolutionCandidate[] | undefined
 }
 
 /** Result union returned by {@link runGraphImpact}. */
@@ -247,10 +381,21 @@ export type RunGraphImpactResult =
   | MultiFileImpactResult
   | ResolvedSymbolImpactResult
   | SymbolNotFoundImpactResult
+  | SymbolUnresolvedImpactResult
   | SymbolAmbiguousImpactResult
   | SpecImpactResult
   | ResolvedPublicExportImpactResult
   | UnresolvedPublicExportImpactResult
+
+/**
+ * Tells a workspace-qualified surface (`core:src/index.ts`) from a plain path.
+ * A Windows drive letter (`C:\\repo\\src\\index.ts`) is a file path, not a workspace prefix.
+ * @param surface - Raw `--from` or surface selector.
+ * @returns True when the selector already carries a workspace prefix.
+ */
+function isWorkspaceQualifiedSurface(surface: string): boolean {
+  return surface.includes(':') && !/^[A-Za-z]:[\\/]/.test(surface)
+}
 
 /**
  * Normalizes graph impact direction aliases to provider directions.
@@ -296,6 +441,146 @@ async function resolveOneFile(
   throw new GraphSelectorError(
     `ambiguous selector "${trimmed}": matches ${String(matches.length)} files across workspaces`,
   )
+}
+
+/**
+ * Projects one canonical source location without consulting the graph provider.
+ * @param config - Active project configuration.
+ * @param location - Canonical graph location.
+ * @returns Location enriched with a repository-relative path.
+ */
+function projectSourceLocation(
+  config: SpecdConfig,
+  location: SourceLocation,
+): ProjectedSourceLocation {
+  return {
+    ...location,
+    projectRelativePath: toProjectRelativePath(config, location.filePath),
+  }
+}
+
+/**
+ * Projects one declaration occurrence and its nested location.
+ * @param config - Active project configuration.
+ * @param declaration - Physical declaration occurrence.
+ * @returns Declaration with recursively projected location.
+ */
+function projectDeclaration(
+  config: SpecdConfig,
+  declaration: DeclarationOccurrence,
+): ProjectedImpactDeclarationOccurrence {
+  const location = projectSourceLocation(config, declaration.location)
+  return { ...declaration, location, projectRelativePath: location.projectRelativePath }
+}
+
+/**
+ * Projects both endpoints of physical dependency evidence.
+ * @param config - Active project configuration.
+ * @param evidence - Physical dependency evidence.
+ * @returns Evidence with recursively projected endpoint locations.
+ */
+function projectPhysicalEvidence(
+  config: SpecdConfig,
+  evidence: PhysicalDependencyEvidence,
+): ProjectedPhysicalDependencyEvidence {
+  const sourceLocation =
+    evidence.sourceLocation === undefined
+      ? undefined
+      : projectSourceLocation(config, evidence.sourceLocation)
+  const targetLocation =
+    evidence.targetLocation === undefined
+      ? undefined
+      : projectSourceLocation(config, evidence.targetLocation)
+  return {
+    ...evidence,
+    sourceLocation,
+    targetLocation,
+    ...(sourceLocation === undefined
+      ? {}
+      : { sourceProjectRelativePath: sourceLocation.projectRelativePath }),
+    ...(targetLocation === undefined
+      ? {}
+      : { targetProjectRelativePath: targetLocation.projectRelativePath }),
+  }
+}
+
+/**
+ * Recursively projects every declaration location nested in a resolved target.
+ * @param config - Active project configuration.
+ * @param target - Resolved target at its proven identity layer.
+ * @returns Target with all nested declaration locations projected.
+ */
+function projectResolvedTarget(
+  config: SpecdConfig,
+  target: ResolvedSymbolTarget,
+): ProjectedResolvedSymbolTarget {
+  if (target.kind === 'declaration') {
+    return { ...target, declaration: projectDeclaration(config, target.declaration) }
+  }
+  return {
+    ...target,
+    declarations: target.declarations.map((declaration) => projectDeclaration(config, declaration)),
+  }
+}
+
+/**
+ * Projects covering-spec file evidence to `projectRelativePath` without graph reads.
+ * @param config - Active project configuration.
+ * @param coveringSpecs - Covering specs with canonical evidence targets; a provider that omits them yields none.
+ * @returns Covering specs whose file evidence exposes a project-relative path.
+ */
+function projectCoveringSpecs(
+  config: SpecdConfig,
+  coveringSpecs: readonly CoveringSpecImpact[] | undefined,
+): ProjectedCoveringSpecImpact[] {
+  return (coveringSpecs ?? []).map((spec) => ({
+    ...spec,
+    evidence: spec.evidence.map((evidence) =>
+      evidence.kind === 'file'
+        ? { ...evidence, projectRelativePath: toProjectRelativePath(config, evidence.target) }
+        : evidence,
+    ),
+  }))
+}
+
+/**
+ * Projects one resolution candidate's declarations.
+ * @param config - Active project configuration.
+ * @param candidate - Logical candidate with its declaration occurrences.
+ * @returns Candidate with projected declaration locations.
+ */
+function projectResolutionCandidate(
+  config: SpecdConfig,
+  candidate: ResolutionCandidate,
+): ProjectedResolutionCandidate {
+  return {
+    ...candidate,
+    declarations: candidate.declarations.map((declaration) =>
+      projectDeclaration(config, declaration),
+    ),
+  }
+}
+
+/**
+ * Projects every nested location of a symbol resolution result.
+ * @param config - Active project configuration.
+ * @param resolution - Provider resolution result.
+ * @returns Resolution with projected resolved target and candidates.
+ */
+function projectSymbolResolution(
+  config: SpecdConfig,
+  resolution: SymbolResolutionResult,
+): ProjectedSymbolResolutionResult {
+  return {
+    ...resolution,
+    resolvedTarget:
+      resolution.resolvedTarget === null
+        ? null
+        : projectResolvedTarget(config, resolution.resolvedTarget),
+    candidates: resolution.candidates.map((candidate) =>
+      projectResolutionCandidate(config, candidate),
+    ),
+  }
 }
 
 /**
@@ -360,7 +645,7 @@ export async function runGraphImpact(
           affectedFiles,
           affectedSymbols,
           symbols: result.symbols,
-          coveringSpecs: result.coveringSpecs,
+          coveringSpecs: projectCoveringSpecs(config, result.coveringSpecs),
           omittedCounts: result.omittedCounts ?? { tests: 0, ignored: 0 },
         }
       }
@@ -402,7 +687,7 @@ export async function runGraphImpact(
         indirectDependents: result.indirectDependents,
         transitiveDependents: result.transitiveDependents,
         affectedFiles: result.affectedFiles.map((p) => toProjectRelativePath(config, p)),
-        coveringSpecs: result.coveringSpecs,
+        coveringSpecs: projectCoveringSpecs(config, result.coveringSpecs),
         omittedCounts: result.omittedCounts ?? { tests: 0, ignored: 0 },
         perFile,
       }
@@ -416,6 +701,15 @@ export async function runGraphImpact(
           kind: 'symbol',
           status: 'not_found',
           symbol: input.symbol,
+        }
+      }
+      if (resolved.status === 'unresolved') {
+        // The graph could not prove absence; never report this as "not found".
+        return {
+          kind: 'symbol',
+          status: 'unresolved',
+          symbol: input.symbol,
+          reasonCode: resolved.reasonCode,
         }
       }
 
@@ -447,34 +741,137 @@ export async function runGraphImpact(
         }
       }
 
-      const sym = await provider.getSymbol(resolved.match.symbolId)
-      if (sym === undefined) {
+      // The selector layer always supplies the typed target; the SDK never rebuilds one.
+      const resolvedTarget: ResolvedSymbolTarget = resolved.target
+
+      const result: DomainResolvedSymbolImpactResult =
+        input.filter !== undefined
+          ? await provider.analyzeResolvedSymbolImpact(
+              resolvedTarget,
+              direction,
+              maxDepth,
+              input.filter,
+            )
+          : await provider.analyzeResolvedSymbolImpact(resolvedTarget, direction, maxDepth)
+
+      const targetDeclarations: readonly DeclarationOccurrence[] =
+        result.resolvedTarget.kind === 'declaration'
+          ? [result.resolvedTarget.declaration]
+          : result.resolvedTarget.declarations
+
+      // Display-only summary derived after traversal; it never selects what was traversed.
+      const first = targetDeclarations[0]
+      if (first === undefined) {
         return {
           kind: 'symbol',
           status: 'not_found',
           symbol: input.symbol,
         }
       }
+      const firstNode =
+        result.resolvedTarget.kind === 'declaration' &&
+        result.resolvedTarget.logicalSymbol === undefined
+          ? await provider.getSymbol(first.symbolId)
+          : undefined
+      const sym: SymbolNode = {
+        id: first.symbolId,
+        name:
+          result.resolvedTarget.kind === 'logical-target' ||
+          result.resolvedTarget.kind === 'public-binding'
+            ? result.resolvedTarget.logicalSymbol.name
+            : (result.resolvedTarget.logicalSymbol?.name ?? firstNode?.name ?? first.symbolId),
+        kind: first.kind,
+        filePath: first.location.filePath,
+        projectRelativePath: toProjectRelativePath(config, first.location.filePath),
+        line: first.location.line,
+        column: first.location.column,
+        endLine: first.location.endLine ?? first.location.line,
+        endColumn: first.location.endColumn ?? first.location.column,
+        selectionRange: {
+          startLine: first.location.line,
+          startColumn: first.location.column,
+          endLine: first.location.endLine ?? first.location.line,
+          endColumn: first.location.endColumn ?? first.location.column,
+        },
+        parentId: undefined,
+        comment: undefined,
+      }
 
-      const result =
-        input.filter === undefined
-          ? await provider.analyzeImpact(sym.id, direction, maxDepth)
-          : await provider.analyzeImpact(sym.id, direction, maxDepth, input.filter)
+      const projectedDeclarations = targetDeclarations.map((declaration) =>
+        projectDeclaration(config, declaration),
+      )
+      const projectedResolvedTarget = projectResolvedTarget(config, result.resolvedTarget)
 
-      const projectRelativePath = sym.projectRelativePath
+      const projectedPhysicalEvidence: ProjectedPhysicalDependencyEvidence[] =
+        result.physicalEvidence.map((evidence) => projectPhysicalEvidence(config, evidence))
+
+      const projectedSemanticAffectedTargets: ProjectedSemanticAffectedTarget[] =
+        result.semanticAffectedTargets.map((target) => {
+          if (target.kind === 'logical-target') {
+            return {
+              kind: 'logical-target',
+              logicalSymbol: target.logicalSymbol,
+              depth: target.depth,
+              declarations: target.declarations.map((declaration) =>
+                projectDeclaration(config, declaration),
+              ),
+              evidence: target.evidence.map((evidence) =>
+                projectPhysicalEvidence(config, evidence),
+              ),
+            }
+          } else {
+            return {
+              kind: 'physical-only',
+              declaration: {
+                ...target.declaration,
+                projectRelativePath: toProjectRelativePath(config, target.declaration.filePath),
+              },
+              projectRelativePath: toProjectRelativePath(config, target.declaration.filePath),
+              depth: target.depth,
+              evidence: target.evidence.map((evidence) =>
+                projectPhysicalEvidence(config, evidence),
+              ),
+            }
+          }
+        })
+
+      const projectRelativePath =
+        projectedDeclarations[0]?.projectRelativePath ?? sym.projectRelativePath
+
       const displayResult = {
-        ...result,
+        target:
+          result.resolvedTarget.kind === 'declaration'
+            ? sym.id
+            : result.resolvedTarget.logicalSymbol.id,
+        riskLevel: result.riskLevel,
+        directDependents: result.directDependents,
+        indirectDependents: result.indirectDependents,
+        transitiveDependents: result.transitiveDependents,
         affectedFiles: result.affectedFiles.map((p) => toProjectRelativePath(config, p)),
         affectedSymbols: result.affectedSymbols.map((s) => ({
           ...s,
           filePath: toProjectRelativePath(config, s.filePath),
           projectRelativePath: toProjectRelativePath(config, s.filePath),
         })),
+        affectedSpecs: result.affectedSpecs,
+        affectedProcesses: result.affectedProcesses,
+        coveringSpecs: projectCoveringSpecs(config, result.coveringSpecs),
+        omittedCounts: result.omittedCounts,
       }
 
       return {
         kind: 'symbol',
         status: 'resolved',
+        targetKind: result.resolvedTarget.kind,
+        resolvedTarget: projectedResolvedTarget,
+        ...(result.resolvedTarget.kind === 'logical-target'
+          ? { logicalSymbol: result.resolvedTarget.logicalSymbol }
+          : result.resolvedTarget.kind === 'declaration' && result.resolvedTarget.logicalSymbol
+            ? { logicalSymbol: result.resolvedTarget.logicalSymbol }
+            : result.resolvedTarget.kind === 'public-binding'
+              ? { logicalSymbol: result.resolvedTarget.logicalSymbol }
+              : {}),
+        declarations: projectedDeclarations,
         symbol: sym,
         projectRelativePath,
         riskLevel: result.riskLevel,
@@ -483,6 +880,10 @@ export async function runGraphImpact(
         transitiveDepsCount: result.transitiveDependents,
         affectedFilesCount: result.affectedFiles.length,
         omittedCounts: result.omittedCounts ?? { tests: 0, ignored: 0 },
+        semanticCounts: result.semanticCounts,
+        semanticAffectedTargets: projectedSemanticAffectedTargets,
+        physicalEvidence: projectedPhysicalEvidence,
+        coveringSpecs: projectCoveringSpecs(config, result.coveringSpecs),
         impact: displayResult,
       }
     }
@@ -525,7 +926,7 @@ export async function runGraphImpact(
     // 4. Public export impact
     if (exportName !== undefined && surface !== undefined) {
       let canonicalSurface = surface
-      if (!surface.includes(':')) {
+      if (!isWorkspaceQualifiedSurface(surface)) {
         const matches = (await provider.resolveFileSelector(surface)).filter(
           (candidate) => candidate.kind === 'file',
         )
@@ -550,12 +951,24 @@ export async function runGraphImpact(
       if (resolution.status !== 'resolved' || resolution.target === null) {
         return {
           kind: 'export',
-          status: 'not_found',
+          status:
+            resolution.status === 'unresolved'
+              ? 'unresolved'
+              : resolution.status === 'ambiguous'
+                ? 'ambiguous'
+                : 'not_found',
           export: exportName,
           from: surface,
           surface,
           projectRelativeSurface,
-          resolution,
+          resolution: projectSymbolResolution(config, resolution),
+          ...(resolution.status === 'ambiguous'
+            ? {
+                candidates: resolution.candidates.map((candidate) =>
+                  projectResolutionCandidate(config, candidate),
+                ),
+              }
+            : {}),
         }
       }
 
@@ -575,11 +988,25 @@ export async function runGraphImpact(
           surface,
           projectRelativeSurface,
           resolution: {
-            ...resolution,
+            ...projectSymbolResolution(config, resolution),
             status: 'ambiguous',
             reasonCode: 'AMBIGUOUS_PUBLIC_BINDING',
           },
-          candidates: [],
+          candidates:
+            resolution.candidates.length > 0
+              ? resolution.candidates.map((candidate) =>
+                  projectResolutionCandidate(config, candidate),
+                )
+              : resolution.resolvedTarget !== null &&
+                  resolution.resolvedTarget.kind !== 'declaration'
+                ? [
+                    projectResolutionCandidate(config, {
+                      target: resolution.target,
+                      declarations: resolution.resolvedTarget.declarations,
+                      path: resolution.path,
+                    }),
+                  ]
+                : [],
         }
       }
 
@@ -619,7 +1046,12 @@ export async function runGraphImpact(
       })
 
       const bindingImpact = mapImpactDetail(result.bindingImpact)
-      const canonicalImpact = mapImpactDetail(result.canonicalImpact)
+      // Only the canonical view carries covering-spec evidence; the exact route has none.
+      const coveringSpecs = projectCoveringSpecs(config, result.canonicalImpact.coveringSpecs)
+      const canonicalImpact: ProjectedPublicImpactDetail = {
+        ...mapImpactDetail(result.canonicalImpact),
+        coveringSpecs,
+      }
 
       return {
         kind: 'export',
@@ -628,12 +1060,16 @@ export async function runGraphImpact(
         from: surface,
         surface,
         projectRelativeSurface,
-        resolution,
-        binding: result.binding,
+        resolution: projectSymbolResolution(config, resolution),
+        binding: {
+          ...result.binding,
+          projectRelativeSurface: toProjectRelativePath(config, result.binding.surface),
+        },
         target: result.target,
         path: result.path,
         bindingImpact,
         canonicalImpact,
+        coveringSpecs,
         riskLevel: canonicalImpact.riskLevel,
         directDepsCount: canonicalImpact.directDependents,
         indirectDepsCount: canonicalImpact.indirectDependents,
@@ -654,4 +1090,11 @@ export async function runGraphImpact(
   }
 
   return withOpenGraphProvider(ctx, executeWithProvider)
+}
+
+export type {
+  ResolvedSymbolTarget,
+  SemanticImpactCounts,
+  DeclarationOccurrence,
+  PhysicalDependencyEvidence,
 }

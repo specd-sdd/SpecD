@@ -12,7 +12,11 @@ import {
 } from '../../../src/domain/value-objects/binding-fact.js'
 import { CallForm, type CallFact } from '../../../src/domain/value-objects/call-fact.js'
 import { type SourceRange, type SymbolNode } from '../../../src/domain/value-objects/symbol-node.js'
-import { type Relation } from '../../../src/domain/value-objects/relation.js'
+import { type Relation, createRelation } from '../../../src/domain/value-objects/relation.js'
+import {
+  buildScopedBindingEnvironment,
+  resolveDependencyFacts,
+} from '../../../src/domain/services/scoped-binding-environment.js'
 import { type ImportDeclaration } from '../../../src/domain/value-objects/import-declaration.js'
 import { InMemoryIndexSession } from '../../../src/application/use-cases/in-memory-index-session.js'
 import { parseLogicalSymbol } from '../../../src/domain/value-objects/symbol-reference.js'
@@ -213,11 +217,39 @@ adapter.extractRelations = (
     filePath,
     analysis: draft,
   })
-  const resolvedImports = { importMap, fileImports: [] }
-  return baseAdapter.buildRelations(analysis, {
+  const resolved = baseAdapter.resolveImports(analysis, {
+    session,
+    qualifiedNames: new Map(),
+    packageToWorkspace: new Map(),
+  })
+  const resolvedImports = {
+    importMap: new Map([...resolved.importMap, ...importMap]),
+    fileImports: resolved.fileImports,
+  }
+  const adapterRelations = baseAdapter.buildRelations(analysis, {
     session,
     resolvedImports,
   })
+  const symbolLookup = {
+    findByName: (name: string, prefix?: string) => session.findSymbolsByName(name, prefix),
+    findByFile: (path: string) => session.findSymbolsByFile(path),
+  }
+  const dependencies = resolveDependencyFacts({
+    environment: buildScopedBindingEnvironment({
+      analysis,
+      importMap: resolvedImports.importMap,
+      symbolLookup,
+    }),
+    analysis,
+    symbolLookup,
+  }).map((dependency) =>
+    createRelation({
+      source: dependency.sourceSymbolId,
+      target: dependency.targetSymbolId,
+      type: dependency.relationType,
+    }),
+  )
+  return [...adapterRelations, ...dependencies]
 }
 
 describe('PhpLanguageAdapter', () => {
@@ -263,7 +295,7 @@ class ChildService extends BaseService implements Persistable {
     ).referenceFacts!
 
     const saves = facts.declarations
-      .map((declaration) => parseLogicalSymbol(declaration.logicalId))
+      .map((declaration) => parseLogicalSymbol(declaration.logicalId ?? ''))
       .filter((logical) => logical?.name === 'save')
     expect(saves.length).toBeGreaterThanOrEqual(2)
     expect(new Set(saves.map((logical) => logical?.ownerId)).size).toBe(saves.length)
@@ -289,7 +321,7 @@ class Service {
     ).referenceFacts!
 
     const forms = facts.declarations
-      .map((declaration) => parseLogicalSymbol(declaration.logicalId))
+      .map((declaration) => parseLogicalSymbol(declaration.logicalId ?? ''))
       .filter((logical) => logical?.ownerId !== undefined)
       .map((logical) => [logical?.name, logical?.memberSemantics])
     expect(forms).toEqual(
@@ -327,7 +359,7 @@ class Service {
       { session: new InMemoryIndexSession(), workspaceName: 'workspace' },
     ).referenceFacts!
     const run = facts.declarations
-      .map((declaration) => parseLogicalSymbol(declaration.logicalId))
+      .map((declaration) => parseLogicalSymbol(declaration.logicalId ?? ''))
       .find((logical) => logical?.name === 'run')
 
     expect(run?.ownerId).toBeDefined()
@@ -697,24 +729,36 @@ class ArticlesController {
   })
 
   describe('extractRelations — require/include', () => {
-    it('require_once with relative string literal emits IMPORTS', () => {
+    it('require_once with relative string literal emits IMPORTS when the target is indexed', () => {
       const root = join(tmpdir(), 'php-require')
+      const filePath = join(root, 'app', 'controllers', 'PostsController.php')
+      const targetPath = resolve(root, 'app', 'models', 'Post.php')
+      const content = `<?php\nrequire_once '../models/Post.php';`
+      const targetSymbols = adapter.extractSymbols(targetPath, '<?php\nclass Post {}')
+      const relations = adapter.extractRelations(filePath, content, targetSymbols, new Map())
+      const importsRels = relations.filter((r: Relation) => r.type === RelationType.Imports)
+      expect(importsRels).toHaveLength(1)
+      expect(importsRels[0]!.target).toBe(targetPath)
+    })
+
+    it('require_once emits no relation when the target is not indexed', () => {
+      const root = join(tmpdir(), 'php-require-missing')
       const filePath = join(root, 'app', 'controllers', 'PostsController.php')
       const content = `<?php\nrequire_once '../models/Post.php';`
       const relations = adapter.extractRelations(filePath, content, [], new Map())
-      const importsRels = relations.filter((r: Relation) => r.type === RelationType.Imports)
-      expect(importsRels).toHaveLength(1)
-      expect(importsRels[0]!.target).toBe(resolve(root, 'app', 'models', 'Post.php'))
+      expect(relations.filter((r: Relation) => r.type === RelationType.Imports)).toHaveLength(0)
     })
 
-    it('include with relative path emits IMPORTS', () => {
+    it('include with relative path emits IMPORTS when the target is indexed', () => {
       const root = join(tmpdir(), 'php-include')
       const filePath = join(root, 'app', 'bootstrap.php')
+      const targetPath = resolve(root, 'app', 'helpers', 'url_helper.php')
       const content = `<?php\ninclude 'helpers/url_helper.php';`
-      const relations = adapter.extractRelations(filePath, content, [], new Map())
+      const targetSymbols = adapter.extractSymbols(targetPath, '<?php\nfunction url_helper() {}')
+      const relations = adapter.extractRelations(filePath, content, targetSymbols, new Map())
       const importsRels = relations.filter((r: Relation) => r.type === RelationType.Imports)
       expect(importsRels).toHaveLength(1)
-      expect(importsRels[0]!.target).toBe(resolve(root, 'app', 'helpers', 'url_helper.php'))
+      expect(importsRels[0]!.target).toBe(targetPath)
     })
 
     it('require with variable is silently dropped', () => {
@@ -729,19 +773,15 @@ class ArticlesController {
       expect(relations.filter((r: Relation) => r.type === RelationType.Imports)).toHaveLength(0)
     })
 
-    it('require_once alongside use statements produces require relation', () => {
+    it('require_once alongside use statements produces only the resolved require relation', () => {
       const root = join(tmpdir(), 'php-require-use')
       const filePath = join(root, 'app', 'controllers', 'PostsController.php')
+      const targetPath = join(root, 'app', 'controllers', 'bootstrap.php')
       const content = `<?php\nuse App\\Models\\User;\nrequire_once 'bootstrap.php';`
-      const importMap = new Map([['User', 'myws:src/Models/User.php:class:User:1']])
-      const relations = adapter.extractRelations(filePath, content, [], importMap)
+      const targetSymbols = adapter.extractSymbols(targetPath, '<?php\nfunction boot() {}')
+      const relations = adapter.extractRelations(filePath, content, targetSymbols, new Map())
       const importsRels = relations.filter((r: Relation) => r.type === RelationType.Imports)
-      expect(
-        importsRels.some(
-          (r: Relation) => r.target === join(root, 'app', 'controllers', 'bootstrap.php'),
-        ),
-      ).toBe(true)
-      expect(importsRels.some((r: Relation) => r.target === 'myws:src/Models/User.php')).toBe(true)
+      expect(importsRels.map((r: Relation) => r.target)).toEqual([targetPath])
     })
   })
 
@@ -850,7 +890,7 @@ class ArticlesController {
 
     it('multiple loaders in same file all detected', () => {
       const filePath = 'ci:application/controllers/ctrl.php'
-      const content = `<?php\nclass Ctrl {\n  public function index() {\n    $this->loadModel('Post');\n    $this->load->library('email');\n  }\n}`
+      const content = `<?php\nclass Ctrl {\n  public function index() {\n    $this->load->model('Post');\n    $this->load->library('email');\n  }\n}`
       const allSymbols = [
         ...adapter.extractSymbols(
           'ci:application/models/post.php',
@@ -1408,7 +1448,7 @@ class Order {
     expect(constSymbol.parentId).toBe(orderClass.id)
 
     const declarations = draft.referenceFacts?.declarations ?? []
-    const logicals = declarations.map((d) => parseLogicalSymbol(d.logicalId))
+    const logicals = declarations.map((d) => parseLogicalSymbol(d.logicalId ?? ''))
     const orderLogical = logicals.find((s) => s?.name === 'Order')
     const propLogical = logicals.find((s) => s?.name === 'orderId')
     const constLogical = logicals.find((s) => s?.name === 'STATUS_NEW')
@@ -1419,5 +1459,801 @@ class Order {
 
     expect(constLogical).toBeDefined()
     expect(constLogical?.ownerId).toBe(orderLogical?.id)
+  })
+})
+
+describe('PhpLanguageAdapter parser authority and resolution', () => {
+  const registerPhp = (session: InMemoryIndexSession, filePath: string): void => {
+    session.registerFile({
+      filePath,
+      projectRelativePath: filePath,
+      language: 'php',
+      contentHash: 'abc',
+      workspace: 'ws',
+    })
+  }
+
+  describe('declaration classification', () => {
+    it('declares types and their members but never locals, parameters or closures', () => {
+      const session = new InMemoryIndexSession()
+      registerPhp(session, 'ws:src/a.php')
+      const draft = baseAdapter.analyzeFile(
+        'ws:src/a.php',
+        `<?php
+namespace N;
+trait T { public function t() {} }
+enum Suit { case Hearts; const X = 1; }
+class C {
+  use T;
+  public int $prop = 1;
+  const K = 2;
+  public function m($param) {
+    $local = 1;
+    $fn = function ($x) { return $x; };
+    $arrow = fn($y) => $y;
+    return $fn($local);
+  }
+}
+$top = new C();
+`,
+        { session, workspaceName: 'ws' },
+      )
+      const declared = (draft.referenceFacts?.declarations ?? []).map((declaration) => {
+        const logical = parseLogicalSymbol(declaration.logicalId ?? '')
+        return `${logical?.ownerId === undefined ? 'top' : 'member'}:${logical?.name ?? ''}`
+      })
+
+      expect(declared.sort()).toEqual(
+        [
+          'top:C',
+          'top:T',
+          'top:Suit',
+          'member:K',
+          'member:m',
+          'member:t',
+          'member:X',
+          'member:prop',
+          'member:Hearts',
+        ].sort(),
+      )
+      for (const name of ['local', 'param', 'fn', 'arrow', 'top', 'x', 'y']) {
+        expect(declared.some((entry) => entry.endsWith(`:${name}`))).toBe(false)
+      }
+    })
+  })
+
+  describe('textual lookalikes', () => {
+    const targets = [
+      ...adapter.extractSymbols('php-app:app/models/article.php', '<?php\nclass Article {}'),
+      ...adapter.extractSymbols('php-app:app/models/helper.php', '<?php\nfunction helper() {}'),
+    ]
+    const imports = (content: string): Relation[] =>
+      adapter
+        .extractRelations('php-app:app/controllers/posts_controller.php', content, targets)
+        .filter((relation: Relation) => relation.type === RelationType.Imports)
+
+    it('emits nothing for loader and require text inside comments, strings and heredocs', () => {
+      const content = [
+        '<?php',
+        'class PostsController {',
+        '  public function index() {',
+        "    // $this->loadModel('Article');",
+        "    /* $this->loadModel('Article'); */",
+        '    $text = "$this->loadModel(\'Article\');";',
+        "    $single = '$this->loadModel(\\'Article\\');';",
+        '    $doc = <<<EOT',
+        "$this->loadModel('Article');",
+        "require_once 'helper.php';",
+        'EOT;',
+        '  }',
+        '}',
+      ].join('\n')
+
+      expect(imports(content)).toEqual([])
+    })
+
+    it('emits one import for the real loader call and none for its lookalike', () => {
+      const content = [
+        '<?php',
+        'class PostsController {',
+        '  public function index() {',
+        '    $note = "$this->loadModel(\'Ghost\');";',
+        "    $this->loadModel('Article');",
+        '  }',
+        '}',
+      ].join('\n')
+
+      const found = imports(content)
+      expect(found).toHaveLength(1)
+      expect(found[0]!.target).toBe('php-app:app/models/article.php')
+    })
+  })
+
+  describe('unresolved evidence persists no relation', () => {
+    it('drops a loader whose literal names no indexed target', () => {
+      const content = `<?php\nclass C {\n  public function f() {\n    $this->loadModel('Ghost');\n    uses('Phantom');\n  }\n}`
+      const relations = adapter.extractRelations('php-app:app/controllers/c.php', content, [])
+
+      expect(
+        relations.filter((relation: Relation) => relation.type === RelationType.Imports),
+      ).toEqual([])
+    })
+
+    it('drops a namespace use with no PSR-4 or qualified-name proof', () => {
+      const session = new InMemoryIndexSession()
+      registerPhp(session, 'ws:src/main.php')
+      const draft = baseAdapter.analyzeFile(
+        'ws:src/main.php',
+        '<?php\nuse Vendor\\Missing\\Thing;\nclass Main {}',
+        { session, workspaceName: 'ws' },
+      )
+      const analysis = session.registerAnalysis({ filePath: 'ws:src/main.php', analysis: draft })
+      const resolved = baseAdapter.resolveImports(analysis, {
+        session,
+        qualifiedNames: new Map(),
+        packageToWorkspace: new Map(),
+      })
+
+      expect(resolved.importMap.size).toBe(0)
+      expect(resolved.fileImports).toEqual([])
+      expect(
+        baseAdapter
+          .buildRelations(analysis, { session, resolvedImports: resolved })
+          .filter((relation: Relation) => relation.type === RelationType.Imports),
+      ).toEqual([])
+    })
+  })
+
+  describe('imported hierarchy provenance', () => {
+    it('pairs each persisted EXTENDS edge with exactly one matching shared fact', () => {
+      const session = new InMemoryIndexSession()
+      const register = (
+        filePath: string,
+        content: string,
+      ): ReturnType<typeof session.registerAnalysis> => {
+        registerPhp(session, filePath)
+        return session.registerAnalysis({
+          filePath,
+          analysis: baseAdapter.analyzeFile(filePath, content, { session, workspaceName: 'ws' }),
+        })
+      }
+      const parent = register('ws:src/Base.php', '<?php\nnamespace App;\nclass Base {}')
+      const child = register(
+        'ws:src/Child.php',
+        '<?php\nnamespace App\\Sub;\nuse App\\Base;\nclass Child extends Base {}',
+      )
+      const parentSymbol = parent.symbols.find((symbol) => symbol.name === 'Base')!
+      const childSymbol = child.symbols.find((symbol) => symbol.name === 'Child')!
+
+      const relations = baseAdapter.buildRelations(child, {
+        session,
+        resolvedImports: {
+          importMap: new Map([['Base', parentSymbol.id]]),
+          fileImports: ['ws:src/Base.php'],
+        },
+      })
+
+      const extendsRelation = relations.find(
+        (relation: Relation) => relation.type === RelationType.Extends,
+      )
+      expect(extendsRelation?.target).toBe(parentSymbol.id)
+      // `class Child extends Base {}` on line 4: the range is the written `extends` name.
+      const nameColumn = 'class Child extends '.length
+      const expectedSourceRange = {
+        startLine: 4,
+        startColumn: nameColumn,
+        endLine: 4,
+        endColumn: nameColumn + 'Base'.length,
+      }
+      expect(childSymbol.line).toBe(4)
+      const expectedImportProvenance = {
+        kind: 'import',
+        requestedName: 'Base',
+        resolvedTargetSymbolId: parentSymbol.id,
+      }
+      expect(extendsRelation?.metadata).toMatchObject({
+        sourceRange: expectedSourceRange,
+        importProvenance: expectedImportProvenance,
+      })
+      const hierarchy = session.getHierarchyFacts()
+      expect(hierarchy).toHaveLength(1)
+      expect(hierarchy[0]).toMatchObject({
+        kind: 'extends',
+        precedence: 0,
+        sourceRange: expectedSourceRange,
+        importProvenance: expectedImportProvenance,
+      })
+    })
+  })
+
+  describe('Pass 2 session isolation', () => {
+    const roots: string[] = []
+    afterEach(() => {
+      for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
+    })
+
+    const resolveWithPsr4 = (
+      autoloadDir: string,
+    ): { resolved: readonly string[]; target: string } => {
+      const root = mkdtempSync(join(tmpdir(), 'php-psr4-'))
+      roots.push(root)
+      writeFileSync(
+        join(root, 'composer.json'),
+        JSON.stringify({ autoload: { 'psr-4': { 'App\\': `${autoloadDir}/` } } }),
+      )
+      const session = new InMemoryIndexSession()
+      const filePath = join(root, 'main.php')
+      registerPhp(session, filePath)
+      const draft = baseAdapter.analyzeFile(
+        filePath,
+        '<?php\nuse App\\Models\\User;\nclass Main {}',
+        { session, workspaceName: 'ws', codeRoot: root, repoRoot: root },
+      )
+      const analysis = session.registerAnalysis({ filePath, analysis: draft })
+      const target = join(root, autoloadDir, 'Models', 'User.php')
+      registerPhp(session, target)
+      // Pass 2 must rely on session-prepared metadata only: remove the manifest from disk.
+      rmSync(join(root, 'composer.json'))
+      const resolved = baseAdapter.resolveImports(analysis, {
+        session,
+        qualifiedNames: new Map(),
+        packageToWorkspace: new Map(),
+        codeRoot: root,
+        repoRoot: root,
+      })
+      return { resolved: resolved.fileImports, target }
+    }
+
+    it('resolves from prepared metadata after the manifest disappears from disk', () => {
+      const { resolved, target } = resolveWithPsr4('src')
+      expect(resolved).toEqual([target])
+    })
+
+    it('does not leak PSR-4 maps between consecutive sessions', () => {
+      const first = resolveWithPsr4('src')
+      const second = resolveWithPsr4('lib')
+      expect(first.resolved).toEqual([first.target])
+      expect(second.resolved).toEqual([second.target])
+      expect(second.target).toContain('lib')
+    })
+
+    it('treats missing session metadata as unresolved instead of rereading disk', () => {
+      const root = mkdtempSync(join(tmpdir(), 'php-psr4-missing-'))
+      roots.push(root)
+      writeFileSync(
+        join(root, 'composer.json'),
+        JSON.stringify({ autoload: { 'psr-4': { 'App\\': 'src/' } } }),
+      )
+      const session = new InMemoryIndexSession()
+      const filePath = join(root, 'main.php')
+      registerPhp(session, filePath)
+      // Analyzed without a codeRoot, so no metadata is prepared for this session.
+      const draft = baseAdapter.analyzeFile(
+        filePath,
+        '<?php\nuse App\\Models\\User;\nclass Main {}',
+        { session, workspaceName: 'ws' },
+      )
+      const analysis = session.registerAnalysis({ filePath, analysis: draft })
+      registerPhp(session, join(root, 'src', 'Models', 'User.php'))
+
+      const resolved = baseAdapter.resolveImports(analysis, {
+        session,
+        qualifiedNames: new Map(),
+        packageToWorkspace: new Map(),
+        codeRoot: root,
+        repoRoot: root,
+      })
+
+      expect(resolved.fileImports).toEqual([])
+    })
+  })
+})
+
+describe('PHP routine-local and module state classification', () => {
+  it('keeps routine locals and static variables out of the logical surface', () => {
+    const session = new InMemoryIndexSession()
+    session.registerFile({
+      filePath: 'ws:s.php',
+      projectRelativePath: 'ws:s.php',
+      language: 'php',
+      contentHash: 'x',
+      workspace: 'ws',
+    })
+    const draft = baseAdapter.analyzeFile(
+      'ws:s.php',
+      '<?php\nconst MODULE = 1;\nfunction run() {\n  $localVar = 1;\n  static $counter = 0;\n}\n',
+      { session, workspaceName: 'ws' },
+    )
+    const logical = (draft.referenceFacts?.declarations ?? []).map(
+      (declaration) => parseLogicalSymbol(declaration.logicalId ?? '')?.name,
+    )
+
+    expect(logical.sort()).toEqual(['MODULE', 'run'])
+    expect(draft.symbols.some((symbol) => ['localVar', 'counter'].includes(symbol.name))).toBe(
+      false,
+    )
+  })
+})
+
+describe('PhpLanguageAdapter calls, PSR-4 arrays and written hierarchy spelling', () => {
+  const callsFrom = (
+    filePath: string,
+    content: string,
+    others: readonly SymbolNode[] = [],
+  ): Relation[] =>
+    adapter
+      .extractRelations(filePath, content, others)
+      .filter((relation: Relation) => relation.type === RelationType.Calls)
+
+  const symbolNamed = (symbols: readonly SymbolNode[], name: string): SymbolNode =>
+    symbols.find((symbol) => symbol.name === name)!
+
+  it('emits a CALLS fact for a free function call to a same-file function', () => {
+    const filePath = 'ws:src/f.php'
+    const content = '<?php\nfunction helper() {}\nfunction run() {\n  helper();\n}\n'
+    const symbols = adapter.extractSymbols(filePath, content)
+
+    expect(callsFrom(filePath, content)).toEqual([
+      expect.objectContaining({
+        source: symbolNamed(symbols, 'run').id,
+        target: symbolNamed(symbols, 'helper').id,
+      }),
+    ])
+  })
+
+  it('emits nothing for a free call to a function that is neither imported nor in the file', () => {
+    const other = adapter.extractSymbols('ws:src/other.php', '<?php\nfunction helper() {}\n')
+    const content = '<?php\nfunction run() {\n  helper();\n  strlen("x");\n}\n'
+
+    expect(callsFrom('ws:src/f.php', content, other)).toEqual([])
+  })
+
+  it('resolves self:: and static:: calls to methods of the enclosing class', () => {
+    const filePath = 'ws:src/c.php'
+    const content = [
+      '<?php',
+      'class C {',
+      '  public static function a() {}',
+      '  public static function b() {}',
+      '  public function run() {',
+      '    self::a();',
+      '    static::b();',
+      '  }',
+      '}',
+    ].join('\n')
+    const symbols = adapter.extractSymbols(filePath, content)
+    const run = symbolNamed(symbols, 'run')
+
+    const targets = callsFrom(filePath, content)
+      .filter((relation: Relation) => relation.source === run.id)
+      .map((relation: Relation) => relation.target)
+      .sort()
+    expect(targets).toEqual([symbolNamed(symbols, 'a').id, symbolNamed(symbols, 'b').id].sort())
+  })
+
+  it('resolves parent:: calls to the base class method', () => {
+    const base = adapter.extractSymbols(
+      'ws:src/base.php',
+      '<?php\nclass Base {\n  public function boot() {}\n}\n',
+    )
+    const filePath = 'ws:src/child.php'
+    const content =
+      '<?php\nclass Child extends Base {\n  public function boot() {\n    parent::boot();\n  }\n}\n'
+    const symbols = adapter.extractSymbols(filePath, content)
+
+    const calls = callsFrom(filePath, content, base)
+    expect(calls).toEqual([
+      expect.objectContaining({
+        source: symbolNamed(symbols, 'boot').id,
+        target: symbolNamed(base, 'boot').id,
+      }),
+    ])
+  })
+
+  it('resolves Class::method() for a class declared in the same file and ignores unknown classes', () => {
+    const filePath = 'ws:src/s.php'
+    const content = [
+      '<?php',
+      'class Util {',
+      '  public static function make() {}',
+      '}',
+      'function run() {',
+      '  Util::make();',
+      '  Ghost::make();',
+      '}',
+    ].join('\n')
+    const symbols = adapter.extractSymbols(filePath, content)
+
+    expect(callsFrom(filePath, content)).toEqual([
+      expect.objectContaining({
+        source: symbolNamed(symbols, 'run').id,
+        target: symbolNamed(symbols, 'make').id,
+      }),
+    ])
+  })
+
+  describe('composer PSR-4 arrays', () => {
+    const roots: string[] = []
+    afterEach(() => {
+      for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
+    })
+
+    it('accepts an array of directories for one prefix and picks the indexed candidate', () => {
+      const root = mkdtempSync(join(tmpdir(), 'php-psr4-array-'))
+      roots.push(root)
+      writeFileSync(
+        join(root, 'composer.json'),
+        JSON.stringify({ autoload: { 'psr-4': { 'App\\': ['src/', 'lib/'] } } }),
+      )
+      const session = new InMemoryIndexSession()
+      const filePath = join(root, 'main.php')
+      session.registerFile({
+        filePath,
+        projectRelativePath: filePath,
+        language: 'php',
+        contentHash: 'x',
+        workspace: 'ws',
+      })
+      const analysis = session.registerAnalysis({
+        filePath,
+        analysis: baseAdapter.analyzeFile(
+          filePath,
+          '<?php\nuse App\\Models\\User;\nclass Main {}',
+          {
+            session,
+            workspaceName: 'ws',
+            codeRoot: root,
+            repoRoot: root,
+          },
+        ),
+      })
+      const target = join(root, 'lib', 'Models', 'User.php')
+      session.registerFile({
+        filePath: target,
+        projectRelativePath: target,
+        language: 'php',
+        contentHash: 'x',
+        workspace: 'ws',
+      })
+
+      const resolved = baseAdapter.resolveImports(analysis, {
+        session,
+        qualifiedNames: new Map(),
+        packageToWorkspace: new Map(),
+        codeRoot: root,
+        repoRoot: root,
+      })
+
+      expect(resolved.fileImports).toEqual([target])
+    })
+  })
+
+  describe('hierarchy targets keep their written spelling', () => {
+    const analyzeInto = (
+      session: InMemoryIndexSession,
+      filePath: string,
+      content: string,
+    ): ReturnType<InMemoryIndexSession['registerAnalysis']> => {
+      session.registerFile({
+        filePath,
+        projectRelativePath: filePath,
+        language: 'php',
+        contentHash: 'x',
+        workspace: 'ws',
+      })
+      return session.registerAnalysis({
+        filePath,
+        analysis: baseAdapter.analyzeFile(filePath, content, { session, workspaceName: 'ws' }),
+      })
+    }
+    const extendsTargets = (
+      session: InMemoryIndexSession,
+      analysis: ReturnType<InMemoryIndexSession['registerAnalysis']>,
+    ): string[] =>
+      baseAdapter
+        .buildRelations(analysis, {
+          session,
+          resolvedImports: baseAdapter.resolveImports(analysis, {
+            session,
+            qualifiedNames: session.getQualifiedNames(),
+            packageToWorkspace: new Map(),
+          }),
+        })
+        .filter((relation: Relation) => relation.type === RelationType.Extends)
+        .map((relation: Relation) => relation.target)
+
+    it('resolves a fully qualified parent through its namespace, not by its tail name', () => {
+      const session = new InMemoryIndexSession()
+      const wanted = analyzeInto(session, 'ws:src/A/Base.php', '<?php\nnamespace A;\nclass Base {}')
+      analyzeInto(session, 'ws:src/B/Base.php', '<?php\nnamespace B;\nclass Base {}')
+      const child = analyzeInto(
+        session,
+        'ws:src/Child.php',
+        '<?php\nnamespace App;\nclass Child extends \\A\\Base {}',
+      )
+
+      expect(extendsTargets(session, child)).toEqual([
+        wanted.symbols.find((symbol) => symbol.name === 'Base')!.id,
+      ])
+    })
+
+    it('does not match an unrelated same-named import for a different qualified parent', () => {
+      const session = new InMemoryIndexSession()
+      analyzeInto(session, 'ws:src/B/Base.php', '<?php\nnamespace B;\nclass Base {}')
+      const child = analyzeInto(
+        session,
+        'ws:src/Child.php',
+        '<?php\nnamespace App;\nuse B\\Base;\nclass Child extends Other\\Base {}',
+      )
+
+      expect(extendsTargets(session, child)).toEqual([])
+    })
+  })
+})
+
+describe('PHP imported clause-name ranges', () => {
+  const hierarchyRanges = (
+    lang: string,
+    files: Record<string, string>,
+    main: string,
+    importMap: (session: InMemoryIndexSession) => ReadonlyMap<string, string>,
+  ): Array<{ type: string; target: string; range: unknown }> => {
+    const session = new InMemoryIndexSession()
+    let analysis: ReturnType<InMemoryIndexSession['registerAnalysis']> | undefined
+    for (const [filePath, content] of Object.entries(files)) {
+      session.registerFile({
+        filePath,
+        projectRelativePath: filePath,
+        language: lang,
+        contentHash: 'x',
+        workspace: 'ws',
+      })
+      const registered = session.registerAnalysis({
+        filePath,
+        analysis: baseAdapter.analyzeFile(filePath, content, { session, workspaceName: 'ws' }),
+      })
+      if (filePath === main) analysis = registered
+    }
+    return baseAdapter
+      .buildRelations(analysis!, {
+        session,
+        resolvedImports: { importMap: importMap(session), fileImports: [] },
+      })
+      .filter((relation) => relation.metadata?.['importProvenance'] !== undefined)
+      .map((relation) => ({
+        type: relation.type,
+        target: relation.target,
+        range: relation.metadata?.['sourceRange'],
+      }))
+  }
+  const idOf = (session: InMemoryIndexSession, file: string, name: string): string =>
+    session.findSymbolsByFile(file).find((symbol) => symbol.name === name)!.id
+  const at = (line: number, text: string, needle: string) => {
+    const column = text.indexOf(needle)
+    return {
+      startLine: line,
+      startColumn: column,
+      endLine: line,
+      endColumn: column + needle.length,
+    }
+  }
+
+  it('records the written-name range for implements and trait edges', () => {
+    const classLine = 'class C implements I {'
+    const useLine = '  use T;'
+    const edges = hierarchyRanges(
+      'php',
+      {
+        'ws:I.php': '<?php\ninterface I {}\n',
+        'ws:T.php': '<?php\ntrait T {}\n',
+        'ws:C.php': `<?php\n${classLine}\n${useLine}\n}\n`,
+      },
+      'ws:C.php',
+      (session) =>
+        new Map([
+          ['I', idOf(session, 'ws:I.php', 'I')],
+          ['T', idOf(session, 'ws:T.php', 'T')],
+        ]),
+    )
+
+    expect(edges).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: RelationType.Implements,
+          range: at(2, classLine, 'I'),
+        }),
+        expect.objectContaining({
+          type: RelationType.UsesType,
+          range: at(3, useLine, 'T'),
+        }),
+      ]),
+    )
+  })
+})
+
+describe('PHP structural boundary regressions', () => {
+  const analyze = (filePath: string, content: string) => {
+    const session = new InMemoryIndexSession()
+    session.registerFile({
+      filePath,
+      projectRelativePath: filePath,
+      language: 'php',
+      contentHash: 'x',
+      workspace: 'ws',
+    })
+    return baseAdapter.analyzeFile(filePath, content, { session, workspaceName: 'ws' })
+  }
+  const callerName = (draft: ReturnType<typeof analyze>, call: string): string | undefined => {
+    const fact = draft.callFacts.find((item) => item.name === call)
+    return draft.symbols.find((symbol) => symbol.id === fact?.callerSymbolId)?.name
+  }
+
+  it('keeps the method as caller after a method-local assignment', () => {
+    const draft = analyze(
+      'ws:c.php',
+      '<?php\nclass C {\n  public function doWork() {\n    $x = helper();\n    after();\n  }\n}\n',
+    )
+
+    expect(callerName(draft, 'helper')).toBe('doWork')
+    expect(callerName(draft, 'after')).toBe('doWork')
+    expect(draft.symbols.map((symbol) => symbol.name)).not.toContain('x')
+  })
+
+  it('keeps distinct owners and column-correct callers for compact one-line classes', () => {
+    const draft = analyze(
+      'ws:compact.php',
+      '<?php\nclass A { function a() { x(); } } class B { function b() { y(); } }\n',
+    )
+    const ownerOf = (method: string): string | undefined => {
+      const symbol = draft.symbols.find((item) => item.name === method)
+      return draft.symbols.find((item) => item.id === symbol?.parentId)?.name
+    }
+
+    expect(ownerOf('a')).toBe('A')
+    expect(ownerOf('b')).toBe('B')
+    expect(callerName(draft, 'x')).toBe('a')
+    expect(callerName(draft, 'y')).toBe('b')
+  })
+
+  it('does not let braces or keywords inside strings and heredocs change structure', () => {
+    const draft = analyze(
+      'ws:look.php',
+      [
+        '<?php',
+        'class C {',
+        '  public function m() {',
+        '    $s = "} class Fake { function f() {";',
+        '    $h = <<<EOT',
+        '} class Other { function g() {',
+        'EOT;',
+        '    z();',
+        '  }',
+        '}',
+      ].join('\n'),
+    )
+
+    expect(draft.symbols.map((symbol) => symbol.name).sort()).toEqual(['C', 'm'])
+    expect(callerName(draft, 'z')).toBe('m')
+  })
+})
+
+describe('PHP framework loader families', () => {
+  interface LoaderFamily {
+    readonly name: string
+    readonly filePath: string
+    readonly call: string
+    readonly targetPath: string
+    readonly targetCode: string
+  }
+  const klass = (name: string): string => `<?php\nclass ${name} { public function go(): void {} }`
+  const families: readonly LoaderFamily[] = [
+    {
+      name: 'CakePHP ClassRegistry::init',
+      filePath: 'php-app:app/controllers/posts_controller.php',
+      call: "ClassRegistry::init('Article');",
+      targetPath: 'php-app:app/models/article.php',
+      targetCode: klass('Article'),
+    },
+    {
+      name: 'CakePHP App::import',
+      filePath: 'php-app:app/controllers/posts_controller.php',
+      call: "App::import('Model', 'Article');",
+      targetPath: 'php-app:app/models/article.php',
+      targetCode: klass('Article'),
+    },
+    {
+      name: 'CodeIgniter load->helper',
+      filePath: 'ci:application/controllers/ctrl.php',
+      call: "$this->load->helper('url');",
+      targetPath: 'ci:application/helpers/url_helper.php',
+      targetCode: '<?php\nfunction site_url() {}',
+    },
+    {
+      name: 'Laravel resolve()',
+      filePath: 'laravel:app/Http/PostController.php',
+      call: 'resolve(App\\Services\\Mailer::class);',
+      targetPath: 'laravel:src/App/Services/Mailer.php',
+      targetCode: klass('Mailer'),
+    },
+    {
+      name: 'Laravel app()',
+      filePath: 'laravel:app/Http/PostController.php',
+      call: 'app(App\\Services\\Mailer::class);',
+      targetPath: 'laravel:src/App/Services/Mailer.php',
+      targetCode: klass('Mailer'),
+    },
+    {
+      name: 'Symfony $this->get()',
+      filePath: 'symfony:src/Controller/PostController.php',
+      call: '$this->get(App\\Service\\Mailer::class);',
+      targetPath: 'symfony:src/App/Service/Mailer.php',
+      targetCode: klass('Mailer'),
+    },
+    {
+      name: 'Yii::createObject',
+      filePath: 'yii:protected/controllers/PostController.php',
+      call: 'Yii::createObject(App\\Services\\Mailer::class);',
+      targetPath: 'yii:src/App/Services/Mailer.php',
+      targetCode: klass('Mailer'),
+    },
+    {
+      name: 'Zend_Loader::loadClass',
+      filePath: 'zend:library/PostController.php',
+      call: "Zend_Loader::loadClass('Mailer');",
+      targetPath: 'zend:src/Mailer.php',
+      targetCode: klass('Mailer'),
+    },
+  ]
+  const host = (body: string): string =>
+    `<?php\nclass Host {\n  public function run() {\n${body}\n  }\n}\n`
+  const importsOf = (family: LoaderFamily, content: string): string[] =>
+    adapter
+      .extractRelations(
+        family.filePath,
+        content,
+        adapter.extractSymbols(family.targetPath, family.targetCode),
+        new Map(),
+      )
+      .filter((relation: Relation) => relation.type === RelationType.Imports)
+      .map((relation: Relation) => relation.target)
+
+  it.each(families)('$name: a real call imports the indexed target', (family) => {
+    expect(importsOf(family, host(`    ${family.call}`))).toEqual([family.targetPath])
+  })
+
+  it.each(families)('$name: a call without an indexed target imports nothing', (family) => {
+    const relations = adapter
+      .extractRelations(family.filePath, host(`    ${family.call}`), [], new Map())
+      .filter((relation: Relation) => relation.type === RelationType.Imports)
+
+    expect(relations).toEqual([])
+  })
+
+  it.each(families)(
+    '$name: the same text in a comment, string and heredoc imports nothing',
+    (family) => {
+      const decoys = [
+        `    // ${family.call}`,
+        `    /* ${family.call} */`,
+        `    $text = "${family.call.replaceAll('"', '')}";`,
+        '    $doc = <<<EOT',
+        family.call,
+        'EOT;',
+      ].join('\n')
+
+      expect(importsOf(family, host(decoys))).toEqual([])
+    },
+  )
+
+  it('Drupal::service never invents a target for a service id', () => {
+    const family: LoaderFamily = {
+      name: 'Drupal::service',
+      filePath: 'drupal:modules/custom/src/Controller.php',
+      call: "\\Drupal::service('foo.bar');",
+      targetPath: 'drupal:src/FooBar.php',
+      targetCode: klass('FooBar'),
+    }
+
+    expect(importsOf(family, host(`    ${family.call}`))).toEqual([])
   })
 })

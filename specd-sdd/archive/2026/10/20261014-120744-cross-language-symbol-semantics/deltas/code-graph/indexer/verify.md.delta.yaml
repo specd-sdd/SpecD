@@ -1,0 +1,172 @@
+- op: added
+  description: 'Verify classification-aware, owner-first logical identity construction.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Reference fact indexing$'
+  content: |
+    ### Requirement: Classification-aware logical identity construction
+
+    #### Scenario: Lexical bindings do not become logical symbols
+
+    - **GIVEN** an adapter classifies a declaration as lexical-binding-only or physical-only
+    - **WHEN** the indexing session registers declarations
+    - **THEN** its physical evidence is retained
+    - **AND** no canonical logical target is manufactured
+
+    #### Scenario: Members use canonical logical owners
+
+    - **GIVEN** an owned member and its container declaration
+    - **WHEN** logical identities are constructed
+    - **THEN** the canonical owner is registered before the member
+    - **AND** lexical parent identity is used only as physical containment evidence
+
+    #### Scenario: Declaration groups require explicit language evidence
+
+    - **GIVEN** same-name declarations with similar broad kinds but no grouping evidence
+    - **WHEN** logical targets are assembled
+    - **THEN** they remain distinct
+    - **AND** valid groups retain every declaration and its occurrence form metadata
+
+- op: added
+  description: 'Verify incremental semantic identity equivalence with clean rebuilds.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Bounded incremental relation construction$'
+  content: |
+    ### Requirement: Identity-sensitive incremental equivalence
+
+    #### Scenario: Declaration mutation matches a clean rebuild
+
+    - **GIVEN** a declaration is moved, renamed, added, deleted, regrouped, or assigned a different owner
+    - **WHEN** incremental indexing and a clean rebuild reach identical final source and configuration
+    - **THEN** their normalized logical symbols, declaration mappings, bindings, relations, evidence, and coverage are equal
+
+    #### Scenario: Body edits rebuild affected consumers
+
+    - **GIVEN** a body edit or newly resolvable target changes dependency semantics without changing a declaration header
+    - **WHEN** incremental indexing computes its affected closure
+    - **THEN** every semantically affected consumer is reconsidered
+    - **AND** cleanup does not leave missing or stale incident relations
+
+    #### Scenario: Incremental mutation matrix matches clean semantic state
+
+    - **GIVEN** independent fixtures for body edits, declaration moves, signature changes, overload or merge-group changes, owner changes, renames, deletes, additions, and newly resolvable references
+    - **WHEN** each fixture is indexed incrementally and from a clean database to the same final source
+    - **THEN** normalized physical symbols, logical symbols, declaration mappings, bindings, public bindings, dependency relations, provenance, and coverage are identical
+    - **AND** equality is checked by semantic content rather than aggregate row counts
+
+- op: added
+  description: 'Replace the bulkLoad insertion assertion with the bulk write session.'
+  position:
+    parent:
+      type: section
+      matches: '^Scenario: Changed files removed from store before bulk load$'
+    before:
+      type: list-item
+      matches: 're-extracted data is inserted via'
+  content: |
+    - **AND** the re-extracted data is written through the bulk write session
+
+- op: removed
+  description: 'Remove the stale bulkLoad insertion assertion.'
+  selector:
+    type: list-item
+    matches: 're-extracted data is inserted via'
+
+- op: added
+  description: 'Replace the bulkLoad staging assertion.'
+  position:
+    parent:
+      type: section
+      matches: '^Scenario: Resolved self-relation is dropped before staging$'
+    before:
+      type: list-item
+      matches: 'that dependency is not staged for'
+  content: |
+    - **THEN** the bulk write session receives no staged row for that dependency
+
+- op: removed
+  description: 'Remove the stale bulkLoad staging assertion.'
+  selector:
+    type: list-item
+    matches: 'that dependency is not staged for'
+
+- op: modified
+  description: 'Align workspace path scenario with projectRelativePath.'
+  selector:
+    type: section
+    matches: '^Scenario: Paths prefixed with workspace name and config-relative path$'
+  rename: 'Scenario: Paths prefixed with workspace name and project-relative path'
+  content: |
+
+    - **GIVEN** the active `specd.yaml` lives at `/project/specd.yaml`
+    - **AND** a workspace named `core` with codeRoot `/project/packages/core`
+    - **AND** a file at `/project/packages/core/src/index.ts`
+    - **WHEN** the indexer processes this workspace
+    - **THEN** `FileNode.path` is `core:src/index.ts`
+    - **AND** `FileNode.projectRelativePath` is `packages/core/src/index.ts`
+    - **AND** `FileNode.workspace` is `core`
+
+- op: modified
+  description: 'Align parent-traversal scenario with projectRelativePath.'
+  selector:
+    type: section
+    matches: '^Scenario: Config-relative path normalizes absolute parent traversal$'
+  rename: 'Scenario: Project-relative path normalizes absolute parent traversal'
+  content: |
+
+    - **GIVEN** the active `specd.yaml` lives at `/project/apps/web/specd.yaml`
+    - **AND** a workspace named `core` with codeRoot `/project/packages/core`
+    - **AND** a file at `/project/packages/core/src/index.ts`
+    - **WHEN** the indexer processes this workspace
+    - **THEN** `FileNode.projectRelativePath` is `../../packages/core/src/index.ts`
+    - **AND** it has forward slashes and no leading `./`
+
+- op: modified
+  description: 'Remove literal object-serialization artifacts left in the optimized-description scenario.'
+  selector:
+    type: section
+    matches: '^Scenario: Indexer uses optimized description$'
+  content: |
+
+    - **GIVEN** a spec with `optimizedDescription: "AI Summary"` and `description: "Manual"`
+    - **WHEN** indexing the spec
+    - **THEN** the resulting `SpecNode` in the graph has `description: "AI Summary"`
+
+- op: added
+  description: 'Verify a workspace-subset rebuild preserves other workspaces.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: Incompatible derivation rebuild$'
+  content: |
+    #### Scenario: Subset rebuild preserves other workspaces
+
+    - **GIVEN** a store indexed for workspaces `core` and `cli`
+    - **AND** a forced or fingerprint-mismatch run targets only workspace `core`
+    - **WHEN** `IndexCodeGraph.execute()` completes
+    - **THEN** every file, symbol, relation, and coverage record of `cli` is still present
+    - **AND** only `core` data is cleared and regenerated
+
+- op: added
+  description: 'Verify whole-graph derivation mismatch recreates storage.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: Incompatible derivation rebuild$'
+  content: |
+    #### Scenario: Whole-graph derivation mismatch recreates storage and rotates generation
+
+    - **GIVEN** a stored derivation fingerprint that differs from the current one
+    - **AND** the run indexes every stored workspace and owns its provider
+    - **WHEN** project indexing runs
+    - **THEN** storage is physically recreated and its generation rotates before extraction
+    - **AND** the result reports the fingerprint-mismatch reason

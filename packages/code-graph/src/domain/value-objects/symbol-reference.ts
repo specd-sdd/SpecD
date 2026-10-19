@@ -1,4 +1,5 @@
 import { type SourceLocation } from './source-location.js'
+import { type SourceRange } from './symbol-node.js'
 import { type SymbolKind } from './symbol-kind.js'
 
 /** Separates namespaces that may legally share a spelling in one language. */
@@ -82,16 +83,38 @@ export interface ParsedSymbolReference {
   readonly candidates: readonly StructuredSymbolReference[]
 }
 
+/** Canonical declaration occurrence form classification. */
+export const DeclarationOccurrenceForm = {
+  Declaration: 'declaration',
+  Signature: 'signature',
+  Implementation: 'implementation',
+  Definition: 'definition',
+} as const
+
+/** Union of declaration occurrence form kinds. */
+export type DeclarationOccurrenceForm =
+  (typeof DeclarationOccurrenceForm)[keyof typeof DeclarationOccurrenceForm]
+
+/** Exact 1-based line and 0-based column in source text. */
+export interface SourcePosition {
+  readonly line: number
+  readonly column: number
+}
+
 /** A source declaration that realizes one logical symbol. */
 export interface DeclarationOccurrence {
-  /** Logical identity realized by this source occurrence. */
-  readonly logicalId: string
+  /** Logical identity realized by this source occurrence, or undefined if physical-only. */
+  readonly logicalId?: string | undefined
   /** Stable location-backed identity retained for backwards compatibility. */
   readonly symbolId: string
   /** Source location of the declaration. */
   readonly location: SourceLocation
   /** Existing graph kind for the declaration. */
   readonly kind: SymbolKind
+  /** Syntax form of this declaration occurrence (e.g. signature vs implementation). */
+  readonly form?: DeclarationOccurrenceForm
+  /** Syntax form alias for occurrence form. */
+  readonly occurrenceForm?: DeclarationOccurrenceForm
 }
 
 /** Semantic identity shared by all declarations of one logical target. */
@@ -145,6 +168,8 @@ export interface LocalBinding {
   readonly space: SymbolSpace
   /** Logical target reached by the binding when proven. */
   readonly targetId: string | undefined
+  /** Source range of the binding syntax; it is part of the binding identity. */
+  readonly range: SourceRange
 }
 
 /** One evidence-preserving hop through aliases, exports, or hierarchy. */
@@ -173,16 +198,41 @@ export interface HierarchyFact {
   readonly parentId: string
   readonly kind: string
   readonly precedence: number
+  /** Parser-derived range of the hierarchy-bearing declaration, when retained. */
+  readonly sourceRange?: SourceRange
+  /** Proven import-resolution route used to select the physical target. */
+  readonly importProvenance?: HierarchyImportProvenance
+}
+
+/** Import evidence retained by an imported hierarchy edge. */
+export interface HierarchyImportProvenance {
+  readonly kind: 'import'
+  readonly requestedName: string
+  readonly resolvedTargetSymbolId: string
 }
 
 /** Additive semantic facts emitted by an adapter alongside legacy graph nodes. */
 export interface ReferenceFacts {
   readonly declarations: readonly DeclarationOccurrence[]
+  /**
+   * Identity-only logical symbols retained without declarations, so members of a demoted
+   * (colliding) owner keep a resolvable `ownerId` and a computed qualified name.
+   */
+  readonly logicalSymbols?: readonly LogicalSymbol[]
+  /** Deterministic reasons why physical declarations received no logical projection. */
+  readonly diagnostics?: readonly LogicalDeclarationDiagnostic[]
   readonly publicBindings: readonly PublicBinding[]
   readonly localBindings: readonly LocalBinding[]
   readonly hierarchy: readonly HierarchyFact[]
   readonly steps: readonly ResolutionStep[]
   readonly capabilities: AdapterCapabilities
+}
+
+/** Deterministic reason why physical declarations could not receive a logical projection. */
+export interface LogicalDeclarationDiagnostic {
+  readonly code: 'UNGROUPED_LOGICAL_COLLISION' | 'CONFLICTING_DECLARATION_GROUP'
+  readonly logicalId: string
+  readonly symbolIds: readonly string[]
 }
 
 /** Structured input for conservative symbol-reference resolution. */
@@ -199,6 +249,10 @@ export interface ResolveSymbolReferenceInput {
   readonly memberSemantics?: MemberSemantics
   readonly scopeId?: string
   readonly buildContext?: Readonly<Record<string, string>>
+  /** Exact physical declaration symbol identifier selector. */
+  readonly declarationSymbolId?: string
+  /** Exact file-position selector. */
+  readonly position?: SourcePosition
 }
 
 /** The four conservative outcomes exposed by reference resolution. */
@@ -218,15 +272,48 @@ export interface ResolutionCandidate {
   readonly path: readonly ResolutionStep[]
 }
 
+/** Logical target outcome with complete declaration occurrences and traversal steps. */
+export interface LogicalResolutionTarget {
+  readonly kind: 'logical-target'
+  readonly logicalSymbol: LogicalSymbol
+  readonly declarations: readonly DeclarationOccurrence[]
+  readonly path: readonly ResolutionStep[]
+}
+
+/** Exact physical declaration outcome with its optional logical target mapping. */
+export interface DeclarationResolutionTarget {
+  readonly kind: 'declaration'
+  readonly declaration: DeclarationOccurrence
+  readonly logicalSymbol: LogicalSymbol | undefined
+  readonly path: readonly ResolutionStep[]
+}
+
+/** Public binding route outcome with its target logical symbol and declarations. */
+export interface PublicBindingResolutionTarget {
+  readonly kind: 'public-binding'
+  readonly binding: PublicBinding
+  readonly logicalSymbol: LogicalSymbol
+  readonly declarations: readonly DeclarationOccurrence[]
+  readonly path: readonly ResolutionStep[]
+}
+
+/** Discriminated union of resolution target outcomes. */
+export type ResolvedSymbolTarget =
+  | LogicalResolutionTarget
+  | DeclarationResolutionTarget
+  | PublicBindingResolutionTarget
+
 /** Conservative resolution result for one structured request. */
 export interface SymbolResolutionResult {
   readonly request: ResolveSymbolReferenceInput
   readonly status: ResolutionStatus
   readonly reasonCode: string | null
   readonly health: ResolutionHealth
-  readonly target: LogicalSymbol | null
+  readonly resolvedTarget: ResolvedSymbolTarget | null
   readonly candidates: readonly ResolutionCandidate[]
   readonly path: readonly ResolutionStep[]
+  /** @deprecated Read `resolvedTarget`; this is non-null only for targets with a logical symbol. */
+  readonly target: LogicalSymbol | null
 }
 
 /**
@@ -261,6 +348,9 @@ export function createLocalBinding(params: Omit<LocalBinding, 'id'>): LocalBindi
       encodePart(params.scopeId),
       encodePart(params.localName),
       encodePart(params.space),
+      encodePart(
+        `${String(params.range.startLine)}:${String(params.range.startColumn)}-${String(params.range.endLine)}:${String(params.range.endColumn)}`,
+      ),
     ].join('|'),
   }
 }
@@ -279,7 +369,10 @@ function encodePart(value: string): string {
  * @param params - Logical symbol fields excluding the derived identifier.
  * @returns Logical symbol with a deterministic identifier.
  */
-export function createLogicalSymbol(params: Omit<LogicalSymbol, 'id'>): LogicalSymbol {
+export function createLogicalSymbol(
+  params: Omit<LogicalSymbol, 'id' | 'ownerId' | 'memberSemantics'> &
+    Partial<Pick<LogicalSymbol, 'ownerId' | 'memberSemantics'>>,
+): LogicalSymbol {
   const id = [
     'logical',
     '2',
@@ -294,7 +387,12 @@ export function createLogicalSymbol(params: Omit<LogicalSymbol, 'id'>): LogicalS
     encodePart(params.memberSemantics?.nativeKind ?? ''),
   ].join('|')
 
-  return { ...params, id }
+  return {
+    ...params,
+    id,
+    ownerId: params.ownerId,
+    memberSemantics: params.memberSemantics,
+  }
 }
 
 /**

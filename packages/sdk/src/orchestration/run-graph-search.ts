@@ -64,7 +64,7 @@ export interface ProjectedSymbolLocation {
 export interface ProjectedDeclarationOccurrence {
   readonly logicalSymbolId: string
   readonly declaration: {
-    readonly logicalId: string
+    readonly logicalId?: string | undefined
     readonly symbolId: string
     readonly location: ProjectedSymbolLocation
     readonly kind: string

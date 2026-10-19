@@ -12,12 +12,59 @@
   ],
   "implementation": [
     {
-      "file": "sdk:src/orchestration/project-relative-path.ts",
-      "symbols": ["toProjectRelativePath", "splitWorkspaceIdentity"]
+      "file": "sdk:src/orchestration/run-graph-impact.ts",
+      "symbols": [
+        "runGraphImpact",
+        "projectCoveringSpecs",
+        "projectSymbolResolution",
+        "ResolvedPublicExportImpactResult",
+        "ProjectedPublicImpactDetail"
+      ]
     },
     {
-      "file": "sdk:src/orchestration/run-graph-impact.ts",
-      "symbols": ["runGraphImpact"]
+      "file": "sdk:test/orchestration/build-implementation-review.spec.ts"
+    },
+    {
+      "file": "sdk:src/orchestration/run-index-project-graph.ts"
+    },
+    {
+      "file": "sdk:test/orchestration/run-index-project-graph.spec.ts"
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Orchestrates host-agnostic file, symbol, spec, and public-export impact analysis with project-relative path projection.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:79052a8418f056d740b55a73e9e9afaad668ca535fb1a109578dee2986e84a63",
+          "lastModified": "2026-10-13T14:47:14.763Z"
+        },
+        "verify.md": {
+          "hash": "sha256:7c50892b95b576adc55647166d3eff5177975a63335c88a0de8f69de579ca013",
+          "lastModified": "2026-10-13T15:03:14.844Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# run-graph-impact\n\n## Rules\n\n### Orchestration\n- runGraphImpact(ctx: SdkHostContext, input: RunGraphImpactInput): Promise<RunGraphImpactResult> supports targets:\n  - files: one or more workspace:path, config-relative, or absolute selectors.\n  - symbol: identifier or qualified name.\n  - spec: workspace:capability-path.\n  - export plus from or surface: public route and surface file.\n- Accept direction upstream, downstream, both, dependents, or dependencies; depth positive integer, default 3.\n- Accept filter: ImpactResultFilter with types, kinds, workspaces, excludeWorkspaces, categories, includeTests, includeIgnored.\n- Without input.provider, use transient provider via withOpenGraphProvider(ctx, ...); otherwise use supplied open provider.\n- File: provider.resolveFileSelector then provider.analyzeFileImpact, or provider.analyzeFilesImpact for multiple files.\n- Symbol: provider.resolveSymbolSelector then provider.analyzeImpact.\n- Spec: provider.getSpec existence validation then provider.analyzeSpecImpact.\n- Public export: provider.resolveSymbolReference plus provider.getExactPublicBinding, then provider.analyzePublicBindingImpact.\n- Forward direction, depth, filter to provider method.\n\n### Path projection\n- Project every target and affected file/symbol location to projectRelativePath using only ctx.kernel.project.getConfig.execute() project/workspace configuration.\n- Single-file target exposes canonicalPath and projectRelativePath.\n- Multi-file target exposes targets and projectRelativeTargets.\n- Symbol target location exposes projectRelativePath.\n- Public-export surface exposes projectRelativeSurface.\n- affectedFiles paths use projectRelativePath; affectedSymbols reference locations use projectRelativePath.\n- RunGraphImpactResult exposes projectRelativePath and projectRelativeTargets; never displayPath or displayTargets.\n\n### Result\n- Return structured RunGraphImpactResult with riskLevel, directDepsCount, indirectDepsCount, transitiveDepsCount, affectedFilesCount, omittedCounts.\n\n## Constraints\n- Path projection MUST NOT read graph store or validate availability.\n- runGraphImpact returns pure structured data.\n- Terminal blocks, trees, depth annotations, ANSI formatting remain host-presenter responsibilities.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:79052a8418f056d740b55a73e9e9afaad668ca535fb1a109578dee2986e84a63",
+          "lastModified": "2026-10-13T14:47:14.763Z"
+        },
+        "verify.md": {
+          "hash": "sha256:7c50892b95b576adc55647166d3eff5177975a63335c88a0de8f69de579ca013",
+          "lastModified": "2026-10-13T15:03:14.844Z"
+        }
+      }
+    }
+  }
 }

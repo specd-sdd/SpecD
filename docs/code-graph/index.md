@@ -12,6 +12,52 @@ Package reference for `@specd/code-graph` — indexing, search, impact analysis,
 
 ## Logical references
 
+### Identity and adapter contract
+
+Code Graph deliberately separates physical declaration evidence, lexical bindings,
+and stable logical targets. The mapping is partial: a physical declaration may have no
+logical target, and one logical target may have several declaration occurrences.
+Declaration form (`signature`, `definition`, `implementation`, or `synthetic`) is
+evidence and never changes the logical ID.
+
+Every language adapter classifies parser syntax before graph emission:
+
+| Role              | Graph representation                               |
+| ----------------- | -------------------------------------------------- |
+| `logical`         | Physical declaration plus stable logical target    |
+| `lexical-binding` | Scope-bound binding and optional physical evidence |
+| `physical-only`   | Navigable range evidence with no logical target    |
+| `unsupported`     | No declaration or binding emitted                  |
+
+Calls use the innermost eligible callable whose complete half-open parser range
+contains the call. A local binding or merely preceding symbol can never become a
+caller. If containment cannot be proved, the caller remains unresolved.
+
+Tree-sitter nodes, fields, ranges, and ancestry are authoritative for source
+structure. Whole-file regex must not decide declarations, imports, bindings, calls,
+construction, types, hierarchy, owners, scopes, callers, or arguments. Regex is
+permitted only for auxiliary manifests, bounded tokenization inside a parser-proven
+node, or a documented grammar compatibility branch anchored to such a node.
+Framework rules inspect proven call nodes and literal arguments.
+
+When adding an adapter, maintainers must:
+
+1. Declare its callable kinds and parser-authoritative policy.
+2. Implement all four classification outcomes before symbol creation.
+3. Use exact half-open ranges and canonical logical owners.
+4. Define language-proven declaration grouping; only the same non-empty proven group
+   key may merge declarations. Missing, empty, or conflicting evidence stays ungrouped.
+5. Emit import relations only after one indexed target is proven; retain unresolved
+   syntax as evidence without choosing a first candidate or raw specifier.
+6. Pair every imported hierarchy relation with exactly one shared fact carrying the
+   same target, parser range, and import-resolution provenance.
+7. Prepare manifest and build metadata once in immutable session state. Pass 2 must
+   perform no filesystem reads or adapter-instance cache lookup.
+8. Keep unsupported dynamic behavior unresolved.
+9. Add registry conformance fixtures for optional/chained/computed/generic syntax,
+   nesting, multiline and same-line ranges, comments/strings, unresolved imports,
+   imported hierarchy, and Pass 2 I/O isolation, declaring unsupported cases explicitly.
+
 Code Graph owns semantic symbol identity and resolution. A `LogicalSymbol` groups the
 declaration occurrences that the source language defines as one target while retaining
 their existing location-backed `SymbolNode` identities. Its canonical identity uses
@@ -62,8 +108,9 @@ rules for base clauses, receiver types, interface satisfaction, namespaces, and
 unsupported build-dependent choices. An adapter advertises hierarchy support only for
 syntax for which it emits matching hierarchy facts and ordered resolution steps.
 Imported hierarchy relations are translated to the same logical-owner model during the
-indexing session, while uncertain MRO, method-set, trait-conflict, or build-context
-choices remain unresolved.
+indexing session. Each imported edge and shared fact retain an identical resolved target,
+parser-derived source range, and import-resolution provenance. Uncertain MRO, method-set,
+trait-conflict, or build-context choices remain unresolved.
 
 ## Public and canonical impact
 
@@ -75,7 +122,15 @@ selected route behind a result limit. `analyzePublicBindingImpact` then returns 
 `bindingImpact` (consumers of that route) and `canonicalImpact` (all consumers of the
 logical implementation), plus the binding, target, and path. Ordinary symbol impact
 resolves the canonical target first and deduplicates traversal by logical identity.
-Ambiguous targets are surfaced rather than merged.
+Ambiguous targets are surfaced rather than merged. `canonicalImpact` aggregates consumers
+by logical target with `semanticCounts`, so one caller of several overload declarations is
+counted once, while `bindingImpact` stays an exact physical view of the route.
+
+Covering specs for symbol impact are looked up through logical targets: the target's own
+declarations are part of the coverage frontier at depth 0, and reached declarations are
+mapped to their logical targets in one bounded batch. The reverse coverage lookup is
+skipped only when no declaration in that frontier has a logical target. Spec impact reads
+`COVERS_SYMBOL` the same way, expanding each logical target to its declarations.
 
 Surface, exported name, and symbol space identify a public export slot. Individual
 route IDs additionally include the proven canonical target, so two modules exposing
@@ -130,6 +185,12 @@ substring discovery results cannot become impact targets.
 
 ## File-impact coverage
 
+Logical symbol impact begins from every declaration of the resolved logical target.
+Traversal remains physical over `CALLS`, `CONSTRUCTS`, `USES_TYPE`, `EXTENDS`,
+`IMPLEMENTS`, and `OVERRIDES`, then projects reached declarations back to logical
+targets. Results report semantic counts separately from physical occurrence and edge
+evidence. Exact declaration impact does not widen to sibling declarations.
+
 File and multi-file impact include ordered `coveringSpecs`. Code Graph batches reverse
 file and symbol coverage, assigns each affected resource its shallowest traversal
 depth, and folds one spec with its minimum depth and distinct evidence. Depth zero is
@@ -143,6 +204,10 @@ persisted implementation state, or a forced generation changes. `COVERS_SYMBOL` 
 targets a logical symbol ID; it never targets a declaration-occurrence ID. A link with a
 missing file, missing symbol, or ambiguous symbol is reported as diagnostic evidence and
 does not fall back to file coverage.
+
+The same rule applies after physical impact traversal: coverage projection contains only
+mapped logical IDs. An all-physical-only result produces an empty logical frontier, skips
+the symbol-coverage query, and never substitutes a physical ID.
 
 `graph index --force` clears every logical-generation input, including coverage hashes,
 semantic facts, observations, and freshness metadata, then reconsiders every selected
@@ -206,11 +271,77 @@ hierarchy, and public-route closure. Unrelated files are not parsed. Persistence
 includes only non-search transactional work; search-index timing is zero when no rebuild
 is requested.
 
+New files also invalidate existing importers whose previously unresolved syntax can now
+resolve. Incremental equivalence is checked across body, move, signature, declaration
+group, owner, rename, delete, add, and newly-resolvable mutations using normalized
+symbols, mappings, bindings, relations, provenance, and coverage.
+
 Normal provider `open()` is read-only with respect to incompatible storage. The
 indexing-specific lifecycle may recreate derived storage, rotate its generation,
 re-extract sources, and rebuild search indexes. `IndexResult.fullRebuild` and
 `IndexResult.fullRebuildReason` explain that recovery directly. Long-lived providers opened against the old generation must
 close and reopen.
+
+### Index lock recovery
+
+Indexing holds an exclusive lock file (`graph/index.lock`). The record is
+`{ version: 2, pid, startedAt, token }`, where `startedAt` is the owner's process start
+time (omitted where the platform cannot report it); version 1 records are still read.
+A process killed by `SIGKILL`, an out-of-memory kill, or a power loss therefore no longer
+blocks the graph forever:
+
+- A lock is **live** when its pid answers a signal-0 probe (`EPERM` still counts as alive)
+  and the recorded start time, when both exist, matches the running process. It is
+  **stale** when the pid is gone (`ESRCH`), the start time differs (pid reuse), or the
+  file is unreadable and older than 10 seconds.
+- Acquiring over a stale lock renames it to a unique sibling file, deletes that sibling
+  and retries the exclusive create once. The rename elects exactly one winner; a loser
+  reports `GraphBusyError`.
+- `assertGraphIndexUnlocked` only throws for a live lock and never removes anything.
+- Recovery is reported through the optional `onWarning` callback of the provider
+  (`createCodeGraphProvider(config, { onWarning })`, or `openSpecdHost({ options: { graph: { onWarning } } })`)
+  and of `runIsolatedGraphIndex`. It never changes results or exit codes.
+
+### Schema shape and recreation
+
+Opening storage checks the schema version before any DDL runs and the column shape of
+every ordinary table after it. A database whose tables lack columns the current DDL
+declares is `SCHEMA_INCOMPATIBLE`, exactly like an older version, and is recovered by
+`graph index --force` (recreate and rebuild). `recreate()` removes only the database
+files (`code-graph.sqlite`, `-wal`, `-shm`), leaves `index.lock` alone, and rotates
+`storage.epoch`.
+
+### Logical collisions and diagnostics
+
+When two declarations would share one canonical logical id without language-proven
+grouping (for example a TypeScript interface merge or same-name classes in different
+namespaces), only those declarations stay physical-only. Their owner identity is
+retained without declarations, so members keep a resolvable `ownerId` and a computed
+`qualifiedName`. `IndexResult.logicalDiagnostics` lists every
+`UNGROUPED_LOGICAL_COLLISION` and `CONFLICTING_DECLARATION_GROUP`.
+
+### Imported hierarchy evidence
+
+An imported base, interface or trait produces its physical hierarchy relation together with
+one shared hierarchy fact. Both carry the parser range of the written clause expression
+(`Base` in `class C(Base)`, the heritage type in `extends ns.Base`, the name in PHP
+`extends`/`implements`/`use`), not the range of the whole child declaration, so two bases of
+one class never share a range.
+
+### Public and local bindings
+
+TypeScript `export { local as alias }`, `export { priv as pub }` and `export default`
+bind the exported name to the declaration of the local name (`default` for default
+exports). Python publishes module-level names without a leading underscore. Import local
+bindings receive their target from the imports resolved in pass 2. Calls resolve only
+through import-proven bindings or top-level declarations of the same file, and a
+parameter or local declaration that rebinds a called name suppresses the call fact.
+
+### Subset runs
+
+A run that indexes only some workspaces keeps the stored project-global (`root`)
+fingerprint and does not compare it, so a later whole-graph run without `--force` is not
+mistaken for a derivation mismatch.
 
 SQLite persists and queries semantic identity through structured workspace,
 surface, name, space, owner, member-form, and exported-name fields rather than parsing

@@ -68,12 +68,6 @@
 - **THEN** the command resolves the symbol through the provider's shared symbol resolver
 - **AND** analyzes impact for that exact symbol
 
-#### Scenario: Multiple symbol matches
-
-- **GIVEN** `validate` exists in 3 different files
-- **WHEN** `specd graph impact --symbol validate` is run
-- **THEN** stdout shows `3 symbols match "validate":` followed by separate impact reports for each
-
 #### Scenario: Symbol not found
 
 - **GIVEN** `nonExistentSymbol` does not exist in the graph
@@ -124,6 +118,30 @@
 - **WHEN** any `--symbol` impact command runs
 - **THEN** storage is reached only through the provider
 - **AND** the CLI does not read `package.json` or SQLite itself
+
+### Requirement: Logical and declaration symbol-impact presentation
+
+#### Scenario: Logical impact summarizes every declaration
+
+- **GIVEN** a logical selector resolves to a canonical target with several declaration locations
+- **WHEN** graph impact is rendered as text
+- **THEN** the target is analyzed once and identified as logical impact
+- **AND** every contributing declaration location is summarized
+
+#### Scenario: Exact and ambiguous selectors are presented truthfully
+
+- **GIVEN** an exact physical selector or an ambiguous semantic selector
+- **WHEN** graph impact runs
+- **THEN** exact impact is identified as declaration impact
+- **AND** ambiguity lists deterministic candidates without traversing any of them
+
+#### Scenario: Structured formats preserve the SDK contract
+
+- **GIVEN** the SDK returns discriminated target, declarations, physical evidence, logical affected targets, coverage, explicit count units, and project-relative paths on nested locations
+- **WHEN** JSON or TOON output is requested
+- **THEN** those fields are preserved without CLI recomputation
+- **AND** nested resolvedTarget declarations and evidence retain their projectRelativePath values
+- **AND** risk, grouping, and coverage remain provider-owned results
 
 ### Requirement: Spec impact analysis
 

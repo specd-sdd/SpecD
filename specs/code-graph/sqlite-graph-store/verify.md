@@ -268,6 +268,28 @@
 - **WHEN** an exact batch node query has no paths, ids, or spec ids
 - **THEN** it returns an empty array without dispatching a worker RPC or executing SQL
 
+### Requirement: Worker-backed logical declaration mapping
+
+#### Scenario: Mapping batch crosses the worker boundary once
+
+- **GIVEN** multiple logical symbols or declarations require mapping
+- **WHEN** the SQLite store executes the batch lookup
+- **THEN** one typed RPC crosses the worker boundary
+- **AND** SQL parameter chunking does not create per-identity worker calls
+
+#### Scenario: Chunked results preserve abstract-store semantics
+
+- **GIVEN** a batch larger than the SQLite parameter bound with duplicates and unknown IDs
+- **WHEN** worker results are merged
+- **THEN** first-request and declaration ordering remain deterministic
+- **AND** duplicates and unknowns follow the abstract store contract
+
+#### Scenario: Empty mapping batch sends no RPC
+
+- **GIVEN** an empty mapping input
+- **WHEN** the host store handles it
+- **THEN** an empty result is returned without contacting the worker
+
 ### Requirement: Config-derived persistence layout
 
 #### Scenario: Graph and tmp directories are derived from configPath
@@ -319,6 +341,13 @@
 - **GIVEN** an opened healthy SQLite store
 - **WHEN** force indexing runs
 - **THEN** it uses logical clear and full reanalysis without physical recreation
+
+#### Scenario: Recreation preserves lock and rotates the epoch
+
+- **GIVEN** a closed store whose graph directory contains the database, `-wal`, `-shm`, `index.lock` and `storage.epoch`
+- **WHEN** `recreate()` runs
+- **THEN** only the database, `-wal` and `-shm` files are removed
+- **AND** `index.lock` is untouched and `storage.epoch` holds a new generation
 
 ### Requirement: Locked recreation preserves the index lease
 
@@ -426,6 +455,22 @@
 - **AND** the indexing result identifies the rejected source and target
 - **AND** no physical symbol row is substituted as the relation target
 
+### Requirement: SQLite batched logical coverage reads
+
+#### Scenario: Reverse coverage joins committed logical targets
+
+- **GIVEN** a physical row and a logical target have equal-looking identifiers
+- **WHEN** reverse logical coverage is queried
+- **THEN** only the committed logical target can satisfy the relation
+- **AND** the physical row neither shadows nor widens the result
+
+#### Scenario: Coverage batch remains one worker operation
+
+- **GIVEN** many logical IDs require SQL parameter chunking
+- **WHEN** reverse coverage is loaded
+- **THEN** the host sends one serializable worker request
+- **AND** merged results preserve deterministic abstract-store ordering
+
 ### Requirement: SQLite full-text search
 
 #### Scenario: Symbol and spec search use SQLite full-text search
@@ -480,11 +525,12 @@
 - **WHEN** searching for `core:change` in the SQLite backend
 - **THEN** that spec is the first result returned
 
-#### Scenario: Persisted file content does not create SQLite file search category
+#### Scenario: Persisted file content is not a SQLite file result category
 
-- **GIVEN** SQLite persists file source content for snippet extraction
-- **WHEN** search APIs are used through the current graph-store contract
-- **THEN** there is still no separate file full-text result category introduced by this change
+- **GIVEN** SQLite persists file source content
+- **WHEN** symbol, spec, and document search runs
+- **THEN** no file result category is introduced
+- **AND** source-content search is served by its own substring-capable index
 
 #### Scenario: Spec-id segment outranks content-only hit in SQLite
 
@@ -625,6 +671,13 @@
 - **THEN** it may require a destructive rebuild instead of applying an incremental
   migration
 
+#### Scenario: Version 15 database missing a required column is recreated
+
+- **GIVEN** a database persisted as schema version 15 whose `local_bindings` table lacks `start_line`
+- **WHEN** the adapter opens it
+- **THEN** open fails with `GraphSchemaIncompatibleError` and reason `SCHEMA_INCOMPATIBLE`
+- **AND** `graph index`, with or without `--force`, recreates the database and completes without a raw SQLite error
+
 ### Requirement: Backend-specific companion files
 
 #### Scenario: SQLite companion files stay under graph persistence root
@@ -637,34 +690,35 @@
 
 ### Requirement: Reference schema upgrade
 
-#### Scenario: SQLite old schema rebuilds safely
+#### Scenario: SQLite schema 14 rebuilds safely as 15
 
-- **GIVEN** schema version 12 or 13 and the reference schema expects 14
-- **WHEN** normal read and then graph index are attempted
-- **THEN** read rejects with `GraphSchemaIncompatibleError` without empty recreation
-- **AND** index rotates generation, rebuilds fields and FTS, and opens version 14
+- **GIVEN** `meta.schemaVersion` is 14 and the reference schema expects 15
+- **WHEN** a normal read and then `graph index` are attempted
+- **THEN** the read rejects with `GraphSchemaIncompatibleError` and recovery reason `SCHEMA_INCOMPATIBLE` without empty recreation
+- **AND** indexing rotates the storage epoch, rebuilds fields and search indexes, and opens schema 15
+- **AND** no in-place `ALTER TABLE` migration is executed
 
-#### Scenario: Version 14 table columns persist project_relative_path
+#### Scenario: Version 15 persists occurrence form and project-relative paths
 
-- **WHEN** a version 14 database is created
-- **THEN** `files` has column `project_relative_path` and no `config_relative_path`
-- **AND** `documents` has column `project_relative_path` and no `config_relative_path`
-- **AND** `symbols` has column `project_relative_path`
-- **AND** `logical_symbols` has `member_kind`, `member_dispatch`, `member_accessor`, `native_kind`, and `qualified_name`
-- **AND** `qualified_name` has an equality index
+- **WHEN** a schema 15 database is created
+- **THEN** `files` and `documents` have `project_relative_path` and no `config_relative_path`
+- **AND** `symbols` has `project_relative_path`
+- **AND** `logical_declarations` has `occurrence_form`
+- **AND** `logical_symbols` has `member_kind`, `member_dispatch`, `member_accessor`, `native_kind`, and indexed `qualified_name`
 
-#### Scenario: Version 14 opens without rebuild
+#### Scenario: Version 15 opens without rebuild
 
-- **GIVEN** `meta.schemaVersion` is already 14
+- **GIVEN** `meta.schemaVersion` is already 15
 - **WHEN** the store opens for a read
 - **THEN** it does not throw `GraphSchemaIncompatibleError`
 - **AND** it does not recreate the database
 
-#### Scenario: Any other version is incompatible
+#### Scenario: Unsupported schema versions are incompatible
 
-- **GIVEN** `meta.schemaVersion` is 13 or 15
+- **GIVEN** `meta.schemaVersion` is older than 14 or newer than 15
 - **WHEN** the store opens
 - **THEN** the error is `GraphSchemaIncompatibleError`
+- **AND** no rows are read beside schema 15 rows
 - **AND** no `ALTER TABLE` is executed
 
 #### Scenario: Qualified spelling is an equality column
@@ -675,18 +729,20 @@
 - **AND** `symbols.search_text` is the expanded bare name
 - **AND** `symbol_fts` has no extra column
 
-#### Scenario: Worker row uses the new columns
+#### Scenario: Worker row uses schema 15 declaration columns
 
-- **WHEN** a logical symbol is inserted and selected through the worker
-- **THEN** the row carries `member_kind`, `member_dispatch`, `member_accessor`, `native_kind`, and `qualified_name`
-- **AND** the statement does not reference `member_form`
+- **WHEN** logical symbols and physical declarations are inserted and selected through the worker
+- **THEN** logical rows carry `member_kind`, `member_dispatch`, `member_accessor`, `native_kind`, and `qualified_name`
+- **AND** logical declaration rows round-trip `occurrence_form`
+- **AND** a physical-only declaration persists no occurrence form and remains retrievable by physical symbol ID
+- **AND** statements do not reference the removed `member_form`
 
 #### Scenario: SQLite source search preserves occurrence and range semantics
 
-- **GIVEN** source content, construct ranges, and selection ranges were bulk indexed
+- **GIVEN** source content, occurrence forms, construct ranges, and selection ranges were bulk indexed
 - **WHEN** full, raw, expanded, and short source queries are executed with filters
 - **THEN** SQLite returns bounded substring candidates equivalent to the abstract Store contract
-- **AND** ranges round-trip without converting half-open coordinates
+- **AND** ranges and occurrence forms round-trip without converting half-open coordinates
 
 #### Scenario: SQLite semantic queries use structured indexes
 
@@ -695,8 +751,15 @@
 - **THEN** SQLite resolves them through indexed structured columns without parsing or substring-ranking canonical ids
 - **AND** provider-visible canonical ids remain unchanged
 
-#### Scenario: SQLite batches reverse coverage and rebuilds FTS once
+#### Scenario: SQLite batches reverse coverage and rebuilds search indexes once
 
-- **WHEN** a bulk generation containing coverage and source content commits
+- **WHEN** a bulk schema 15 generation containing coverage and source content commits
 - **THEN** reverse file/symbol coverage is queryable in batches
-- **AND** semantic and source-content FTS structures are rebuilt once after commit
+- **AND** semantic and source-content search indexes are rebuilt once after commit
+
+#### Scenario: Version 15 persists local binding source ranges
+
+- **GIVEN** two lexical bindings with the same name and scope but different source ranges
+- **WHEN** they are written and read back through the store
+- **THEN** both rows exist with their own `start_line`, `start_column`, `end_line`, and `end_column`
+- **AND** their identities differ

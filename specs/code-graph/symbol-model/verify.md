@@ -228,28 +228,6 @@
 - **WHEN** graph relations are built from archived traceability
 - **THEN** a `COVERS_SYMBOL` relation connects the spec node to that symbol node
 
-### Requirement: Relation staleness
-
-#### Scenario: Missing symbol marks implementation relation as stale
-
-- **GIVEN** an archived symbol-level implementation link exists
-- **AND** the target symbol is no longer detectable in the current graph index
-- **WHEN** graph relations are rebuilt
-- **THEN** the implementation relation is retained
-- **AND** its `COVERS_SYMBOL` metadata marks it as `stale: true`
-
-#### Scenario: File-level implementation relation is never marked stale
-
-- **GIVEN** an archived file-level implementation link exists for `core:src/index.ts`
-- **WHEN** graph relations are rebuilt
-- **THEN** the `COVERS_FILE` relation is retained without stale metadata
-
-#### Scenario: Workspace-boundary materialization failure is not represented as stale
-
-- **GIVEN** an implementation link failed earlier archive-time materialization because of workspace-boundary validation
-- **WHEN** graph relations are built from archived traceability
-- **THEN** no synthetic stale relation is created for that failure
-
 ### Requirement: Relation value object
 
 #### Scenario: Relation equality by source, target, and type
@@ -453,6 +431,38 @@
 - **THEN** its canonical id is unchanged
 - **AND** the declaration occurrence records the new line
 
+### Requirement: Declaration, binding, and logical identity layers
+
+#### Scenario: Equal local names in competing scopes remain distinct
+
+- **GIVEN** two nested scopes each declare a local callable named `same`
+- **WHEN** their declaration occurrences, bindings, and semantic identities are built
+- **THEN** each physical declaration retains its own location identity
+- **AND** the local bindings have different scope identities
+- **AND** they do not collapse into one logical target
+
+#### Scenario: Overload movement preserves one logical target
+
+- **GIVEN** several declarations form one language-defined overload group
+- **WHEN** an overload declaration moves to another line without changing the owner or semantic signature group
+- **THEN** its physical declaration ID changes
+- **AND** the logical target ID remains unchanged
+- **AND** the target still retains every declaration occurrence
+
+#### Scenario: Physical-only declaration remains navigable
+
+- **GIVEN** an adapter classifies a routine-local declaration as physical-only
+- **WHEN** graph identities are materialized
+- **THEN** the declaration remains available by physical ID and range
+- **AND** no logical symbol is fabricated for it
+
+#### Scenario: Missing group evidence does not create a group
+
+- **GIVEN** two same-name declarations have no language grouping key
+- **WHEN** logical identities are assembled
+- **THEN** the absent keys are not treated as one shared group
+- **AND** the declarations remain distinct semantic candidates
+
 ### Requirement: Member semantics and symbol spaces
 
 #### Scenario: Same-name forms remain distinct
@@ -523,6 +533,30 @@
 - **GIVEN** one surface exports the same name as a value and as a type
 - **WHEN** both routes are stored
 - **THEN** symbol space keeps them as two bindings
+
+#### Scenario: Shadowed local bindings remain distinct
+
+- **GIVEN** two local bindings with the same name and scope declared at different source ranges
+- **WHEN** their identities are built
+- **THEN** their identities differ
+- **AND** each preserves its own source range
+
+### Requirement: Evidence-preserving semantic projection
+
+#### Scenario: Several physical routes aggregate to one semantic result
+
+- **GIVEN** two declarations of one logical method have distinct incoming `CALLS` relations
+- **WHEN** the relations are projected to semantic impact
+- **THEN** the logical method appears once
+- **AND** both physical relations and caller locations remain in its evidence
+
+#### Scenario: Logical coverage is found from a reached declaration
+
+- **GIVEN** a spec has `COVERS_SYMBOL` to a logical target
+- **AND** impact traversal reaches one physical declaration of that target
+- **WHEN** reverse coverage is projected
+- **THEN** the spec is returned with the reached declaration as evidence
+- **AND** the physical declaration ID is not used as the coverage endpoint
 
 ### Requirement: Index coverage facts
 

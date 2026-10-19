@@ -1,6 +1,7 @@
 import { type Relation } from './relation.js'
 import { type IndexSession } from './index-session.js'
 import { type FileAnalysisDraft, type FileAnalysis } from './file-analysis.js'
+import { type SymbolKind } from './symbol-kind.js'
 import {
   type AdapterCapabilities,
   type LogicalSymbol,
@@ -8,6 +9,22 @@ import {
   type PublicBinding,
   type ResolutionStep,
 } from './symbol-reference.js'
+
+/**
+ * Pure declaration classification, caller containment, and parser-authority policy for a language adapter.
+ */
+export interface AdapterDeclarationPolicy {
+  /** Language identifiers governed by this policy. */
+  readonly languageIds: readonly string[]
+  /** Symbol kinds eligible to be caller containers. */
+  readonly callableContainerKinds: ReadonlySet<SymbolKind>
+  /** Whether the language supports merging distinct declarations into one logical group (e.g. overloads). */
+  readonly supportsLogicalDeclarationGroups: boolean
+  /** Whether the adapter can emit physical declarations lacking a logical symbol target. */
+  readonly supportsPhysicalOnlyDeclarations: boolean
+  /** Whether all source structural facts are derived from typed parser nodes rather than whole-source text scans. */
+  readonly structuralFactsAreParserAuthoritative: true
+}
 
 /**
  * Exposes the shared run context available while analyzing a single file.
@@ -55,6 +72,12 @@ export interface RelationBuildContext {
 export interface LanguageAdapter {
   /** Declares the semantic reference features this adapter can prove without guessing. */
   capabilities?(): AdapterCapabilities
+
+  /**
+   * Declares the declaration, caller containment, and parser-authority policies for this adapter.
+   * Pure: returns metadata without performing I/O or retaining parser nodes.
+   */
+  declarationPolicy?(): AdapterDeclarationPolicy
 
   /**
    * Returns the language identifiers this adapter supports.

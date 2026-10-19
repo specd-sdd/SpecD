@@ -11,42 +11,62 @@
   ],
   "implementation": [
     {
+      "file": "code-graph:src/infrastructure/sqlite/schema.ts",
+      "symbols": ["SQLITE_SCHEMA_VERSION", "SQLITE_SCHEMA_DDL", "REQUIRED_COLUMNS"]
+    },
+    {
+      "file": "code-graph:src/infrastructure/sqlite/sqlite-worker-protocol.ts",
+      "symbols": ["SQLiteWorkerOperationMap"]
+    },
+    {
+      "file": "code-graph:src/infrastructure/sqlite/sqlite-worker.ts",
+      "symbols": ["handleMessage"]
+    },
+    {
       "file": "code-graph:src/infrastructure/sqlite/sqlite-graph-database.ts",
-      "symbols": ["SQLiteGraphDatabase"]
+      "symbols": [
+        "findDeclarations",
+        "relationEndpointsExist",
+        "queryImpactFrontierDirection",
+        "SQLiteGraphDatabase"
+      ]
+    },
+    {
+      "file": "code-graph:test/infrastructure/sqlite/sqlite-worker-protocol.spec.ts"
     }
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "SQLite GraphStore isolates synchronous persistence in one worker, with durable schema, FTS search, atomic batches, and recovery contracts.",
+      "value": "SQLite GraphStore isolates persistence in one worker with schema v14, atomic batches, logical coverage, FTS search, and recovery.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:b1f0510cbc0422276c63315ff29b3a54c98365b606a49644aceb3ba74a6fae39",
-          "lastModified": "2026-10-08T11:18:49.148Z"
+          "hash": "sha256:bd4616516e809f11a70eecfba7287f7f4d325e0d64752494f540b218182f51c6",
+          "lastModified": "2026-10-14T09:19:31.754Z"
         },
         "verify.md": {
-          "hash": "sha256:0ee7ec121ec817e3c980014a5a771c48ba7845ffb1379290b1a0a42bf274f2dd",
-          "lastModified": "2026-10-08T12:14:13.783Z"
+          "hash": "sha256:746b0ce09b6a2ded701f820aa097d5f13a6a3191fb64991a02b6395b510cbf1a",
+          "lastModified": "2026-10-14T09:19:31.801Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# SQLite Graph Store\n\n## Rules\n- `SQLiteGraphStore` implements `GraphStore` using `better-sqlite3`; id `sqlite`; native binding deferred to `open()`; `close()` idempotent.\n- One open store = one persistent `node:worker_threads` worker + SQLite connection. Worker owns DB, statements, transactions, schema, FTS, filesystem. Typed structured-clone DTOs/correlation ids only; FIFO serial queue; no native handles/functions/classes cross boundary.\n- `maxPendingOperations >= 1`, default 256; excess rejects `StoreOverloadError`. `close()` rejects new work, drains default 5000 ms, asks worker close, force-terminates; unsettled → `StoreWorkerError`. Worker fault rejects outstanding; recovery explicit `close()` + `open()`, never restart.\n- Runtime crosses via serializable `SqliteRuntimeDescriptor`; absolute `modulePath` → `file:` URL; package/already-qualified URLs unchanged. Worker test override not public. Sessions use `sessionId`, lifecycle generation, explicit active/committing/rolling-back/finished states. Progress callback failures isolated.\n- Batch nodes/relations execute one RPC, set-based SQL, deterministic bounded parameter chunks; preserve ordering, dedup, unknown/empty behavior. Filtered impact parameterized in SQL; canonical workspace predicates; exclusions win; constrain frontier before hydration; normalized filter preserved host→worker→database.\n- Persist `{configPath}/graph`, scratch `{configPath}/tmp`; companion files local. `recreate()` closed-only, rotates storage generation, preserves `index.lock`, retries access-lock deletion errors; known corruption/schema failures map typed recoverable error. `clear()` one atomic logical generation reset; no stale skip authority after commit.\n- Persist files (source), documents, symbols/specs/meta, all relation types incl `EXTENDS`, `IMPLEMENTS`, `OVERRIDES`, coverage logical targets. Bulk staged worker session/chunks, atomic commit, progress stages.\n- FTS5 symbol/spec/document candidate generation, shared lexical expansion, identity candidates and explicit SQL rank: exact identity > strong identity > content; token coverage helps; snippets/line ranges.\n- Schema version 12; incompatible version → `GraphSchemaIncompatibleError`/`SCHEMA_INCOMPATIBLE`, rebuild derived store/epoch/indexes; no `ALTER TABLE`/mixed v10/v11. Version 12 logical-member columns and equality `qualified_name` index; canonical IDs never parsed for semantic lookup.\n\n## Constraints\n- SQLite-specific adapter; storage-neutral consumers use `code-graph:graph-store`.\n- Synchronous SQLite never host event loop.\n- All artifacts rooted `configPath`; force reindex logical clear, not deletion/reopen.",
+      "value": "# SQLite Graph Store\n\n## Rules\n\n- `SQLiteGraphStore` implements storage-neutral `GraphStore` semantics with `better-sqlite3`; stable backend id `sqlite`; native binding resolution deferred to `open()`; `close()` idempotent. Built-in composition registers/selects `sqlite` as sole default backend.\n- All synchronous SQLite queries, mutations, transactions, schema/FTS work, maintenance, and backend filesystem work execute in one persistent `node:worker_threads` worker per open store; never host event loop. Worker owns one connection, statements, transactions, schema, FTS.\n- Concurrent `open()`/`close()` share lifecycle Promise. Typed structured-cloneable request/result/error/progress DTOs with monotonic ids only; no functions, classes, native handles. Explicit FIFO serial queue prevents interleaving.\n- Validate `maxPendingOperations >= 1`; default 256. Excess rejects immediately with `StoreOverloadError`. `close()` rejects new work, drains accepted work within `drainTimeoutMs` default 5,000 ms, requests database closure, then force-terminates; unsettled requests reject `StoreWorkerError`. Await termination without claiming hard deadline during native execution.\n- Runtime boundary uses `SqliteRuntimeDescriptor`. Absolute `modulePath` becomes `file:` URL; package specifiers and `file:`, `data:`, `node:` URLs pass unchanged. Worker-path test overrides stay internal.\n- Worker error/exit faults store and rejects outstanding requests with `StoreWorkerError`; recovery requires explicit `close()` then `open()`, never silent restart. If close begins during open, shutdown owns final state. Progress callback failures never abort operation/transaction.\n- Bulk worker sessions use `sessionId`, current lifecycle generation, explicit active/committing/rolling-back/finished states. Only start creates state; missing/finalized session staging, commit, rollback reject.\n- Batch symbols/relations and exact node lookups `getFilesByPaths`, `getDocumentsByPaths`, `getSpecsByIds`, `getSymbolsByIds` use one typed RPC per logical batch and set-based SQL. Deterministic bounded parameter chunks account for fixed and repeated parameters. Preserve first requested-identity order, dedupe, omit unknowns, deterministic relation ordering, and return empty without RPC.\n- Filtered impact uses parameterized SQL for result types, symbol kinds, included/excluded workspaces. Use canonical workspace columns or declaration owning-file join; normalize duplicates; exclusions win. Empty filter lists omit predicates. Constrain each frontier before hydration; unrequested/excluded rows never cross database→store. Normalized filter passes unchanged host→worker→database; results never widen.\n- Persist graph under `{configPath}/graph`, scratch under `{configPath}/tmp`; create on demand; all database/WAL/shared-memory/scratch artifacts remain there. Persist storage generation sidecar such as `graph/storage.epoch`; expose current generation on open; destructive recreation rotates it so old providers detect staleness.\n- `recreate()` is closed-only physical recovery: reject while open, non-blockingly delete graph database/sidecars, rotate generation, return closed. Never delete live `index.lock`. Retry bounded `EPERM`, `EBUSY`, `EACCES`, then surface original error. Map only known corruption/non-migratable schema failures to typed recoverable open error after closing partial resources; permission/config/runtime/unrelated I/O propagate.\n- Forced healthy reindex uses opened-store logical `clear()`, never close/delete/reopen. `clear()` atomically resets one logical generation: physical graph rows, specs, relations, observations, coverage, logical symbols/declarations, public/local bindings, reference/resolution facts, freshness latches, derivation metadata, FTS. After commit no cleared hash/semantic/coverage fact may authorize skip; failure rolls back fully.\n- Persist `File`, `Document`, `Symbol`, `Spec`, `Meta`; source content supports snippets. Persist all relation families: `IMPORTS`, `DEFINES`, `CALLS`, `CONSTRUCTS`, `USES_TYPE`, `EXPORTS`, `DEPENDS_ON`, `COVERS_FILE`, `COVERS_SYMBOL`, `EXTENDS`, `IMPLEMENTS`, `OVERRIDES`. Preserve `COVERS_SYMBOL` metadata across reload.\n- Logical coverage integrity: newly projected `COVERS_SYMBOL` target must be a logical-symbol row; physical declaration alone is insufficient. Same transaction persists logical symbols before endpoint validation/insertion. Valid coverage survives dedupe, reverse indexing, statistics, worker serialization, and `GraphStore` reads unchanged. Missing spec source/logical target rejects relation and emits indexing diagnostic; never silently accept/retarget.\n- FTS5 remains candidate source for `searchSymbols()`, `searchSpecs()`, `searchDocuments()`; tables `symbol_fts`, `spec_fts`, `document_fts`. Expand tokens with shared lexical policy; sanitize and join multi-token queries with `OR`; supplement identity-derived candidates where tokenization misses strong identity. Ranking is explicit SQL ordering: exact canonical identity > strong non-exact identity > content; exact token > prefix > suffix > substring; real component > arbitrary substring; more matched identity tokens > fewer; BM25 resolves remaining text relevance. Equal symbol relevance uses kind tiers: class/interface 4, function/method 3, type/enum 2, variable/property 1. Produce match-aware snippets and 1-based line ranges. Never replace FTS with whole-query `LIKE` only; file content is not separate searchable category.\n- Every atomic mutation runs wholly inside one worker operation/SQLite transaction; no transaction spans RPCs. Failure preserves prior graph. File cleanup parameter count is independent of previous symbol count; remove all relations touching file symbols before symbols. Any cleanup failure rolls back entire mutation.\n- Bulk indexing stages bounded chunks into worker session; commit exposes complete session atomically in one transaction; reference-fact chunks merge. Emit serializable stages for cleanup, files, documents, symbols, specs, reference facts, observations, relations, search indexes. Prepared statements, temp tables, bounded SQL chunks allowed; scratch remains under `{configPath}/tmp`.\n- Adapter owns physical schema and backend version. Open creates current schema, verifies/records version, prepares FTS. Incompatibility rejects with `GraphSchemaIncompatibleError` and `SCHEMA_INCOMPATIBLE`; `graph index` recreates derived storage, rotates `storage.epoch`, rebuilds indexes. No `ALTER TABLE` or mixed old/current reads.\n- Reference schema version is `14`; `SQLITE_SCHEMA_VERSION` and DDL change together. Version 13 or older is unreadable beside v14. `files`, `documents`, `symbols` persist `project_relative_path`; files/documents drop `config_relative_path`; symbol denormalization enables zero-join search/hotspots.\n- `logical_symbols` retains `id`, `workspace`, `surface`, `name`, `space`, `owner_id`, `member_kind`, `member_dispatch`, `member_accessor`, `native_kind`, `qualified_name`; `qualified_name` is generic dotted owner path with equality index; `idx_logical_symbols_member_lookup` uses member-semantics columns. Stored `id` uses versioned canonical encoding. Canonical ids remain external identities and MUST NOT be parsed/substr-ranked for semantic lookup; local integer join keys allowed without changing visible ids.\n- Preserve columns for `public_bindings`, `resolution_steps`, `symbols.parent_id`, `symbols.search_text`, `logical_declarations`, `local_bindings`, `index_coverage`, `relations`, and `symbol_fts` (`id`, `search_text`, `comment`). Re-exports/resolution steps are rows. `symbol_fts.search_text` may contain qualified discovery spelling but is not exact-match key; `symbols.search_text` remains expanded bare name.\n- Maintain substring-capable source-content index and bounded short-query fallback. Reverse coverage/traversal batch reads are set-based and deterministic. Persist indexed-input observations, freshness latches, VCS evidence, compact unchanged-file facts. One indexing run uses one transaction, set-based endpoint validation, bounded writes, one commit, one semantic/content index rebuild; inserts, selects, worker row shapes use v14 columns together.\n\n## Constraints\n\n- SQLite-specific infrastructure adapter; storage-neutral callers depend on `code-graph:graph-store`.\n- Synchronous SQLite never runs on host event loop.\n- All persisted, companion, and scratch artifacts stay beneath `configPath`.\n- Force reindex uses logical clear; destructive recreation is recovery-only and closed-only.\n- Schema v14 is rebuild-only from older versions; canonical ids never parsed for semantics.\n- Storage-neutral use cases/CLI MUST NOT depend on this spec absent SQLite-specific need.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:b1f0510cbc0422276c63315ff29b3a54c98365b606a49644aceb3ba74a6fae39",
-          "lastModified": "2026-10-08T11:18:49.148Z"
+          "hash": "sha256:bd4616516e809f11a70eecfba7287f7f4d325e0d64752494f540b218182f51c6",
+          "lastModified": "2026-10-14T09:19:31.754Z"
         },
         "verify.md": {
-          "hash": "sha256:0ee7ec121ec817e3c980014a5a771c48ba7845ffb1379290b1a0a42bf274f2dd",
-          "lastModified": "2026-10-08T12:14:13.783Z"
+          "hash": "sha256:746b0ce09b6a2ded701f820aa097d5f13a6a3191fb64991a02b6395b510cbf1a",
+          "lastModified": "2026-10-14T09:19:31.801Z"
         }
       }
     }

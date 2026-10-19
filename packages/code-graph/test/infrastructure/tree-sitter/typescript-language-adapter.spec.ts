@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest'
-import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs'
+import { mkdtempSync, writeFileSync, mkdirSync, rmSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { parse, Lang } from '@ast-grep/napi'
@@ -14,6 +14,7 @@ import {
 import { CallForm, type CallFact } from '../../../src/domain/value-objects/call-fact.js'
 import { type SourceRange, type SymbolNode } from '../../../src/domain/value-objects/symbol-node.js'
 import { type Relation } from '../../../src/domain/value-objects/relation.js'
+import { type FileAnalysis } from '../../../src/domain/value-objects/file-analysis.js'
 import { type ImportDeclaration } from '../../../src/domain/value-objects/import-declaration.js'
 import { InMemoryIndexSession } from '../../../src/application/use-cases/in-memory-index-session.js'
 import { parseLogicalSymbol } from '../../../src/domain/value-objects/symbol-reference.js'
@@ -188,7 +189,7 @@ describe('TypeScriptLanguageAdapter', () => {
       hierarchy: true,
       buildContext: false,
     })
-    expect(facts?.declarations.some((item) => item.logicalId.includes('PublicApi'))).toBe(true)
+    expect(facts?.declarations.some((item) => item.logicalId?.includes('PublicApi'))).toBe(true)
     expect(facts?.publicBindings.map((item) => item.exportedName)).toContain('PublicApi')
     expect(facts?.localBindings.map((item) => item.localName)).toContain('Alias')
   })
@@ -201,7 +202,7 @@ describe('TypeScriptLanguageAdapter', () => {
     ).referenceFacts
 
     const methods = facts?.declarations
-      .map((item) => parseLogicalSymbol(item.logicalId))
+      .map((item) => parseLogicalSymbol(item.logicalId!))
       .filter((item) => item?.name === 'save')
     expect(methods).toHaveLength(3)
     expect(new Set(methods?.map((item) => item?.ownerId)).size).toBe(3)
@@ -224,7 +225,7 @@ class Service {
     ).referenceFacts!
 
     const forms = facts.declarations
-      .map((item) => parseLogicalSymbol(item.logicalId))
+      .map((item) => parseLogicalSymbol(item.logicalId!))
       .filter((item) => item?.ownerId !== undefined)
       .map((item) => [item?.name, item?.memberSemantics])
 
@@ -245,7 +246,7 @@ class Service {
       { session: new InMemoryIndexSession(), workspaceName: 'workspace' },
     ).referenceFacts!
     const saves = facts.declarations
-      .map((declaration) => parseLogicalSymbol(declaration.logicalId))
+      .map((declaration) => parseLogicalSymbol(declaration.logicalId!))
       .filter((logical) => logical?.name === 'save')
 
     expect(saves).toHaveLength(2)
@@ -714,13 +715,12 @@ const rows = [${records}, { recordId: 1000, run: () => true }];`
       expect(exports).toHaveLength(1)
     })
 
-    it('creates IMPORTS relations for relative imports', () => {
+    it('does not create an IMPORTS relation for an unresolved relative import', () => {
       const code = `import { foo } from './utils.js'`
       const symbols = adapter.extractSymbols('src/main.ts', code)
       const relations = adapter.extractRelations('src/main.ts', code, symbols, new Map())
       const imports = relations.filter((r: Relation) => r.type === RelationType.Imports)
-      expect(imports).toHaveLength(1)
-      expect(imports[0]!.target).toBe('src/utils.ts')
+      expect(imports).toHaveLength(0)
     })
 
     it('skips non-relative imports', () => {
@@ -754,19 +754,74 @@ const rows = [${records}, { recordId: 1000, run: () => true }];`
     })
 
     it('creates EXTENDS for imported base classes', () => {
-      const code = `import { BaseService } from './base.js'; class UserService extends BaseService {}`
-      const symbols = adapter.extractSymbols('main.ts', code)
-      const relations = adapter.extractRelations(
-        'main.ts',
-        code,
-        symbols,
-        new Map([['BaseService', 'src/base.ts:class:BaseService:1:0']]),
+      const session = new InMemoryIndexSession()
+      const register = (filePath: string, content: string) => {
+        session.registerFile({
+          filePath,
+          projectRelativePath: filePath,
+          language: 'typescript',
+          contentHash: filePath,
+          workspace: 'ws',
+        })
+        return session.registerAnalysis({
+          filePath,
+          analysis: baseAdapter.analyzeFile(filePath, content, {
+            session,
+            workspaceName: 'ws',
+          }),
+        })
+      }
+      const parent = register('ws:src/base.ts', 'export class BaseService {}')
+      const child = register(
+        'ws:src/main.ts',
+        `import { BaseService } from './base.js'; class UserService extends BaseService {}`,
       )
+      const parentSymbol = parent.symbols.find((symbol) => symbol.name === 'BaseService')!
+      const childSymbol = child.symbols.find((symbol) => symbol.name === 'UserService')!
+      const relations = baseAdapter.buildRelations(child, {
+        session,
+        resolvedImports: {
+          importMap: new Map([['BaseService', parentSymbol.id]]),
+          fileImports: ['ws:src/base.ts'],
+        },
+      })
 
       const extendsRelation = relations.find(
         (relation: Relation) => relation.type === RelationType.Extends,
       )
-      expect(extendsRelation?.target).toBe('src/base.ts:class:BaseService:1:0')
+      expect(extendsRelation?.target).toBe(parentSymbol.id)
+      // The evidence points at the written heritage expression, not the whole class.
+      const childContent = `import { BaseService } from './base.js'; class UserService extends BaseService {}`
+      const clauseStart = childContent.lastIndexOf('BaseService')
+      const expectedSourceRange = {
+        startLine: 1,
+        startColumn: clauseStart,
+        endLine: 1,
+        endColumn: clauseStart + 'BaseService'.length,
+      }
+      expect(expectedSourceRange.startColumn).not.toBe(childSymbol.column)
+      const expectedImportProvenance = {
+        kind: 'import',
+        requestedName: 'BaseService',
+        resolvedTargetSymbolId: parentSymbol.id,
+      }
+      expect(extendsRelation?.metadata).toMatchObject({
+        sourceRange: expectedSourceRange,
+        importProvenance: expectedImportProvenance,
+      })
+      const hierarchy = session.getHierarchyFacts()
+      expect(hierarchy).toHaveLength(1)
+      expect(hierarchy[0]).toMatchObject({
+        kind: 'extends',
+        precedence: 0,
+        sourceRange: expectedSourceRange,
+        importProvenance: expectedImportProvenance,
+      })
+      expect(session.getResolutionSteps()).toContainEqual({
+        fromId: hierarchy[0]!.childId,
+        toId: hierarchy[0]!.parentId,
+        kind: 'extends:0',
+      })
     })
   })
 
@@ -903,6 +958,31 @@ const rows = [${records}, { recordId: 1000, run: () => true }];`
       const calls = relations.filter((r: Relation) => r.type === RelationType.Calls)
       expect(calls).toHaveLength(1)
       expect(calls[0]!.target).toBe('utils.ts:function:helper:1')
+    })
+
+    it('given a class method named like a called free identifier, when relations are built, then the bare call does not target the method', () => {
+      const code = `class Service { helper() {} }\nfunction run() { helper() }`
+      const symbols = adapter.extractSymbols('main.ts', code)
+      const relations = adapter.extractRelations('main.ts', code, symbols, new Map())
+      const calls = relations.filter((r: Relation) => r.type === RelationType.Calls)
+      expect(calls).toHaveLength(0)
+    })
+
+    it('given a function nested inside the caller, when relations are built, then the free call targets it', () => {
+      const code = `function outer() { function inner() {}\n inner() }`
+      const symbols = adapter.extractSymbols('main.ts', code)
+      const relations = adapter.extractRelations('main.ts', code, symbols, new Map())
+      const calls = relations.filter((r: Relation) => r.type === RelationType.Calls)
+      expect(calls).toHaveLength(1)
+      expect(calls[0]!.target).toContain('inner')
+    })
+
+    it('given a function nested inside another routine, when a different routine calls its name, then the call does not target it', () => {
+      const code = `function a() { function hidden() {} }\nfunction b() { hidden() }`
+      const symbols = adapter.extractSymbols('main.ts', code)
+      const relations = adapter.extractRelations('main.ts', code, symbols, new Map())
+      const calls = relations.filter((r: Relation) => r.type === RelationType.Calls)
+      expect(calls).toHaveLength(0)
     })
 
     it('skips unresolvable calls', () => {
@@ -1054,6 +1134,42 @@ describe('TypeScriptLanguageAdapter member references and re-exports', () => {
     expect(canonical.candidates).toEqual([])
     expect(parseLogicalSymbol('EditChange.execute')).toBeUndefined()
     expect(baseAdapter.resolutionManifests()).toEqual(['package.json'])
+  })
+
+  it('given conditional package exports and no main, when a re-export names the package, then no entry is selected', () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'ts-conditional-exports-'))
+    writeFileSync(
+      join(tempDir, 'package.json'),
+      JSON.stringify({
+        name: '@specd/code-graph',
+        exports: { '.': { import: './dist/public.js', require: './dist/public.cjs' } },
+      }),
+    )
+    const session = analyzedSession([
+      {
+        path: 'code-graph:src/public.ts',
+        workspace: 'code-graph',
+        codeRoot: tempDir,
+        content: 'export function runIsolatedGraphIndex(): void {}\n',
+      },
+      {
+        path: 'sdk:src/index.ts',
+        workspace: 'sdk',
+        content: "export { runIsolatedGraphIndex } from '@specd/code-graph'\n",
+      },
+    ])
+
+    const linked = baseAdapter.linkReExports(
+      session,
+      new Map([['@specd/code-graph', 'code-graph']]),
+    )
+
+    expect(
+      linked.publicBindings.some(
+        (item) =>
+          item.surface === 'sdk:src/index.ts' && item.exportedName === 'runIsolatedGraphIndex',
+      ),
+    ).toBe(false)
   })
 
   it('binds a package root re-export to the published source file', () => {
@@ -1289,6 +1405,132 @@ describe('TypeScriptLanguageAdapter member references and re-exports', () => {
     expect(linked.publicBindings.some((item) => item.exportedName === 'default')).toBe(false)
   })
 
+  describe('public bindings follow the exported specifier, not the exported name', () => {
+    const targetNameOf = (
+      session: InMemoryIndexSession,
+      surface: string,
+      exportedName: string,
+    ): readonly (string | undefined)[] => {
+      const logicalById = new Map(session.getLogicalSymbols().map((symbol) => [symbol.id, symbol]))
+      return session
+        .getPublicBindings()
+        .filter((binding) => binding.surface === surface && binding.exportedName === exportedName)
+        .map((binding) =>
+          binding.targetId === undefined ? undefined : logicalById.get(binding.targetId)?.name,
+        )
+    }
+
+    it('binds `export { local as alias }` to the local declaration', () => {
+      const session = analyzedSession([
+        {
+          path: 'ws:src/a.ts',
+          workspace: 'ws',
+          content: 'function local(): void {}\nexport { local as alias }\n',
+        },
+      ])
+
+      expect(targetNameOf(session, 'ws:src/a.ts', 'alias')).toEqual(['local'])
+      expect(targetNameOf(session, 'ws:src/a.ts', 'local')).toEqual([])
+    })
+
+    it('binds `export { priv as pub }` to priv even when another local is named pub', () => {
+      const session = analyzedSession([
+        {
+          path: 'ws:src/b.ts',
+          workspace: 'ws',
+          content: 'function priv(): void {}\nfunction pub(): void {}\nexport { priv as pub }\n',
+        },
+      ])
+
+      expect(targetNameOf(session, 'ws:src/b.ts', 'pub')).toEqual(['priv'])
+    })
+
+    it('binds `export default` forms to the declaration under the name default', () => {
+      const named = analyzedSession([
+        {
+          path: 'ws:src/c.ts',
+          workspace: 'ws',
+          content: 'export default function hidden(): void {}\n',
+        },
+      ])
+      const identifier = analyzedSession([
+        {
+          path: 'ws:src/d.ts',
+          workspace: 'ws',
+          content: 'class Service {}\nexport default Service\n',
+        },
+      ])
+
+      expect(targetNameOf(named, 'ws:src/c.ts', 'default')).toEqual(['hidden'])
+      expect(targetNameOf(named, 'ws:src/c.ts', 'hidden')).toEqual([])
+      expect(targetNameOf(identifier, 'ws:src/d.ts', 'default')).toEqual(['Service'])
+    })
+
+    it('keeps plain named exports bound under their own name', () => {
+      const session = analyzedSession([
+        {
+          path: 'ws:src/e.ts',
+          workspace: 'ws',
+          content: 'export function plain(): void {}\nexport const value = 1\n',
+        },
+      ])
+
+      expect(targetNameOf(session, 'ws:src/e.ts', 'plain')).toEqual(['plain'])
+      expect(targetNameOf(session, 'ws:src/e.ts', 'value')).toEqual(['value'])
+    })
+  })
+
+  describe('ungrouped logical collisions demote only the colliding declarations', () => {
+    const analyzeOne = (
+      content: string,
+    ): { facts: NonNullable<ReturnType<typeof baseAdapter.analyzeFile>['referenceFacts']> } => {
+      const session = analyzedSession([{ path: 'ws:src/a.ts', workspace: 'ws', content }])
+      const analysis = session.getAnalysis('ws:src/a.ts')!
+      return { facts: analysis.referenceFacts! }
+    }
+
+    const cases: ReadonlyArray<readonly [string, string, readonly string[]]> = [
+      ['an interface merge', 'interface A { m(): void }\ninterface A { n(): void }\n', ['m', 'n']],
+      [
+        'a class and interface merge',
+        'class B { m(): void {} }\ninterface B { n(): void }\n',
+        ['m', 'n'],
+      ],
+      [
+        'same-name classes in different namespaces',
+        'namespace X { export class C { m(): void {} } }\nnamespace Y { export class C { m(): void {} } }\n',
+        [],
+      ],
+    ]
+
+    it.each(cases)('%s: owners are physical-only and reported', (_label, content) => {
+      const { facts } = analyzeOne(content)
+      const declaredOwners = facts.declarations
+        .map((declaration) => parseLogicalSymbol(declaration.logicalId ?? ''))
+        .filter((logical) => logical?.ownerId === undefined)
+
+      expect(declaredOwners).toEqual([])
+      expect(facts.diagnostics?.map((diagnostic) => diagnostic.code)).toContain(
+        'UNGROUPED_LOGICAL_COLLISION',
+      )
+    })
+
+    it.each(cases)('%s: surviving members keep a resolvable owner', (_label, content, members) => {
+      const session = analyzedSession([{ path: 'ws:src/a.ts', workspace: 'ws', content }])
+      const logicals = session.getLogicalSymbols()
+      const byId = new Map(logicals.map((logical) => [logical.id, logical]))
+
+      const survivors = logicals.filter((logical) => logical.ownerId !== undefined)
+      expect(survivors.map((logical) => logical.name).sort()).toEqual([...members].sort())
+      for (const member of survivors) {
+        const owner = byId.get(member.ownerId!)
+        expect(owner).toBeDefined()
+        expect(member.qualifiedName).toContain(owner!.name)
+      }
+      expect(session.getLogicalDiagnostics().length).toBeGreaterThan(0)
+    })
+  })
+
   it('keeps value and type exports of one name as two bindings', () => {
     const session = analyzedSession([
       {
@@ -1382,5 +1624,659 @@ function run() {
     expect(names).toContain('getClient')
     expect(names).toContain('fetchData')
     expect(names).toContain('process')
+  })
+
+  describe('Task 12.12 ArchiveChange regression', () => {
+    it('does not emit name symbol or binding for anonymous argument key in uc.execute', () => {
+      const code = `
+it('rejects invalid change', async () => {
+  await expect(uc.execute({ name: 'my-change' })).rejects.toThrow();
+});
+`
+      const session = new InMemoryIndexSession()
+      session.registerFile({
+        filePath: 'test.ts',
+        projectRelativePath: 'test.ts',
+        language: 'typescript',
+        contentHash: '123',
+        workspace: 'ws',
+      })
+      const draft = baseAdapter.analyzeFile('test.ts', code, {
+        session,
+        workspaceName: 'ws',
+      })
+
+      // No 'name' symbol
+      expect(draft.symbols.some((s) => s.name === 'name')).toBe(false)
+      // No 'name' binding
+      expect(draft.bindingFacts.some((b) => b.name === 'name')).toBe(false)
+      // Real call target remains present
+      const executeCall = draft.callFacts.find((c) => c.name === 'execute')
+      expect(executeCall).toBeDefined()
+      expect(executeCall?.receiverName).toBe('uc')
+      expect(executeCall?.arity).toBe(1)
+
+      // Caller is the physical callback (<anonymous>)
+      const anon = draft.symbols.find((s) => s.name === '<anonymous>')
+      expect(anon).toBeDefined()
+      expect(executeCall?.callerSymbolId).toBe(anon?.id)
+
+      // Named-object control: named object still emits property
+      const namedCode = `const config = { name: 'my-change' };`
+      const namedDraft = baseAdapter.analyzeFile('named.ts', namedCode, {
+        session,
+        workspaceName: 'ws',
+      })
+      expect(namedDraft.symbols.some((s) => s.name === 'name')).toBe(true)
+    })
+  })
+
+  describe('Task 8.4 TypeScript semantic regressions', () => {
+    it('groups method overloads under one logical target with signature and definition occurrences', () => {
+      const code = `
+export class Service {
+  save(text: string): void;
+  save(num: number): void;
+  save(val: any): void {}
+}
+`
+      const session = new InMemoryIndexSession()
+      session.registerFile({
+        filePath: 'service.ts',
+        projectRelativePath: 'service.ts',
+        language: 'typescript',
+        contentHash: '123',
+        workspace: 'ws',
+      })
+      const draft = baseAdapter.analyzeFile('service.ts', code, {
+        session,
+        workspaceName: 'ws',
+      })
+
+      const saveDeclarations = draft.referenceFacts?.declarations.filter(
+        (d) => d.symbolId && draft.symbols.find((s) => s.id === d.symbolId)?.name === 'save',
+      )
+      expect(saveDeclarations).toHaveLength(3)
+
+      // All share the same logical ID!
+      const logicalIds = new Set(saveDeclarations?.map((d) => d.logicalId))
+      expect(logicalIds.size).toBe(1)
+
+      // Occurrence forms: 2 signatures, 1 definition
+      const forms = saveDeclarations?.map((d) => d.occurrenceForm)
+      expect(forms).toEqual(['signature', 'signature', 'definition'])
+    })
+
+    it('given same-named functions nested in different routines or sibling blocks, when facts are built, then none receives a shared logical target', () => {
+      const code = `function a() { function same() {} }
+function b() { function same() {} }
+function f() { if (x) { function g() {} } else { function g() {} } }
+`
+      const draft = baseAdapter.analyzeFile('w:src/nested.ts', code, {
+        session: new InMemoryIndexSession(),
+        workspaceName: 'w',
+      })
+      const logicalNames = (draft.referenceFacts?.declarations ?? [])
+        .map((d) => draft.symbols.find((s) => s.id === d.symbolId)?.name)
+        .sort()
+
+      expect(logicalNames).toEqual(['a', 'b', 'f'])
+      // Each nested declaration stays navigable as a physical symbol.
+      expect(draft.symbols.filter((s) => s.name === 'same')).toHaveLength(2)
+      expect(draft.symbols.filter((s) => s.name === 'g')).toHaveLength(2)
+    })
+
+    it('given equally named properties in different owners, when facts are built, then each logical id is qualified by its declaring owner', () => {
+      const code = `class A { count: number }
+class B { count: number }
+`
+      const draft = baseAdapter.analyzeFile('w:src/props.ts', code, {
+        session: new InMemoryIndexSession(),
+        workspaceName: 'w',
+      })
+      const counts = (draft.referenceFacts?.declarations ?? [])
+        .map((d) => ({
+          name: draft.symbols.find((s) => s.id === d.symbolId)?.name,
+          logical: d.logicalId !== undefined ? parseLogicalSymbol(d.logicalId) : undefined,
+        }))
+        .filter((entry) => entry.name === 'count')
+
+      expect(counts).toHaveLength(2)
+      expect(new Set(counts.map((entry) => entry.logical?.id)).size).toBe(2)
+      for (const entry of counts) {
+        expect(entry.logical?.ownerId).toBeDefined()
+        expect(entry.logical?.memberSemantics).toEqual({ kind: 'property', dispatch: 'instance' })
+      }
+    })
+
+    it('given accessors, static accessors, and methods named get or set, when facts are built, then forms come from parser tokens and not from the member name', () => {
+      const code = `class Box {
+  get value() { return 1 }
+  set value(v: number) {}
+  static get shared() { return 2 }
+  get() {}
+  set(v: number) {}
+  static create() {}
+}
+`
+      const draft = baseAdapter.analyzeFile('w:src/box.ts', code, {
+        session: new InMemoryIndexSession(),
+        workspaceName: 'w',
+      })
+      const semantics = (draft.referenceFacts?.declarations ?? [])
+        .map((d) => parseLogicalSymbol(d.logicalId!))
+        .filter((logical) => logical?.ownerId !== undefined)
+        .map((logical) => `${logical!.name}:${JSON.stringify(logical!.memberSemantics)}`)
+
+      expect(semantics).toEqual(
+        expect.arrayContaining([
+          'value:{"kind":"property","dispatch":"instance","accessor":"get"}',
+          'value:{"kind":"property","dispatch":"instance","accessor":"set"}',
+          'shared:{"kind":"property","dispatch":"static","accessor":"get"}',
+          'get:{"kind":"method","dispatch":"instance"}',
+          'set:{"kind":"method","dispatch":"instance"}',
+          'create:{"kind":"method","dispatch":"static"}',
+        ]),
+      )
+    })
+
+    it('distinguishes block locals from module-level declarations', () => {
+      const code = `
+export function compute() {
+  const localVar = 1;
+  return localVar;
+}
+`
+      const session = new InMemoryIndexSession()
+      session.registerFile({
+        filePath: 'compute.ts',
+        projectRelativePath: 'compute.ts',
+        language: 'typescript',
+        contentHash: '123',
+        workspace: 'ws',
+      })
+      const draft = baseAdapter.analyzeFile('compute.ts', code, {
+        session,
+        workspaceName: 'ws',
+      })
+
+      // compute is a logical symbol
+      const computeLogical = draft.referenceFacts?.declarations.find(
+        (d) => draft.symbols.find((s) => s.id === d.symbolId)?.name === 'compute',
+      )
+      expect(computeLogical).toBeDefined()
+
+      // localVar is not emitted as a logical declaration
+      const localLogical = draft.referenceFacts?.declarations.find(
+        (d) => draft.symbols.find((s) => s.id === d.symbolId)?.name === 'localVar',
+      )
+      expect(localLogical).toBeUndefined()
+    })
+  })
+
+  describe('ArchiveChange production corpus', () => {
+    it('retains all 72 execute calls without anonymous name declarations', () => {
+      const files = [
+        join(
+          process.cwd(),
+          '..',
+          'core',
+          'test',
+          'application',
+          'use-cases',
+          'archive-change.spec.ts',
+        ),
+        join(
+          process.cwd(),
+          '..',
+          'core',
+          'test',
+          'application',
+          'use-cases',
+          'archive-change-batch-restore.spec.ts',
+        ),
+      ]
+      let expectedCalls = 0
+      let extractedCalls = 0
+
+      for (const [index, absolutePath] of files.entries()) {
+        const content = readFileSync(absolutePath, 'utf8')
+        const expectedLines = new Set(
+          content
+            .split('\n')
+            .flatMap((line, lineIndex) =>
+              /uc\.execute\(\{\s*name:/.test(line) ? [lineIndex + 1] : [],
+            ),
+        )
+        expectedCalls += expectedLines.size
+
+        const filePath = `archive-corpus-${String(index)}.spec.ts`
+        const session = new InMemoryIndexSession()
+        session.registerFile({
+          filePath,
+          projectRelativePath: filePath,
+          language: 'typescript',
+          contentHash: 'corpus',
+          workspace: 'core',
+        })
+        const draft = baseAdapter.analyzeFile(filePath, content, {
+          session,
+          workspaceName: 'core',
+        })
+
+        const corpusCalls = draft.callFacts.filter(
+          (fact) => fact.name === 'execute' && expectedLines.has(fact.location.line),
+        )
+        extractedCalls += corpusCalls.length
+        expect(
+          draft.symbols.filter(
+            (symbol) => symbol.name === 'name' && expectedLines.has(symbol.line),
+          ),
+        ).toEqual([])
+        expect(corpusCalls.every((fact) => fact.callerSymbolId !== undefined)).toBe(true)
+        expect(
+          corpusCalls.every((fact) =>
+            draft.symbols.some(
+              (symbol) => symbol.id === fact.callerSymbolId && symbol.name === '<anonymous>',
+            ),
+          ),
+        ).toBe(true)
+      }
+
+      expect(expectedCalls).toBe(72)
+      expect(extractedCalls).toBe(72)
+    }, 120000)
+  })
+})
+
+describe('TypeScript routine-local and module state classification', () => {
+  it('emits no logical declaration for locals or non-exported module state', () => {
+    const session = new InMemoryIndexSession()
+    session.registerFile({
+      filePath: 'ws:src/s.ts',
+      projectRelativePath: 'ws:src/s.ts',
+      language: 'typescript',
+      contentHash: 'x',
+      workspace: 'ws',
+    })
+    const draft = baseAdapter.analyzeFile(
+      'ws:src/s.ts',
+      'const moduleState = 1\nexport const exposed = 2\nexport function run(): void {\n  const localVar = 1\n  let other = 2\n}\n',
+      { session, workspaceName: 'ws' },
+    )
+    const logical = (draft.referenceFacts?.declarations ?? []).map(
+      (declaration) => parseLogicalSymbol(declaration.logicalId ?? '')?.name,
+    )
+
+    expect(logical.sort()).toEqual(['exposed', 'run'])
+  })
+})
+
+describe('TypeScript import forms, qualified heritage, namespaces, jsx and shadowing', () => {
+  const build = (
+    files: Record<string, string>,
+    main: string,
+  ): {
+    relations: Relation[]
+    fileImports: readonly string[]
+    importMap: ReadonlyMap<string, string>
+  } => {
+    const session = new InMemoryIndexSession()
+    let analysis: FileAnalysis | undefined
+    for (const [filePath, content] of Object.entries(files)) {
+      session.registerFile({
+        filePath,
+        projectRelativePath: filePath,
+        language: 'typescript',
+        contentHash: 'x',
+        workspace: 'ws',
+      })
+      const registered = session.registerAnalysis({
+        filePath,
+        analysis: baseAdapter.analyzeFile(filePath, content, { session, workspaceName: 'ws' }),
+      })
+      if (filePath === main) analysis = registered
+    }
+    const resolvedImports = baseAdapter.resolveImports(analysis!, {
+      session,
+      qualifiedNames: new Map(),
+      packageToWorkspace: new Map(),
+    })
+    return {
+      relations: baseAdapter.buildRelations(analysis!, { session, resolvedImports }),
+      fileImports: resolvedImports.fileImports,
+      importMap: resolvedImports.importMap,
+    }
+  }
+
+  it('resolves default and namespace imports to a module dependency', () => {
+    // IMPORTS relations are created by the indexer from the resolved file dependencies.
+    const { fileImports, importMap } = build(
+      {
+        'ws:lib.ts': 'export default function d(): void {}\nexport function n(): void {}\n',
+        'ws:m.ts': "import d from './lib.js'\nimport * as ns from './lib.js'\nexport const x = 1\n",
+      },
+      'ws:m.ts',
+    )
+
+    expect(fileImports).toEqual(['ws:lib.ts'])
+    expect(importMap.get('d')).toContain('function:d')
+    expect(importMap.has('ns')).toBe(false)
+  })
+
+  it('records no dependency for a default import whose module is not indexed', () => {
+    const { fileImports, importMap } = build(
+      { 'ws:m.ts': "import d from './missing.js'\nexport const x = 1\n" },
+      'ws:m.ts',
+    )
+
+    expect(fileImports).toEqual([])
+    expect(importMap.size).toBe(0)
+  })
+
+  it('keeps `extends ns.Base` qualified and resolves it through the namespace import', () => {
+    const { relations } = build(
+      {
+        'ws:base.ts': 'export class Base {}\n',
+        'ws:other.ts': 'export class Other {}\n',
+        'ws:m.ts': "import * as ns from './base.js'\nexport class C extends ns.Base {}\n",
+      },
+      'ws:m.ts',
+    )
+
+    const extendsRelation = relations.find((r) => r.type === RelationType.Extends)
+    expect(extendsRelation?.target).toBe('ws:base.ts:class:Base:1:7')
+    expect(extendsRelation?.metadata).toMatchObject({
+      importProvenance: { requestedName: 'ns.Base' },
+    })
+  })
+
+  it('does not resolve `extends other.Base` through an unrelated simple name', () => {
+    const { relations } = build(
+      {
+        'ws:base.ts': 'export class Base {}\n',
+        'ws:m.ts': "import { Base } from './base.js'\nexport class C extends unknown.Base {}\n",
+      },
+      'ws:m.ts',
+    )
+
+    expect(relations.filter((r) => r.type === RelationType.Extends)).toEqual([])
+  })
+
+  it('keeps namespace-scoped functions with the same name as distinct declarations', () => {
+    const session = new InMemoryIndexSession()
+    session.registerFile({
+      filePath: 'ws:ns.ts',
+      projectRelativePath: 'ws:ns.ts',
+      language: 'typescript',
+      contentHash: 'x',
+      workspace: 'ws',
+    })
+    const draft = baseAdapter.analyzeFile(
+      'ws:ns.ts',
+      'namespace X { export function f(): void {} }\nnamespace Y { export function f(): void {} }\n',
+      { session, workspaceName: 'ws' },
+    )
+
+    const functions = draft.symbols.filter((symbol) => symbol.name === 'f')
+    expect(functions).toHaveLength(2)
+    expect(new Set(functions.map((symbol) => symbol.id)).size).toBe(2)
+  })
+
+  it('reports the jsx language id for .jsx files', () => {
+    const session = new InMemoryIndexSession()
+    session.registerFile({
+      filePath: 'ws:a.jsx',
+      projectRelativePath: 'ws:a.jsx',
+      language: 'jsx',
+      contentHash: 'x',
+      workspace: 'ws',
+    })
+
+    expect(
+      baseAdapter.analyzeFile('ws:a.jsx', 'export const A = () => <div />\n', {
+        session,
+        workspaceName: 'ws',
+      }).language,
+    ).toBe('jsx')
+  })
+
+  it('emits no CALLS when a parameter or local declaration shadows the imported name', () => {
+    const { relations } = build(
+      {
+        'ws:lib.ts': 'export function helper(): void {}\n',
+        'ws:m.ts': [
+          "import { helper } from './lib.js'",
+          'export function viaParam(helper: () => void): void { helper() }',
+          'export function viaLocal(): void { const helper = () => {}; helper() }',
+          'export function viaCatch(): void { try {} catch (helper) { helper() } }',
+        ].join('\n'),
+      },
+      'ws:m.ts',
+    )
+
+    expect(relations.filter((r) => r.type === RelationType.Calls)).toEqual([])
+  })
+
+  it('still emits CALLS for the imported name when it is not shadowed', () => {
+    const { relations } = build(
+      {
+        'ws:lib.ts': 'export function helper(): void {}\n',
+        'ws:m.ts': "import { helper } from './lib.js'\nexport function run(): void { helper() }\n",
+      },
+      'ws:m.ts',
+    )
+
+    expect(relations.filter((r) => r.type === RelationType.Calls)).toHaveLength(1)
+  })
+})
+
+describe('TypeScript imported heritage clause ranges', () => {
+  const hierarchyRanges = (
+    lang: string,
+    files: Record<string, string>,
+    main: string,
+    importMap: (session: InMemoryIndexSession) => ReadonlyMap<string, string>,
+  ): Array<{ type: string; target: string; range: unknown }> => {
+    const session = new InMemoryIndexSession()
+    let analysis: ReturnType<InMemoryIndexSession['registerAnalysis']> | undefined
+    for (const [filePath, content] of Object.entries(files)) {
+      session.registerFile({
+        filePath,
+        projectRelativePath: filePath,
+        language: lang,
+        contentHash: 'x',
+        workspace: 'ws',
+      })
+      const registered = session.registerAnalysis({
+        filePath,
+        analysis: baseAdapter.analyzeFile(filePath, content, { session, workspaceName: 'ws' }),
+      })
+      if (filePath === main) analysis = registered
+    }
+    return baseAdapter
+      .buildRelations(analysis!, {
+        session,
+        resolvedImports: { importMap: importMap(session), fileImports: [] },
+      })
+      .filter((relation) => relation.metadata?.['importProvenance'] !== undefined)
+      .map((relation) => ({
+        type: relation.type,
+        target: relation.target,
+        range: relation.metadata?.['sourceRange'],
+      }))
+  }
+  const idOf = (session: InMemoryIndexSession, file: string, name: string): string =>
+    session.findSymbolsByFile(file).find((symbol) => symbol.name === name)!.id
+  const at = (line: number, text: string, needle: string) => {
+    const column = text.indexOf(needle)
+    return {
+      startLine: line,
+      startColumn: column,
+      endLine: line,
+      endColumn: column + needle.length,
+    }
+  }
+
+  it('records the range of each implements expression on its own edge', () => {
+    const line = 'export class C implements A, B {}'
+    const edges = hierarchyRanges(
+      'typescript',
+      {
+        'ws:a.ts': 'export interface A {}\n',
+        'ws:b.ts': 'export interface B {}\n',
+        'ws:c.ts': `import { A } from './a.js'\nimport { B } from './b.js'\n${line}\n`,
+      },
+      'ws:c.ts',
+      (session) =>
+        new Map([
+          ['A', idOf(session, 'ws:a.ts', 'A')],
+          ['B', idOf(session, 'ws:b.ts', 'B')],
+        ]),
+    )
+
+    expect(edges.map((edge) => edge.range)).toEqual([at(3, line, 'A'), at(3, line, 'B')])
+  })
+})
+
+describe('TypeScript structural boundary regressions', () => {
+  const analyze = (filePath: string, content: string) => {
+    const session = new InMemoryIndexSession()
+    session.registerFile({
+      filePath,
+      projectRelativePath: filePath,
+      language: 'typescript',
+      contentHash: 'x',
+      workspace: 'ws',
+    })
+    return baseAdapter.analyzeFile(filePath, content, { session, workspaceName: 'ws' })
+  }
+
+  it('keeps a call initializer inside its function and declares no logical local', () => {
+    const draft = analyze(
+      'ws:p.ts',
+      'export function process(): void {\n  const result = Service.run()\n}\n',
+    )
+    const processSymbol = draft.symbols.find((symbol) => symbol.name === 'process')!
+    const run = draft.callFacts.find((fact) => fact.name === 'run')
+
+    expect(run?.callerSymbolId).toBe(processSymbol.id)
+    expect(draft.symbols.some((symbol) => symbol.name === 'result')).toBe(false)
+    expect(
+      (draft.referenceFacts?.declarations ?? []).some(
+        (declaration) => parseLogicalSymbol(declaration.logicalId ?? '')?.name === 'result',
+      ),
+    ).toBe(false)
+  })
+
+  it('reads multiline imports, types and heritage from nodes, never from comments or templates', () => {
+    const draft = analyze(
+      'ws:m.ts',
+      [
+        'import {',
+        '  Alpha,',
+        '  Beta,',
+        "} from './dep.js'",
+        "// import { Fake } from './fake.js'",
+        "const text = `import { Ghost } from './ghost.js'; class Phantom extends Ghost {}`",
+        'export class Child',
+        '  extends Alpha',
+        '  implements',
+        '    Beta {',
+        '  field: Map<',
+        '    string,',
+        '    Alpha',
+        '  > = new Map()',
+        '}',
+      ].join('\n'),
+    )
+
+    expect(draft.imports.map((item) => item.localName).sort()).toEqual(['Alpha', 'Beta'])
+    expect(draft.symbols.map((symbol) => symbol.name)).not.toContain('Phantom')
+    const state = draft.parserState as unknown as {
+      declarations: ReadonlyArray<{
+        name: string
+        extendsNames: string[]
+        implementsNames: string[]
+      }>
+    }
+    expect(state.declarations.map((declaration) => declaration.name)).toEqual(['Child'])
+    expect(state.declarations[0]).toMatchObject({
+      extendsNames: ['Alpha'],
+      implementsNames: ['Beta'],
+    })
+  })
+})
+
+describe('TypeScript identity layers through the real adapter', () => {
+  const analyze = (content: string) => {
+    const session = new InMemoryIndexSession()
+    session.registerFile({
+      filePath: 'ws:src/calc.ts',
+      projectRelativePath: 'ws:src/calc.ts',
+      language: 'typescript',
+      contentHash: 'x',
+      workspace: 'ws',
+    })
+    const draft = baseAdapter.analyzeFile('ws:src/calc.ts', content, {
+      session,
+      workspaceName: 'ws',
+    })
+    const logicalByName = new Map(
+      (draft.referenceFacts?.declarations ?? []).map((declaration) => [
+        declaration.symbolId,
+        declaration.logicalId,
+      ]),
+    )
+    return { draft, logicalByName }
+  }
+
+  it('moving an overloaded method keeps its logical id while physical ids change', () => {
+    const body =
+      'export class Calc {\n  add(a: string): void\n  add(a: number): void\n  add(a: any) {}\n}\n'
+    const before = analyze(body)
+    const after = analyze(`// moved\n// down\n${body}`)
+    const idsOf = (
+      result: ReturnType<typeof analyze>,
+    ): { physical: string[]; logical: string[] } => {
+      const adds = result.draft.symbols.filter((symbol) => symbol.name === 'add')
+      return {
+        physical: adds.map((symbol) => symbol.id).sort(),
+        logical: [
+          ...new Set(adds.map((symbol) => result.logicalByName.get(symbol.id)).filter(Boolean)),
+        ] as string[],
+      }
+    }
+
+    const first = idsOf(before)
+    const second = idsOf(after)
+    expect(first.physical).toHaveLength(3)
+    expect(first.physical).not.toEqual(second.physical)
+    expect(first.logical).toHaveLength(1)
+    expect(second.logical).toEqual(first.logical)
+  })
+
+  it('a physical-only declaration has no logical id but is still found by symbol id and location', () => {
+    const { draft, logicalByName } = analyze(
+      "describe('suite', () => {\n  it('case', () => {\n    run()\n  })\n})\n",
+    )
+    const anonymous = draft.symbols.filter((symbol) => symbol.name === '<anonymous>')
+
+    expect(anonymous.length).toBeGreaterThan(0)
+    for (const symbol of anonymous) {
+      expect(logicalByName.get(symbol.id)).toBeUndefined()
+      expect(symbol.line).toBeGreaterThan(0)
+    }
+  })
+
+  it('equal local function names in competing routines stay distinct physical symbols without a shared logical target', () => {
+    const { draft, logicalByName } = analyze(
+      'export function a() { function same() {} }\nexport function b() { function same() {} }\n',
+    )
+    const same = draft.symbols.filter((symbol) => symbol.name === 'same')
+
+    expect(same).toHaveLength(2)
+    expect(new Set(same.map((symbol) => symbol.id)).size).toBe(2)
+    expect(same.every((symbol) => logicalByName.get(symbol.id) === undefined)).toBe(true)
   })
 })

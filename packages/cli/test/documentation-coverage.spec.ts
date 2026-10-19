@@ -10,6 +10,10 @@ const docsCliDir = path.join(repoRoot, 'docs/cli')
 const guideCliFile = path.join(repoRoot, 'docs/guide/cli.md')
 const guideIndexFile = path.join(repoRoot, 'docs/guide/index.md')
 const indexCliFile = path.join(repoRoot, 'docs/cli/index.md')
+const graphCliFile = path.join(repoRoot, 'docs/cli/graph.md')
+const codeGraphFile = path.join(repoRoot, 'docs/code-graph/index.md')
+const sdkFile = path.join(repoRoot, 'docs/sdk/index.md')
+const symbolSemanticsAdr = path.join(repoRoot, 'docs/adr/0029-cross-language-symbol-semantics.md')
 
 /**
  * Resolves the documentation file for a given command name or its aliases.
@@ -111,6 +115,21 @@ describe('CLI Documentation Coverage (dynamic introspection)', () => {
       expect(indexContent).toContain('`specd guide`')
       expect(indexContent).toContain('SDK and package-reference collections for integrators')
       expect(indexContent).toContain('user-facing guides')
+    })
+  })
+
+  describe('Cross-language symbol semantics references', () => {
+    it('documents the adapter, SDK, CLI, and architecture contracts', () => {
+      for (const file of [graphCliFile, codeGraphFile, sdkFile, symbolSemanticsAdr]) {
+        expect(fs.existsSync(file), `Expected ${file} to exist`).toBe(true)
+      }
+
+      expect(fs.readFileSync(codeGraphFile, 'utf8')).toContain('parser-authoritative policy')
+      expect(fs.readFileSync(sdkFile, 'utf8')).toContain('semanticCounts')
+      expect(fs.readFileSync(graphCliFile, 'utf8')).toContain('targetKind')
+      expect(fs.readFileSync(symbolSemanticsAdr, 'utf8')).toContain(
+        '## Decision Outcome Confirmation',
+      )
     })
   })
 

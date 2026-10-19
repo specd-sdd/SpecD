@@ -39,6 +39,7 @@ const INDEX_RESULT: IndexResult = {
     reasons: [],
   },
   coverageDiagnostics: [],
+  logicalDiagnostics: [],
 }
 
 function makeProvider(): CodeGraphHostPort {

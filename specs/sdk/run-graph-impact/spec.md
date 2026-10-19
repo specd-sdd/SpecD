@@ -19,18 +19,31 @@ Provides a host-agnostic SDK orchestration function `runGraphImpact` that perfor
 3. Accept provider-side filter constraints `filter: ImpactResultFilter` covering `types`, `kinds`, `workspaces`, `excludeWorkspaces`, `categories`, `includeTests`, and `includeIgnored`.
 4. When `input.provider` is omitted, open a transient provider using `withOpenGraphProvider(ctx, ...)`. When provided, execute on the supplied open provider directly.
 5. For file targets: resolve selectors using `provider.resolveFileSelector` and execute `provider.analyzeFileImpact` (or `provider.analyzeFilesImpact` for multiple files).
-6. For symbol targets: resolve selector using `provider.resolveSymbolSelector` and execute `provider.analyzeImpact`.
-7. For spec targets: validate spec existence using `provider.getSpec` and execute `provider.analyzeSpecImpact`.
-8. For public export targets: resolve public surface and binding using `provider.resolveSymbolReference` and `provider.getExactPublicBinding`, and execute `provider.analyzePublicBindingImpact`.
-9. Forward traversal direction, depth, and `filter` options to the corresponding provider method.
-10. Project all target and affected file/symbol locations to `projectRelativePath` using project and workspace configuration alone (`ctx.kernel.project.getConfig.execute()`):
-    - Single-file impact: target exposes `canonicalPath` and `projectRelativePath`.
-    - Multi-file impact: targets expose `targets` (canonical) and `projectRelativeTargets`.
-    - Symbol impact: target symbol location exposes `projectRelativePath`.
-    - Public export impact: public surface exposes `projectRelativeSurface`.
-    - Affected files: list paths formatted as `projectRelativePath`.
-    - Affected symbols: reference locations projected to `projectRelativePath`.
-11. Return `RunGraphImpactResult` containing aggregate metrics (`riskLevel`, `directDepsCount`, `indirectDepsCount`, `transitiveDepsCount`, `affectedFilesCount`, `omittedCounts`).
+6. For spec targets: validate spec existence using `provider.getSpec` and execute `provider.analyzeSpecImpact`.
+7. For public export targets: resolve public surface and binding using `provider.resolveSymbolReference` and `provider.getExactPublicBinding`, and execute `provider.analyzePublicBindingImpact`.
+8. Forward traversal direction, depth, and `filter` options to the corresponding provider method.
+9. Project all target and affected file/symbol locations to `projectRelativePath` using project and workspace configuration alone (`ctx.kernel.project.getConfig.execute()`):
+   - Single-file impact: target exposes `canonicalPath` and `projectRelativePath`.
+   - Multi-file impact: targets expose `targets` (canonical) and `projectRelativeTargets`.
+   - Symbol impact: target symbol location exposes `projectRelativePath`.
+   - Public export impact: public surface exposes `projectRelativeSurface`.
+   - Affected files: list paths formatted as `projectRelativePath`.
+   - Affected symbols: reference locations projected to `projectRelativePath`.
+10. Return `RunGraphImpactResult` containing aggregate metrics (`riskLevel`, `directDepsCount`, `indirectDepsCount`, `transitiveDepsCount`, `affectedFilesCount`, `omittedCounts`).
+
+6) For symbol targets: resolve the selector through the provider and execute the typed discriminated `provider.analyzeResolvedSymbolImpact` operation, as required by "Resolution-preserving symbol impact orchestration".
+
+### Requirement: Resolution-preserving symbol impact orchestration
+
+For a symbol target, `runGraphImpact` SHALL preserve the discriminated provider resolution through impact execution. A logical-target resolution MUST be passed to the provider impact operation with its canonical logical symbol, complete declaration set, and ordered resolution evidence. The SDK MUST NOT load one declaration and invoke impact using only that declaration's physical ID. It MUST NOT retain a compatibility branch that selects `declarations[0]` or calls a physical-only provider method for a logical target; provider implementations used by this API SHALL implement the typed discriminated operation.
+
+Deprecated legacy summary fields such as `symbol` and `impact.target` MAY remain in `RunGraphImpactResult` only as display projections derived from the typed result after traversal. They MUST NOT select, widen, or narrow what is traversed. For a logical target, `impact.target` SHALL carry the canonical logical identity, not a physical declaration ID, and a human-readable name SHALL come from the canonical logical symbol rather than from parsing a physical ID.
+
+An exact-declaration selector SHALL retain physical impact semantics. A public export selector SHALL continue to retain the exact binding route separately from canonical-target impact. Ambiguous or unresolved results MUST NOT start traversal.
+
+`RunGraphImpactResult` SHALL expose the resolved target kind, canonical logical identity when present, contributing declaration locations, physical dependency evidence, logical affected targets, declaration-only affected evidence, and covering specs. Aggregate count and risk fields MUST document whether they count unique logical targets or physical occurrences.
+
+Path projection SHALL project every retained declaration and evidence location to `projectRelativePath` without additional graph reads. This includes locations nested under `resolvedTarget`, resolution evidence, declaration sets, affected logical targets, declaration-only evidence, public-binding surfaces, and covering-spec evidence. No nested location returned by the public result MAY expose only a canonical workspace path when a project-relative projection is part of the result contract.
 
 ### Requirement: Elimination of displayPath and displayTargets
 

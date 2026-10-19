@@ -6,6 +6,7 @@ import { type FileAnalysis, type FileAnalysisDraft } from './file-analysis.js'
 import {
   type DeclarationOccurrence,
   type LocalBinding,
+  type LogicalDeclarationDiagnostic,
   type LogicalSymbol,
   type PublicBinding,
   type ResolutionStep,
@@ -151,6 +152,12 @@ export interface IndexSession {
 
   /** Returns logical symbols recorded for this session. */
   getLogicalSymbols(): readonly LogicalSymbol[]
+
+  /**
+   * Returns logical-collision diagnostics gathered while registering analyses.
+   * @returns Deterministically ordered diagnostics.
+   */
+  getLogicalDiagnostics(): readonly LogicalDeclarationDiagnostic[]
 
   /** Returns public bindings recorded for this session. */
   getPublicBindings(): readonly PublicBinding[]

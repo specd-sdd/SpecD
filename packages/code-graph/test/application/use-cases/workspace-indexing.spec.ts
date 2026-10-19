@@ -278,9 +278,7 @@ describe('Workspace indexing', () => {
       graphConfig: { includePaths: [], workspaces: new Map() },
     }
     await indexer.execute(options)
-    await expect(store.getImporters('ws:src/target.ts')).resolves.toEqual([
-      expect.objectContaining({ source: 'ws:src/importer.ts', target: 'ws:src/target.ts' }),
-    ])
+    await expect(store.getImporters('ws:src/target.ts')).resolves.toEqual([])
     analyzeFile.mockClear()
 
     writeFileSync(join(wsDir, 'src/target.ts'), 'export function target(): number { return 1 }')
@@ -347,6 +345,150 @@ describe('Workspace indexing', () => {
     expect(foo).toBeDefined()
     expect(bar).toBeDefined()
     expect(result.errors).toEqual([])
+  })
+
+  it('given a store indexed for two workspaces, when a forced run targets only one, then the other workspace keeps its data and only the target is regenerated', async () => {
+    const ws1Dir = createWorkspaceDir(tempDir, 'ws1', {
+      'package.json': JSON.stringify({ name: 'ws1' }),
+      'src/a.ts': 'export const alpha = 1;',
+    })
+    const ws2Dir = createWorkspaceDir(tempDir, 'ws2', {
+      'package.json': JSON.stringify({ name: 'ws2' }),
+      'src/b.ts': 'export const beta = 2;',
+    })
+    const target = (name: string, codeRoot: string) => ({
+      name,
+      prefix: null,
+      codeRoot,
+      specRepo: makeMockRepo([]),
+      ownership: 'owned' as const,
+      isExternal: false,
+    })
+    const base = {
+      projectRoot: tempDir,
+      vcsRoot: tempDir,
+      graphConfig: { includePaths: [], workspaces: new Map() },
+    }
+    const uc = new IndexCodeGraph(store, registry)
+    await uc.execute({ ...base, workspaces: [target('ws1', ws1Dir), target('ws2', ws2Dir)] })
+    expect(await store.getFile('ws2:src/b.ts')).toBeDefined()
+
+    writeFileSync(join(ws1Dir, 'src/a.ts'), 'export const alpha = 1; export const gamma = 3;')
+    const result = await uc.execute({
+      ...base,
+      workspaces: [target('ws1', ws1Dir)],
+      force: true,
+    })
+
+    expect(result.errors).toEqual([])
+    expect(await store.getFile('ws2:src/b.ts')).toBeDefined()
+    expect(
+      (await store.findSymbols({ name: 'beta' })).some((s) => s.filePath === 'ws2:src/b.ts'),
+    ).toBe(true)
+    expect(
+      (await store.findSymbols({ name: 'gamma' })).some((s) => s.filePath === 'ws1:src/a.ts'),
+    ).toBe(true)
+  })
+
+  it('given a derivation mismatch on a whole-graph run, when derivationMismatch is fail, then it throws before any write and the default rebuilds in place', async () => {
+    const wsDir = createWorkspaceDir(tempDir, 'ws1', { 'src/a.ts': 'export const alpha = 1;' })
+    const options = (
+      codeGraphVersion: string,
+      extra: Partial<IndexOptions> = {},
+    ): IndexOptions => ({
+      projectRoot: tempDir,
+      vcsRoot: tempDir,
+      workspaces: [
+        {
+          name: 'ws1',
+          prefix: null,
+          codeRoot: wsDir,
+          specRepo: makeMockRepo([]),
+          ownership: 'owned',
+          isExternal: false,
+        },
+      ],
+      graphConfig: { includePaths: [], workspaces: new Map() },
+      codeGraphVersion,
+      ...extra,
+    })
+    const uc = new IndexCodeGraph(store, registry)
+    await uc.execute(options('1.0.0'))
+    const filesBefore = (await store.getAllFiles()).map((file) => file.path)
+
+    await expect(
+      uc.execute(options('2.0.0', { derivationMismatch: 'fail' })),
+    ).rejects.toMatchObject({
+      code: 'GRAPH_DERIVATION_MISMATCH',
+      reason: FULL_REBUILD_FINGERPRINT_REASON,
+    })
+    expect((await store.getAllFiles()).map((file) => file.path)).toEqual(filesBefore)
+
+    const rebuilt = await uc.execute(options('2.0.0'))
+    expect(rebuilt.fullRebuildReason).toBe(FULL_REBUILD_FINGERPRINT_REASON)
+  })
+
+  it('given a full index followed by a subset run, when a full run follows without force, then no derivation mismatch is raised', async () => {
+    const ws1Dir = createWorkspaceDir(tempDir, 'ws1', { 'src/a.ts': 'export const alpha = 1;' })
+    const ws2Dir = createWorkspaceDir(tempDir, 'ws2', { 'src/b.ts': 'export const beta = 2;' })
+    const target = (name: string, codeRoot: string) => ({
+      name,
+      prefix: null,
+      codeRoot,
+      specRepo: makeMockRepo([]),
+      ownership: 'owned' as const,
+      isExternal: false,
+    })
+    const base = {
+      projectRoot: tempDir,
+      vcsRoot: tempDir,
+      graphConfig: { includePaths: [], workspaces: new Map() },
+      derivationMismatch: 'fail' as const,
+    }
+    const uc = new IndexCodeGraph(store, registry)
+    const all = [target('ws1', ws1Dir), target('ws2', ws2Dir)]
+    await uc.execute({ ...base, workspaces: all })
+    const storedAfterFull = (await store.getStatistics()).graphFingerprint
+
+    await uc.execute({ ...base, workspaces: [target('ws1', ws1Dir)] })
+    const storedAfterSubset = (await store.getStatistics()).graphFingerprint
+    expect(JSON.parse(storedAfterSubset!)).toEqual(JSON.parse(storedAfterFull!))
+
+    const full = await uc.execute({ ...base, workspaces: all })
+
+    expect(full.fullRebuild).toBe(false)
+    expect(full.errors).toEqual([])
+  })
+
+  it('stores the project-relative path of indexed files, including code roots outside the project', async () => {
+    const projectRoot = join(tempDir, 'project')
+    mkdirSync(projectRoot, { recursive: true })
+    const insideDir = createWorkspaceDir(projectRoot, 'inside', {
+      'src/a.ts': 'export const a = 1;',
+    })
+    const outsideDir = createWorkspaceDir(join(tempDir, 'vendor'), 'outside', {
+      'src/b.ts': 'export const b = 2;',
+    })
+    const target = (name: string, codeRoot: string) => ({
+      name,
+      prefix: null,
+      codeRoot,
+      specRepo: makeMockRepo([]),
+      ownership: 'owned' as const,
+      isExternal: false,
+    })
+
+    await new IndexCodeGraph(store, registry).execute({
+      projectRoot,
+      vcsRoot: tempDir,
+      workspaces: [target('inside', insideDir), target('outside', outsideDir)],
+      graphConfig: { includePaths: [], workspaces: new Map() },
+    })
+
+    expect((await store.getFile('inside:src/a.ts'))?.projectRelativePath).toBe('inside/src/a.ts')
+    expect((await store.getFile('outside:src/b.ts'))?.projectRelativePath).toBe(
+      '../vendor/outside/src/b.ts',
+    )
   })
 
   it('assigns specs to the correct workspace and specId', async () => {

@@ -359,6 +359,7 @@ export function serializeFingerprintMap(map: Map<string, string>): string {
  * @param adapters - Registered language adapters supply resolution-manifest basenames.
  * @param repoRoot - Repository root that bounds the resolution-manifest walk, or null.
  * @param source - Port that reads manifest existence and text.
+ * @param includeRoot - Whether the project-global `root` entry takes part; false for subset runs.
  * @returns True if any mismatch is detected.
  */
 export function detectFingerprintMismatch(
@@ -370,6 +371,7 @@ export function detectFingerprintMismatch(
   adapters: readonly LanguageAdapter[] = [],
   repoRoot: string | null = null,
   source: ResolutionManifestSource = emptyResolutionManifestSource,
+  includeRoot = true,
 ): boolean {
   if (storedMap.size === 0) {
     return false
@@ -391,6 +393,10 @@ export function detectFingerprintMismatch(
       return true
     }
   }
+
+  // The root entry is derived from the whole workspace list, so only a run that indexes
+  // every workspace can judge it; a subset run must neither compare nor rewrite it.
+  if (!includeRoot) return false
 
   const rootFingerprint = computeRootFingerprint(
     codeGraphVersion,

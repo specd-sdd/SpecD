@@ -1,6 +1,6 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { performance } from 'node:perf_hooks'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -31,6 +31,125 @@ import { GoLanguageAdapter } from '../../../src/infrastructure/tree-sitter/go-la
 import { TypeScriptLanguageAdapter } from '../../../src/infrastructure/tree-sitter/typescript-language-adapter.js'
 
 const makeMockRepo = makeMockSpecRepository
+
+interface SemanticMutationCase {
+  readonly name: string
+  readonly initial: Readonly<Record<string, string>>
+  readonly final: Readonly<Record<string, string>>
+}
+
+const semanticMutationCases: readonly SemanticMutationCase[] = [
+  {
+    name: 'body',
+    initial: { 'service.ts': 'export function run(): number { return 1 }\n' },
+    final: { 'service.ts': 'export function run(): number { return 2 }\n' },
+  },
+  {
+    name: 'move',
+    initial: { 'service.ts': 'export function run(): number { return 1 }\n' },
+    final: { 'service.ts': '\n\nexport function run(): number { return 1 }\n' },
+  },
+  {
+    name: 'signature',
+    initial: { 'service.ts': 'export function run(value: string): string { return value }\n' },
+    final: {
+      'service.ts': 'export function run(value: number): string { return String(value) }\n',
+    },
+  },
+  {
+    name: 'group',
+    initial: { 'service.ts': 'export function run(value: string): string { return value }\n' },
+    final: {
+      'service.ts': [
+        'export function run(value: string): string;',
+        'export function run(value: number): string;',
+        'export function run(value: string | number): string { return String(value) }',
+        '',
+      ].join('\n'),
+    },
+  },
+  {
+    name: 'owner',
+    initial: { 'service.ts': 'export class First { run(): number { return 1 } }\n' },
+    final: { 'service.ts': 'export class Second { run(): number { return 1 } }\n' },
+  },
+  {
+    name: 'rename',
+    initial: { 'service.ts': 'export function before(): number { return 1 }\n' },
+    final: { 'service.ts': 'export function after(): number { return 1 }\n' },
+  },
+  {
+    name: 'delete',
+    initial: {
+      'service.ts': 'export function run(): number { return 1 }\n',
+      'obsolete.ts': 'export function obsolete(): number { return 0 }\n',
+    },
+    final: { 'service.ts': 'export function run(): number { return 1 }\n' },
+  },
+  {
+    name: 'add',
+    initial: { 'service.ts': 'export function run(): number { return 1 }\n' },
+    final: {
+      'service.ts': 'export function run(): number { return 1 }\n',
+      'added.ts': 'export function added(): number { return 2 }\n',
+    },
+  },
+  {
+    name: 'newly resolvable',
+    initial: {
+      'consumer.ts':
+        "import { target } from './target.js'; export function call(): number { return target() }\n",
+    },
+    final: {
+      'consumer.ts':
+        "import { target } from './target.js'; export function call(): number { return target() }\n",
+      'target.ts': 'export function target(): number { return 1 }\n',
+    },
+  },
+]
+
+function writeSourceSnapshot(
+  codeRoot: string,
+  previous: Readonly<Record<string, string>>,
+  next: Readonly<Record<string, string>>,
+): void {
+  for (const relativePath of new Set([...Object.keys(previous), ...Object.keys(next)])) {
+    const absolutePath = join(codeRoot, relativePath)
+    const content = next[relativePath]
+    if (content === undefined) {
+      rmSync(absolutePath, { force: true })
+      continue
+    }
+    mkdirSync(dirname(absolutePath), { recursive: true })
+    writeFileSync(absolutePath, content)
+  }
+}
+
+function readNormalizedSemanticSnapshot(storagePath: string): Readonly<Record<string, unknown>> {
+  const database = new Database(join(storagePath, 'graph', 'code-graph.sqlite'), {
+    readonly: true,
+  })
+  try {
+    const tables = [
+      'symbols',
+      'logical_symbols',
+      'logical_declarations',
+      'public_bindings',
+      'local_bindings',
+      'relations',
+      'resolution_steps',
+      'index_coverage',
+    ] as const
+    return Object.fromEntries(
+      tables.map((table) => [
+        table,
+        database.prepare(`SELECT * FROM ${table} ORDER BY 1, 2, 3`).all(),
+      ]),
+    )
+  } finally {
+    database.close()
+  }
+}
 
 function makeConfig(projectRoot: string, codeRoot: string): SpecdConfig {
   return {
@@ -71,6 +190,57 @@ describe('IndexProjectGraph integration', () => {
       rmSync(tempDir, { recursive: true, force: true })
     }
   })
+
+  it.each(semanticMutationCases)(
+    'produces the clean semantic snapshot after an incremental $name mutation',
+    async ({ initial, final }) => {
+      tempDir = mkdtempSync(join(tmpdir(), 'index-semantic-equivalence-'))
+      const codeRoot = join(tempDir, 'workspace')
+      const incrementalStorage = join(tempDir, 'incremental-store')
+      const cleanStorage = join(tempDir, 'clean-store')
+      mkdirSync(codeRoot, { recursive: true })
+      writeSourceSnapshot(codeRoot, {}, initial)
+
+      const createIndexer = async (storagePath: string) => {
+        const store = new SQLiteGraphStore(storagePath)
+        await store.open()
+        const registry = new AdapterRegistry()
+        registry.register(new TypeScriptLanguageAdapter())
+        return { store, indexer: new IndexCodeGraph(store, registry) }
+      }
+      const options = {
+        projectRoot: tempDir,
+        vcsRoot: null,
+        workspaces: [
+          {
+            name: 'fixture',
+            prefix: null,
+            codeRoot,
+            specRepo: makeMockRepo(),
+            ownership: 'owned' as const,
+            isExternal: false,
+          },
+        ],
+        graphConfig: { includePaths: [], excludePaths: [], workspaces: new Map() },
+        codeGraphVersion: readInstalledCodeGraphVersion(),
+      }
+
+      const incremental = await createIndexer(incrementalStorage)
+      await incremental.indexer.execute(options)
+      writeSourceSnapshot(codeRoot, initial, final)
+      await incremental.indexer.execute(options)
+
+      const clean = await createIndexer(cleanStorage)
+      await clean.indexer.execute({ ...options, force: true })
+
+      await incremental.store.close()
+      await clean.store.close()
+      expect(readNormalizedSemanticSnapshot(incrementalStorage)).toEqual(
+        readNormalizedSemanticSnapshot(cleanStorage),
+      )
+    },
+    60000,
+  )
 
   it('indexes after a forced logical rebuild without recreating healthy storage', async () => {
     tempDir = mkdtempSync(join(tmpdir(), 'index-project-graph-force-'))
@@ -316,7 +486,7 @@ describe('IndexProjectGraph integration', () => {
     const exportedResults = await provider.searchReferenceSymbols({ query: 'PythonService' })
     expect(
       exportedResults.flatMap((item) => item.publicBindings.map((binding) => binding.exportedName)),
-    ).not.toContain('PythonService')
+    ).toContain('PythonService')
 
     const publicServiceResults = await provider.searchReferenceSymbols({
       query: 'PublicService',
@@ -378,6 +548,11 @@ describe('IndexProjectGraph integration', () => {
     )
     expect(publicImpact.canonicalImpact.affectedSymbols).toEqual(canonicalImpact.affectedSymbols)
     expect(publicImpact.binding.id).toBe(publicBinding!.id)
+    // The exact-route view is built from a real index and must not be empty.
+    expect(publicImpact.bindingImpact.affectedSymbols.map((symbol) => symbol.name)).toContain(
+      'direct',
+    )
+    expect(publicImpact.bindingImpact.directDependents).toBeGreaterThan(0)
     expect(publicImpact.target.id).toBe(publicCandidate!.target.id)
     expect(publicImpact.canonicalImpact.affectedSymbols.map((symbol) => symbol.name)).toContain(
       'direct',
@@ -533,6 +708,81 @@ describe('IndexProjectGraph integration', () => {
     expect(result.phaseMetrics.searchIndexRebuild.durationMs).toBeGreaterThanOrEqual(0)
     const statistics = await provider.getStatistics()
     expect(statistics.relationCounts.CALLS).toBeGreaterThanOrEqual(symbolCount)
+    await provider.close()
+  }, 15_000)
+
+  it('fills import local binding targets from imports resolved in pass 2', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'index-project-graph-import-binding-'))
+    const codeRoot = join(tempDir, 'workspace')
+    mkdirSync(codeRoot, { recursive: true })
+    writeFileSync(join(codeRoot, 'lib.ts'), 'export function helper(): void {}\n')
+    writeFileSync(
+      join(codeRoot, 'consumer.ts'),
+      "import { helper } from './lib.js'\nexport function run(): void {\n  helper()\n}\n",
+    )
+    const provider = createCodeGraphProvider(makeConfig(tempDir, codeRoot))
+    await provider.open()
+    const result = await provider.index({
+      projectRoot: tempDir,
+      vcsRoot: null,
+      workspaces: [
+        {
+          name: 'fixture',
+          prefix: null,
+          codeRoot,
+          specRepo: makeMockRepo(),
+          ownership: 'owned',
+          isExternal: false,
+        },
+      ],
+      graphConfig: { includePaths: [], excludePaths: [], workspaces: new Map() },
+      codeGraphVersion: readInstalledCodeGraphVersion(),
+    })
+    expect(result.errors).toEqual([])
+
+    const resolution = await provider.resolveSymbolReference({
+      workspace: 'fixture',
+      requested: 'helper',
+      filePath: 'fixture:consumer.ts',
+      scopeId: 'module',
+    })
+
+    expect(resolution.status).toBe('resolved')
+    expect(resolution.target?.name).toBe('helper')
+    await provider.close()
+  }, 15_000)
+
+  it('reports logical collision diagnostics in the index result', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'index-project-graph-collision-'))
+    const codeRoot = join(tempDir, 'workspace')
+    mkdirSync(codeRoot, { recursive: true })
+    writeFileSync(
+      join(codeRoot, 'merge.ts'),
+      'interface Merged { m(): void }\ninterface Merged { n(): void }\nexport function ok(): void {}\n',
+    )
+    const provider = createCodeGraphProvider(makeConfig(tempDir, codeRoot))
+    await provider.open()
+    const result = await provider.index({
+      projectRoot: tempDir,
+      vcsRoot: null,
+      workspaces: [
+        {
+          name: 'fixture',
+          prefix: null,
+          codeRoot,
+          specRepo: makeMockRepo(),
+          ownership: 'owned',
+          isExternal: false,
+        },
+      ],
+      graphConfig: { includePaths: [], excludePaths: [], workspaces: new Map() },
+      codeGraphVersion: readInstalledCodeGraphVersion(),
+    })
+
+    expect(result.errors).toEqual([])
+    expect(result.logicalDiagnostics.map((diagnostic) => diagnostic.code)).toContain(
+      'UNGROUPED_LOGICAL_COLLISION',
+    )
     await provider.close()
   }, 15_000)
 

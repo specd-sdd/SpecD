@@ -11,22 +11,16 @@
   ],
   "implementation": [
     {
-      "file": "code-graph:src/application/use-cases/_shared/compute-graph-fingerprint.ts",
+      "file": "code-graph:src/infrastructure/index-lock.ts",
       "symbols": [
-        "detectFingerprintMismatch",
-        "computeGraphFingerprint",
-        "GRAPH_STATS_FINGERPRINT_WARNING"
+        "classifyGraphIndexLock",
+        "readProcessStartTime",
+        "acquireGraphIndexLockLeaseByStoragePath",
+        "assertGraphIndexUnlockedByStoragePath"
       ]
     },
     {
-      "file": "code-graph:src/application/use-cases/get-graph-health.ts",
-      "symbols": ["GetGraphHealth"]
-    },
-    {
-      "file": "code-graph:test/application/use-cases/staleness-detection.verify.spec.ts"
-    },
-    {
-      "file": "code-graph:test/application/use-cases/get-graph-health.spec.ts"
+      "file": "code-graph:test/infrastructure/index-lock.spec.ts"
     }
   ],
   "optimizations": {

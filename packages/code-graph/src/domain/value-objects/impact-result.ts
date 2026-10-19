@@ -1,6 +1,14 @@
 import { type FileCategory } from './file-node.js'
+import { type RelationType } from './relation-type.js'
 import { type RiskLevel } from './risk-level.js'
+import { type SourceLocation } from './source-location.js'
 import { type SymbolKind } from './symbol-kind.js'
+import { type SymbolNode } from './symbol-node.js'
+import {
+  type DeclarationOccurrence,
+  type LogicalSymbol,
+  type ResolvedSymbolTarget,
+} from './symbol-reference.js'
 
 /** Supported result categories for an impact query. */
 export const IMPACT_RESULT_TYPES = ['files', 'symbols', 'specs'] as const
@@ -105,6 +113,7 @@ export interface CoveringSpecEvidence {
   readonly kind: 'file' | 'symbol'
   readonly target: string
   readonly depth: number
+  readonly declarations?: readonly string[] | undefined
 }
 
 /** Deduplicated covering spec with its shallowest depth and complete evidence. */
@@ -124,3 +133,51 @@ export interface FileImpactResult extends ImpactResult {
 
 /** Impact result for a spec requirement. */
 export type SpecImpactResult = ImpactResult
+
+/** Reconstructed physical dependency edge proving why a target is impacted. */
+export interface PhysicalDependencyEvidence {
+  readonly relationType: RelationType
+  readonly sourceDeclarationId: string
+  readonly targetDeclarationId: string
+  readonly sourceLocation: SourceLocation | undefined
+  readonly targetLocation: SourceLocation | undefined
+  readonly depth: number
+}
+
+/** Logical target impacted by a change, aggregating all declaration occurrences. */
+export interface LogicalAffectedTarget {
+  readonly kind: 'logical-target'
+  readonly logicalSymbol: LogicalSymbol
+  readonly declarations: readonly DeclarationOccurrence[]
+  readonly depth: number
+  readonly evidence: readonly PhysicalDependencyEvidence[]
+}
+
+/** Physical declaration with no logical target impacted by a change. */
+export interface PhysicalOnlyAffectedTarget {
+  readonly kind: 'physical-only'
+  readonly declaration: SymbolNode
+  readonly depth: number
+  readonly evidence: readonly PhysicalDependencyEvidence[]
+}
+
+/** Discriminated union of semantic affected targets. */
+export type SemanticAffectedTarget = LogicalAffectedTarget | PhysicalOnlyAffectedTarget
+
+/** Explicit impact counts separating unique logical targets from physical evidence. */
+export interface SemanticImpactCounts {
+  readonly directLogicalTargets: number
+  readonly indirectLogicalTargets: number
+  readonly transitiveLogicalTargets: number
+  readonly physicalOnlyTargets: number
+  readonly physicalDeclarationOccurrences: number
+}
+
+/** Rich semantic impact result preserving discriminated target and occurrence evidence. */
+export interface ResolvedSymbolImpactResult extends ImpactResult {
+  readonly resolvedTarget: ResolvedSymbolTarget
+  readonly semanticAffectedTargets: readonly SemanticAffectedTarget[]
+  readonly physicalEvidence: readonly PhysicalDependencyEvidence[]
+  readonly semanticCounts: SemanticImpactCounts
+  readonly coveringSpecs: readonly CoveringSpecImpact[]
+}

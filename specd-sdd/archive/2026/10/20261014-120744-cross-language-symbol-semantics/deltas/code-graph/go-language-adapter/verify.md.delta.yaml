@@ -1,0 +1,80 @@
+- op: added
+  description: 'Verify Go caller containment, lexical roles, and non-overloaded identities.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Scoped bindings, selectors, construction, and types$'
+  content: |
+    ### Requirement: Go caller containment and declaration classification
+
+    #### Scenario: Short variable before a call is not the caller
+
+    - **GIVEN** a Go function contains a short-variable declaration followed by a package function call
+    - **WHEN** caller identity is extracted
+    - **THEN** the containing Go function is the caller
+    - **AND** the short-variable name remains a lexical binding
+
+    #### Scenario: Receiver method owns calls in its body
+
+    - **GIVEN** a receiver method and a package function occur on adjacent lines
+    - **AND** the method body contains a call
+    - **WHEN** containment is evaluated
+    - **THEN** the receiver method is selected from its complete range
+    - **AND** the adjacent package function is not selected by line order
+
+    #### Scenario: Equal package names are not overloads
+
+    - **GIVEN** competing same-name declarations cannot form a valid Go package binding
+    - **WHEN** logical identity is constructed
+    - **THEN** they are not grouped as an overload set
+    - **AND** the conflict remains distinct or unsupported
+
+- op: added
+  description: 'Verify AST-derived Go declarations, imports, calls, and composite literals.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Supported files and deterministic analysis$'
+  content: |
+    ### Requirement: Go parser-authoritative structural extraction
+
+    #### Scenario: Braces and call-like text do not reconstruct Go structure
+
+    - **GIVEN** Go strings and comments contain braces, selector calls, imports, and composite-literal-like text
+    - **AND** real interfaces, grouped imports, calls, and composite literals span multiple lines
+    - **WHEN** the adapter analyzes the file
+    - **THEN** bodies, methods, imports, calls, literals, and ranges follow Go parser nodes
+    - **AND** raw brace counts and textual lookalikes add no facts
+
+    #### Scenario: Go module metadata remains separate
+
+    - **GIVEN** module identity is parsed textually from `go.mod`
+    - **WHEN** Go source facts are extracted
+    - **THEN** the module identity may qualify package resolution
+    - **AND** source declarations and dependencies still require Go AST evidence
+
+    #### Scenario: Unresolved Go import is not a resolved target
+
+    - **GIVEN** an import spec contains a raw package path that cannot be resolved under the configured module and workspace maps
+    - **WHEN** dependency relations are emitted
+    - **THEN** no relation uses the raw specifier as its resolved target
+    - **AND** unresolved diagnostic evidence may retain the original specifier
+
+- op: modified
+  description: 'Align the Go relation scenario with indexer-owned IMPORTS.'
+  selector:
+    type: section
+    matches: '^Scenario: Go buildRelations emits IMPORTS and CALLS relations$'
+  rename: 'Scenario: Go resolves imports and buildRelations emits CALLS relations'
+  content: |
+
+    - **GIVEN** a Go file importing a known indexed package and calling a function
+    - **WHEN** `resolveImports()` and `buildRelations()` execute
+    - **THEN** the resolved import is returned so the indexer can derive the file-level `IMPORTS` relation
+    - **AND** a `CALLS` relation connects the caller to the resolved target function or receiver method

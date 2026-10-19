@@ -2,6 +2,7 @@ import {
   buildProjectGraphConfig,
   createIndexProjectGraph,
   type CodeGraphProvider,
+  GraphDerivationMismatchError,
   GraphStorageRecoveryRequiredError,
   type IndexProgressCallback,
   type IndexResult,
@@ -84,6 +85,7 @@ export async function runIndexProjectGraph(
   const executeIndex = async (
     provider: CodeGraphProvider,
     repair = { fullRebuild: false, fullRebuildReason: null as string | null },
+    derivationMismatch: 'rebuild' | 'fail' = 'rebuild',
   ): Promise<RunIndexProjectGraphResult> => {
     const result = await indexProjectGraph.execute({
       provider,
@@ -93,6 +95,7 @@ export async function runIndexProjectGraph(
       codeGraphVersion,
       vcsRoot,
       ...(input.force !== undefined ? { force: input.force } : {}),
+      derivationMismatch,
       ...(vcsRef !== undefined ? { vcsRef } : {}),
       ...(input.onProgress !== undefined ? { onProgress: input.onProgress } : {}),
       getSpecMetadata: ctx.kernel.specs.getMetadata,
@@ -109,22 +112,43 @@ export async function runIndexProjectGraph(
   }
 
   let repair = { fullRebuild: false, fullRebuildReason: null as string | null }
-  return withOpenGraphProvider<RunIndexProjectGraphResult>(
-    ctx,
-    (provider) => executeIndex(provider, repair),
-    {
-      ...(input.beforeOpen === undefined ? {} : { beforeOpen: input.beforeOpen }),
-      ...(input.afterClose === undefined ? {} : { afterClose: input.afterClose }),
-      recoverOpenFailure: async (error: unknown, provider: CodeGraphProvider): Promise<boolean> => {
-        if (!(error instanceof GraphStorageRecoveryRequiredError)) return false
-        if (input.force !== true && error.reason !== 'SCHEMA_INCOMPATIBLE') return false
-        await provider.recreate()
-        repair = {
-          fullRebuild: true,
-          fullRebuildReason: error.reason,
-        }
-        return true
-      },
+  const lifecycle = {
+    ...(input.afterClose === undefined ? {} : { afterClose: input.afterClose }),
+    recoverOpenFailure: async (error: unknown, provider: CodeGraphProvider): Promise<boolean> => {
+      if (!(error instanceof GraphStorageRecoveryRequiredError)) return false
+      if (input.force !== true && error.reason !== 'SCHEMA_INCOMPATIBLE') return false
+      await provider.recreate()
+      repair = {
+        fullRebuild: true,
+        fullRebuildReason: error.reason,
+      }
+      return true
     },
-  )
+  }
+  try {
+    // First attempt asks to fail before any write when the whole graph is incompatible.
+    return await withOpenGraphProvider<RunIndexProjectGraphResult>(
+      ctx,
+      (provider) => executeIndex(provider, repair, 'fail'),
+      {
+        ...(input.beforeOpen === undefined ? {} : { beforeOpen: input.beforeOpen }),
+        ...lifecycle,
+      },
+    )
+  } catch (error) {
+    if (!(error instanceof GraphDerivationMismatchError)) throw error
+    // Recreate storage physically while the provider is still closed, then index an empty store.
+    const mismatch = { fullRebuild: true, fullRebuildReason: error.reason }
+    return withOpenGraphProvider<RunIndexProjectGraphResult>(
+      ctx,
+      (provider) => executeIndex(provider, mismatch),
+      {
+        beforeOpen: async (provider) => {
+          await input.beforeOpen?.(provider)
+          await provider.recreate()
+        },
+        ...lifecycle,
+      },
+    )
+  }
 }

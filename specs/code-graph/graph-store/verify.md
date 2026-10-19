@@ -26,10 +26,10 @@
 
 ### Requirement: Minimum graph semantics
 
-#### Scenario: Backend preserves canonical and config-relative file identity
+#### Scenario: Backend preserves canonical and project-relative file identity
 
 - **WHEN** indexing and query features use the abstract `GraphStore`
-- **THEN** file nodes retain both canonical workspace-prefixed `path` values and `configRelativePath` values needed for CLI lookup
+- **THEN** file nodes retain both canonical workspace-prefixed `path` values and `projectRelativePath` values needed for CLI lookup
 - **AND** storage-agnostic consumers do not depend on backend-specific column or label names
 
 #### Scenario: Backend persists file source content for preview extraction
@@ -229,12 +229,12 @@
 - **WHEN** `rebuildFtsIndexes()` is called after bulk data changes
 - **THEN** subsequent abstract search queries see the new symbols and specs
 
-#### Scenario: Persisted file content does not introduce file search surface
+#### Scenario: Persisted file content is not a file result category
 
-- **GIVEN** a backend persists file source content for symbol snippet extraction
-- **WHEN** consumers use the abstract search contract
-- **THEN** the contract exposes search across symbols, specs, and documents only
-- **AND** no separate file full-text search category is implied by persisted file content
+- **GIVEN** a backend persists file source content
+- **WHEN** consumers use the `GraphStore` `searchSymbols`, `searchSpecs`, and `searchDocuments` contract
+- **THEN** those methods return symbols, specs, and documents only, and the store adds no persisted-file result category to them
+- **AND** matches in source text that are not symbols are served only by `searchSourceContentCandidates`, which the reference-aware search surfaces as its `files` category
 
 #### Scenario: Spec-id segment outranks content-only hit
 
@@ -311,17 +311,17 @@
 
 ### Requirement: Query methods
 
-#### Scenario: findFilesByConfigRelativePath returns exact matches
+#### Scenario: findFilesByProjectRelativePath returns exact matches
 
-- **GIVEN** indexed files `core:src/index.ts` with `configRelativePath` `packages/core/src/index.ts`
-- **AND** `cli:src/index.ts` with `configRelativePath` `packages/cli/src/index.ts`
-- **WHEN** `findFilesByConfigRelativePath('packages/core/src/index.ts')` is called
+- **GIVEN** indexed files `core:src/index.ts` with `projectRelativePath` `packages/core/src/index.ts`
+- **AND** `cli:src/index.ts` with `projectRelativePath` `packages/cli/src/index.ts`
+- **WHEN** `findFilesByProjectRelativePath('packages/core/src/index.ts')` is called
 - **THEN** only the `core:src/index.ts` file node is returned
 
-#### Scenario: findFilesByConfigRelativePath may return multiple canonical files
+#### Scenario: findFilesByProjectRelativePath may return multiple canonical files
 
-- **GIVEN** two indexed files from different workspaces share the same `configRelativePath`
-- **WHEN** `findFilesByConfigRelativePath('src/index.ts')` is called
+- **GIVEN** two indexed files from different workspaces share the same `projectRelativePath`
+- **WHEN** `findFilesByProjectRelativePath('src/index.ts')` is called
 - **THEN** both canonical file nodes are returned so the caller can raise an ambiguity error
 
 #### Scenario: getCallers includes USES_TYPE and CONSTRUCTS dependents
@@ -532,6 +532,29 @@
 - **THEN** the SQLite backend returns deterministically ordered facts and file paths
 - **AND** affected lookup uses a bounded batch operation rather than one query per relation
 
+### Requirement: Logical and declaration batch lookup boundary
+
+#### Scenario: Logical IDs return complete declaration sets
+
+- **GIVEN** repeated, known, and unknown logical-symbol IDs
+- **WHEN** declarations are loaded as one batch
+- **THEN** every known declaration is returned in deterministic order
+- **AND** repeated inputs are deduplicated by first occurrence and unknown inputs are omitted
+
+#### Scenario: Declaration IDs map without inventing logical identity
+
+- **GIVEN** mapped and physical-only declaration IDs
+- **WHEN** logical mappings are loaded as one batch
+- **THEN** only mapped declarations return a logical symbol
+- **AND** the physical-only declaration remains retrievable as a physical symbol
+
+#### Scenario: Empty identity batches do no backend work
+
+- **GIVEN** an empty logical-ID or declaration-ID batch
+- **WHEN** the mapping query is executed
+- **THEN** an empty result is returned
+- **AND** no backend operation is issued
+
 ### Requirement: Member-semantics persistence
 
 #### Scenario: Lookup uses the four member axes
@@ -586,6 +609,28 @@
 - **WHEN** the relations are validated for commit
 - **THEN** neither invalid relation becomes visible
 - **AND** no backend retargets either relation implicitly
+
+#### Scenario: Physical symbol is rejected as coverage target
+
+- **GIVEN** a `COVERS_SYMBOL` relation whose target is a location-backed physical symbol ID
+- **WHEN** the relation is persisted through the store
+- **THEN** the relation is rejected and is not persisted under any identity
+- **AND** no logical reverse-coverage query returns it
+
+### Requirement: Batched logical coverage lookup
+
+#### Scenario: Physical IDs cannot satisfy logical coverage
+
+- **GIVEN** a physical declaration ID is passed to the logical reverse-coverage endpoint
+- **WHEN** coverage is queried
+- **THEN** it does not match or retarget any logical-symbol relation
+
+#### Scenario: Impact coverage uses one bounded batch
+
+- **GIVEN** an impact operation reaches several logical targets
+- **WHEN** reverse coverage is loaded
+- **THEN** all targets are queried through one bounded batch operation
+- **AND** returned relations retain deterministic logical targets and coverage metadata
 
 ### Requirement: Incompatible store handling
 

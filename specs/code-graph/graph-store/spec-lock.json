@@ -11,78 +11,60 @@
   ],
   "implementation": [
     {
-      "file": "code-graph:src/domain/value-objects/file-node.ts",
-      "symbols": ["FileCategory", "FILE_CATEGORIES", "FileNode", "createFileNode"]
+      "file": "code-graph:src/domain/ports/graph-store.ts",
+      "symbols": ["GraphStore"]
     },
     {
-      "file": "code-graph:src/domain/services/classify-file-category.ts",
-      "symbols": ["classifyFileCategory"]
+      "file": "code-graph:test/helpers/in-memory-graph-store.ts",
+      "symbols": ["InMemoryGraphStore"]
     },
     {
-      "file": "code-graph:test/domain/services/classify-file-category.spec.ts",
-      "symbols": ["classifyFileCategory"]
+      "file": "code-graph:test/domain/ports/graph-store.contract.ts",
+      "symbols": ["graphStoreContractTests"]
     },
     {
-      "file": "code-graph:src/infrastructure/sqlite/schema.ts",
-      "symbols": ["SQLITE_SCHEMA_VERSION", "SQLITE_SCHEMA_DDL"]
+      "file": "code-graph:src/application/services/session-reference-store.ts",
+      "symbols": ["SessionReferenceStore"]
     },
     {
-      "file": "code-graph:src/infrastructure/sqlite/sqlite-graph-database.ts",
-      "symbols": ["SQLiteGraphDatabase", "queryImpactFrontierDirection", "findSymbols"]
+      "file": "code-graph:src/domain/errors/graph-derivation-mismatch-error.ts"
     },
     {
-      "file": "code-graph:src/application/use-cases/index-project-graph.ts",
-      "symbols": ["IndexProjectGraph"]
-    },
-    {
-      "file": "code-graph:src/application/services/build-project-graph-config.ts",
-      "symbols": ["buildProjectGraphConfig"]
-    },
-    {
-      "file": "code-graph:test/infrastructure/sqlite/sqlite-graph-store.spec.ts",
-      "symbols": ["SQLiteGraphStore"]
-    },
-    {
-      "file": "code-graph:src/application/use-cases/search-code-graph.ts",
-      "symbols": ["SearchCodeGraph"]
-    },
-    {
-      "file": "code-graph:test/application/use-cases/search-code-graph.spec.ts",
-      "symbols": ["SearchCodeGraph"]
+      "file": "code-graph:test/application/use-cases/search-code-graph.spec.ts"
     }
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Abstract GraphStore port for durable code-graph persistence with atomic updates, multi-axis indexing, filtered impact, and search.",
+      "value": "Backend-neutral durable graph port with recovery, atomic generations, filtered impact, exact batches, and indexed search.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:3d21c5d41282dd16473cd7e475e2eff57076b5fe9720df4868da0fc8f24a09e0",
-          "lastModified": "2026-09-28T07:27:44.440Z"
+          "hash": "sha256:0b1557edcadd936a7f4ef641b9a00538abd0290407fd65978d333b52d6430eb6",
+          "lastModified": "2026-10-12T15:40:16.301Z"
         },
         "verify.md": {
-          "hash": "sha256:39a49410b63159c4bfa61ab689284d001c159483f1df394ca7d4c1510fa6da81",
-          "lastModified": "2026-09-28T08:41:51.752Z"
+          "hash": "sha256:ff4cd6aecc957e6c0fbcb0b0bc5915b983a83a38d6bd611ed69e1f819083fe28",
+          "lastModified": "2026-10-12T15:47:34.803Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# Graph Store\n\n## Rules\n- Abstract `GraphStore` port: domain persistence for files, documents, symbols, specs, relations. Hexagonal port; no I/O or schema prescriptions.\n- Lifecycle: `open()` before operations; `close()` releases locks; `isOpen()` checks state.\n- File-level atomic updates: `upsertFile` replaces file, symbols, relations, observations in single transaction.\n- Query methods: `findSymbols`, `getSymbolsByIds`, `getFilesByPaths`, `getSpecsByIds`, `getIncomingSymbolRelations`, `getOutgoingSymbolRelations`, `getCoveringSpecsForFile`, `getCoveringSpecsForSymbol`.\n- Filtered impact: backend-neutral criteria (types, kinds, workspace inclusions/exclusions, direction, depth). Applied at backend level, never filtered post-fetch.\n- Reverse coverage: batch file paths & symbol IDs -> `COVERS_FILE` / `COVERS_SYMBOL`.\n- Member-semantics persistence: lookups by structured fields (workspace, surface, name, symbol space, owner id, MemberSemantics). `qualified_name` equality lookup for owned symbols; no full-text/alias tables for qualified names.\n- Logical-symbol coverage endpoints: `COVERS_SYMBOL` links spec ID to logical symbol ID; rejects missing endpoints.\n- Source-content candidates: query over `FileNode.content`; substring-capable index for >=3 chars with bounded fallback.\n- Incompatible store handling: reject reads on schema mismatch; recreate with full rebuild and rotated generation marker.\n- Indexed-input freshness: persist `IndexedInputObservation` records; atomic monotonic latches (`knownStaleSinceLastIndex`).\n- Single-session bulk indexing: chunked session with single commit and index rebuild.\n\n## Constraints\n- Abstract class, not interface.\n- Atomic file-level mutations.\n- `StoreNotOpenError` when closed.\n- No direct `@specd/core` dependency; errors extend `CodeGraphError`.\n- No prescribed physical storage engine.",
+      "value": "# Graph Store\n\n## Rules\n- Abstract `GraphStore(storagePath)` port in `domain/ports/`; concrete infrastructure owns schema/layout/backend.\n- Persist Files (canonical/project-relative paths, content, category `source|test|ignored`), Symbols, Specs, Documents, all relation families, statistics, VCS ref, derivation fingerprint, generation, observations, coverage/reference facts.\n- `open()` explicit and non-destructive; corruption/incompatibility returns typed recoverable open error. `close()` idempotent and leaves closed after partial failure.\n- `recreate()` requires closed store, physically replaces persistence, rotates generation, remains closed. `clear()` requires healthy open store, removes every logical artifact/index/observation/fingerprint/ref influencing next index, preserves physical generation.\n- Providers cache generation at open and detect external destructive replacement before reads.\n- `upsertFile(file,symbols,relations)` atomically replaces one file slice; failure preserves previous state. `addRelations` additive. `removeFile` atomically removes file, symbols, endpoint relations.\n- File content and category persist/index; category defaults `source`.\n- Query contract covers individual/batch/all node retrieval; symbol/file/spec dependency, hierarchy, import, coverage reads; symbol queries by name/kind/file/comment/category.\n- Exact batches `getSymbolsByIds`, `getFilesByPaths`, `getDocumentsByPaths`, `getSpecsByIds`: arbitrary input order, dedupe first occurrence, omit missing, preserve requested order, empty input avoids backend work, no call per identity.\n- Batch incoming/outgoing symbol relations accept IDs+types, support dependency/hierarchy families, deterministic source/type/target order, dedupe, omit unknown, empty avoids work, logical batch not per ID/type.\n- Filtered-impact input carries result types, kinds, workspace inclusion/exclusion, category admission, target, direction, resource category, depth. Categories default source; exclusions win; empty inclusion admits all; depth zero supports coverage.\n- Backend applies supported relation/kind/category/workspace predicates during physical query; never return unrestricted candidates for TypeScript post-filtering. Worker/batch protocol preserves filters.\n- Coverage reverse lookups batch file paths/logical symbol IDs. `COVERS_SYMBOL` targets logical symbols and rejects absent endpoints.\n- Member lookups use structured workspace/surface/name/space/owner/`MemberSemantics`; owned symbols support exact `qualified_name`; no FTS or alias rows for qualified names.\n- Source-content search operates on persisted `FileNode.content`, substring-capable for ≥3 chars with bounded fallback.\n- Search symbols/specs/documents prioritizes exact primary identity before ranked normalized text/comment/content. Rebuild hook supports explicit FTS maintenance.\n- Statistics expose node counts, per-`RelationType` counts, languages, last index time/ref, fingerprint.\n- Spec upsert/removal atomically replaces spec-owned dependencies/coverage as defined.\n- Indexed observations and stale latches update atomically and monotonically; complete generation may clear latches.\n- Bulk indexing uses one chunked session, one commit, bounded writes, optional final search rebuild.\n\n## Constraints\n- Abstract class, not interface; backend-neutral contract.\n- Closed operations raise `StoreNotOpenError`.\n- File-level/logical-generation mutations atomic.\n- No direct `@specd/core` dependency; package errors use code-graph error hierarchy.\n- No prescribed storage engine, schema, tables, worker messages, or filenames.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:3d21c5d41282dd16473cd7e475e2eff57076b5fe9720df4868da0fc8f24a09e0",
-          "lastModified": "2026-09-28T07:27:44.440Z"
+          "hash": "sha256:0b1557edcadd936a7f4ef641b9a00538abd0290407fd65978d333b52d6430eb6",
+          "lastModified": "2026-10-12T15:40:16.301Z"
         },
         "verify.md": {
-          "hash": "sha256:39a49410b63159c4bfa61ab689284d001c159483f1df394ca7d4c1510fa6da81",
-          "lastModified": "2026-09-28T08:41:51.752Z"
+          "hash": "sha256:ff4cd6aecc957e6c0fbcb0b0bc5915b983a83a38d6bd611ed69e1f819083fe28",
+          "lastModified": "2026-10-12T15:47:34.803Z"
         }
       }
     }

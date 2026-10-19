@@ -1,0 +1,20 @@
+- op: added
+  description: 'Round 3: stale-lock recovery now lives in the lock helper, not in the supervisor.'
+  position:
+    parent:
+      type: section
+      matches: '^Constraints$'
+    before:
+      type: list-item
+      matches: 'MUST NOT implement queueing'
+  content: |
+    - The capability MUST NOT implement queueing, lock waiting, automatic retry, scheduled indexing, or background indexing. It MUST NOT implement stale-lock detection or PID recovery itself: acquiring the lock through the lock helper of `code-graph:staleness-detection` recovers a dead owner's lock, and the supervisor only consumes the outcome (acquired or typed busy error).
+
+- op: removed
+  description: 'Remove the old constraint that forbade stale-lock PID recovery for the whole capability.'
+  selector:
+    type: list-item
+    matches: 'stale-lock\s+PID recovery'
+    parent:
+      type: section
+      matches: '^Constraints$'

@@ -1,4 +1,5 @@
 import type { IndexCoverageStatus } from './index-session.js'
+import type { LogicalDeclarationDiagnostic } from './symbol-reference.js'
 
 /**
  * Describes an error encountered while indexing a specific file.
@@ -44,6 +45,7 @@ export type IndexCoverageDiagnosticReason =
   | 'FILE_NOT_INDEXED'
   | 'SYMBOL_NOT_FOUND'
   | 'SYMBOL_AMBIGUOUS'
+  | 'COVERAGE_NOT_APPLICABLE'
 
 /** Diagnostic evidence for one unresolved persisted implementation link. */
 export interface IndexCoverageDiagnostic {
@@ -81,4 +83,6 @@ export interface IndexResult {
   readonly phaseMetrics: IndexPhaseMetrics
   readonly coverage: IndexRunCoverageSummary
   readonly coverageDiagnostics: readonly IndexCoverageDiagnostic[]
+  /** Logical-identity collisions whose declarations were kept physical-only. */
+  readonly logicalDiagnostics: readonly LogicalDeclarationDiagnostic[]
 }

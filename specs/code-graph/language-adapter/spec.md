@@ -15,7 +15,6 @@ Different programming languages have fundamentally different syntax for function
 - **`resolutionManifests(): readonly string[]`** — returns the exact basenames of the manifests this adapter reads for package identity or import resolution. The method is required, synchronous, and MUST NOT perform I/O. An adapter that reads no resolution manifest MUST return an empty array. Values MUST be exact filenames, not globs or directory paths.
 - **`analyzeFile(filePath: string, content: string, context: AdapterAnalyzeContext): FileAnalysisDraft`** — parses the file content once and returns the complete compact analysis required by indexing for that file, including symbols, imports, deterministic binding facts, deterministic call facts, namespace data when relevant, and optional compact parser-specific state.
 - **`resolveImports(analysis: FileAnalysis, context: ImportResolutionContext): ResolvedImports`** — resolves the file's previously extracted import declarations, qualified names, aliases, and deterministic file targets using the shared session lookups instead of re-reading or re-parsing file content.
-- **`buildRelations(analysis: FileAnalysis, context: RelationBuildContext): readonly Relation[]`** — builds deterministic graph relations for the file from the stored analysis facts and resolved import information. For code-file dependencies, adapters SHOULD emit concrete relations (`IMPORTS`, `CALLS`, `CONSTRUCTS`, `USES_TYPE`, hierarchy relations) when targets are resolvable; `DEPENDS_ON` remains reserved for spec-level dependency edges.
 - **`getPackageIdentity?(codeRoot: string, repoRoot?: string): string | undefined`** — optionally derives a package identity for the workspace.
 - **`resolvePackageFromSpecifier?(specifier: string, knownPackages: string[]): string | undefined`** — optionally maps an import specifier to a package identity.
 - **`resolveQualifiedNameToPath?(qualifiedName: string, codeRoot: string, repoRoot?: string): string | undefined`** — optionally maps a qualified name to a source file path for languages that support deterministic namespace resolution.
@@ -24,6 +23,8 @@ All adapter methods MUST be synchronous and deterministic with respect to the pr
 
 The default TypeScript adapter MUST return `['package.json']` from `resolutionManifests()`.
 
+- **`buildRelations(analysis: FileAnalysis, context: RelationBuildContext): readonly Relation[]`** — builds deterministic graph relations for the file from the stored analysis facts and resolved import information. For code-file dependencies, adapters SHOULD emit concrete relations (`CALLS`, `CONSTRUCTS`, `USES_TYPE`, hierarchy relations) when targets are resolvable. File-level `IMPORTS` relations are derived by the indexer from the resolved imports returned by `resolveImports()`; an adapter MAY emit `IMPORTS` only for loader-style dependencies that only the adapter can prove; `DEPENDS_ON` remains reserved for spec-level dependency edges.
+
 ### Requirement: Full-file analysis contract
 
 Each built-in language adapter SHALL emit a complete compact `FileAnalysisDraft` for every indexed file in a single `analyzeFile` call.
@@ -31,6 +32,20 @@ Each built-in language adapter SHALL emit a complete compact `FileAnalysisDraft`
 The draft MUST include every deterministic analysis fact the adapter needs later in the run for import resolution and relation building. Adapters MUST NOT require the indexer to call separate symbol, import, binding, or call extraction entry points for the same file.
 
 The draft MAY include compact per-file parser-specific state when that state avoids repeated deterministic work in Pass 2, but it MUST remain serializable in memory-friendly plain data structures and MUST NOT retain AST nodes, parser trees, or other heavyweight parser-runtime objects.
+
+### Requirement: Parser-authoritative structural fact extraction
+
+When the configured parser represents a source construct, an adapter SHALL derive the construct's declaration role, call or construction form, import, binding, type reference, hierarchy relation, owner, scope, caller, arguments, and source range from typed parser nodes, named fields, ancestry, and parser coordinates. Raw-source regular expressions or substring scans MUST NOT independently decide that such a structural or semantic fact exists.
+
+A regular expression MAY parse an auxiliary manifest for which the adapter has no configured syntax tree, normalize or tokenize text already isolated by an authoritative parser node, or support an explicitly documented grammar-compatibility case. Such use MUST NOT escape the parser node's range or manufacture a declaration, owner, caller, call, import, or dependency that parser evidence cannot prove. Framework-specific rules MAY recognize known APIs and literal conventions, but SHALL inspect parser-proven call nodes and arguments rather than rediscovering call syntax in the whole source string.
+
+Unsupported, erroneous, ambiguous, or runtime-only syntax SHALL yield no graph fact or an explicit unresolved fact as defined by the relevant value-object contract. Textual proximity MUST NOT be used to guess missing structural evidence.
+
+A syntactically valid import or loader whose target cannot be resolved MAY remain as unresolved analysis evidence, but it MUST NOT emit a persisted dependency relation to the first syntactic candidate, a raw specifier, or another guessed target. Imported hierarchy evidence SHALL follow the same rule: every persisted hierarchy relation MUST have one matching shared hierarchy reference fact carrying the parser-derived range, resolution provenance, and resolved target.
+
+Filesystem-derived resolution metadata, including manifests and package maps, SHALL be prepared in the run-scoped adapter session before per-file relation analysis. Pass 2 relation extraction MUST consume immutable session data and MUST NOT perform metadata filesystem I/O or rely on mutable adapter-instance caches shared across sessions.
+
+Every built-in and newly registered first-party adapter SHALL maintain tests covering its structural-text boundary. The tests MUST prove that comments, string and template contents, multiline syntax, optional or chained syntax, nested expressions, and same-line constructs cannot create lookalike graph facts, while legitimate auxiliary-metadata parsing remains supported.
 
 ### Requirement: Unified built-in adapter migration
 
@@ -74,6 +89,14 @@ For `CALLS` relations, the adapter MUST extract deterministic call facts during 
 - **Callee**: resolved through deterministic local symbols, resolved imports, receiver bindings, or other statically known candidates available through the shared session and adapter facts.
 
 Calls to identifiers that cannot be resolved deterministically (e.g. unresolved global built-ins, ambiguous member expressions, dynamic expressions) SHALL be silently dropped — no relation is created, no error is thrown.
+
+### Requirement: Semantic caller containment
+
+A `CallFact.callerSymbolId` SHALL identify the innermost language-approved executable declaration whose complete parser-derived range contains the call expression. Containment MUST compare both line and column coordinates using the shared half-open range convention, including when declarations and calls occur on the same line.
+
+A declaration that merely starts before the call MUST NOT be selected. Variables, properties, types, containers, or unrelated preceding declarations MUST NOT become callers unless the language-specific adapter contract explicitly classifies that declaration as an executable callable container.
+
+Caller selection SHALL be implemented through one shared containment policy used by built-in adapters and the scoped-binding fallback. An adapter MUST NOT retain a private nearest-preceding, line-only caller selector. When no supported containing caller can be proven, the call SHALL remain caller-unresolved and MUST NOT produce a speculative source relation.
 
 ### Requirement: Scoped binding fact extraction
 
@@ -238,6 +261,30 @@ Empty hierarchy/provenance output for source containing supported, resolvable hi
 Every built-in adapter SHALL emit, for each symbol, the complete syntactic construct range and exact declared-name `selectionRange` using the shared half-open source-range convention. The selection range MUST be contained by the construct range.
 
 Adapters SHALL derive these ranges from parsed syntax before parser artifacts are released. They MUST NOT approximate a construct end from the next symbol or from line-oriented regular expressions when the parser exposes the authoritative node range. A candidate without trustworthy complete and selection ranges SHALL be omitted and its capability gap reported rather than emitted with misleading coordinates.
+
+### Requirement: Declaration classification policy
+
+Every language adapter SHALL define a deterministic policy that classifies each supported declaration role as one of: logical target with physical declaration, lexical binding, physical-only declaration, or unsupported/no graph declaration. Classification MUST consider syntax role, lexical scope, visibility, owner, and language semantics; broad `SymbolKind` alone is insufficient.
+
+Adapters SHALL establish canonical logical owners before constructing owned logical identities. Same-name declarations under distinct owners or competing lexical scopes MUST remain distinct. Declarations SHALL share a logical identity only when the language-specific policy proves that they form one semantic target.
+
+### Requirement: Cross-language semantic conformance suite
+
+Every built-in adapter and every newly registered first-party language adapter MUST pass a reusable contract suite covering:
+
+- authoritative construct and selection ranges and exact caller containment;
+- same-line, multiline, nested, and unresolved caller cases;
+- logical owner creation before member identity;
+- same-name declarations in distinct owners and lexical scopes;
+- supported merged or overload declaration groups, or explicit absence of such grouping;
+- physical declarations without logical identity;
+- logical resolution retaining all declaration occurrences;
+- logical coverage lookup after physical impact traversal; and
+- unresolved imports producing no guessed relation and imported hierarchy relations retaining matching provenance; and
+- per-file relation analysis performing no filesystem metadata reads after session preparation; and
+- identity-sensitive incremental indexing producing the same semantic graph as a clean rebuild.
+
+Language-specific specs SHALL add scenarios for semantics that the generic suite cannot express. A new adapter MUST NOT be considered conformant solely because it implements the `LanguageAdapter` TypeScript interface.
 
 ## Constraints
 
