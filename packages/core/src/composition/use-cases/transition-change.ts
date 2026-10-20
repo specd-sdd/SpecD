@@ -1,6 +1,7 @@
 import { type ActorResolver } from '../../application/ports/actor-resolver.js'
 import { type ChangeRepository } from '../../application/ports/change-repository.js'
 import { type SchemaProvider } from '../../application/ports/schema-provider.js'
+import { type ResolveChangeSchema } from '../../application/services/resolve-change-schema.js'
 import { TransitionChange } from '../../application/use-cases/transition-change.js'
 import { type RefreshImplementationTracking } from '../../application/use-cases/refresh-implementation-tracking.js'
 import { type SpecdConfig } from '../../application/specd-config.js'
@@ -25,6 +26,8 @@ export interface TransitionChangeDeps {
   readonly actor: ActorResolver
   /** Schema provider used by the use case. */
   readonly schemaProvider: SchemaProvider
+  /** Shared change schema resolver. */
+  readonly resolveChangeSchema?: ResolveChangeSchema
   /** Refresh implementation tracking use case used by the use case. */
   readonly refreshImplementationTracking: RefreshImplementationTracking
   /** Approval gate configuration used by the use case. */
@@ -49,11 +52,12 @@ export function resolveTransitionChangeDeps(resolver: CompositionResolver): Tran
     changes: resolver.getChangeRepository(),
     actor: resolver.getActorResolver(),
     schemaProvider: resolver.getSchemaProvider(),
+    resolveChangeSchema: resolver.getResolveChangeSchema(),
     refreshImplementationTracking: resolver.getRefreshImplementationTracking(),
     approvals: resolver.config.approvals,
     transitionBindings: registry.transitionBindings,
     reconcile: resolver.getReconcileChangeValidity(),
-    checkRegistry: resolver.registry?.checks,
+    ...(registry.checkRegistry !== undefined ? { checkRegistry: registry.checkRegistry } : {}),
   }
 }
 
@@ -124,6 +128,7 @@ function createTransitionChangeFromNormalized(
       transitionBindings,
       reconcile,
       checkRegistry,
+      input.deps.resolveChangeSchema,
     )
   }
 

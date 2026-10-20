@@ -8,19 +8,10 @@
     "core:composition",
     "core:storage",
     "core:change-list-entry",
-    "core:change-repository-port"
+    "core:change-repository-port",
+    "core:resolve-change-schema"
   ],
-  "implementation": [
-    {
-      "file": "core:test/infrastructure/fs/change-repository.spec.ts"
-    },
-    {
-      "file": "core:test/infrastructure/fs/path-platform.spec.ts"
-    },
-    {
-      "file": "core:test/infrastructure/fs/fs-index-cache-base.spec.ts"
-    }
-  ],
+  "implementation": [],
   "optimizations": {
     "optimizedDescription": {
       "value": "Fs filesystem ChangeRepository: Zod-validated path config, three-bucket FsChangeIndexCache, atomic mutate locks.",

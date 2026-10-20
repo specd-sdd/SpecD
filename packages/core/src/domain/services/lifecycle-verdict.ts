@@ -2,15 +2,18 @@
 import { type Change, type InvalidatedEvent } from '../entities/change.js'
 import { type ChangeArtifact } from '../entities/change-artifact.js'
 import { type ArtifactStatus } from '../value-objects/artifact-status.js'
-import {
-  type ChangeState,
-  VALID_TRANSITIONS,
-  isValidTransition,
-} from '../value-objects/change-state.js'
+import { type ChangeState } from '../value-objects/change-state.js'
 import { type Schema } from '../value-objects/schema.js'
 import { type ChangeValidityVerdict, type ValidityBlocker } from './change-validity.js'
 import { type CheckResult } from './transition-checks.js'
 import { boundFromStates } from './check-bindings.js'
+import {
+  isWorkflowStepEnabled,
+  isWorkflowTransitionLegal,
+  listWorkflowTransitions,
+  resolveWorkflowPipeline,
+  type PipelineStep,
+} from './workflow-topology.js'
 import { Logger } from '../../observability/logger.js'
 
 function isBypassFlagActive(bypassFlag: string | undefined, flags: ReadonlySet<string>): boolean {
@@ -155,6 +158,7 @@ export interface LifecycleTransitionBlocker {
 
 export interface LifecycleStepVerdict {
   readonly step: string
+  readonly optional?: boolean
   readonly available: boolean
   readonly isReady: boolean
   readonly isPermitted: boolean
@@ -169,7 +173,7 @@ export function evaluateLifecycleVerdict(
 ): LifecycleDomainVerdict {
   const approvals = options.approvals ?? { spec: false, signoff: false }
   const bypassFlags = new Set(options.bypassFlags ?? [])
-  const validTransitions = VALID_TRANSITIONS[change.state]
+  const validTransitions = listWorkflowTransitions(change.state, schema, approvals)
   const effectiveTarget =
     options.requestedTarget !== undefined ? options.requestedTarget : undefined
 
@@ -194,43 +198,51 @@ export function evaluateLifecycleVerdict(
     }
   }
 
-  const availableSteps: LifecycleStepVerdict[] = schema.workflow().map((workflowStep) => {
-    const step = workflowStep.step as ChangeState
-    const evaluationChecks = checksByTarget[step]
-    const blockingArtifacts = blockingArtifactIds(
-      workflowStep.requires,
-      evaluationChecks,
-      verdictByArtifact,
-    )
-    const readinessBlockers = blockingArtifacts.flatMap((artifactId) =>
-      artifactBlockers(change, schema, artifactId, verdictByArtifact, false),
-    )
-    const requiresFailed =
-      evaluationChecks !== undefined
-        ? evaluationChecks.some(
-            (check) => check.id === 'workflow.requires' && check.outcome === 'fail',
-          )
-        : blockingArtifacts.length > 0
-    const isReady = !requiresFailed
-    const isPermitted =
-      evaluationChecks !== undefined
-        ? evaluationChecks.every(
-            (check) => check.id !== 'protocol.edge' || check.outcome !== 'fail',
-          )
-        : isStepPermitted(change.state, step, approvals)
-    const available =
-      evaluationChecks !== undefined
-        ? evaluationChecks.every((check) => check.outcome !== 'fail')
-        : isReady && isPermitted
-    return {
-      step: workflowStep.step,
-      available,
-      isReady,
-      isPermitted,
-      blockingArtifacts,
-      blockers: evaluationChecks !== undefined || isReady ? [] : dedupeBlockers(readinessBlockers),
-    }
-  })
+  const availableSteps: LifecycleStepVerdict[] = resolveWorkflowPipeline(schema, approvals).flatMap(
+    (pipelineStep) => {
+      const step = pipelineStep.step
+      const workflowStep = schema.workflowStep(step)
+      if (workflowStep === null) return []
+      const evaluationChecks = checksByTarget[step]
+      const blockingArtifacts = blockingArtifactIds(
+        workflowStep?.requires ?? [],
+        evaluationChecks,
+        verdictByArtifact,
+      )
+      const readinessBlockers = blockingArtifacts.flatMap((artifactId) =>
+        artifactBlockers(change, schema, artifactId, verdictByArtifact, false),
+      )
+      const requiresFailed =
+        evaluationChecks !== undefined
+          ? evaluationChecks.some(
+              (check) => check.id === 'workflow.requires' && check.outcome === 'fail',
+            )
+          : blockingArtifacts.length > 0
+      const isReady = !requiresFailed
+      const isPermitted =
+        evaluationChecks !== undefined
+          ? evaluationChecks.every(
+              (check) => check.id !== 'protocol.edge' || check.outcome !== 'fail',
+            )
+          : isWorkflowTransitionLegal(change.state, step, schema, approvals)
+      const available =
+        evaluationChecks !== undefined
+          ? evaluationChecks.every((check) => check.outcome !== 'fail')
+          : isReady && isPermitted
+      return [
+        {
+          step,
+          optional: pipelineStep.optional,
+          available,
+          isReady,
+          isPermitted,
+          blockingArtifacts,
+          blockers:
+            evaluationChecks !== undefined || isReady ? [] : dedupeBlockers(readinessBlockers),
+        },
+      ]
+    },
+  )
 
   const transitionBlockers: LifecycleTransitionBlocker[] = validTransitions.flatMap(
     (transition) => {
@@ -288,12 +300,14 @@ export function evaluateLifecycleVerdict(
   const nextArtifactId = nextArtifact(schema, verdictByArtifact)
   const guidedTransitions =
     options.validity?.artifactReviewRequired === true
-      ? availableTransitions.filter((target) => !isForward(change.state, target))
+      ? availableTransitions.filter((target) => !isForward(change.state, target, schema, approvals))
       : availableTransitions
   const nextHop = projectValidityNextHop(
     change,
     options.validity,
-    resolveLifecycleNextHop(change, review, guidedTransitions, approvals),
+    resolveLifecycleNextHop(change, review, guidedTransitions, approvals, schema),
+    schema,
+    approvals,
   )
   const checks =
     options.requestedTarget !== undefined
@@ -365,30 +379,24 @@ export function projectArtifacts(
   }))
 }
 
+/**
+ * Maps projected artifacts to a Map of artifact id -> effectiveStatus.
+ *
+ * @param artifacts - Projected verdict artifacts
+ * @returns Map keyed by artifact id
+ */
+export function toEffectiveStatusMap(
+  artifacts: readonly { readonly type: string; readonly effectiveStatus: ArtifactStatus }[],
+): ReadonlyMap<string, ArtifactStatus> {
+  return new Map(artifacts.map((artifact) => [artifact.type, artifact.effectiveStatus]))
+}
+
 export function findBlockingParent(
   change: ArtifactGraphSource,
   schema: Schema,
   artifactId: string,
 ): { artifactId: string; status: ArtifactStatus } | null {
   return findBlockingParentInternal(change, schema, artifactId, new Set())
-}
-
-function resolveTarget(requestedTarget: ChangeState): ChangeState {
-  return requestedTarget
-}
-
-function isStepPermitted(
-  fromState: ChangeState,
-  step: ChangeState,
-  approvals: { readonly spec: boolean; readonly signoff: boolean },
-): boolean {
-  if (step === 'pending-spec-approval' || step === 'spec-approved') {
-    return approvals.spec && isValidTransition(fromState, step)
-  }
-  if (step === 'pending-signoff' || step === 'signed-off') {
-    return approvals.signoff && isValidTransition(fromState, step)
-  }
-  return resolveTarget(step) === step && isValidTransition(fromState, step)
 }
 
 function effectiveStatus(
@@ -605,8 +613,6 @@ function requestedTargetBlockers(
   bypassFlags: ReadonlySet<string>,
 ): LifecycleBlocker[] {
   const blockers: LifecycleBlocker[] = blockersFromFailedChecks(requestedChecks, bypassFlags)
-  const effectiveTarget = resolveTarget(requestedTarget)
-
   if (
     (requestedTarget === 'pending-spec-approval' || requestedTarget === 'spec-approved') &&
     !approvals.spec
@@ -633,18 +639,18 @@ function requestedTargetBlockers(
     ]
   }
 
-  if (!isValidTransition(change.state, effectiveTarget)) {
+  if (!isWorkflowTransitionLegal(change.state, requestedTarget, schema, approvals)) {
     return [
       {
         code: 'INVALID_TRANSITION',
-        message: `Transition from '${change.state}' to '${effectiveTarget}' is not permitted`,
+        message: `Transition from '${change.state}' to '${requestedTarget}' is not permitted`,
         isSkippable: false,
       },
     ]
   }
 
-  const workflowStep = schema.workflowStep(effectiveTarget)
-  if (change.state === 'archiving' && effectiveTarget === 'archivable') {
+  const workflowStep = schema.workflowStep(requestedTarget)
+  if (change.state === 'archiving' && requestedTarget === 'archivable') {
     return dedupeBlockers([...blockers, ...reviewBlockers])
   }
 
@@ -861,23 +867,50 @@ function blockersFromFailedChecks(
     })
 }
 
-const DELIVERY_AXIS: readonly ChangeState[] = [
-  'drafting',
-  'designing',
-  'ready',
-  'pending-spec-approval',
-  'spec-approved',
-  'implementing',
-  'verifying',
-  'done',
-  'pending-signoff',
-  'signed-off',
-  'archivable',
-  'archiving',
-]
+/** Drain states sit just after their pipeline anchor; used for comparison only. */
+const DRAIN_OFFSETS: Readonly<
+  Partial<Record<ChangeState, { anchor: ChangeState; offset: number }>>
+> = {
+  'pending-spec-approval': { anchor: 'ready', offset: 0.25 },
+  'spec-approved': { anchor: 'ready', offset: 0.5 },
+  'pending-signoff': { anchor: 'done', offset: 0.25 },
+  'signed-off': { anchor: 'done', offset: 0.5 },
+}
 
-function isForward(from: ChangeState, to: ChangeState): boolean {
-  return DELIVERY_AXIS.indexOf(to) > DELIVERY_AXIS.indexOf(from)
+/**
+ * Returns the position of a state on the schema's active pipeline.
+ *
+ * @param state - Lifecycle state
+ * @param pipeline - Active pipeline in canonical order
+ * @returns Pipeline index (drain states fall between their anchor and its successor), or -1
+ */
+function pipelinePosition(state: ChangeState, pipeline: readonly PipelineStep[]): number {
+  const drain = DRAIN_OFFSETS[state]
+  const index = pipeline.findIndex((entry) => entry.step === (drain?.anchor ?? state))
+  return index === -1 ? -1 : index + (drain?.offset ?? 0)
+}
+
+/**
+ * Whether `to` lies strictly after `from` on the schema's active pipeline.
+ *
+ * @param from - Source state
+ * @param to - Candidate later state
+ * @param schema - Sovereign change schema
+ * @param approvals - Exact approval-gate snapshot
+ * @param approvals.spec - Whether the spec approval anchor is active
+ * @param approvals.signoff - Whether the signoff approval anchor is active
+ * @returns True when `to` is strictly later than `from`
+ */
+function isForward(
+  from: ChangeState,
+  to: ChangeState,
+  schema: Schema,
+  approvals: { readonly spec: boolean; readonly signoff: boolean },
+): boolean {
+  const pipeline = resolveWorkflowPipeline(schema, approvals)
+  const fromPosition = pipelinePosition(from, pipeline)
+  const toPosition = pipelinePosition(to, pipeline)
+  return fromPosition >= 0 && toPosition > fromPosition
 }
 
 function validityBlockers(validity: ChangeValidityVerdict): LifecycleBlocker[] {
@@ -896,6 +929,8 @@ function projectValidityNextHop(
   change: Change,
   validity: ChangeValidityVerdict | undefined,
   nextHop: LifecycleNextHop,
+  schema: Schema,
+  approvals: { readonly spec: boolean; readonly signoff: boolean },
 ): LifecycleNextHop {
   if (validity === undefined) return nextHop
   if (validity.specApproval === 'stale' || validity.specApproval === 'revoked') {
@@ -907,7 +942,7 @@ function projectValidityNextHop(
   }
   if (
     (validity.signoff === 'stale' || validity.signoff === 'revoked') &&
-    isForward('done', change.state)
+    isForward('done', change.state, schema, approvals)
   ) {
     return {
       targetStep: 'done',
@@ -915,7 +950,10 @@ function projectValidityNextHop(
       reason: 'Sign-off must be renewed from done',
     }
   }
-  if (verificationBoundary(change.state) && verificationNeedsRenewal(validity)) {
+  if (
+    isAtOrAfterVerificationBoundary(change.state, schema, approvals) &&
+    verificationNeedsRenewal(validity)
+  ) {
     return {
       targetStep: change.state,
       actionType: 'cognitive',
@@ -925,7 +963,7 @@ function projectValidityNextHop(
   if (
     validity.artifactReviewRequired &&
     validity.recovery === null &&
-    isForward(change.state, nextHop.targetStep)
+    isForward(change.state, nextHop.targetStep, schema, approvals)
   ) {
     return {
       targetStep: change.state,
@@ -936,15 +974,30 @@ function projectValidityNextHop(
   return nextHop
 }
 
-function verificationBoundary(state: ChangeState): boolean {
-  return (
-    state === 'verifying' ||
-    state === 'done' ||
-    state === 'pending-signoff' ||
-    state === 'signed-off' ||
-    state === 'archivable' ||
-    state === 'archiving'
-  )
+/**
+ * Whether a state sits at or after the verification boundary of the schema's active pipeline.
+ * Derived from topology: a disabled `verifying` step has no boundary, and drain states
+ * sit just after their pipeline anchor.
+ *
+ * @param state - Lifecycle state
+ * @param schema - Sovereign change schema
+ * @param approvals - Exact approval-gate snapshot
+ * @param approvals.spec - Whether the spec approval anchor is active
+ * @param approvals.signoff - Whether the signoff approval anchor is active
+ * @returns True when verification evidence is required to proceed from `state`
+ */
+export function isAtOrAfterVerificationBoundary(
+  state: ChangeState,
+  schema: Schema,
+  approvals: { readonly spec: boolean; readonly signoff: boolean },
+): boolean {
+  if (!isWorkflowStepEnabled('verifying', schema)) {
+    return false
+  }
+  const pipeline = resolveWorkflowPipeline(schema, approvals)
+  const boundary = pipelinePosition('verifying', pipeline)
+  const position = pipelinePosition(state, pipeline)
+  return boundary >= 0 && position >= boundary
 }
 
 function verificationNeedsRenewal(validity: ChangeValidityVerdict): boolean {
@@ -955,11 +1008,56 @@ function verificationNeedsRenewal(validity: ChangeValidityVerdict): boolean {
   )
 }
 
+/**
+ * Selects Core's preferred forward target from already predicate-filtered transitions.
+ * Entry into an optional step remains available, while passing skip checks make the
+ * furthest legal shortcut across a consecutive optional run the default.
+ *
+ * @param state - Current lifecycle state
+ * @param availableTransitions - Predicate-filtered legal targets
+ * @param schema - Sovereign change schema
+ * @param approvals - Exact approval-gate snapshot
+ * @param approvals.spec - Whether the spec approval anchor is active
+ * @param approvals.signoff - Whether the signoff approval anchor is active
+ * @returns Preferred forward target, or null when no forward target is available
+ */
+export function recommendedForwardTarget(
+  state: ChangeState,
+  availableTransitions: readonly ChangeState[],
+  schema: Schema,
+  approvals: { readonly spec: boolean; readonly signoff: boolean },
+): ChangeState | null {
+  const pipeline = resolveWorkflowPipeline(schema, approvals)
+  const currentIndex = pipeline.findIndex((entry) => entry.step === state)
+  if (currentIndex < 0) return null
+
+  const immediate = pipeline[currentIndex + 1]
+  if (immediate === undefined) return null
+  if (!immediate.optional) {
+    return availableTransitions.includes(immediate.step) ? immediate.step : null
+  }
+
+  const candidates: ChangeState[] = [immediate.step]
+  for (let index = currentIndex + 2; index < pipeline.length; index++) {
+    const candidate = pipeline[index]
+    if (candidate === undefined) break
+    candidates.push(candidate.step)
+    if (!candidate.optional) break
+  }
+
+  for (let index = candidates.length - 1; index >= 0; index--) {
+    const candidate = candidates[index]
+    if (candidate !== undefined && availableTransitions.includes(candidate)) return candidate
+  }
+  return null
+}
+
 export function resolveLifecycleNextHop(
   change: Change,
   review: LifecycleReviewSummary,
   availableTransitions: readonly ChangeState[],
   approvals: { readonly spec: boolean; readonly signoff: boolean },
+  schema?: Schema,
 ): LifecycleNextHop {
   const state = change.state
 
@@ -1003,10 +1101,15 @@ export function resolveLifecycleNextHop(
     }
   }
 
+  const forwardTarget = schema
+    ? recommendedForwardTarget(state, availableTransitions, schema, approvals)
+    : null
+
   if (state === 'drafting' || state === 'designing') {
-    if (availableTransitions.includes('ready')) {
+    const readyTarget = forwardTarget ?? 'ready'
+    if (availableTransitions.includes(readyTarget)) {
       return {
-        targetStep: 'ready',
+        targetStep: readyTarget,
         actionType: 'cognitive',
         reason: 'Design complete, ready to leave designing',
       }
@@ -1018,11 +1121,14 @@ export function resolveLifecycleNextHop(
     }
   }
 
-  if (state === 'ready' && availableTransitions.includes('implementing')) {
-    return {
-      targetStep: 'implementing',
-      actionType: 'mechanical',
-      reason: 'Design complete, ready to implement',
+  if (state === 'ready') {
+    const nextTarget = forwardTarget ?? 'implementing'
+    if (availableTransitions.includes(nextTarget)) {
+      return {
+        targetStep: nextTarget,
+        actionType: 'mechanical',
+        reason: 'Design complete, ready to implement',
+      }
     }
   }
 
@@ -1034,20 +1140,27 @@ export function resolveLifecycleNextHop(
     }
   }
 
-  if (state === 'spec-approved' && availableTransitions.includes('implementing')) {
-    return {
-      targetStep: 'implementing',
-      actionType: 'mechanical',
-      reason: 'Design complete, ready to implement',
+  if (state === 'spec-approved') {
+    const nextTarget = forwardTarget ?? 'implementing'
+    if (availableTransitions.includes(nextTarget)) {
+      return {
+        targetStep: nextTarget,
+        actionType: 'mechanical',
+        reason: 'Design complete, ready to implement',
+      }
     }
   }
 
   if (state === 'implementing') {
-    if (availableTransitions.includes('verifying')) {
+    const nextTarget = forwardTarget ?? 'verifying'
+    if (availableTransitions.includes(nextTarget)) {
       return {
-        targetStep: 'verifying',
+        targetStep: nextTarget,
         actionType: 'mechanical',
-        reason: 'Tasks complete, ready to verify',
+        reason:
+          nextTarget === 'verifying'
+            ? 'Tasks complete, ready to verify'
+            : 'Tasks complete, ready to proceed',
       }
     }
     return {
@@ -1058,9 +1171,10 @@ export function resolveLifecycleNextHop(
   }
 
   if (state === 'verifying') {
-    if (availableTransitions.includes('done')) {
+    const nextTarget = forwardTarget ?? 'done'
+    if (availableTransitions.includes(nextTarget)) {
       return {
-        targetStep: 'done',
+        targetStep: nextTarget,
         actionType: 'mechanical',
         reason: 'Verification complete, ready to leave verifying',
       }
@@ -1081,9 +1195,10 @@ export function resolveLifecycleNextHop(
   }
 
   if (state === 'done' || state === 'signed-off') {
-    if (availableTransitions.includes('archivable')) {
+    const nextTarget = forwardTarget ?? 'archivable'
+    if (availableTransitions.includes(nextTarget)) {
       return {
-        targetStep: 'archivable',
+        targetStep: nextTarget,
         actionType: 'mechanical',
         reason: 'Ready to enter archivable',
       }

@@ -35,9 +35,9 @@ class GetArtifactInstruction {
 
 `GetArtifactInstruction` loads the change by name via `ChangeRepository`. If no change exists with the given name, it MUST throw `ChangeNotFoundError`.
 
-### Requirement: Schema name guard
+### Requirement: Sovereign schema resolution
 
-After resolving the schema, `GetArtifactInstruction` MUST compare `schema.name()` with `change.schemaName`. If they differ, it MUST throw `SchemaMismatchError`.
+`GetArtifactInstruction` MUST obtain the schema for the change through `ResolveChangeSchema`. The change's recorded schema is the sovereign authority defining its artifact types, rules, and instructions. A different workspace default MUST remain irrelevant; provider identity mismatch MUST propagate as `SchemaProviderIdentityMismatchError`.
 
 ### Requirement: Artifact resolution
 
@@ -113,3 +113,4 @@ When resolving which artifact is next or whether a required artifact is ready, `
 - [`core:schema-format`](../schema-format/spec.md)
 - [`core:composition-resolver`](../composition-resolver/spec.md)
 - [`core:transition-checks`](../transition-checks/spec.md) — no `gatherPredicateSnapshots`
+- [core:resolve-change-schema](../resolve-change-schema/spec.md) — named sovereign lookup, provider identity validation, and same-name version advisory

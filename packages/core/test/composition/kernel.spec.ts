@@ -11,6 +11,9 @@ import {
 } from '../../src/domain/errors/check-registry-errors.js'
 import { InvalidStateTransitionError } from '../../src/domain/errors/invalid-state-transition-error.js'
 import { createKernel } from '../../src/composition/kernel.js'
+import { createResolveChangeSchema } from '../../src/composition/use-cases/resolve-change-schema.js'
+import { makeSchema } from '../application/use-cases/helpers.js'
+import { ResolveChangeSchema } from '../../src/application/services/resolve-change-schema.js'
 import { NullActorResolver } from '../../src/infrastructure/null/actor-resolver.js'
 import { GetSpecsHealth } from '../../src/application/use-cases/get-specs-health.js'
 import { SearchSpecs } from '../../src/application/use-cases/search-specs.js'
@@ -425,7 +428,7 @@ describe('createKernel', () => {
       ).rejects.toThrow(CheckNotSkippableError)
     })
 
-    it('fails fast on internal protocol.edge before executing custom checks on illegal transitions', async () => {
+    it('still rejects illegal transitions even when custom checks pass', async () => {
       let customCheckExecuted = false
       const kernel = await makeTestKernel([
         {
@@ -464,8 +467,30 @@ describe('createKernel', () => {
         }),
       ).rejects.toThrow(InvalidStateTransitionError)
 
-      // Internal check protocol.edge runs first and fails fast, so custom check should NOT run
+      // Execute mode evaluates protocol.edge first and stops on failure, so the
+      // custom check never runs for an illegal edge.
       expect(customCheckExecuted).toBe(false)
     })
+  })
+  it('exposes the shared ResolveChangeSchema and builds working instances from both factory overloads', async () => {
+    const config = await makeConfig()
+    const kernel = await createKernel(config)
+
+    expect(kernel.changes.resolveSchema).toBeInstanceOf(ResolveChangeSchema)
+
+    const fromConfig = createResolveChangeSchema(config)
+    expect(fromConfig).toBeInstanceOf(ResolveChangeSchema)
+
+    const fixture = makeSchema({ name: 'fixture-schema', version: 1 })
+    const fromDeps = createResolveChangeSchema({
+      schemaProvider: { get: async () => fixture },
+    })
+    const resolved = await fromDeps.execute({
+      changeName: 'any',
+      schemaName: 'fixture-schema',
+      schemaVersion: 1,
+    })
+    expect(resolved.schema).toBe(fixture)
+    expect(resolved.warnings).toEqual([])
   })
 })

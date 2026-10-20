@@ -13,16 +13,16 @@
     "core:refresh-implementation-tracking",
     "core:composition-resolver",
     "core:count-tasks",
-    "core:transition-checks"
+    "core:transition-checks",
+    "core:resolve-change-schema"
   ],
   "implementation": [
     {
-      "file": "core:src/application/services/lifecycle-guidance.ts",
-      "symbols": ["resolveLifecycleCommand"]
+      "file": "core:src/application/use-cases/get-status.ts",
+      "symbols": ["GetStatus"]
     },
     {
-      "file": "core:src/application/use-cases/get-status.ts",
-      "symbols": ["GetStatus", "ValidityStatusProjection"]
+      "file": "core:test/application/use-cases/get-status.spec.ts"
     }
   ],
   "optimizations": {

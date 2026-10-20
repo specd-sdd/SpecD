@@ -384,6 +384,7 @@ describe('change status', () => {
   it('displays change info in text format', async () => {
     const { kernel, stdout } = setup()
     kernel.changes.status.execute.mockResolvedValue({
+      schemaWarnings: [],
       change: makeMockChange({ name: 'feat', state: 'designing', specIds: ['auth/login'] }),
       artifactStatuses: [
         { type: 'spec', state: 'in-progress', effectiveStatus: 'in-progress', files: [] },
@@ -423,6 +424,7 @@ describe('change status', () => {
   it('outputs valid JSON in json format', async () => {
     const { kernel, stdout } = setup()
     kernel.changes.status.execute.mockResolvedValue({
+      schemaWarnings: [],
       change: makeMockChange({ name: 'feat', state: 'designing' }),
       artifactStatuses: [
         { type: 'spec', state: 'in-progress', effectiveStatus: 'in-progress', files: [] },
@@ -472,6 +474,7 @@ describe('change status', () => {
   it('JSON output contains schema object with name and version', async () => {
     const { kernel, stdout } = setup()
     kernel.changes.status.execute.mockResolvedValue({
+      schemaWarnings: [],
       change: makeMockChange({
         name: 'add-login',
         state: 'designing',
@@ -530,6 +533,7 @@ describe('change transition', () => {
   it('exits 1 when transition is invalid', async () => {
     const { kernel, stderr } = setup()
     kernel.changes.status.execute.mockResolvedValue({
+      schemaWarnings: [],
       change: makeMockChange({ name: 'feat', state: 'drafting' }),
       artifactStatuses: [],
       blockers: [],
@@ -568,6 +572,7 @@ describe('change transition', () => {
   it('exits 2 when hook fails', async () => {
     const { kernel, stderr } = setup()
     kernel.changes.status.execute.mockResolvedValue({
+      schemaWarnings: [],
       change: makeMockChange({ name: 'feat', state: 'designing' }),
       artifactStatuses: [],
       blockers: [],
@@ -599,6 +604,7 @@ describe('change transition', () => {
   it('prints transition confirmation with from → to format', async () => {
     const { kernel, stdout } = setup()
     kernel.changes.status.execute.mockResolvedValue({
+      schemaWarnings: [],
       change: makeMockChange({ name: 'feat', state: 'designing' }),
       artifactStatuses: [],
       blockers: [],
@@ -632,6 +638,7 @@ describe('change transition', () => {
   it('outputs json with new state', async () => {
     const { kernel, stdout } = setup()
     kernel.changes.status.execute.mockResolvedValue({
+      schemaWarnings: [],
       change: makeMockChange({ name: 'feat', state: 'designing' }),
       artifactStatuses: [],
       blockers: [],
@@ -680,6 +687,7 @@ describe('change transition', () => {
   it('JSON output includes from and to fields', async () => {
     const { kernel, stdout } = setup()
     kernel.changes.status.execute.mockResolvedValue({
+      schemaWarnings: [],
       change: makeMockChange({ name: 'my-change', state: 'drafting' }),
       artifactStatuses: [],
       blockers: [],
@@ -741,6 +749,7 @@ describe('change transition', () => {
     mockProcessExit()
 
     kernel.changes.status.execute.mockResolvedValue({
+      schemaWarnings: [],
       change: makeMockChange({ name: 'feat', state: 'designing' }),
       artifactStatuses: [],
       blockers: [],

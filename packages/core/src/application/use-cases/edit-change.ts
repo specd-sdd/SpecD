@@ -62,12 +62,13 @@ export interface EditChangeInput {
   readonly invalidation?: InvalidationPolicyOverride
 }
 
+import { ResolveChangeSchema } from '../services/resolve-change-schema.js'
+
 /**
  * Edits metadata and scope of an active change.
  *
  * Any modification to `description` only records a `description-updated` event.
- * Any modification to `specIds` triggers approval invalidation via
- * {@link Change.updateSpecIds}.
+ * Scope modifications are serialized through the dedicated reconciliation path.
  */
 export class EditChange {
   private readonly _changes: ChangeRepository
@@ -76,6 +77,7 @@ export class EditChange {
   private readonly _schemaProvider: SchemaProvider
   private readonly _refresh?: RefreshImplementationTracking | undefined
   private readonly _reconcile: ReconcileChangeValidity
+  private readonly _resolveChangeSchema: ResolveChangeSchema
 
   /**
    * Creates a new `EditChange` use case instance.
@@ -86,6 +88,7 @@ export class EditChange {
    * @param schemaProvider - Provider for the active schema DAG
    * @param refreshImplementationTracking - Optional refresh handler for implementation tracking cleanup
    * @param reconcile - Canonical reconciler for scope edits
+   * @param resolveChangeSchema - Shared change schema resolver
    */
   constructor(
     changes: ChangeRepository,
@@ -94,6 +97,7 @@ export class EditChange {
     schemaProvider: SchemaProvider,
     refreshImplementationTracking?: RefreshImplementationTracking,
     reconcile?: ReconcileChangeValidity,
+    resolveChangeSchema?: ResolveChangeSchema,
   ) {
     this._changes = changes
     this._listWorkspaces = listWorkspaces
@@ -104,6 +108,7 @@ export class EditChange {
       throw new InvalidCompositionFactoryArgumentsError('EditChange', 'reconcile is required')
     }
     this._reconcile = reconcile
+    this._resolveChangeSchema = resolveChangeSchema ?? new ResolveChangeSchema(schemaProvider)
   }
 
   /**
@@ -112,7 +117,6 @@ export class EditChange {
    * @param input - Edit parameters
    * @returns The updated change and whether approvals were invalidated
    * @throws {ChangeNotFoundError} If no change with the given name exists
-   * @throws {SpecNotInChangeError} If a spec to remove is not in the change's specIds
    */
   async execute(input: EditChangeInput): Promise<EditChangeResult> {
     const change = await this._changes.get(input.name)
@@ -135,21 +139,26 @@ export class EditChange {
     const workspaces = await this._listWorkspaces.execute()
     const workspaceMap = new Map(workspaces.map((ws) => [ws.name, ws]))
 
-    if (input.addSpecIds !== undefined && input.addSpecIds.length > 0) {
-      const schema = await this._schemaProvider.get()
-      for (const specId of input.addSpecIds) {
-        const persisted = await loadPersistedSpecSchema(workspaceMap, specId)
-        const specSchemaName = persisted.schema !== null ? persisted.schema.name : schema.name()
-        const isCompatible =
-          specSchemaName === change.schemaName || schema.compat()?.name === specSchemaName
+    if (hasSpecChanges) {
+      const { schema } = await this._resolveChangeSchema.execute({
+        changeName: change.name,
+        schemaName: change.schemaName,
+        schemaVersion: change.schemaVersion,
+      })
 
-        if (!isCompatible) {
-          throw new IncompatibleSchemaError(specId, specSchemaName, change.schemaName)
+      if (input.addSpecIds !== undefined && input.addSpecIds.length > 0) {
+        for (const specId of input.addSpecIds) {
+          const persisted = await loadPersistedSpecSchema(workspaceMap, specId)
+          const specSchemaName = persisted.schema !== null ? persisted.schema.name : schema.name()
+          const isCompatible =
+            specSchemaName === change.schemaName || schema.compat()?.name === specSchemaName
+
+          if (!isCompatible) {
+            throw new IncompatibleSchemaError(specId, specSchemaName, change.schemaName)
+          }
         }
       }
-    }
 
-    if (hasSpecChanges) {
       return this._executeScopeEdit(
         input,
         actor,
@@ -162,50 +171,7 @@ export class EditChange {
 
     const { result: persisted, change: initialChange } = await this._changes.mutate(
       input.name,
-      async (freshChange) => {
-        let specIdsChanged = false
-        let removedSpecIds: string[] = []
-        let addedSpecIds: string[] = []
-
-        if (hasSpecChanges) {
-          const specIds = [...freshChange.specIds]
-
-          if (input.removeSpecIds !== undefined) {
-            for (const id of input.removeSpecIds) {
-              const idx = specIds.indexOf(id)
-              if (idx === -1) {
-                throw new SpecNotInChangeError(id, input.name)
-              }
-              specIds.splice(idx, 1)
-            }
-          }
-
-          if (input.addSpecIds !== undefined) {
-            for (const id of input.addSpecIds) {
-              if (!specIds.includes(id)) {
-                specIds.push(id)
-              }
-            }
-          }
-
-          const currentSpecIds = freshChange.specIds
-          addedSpecIds = specIds.filter((id) => !currentSpecIds.includes(id))
-          specIdsChanged =
-            specIds.length !== currentSpecIds.length ||
-            specIds.some((id, i) => id !== currentSpecIds[i])
-
-          if (specIdsChanged) {
-            removedSpecIds = currentSpecIds.filter((id) => !specIds.includes(id))
-            const schema = await this._schemaProvider.get()
-            freshChange.updateSpecIds(specIds, actor, schema.artifactDag())
-            for (const specId of addedSpecIds) {
-              if (freshChange.specDependsOn.get(specId) !== undefined) continue
-              const persistedDeps = await loadPersistedSpecDependsOn(workspaceMap, specId)
-              freshChange.setSpecDependsOn(specId, persistedDeps.dependsOn)
-            }
-          }
-        }
-
+      (freshChange) => {
         if (hasDescriptionChange) {
           freshChange.updateDescription(input.description ?? '', actor)
         }
@@ -214,7 +180,7 @@ export class EditChange {
           freshChange.invalidationPolicy = resolvedPolicy
         }
 
-        return { invalidated: specIdsChanged, removedSpecIds }
+        return { invalidated: false, removedSpecIds: [] as string[] }
       },
     )
 
@@ -258,7 +224,7 @@ export class EditChange {
     policyChanged: boolean,
     hasDescriptionChange: boolean,
   ): Promise<EditChangeResult> {
-    const mutation = await this._reconcile.mutate({ name: input.name }, async (ctx) => {
+    const mutation = await this._reconcile.mutate({ name: input.name, actor }, async (ctx) => {
       const freshChange = ctx.change
       if (policyChanged) freshChange.invalidationPolicy = resolvedPolicy
       if (hasDescriptionChange) freshChange.updateDescription(input.description ?? '', actor)

@@ -11,12 +11,38 @@
     "core:get-status",
     "core:transition-change",
     "core:archive-change",
-    "core:hook-execution-model"
+    "core:hook-execution-model",
+    "core:workflow-topology",
+    "core:check-registry"
   ],
   "implementation": [
     {
       "file": "core:src/domain/value-objects/workflow-step.ts",
-      "symbols": ["WorkflowStep", "WorkflowStepCheckDeclaration", "HookFailurePolicy", "HookEntry"]
+      "symbols": ["WorkflowStep"]
+    },
+    {
+      "file": "core:src/infrastructure/schema-yaml-parser.ts",
+      "symbols": ["WorkflowStepRaw"]
+    },
+    {
+      "file": "core:src/domain/services/build-schema.ts",
+      "symbols": ["buildSchema"]
+    },
+    {
+      "file": "core:src/application/ports/schema-provider.ts",
+      "symbols": ["SchemaProvider"]
+    },
+    {
+      "file": "core:src/composition/lazy-schema-provider.ts",
+      "symbols": ["LazySchemaProvider"]
+    },
+    {
+      "file": "core:src/application/use-cases/resolve-schema.ts",
+      "symbols": ["ResolveSchema"]
+    },
+    {
+      "file": "core:src/application/use-cases/validate-schema.ts",
+      "symbols": ["ValidateSchema"]
     }
   ],
   "optimizations": {

@@ -80,7 +80,7 @@ Each check id SHALL be implemented in its own module pair as needed (pure rule v
 
 ### Requirement: Applicability from, to, and along
 
-The **check registry** SHALL declare applicability as `from`, `to`, and `along` (wildcards allowed) on bindings that reference a check. The same check object MAY be bound to more than one attempt (for example enter-`ready` and operation `archive`).
+The **check registry** SHALL declare applicability as `from`, `to`, and `along` (wildcards allowed) on bindings that reference a check. The same check object MAY be bound to more than one attempt (for example enter-`ready`, operation `archive`, or intermediate `step-skip`).
 
 `along` SHALL be one of:
 
@@ -90,7 +90,10 @@ The **check registry** SHALL declare applicability as `from`, `to`, and `along` 
 - `recovery` — archive rollback (`archiving → archivable`)
 - `any` — no direction filter
 
-The progress axis SHALL start from `schema.workflow[]` declaration order of **known** `ChangeState` lookup rows. Missing delivery states SHALL be **spliced** into that axis in canonical `AXIS_FALLBACK` order (`ready`, `implementing`, `verifying`, `done`, `archivable`, `archiving`), inserting each omitted fallback at the index that preserves fallback relative order — not pushed after later listed steps. Tail-append MUST NOT invert retry (`verifying → implementing` MUST remain `backward` when `implementing` is omitted). `drafting` and `designing` MUST NOT be members of `AXIS_FALLBACK`. Strings that are not `ChangeState` MUST NOT occupy axis slots. That order MUST NOT mean consecutive steps are mandatory. Omitting a `workflow[]` row MUST NOT remove the named state from `VALID_TRANSITIONS`.
+The progress axis and transition classification SHALL be derived directly from `resolveWorkflowPipeline(schema, approvals)`.
+Steps explicitly declared `disabled: true` are excluded from the axis.
+Fallback insertion MUST NOT revive disabled steps or corrupt retry classification.
+Omission of a canonical step from `workflow[]` defaults to enabled.
 
 `from = *` / `to = *` without `along` MUST NOT be used when it would confuse `ready → designing` with `ready → implementing`.
 
@@ -98,7 +101,40 @@ Sugar MAY be used in authoring; the stored contract is the triple:
 
 - `onEnter(S)` → `to = S`, `from = *`, `along = any` unless specified
 - `onExit(S, along)` → `from = S`, `to = *`
-- `onEdge(A, B)` → exact pair
+
+### Requirement: Step-skip check scope and applicability
+
+The check system SHALL support a dedicated attempt scope for validating whether an intermediate workflow step may be bypassed:
+
+1. **CheckAttempt Extension**:
+   - `scope: 'step-skip'` identifies an attempt to bypass an intermediate step `step` during a transition from `from` to `to`.
+   - Discriminator: `{ readonly scope: 'step-skip'; readonly step: ChangeState; readonly from: ChangeState; readonly to: ChangeState }`.
+2. **CheckApplicability Extension**:
+   - `StepSkipApplicability` targets checks bound to bypassed steps: `{ readonly scope: 'step-skip'; readonly step: ChangeState | '*' }`.
+   - Matching: `checkMatches` returns `true` if binding scope is `'step-skip'` and binding `step` matches the attempt `step` (or `'*'`).
+3. **Isolation**: Checks bound under `scope: 'step-skip'` are evaluated strictly as bypass preconditions and do not collide with destination enter/exit predicates under `scope: 'transition'`.
+
+### Requirement: Dynamic runtime binding composition and cascaded config resolution
+
+When evaluating a candidate transition (`from` -> `to`) or bypassed steps (`listBypassedWorkflowSteps(from, to, schema, approvals)`):
+
+1. **Target Step Transition Bindings**:
+   - The active evaluation bindings SHALL dynamically incorporate check declarations from `schema.workflowStep(to).checks`.
+   - Declarations with `disabled: true` SHALL exclude the matching check from execution for that transition coordinate.
+   - Declarations defining new bindings SHALL synthesize a `CheckBinding` with `scope: 'transition'`, `to`, and `along`.
+   - Step configuration SHALL be merged over binding defaults and check defaults using `deepMergeConfig(checkDefault, bindingDefault, stepConfig)`, passing the resolved record into `CheckExecutionContext.config`.
+2. **Bypassed Steps Skip Bindings**:
+   - For each intermediate bypassed step `S`, the active evaluation bindings SHALL dynamically incorporate skip check declarations from `schema.workflowStep(S).skipChecks`.
+   - Declarations with `disabled: true` SHALL exclude the matching skip check from execution.
+   - Declarations defining new bindings SHALL synthesize a `CheckBinding` with `scope: 'step-skip'` and `step: S`.
+   - Step configuration SHALL be merged using `deepMergeConfig` and passed into `CheckExecutionContext.config`.
+3. **Single-pass config cascade**: The effective configuration for each binding SHALL be computed exactly once, in the order check default → binding default → step declaration, and carried on the resolved binding. Predicate execution SHALL pass that resolved record to `CheckExecutionContext.config` unchanged and MUST NOT merge any layer a second time. Merging the same layer twice (for example duplicating array entries) is a defect.
+4. **Coordinate isolation**: The `scope: 'transition'` coordinate of a step and the `scope: 'step-skip'` coordinate of the same step are independent bindings. `disabled: true` in `checks` SHALL remove the check only from that step's transition coordinate, and `disabled: true` in `skipChecks` SHALL remove it only from that step's step-skip coordinate. Disabling one coordinate MUST NOT remove, reconfigure, or otherwise affect the other.
+5. **Applicability of step checks**: A check declared in `schema.workflowStep(to).checks` SHALL match a transition attempt only when its `from` (default `'*'`) and `along` (default `'forward'`) match the attempt. Step checks MUST NOT run on backward, redesign, or recovery entries unless their declaration explicitly selects that `along`. This applies equally when the declaration overlays a code-defined binding: the overlaid binding's applicability SHALL be narrowed to the declaration's `from` and `along`, and the rows of the code-defined binding that the declaration does not select SHALL keep their original policy and configuration.
+6. **Concrete step-skip coordinates**: When a code-defined `step-skip` binding with `step: '*'` serves a bypassed step that the schema declares in `skipChecks`, the resolved binding for that step SHALL carry the concrete `step` value. A binding resolved for one bypassed step MUST NOT match, or lend its configuration to, a different bypassed step.
+7. **Resolver is the single owner**: `resolveEffectiveBindings` SHALL be the only place that applies schema `checks` / `skipChecks` declarations (exclusion through `disabled`, `from` / `along` narrowing, `onFailure`, `skippable`, and configuration). Every declaration SHALL resolve either into a binding or into an exclusion. The predicate runner SHALL execute the resolved bindings as given: it MUST NOT re-filter declarations, re-merge configuration, or execute declarations that are not represented as resolved bindings.
+8. **Executable instances**: A binding synthesized for a declaration SHALL reference the executable check instance from the registry handed in by composition (see [`core:check-registry`](../check-registry/spec.md)), so a schema-embedded built-in check evaluates real facts.
+9. **Derived policy comes from resolved bindings**: Every consumer that reports or enforces binding policy — failure mapping (`skippable` on `CheckPredicateFailedError`), `--skip-checks` validation, blocker `bypassFlag` projection, and `onFailure` handling — SHALL read it from the resolved bindings for the attempt being evaluated, never from the base binding table.
 
 ### Requirement: Archive is an operation not an edge
 
@@ -129,13 +165,30 @@ Execute MUST select effects by binding `phase` and MUST apply binding `onFailure
 
 For a candidate edge (`from` = current state, `to` = requested target):
 
-1. Classify `along` for the requested pair. There is **no** approval routing rewrite: the requested target is the target.
-2. Run `protocol.edge` against `VALID_TRANSITIONS`. On `TransitionChange` execute, fail-fast if it fails. On `GetStatus`, collect it with every other matching predicate (no fail-fast).
+1. Classify `along` for the requested pair using `resolveWorkflowPipeline(schema, approvals)`. There is **no** approval routing rewrite: the requested target is the target.
+2. Run `protocol.edge` against `listWorkflowTransitions(from, schema, approvals)`. On `TransitionChange` execute, fail-fast if it fails. On `GetStatus`, collect it with every other matching predicate (no fail-fast).
 3. For every registered **predicate** whose binding matches the attempt, call `check.execute(ctx)` (schema `workflow.requires` and `workflow.taskCompletion` still use `to` = requested target).
 4. Set `allowed` when no blocking predicate failed (`skip` is not a failure).
 5. On execute only: for matching **effects** whose binding `phase` matches the current slot, call `check.execute(ctx)`, then persist (or, for `after-persist`, after persist). Apply each binding’s `onFailure`.
 
 `ApproveSpec` / `ApproveSignoff` remain separate commands. They MUST record consent on the change and MUST NOT call `TransitionChange` into a pending state.
+
+### Requirement: Shared transition candidate evaluator
+
+Core SHALL expose one pure application-facing candidate evaluation path that accepts the current change facts, sovereign schema, approval gates, target, registry bindings, and predicate execution context.
+
+The evaluator MUST:
+
+1. compute the target attempt and `listBypassedWorkflowSteps(from, to, schema, approvals)`;
+2. evaluate `protocol.edge` first;
+3. resolve and evaluate all matching normal transition predicates;
+4. for every optional bypassed step, resolve and evaluate its matching `scope: 'step-skip'` predicates in pipeline order;
+5. treat an empty effective step-skip set as passing;
+6. return the complete ordered check results, bypassed steps, and allowed verdict without executing effects or mutating state.
+
+The evaluator SHALL accept an evaluation mode. In **projection** mode (used by `GetStatus`) every matching predicate is evaluated and collected. In **execute** mode (used by `TransitionChange`) a failing `protocol.edge` SHALL stop evaluation immediately: no other predicate executes and the result carries only the protocol failure.
+
+`GetStatus` and `TransitionChange` MUST both call this evaluator. `TransitionChange` MUST call it against fresh state immediately before running effects and persistence; it MUST NOT reuse a prior status snapshot as authorization.
 
 ### Requirement: Shared validity verdict and recovery priority
 
@@ -167,11 +220,15 @@ Every mutating use-case dependency path SHALL provide this reconciler. A direct 
 The system SHALL maintain explicit governance and skippability permissions across all built-in check bindings in `CheckBindingSpec` and `CheckBinding`:
 
 - **Category A (Protocol & State Invariants)** (`protocol.edge`, `verification.current`, `archive.archivable`, `schema.nameMatch`, `hook.pre`, `hook.post`): MUST explicitly declare `allowBindingOverride: false`, `allowDisable: false`, and `skippable: false`. Cannot be embedded into steps or disabled in `schema.yaml`. Hook effects (`hook.pre`, `hook.post`) are bypassed via `--skip-hooks`, never `--skip-checks`.
-- **Category B (Native Step Attributes)** (`workflow.requires`, `workflow.taskCompletion`, `approval.spec`, `approval.signoff`): Governed natively via dedicated step and workspace schema configurations (`requires: []`, `requiresTaskCompletion`, `approvals`). Declares `skippable: false`.
+- **Category B (Native Step Attributes)** (`workflow.requires`, `workflow.taskCompletion`, `workflow.tasksEmpty`, `approval.spec`, `approval.signoff`): Governed natively via dedicated step and workspace schema configurations (`requires: []`, `requiresTaskCompletion`, `approvals`). Declares `skippable: false`.
+  - `workflow.tasksEmpty`: Bound under `scope: 'step-skip'` with `step: 'implementing'`. Verifies that `tasks.md` has no incomplete tasks (`incomplete === 0`) or 0 total tasks before skipping implementation.
 - **Category C (Policy & Consistency Checks)**: Declares `allowBindingOverride: true` and `allowDisable: true`, permitting project schemas to bind them to workflow steps or declaratively disable them (`disabled: true`).
-  - `impl.linksInScope`: Declares `skippable: true`. Bypassed via `--skip-checks impl.linksInScope` (or legacy alias `--allow-out-of-scope`).
+  - `impl.linksInScope`: Declares `skippable: true`. Bound under `scope: 'step-skip'` with `step: 'implementing'`, `scope: 'transition'` entering `verifying`, and `scope: 'archive'`.
+  - `impl.filesResolved`: Declares `skippable: false`. Bound under `scope: 'step-skip'` with `step: 'implementing'`, `scope: 'transition'` entering `verifying`, and `scope: 'archive'`.
   - `spec.overlap`: Declares `skippable: true`. Bypassed via `--skip-checks spec.overlap` (or legacy alias `--allow-overlap`).
-  - `deps.consistent`, `impl.filesResolved`, `workspace.readOnly`: Declare `skippable: false`. Cannot be bypassed via CLI flag.
+  - `deps.consistent`, `workspace.readOnly`: Declare `skippable: false`. Cannot be bypassed via CLI flag.
+
+Every built-in `CheckBindingSpec` SHALL declare `allowBindingOverride` and `allowDisable` explicitly with the values of its category above. When a binding (built-in or plugin) omits a governance field, it SHALL inherit the check-level governance value; binding construction MUST NOT substitute a permissive default (such as `allowBindingOverride: true`).
 
 ### Requirement: Actionable fail diagnostics
 
@@ -185,7 +242,7 @@ A failing check’s `message` (and `details` when structured data helps) MUST ex
 
 `label` orients “which check”; `message`/`details` orient “what to fix” (or, for `impl.*`, “how big the problem is” plus where to list the rest).
 
-`impl.linksInScope` remains skippable with `--allow-out-of-scope` on archive (and MUST use the same skippable semantics when evaluated on `from = implementing` if that override is in scope). `impl.filesResolved` MUST NOT be skippable with that flag. When projecting status or repair blockers from failed checks, `bypassFlag: '--allow-out-of-scope'` (and `isSkippable` for that flag) MUST attach only when the failing check id is `impl.linksInScope` — never solely because `code` is `IMPLEMENTATION_STATE`.
+`impl.linksInScope` remains skippable on archive and, with the same skippable semantics, on `from = implementing`. `impl.filesResolved` MUST NOT be skippable. The canonical bypass for a skippable failing check is `--skip-checks <checkId>`; the CLI MAY keep `--allow-out-of-scope` (for `impl.linksInScope`) and `--allow-overlap` (for `spec.overlap`) as accepted aliases. When projecting status or repair blockers from failed checks, `bypassFlag` SHALL be `--skip-checks <checkId>` and SHALL attach (with `isSkippable`) only when the resolved binding for the failing check is skippable — never solely because `code` is `IMPLEMENTATION_STATE`.
 
 Default **effect** bindings (`hook.pre` / `hook.post`, kind `effect`) for schema `run:` hooks. Each effect’s `execute` SHALL call `RunStepHooks` via constructor deps. Lifecycle use cases MUST NOT call `RunStepHooks` by check id. Each effect binding SHALL declare `phase` and `onFailure`:
 
@@ -225,12 +282,14 @@ Canonical built-in labels (gerund):
 | `protocol.edge`           | Validating transition edge         |
 | `workflow.requires`       | Checking required artifacts        |
 | `workflow.taskCompletion` | Checking task completion           |
+| `workflow.tasksEmpty`     | Checking empty tasks               |
 | `deps.consistent`         | Checking spec dependencies         |
 | `workspace.readOnly`      | Checking workspace ownership       |
 | `impl.filesResolved`      | Checking open implementation files |
 | `impl.linksInScope`       | Checking implementation links      |
 | `approval.spec`           | Checking spec approval             |
 | `approval.signoff`        | Checking signoff approval          |
+| `verification.current`    | Checking verification freshness    |
 | `schema.nameMatch`        | Checking schema name               |
 | `archive.archivable`      | Checking archivable state          |
 | `spec.overlap`            | Checking spec overlap              |
@@ -272,8 +331,9 @@ Transition evaluation for historic parked approval states MUST preserve the appr
 
 ## Spec Dependencies
 
-- [`core:change`](../change/spec.md) — lifecycle states, approval records, and VALID_TRANSITIONS
+- [`core:change`](../change/spec.md) — lifecycle states, approval records, and state transitions
 - [`core:workflow-model`](../workflow-model/spec.md) — workflow\[] lookup rows, progress axis, requires, taskCompletion, hook declarations
+- [`core:workflow-topology`](../workflow-topology/spec.md) — ordered pipeline, dynamic legal transitions, and bypassed step calculation
 - [`core:schema-format`](../schema-format/spec.md) — workflow step YAML shape
 - [`default:_global/architecture`](../../../_global/architecture/spec.md) — domain purity vs application I/O
-- [`core:check-registry`](../check-registry/spec.md) — Dynamic check resolution, namespacing, and two-tier governance.
+- [`core:check-registry`](../check-registry/spec.md) — dynamic check resolution, namespacing, and two-tier governance

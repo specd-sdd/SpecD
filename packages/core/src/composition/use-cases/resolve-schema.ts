@@ -1,3 +1,4 @@
+import { type ApprovalGates } from '../../domain/services/workflow-topology.js'
 import { type SchemaRegistry } from '../../application/ports/schema-registry.js'
 import { ResolveSchema } from '../../application/use-cases/resolve-schema.js'
 import { type SpecdConfig } from '../../application/specd-config.js'
@@ -21,6 +22,8 @@ export interface ResolveSchemaDeps {
   readonly schemaPlugins?: readonly string[]
   /** Optional inline schema override operations. */
   readonly schemaOverrides?: SchemaOperations
+  /** Optional approval gates used to validate workflow anchors. */
+  readonly approvals?: ApprovalGates
 }
 
 /**
@@ -39,6 +42,7 @@ export function resolveResolveSchemaDeps(resolver: CompositionResolver): Resolve
     ...(resolver.config.schemaOverrides !== undefined
       ? { schemaOverrides: resolver.config.schemaOverrides }
       : {}),
+    approvals: resolver.config.approvals,
   }
 }
 
@@ -95,6 +99,8 @@ function createResolveSchemaFromNormalized(
       input.deps.schemaRef,
       input.deps.schemaPlugins ?? [],
       input.deps.schemaOverrides,
+      undefined,
+      input.deps.approvals,
     )
   }
   const resolver = createCompositionResolver(input.config, input.options)

@@ -181,6 +181,108 @@
 - **THEN** it repeats all applicable verification work before completion
 - **AND** earlier results cannot complete the new attempt
 
+#### Scenario: Dynamic topology consumption by agent skills
+
+- **GIVEN** a change where `verifying` is disabled or `implementing` is optional and bypassed
+- **WHEN** the agent skill reads `changes status --format toon`
+- **THEN** it advances along `nextAction.command` and `availableTransitions` directly
+- **AND** it does not execute hooks for the bypassed intermediate steps
+
+#### Scenario: Disabled verifying selects only the actual target hooks
+
+- **GIVEN** structured status where `verifying` is disabled and the selected direct target is `done`
+- **WHEN** a lifecycle skill advances from `implementing`
+- **THEN** it runs hooks and the transition only for the actual source and `done`
+- **AND** it selects no `verifying` pre-hook, post-hook, or transition command
+
+#### Scenario: Optional implementing bypass follows status routing
+
+- **GIVEN** structured status where `implementing` is bypassable and `nextAction.command` selects the next legal lifecycle skill
+- **WHEN** design completion advances along an advertised direct target in `availableTransitions`
+- **THEN** the skill uses that exact target
+- **AND** it selects no `implementing` hook or transition command
+
+#### Scenario: Fixed canonical recipes cannot override structured routing
+
+- **GIVEN** a lifecycle template containing operational transition instructions
+- **WHEN** its protocol is validated
+- **THEN** every target and target hook is derived from fresh structured status
+- **AND** an unconditional canonical target recipe fails validation
+
+#### Scenario: Skill does not invent optional-step policy
+
+- **GIVEN** Core advertises a legal shortcut for an optional step with no effective skip checks
+- **WHEN** the lifecycle skill consumes structured status
+- **THEN** it follows the advertised target
+- **AND** it does not require tasks, checks, or user judgment absent from the Core projection
+
+#### Scenario: Explicit design invocation may choose an advertised redesign
+
+- **GIVEN** `nextAction.command` recommends another lifecycle skill
+- **AND** `designing` is present in `lifecycle.availableTransitions`
+- **WHEN** the user explicitly invokes `specd-design`
+- **THEN** the design skill may continue toward `designing`
+- **AND** it reports the preferred recommendation without treating it as a veto
+
+#### Scenario: Explicit skill stops when its target is unavailable
+
+- **GIVEN** the target associated with an explicitly invoked lifecycle skill is absent from `lifecycle.availableTransitions`
+- **WHEN** that skill evaluates routing
+- **THEN** it stops before hooks or transition
+- **AND** it reports current blockers and the preferred `nextAction`
+
+#### Scenario: Generated lifecycle guides preserve semantic routing invariants
+
+- **GIVEN** generated lifecycle skill guides for design, implement, verify, and archive
+- **WHEN** their protocol semantics are validated
+- **THEN** optional-step shortcuts follow Core-advertised targets
+- **AND** disabled steps and their hooks are absent from execution routes
+- **AND** an empty effective skip-check set needs no invented condition
+- **AND** Core alone owns `availableTransitions` and `nextAction` routing decisions
+- **AND** `done` remains mandatory regardless of signoff configuration
+
+#### Scenario: specd-verify skips verifying hooks when verifying is disabled
+
+- **GIVEN** a change whose schema disables `verifying` and whose status does not advertise `verifying`
+- **WHEN** the `specd-verify` instructions are followed
+- **THEN** no `run-hooks <name> verifying` or `hook-instruction <name> verifying` command is executed
+- **AND** no transition to `verifying` is attempted
+
+#### Scenario: Approval gating comes from structured status
+
+- **WHEN** a lifecycle template decides whether a sign-off or spec approval gate applies
+- **THEN** it reads `lifecycle.approvals` / `availableTransitions` from `changes status --format toon` rather than parsing the text `approvals:` line
+
+### Requirement: Lifecycle template protocol validation
+
+#### Scenario: Unconditional transition recipe fails validation
+
+- **GIVEN** a lifecycle template containing `specd changes transition <name> done --skip-hooks all` that is not conditioned on `nextAction` or on `done` being in `lifecycle.availableTransitions`
+- **WHEN** the template protocol validator runs over the real templates
+- **THEN** it fails and names the template and line
+
+#### Scenario: Hooks for a possibly disabled step fail validation
+
+- **GIVEN** a lifecycle template that always runs `run-hooks <name> verifying` regardless of the routed hop
+- **WHEN** the validator runs
+- **THEN** it fails
+
+#### Scenario: Fixed next-skill completion message fails validation
+
+- **GIVEN** a template whose completion message always suggests `/specd-verify`
+- **WHEN** the validator runs
+- **THEN** it fails and requires the suggestion to come from `nextAction.command`
+
+#### Scenario: Current templates and installed copies pass
+
+- **WHEN** the validator runs over `packages/skills/templates/skills/*/SKILL.md.tpl` and every installed generated copy
+- **THEN** it passes
+
+#### Scenario: Routing tests exercise real templates
+
+- **WHEN** the skills test suite is inspected
+- **THEN** no routing test relies solely on a routing function defined inside the test file
+
 ### Requirement: Implementation traceability policy
 
 #### Scenario: Agent resolves tracked files explicitly before archive

@@ -2,6 +2,7 @@ import {
   Logger,
   SpecdError,
   SchemaNotFoundError,
+  SchemaProviderIdentityMismatchError,
   SchemaValidationError,
   HookFailedError,
   HistoricalImplementationGuardError,
@@ -177,8 +178,10 @@ export function handleError(err: unknown, format?: string): never {
 
     if (
       err instanceof SchemaNotFoundError ||
+      err instanceof SchemaProviderIdentityMismatchError ||
       err instanceof SchemaValidationError ||
       code === 'SCHEMA_NOT_FOUND' ||
+      code === 'SCHEMA_PROVIDER_IDENTITY_MISMATCH' ||
       code === 'SCHEMA_VALIDATION_ERROR'
     ) {
       return cliError(err.message, format, 3, code, { metadata })

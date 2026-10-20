@@ -85,9 +85,15 @@ The schema SHALL define declarative extractors for project metadata:
 
 The schema workflow SHALL declare standard lifecycle steps and valid transitions:
 
-1. Steps SHALL include `drafting`, `designing`, `ready`, `implementing`, `verifying`, `done`, `pending-signoff`, `signed-off`, and `archiving`.
-2. Step transitions MUST define permitted forward routes and mandatory gate checks.
-3. Transitions SHALL support declarative pre- and post-execution hooks.
+1. Declarative workflow rows SHALL include the delivery steps `designing`, `ready`, `implementing`, `verifying`, and `archiving`. The protocol-owned states `drafting`, `done`, and `archivable` remain valid lifecycle anchors without requiring dedicated workflow rows.
+2. `pending-spec-approval`, `pending-signoff`, and `signed-off` are drain-only historical states and MUST NOT be introduced as standard `workflow[]` rows. Spec approval remains a gate on leaving `ready`; signoff remains a gate on leaving `done`.
+3. Step transitions MUST define permitted forward routes and mandatory gate checks.
+4. Workflow step declarations SHALL support `optional: boolean` and `disabled: boolean` flags:
+   - `optional: true` marks a step as skippable. A shortcut across it is permitted when every effective `step-skip` check for the step passes; when the step has no effective `step-skip` checks, the bypass is unconditional (see [`core:workflow-model`](../../core/workflow-model/spec.md)).
+   - `disabled: true` removes a step from the active progression axis and legal transition graph.
+5. Bedrock states (`drafting`, `designing`, `done`, `archiving`, `archivable`) cannot be optional or disabled. `done` is the mandatory completed-delivery boundary and remains distinct from `archivable`, whether or not signoff is enabled.
+6. When signoff is disabled, `approval.signoff` skips on `done -> archivable`; the standard lifecycle MUST NOT bypass or remove `done`.
+7. Transitions SHALL support declarative pre- and post-execution hooks, which are skipped when a step is bypassed.
 
 ### Requirement: Schema Package Distribution
 
@@ -100,4 +106,4 @@ The `@specd/schema-std` package SHALL be structured as a standard ESM package ex
 
 ## Spec Dependencies
 
-_none_
+- [`core:workflow-model`](../../core/workflow-model/spec.md) — schema workflow step model, optional/disabled declarations

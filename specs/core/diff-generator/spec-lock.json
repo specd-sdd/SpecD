@@ -21,5 +21,41 @@
       "file": "core:src/composition/diff-generator.ts",
       "symbols": ["createDefaultDiffGenerator"]
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "DiffGenerator produces presentation-neutral unified file diffs behind a typed, swappable core capability.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:cc0ad557b02909e665fd9470d6213b45f71a64050b59100dcfa27dfaaf4426e1",
+          "lastModified": "2026-08-25T15:37:19.279Z"
+        },
+        "verify.md": {
+          "hash": "sha256:c61622d8b4fc2a7e1c49303ceecf0d9dbda3d021fba219a8c8ec9c288d0abbf8",
+          "lastModified": "2026-08-25T15:37:19.279Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# DiffGenerator\n\n## Rules\n- TypeScript interface `DiffGenerator`, not abstract class; exposes `generate({ filename, base, merged, contextLines? }): string`.\n- `base` may be empty for newly introduced artifacts.\n- Return plain unified diff: no ANSI, controls, or host separators. Labels: `a/<filename> (base)` and `b/<filename> (merged)`.\n- Omitted `contextLines` defaults to 3.\n- Dedicated `DiffGenerationError` distinguishes non-fatal diff-surface failure from merge/artifact-preview failure; default implementation raises it when usable unified diff cannot be produced.\n- Core provides default factory; concrete diff library remains encapsulated.\n- Internal shared preview capability suitable for `PreviewSpec`; delivery hosts need not use it for unrelated workflows.\n\n## Constraints\n- Port lives `application/ports/`; port has no concrete diff-library dependency.\n- Plain text only; presentation outside port.\n- Models file-to-file unified diffs, not semantic comments or artifact filtering.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:cc0ad557b02909e665fd9470d6213b45f71a64050b59100dcfa27dfaaf4426e1",
+          "lastModified": "2026-08-25T15:37:19.279Z"
+        },
+        "verify.md": {
+          "hash": "sha256:c61622d8b4fc2a7e1c49303ceecf0d9dbda3d021fba219a8c8ec9c288d0abbf8",
+          "lastModified": "2026-08-25T15:37:19.279Z"
+        }
+      }
+    }
+  }
 }

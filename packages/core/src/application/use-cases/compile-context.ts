@@ -1,6 +1,5 @@
 import { type SpecMetadata } from '../../domain/services/parse-metadata.js'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
-import { SchemaMismatchError } from '../errors/schema-mismatch-error.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
 import { type SpecRepository } from '../ports/spec-repository.js'
 import { type SchemaProvider } from '../ports/schema-provider.js'
@@ -29,6 +28,7 @@ import {
   materializeContextSpecMetadata,
 } from './_shared/materialize-context-spec-metadata.js'
 import { mergeCompileContextRuntimeOverrides } from './_shared/merge-compile-context-config.js'
+import { ResolveChangeSchema } from '../services/resolve-change-schema.js'
 
 const CONTEXT_SOURCE_PRIORITY: Record<ContextSpecSource, number> = {
   includePattern: 0,
@@ -208,6 +208,7 @@ export class CompileContext {
   private readonly _workspaceRoutes: readonly SpecWorkspaceRoute[]
   private readonly _defaultConfig: CompileContextConfig
   private readonly _getMetadata: GetSpecMetadata
+  private readonly _resolveChangeSchema: ResolveChangeSchema
 
   /**
    * Creates a new `CompileContext` use case instance.
@@ -223,6 +224,7 @@ export class CompileContext {
    * @param extractorTransforms - Shared extractor transform registry
    * @param workspaceRoutes - Workspace routing metadata for cross-workspace resolution
    * @param defaultConfig - Yaml-derived context configuration baked at composition time
+   * @param resolveChangeSchema - Shared change schema resolver
    */
   constructor(
     changes: ChangeRepository,
@@ -236,6 +238,7 @@ export class CompileContext {
     extractorTransforms: ExtractorTransformRegistry = new Map(),
     workspaceRoutes: readonly SpecWorkspaceRoute[] = [],
     defaultConfig: CompileContextConfig = {},
+    resolveChangeSchema?: ResolveChangeSchema,
   ) {
     this._changes = changes
     this._listWorkspaces = listWorkspaces
@@ -248,6 +251,7 @@ export class CompileContext {
     this._extractorTransforms = extractorTransforms
     this._workspaceRoutes = workspaceRoutes
     this._defaultConfig = defaultConfig
+    this._resolveChangeSchema = resolveChangeSchema ?? new ResolveChangeSchema(schemaProvider)
   }
 
   /**
@@ -269,12 +273,11 @@ export class CompileContext {
     const change = await this._changes.get(input.name)
     if (change === null) throw new ChangeNotFoundError(input.name)
 
-    const schema = await this._schemaProvider.get()
-
-    // --- Schema name guard ---
-    if (schema.name() !== change.schemaName) {
-      throw new SchemaMismatchError(change.name, change.schemaName, schema.name())
-    }
+    const { schema } = await this._resolveChangeSchema.execute({
+      changeName: change.name,
+      schemaName: change.schemaName,
+      schemaVersion: change.schemaVersion,
+    })
 
     const warnings: ContextWarning[] = []
 
@@ -417,7 +420,11 @@ export class CompileContext {
           if (!spec) continue
 
           try {
-            const materialized = await this._getMetadata.execute({ specId })
+            // Specs in the change are extracted with the change's schema; the loop only visits those.
+            const materialized = await this._getMetadata.execute({
+              specId,
+              schemaName: schema.name(),
+            })
             appendMaterializationDiagnostics(specId, materialized, warnings)
             dependsOnList = materialized.metadata.dependsOn
           } catch {
@@ -659,7 +666,12 @@ export class CompileContext {
       let metadata: SpecMetadata | null = null
       if (!usable(view)) {
         try {
-          metadata = await materializeContextSpecMetadata(this._getMetadata, specId, warnings)
+          metadata = await materializeContextSpecMetadata(
+            this._getMetadata,
+            specId,
+            warnings,
+            specIdsSet.has(specId) ? schema.name() : undefined,
+          )
         } catch {
           metadata = null
         }

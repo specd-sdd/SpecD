@@ -5,6 +5,7 @@ import { FingerprintInputError } from '../errors/fingerprint-input-error.js'
 import { type ActorResolver } from '../ports/actor-resolver.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
 import { type SchemaProvider } from '../ports/schema-provider.js'
+import { ResolveChangeSchema } from '../services/resolve-change-schema.js'
 import { buildCheckExecutionContext } from '../services/execute-matching-predicates.js'
 import { type ValidityFingerprintService } from '../services/validity-fingerprint-service.js'
 import { type RefreshImplementationTracking } from './refresh-implementation-tracking.js'
@@ -41,6 +42,7 @@ export interface StartVerificationDeps {
   readonly fingerprint: ValidityFingerprintService
   readonly implementationChecks: readonly Check[]
   readonly schemaProvider: SchemaProvider
+  readonly resolveChangeSchema?: ResolveChangeSchema
 }
 
 /**
@@ -52,6 +54,7 @@ export interface StartVerificationDeps {
  */
 export class StartVerification {
   private readonly _deps: StartVerificationDeps
+  private readonly _resolveChangeSchema: ResolveChangeSchema
 
   /**
    * Creates the start-verification use case.
@@ -60,6 +63,8 @@ export class StartVerification {
    */
   constructor(deps: StartVerificationDeps) {
     this._deps = deps
+    this._resolveChangeSchema =
+      deps.resolveChangeSchema ?? new ResolveChangeSchema(deps.schemaProvider)
   }
 
   /**
@@ -114,7 +119,11 @@ export class StartVerification {
     change: Change,
     validity: ReconcileChangeValidityResult['verdict'],
   ): Promise<void> {
-    const schema = await this._deps.schemaProvider.get()
+    const { schema } = await this._resolveChangeSchema.execute({
+      changeName: change.name,
+      schemaName: change.schemaName,
+      schemaVersion: change.schemaVersion,
+    })
     const ctx = buildCheckExecutionContext({
       change,
       schema,

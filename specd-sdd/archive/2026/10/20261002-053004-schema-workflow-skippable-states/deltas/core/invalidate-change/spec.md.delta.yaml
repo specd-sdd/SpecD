@@ -1,0 +1,30 @@
+- op: added
+  description: Resolve invalidation targets from the change's sovereign schema
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Sovereign schema resolution
+
+    `InvalidateChange` MUST resolve the schema through `ResolveChangeSchema` after loading the target change. Artifact targets, global targets, and downstream propagation MUST be derived from that sovereign schema's artifact DAG.
+
+    The use case MUST NOT consult the workspace default schema for a change-scoped invalidation, even when the default differs from the schema recorded on the change. Schema resolution errors MUST propagate before invalidation is persisted.
+- op: added
+  description: Declare the shared sovereign change-schema resolution dependency
+  position:
+    parent:
+      type: section
+      matches: 'Spec Dependencies'
+  content: |
+    - [core:resolve-change-schema](../resolve-change-schema/spec.md) — named sovereign lookup, provider identity validation, and same-name version advisory
+- op: added
+  description: Route the post-invalidation next action through lifecycle guidance
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Next action follows lifecycle guidance
+
+    The `nextAction` returned after an invalidation that triggers an automatic recovery MUST be derived from lifecycle guidance (`evaluateLifecycle`) for the recovered state under the change's sovereign schema, not from a hard-coded command per recovery target. When the schema disables `verifying`, the command MUST NOT be `/specd-verify` or `specd changes verification start`.

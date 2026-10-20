@@ -1,7 +1,11 @@
 import { parse as parseYaml } from 'yaml'
 import { z } from 'zod'
 import { type SelectorRaw, SelectorZodSchema } from './zod/selector-schema.js'
-import { type HookEntry } from '../domain/value-objects/workflow-step.js'
+import {
+  type HookEntry,
+  type WorkflowStepCheckDeclaration,
+  type WorkflowStepSkipCheckDeclaration,
+} from '../domain/value-objects/workflow-step.js'
 import { SchemaValidationError } from '../domain/errors/schema-validation-error.js'
 
 // ---------------------------------------------------------------------------
@@ -245,9 +249,45 @@ const HookEntryZodSchema = z.union([
     ),
 ])
 
+const WorkflowStepCheckZodSchema = z.object({
+  id: z.string(),
+  from: z
+    .enum([
+      '*',
+      'drafting',
+      'designing',
+      'ready',
+      'pending-spec-approval',
+      'spec-approved',
+      'implementing',
+      'verifying',
+      'done',
+      'pending-signoff',
+      'signed-off',
+      'archivable',
+      'archiving',
+    ])
+    .optional(),
+  along: z.enum(['forward', 'backward', 'recovery', 'redesign', '*']).optional(),
+  onFailure: z.enum(['abort', 'collect']).optional(),
+  skippable: z.boolean().optional(),
+  disabled: z.boolean().optional(),
+  config: z.record(z.unknown()).optional(),
+})
+
+const WorkflowStepSkipCheckZodSchema = z.object({
+  id: z.string(),
+  onFailure: z.enum(['abort', 'collect']).optional(),
+  skippable: z.boolean().optional(),
+  disabled: z.boolean().optional(),
+  config: z.record(z.unknown()).optional(),
+})
+
 const WorkflowStepZodSchema = z
   .object({
     step: z.string(),
+    optional: z.boolean().optional(),
+    disabled: z.boolean().optional(),
     requires: z.array(z.string()).optional(),
     requiresTaskCompletion: z.array(z.string()).optional(),
     hooks: z
@@ -256,16 +296,24 @@ const WorkflowStepZodSchema = z
         post: z.array(HookEntryZodSchema).optional(),
       })
       .optional(),
+    checks: z.array(WorkflowStepCheckZodSchema).optional(),
+    skipChecks: z.array(WorkflowStepSkipCheckZodSchema).optional(),
   })
   .transform(
     (ws): WorkflowStepRaw => ({
       step: ws.step,
+      optional: ws.optional ?? false,
+      disabled: ws.disabled ?? false,
       requires: ws.requires ?? [],
       requiresTaskCompletion: ws.requiresTaskCompletion ?? [],
       hooks: {
         pre: ws.hooks?.pre ?? [],
         post: ws.hooks?.post ?? [],
       },
+      ...(ws.checks !== undefined ? { checks: ws.checks as WorkflowStepCheckDeclaration[] } : {}),
+      ...(ws.skipChecks !== undefined
+        ? { skipChecks: ws.skipChecks as WorkflowStepSkipCheckDeclaration[] }
+        : {}),
     }),
   )
 
@@ -374,12 +422,16 @@ export type RuleEntryRaw = z.infer<typeof RuleEntryZodSchema>
 /** Intermediate workflow step shape after Zod validation (already transformed). */
 export interface WorkflowStepRaw {
   readonly step: string
+  readonly optional?: boolean
+  readonly disabled?: boolean
   readonly requires: readonly string[]
   readonly requiresTaskCompletion: readonly string[]
   readonly hooks: {
     readonly pre: readonly HookEntry[]
     readonly post: readonly HookEntry[]
   }
+  readonly checks?: readonly WorkflowStepCheckDeclaration[]
+  readonly skipChecks?: readonly WorkflowStepSkipCheckDeclaration[]
 }
 
 /** Zod-inferred metadata extraction block. */

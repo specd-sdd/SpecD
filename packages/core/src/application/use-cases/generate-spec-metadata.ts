@@ -27,6 +27,7 @@ import {
   computeProjectionFingerprint,
   METADATA_PROJECTION_VERSION,
 } from '../../domain/services/metadata-projection.js'
+import { SchemaProviderIdentityMismatchError } from '../errors/schema-provider-identity-mismatch-error.js'
 import { type ArtifactMeta } from '../ports/spec-repository.js'
 
 /** Input for the {@link GenerateSpecMetadata} use case. */
@@ -35,6 +36,11 @@ export interface GenerateSpecMetadataInput {
   readonly specId: string
   /** When true, allow extracted dependsOn to differ from persisted dependsOn. */
   readonly allowDependsOnOverwrite?: boolean
+  /**
+   * Schema to extract with when acting inside a change (the change's schema).
+   * When omitted, the spec's persisted lock schema applies, then the project default.
+   */
+  readonly schemaName?: string
 }
 
 /** Result returned by the {@link GenerateSpecMetadata} use case. */
@@ -91,14 +97,6 @@ export class GenerateSpecMetadata {
    * @returns Generated metadata and source-state provenance
    */
   async execute(input: GenerateSpecMetadataInput): Promise<GenerateSpecMetadataResult> {
-    const schema = await this._schemaProvider.get()
-    const extraction = schema.metadataExtraction()
-    const projectionFingerprint = computeProjectionFingerprint(
-      schema,
-      [...this._extractorTransforms.keys()].sort(),
-      this._hasher,
-    )
-
     const { workspace, capPath } = parseSpecId(input.specId)
     const workspaces = await this._listWorkspaces.execute()
     const workspaceMap = new Map(workspaces.map((ws) => [ws.name, ws]))
@@ -116,11 +114,28 @@ export class GenerateSpecMetadata {
     }
 
     const persistedState = await specRepo.readPersistedState(spec)
-    const canonical = schema.canonicalSpecSchema()
-    const schemaIdentity: PersistedSchemaIdentity = persistedState?.schema ?? {
-      name: canonical.name,
-      version: canonical.version,
+
+    // Schema precedence: explicit change schema, then the persisted lock identity,
+    // then the project default (a legacy lock-less spec outside any change).
+    const requested = input.schemaName ?? persistedState?.schema?.name
+    const schema =
+      requested !== undefined
+        ? await this._schemaProvider.get(requested)
+        : await this._schemaProvider.get()
+    if (requested !== undefined && schema.name() !== requested) {
+      throw new SchemaProviderIdentityMismatchError(input.specId, requested, schema.name(), 'spec')
     }
+    const extraction = schema.metadataExtraction()
+    const projectionFingerprint = computeProjectionFingerprint(
+      schema,
+      [...this._extractorTransforms.keys()].sort(),
+      this._hasher,
+    )
+    const canonical = schema.canonicalSpecSchema()
+    const schemaIdentity: PersistedSchemaIdentity =
+      input.schemaName !== undefined
+        ? { name: canonical.name, version: canonical.version }
+        : (persistedState?.schema ?? { name: canonical.name, version: canonical.version })
 
     const artifacts: MetadataArtifactInput[] = []
     const artifactMetaByFilename: Record<string, ArtifactMeta> = {}

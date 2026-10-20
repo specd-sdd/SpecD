@@ -12,6 +12,8 @@ import { ChangeArtifact } from './change-artifact.js'
 import { ArtifactFile } from '../value-objects/artifact-file.js'
 import { type ArtifactDag } from '../value-objects/artifact-dag.js'
 import { type ArtifactType } from '../value-objects/artifact-type.js'
+import { type Schema } from '../value-objects/schema.js'
+import { isWorkflowTransitionLegal } from '../services/workflow-topology.js'
 import {
   type InvalidationPolicy,
   type ArtifactInvalidationPolicy,
@@ -917,14 +919,26 @@ export class Change {
    *
    * @param to - The target state
    * @param actor - Identity of the actor performing the transition
+   * @param schema - Optional sovereign schema used for topology-aware validation
+   * @param approvals - Optional project approval-gate configuration
+   * @param approvals.spec - Whether spec approval is required
+   * @param approvals.signoff - Whether signoff approval is required
    * @throws {InvalidStateTransitionError} If the transition is not permitted or is a self-transition
    */
-  transition(to: ChangeState, actor: ActorIdentity): void {
+  transition(
+    to: ChangeState,
+    actor: ActorIdentity,
+    schema?: Schema,
+    approvals?: { spec: boolean; signoff: boolean },
+  ): void {
     const from = this.state
     if (from === to) {
       throw new InvalidStateTransitionError(from, to)
     }
-    if (!isValidTransition(from, to)) {
+    const isLegal = schema
+      ? isWorkflowTransitionLegal(from, to, schema, approvals ?? { spec: false, signoff: false })
+      : isValidTransition(from, to)
+    if (!isLegal) {
       throw new InvalidStateTransitionError(from, to)
     }
     const now = new Date()

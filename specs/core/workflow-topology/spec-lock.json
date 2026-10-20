@@ -1,0 +1,28 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["core:workflow-model", "core:schema-format", "default:_global/architecture"],
+  "implementation": [
+    {
+      "file": "core:src/domain/services/workflow-topology.ts",
+      "symbols": [
+        "WorkflowTopology",
+        "resolveWorkflowPipeline",
+        "isWorkflowStepEnabled",
+        "listWorkflowTransitions",
+        "isWorkflowTransitionLegal",
+        "listBypassedWorkflowSteps",
+        "nextWorkflowStep"
+      ]
+    },
+    {
+      "file": "core:src/domain/services/lifecycle-verdict.ts",
+      "symbols": ["verificationBoundary"]
+    },
+    {
+      "file": "core:test/domain/services/workflow-topology.spec.ts"
+    }
+  ]
+}

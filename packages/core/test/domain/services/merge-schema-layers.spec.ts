@@ -395,4 +395,60 @@ describe('mergeSchemaLayers — workflow step checks', () => {
       ]),
     ).toThrow(SchemaValidationError)
   })
+
+  it('applies optional/disabled overrides to an existing workflow step via append', () => {
+    const b = base()
+    const result = mergeSchemaLayers(b, [
+      layer('override', {
+        append: {
+          workflow: [
+            { step: 'implementing', optional: true },
+            { step: 'verifying', disabled: true },
+          ],
+        },
+      }),
+    ])
+
+    const implementing = result.workflow!.find((w) => w.step === 'implementing')
+    const verifying = result.workflow!.find((w) => w.step === 'verifying')
+    expect(implementing?.optional).toBe(true)
+    expect(verifying?.disabled).toBe(true)
+  })
+
+  it('appends skipChecks to an existing workflow step and rejects duplicate skipCheck identities', () => {
+    const b = base()
+    const result = mergeSchemaLayers(b, [
+      layer('plugin', {
+        append: {
+          workflow: [
+            {
+              step: 'implementing',
+              skipChecks: [{ id: '@code-analysis.coverage', config: { min: 80 } }] as any,
+            },
+          ],
+        },
+      }),
+    ])
+
+    const implementing = result.workflow!.find((w) => w.step === 'implementing')
+    expect(implementing?.skipChecks).toHaveLength(1)
+    expect(implementing?.skipChecks?.[0]?.id).toBe('@code-analysis.coverage')
+    expect(implementing?.skipChecks?.[0]?.config).toEqual({ min: 80 })
+
+    // Merging duplicate skipCheck identity throws SchemaValidationError
+    expect(() =>
+      mergeSchemaLayers(result, [
+        layer('override', {
+          append: {
+            workflow: [
+              {
+                step: 'implementing',
+                skipChecks: [{ id: '@code-analysis.coverage' }] as any,
+              },
+            ],
+          },
+        }),
+      ]),
+    ).toThrow(SchemaValidationError)
+  })
 })

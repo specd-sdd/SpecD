@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { ResolveChangeSchema } from '../../../src/application/services/resolve-change-schema.js'
 import { CompleteVerification } from '../../../src/application/use-cases/complete-verification.js'
 import { InvalidateVerification } from '../../../src/application/use-cases/invalidate-verification.js'
 import { ReconcileChangeValidity } from '../../../src/application/use-cases/reconcile-change-validity.js'
@@ -32,7 +33,7 @@ const noopRefresh = { execute: async () => undefined }
 function reconcileDeps(): ReconcileChangeValidityDeps {
   return {
     changes: {} as never,
-    schemaProvider: {} as never,
+    resolveChangeSchema: new ResolveChangeSchema({} as never),
     actor: { identity: async () => ({ name: 'direct', email: 'direct@example.com' }) },
     refreshImplementationTracking: noopRefresh as never,
     fingerprint: {} as never,
@@ -66,6 +67,7 @@ function invalidateDeps(): InvalidateVerificationDeps {
     changes: {} as never,
     actor: { identity: async () => ({ name: 'direct', email: 'direct@example.com' }) },
     reconcileChangeValidity: {} as never,
+    resolveChangeSchema: {} as never,
   }
 }
 

@@ -9,15 +9,13 @@
     "core:composition",
     "core:kernel",
     "core:composition-resolver",
-    "core:transition-checks"
+    "core:transition-checks",
+    "core:resolve-change-schema"
   ],
   "implementation": [
     {
       "file": "core:src/application/use-cases/approve-spec.ts",
       "symbols": ["ApproveSpec"]
-    },
-    {
-      "file": "core:test/application/use-cases/approve-spec.spec.ts"
     }
   ]
 }

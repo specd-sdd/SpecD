@@ -66,9 +66,9 @@ Hosts MUST NOT pass yaml-derived configuration on each call. They pass runtime o
 
 It MUST NOT invoke `ImplementationDetector` or merge detected files during context compilation. Callers that require fresh tracked files MUST invoke `RefreshImplementationTracking` before `CompileContext`.
 
-### Requirement: Schema name guard
+### Requirement: Sovereign schema resolution
 
-After resolving the schema from config, `CompileContext` must compare `schema.name()` with `change.schemaName`. If they differ, it must throw `SchemaMismatchError`. This must happen before any context collection or instruction assembly.
+`CompileContext` MUST resolve the change's sovereign schema through `ResolveChangeSchema`. The change's recorded schema is the sovereign authority governing instructions and artifact templates. A different workspace default MUST remain irrelevant; provider identity mismatch MUST propagate as `SchemaProviderIdentityMismatchError`.
 
 ### Requirement: Workspace resolution for spec IDs
 
@@ -283,6 +283,10 @@ It MUST NOT resolve `LifecycleEngine`.
 
 The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
 
+### Requirement: Change schema applies to change specs only
+
+When `CompileContext` materializes spec metadata (through `GetSpecMetadata`), it MUST pass the change's resolved schema name as `schemaName` only for specs that belong to the change (`change.specIds`). Specs outside the change — such as dependency or project-context specs — MUST be materialized without `schemaName`, so their own persisted lock schema (or the project default) governs extraction and their metadata is neither regenerated nor overwritten under a schema they were not authored with.
+
 ## Constraints
 
 - Project `context` entries always appear first in `projectContext`, before spec entries
@@ -354,3 +358,4 @@ const result = await compileContext.execute({
 - [`core:spec-optimization`](../spec-optimization/spec.md) — per-field optimization freshness backing the optimization warning signals
 - [`core:composition-resolver`](../composition-resolver/spec.md)
 - [`core:resolve-context-specs`](../resolve-context-specs/spec.md) — shared content-free configured include/exclude helper for steps 1–4
+- [core:resolve-change-schema](../resolve-change-schema/spec.md) — named sovereign lookup, provider identity validation, and same-name version advisory

@@ -1,11 +1,13 @@
 import { createHash } from 'crypto'
+import { ResolveChangeSchema } from '../../../src/application/services/resolve-change-schema.js'
 import { describe, it, expect, vi } from 'vitest'
 import { makeSpec } from '../../helpers/make-spec.js'
 import { ValidateArtifacts as CoreValidateArtifacts } from '../../../src/application/use-cases/validate-artifacts.js'
 import { ChangeNotFoundError } from '../../../src/application/errors/change-not-found-error.js'
 import { SchemaNotFoundError } from '../../../src/application/errors/schema-not-found-error.js'
-import { SchemaMismatchError } from '../../../src/application/errors/schema-mismatch-error.js'
 import { SpecNotInChangeError } from '../../../src/application/errors/spec-not-in-change-error.js'
+import { SchemaProviderIdentityMismatchError } from '../../../src/application/errors/schema-provider-identity-mismatch-error.js'
+import { type SchemaProvider } from '../../../src/application/ports/schema-provider.js'
 import { Change } from '../../../src/domain/entities/change.js'
 import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
 import { ArtifactFile } from '../../../src/domain/value-objects/artifact-file.js'
@@ -156,23 +158,52 @@ describe('ValidateArtifacts', () => {
     })
   })
 
-  describe('schema name mismatch', () => {
-    it('throws SchemaMismatchError when active schema name differs from change schema name', async () => {
+  describe('schema resolution', () => {
+    it('resolves sovereign schema by change.schemaName', async () => {
       const change = makeChangeWithArtifacts('c', [], { schemaName: 'schema-a' })
+      const schemaA = makeSchema({ name: 'schema-a' })
+      const schemaProvider: SchemaProvider = {
+        get: vi.fn().mockResolvedValue(schemaA),
+      }
       const uc = makeValidateArtifacts(
         makeChangeRepository([change]),
         makeListWorkspaces(new Map()),
-        makeSchemaProvider(makeSchema({ name: 'schema-b' })),
+        schemaProvider,
         makeParsers(),
         makeActorResolver(),
         makeContentHasher(),
       )
-      await expect(
-        uc.execute({
-          name: 'c',
-          specPath: 'default:auth',
-        }),
-      ).rejects.toThrow(SchemaMismatchError)
+      const result = await uc.execute({
+        name: 'c',
+        specPath: 'default:auth',
+      })
+      expect(result).toBeDefined()
+      expect(schemaProvider.get).toHaveBeenCalledWith('schema-a')
+    })
+  })
+
+  describe('schema identity', () => {
+    it('fails closed on a provider identity mismatch instead of using the default schema', async () => {
+      const change = makeChangeWithArtifacts('c', [], { schemaName: 'schema-a' })
+      const schemaProvider: SchemaProvider = {
+        get: vi
+          .fn()
+          .mockImplementation(async (ref?: string) =>
+            makeSchema({ name: ref === 'schema-a' ? 'schema-b' : 'default-schema' }),
+          ),
+      }
+      const uc = makeValidateArtifacts(
+        makeChangeRepository([change]),
+        makeListWorkspaces(new Map()),
+        schemaProvider,
+        makeParsers(),
+        makeActorResolver(),
+        makeContentHasher(),
+      )
+
+      await expect(uc.execute({ name: 'c', specPath: 'default:auth' })).rejects.toBeInstanceOf(
+        SchemaProviderIdentityMismatchError,
+      )
     })
   })
 
@@ -4142,7 +4173,7 @@ describe('ValidateArtifacts reconciliation', () => {
     })
     const reconcile = new ReconcileChangeValidity({
       changes: repo,
-      schemaProvider,
+      resolveChangeSchema: new ResolveChangeSchema(schemaProvider),
       actor: makeActorResolver(),
       refreshImplementationTracking: {
         execute: async () => undefined,

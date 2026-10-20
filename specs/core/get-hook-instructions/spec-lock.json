@@ -10,12 +10,17 @@
     "core:change",
     "core:template-variables",
     "core:archive-repository-port",
-    "core:composition-resolver"
+    "core:composition-resolver",
+    "core:resolve-change-schema",
+    "core:workflow-topology"
   ],
   "implementation": [
     {
       "file": "core:src/application/use-cases/get-hook-instructions.ts",
       "symbols": ["GetHookInstructions"]
+    },
+    {
+      "file": "core:test/application/use-cases/get-hook-instructions.spec.ts"
     }
   ],
   "optimizations": {

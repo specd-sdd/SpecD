@@ -33,6 +33,33 @@ For other blockers, follow the **next action:** command recommendation.
 
 Extract the `path:` field from the "lifecycle:" section.
 
+### Schema-aware lifecycle routing
+
+Before entering verification or advancing afterwards, read fresh structured status:
+
+```bash
+specd changes status <name> --format toon
+```
+
+Treat `nextAction.command` as the preferred default recommendation and
+`lifecycle.availableTransitions` as the sole source of legal targets. When explicitly
+invoked, map `/specd-verify` to its intended target (`verifying` or the current verify-owned
+completion hop): if a different command is recommended, report that recommendation but
+continue toward the mapped target if it is present in `lifecycle.availableTransitions`.
+If the target is absent from `availableTransitions`, stop before running any hooks and
+report the blockers along with the recommended command. Lifecycle advancement remains a
+separate authorized action and follows the hop rules below. Refresh before each hop, stop if
+routing data is absent or stale, and execute hooks only for the actual source and target;
+never run verifying hooks when verification is disabled or bypassed.
+
+Routed blocks (`<!-- route: target -->` … `<!-- /route -->`) use placeholders instead of
+fixed state names: `<target>` is the lifecycle step selected from a fresh
+`lifecycle.availableTransitions` (this skill's intended target when advertised,
+otherwise `nextAction.targetStep`) and `<source>` is the change's current `state`.
+Run `run-hooks` / `hook-instruction` only for the source (`--phase post`) and the
+selected target (`--phase pre`) of an actual hop, and never substitute a fixed state
+sequence.
+
 Trust the reconciled status. Do not calculate fingerprints or roll the lifecycle
 back yourself. See `shared.md` — "Canonical validity reconciliation".
 
@@ -53,8 +80,8 @@ If the status output shows `review: required: yes`:
 Verification evidence is state-independent. Record it from any active lifecycle
 state. Entering `verifying` does **not** capture a baseline and is not required
 merely to produce evidence. Lifecycle advancement
-(`implementing` → `verifying` → `done` → `archivable`) remains a separate
-authorized action and still follows the hop rules below.
+remains a separate authorized action. It follows the hop rules below, with each
+target taken from a fresh `lifecycle.availableTransitions`.
 
 Verification staleness never moves lifecycle state. Before `verifying` it is
 contextual. At `verifying` or later it blocks until this skill renews evidence
@@ -63,20 +90,27 @@ earlier state forward.
 
 ### 2. Enter verification (or resume)
 
-**If in `implementing`** (normal entry from `/specd-implement`):
+**If `verifying` is in `lifecycle.availableTransitions`** (normal entry from `/specd-implement`):
 
-Run pre-hooks and transition:
+Run pre-hooks and transition. Enter `verifying` and run its hooks **only** when it is
+advertised; when verification is disabled or bypassed, never enter it or run its hooks.
+Produce verification evidence only if fresh status reports it is required, then route
+forward from `nextAction.command`:
 
+<!-- route: target -->
 ```bash
-specd changes run-hooks <name> verifying --phase pre
-specd changes hook-instruction <name> verifying --phase pre --format text
+specd changes run-hooks <name> <target> --phase pre
+specd changes hook-instruction <name> <target> --phase pre --format text
 ```
+<!-- /route -->
 
 Follow guidance.
 
+<!-- route: target -->
 ```bash
-specd changes transition <name> verifying --skip-hooks all
+specd changes transition <name> <target> --skip-hooks all
 ```
+<!-- /route -->
 
 If it fails with `IMPLEMENTATION_STATE` / open tracked files: drain tracking using
 `shared.md` — "Implementation tracking" (`list` → `resolve` in-scope files, `ignore`
@@ -86,12 +120,14 @@ alone.
 
 If it fails for any other reason, follow the **Repair Guide** output.
 
-**If in `verifying`** (resuming): run pre-hooks but skip the transition:
+**If already in `verifying`** (resuming): run pre-hooks but skip the transition:
 
+<!-- route: target -->
 ```bash
-specd changes run-hooks <name> verifying --phase pre
-specd changes hook-instruction <name> verifying --phase pre --format text
+specd changes run-hooks <name> <target> --phase pre
+specd changes hook-instruction <name> <target> --phase pre --format text
 ```
+<!-- /route -->
 
 **If in `done`**: skip the `verifying` entry transition. Continue with attempt
 ownership below when evidence must be renewed; otherwise continue at step 6b
@@ -217,10 +253,12 @@ For each scenario:
 
 The moment all scenarios have been evaluated, run the post-verifying hooks:
 
+<!-- route: target -->
 ```bash
-specd changes run-hooks <name> verifying --phase post
-specd changes hook-instruction <name> verifying --phase post --format text
+specd changes run-hooks <name> <source> --phase post
+specd changes hook-instruction <name> <source> --phase post --format text
 ```
+<!-- /route -->
 
 Follow guidance. If hooks fail, fix and re-run.
 
@@ -283,19 +321,23 @@ unresolved non-task drift, do NOT route back to `implementing`. Tell the user
 to run `/specd-design <name>` and **stop**. Under `workflow: preserve`, stay in
 phase for in-place review instead of forcing design.
 
-If this is an implementation-only failure:
+If this is an implementation-only failure (`<target>` is `implementing` when advertised):
 
+<!-- route: target -->
 ```bash
-specd changes transition <name> implementing --skip-hooks all
+specd changes transition <name> <target> --skip-hooks all
 ```
+<!-- /route -->
 
-Tell the user to run `/specd-implement <name>` to fix the implementation. **Stop.**
+Tell the user to continue with the command recommended by a fresh `nextAction.command` to fix the implementation. **Stop.**
 
-If this is artifact review required:
+If this is artifact review required (`<target>` is `designing`):
 
+<!-- route: target -->
 ```bash
-specd changes transition <name> designing --skip-hooks all
+specd changes transition <name> <target> --skip-hooks all
 ```
+<!-- /route -->
 
 Tell the user to run `/specd-design <name>` to update them. **Stop.**
 
@@ -317,52 +359,64 @@ again, repeat all required verification work against the new baseline, then
 complete.
 
 Lifecycle advancement is separate. When the user authorizes it and current
-evidence exists, transition through `done` and the signoff gate to reach
-`archivable`.
+evidence exists, advance through the hops the fresh status advertises, honoring
+the sign-off gate, until it recommends archiving.
 
 #### 6a. Transition to done
 
 Run done pre-hooks, then transition:
 
+<!-- route: target -->
 ```bash
-specd changes run-hooks <name> done --phase pre
-specd changes hook-instruction <name> done --phase pre --format text
+specd changes run-hooks <name> <target> --phase pre
+specd changes hook-instruction <name> <target> --phase pre --format text
 ```
+<!-- /route -->
 
 Follow guidance.
 
+<!-- route: target -->
 ```bash
-specd changes transition <name> done --skip-hooks all
+specd changes transition <name> <target> --skip-hooks all
 ```
+<!-- /route -->
 
 Run done post-hooks:
 
+<!-- route: target -->
 ```bash
-specd changes run-hooks <name> done --phase post
-specd changes hook-instruction <name> done --phase post --format text
+specd changes run-hooks <name> <source> --phase post
+specd changes hook-instruction <name> <source> --phase post --format text
 ```
+<!-- /route -->
 
 #### 6b. Handle signoff gate
 
-Run `changes status <name> --format text` and check `approvals:` line.
+Read a fresh `specd changes status <name> --format toon` and use `lifecycle.approvals`.
 
 **If signoff=off:** no signoff needed — run archivable hooks and transition:
 
+<!-- route: target -->
 ```bash
-specd changes run-hooks <name> archivable --phase pre
-specd changes hook-instruction <name> archivable --phase pre --format text
+specd changes run-hooks <name> <target> --phase pre
+specd changes hook-instruction <name> <target> --phase pre --format text
 ```
+<!-- /route -->
 
 Follow guidance.
 
+<!-- route: target -->
 ```bash
-specd changes transition <name> archivable --skip-hooks all
+specd changes transition <name> <target> --skip-hooks all
 ```
+<!-- /route -->
 
+<!-- route: target -->
 ```bash
-specd changes run-hooks <name> archivable --phase post
-specd changes hook-instruction <name> archivable --phase post --format text
+specd changes run-hooks <name> <source> --phase post
+specd changes hook-instruction <name> <source> --phase post --format text
 ```
+<!-- /route -->
 
 **If signoff=on:** stay in `done`. Tell user:
 
@@ -370,7 +424,7 @@ specd changes hook-instruction <name> archivable --phase post --format text
 > Then continue this skill for `done → archivable`.
 
 **Stop.**
-Do not invoke `/specd-archive` automatically; wait for explicit user confirmation.
+Do not invoke the recommended command (`nextAction.command`) automatically; wait for explicit user confirmation.
 
 ## Session tasks
 
@@ -401,11 +455,13 @@ path above).
 If during verification you discover that the artifacts need revision, stop and explain.
 If the user agrees:
 
+<!-- route: target -->
 ```bash
-specd changes transition <name> designing --skip-hooks all
+specd changes transition <name> <target> --skip-hooks all
 ```
+<!-- /route -->
 
-> Artifacts need revision. Run `/specd-design <name>` to update them.
+> Artifacts need revision. Continue with the command in `nextAction.command` (expected `/specd-design`).
 
 **Stop — do not continue verifying.**
 

@@ -12,7 +12,6 @@ import { ChangeNotFoundError } from '../../../src/application/errors/change-not-
 import { ChangeAlreadyExistsError } from '../../../src/application/errors/change-already-exists-error.js'
 import { ChangeMutationRequiredError } from '../../../src/domain/errors/change-mutation-required-error.js'
 import { DraftedChangeReadOnlyError } from '../../../src/domain/errors/drafted-change-read-only-error.js'
-import { SchemaMismatchError } from '../../../src/application/errors/schema-mismatch-error.js'
 import { Logger } from '../../../src/application/logger.js'
 import { FsChangeRepository } from '../../../src/infrastructure/fs/change-repository.js'
 import {
@@ -2665,7 +2664,7 @@ describe('FsChangeRepository', () => {
   })
 
   describe('compliance validations', () => {
-    it('throws SchemaMismatchError when schema name differs from active schema', async () => {
+    it('hydrates a change without consulting any workspace default schema', async () => {
       const change = makeChange('c-schema-mismatch')
       await persistChange(ctx.repo, change)
 
@@ -2677,16 +2676,26 @@ describe('FsChangeRepository', () => {
         changesPath: ctx.changesPath,
         draftsPath: ctx.draftsPath,
         discardedPath: ctx.discardedPath,
-        activeSchema: { name: 'different-schema', version: 1 },
       })
 
-      await expect(repo.get('c-schema-mismatch')).rejects.toThrow(SchemaMismatchError)
+      const loaded = await repo.get('c-schema-mismatch')
+      expect(loaded).not.toBeNull()
+      expect(loaded?.schemaName).toBe('@specd/schema-std')
     })
 
-    it('logs a warning when schema version differs from active schema', async () => {
+    it('does not log a schema version warning on load', async () => {
       const change = makeChange('c-version-mismatch')
       await persistChange(ctx.repo, change)
 
+      const warnSpy = vi.spyOn(Logger, 'warn')
+      await ctx.repo.get('c-version-mismatch')
+      expect(warnSpy).not.toHaveBeenCalled()
+    })
+
+    it('resolves artifact types once per schema name using the change schema identity', async () => {
+      const resolveArtifactTypes = vi.fn(
+        async (_ref: { changeName: string; schemaName: string; schemaVersion: number }) => [],
+      )
       const repo = new FsChangeRepository({
         workspace: 'default',
         ownership: 'owned',
@@ -2695,13 +2704,109 @@ describe('FsChangeRepository', () => {
         changesPath: ctx.changesPath,
         draftsPath: ctx.draftsPath,
         discardedPath: ctx.discardedPath,
-        activeSchema: { name: '@specd/schema-std', version: 2 },
+        resolveArtifactTypes,
       })
+      await persistChange(repo, makeChange('c-per-schema-a'))
+      await persistChange(repo, makeChange('c-per-schema-b'))
+      await repo.get('c-per-schema-a')
+      await repo.get('c-per-schema-b')
 
-      const warnSpy = vi.spyOn(Logger, 'warn')
-      await repo.get('c-version-mismatch')
-      expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('created with schema version 1 but the active schema version is 2'),
+      expect(resolveArtifactTypes).toHaveBeenCalledTimes(1)
+      expect(resolveArtifactTypes).toHaveBeenCalledWith(
+        expect.objectContaining({ schemaName: '@specd/schema-std', schemaVersion: 1 }),
+      )
+    })
+
+    it('skips artifact sync and leaves the artifact map unchanged when the schema is unresolvable', async () => {
+      const change = makeChange('c-unresolvable')
+      change.setArtifact(
+        new ChangeArtifact({
+          type: 'legacy',
+          optional: false,
+          requires: [],
+          files: new Map([
+            [
+              'legacy',
+              new ArtifactFile({ key: 'legacy', filename: 'legacy.md', status: 'missing' }),
+            ],
+          ]),
+        }),
+      )
+      const repo = new FsChangeRepository({
+        workspace: 'default',
+        ownership: 'owned',
+        isExternal: false,
+        configPath: ctx.configPath,
+        changesPath: ctx.changesPath,
+        draftsPath: ctx.draftsPath,
+        discardedPath: ctx.discardedPath,
+        resolveArtifactTypes: async () => null,
+      })
+      await persistChange(repo, change)
+
+      const loaded = await repo.get('c-unresolvable')
+      expect([...(loaded?.artifacts.keys() ?? [])]).toEqual(['legacy'])
+      expect(loaded?.history.some((event) => event.type === 'artifacts-synced')).toBe(false)
+    })
+
+    it('resolves artifact types per recorded schema identity, including its version', async () => {
+      const typeOf = (id: string): ArtifactType =>
+        new ArtifactType({
+          id,
+          scope: 'change',
+          output: `${id}.md`,
+          optional: false,
+          requires: [],
+          format: 'markdown',
+          validations: [],
+          deltaValidations: [],
+          preHashCleanup: [],
+        })
+      const resolveArtifactTypes = vi.fn(
+        async (ref: { schemaName: string; schemaVersion: number }) =>
+          ref.schemaVersion === 1 ? [typeOf('legacy-doc')] : [typeOf('current-doc')],
+      )
+      const repo = new FsChangeRepository({
+        workspace: 'default',
+        ownership: 'owned',
+        isExternal: false,
+        configPath: ctx.configPath,
+        changesPath: ctx.changesPath,
+        draftsPath: ctx.draftsPath,
+        discardedPath: ctx.discardedPath,
+        resolveArtifactTypes,
+      })
+      const makeVersioned = (name: string, schemaVersion: number): Change =>
+        new Change({
+          name,
+          createdAt: new Date('2024-01-15T10:00:00.000Z'),
+          specIds: ['core:auth'],
+          schemaName: 'custom-schema',
+          schemaVersion,
+          history: [
+            {
+              type: 'created',
+              at: new Date('2024-01-15T10:00:00.000Z'),
+              by: actor,
+              specIds: ['core:auth'],
+              schemaName: 'custom-schema',
+              schemaVersion,
+            },
+          ],
+        })
+      await persistChange(repo, makeVersioned('c-v1', 1))
+      await persistChange(repo, makeVersioned('c-v2', 2))
+
+      const v1 = await repo.get('c-v1')
+      const v2 = await repo.get('c-v2')
+
+      expect([...(v1?.artifacts.keys() ?? [])]).toEqual(['legacy-doc'])
+      expect([...(v2?.artifacts.keys() ?? [])]).toEqual(['current-doc'])
+      expect(resolveArtifactTypes).toHaveBeenCalledWith(
+        expect.objectContaining({ schemaName: 'custom-schema', schemaVersion: 1 }),
+      )
+      expect(resolveArtifactTypes).toHaveBeenCalledWith(
+        expect.objectContaining({ schemaName: 'custom-schema', schemaVersion: 2 }),
       )
     })
 

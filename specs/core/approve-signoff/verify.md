@@ -63,6 +63,14 @@ Scenarios:
 - **AND** it resolves exactly one decorated identity for the logical operation
 - **AND** reconciliation, the projection, and all appended events receive that same value
 
+#### Scenario: Signoff without verification when verifying is disabled
+
+- **GIVEN** a change in `done` whose schema disables `verifying`
+- **AND** no verification evidence exists
+- **WHEN** `ApproveSignoff.execute` runs with a valid reason
+- **THEN** sign-off is recorded
+- **AND** no `VerificationNotFoundError` or other verification eligibility error is thrown
+
 ### Requirement: Canonical pre-signoff reconciliation
 
 #### Scenario: Reconciliation blocks signing a changed snapshot
@@ -106,12 +114,12 @@ Scenarios:
 - **WHEN** `execute({ name, reason })` is called
 - **THEN** the change transitions to `signed-off`
 
-#### Scenario: Schema mismatch fails in gate guard
+#### Scenario: Sovereign schema resolution in gate guard
 
 - **GIVEN** `ApproveSignoff` is constructed with `approvals.signoff: true`
 - **GIVEN** the active schema name differs from the change `schemaName`
 - **WHEN** `execute({ name, reason })` is called
-- **THEN** a `SchemaMismatchError` is thrown before `mutate` is invoked
+- **THEN** it resolves the schema via `SchemaProvider.get(change.schemaName)` without throwing `SchemaMismatchError`
 
 ### Requirement: Config-based factory delegates through resolveApproveSignoffDeps
 

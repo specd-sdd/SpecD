@@ -1,0 +1,24 @@
+- op: modified
+  description: Verify sovereign schema resolution in approve-spec gate guard
+  selector:
+    type: section
+    matches: 'Requirement: Approval gate baked at construction'
+  content: |
+    #### Scenario: Factory passes config.approvals
+
+    - **WHEN** `createApproveSpec(config)` constructs the use case
+    - **THEN** the instance receives `config.approvals` as its baked gate configuration
+
+    #### Scenario: Enabled gate allows execute with name and reason
+
+    - **GIVEN** `ApproveSpec` is constructed with `approvals.spec: true`
+    - **GIVEN** the change is in `pending-spec-approval` state
+    - **WHEN** `execute({ name, reason })` is called
+    - **THEN** the change transitions to `spec-approved`
+
+    #### Scenario: Sovereign schema resolution in gate guard
+
+    - **GIVEN** `ApproveSpec` is constructed with `approvals.spec: true`
+    - **GIVEN** the active schema name differs from the change `schemaName`
+    - **WHEN** `execute({ name, reason })` is called
+    - **THEN** it resolves the schema via `SchemaProvider.get(change.schemaName)` without throwing `SchemaMismatchError`

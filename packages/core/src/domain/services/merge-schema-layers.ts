@@ -585,8 +585,15 @@ function applyWorkflowMutations(
       throw err(layer, `${opName}.workflow: '${entry.step}' already exists`)
     }
 
-    // Existing step — merge nested hooks
+    // Existing step — merge nested hooks and scalar overrides
     let step = { ...result[existingIdx]! }
+
+    if (entry.optional !== undefined) {
+      step = { ...step, optional: entry.optional }
+    }
+    if (entry.disabled !== undefined) {
+      step = { ...step, disabled: entry.disabled }
+    }
 
     if (entry.hooks?.pre) {
       step = {
@@ -630,6 +637,19 @@ function applyWorkflowMutations(
           position,
           layer,
           `${opName}.workflow[${entry.step}].checks`,
+        ),
+      }
+    }
+    if (entry.skipChecks) {
+      step = {
+        ...step,
+        skipChecks: addToArray(
+          step.skipChecks ?? [],
+          entry.skipChecks,
+          'id',
+          position,
+          layer,
+          `${opName}.workflow[${entry.step}].skipChecks`,
         ),
       }
     }

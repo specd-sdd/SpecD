@@ -64,6 +64,10 @@ In `json` or `toon` mode, the output is (encoded in the respective format):
 Artifacts are listed in schema-declared order, with per-file entries within each
 artifact.
 
+### Requirement: Artifact listing from the change's schema
+
+The artifacts listed, their schema-declared order, and their `delta` flags SHALL come from the change's sovereign schema, resolved through `ResolveChangeSchema`. The workspace default schema MUST NOT be consulted. Schema resolution failures and `SchemaProviderIdentityMismatchError` SHALL be reported as errors with a non-zero exit code.
+
 ### Requirement: Drift-aware artifact listing
 
 Human-facing artifact listings SHALL expose drift-aware display state rather than forcing users to infer drift from canonical state plus hashes.
@@ -104,3 +108,4 @@ tasks                         missing       no
 
 - [`cli:entrypoint`](../entrypoint/spec.md) — CLI config discovery, exit codes, and output conventions
 - [`core:change`](../../core/change/spec.md) — artifact and file state model used for listing
+- [`core:resolve-change-schema`](../../core/resolve-change-schema/spec.md) — sovereign change schema lookup, identity integrity, and version advisory

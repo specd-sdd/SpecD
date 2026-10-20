@@ -26,7 +26,11 @@ vi.mock('chalk', () => {
 
 import { resolveCliContext } from '../../../src/helpers/cli-context.js'
 import { registerChangeSpecPreview } from '../../../src/commands/change/spec-preview.js'
-import { ChangeNotFoundError, SpecNotInChangeError } from '@specd/sdk'
+import {
+  ChangeNotFoundError,
+  SchemaProviderIdentityMismatchError,
+  SpecNotInChangeError,
+} from '@specd/sdk'
 
 function setup() {
   const config = makeMockConfig()
@@ -664,5 +668,108 @@ describe('change spec-preview', () => {
         "artifact 'verify' (verify.md) not found in change for spec 'auth/login'",
       )
     })
+  })
+})
+
+describe('change spec-preview — change schema resolution', () => {
+  it('exits 3 with a fatal error when the change schema cannot be resolved', async () => {
+    const { kernel, stderr } = setup()
+    kernel.changes.preview.execute.mockResolvedValue({
+      specId: 'default:auth/login',
+      changeName: 'feat',
+      files: [{ filename: 'spec.md', base: null, merged: '# Spec', status: 'merged' }],
+      warnings: [],
+    })
+    kernel.changes.resolveSchema.execute.mockRejectedValue(new Error('schema is broken'))
+
+    const program = makeProgram()
+    registerChangeSpecPreview(program.command('change'))
+    await program
+      .parseAsync([
+        'node',
+        'specd',
+        'change',
+        'spec-preview',
+        'feat',
+        'auth/login',
+        '--artifact',
+        'specs',
+      ])
+      .catch(() => {})
+
+    expect(process.exit).toHaveBeenCalledWith(3)
+    expect(stderr()).toContain('fatal: schema is broken')
+  })
+
+  it('keeps the identity-mismatch code when the provider returns the wrong schema', async () => {
+    const { kernel, stderr } = setup()
+    kernel.changes.preview.execute.mockResolvedValue({
+      specId: 'default:auth/login',
+      changeName: 'feat',
+      files: [{ filename: 'spec.md', base: null, merged: '# Spec', status: 'merged' }],
+      warnings: [],
+    })
+    kernel.changes.resolveSchema.execute.mockRejectedValue(
+      new SchemaProviderIdentityMismatchError('feat', 'custom', 'schema-std'),
+    )
+
+    const program = makeProgram()
+    registerChangeSpecPreview(program.command('change'))
+    await program
+      .parseAsync([
+        'node',
+        'specd',
+        'change',
+        'spec-preview',
+        'feat',
+        'auth/login',
+        '--artifact',
+        'specs',
+      ])
+      .catch(() => {})
+
+    expect(process.exit).toHaveBeenCalledWith(3)
+    expect(stderr()).toContain('fatal:')
+  })
+
+  it('renders resolver advisories in a warnings block on stderr', async () => {
+    const { kernel, stdout, stderr } = setup()
+    kernel.changes.preview.execute.mockResolvedValue({
+      specId: 'default:auth/login',
+      changeName: 'feat',
+      files: [{ filename: 'spec.md', base: null, merged: '# Spec', status: 'merged' }],
+      warnings: [],
+    })
+    const specsArtifact = { id: 'specs', scope: 'spec', output: 'specs/**/spec.md' }
+    kernel.changes.resolveSchema.execute.mockResolvedValue({
+      schema: { artifact: () => specsArtifact },
+      warnings: [
+        {
+          code: 'SCHEMA_VERSION_DRIFT',
+          changeName: 'feat',
+          schemaName: 'schema-std',
+          recordedVersion: 1,
+          resolvedVersion: 2,
+          message: 'schema moved from v1 to v2',
+        },
+      ],
+    })
+
+    const program = makeProgram()
+    registerChangeSpecPreview(program.command('change'))
+    await program.parseAsync([
+      'node',
+      'specd',
+      'change',
+      'spec-preview',
+      'feat',
+      'auth/login',
+      '--artifact',
+      'specs',
+    ])
+
+    expect(stderr()).toContain('warnings:')
+    expect(stderr()).toContain('! SCHEMA_VERSION_DRIFT: schema moved from v1 to v2')
+    expect(stdout()).not.toContain('SCHEMA_VERSION_DRIFT')
   })
 })

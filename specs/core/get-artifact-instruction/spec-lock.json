@@ -11,15 +11,13 @@
     "core:lifecycle-engine",
     "core:schema-format",
     "core:composition-resolver",
-    "core:transition-checks"
+    "core:transition-checks",
+    "core:resolve-change-schema"
   ],
   "implementation": [
     {
       "file": "core:src/application/use-cases/get-artifact-instruction.ts",
       "symbols": ["GetArtifactInstruction"]
-    },
-    {
-      "file": "core:test/application/use-cases/get-artifact-instruction.spec.ts"
     }
   ],
   "optimizations": {

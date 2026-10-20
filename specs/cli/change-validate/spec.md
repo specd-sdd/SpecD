@@ -26,6 +26,10 @@ The command invokes the `ValidateArtifacts` use case, passing the change name, s
 
 The command MUST render file path details from the use case's structured file result metadata instead of recomputing expected paths in the CLI layer.
 
+### Requirement: Artifact model from the change's schema
+
+The artifact DAG walked by `--all`, the artifact IDs accepted by `--artifact`, and the scope of each artifact (`change` or `spec`) SHALL come from the change's sovereign schema, resolved through `ResolveChangeSchema` (directly or through the core use cases). The command MUST NOT build the DAG or resolve artifact IDs from the workspace default schema. When the change's schema cannot be resolved — in every mode, including single-spec validation without `--artifact` where the core use case performs the resolution — the command SHALL exit with code 3 and print a `fatal:` message to stderr, per [`cli:entrypoint`](../entrypoint/spec.md). `SchemaProviderIdentityMismatchError` SHALL be reported as such: structured output SHALL carry the error's own code (`SCHEMA_PROVIDER_IDENTITY_MISMATCH`) rather than the generic `SCHEMA_RESOLUTION_FAILED`. Resolver advisories (`warnings`) SHALL be rendered, not discarded.
+
 ### Requirement: Structural validation scope
 
 `specd changes validate` SHALL validate artifact structure, schema conformance, dependency readiness, and lifecycle validation status only.
@@ -200,3 +204,4 @@ specd change validate update-billing default:billing/invoices --artifact specs
 - [`core:validate-artifacts`](../../core/validate-artifacts/spec.md) — validation result shape and expected artifact file paths
 - [`core:spec-id-format`](../../core/spec-id-format/spec.md) — canonical `workspace:capabilityPath` format
 - [`core:preview-spec`](../../core/preview-spec/spec.md) — inline diff review for successful single-artifact spec-delta validation reuses the preview merge/diff surface
+- [`core:resolve-change-schema`](../../core/resolve-change-schema/spec.md) — sovereign change schema lookup, identity integrity, and version advisory

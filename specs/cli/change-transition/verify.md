@@ -22,6 +22,22 @@
 - **WHEN** parsing command options
 - **THEN** `TransitionChangeInput.skipChecks` includes `'spec.overlap'`
 
+#### Scenario: Missing step and --next is a usage error
+
+- **WHEN** `specd change transition my-change` is run without `<step>` and without `--next`
+- **THEN** the command exits with code 1 and prints `either <step> or --next is required`
+- **AND** `TransitionChange.execute` is not called
+
+#### Scenario: Step and --next together is a usage error
+
+- **WHEN** `specd change transition my-change implementing --next` is run
+- **THEN** the command exits with code 1 and prints `<step> and --next are mutually exclusive`
+
+#### Scenario: Change name is required
+
+- **WHEN** `specd change transition` is run with no arguments
+- **THEN** the command fails with a missing-argument usage error
+
 ### Requirement: Next-transition resolution
 
 #### Scenario: Next flag advances designing to ready
@@ -38,6 +54,24 @@
 - **THEN** the command resolves `implementing` as the logical next target
 - **AND** the change remains in `ready`
 - **AND** it does not persist `pending-spec-approval`
+
+#### Scenario: Next flag skips disabled step
+
+- **GIVEN** a schema where `verifying` is `disabled: true`
+- **AND** the change is in `implementing`
+- **WHEN** `specd change transition my-change --next` is run
+- **THEN** the command resolves `done` as the next active target
+- **AND** transitions directly without visiting `verifying`
+
+#### Scenario: Next flag enters the closest enabled optional step
+
+- **GIVEN** a schema where `implementing` is `optional: true`
+- **AND** its effective `step-skip` checks pass or the effective set is empty
+- **AND** the change is in `ready`
+- **WHEN** `specd change transition my-change --next` is run
+- **THEN** Core resolves `implementing` as the closest enabled target
+- **AND** the command does not bypass `implementing`
+- **AND** an optional shortcut is available only by passing the explicit target advertised by `GetStatus.nextAction`
 
 #### Scenario: Next flag fails in pending spec approval state
 
@@ -222,6 +256,20 @@
 - **WHEN** the command runs in text mode
 - **THEN** progress uses `Running post hooks (hook.post)`
 - **AND** streamed lines appear as `check-progress` under that check
+
+#### Scenario: Skipped hooks render as skipped
+
+- **GIVEN** `--skip-hooks all`
+- **WHEN** the transition succeeds and Core reports `hook.pre` and `hook.post` with `outcome: 'skip'`
+- **THEN** text output renders them with the skipped marker and a `--skip-hooks` reason
+- **AND** no `✓ Running pre hooks` or `✓ Running post hooks` line is printed
+
+#### Scenario: Re-check after hooks is shown only when hooks ran
+
+- **GIVEN** `--skip-hooks all`
+- **WHEN** Core re-evaluates predicates after the (skipped) hook phases
+- **THEN** the check list is printed once
+- **AND** when hooks did run, the second pass is labeled as a re-check
 
 ### Requirement: Hook execution
 

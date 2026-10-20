@@ -689,7 +689,23 @@ export function buildSchema(
     artifacts.push(buildArtifactType(raw, templateContent))
   }
 
-  const workflow = (data.workflow ?? []) as WorkflowStep[]
+  const BEDROCK_STATES = new Set(['drafting', 'designing', 'done', 'archiving', 'archivable'])
+  const DRAIN_STATES = new Set([
+    'pending-spec-approval',
+    'spec-approved',
+    'pending-signoff',
+    'signed-off',
+  ])
+  const workflow: WorkflowStep[] = (data.workflow ?? []).map((step) => ({
+    step: step.step,
+    optional: step.optional ?? false,
+    disabled: step.disabled ?? false,
+    requires: step.requires ?? [],
+    requiresTaskCompletion: step.requiresTaskCompletion ?? [],
+    hooks: step.hooks ?? { pre: [], post: [] },
+    ...(step.checks !== undefined ? { checks: step.checks } : {}),
+    ...(step.skipChecks !== undefined ? { skipChecks: step.skipChecks } : {}),
+  }))
 
   // Semantic validation: duplicate step names
   const stepSet = new Set<string>()
@@ -708,6 +724,27 @@ export function buildSchema(
         ref,
         `workflow step '${step.step}' is not a valid lifecycle state`,
       )
+    }
+    if (DRAIN_STATES.has(step.step)) {
+      throw new SchemaValidationError(
+        ref,
+        `Workflow step '${step.step}' is a drain-only state and cannot be declared`,
+      )
+    }
+    if (step.disabled === true && BEDROCK_STATES.has(step.step)) {
+      throw new SchemaValidationError(
+        ref,
+        `bedrock lifecycle state '${step.step}' cannot be disabled`,
+      )
+    }
+    if (step.optional === true && BEDROCK_STATES.has(step.step)) {
+      throw new SchemaValidationError(
+        ref,
+        `bedrock lifecycle state '${step.step}' cannot be optional`,
+      )
+    }
+    if (step.disabled === true && step.skipChecks !== undefined && step.skipChecks.length > 0) {
+      throw new SchemaValidationError(ref, `disabled step '${step.step}' cannot declare skipChecks`)
     }
   }
 
@@ -760,6 +797,12 @@ export function buildSchema(
   const checkCoordinateSet = new Set<string>()
   for (const step of workflow) {
     for (const chk of step.checks ?? []) {
+      if (chk.from !== undefined && chk.from !== '*' && !(chk.from in VALID_TRANSITIONS)) {
+        throw new SchemaValidationError(
+          ref,
+          `workflow check '${chk.id}' has invalid from state '${chk.from}'`,
+        )
+      }
       if (!activeRegistry.has(chk.id)) {
         throw new UnknownCheckError(chk.id)
       }
@@ -775,6 +818,7 @@ export function buildSchema(
       checkCoordinateSet.add(coordKey)
 
       const governance = activeRegistry.getGovernance(chk.id)
+      const chkFrom = chk.from ?? '*'
       const matchingBinding = activeRegistry
         .bindings()
         .find(
@@ -787,28 +831,33 @@ export function buildSchema(
                 (a.along === undefined ||
                   a.along === '*' ||
                   a.along === 'any' ||
-                  a.along === along),
+                  a.along === along) &&
+                (a.from === undefined || a.from === '*' || a.from === chkFrom),
             ),
         )
 
-      const isPluginCheck = chk.id.startsWith('@')
-      if (governance?.allowBindingOverride === false && (!isPluginCheck || !matchingBinding)) {
+      // Placement lock: a check may only be declared by a schema at a coordinate
+      // one of its code-defined bindings serves, unless it allows schema embedding.
+      const isOwnCoordinate = matchingBinding !== undefined
+      if (!isOwnCoordinate && governance?.allowSchemaEmbedding === false) {
         throw new CheckEmbeddingForbiddenError(chk.id, step.step)
       }
 
+      // Binding-level locks protect only code-defined bindings at their own coordinate.
+      const ownBinding = isOwnCoordinate ? matchingBinding : undefined
+
       if (
-        (governance?.allowBindingOverride === false ||
-          matchingBinding?.allowBindingOverride === false) &&
+        ownBinding?.allowBindingOverride === false &&
         (chk.onFailure !== undefined || chk.skippable !== undefined)
       ) {
-        if (chk.onFailure !== undefined && chk.onFailure !== matchingBinding?.onFailure) {
+        if (chk.onFailure !== undefined && chk.onFailure !== ownBinding.onFailure) {
           throw new CheckBindingOverrideForbiddenError(
             chk.id,
             'onFailure',
             `scope: transition, to: ${step.step}, along: ${along}`,
           )
         }
-        if (chk.skippable !== undefined && chk.skippable !== matchingBinding?.skippable) {
+        if (chk.skippable !== undefined && chk.skippable !== ownBinding.skippable) {
           throw new CheckBindingOverrideForbiddenError(
             chk.id,
             'skippable',
@@ -818,7 +867,7 @@ export function buildSchema(
       }
 
       if (chk.disabled === true) {
-        if (governance?.allowDisable === false || matchingBinding?.allowDisable === false) {
+        if (governance?.allowDisable === false || ownBinding?.allowDisable === false) {
           throw new CheckDisableForbiddenError(chk.id, step.step)
         }
       }
@@ -827,7 +876,75 @@ export function buildSchema(
         if (governance?.allowConfigOverride === false) {
           throw new CheckConfigOverrideForbiddenError(chk.id, `workflow step '${step.step}'`)
         }
-        if (matchingBinding && matchingBinding.allowConfigOverride === false) {
+        if (ownBinding && ownBinding.allowConfigOverride === false) {
+          throw new CheckConfigOverrideForbiddenError(chk.id, `workflow step '${step.step}'`)
+        }
+      }
+    }
+
+    for (const chk of step.skipChecks ?? []) {
+      if (!activeRegistry.has(chk.id)) {
+        throw new UnknownCheckError(chk.id)
+      }
+
+      const coordKey = `${chk.id}::step-skip::${step.step}`
+      if (checkCoordinateSet.has(coordKey)) {
+        throw new DuplicateCheckBindingError(chk.id, `scope: step-skip, step: ${step.step}`)
+      }
+      checkCoordinateSet.add(coordKey)
+
+      const governance = activeRegistry.getGovernance(chk.id)
+      const matchingBinding = activeRegistry
+        .bindings()
+        .find(
+          (b) =>
+            b.check.id === chk.id &&
+            b.applicability.some(
+              (a) =>
+                a.scope === 'step-skip' &&
+                (a.step === undefined || a.step === '*' || a.step === step.step),
+            ),
+        )
+
+      // Placement lock: see the transition checks loop.
+      const isOwnCoordinate = matchingBinding !== undefined
+      if (!isOwnCoordinate && governance?.allowSchemaEmbedding === false) {
+        throw new CheckEmbeddingForbiddenError(chk.id, step.step)
+      }
+
+      const ownBinding = isOwnCoordinate ? matchingBinding : undefined
+
+      if (
+        ownBinding?.allowBindingOverride === false &&
+        (chk.onFailure !== undefined || chk.skippable !== undefined)
+      ) {
+        if (chk.onFailure !== undefined && chk.onFailure !== ownBinding.onFailure) {
+          throw new CheckBindingOverrideForbiddenError(
+            chk.id,
+            'onFailure',
+            `scope: step-skip, step: ${step.step}`,
+          )
+        }
+        if (chk.skippable !== undefined && chk.skippable !== ownBinding.skippable) {
+          throw new CheckBindingOverrideForbiddenError(
+            chk.id,
+            'skippable',
+            `scope: step-skip, step: ${step.step}`,
+          )
+        }
+      }
+
+      if (chk.disabled === true) {
+        if (governance?.allowDisable === false || ownBinding?.allowDisable === false) {
+          throw new CheckDisableForbiddenError(chk.id, step.step)
+        }
+      }
+
+      if (chk.config !== undefined && Object.keys(chk.config).length > 0) {
+        if (governance?.allowConfigOverride === false) {
+          throw new CheckConfigOverrideForbiddenError(chk.id, `workflow step '${step.step}'`)
+        }
+        if (ownBinding && ownBinding.allowConfigOverride === false) {
           throw new CheckConfigOverrideForbiddenError(chk.id, `workflow step '${step.step}'`)
         }
       }
@@ -838,6 +955,14 @@ export function buildSchema(
   // and reference artifacts with task capability (hasTasks: true)
   const artifactIndex = new Map(artifacts.map((a) => [a.id, a]))
   for (const step of workflow) {
+    for (const id of [...step.requires, ...(step.requiresTaskCompletion ?? [])]) {
+      if (!artifactIndex.has(id)) {
+        throw new SchemaValidationError(
+          ref,
+          `Workflow step '${step.step}' requires unknown artifact '${id}'`,
+        )
+      }
+    }
     for (const id of step.requiresTaskCompletion ?? []) {
       if (!step.requires.includes(id)) {
         throw new SchemaValidationError(

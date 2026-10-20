@@ -1,0 +1,18 @@
+- op: added
+  description: schemaName passthrough scenarios
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Input and result contract'
+  content: |
+    #### Scenario: schemaName is forwarded to generation
+
+    - **GIVEN** `MaterializeSpecMetadata.execute({ specId, policy: 'force', schemaName: 'custom-workflow' })`
+    - **WHEN** the use case regenerates metadata
+    - **THEN** `GenerateSpecMetadata` receives `schemaName: 'custom-workflow'`
+
+    #### Scenario: if-needed freshness uses the same schema selection
+
+    - **GIVEN** persisted metadata generated with `custom-workflow`
+    - **WHEN** `execute({ specId, policy: 'if-needed', schemaName: 'custom-workflow' })` is called with unchanged sources
+    - **THEN** the persisted metadata is reused (`source: 'persisted'`) instead of being regenerated with the project default

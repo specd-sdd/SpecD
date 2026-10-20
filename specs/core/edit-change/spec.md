@@ -121,14 +121,22 @@ The helper is the only use-case-specific composition entry for config-based boot
 
 ### Requirement: Schema compatibility guardrail
 
-When `addSpecIds` is provided, the system MUST verify that every new spec is compatible with the Change's schema. For every added spec:
+When `addSpecIds` is provided, the system MUST verify that every new spec is compatible with the Change's sovereign schema (resolved through `ResolveChangeSchema`). For every added spec:
 
-1. If the spec has no persisted semantic state (uninitialized) or its persisted state lacks a schema definition, the system assumes it uses the project's active global schema (`GetActiveSchema`).
+1. If the spec has no persisted semantic state (uninitialized) or its persisted state lacks a schema definition, the spec is compatible: it has no schema identity of its own and adopts the Change's schema. The workspace default or project global schema (`GetActiveSchema`) MUST NOT be consulted.
 2. Otherwise, it extracts the spec's persisted schema identity (`name` and `version`).
 
-A spec is considered compatible if its schema name matches the Change's schema name, or if the Change's schema explicitly declares a `compat` property matching the spec's schema name.
+A spec with a persisted schema identity is considered compatible if its schema name matches the Change's schema name, or if the Change's schema explicitly declares a `compat` property matching the spec's schema name.
 
 If any added spec is found to be incompatible, the use case MUST throw an `IncompatibleSchemaError` and abort the edit operation without mutating the change.
+
+### Requirement: Sovereign schema resolution
+
+After loading the target change, `EditChange` MUST resolve its direct schema-dependent compatibility decision through `ResolveChangeSchema` rather than through the workspace default schema.
+
+`EditChange` MUST resolve that sovereign schema once before mutation when validating added-spec compatibility. Inside the serialized repository mutation it MUST update the fresh persisted change with `replaceSpecIds()` and delegate artifact-DAG and validity synchronization to the canonical reconciler through `ctx.reconcileAfter()`. It MUST NOT call `updateSpecIds()` or perform a second direct schema lookup for synchronization, because the reconciler owns that decision against the fresh persisted change.
+
+A workspace default that differs from `change.schemaName` MUST NOT affect compatibility results, artifact topology, or invalidation. A compatibility schema-resolution error MUST abort before mutation, and a reconciliation error MUST prevent persistence of a partial scope edit.
 
 ## Constraints
 
@@ -142,3 +150,4 @@ If any added spec is found to be incompatible, the use case MUST throw an `Incom
 - [`core:composition`](../composition/spec.md)
 - [`core:composition-resolver`](../composition-resolver/spec.md)
 - [`core:list-workspaces`](../list-workspaces/spec.md) — workspace-owned repository views used by edit orchestration
+- [core:resolve-change-schema](../resolve-change-schema/spec.md) — named sovereign lookup, provider identity validation, and same-name version advisory

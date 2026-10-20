@@ -42,7 +42,7 @@ afterEach(() => vi.restoreAllMocks())
 
 describe('Command signature', () => {
   it('Missing arguments', async () => {
-    const { stderr } = setup()
+    const { kernel, stderr } = setup()
 
     const program = makeProgram()
     registerChangeTransition(program.command('change'))
@@ -50,10 +50,23 @@ describe('Command signature', () => {
 
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toMatch(/either <step> or --next is required/)
+    expect(kernel.changes.transition.execute).not.toHaveBeenCalled()
+  })
+
+  it('rejects a missing change name without calling TransitionChange', async () => {
+    const { kernel, stderr } = setup()
+
+    const program = makeProgram()
+    program.exitOverride()
+    registerChangeTransition(program.command('change'))
+    await program.parseAsync(['node', 'specd', 'change', 'transition']).catch(() => {})
+
+    expect(stderr()).toMatch(/missing required argument 'name'/)
+    expect(kernel.changes.transition.execute).not.toHaveBeenCalled()
   })
 
   it('rejects combining explicit step with --next', async () => {
-    const { stderr } = setup()
+    const { kernel, stderr } = setup()
 
     const program = makeProgram()
     registerChangeTransition(program.command('change'))
@@ -63,6 +76,7 @@ describe('Command signature', () => {
 
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toMatch(/mutually exclusive/)
+    expect(kernel.changes.transition.execute).not.toHaveBeenCalled()
   })
 
   it('resolves target from --next without positional step', async () => {
@@ -89,6 +103,35 @@ describe('Command signature', () => {
       expect.any(Function),
     )
     expect(stdout()).toContain('transitioned my-change: drafting')
+  })
+
+  it('keeps --next as a nearest-step request when status recommends an optional shortcut', async () => {
+    const { kernel, stdout } = setup()
+    kernel.changes.status.execute.mockResolvedValue({
+      change: makeMockChange({ name: 'my-change', state: 'ready' }),
+      artifactStatuses: [],
+      blockers: [],
+      nextAction: {
+        targetStep: 'verifying',
+        actionType: 'mechanical',
+        reason: 'The optional implementing step can be bypassed',
+        command: 'specd changes transition my-change verifying',
+      },
+    })
+    kernel.changes.transition.execute.mockResolvedValue({
+      change: makeMockChange({ name: 'my-change', state: 'implementing' }),
+    })
+
+    const program = makeProgram()
+    registerChangeTransition(program.command('change'))
+    await program.parseAsync(['node', 'specd', 'change', 'transition', 'my-change', '--next'])
+
+    expect(kernel.changes.transition.execute).toHaveBeenCalledWith(
+      expect.objectContaining({ to: 'next' }),
+      expect.any(Function),
+    )
+    expect(stdout()).toContain('ready → implementing')
+    expect(stdout()).not.toContain('verifying')
   })
 
   it('Allow-out-of-scope is forwarded to execute', async () => {
@@ -977,6 +1020,7 @@ describe('Incomplete tasks error', () => {
   it('status omits verifying before incomplete-tasks transition fails', async () => {
     const { kernel, stdout, stderr } = setup()
     const sharedStatus = {
+      schemaWarnings: [],
       change: makeMockChange({ name: 'my-change', state: 'implementing' }),
       specDependsOn: {},
       implementationTracking: { trackedFiles: [], links: [] },
@@ -1614,6 +1658,62 @@ describe('validity-aware transition guidance', () => {
       expect(err).toContain(
         'bypass:  Retry with --skip-checks @qa.smoke if an exception is granted',
       )
+    })
+
+    it('renders Repair Guide and exits with code 1 on HappyPathNextUnavailableError', async () => {
+      const { kernel, stderr } = setup()
+      kernel.changes.status.execute.mockResolvedValue({
+        change: makeMockChange({ name: 'my-change', state: 'archivable' }),
+        artifactStatuses: [],
+      })
+      kernel.changes.transition.execute.mockRejectedValue(
+        new HappyPathNextUnavailableError('archivable'),
+      )
+
+      const program = makeProgram()
+      registerChangeTransition(program.command('change'))
+      await program
+        .parseAsync(['node', 'specd', 'change', 'transition', 'my-change', '--next'])
+        .catch(() => {})
+
+      expect(process.exit).toHaveBeenCalledWith(1)
+      const err = stderr()
+      expect(err).toContain('repair guide:')
+      expect(err).toContain('cannot advance with --next: archiving is not a lifecycle transition')
+    })
+
+    it('passes custom checks to transition execute when --skip-checks is provided', async () => {
+      const { kernel, stdout } = setup()
+      kernel.changes.status.execute.mockResolvedValue({
+        change: makeMockChange({ name: 'my-change', state: 'ready' }),
+        artifactStatuses: [],
+      })
+      kernel.changes.transition.execute.mockResolvedValue({
+        change: makeMockChange({ name: 'my-change', state: 'verifying' }),
+      })
+
+      const program = makeProgram()
+      registerChangeTransition(program.command('change'))
+      await program.parseAsync([
+        'node',
+        'specd',
+        'change',
+        'transition',
+        'my-change',
+        'verifying',
+        '--skip-checks',
+        '@qa.bypass-gate',
+      ])
+
+      expect(kernel.changes.transition.execute).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'my-change',
+          to: 'verifying',
+          skipChecks: ['@qa.bypass-gate'],
+        }),
+        expect.any(Function),
+      )
+      expect(stdout()).toContain('my-change')
     })
   })
 })

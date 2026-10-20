@@ -97,6 +97,7 @@ export {
   projectArtifacts,
   findBlockingParent,
   resolveLifecycleNextHop,
+  recommendedForwardTarget,
   type ArtifactGraphSource,
   type LifecycleVerdictInput,
   type LifecycleAffectedFile,
@@ -134,6 +135,8 @@ export {
   type EffectOnFailure,
   isEffectCheck,
   applyBindingSpecs,
+  resolveEffectiveBindings,
+  type ResolveEffectiveBindingsInput,
 } from './transition-checks.js'
 export {
   TRANSITION_BINDINGS,
@@ -156,3 +159,13 @@ export {
   type CheckGovernance,
   type PluginCheckRegistrationOptions,
 } from './check-registry.js'
+export {
+  resolveWorkflowPipeline,
+  isWorkflowStepEnabled,
+  listWorkflowTransitions,
+  isWorkflowTransitionLegal,
+  listBypassedWorkflowSteps,
+  nextWorkflowStep,
+  type ApprovalGates,
+  type PipelineStep,
+} from './workflow-topology.js'

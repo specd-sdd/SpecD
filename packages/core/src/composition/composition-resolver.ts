@@ -5,6 +5,7 @@ import { ListWorkspaces } from '../application/use-cases/list-workspaces.js'
 import { RefreshImplementationTracking } from '../application/use-cases/refresh-implementation-tracking.js'
 import { isPathInside, normalizeVcsRoot } from '../infrastructure/fs/path-platform.js'
 import { ResolveSchema } from '../application/use-cases/resolve-schema.js'
+import { ResolveChangeSchema } from '../application/services/resolve-change-schema.js'
 import { RunStepHooks } from '../application/use-cases/run-step-hooks.js'
 import { type ActorResolver } from '../application/ports/actor-resolver.js'
 import { type ArchiveRepository } from '../application/ports/archive-repository.js'
@@ -27,6 +28,8 @@ import { type SpecdConfig, type SpecdWorkspaceConfig } from '../application/spec
 import { TemplateExpander } from '../application/template-expander.js'
 import { buildSchema } from '../domain/services/build-schema.js'
 import { type ExtractorTransformRegistry } from '../domain/services/content-extraction.js'
+import { SchemaNotFoundError } from '../application/errors/schema-not-found-error.js'
+import { SchemaProviderIdentityMismatchError } from '../application/errors/schema-provider-identity-mismatch-error.js'
 import { ConfigValidationError } from '../domain/errors/config-validation-error.js'
 import { parseSpecId } from '../domain/services/parse-spec-id.js'
 import { SpecPath } from '../domain/value-objects/spec-path.js'
@@ -126,6 +129,13 @@ export interface CompositionResolver {
    * @returns The schema provider
    */
   getSchemaProvider(): SchemaProvider
+
+  /**
+   * Returns the shared resolve-change-schema application service.
+   *
+   * @returns The resolve-change-schema service
+   */
+  getResolveChangeSchema(): ResolveChangeSchema
 
   /**
    * Returns the shared resolve-schema use case.
@@ -401,6 +411,7 @@ export function createCompositionResolver(
   let templateExpander: TemplateExpander | undefined
   let resolveSchema: ResolveSchema | undefined
   let schemaProvider: SchemaProvider | undefined
+  let resolveChangeSchema: ResolveChangeSchema | undefined
   let getActiveSchema: GetActiveSchema | undefined
   let listWorkspaces: ListWorkspaces | undefined
   let runStepHooks: RunStepHooks | undefined
@@ -427,9 +438,22 @@ export function createCompositionResolver(
         specdPath: config.specdPath ?? '.specd',
         draftsPath: config.storage.draftsPath,
         discardedPath: config.storage.discardedPath,
-        resolveArtifactTypes: async () => {
-          const schema = await resolver.getSchemaRegistry().resolve(config.schemaRef)
-          return schema !== null ? schema.artifacts() : []
+        resolveArtifactTypes: async (ref: {
+          readonly changeName: string
+          readonly schemaName: string
+          readonly schemaVersion: number
+        }) => {
+          try {
+            return (await resolver.getResolveChangeSchema().execute(ref)).schema.artifacts()
+          } catch (err) {
+            if (
+              err instanceof SchemaNotFoundError ||
+              err instanceof SchemaProviderIdentityMismatchError
+            ) {
+              return null
+            }
+            throw err
+          }
         },
         resolveSpecExists: async (specId: string) => {
           const { workspace, capPath } = parseSpecId(specId)
@@ -552,6 +576,12 @@ export function createCompositionResolver(
       return schemaProvider
     },
 
+    getResolveChangeSchema(): ResolveChangeSchema {
+      if (resolveChangeSchema !== undefined) return resolveChangeSchema
+      resolveChangeSchema = new ResolveChangeSchema(resolver.getSchemaProvider())
+      return resolveChangeSchema
+    },
+
     getResolveSchema(): ResolveSchema {
       if (resolveSchema !== undefined) return resolveSchema
       resolveSchema = new ResolveSchema(
@@ -560,6 +590,7 @@ export function createCompositionResolver(
         config.schemaPlugins ?? [],
         config.schemaOverrides,
         resolver.registry.checks,
+        config.approvals,
       )
       return resolveSchema
     },
@@ -676,6 +707,7 @@ export function createCompositionResolver(
         hasher: resolver.getContentHasher(),
         binaryHasher: resolver.getBinaryContentHasher(),
         schemaProvider: resolver.getSchemaProvider(),
+        resolveChangeSchema: resolver.getResolveChangeSchema(),
       })
       return validityFingerprintService
     },
@@ -684,7 +716,7 @@ export function createCompositionResolver(
       if (reconcileChangeValidity !== undefined) return reconcileChangeValidity
       reconcileChangeValidity = new ReconcileChangeValidity({
         changes: resolver.getChangeRepository(),
-        schemaProvider: resolver.getSchemaProvider(),
+        resolveChangeSchema: resolver.getResolveChangeSchema(),
         actor: resolver.getActorResolver(),
         refreshImplementationTracking: resolver.getRefreshImplementationTracking(),
         fingerprint: resolver.getValidityFingerprintService(),

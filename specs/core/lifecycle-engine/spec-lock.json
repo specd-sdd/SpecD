@@ -9,15 +9,25 @@
     "core:schema-format",
     "default:_global/architecture",
     "default:_global/logging",
-    "core:transition-checks"
+    "core:transition-checks",
+    "core:workflow-topology",
+    "core:resolve-change-schema"
   ],
   "implementation": [
     {
       "file": "core:src/domain/services/lifecycle-verdict.ts",
-      "symbols": ["evaluateLifecycleVerdict"]
+      "symbols": ["evaluateLifecycleVerdict", "resolveLifecycleNextHop", "recommendedForwardTarget"]
     },
     {
-      "file": "core:test/domain/services/lifecycle-verdict.spec.ts"
+      "file": "core:src/application/services/lifecycle-guidance.ts",
+      "symbols": ["resolveLifecycleCommand"]
+    },
+    {
+      "file": "core:test/domain/services/lifecycle-engine.spec.ts"
+    },
+    {
+      "file": "core:src/application/services/lifecycle-evaluation.ts",
+      "symbols": ["evaluateLifecycle"]
     }
   ],
   "optimizations": {

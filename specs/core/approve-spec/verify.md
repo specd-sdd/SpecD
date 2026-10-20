@@ -107,12 +107,12 @@ Scenarios:
 - **WHEN** `execute({ name, reason })` is called
 - **THEN** the change transitions to `spec-approved`
 
-#### Scenario: Schema mismatch fails in gate guard
+#### Scenario: Sovereign schema resolution in gate guard
 
 - **GIVEN** `ApproveSpec` is constructed with `approvals.spec: true`
 - **GIVEN** the active schema name differs from the change `schemaName`
 - **WHEN** `execute({ name, reason })` is called
-- **THEN** a `SchemaMismatchError` is thrown before `mutate` is invoked
+- **THEN** it resolves the schema via `SchemaProvider.get(change.schemaName)` without throwing `SchemaMismatchError`
 
 ### Requirement: Config-based factory delegates through resolveApproveSpecDeps
 

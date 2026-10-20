@@ -12,9 +12,8 @@ The gate guard sequence is:
 
 1. If `approvals.signoff` is `false` (baked at construction), throw `ApprovalGateDisabledError` with gate `'signoff'`. No repository access occurs.
 2. Load the change by name from the `ChangeRepository`. If no change exists, throw `ChangeNotFoundError`.
-3. Resolve the current actor identity via `ActorResolver`.
-4. Obtain the active schema from `SchemaProvider`. If the schema cannot be resolved, `get()` throws `SchemaNotFoundError` or `SchemaValidationError` — the use case does not catch these.
-5. Compare `schema.name()` with `change.schemaName`. If they differ, throw `SchemaMismatchError`.
+3. Obtain the change's sovereign schema through `ResolveChangeSchema`. General resolution failures and `SchemaProviderIdentityMismatchError` propagate before the actor is resolved and before consent is recorded.
+4. Resolve the current actor identity via `ActorResolver`.
 
 ### Requirement: Change lookup
 
@@ -28,15 +27,15 @@ The implementation fingerprint SHALL deduplicate project-relative paths, sort th
 
 ### Requirement: Signoff recording and state transition
 
-Sign-off MAY be granted or renewed only while the reconciled change is in `done`, with valid verification evidence and no unresolved non-task artifact review.
+Sign-off MAY be granted or renewed only while the reconciled change is in `done` (or, for historic in-flight manifests, in the drain state `pending-signoff`, which records consent and moves to `signed-off`), with no unresolved non-task artifact review and, when verification is required for the change (see `core:change` "Verification requirement follows workflow topology"), valid verification evidence. When the change schema disables `verifying`, `ApproveSignoff` SHALL NOT require or fingerprint-compare verification evidence, and any evidence it reads SHALL have no effect on eligibility, and SHALL NOT raise verification eligibility errors.
 
 On success `ApproveSignoff` SHALL append the `signed-off` audit event and persist a current sign-off projection with status `valid`, actor, reason, timestamp, artifact fingerprint, implementation fingerprint, and both algorithm identifiers. Prior sign-off and invalidation events remain unchanged.
 
 Actor name and email SHALL continue to be resolved through the existing approval actor decorator and its privacy/fallback rules. One logical sign-off operation MUST resolve exactly one decorated `ActorIdentity` value and reuse it for reconciliation consequences, the materialized projection, and every appended event. Direct-dependency factory forms MUST NOT permit the use case and reconciler to observe different actor resolvers.
 
-If required sign-off is stale while the change is beyond `done`, reconciliation SHALL first return it to `done`. If verification is stale, verification recovery must complete before sign-off can be renewed.
+If required sign-off is stale while the change is beyond `done`, reconciliation SHALL first return it to `done`. If verification is required and stale, verification recovery must complete before sign-off can be renewed.
 
-Verification eligibility failures SHALL remain semantically distinct: never-completed evidence raises the typed not-found error; an active attempt without completion raises the typed in-progress error; stale or legacy-unknown evidence raises a typed stale/not-current error with `/specd-verify` recovery; and a current record that does not match a supplied expected fingerprint raises fingerprint mismatch. Stale evidence MUST NOT be reported as `VerificationNotFoundError`.
+When verification is required, eligibility failures SHALL remain semantically distinct: never-completed evidence raises the typed not-found error; an active attempt without completion raises the typed in-progress error; stale or legacy-unknown evidence raises a typed stale/not-current error with `/specd-verify` recovery; and a current record that does not match a supplied expected fingerprint raises fingerprint mismatch. Stale evidence MUST NOT be reported as `VerificationNotFoundError`.
 
 ### Requirement: Canonical pre-signoff reconciliation
 
@@ -90,3 +89,4 @@ Dependencies SHALL include the change repository, actor resolver, schema provide
 - [`core:kernel`](../kernel/spec.md)
 - [`core:composition-resolver`](../composition-resolver/spec.md)
 - [`core:transition-checks`](../transition-checks/spec.md) — `from` states for `approval.signoff` come from check registry bindings
+- [core:resolve-change-schema](../resolve-change-schema/spec.md) — named sovereign lookup, provider identity validation, and same-name version advisory

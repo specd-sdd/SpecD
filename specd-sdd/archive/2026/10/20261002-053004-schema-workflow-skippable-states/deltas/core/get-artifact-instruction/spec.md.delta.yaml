@@ -1,0 +1,16 @@
+- op: modified
+  description: Resolve sovereign change schema without throwing SchemaMismatchError
+  selector:
+    type: section
+    matches: 'Requirement: Schema name guard'
+  rename: 'Requirement: Sovereign schema resolution'
+  content: |
+    `GetArtifactInstruction` MUST obtain the schema for the change through `ResolveChangeSchema`. The change's recorded schema is the sovereign authority defining its artifact types, rules, and instructions. A different workspace default MUST remain irrelevant; provider identity mismatch MUST propagate as `SchemaProviderIdentityMismatchError`.
+- op: added
+  description: Declare the shared sovereign change-schema resolution dependency
+  position:
+    parent:
+      type: section
+      matches: 'Spec Dependencies'
+  content: |
+    - [core:resolve-change-schema](../resolve-change-schema/spec.md) — named sovereign lookup, provider identity validation, and same-name version advisory

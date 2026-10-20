@@ -3,7 +3,7 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": [],
+  "dependsOn": ["core:workflow-model"],
   "implementation": [
     {
       "file": "schema-std:schema.yaml"

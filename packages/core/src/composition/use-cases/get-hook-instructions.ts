@@ -1,6 +1,7 @@
 import { type ArchiveRepository } from '../../application/ports/archive-repository.js'
 import { type ChangeRepository } from '../../application/ports/change-repository.js'
 import { type SchemaProvider } from '../../application/ports/schema-provider.js'
+import { type ResolveChangeSchema } from '../../application/services/resolve-change-schema.js'
 import { type TemplateExpander } from '../../application/template-expander.js'
 import { GetHookInstructions } from '../../application/use-cases/get-hook-instructions.js'
 import { type SpecdConfig } from '../../application/specd-config.js'
@@ -21,6 +22,8 @@ export interface GetHookInstructionsDeps {
   readonly archive: ArchiveRepository
   /** Schema provider used by the use case. */
   readonly schemaProvider: SchemaProvider
+  /** Shared change schema resolver. */
+  readonly resolveChangeSchema?: ResolveChangeSchema
   /** Template expander used by the use case. */
   readonly templateExpander: TemplateExpander
 }
@@ -38,6 +41,7 @@ export function resolveGetHookInstructionsDeps(
     changes: resolver.getChangeRepository(),
     archive: resolver.getArchiveRepository(),
     schemaProvider: resolver.getSchemaProvider(),
+    resolveChangeSchema: resolver.getResolveChangeSchema(),
     templateExpander: resolver.getTemplateExpander(),
   }
 }
@@ -90,8 +94,14 @@ function createGetHookInstructionsFromNormalized(
   input: FactoryInput<GetHookInstructionsDeps, CompositionResolutionOptions>,
 ): GetHookInstructions {
   if (input.kind === 'deps') {
-    const { changes, archive, schemaProvider, templateExpander } = input.deps
-    return new GetHookInstructions(changes, archive, schemaProvider, templateExpander)
+    const { changes, archive, schemaProvider, templateExpander, resolveChangeSchema } = input.deps
+    return new GetHookInstructions(
+      changes,
+      archive,
+      schemaProvider,
+      templateExpander,
+      resolveChangeSchema,
+    )
   }
 
   const resolver = createCompositionResolver(input.config, input.options)

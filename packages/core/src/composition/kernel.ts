@@ -135,6 +135,7 @@ import { createGetSpecOutline, resolveGetSpecOutlineDeps } from './use-cases/get
 import { createGetSpecsHealth } from './use-cases/get-specs-health.js'
 import { createGetStatus, resolveGetStatusDeps } from './use-cases/get-status.js'
 import { createCountTasks, resolveCountTasksDeps } from './use-cases/count-tasks.js'
+import { type ResolveChangeSchema } from '../application/services/resolve-change-schema.js'
 import { type CountTasks } from '../application/use-cases/count-tasks.js'
 import {
   createInvalidateChange,
@@ -198,6 +199,7 @@ export interface Kernel {
     create: CreateChange
     status: GetStatus
     countTasks: CountTasks
+    resolveSchema: ResolveChangeSchema
     transition: TransitionChange
     draft: DraftChange
     restore: RestoreChange
@@ -368,6 +370,7 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
   const create = createCreateChange(resolveCreateChangeDeps(resolver))
   const status = createGetStatus(resolveGetStatusDeps(resolver))
   const countTasks = createCountTasks(resolveCountTasksDeps(resolver))
+  const resolveChangeSchema = resolver.getResolveChangeSchema()
   const transition = createTransitionChange(resolveTransitionChangeDeps(resolver))
   const draft = createDraftChange(resolveDraftChangeDeps(resolver))
   const restore = createRestoreChange(resolveRestoreChangeDeps(resolver))
@@ -427,6 +430,7 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
       create,
       status,
       countTasks,
+      resolveSchema: resolveChangeSchema,
       transition,
       draft,
       restore,

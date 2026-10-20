@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
+import { buildSchema } from '../../src/domain/services/build-schema.js'
+import { CheckEmbeddingForbiddenError } from '../../src/domain/errors/check-registry-errors.js'
 import { type ArtifactParser } from '../../src/application/ports/artifact-parser.js'
 import {
   createBuiltinCompositionRegistry,
@@ -37,5 +39,83 @@ describe('createCompositionRegistryView', () => {
     const registry = createCompositionRegistryView(createBuiltinCompositionRegistry())
 
     expect('graphStores' in registry).toBe(false)
+  })
+
+  it('forwards plugin allowDisable into check governance', () => {
+    const check = {
+      id: 'audit',
+      label: 'Auditing',
+      execute: async () => ({
+        id: '@qa.audit',
+        label: 'Auditing',
+        kind: 'predicate' as const,
+        outcome: 'pass' as const,
+      }),
+    }
+    const view = createCompositionRegistryView(createBuiltinCompositionRegistry(), {
+      checks: [
+        { pluginName: 'qa', check, allowDisable: false },
+        { pluginName: 'qb', check, options: { allowDisable: false } },
+        { pluginName: 'qc', check },
+      ],
+    })
+
+    expect(view.checks.getGovernance('@qa.audit')?.allowDisable).toBe(false)
+    expect(view.checks.getGovernance('@qb.audit')?.allowDisable).toBe(false)
+    expect(view.checks.getGovernance('@qc.audit')?.allowDisable).toBe(true)
+  })
+  it('forwards plugin allowSchemaEmbedding into check governance and enforces it at build time', () => {
+    const check = {
+      id: 'gate',
+      label: 'Gating',
+      execute: async () => ({
+        id: '@qa.gate',
+        label: 'Gating',
+        kind: 'predicate' as const,
+        outcome: 'pass' as const,
+      }),
+    }
+    const bound = [{ scope: 'transition', to: 'ready', along: 'forward' }]
+    const view = createCompositionRegistryView(createBuiltinCompositionRegistry(), {
+      checks: [
+        { pluginName: 'qa', check, defaultBindings: bound, allowSchemaEmbedding: true },
+        {
+          pluginName: 'qb',
+          check,
+          defaultBindings: bound,
+          options: { allowSchemaEmbedding: true },
+        },
+        { pluginName: 'qc', check, defaultBindings: bound },
+      ],
+    })
+
+    expect(view.checks.getGovernance('@qa.gate')?.allowSchemaEmbedding).toBe(true)
+    expect(view.checks.getGovernance('@qb.gate')?.allowSchemaEmbedding).toBe(true)
+    // Default bindings without an explicit lock make the check non-embeddable.
+    expect(view.checks.getGovernance('@qc.gate')?.allowSchemaEmbedding).toBe(false)
+
+    const build = (id: string) =>
+      buildSchema(
+        '#t',
+        {
+          kind: 'schema',
+          name: 'test',
+          version: 1,
+          artifacts: [{ id: 'spec', scope: 'spec', output: 'spec.md' }],
+          workflow: [
+            {
+              step: 'implementing',
+              requires: [],
+              requiresTaskCompletion: [],
+              hooks: { pre: [], post: [] },
+              checks: [{ id }],
+            },
+          ],
+        } as never,
+        new Map(),
+        view.checks,
+      )
+    expect(() => build('@qa.gate')).not.toThrow()
+    expect(() => build('@qc.gate')).toThrow(CheckEmbeddingForbiddenError)
   })
 })

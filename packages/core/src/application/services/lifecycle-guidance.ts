@@ -2,9 +2,12 @@ import { type Change } from '../../domain/entities/change.js'
 import { type ChangeState } from '../../domain/value-objects/change-state.js'
 import { type ChangeValidityVerdict } from '../../domain/services/change-validity.js'
 import {
+  isAtOrAfterVerificationBoundary,
   type LifecycleNextHop,
   type LifecycleReviewSummary,
 } from '../../domain/services/lifecycle-verdict.js'
+import { isWorkflowStepEnabled } from '../../domain/services/workflow-topology.js'
+import { type Schema } from '../../domain/value-objects/schema.js'
 import { boundFromStates } from '../../domain/services/check-bindings.js'
 
 /** Public next-action including the application-owned command string. */
@@ -22,6 +25,7 @@ export interface LifecycleNextAction extends LifecycleNextHop {
  * @param approvals - Configured approval gates
  * @param approvals.spec - Whether spec approval is enabled in config
  * @param approvals.signoff - Whether signoff approval is enabled in config
+ * @param schema - Sovereign change schema; guidance follows its topology
  * @param validity - Reconciled validity verdict, when one is available
  * @returns Skill or CLI command string, or null when no guidance applies
  */
@@ -31,22 +35,23 @@ export function resolveLifecycleCommand(
   review: LifecycleReviewSummary,
   availableTransitions: readonly ChangeState[],
   approvals: { readonly spec: boolean; readonly signoff: boolean },
+  schema: Schema,
   validity?: ChangeValidityVerdict,
 ): string | null {
   const state = change.state
+  const verifyingEnabled = isWorkflowStepEnabled('verifying', schema)
+  // Retained in the public contract for diagnostics; routing follows Core's selected nextHop.
+  void availableTransitions
 
   if (validity?.specApproval === 'stale' || validity?.specApproval === 'revoked') {
     return '/specd-design'
   }
 
   if (
+    verifyingEnabled &&
     validity !== undefined &&
-    (state === 'verifying' ||
-      state === 'done' ||
-      state === 'pending-signoff' ||
-      state === 'signed-off' ||
-      state === 'archivable' ||
-      state === 'archiving') &&
+    nextHop.reason === 'Renew verification in place' &&
+    isAtOrAfterVerificationBoundary(state, schema, approvals) &&
     (validity.verification === 'stale' ||
       validity.verification === 'absent' ||
       validity.verification === 'attempt-active')
@@ -54,8 +59,10 @@ export function resolveLifecycleCommand(
     return '/specd-verify'
   }
 
+  const guidance: PhaseGuidance = { verifyingEnabled, review, approvals, validity }
+
   if (validity?.artifactReviewRequired === true && validity.recovery === null) {
-    return phaseCommand(change, nextHop, availableTransitions)
+    return phaseCommand(change, nextHop, guidance)
   }
 
   if (review.required || validity?.recovery?.cause === 'workflow-redesign') {
@@ -78,7 +85,15 @@ export function resolveLifecycleCommand(
     return 'specd changes approve signoff'
   }
 
-  return phaseCommand(change, nextHop, availableTransitions)
+  return phaseCommand(change, nextHop, guidance)
+}
+
+/** Context phase guidance needs beyond the change and next hop. */
+interface PhaseGuidance {
+  readonly verifyingEnabled: boolean
+  readonly review: LifecycleReviewSummary
+  readonly approvals: { readonly spec: boolean; readonly signoff: boolean }
+  readonly validity: ChangeValidityVerdict | undefined
 }
 
 /**
@@ -86,34 +101,47 @@ export function resolveLifecycleCommand(
  *
  * @param change - change
  * @param nextHop - next hop
- * @param availableTransitions - available transitions
+ * @param guidance - Schema topology, review, approvals, and validity context
  * @returns phase command result
  */
 function phaseCommand(
   change: Change,
   nextHop: LifecycleNextHop,
-  availableTransitions: readonly ChangeState[],
+  guidance: PhaseGuidance,
 ): string | null {
   const state = change.state
+  const { verifyingEnabled, review, approvals, validity } = guidance
 
   if (state === 'drafting' || state === 'designing') {
     return '/specd-design'
   }
 
-  if (state === 'ready' && availableTransitions.includes('implementing')) {
-    return '/specd-implement'
+  if (state === 'ready') {
+    if (nextHop.targetStep === 'implementing') return '/specd-implement'
+    if (nextHop.targetStep === 'verifying') return '/specd-verify'
+    if (nextHop.targetStep === 'done' || nextHop.targetStep === 'archivable') {
+      return '/specd-archive'
+    }
   }
 
   if (state === 'pending-spec-approval') {
     return 'specd changes approve spec'
   }
 
-  if (state === 'spec-approved' && availableTransitions.includes('implementing')) {
-    return '/specd-implement'
+  if (state === 'spec-approved') {
+    if (nextHop.targetStep === 'implementing') return '/specd-implement'
+    if (nextHop.targetStep === 'verifying') return '/specd-verify'
+    if (nextHop.targetStep === 'done' || nextHop.targetStep === 'archivable') {
+      return '/specd-archive'
+    }
   }
 
   if (state === 'implementing') {
-    return availableTransitions.includes('verifying') ? '/specd-verify' : '/specd-implement'
+    if (nextHop.targetStep === 'verifying') return '/specd-verify'
+    if (nextHop.targetStep === 'done' || nextHop.targetStep === 'archivable') {
+      return '/specd-archive'
+    }
+    return '/specd-implement'
   }
 
   if (state === 'verifying') {
@@ -125,9 +153,19 @@ function phaseCommand(
   }
 
   if (state === 'done' || state === 'signed-off') {
-    return nextHop.targetStep === 'archivable' || availableTransitions.includes('archivable')
-      ? '/specd-archive'
-      : '/specd-verify'
+    if (nextHop.targetStep === 'archivable') return '/specd-archive'
+    if (!verifyingEnabled) {
+      // Without verification evidence the blocker is design, review, or sign-off.
+      if (nextHop.targetStep === 'designing' || review.required) return '/specd-design'
+      if (
+        approvals.signoff &&
+        (validity !== undefined ? validity.signoff !== 'valid' : change.activeSignoff === undefined)
+      ) {
+        return 'specd changes approve signoff'
+      }
+      return '/specd-archive'
+    }
+    return '/specd-verify'
   }
 
   if (state === 'archivable') {
@@ -151,7 +189,12 @@ function phaseCommand(
   if (nextHop.targetStep !== state) {
     if (nextHop.targetStep === 'implementing') return '/specd-implement'
     if (nextHop.targetStep === 'verifying') return '/specd-verify'
-    if (nextHop.targetStep === 'archiving') return '/specd-archive'
+    if (
+      nextHop.targetStep === 'done' ||
+      nextHop.targetStep === 'archivable' ||
+      nextHop.targetStep === 'archiving'
+    )
+      return '/specd-archive'
     if (nextHop.targetStep === 'designing') return '/specd-design'
   }
 
@@ -168,6 +211,7 @@ function phaseCommand(
  * @param approvals - Configured approval gates
  * @param approvals.spec - Whether spec approval is enabled in config
  * @param approvals.signoff - Whether signoff approval is enabled in config
+ * @param schema - Sovereign change schema; guidance follows its topology
  * @param validity - Reconciled validity verdict, when one is available
  * @returns Next hop fields plus resolved command string
  */
@@ -177,6 +221,7 @@ export function resolveLifecycleNextAction(
   review: LifecycleReviewSummary,
   availableTransitions: readonly ChangeState[],
   approvals: { readonly spec: boolean; readonly signoff: boolean },
+  schema: Schema,
   validity?: ChangeValidityVerdict,
 ): LifecycleNextAction {
   return {
@@ -187,6 +232,7 @@ export function resolveLifecycleNextAction(
       review,
       availableTransitions,
       approvals,
+      schema,
       validity,
     ),
   }

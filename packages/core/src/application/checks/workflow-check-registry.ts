@@ -28,6 +28,7 @@ import { createVerificationCurrent } from './verification-current.js'
 import { createWorkspaceReadOnly } from './workspace-read-only.js'
 import { createWorkflowRequires } from './workflow-requires.js'
 import { createWorkflowTaskCompletion } from './workflow-task-completion.js'
+import { createWorkflowTasksEmpty } from './workflow-tasks-empty.js'
 
 /**
  * Ports required to compose built-in workflow checks.
@@ -59,6 +60,8 @@ export interface WorkflowCheckRegistry {
   readonly transitionBindings: readonly CheckBinding[]
   /** Archive bindings in registry order. */
   readonly archiveBindings: readonly CheckBinding[]
+  /** Executable built-in check instances keyed by canonical id. */
+  readonly checks: Readonly<Partial<Record<CheckId, Check>>>
 }
 
 /**
@@ -71,6 +74,7 @@ export function createWorkflowCheckRegistry(
   deps: CreateWorkflowCheckRegistryDeps,
 ): WorkflowCheckRegistry {
   const taskCompletion = createWorkflowTaskCompletion({ countTasks: deps.countTasks })
+  const tasksEmpty = createWorkflowTasksEmpty({ countTasks: deps.countTasks })
   const hookPre = createHookPre({ runStepHooks: deps.runStepHooks })
   const hookPost = createHookPost({ runStepHooks: deps.runStepHooks })
   const protocolEdge = createProtocolEdge()
@@ -94,6 +98,7 @@ export function createWorkflowCheckRegistry(
     'protocol.edge': protocolEdge,
     'workflow.requires': workflowRequires,
     'workflow.taskCompletion': taskCompletion,
+    'workflow.tasksEmpty': tasksEmpty,
     'deps.consistent': depsConsistent,
     'workspace.readOnly': workspaceReadOnly,
     'impl.filesResolved': implFilesResolved,
@@ -111,5 +116,6 @@ export function createWorkflowCheckRegistry(
   return {
     transitionBindings: applyBindingSpecs(TRANSITION_BINDING_SPECS, checks),
     archiveBindings: applyBindingSpecs(ARCHIVE_BINDING_SPECS, checks),
+    checks,
   }
 }

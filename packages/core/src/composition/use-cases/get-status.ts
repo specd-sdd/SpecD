@@ -1,5 +1,6 @@
 import { type ChangeRepository } from '../../application/ports/change-repository.js'
 import { type SchemaProvider } from '../../application/ports/schema-provider.js'
+import { type ResolveChangeSchema } from '../../application/services/resolve-change-schema.js'
 import { GetStatus } from '../../application/use-cases/get-status.js'
 import { type RefreshImplementationTracking } from '../../application/use-cases/refresh-implementation-tracking.js'
 import { type SpecdConfig } from '../../application/specd-config.js'
@@ -21,6 +22,8 @@ export interface GetStatusDeps {
   readonly changes: ChangeRepository
   /** Schema provider used by the use case. */
   readonly schemaProvider: SchemaProvider
+  /** Shared change schema resolver. */
+  readonly resolveChangeSchema?: ResolveChangeSchema
   /** Approval gate configuration used by the use case. */
   readonly approvals: { readonly spec: boolean; readonly signoff: boolean }
   /** Refresh implementation tracking use case used by the use case. */
@@ -48,12 +51,13 @@ export function resolveGetStatusDeps(resolver: CompositionResolver): GetStatusDe
   return {
     changes: resolver.getChangeRepository(),
     schemaProvider: resolver.getSchemaProvider(),
+    resolveChangeSchema: resolver.getResolveChangeSchema(),
     approvals: resolver.config.approvals,
     refreshImplementationTracking: resolver.getRefreshImplementationTracking(),
     transitionBindings: registry.transitionBindings,
     archiveBindings: registry.archiveBindings,
     reconcile: resolver.getReconcileChangeValidity(),
-    checkRegistry: resolver.registry?.checks,
+    ...(registry.checkRegistry !== undefined ? { checkRegistry: registry.checkRegistry } : {}),
   }
 }
 
@@ -124,6 +128,7 @@ function createGetStatusFromNormalized(
       archiveBindings,
       reconcile,
       checkRegistry,
+      input.deps.resolveChangeSchema,
     )
   }
 

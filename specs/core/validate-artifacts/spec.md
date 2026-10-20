@@ -37,9 +37,9 @@ When `specPath` is omitted for a `scope: change` artifact, `ValidateArtifacts` M
 
 When `specPath` is provided and the artifact is `scope: change`, the specPath is ignored — the artifact ID is sufficient.
 
-### Requirement: Schema name guard
+### Requirement: Sovereign schema resolution
 
-After obtaining the schema from `SchemaProvider`, `ValidateArtifacts` MUST compare `schema.name()` with `change.schemaName`. If they differ, it MUST throw `SchemaMismatchError`. This MUST happen before any artifact validation logic.
+`ValidateArtifacts` MUST obtain the schema for the change through `ResolveChangeSchema`. The change's recorded schema is the sovereign authority governing its artifact DAG, validation rules, required sections, and delta validations. A different workspace default MUST remain irrelevant. General resolution failures and `SchemaProviderIdentityMismatchError` MUST propagate before validation changes artifact state.
 
 ### Requirement: Required artifacts check
 
@@ -338,3 +338,4 @@ When `ChangeRepository.get(name)` returns `null`, `ValidateArtifacts.execute` MU
 - [`core:schema-format`](../schema-format/spec.md)
 - [`core:composition-resolver`](../composition-resolver/spec.md)
 - [`core:transition-checks`](../transition-checks/spec.md) — no snapshot bag; hop predicates are not this use case
+- [core:resolve-change-schema](../resolve-change-schema/spec.md) — named sovereign lookup, provider identity validation, and same-name version advisory

@@ -36,9 +36,11 @@ The use case MUST load the change from the `ChangeRepository` by name. If no cha
 
 ### Requirement: Optional pre-transition implementation tracking refresh
 
-When `refreshImplementationTrackingBefore` is not `false` (default `true`) and the change exists in active storage, `TransitionChange` MUST invoke `RefreshImplementationTracking.execute({ name })` before lifecycle evaluation, hook execution, and mutation.
+When `refreshImplementationTrackingBefore` is not `false` (default `true`) and the change exists in active storage, `TransitionChange` MUST refresh implementation tracking (through the canonical reconciler, which delegates to `RefreshImplementationTracking`) before lifecycle evaluation, hook execution, and mutation.
 
-When `refreshImplementationTrackingBefore` is `false`, `TransitionChange` MUST NOT invoke `RefreshImplementationTracking`.
+When `refreshImplementationTrackingBefore` is `false`, `TransitionChange` MUST NOT run that pre-evaluation refresh. The flag exists only so a caller that has just refreshed tracking can avoid repeating it; it is an optimization, not a way to evaluate against stale facts.
+
+The post-hook reconciliation that precedes persistence MUST always refresh implementation tracking, regardless of `refreshImplementationTrackingBefore`, because pre-persist hooks may change implementation files. `TransitionChange` MUST NOT persist a transition whose predicates were evaluated only against tracking captured before those hooks ran.
 
 `TransitionChange` MUST NOT invoke `ImplementationDetector` directly and MUST NOT duplicate refresh merge logic.
 
@@ -70,14 +72,15 @@ When the change is in `ready` waiting on spec approval, callers MUST use `Approv
 
 Before attempting state mutation, the Use Case MUST reconcile and evaluate all checks applicable to the target state:
 
-1. **Active Check Resolution**: Query `CheckRegistry` and active schema step declarations to determine all applicable checks for `attempt.to` and classified `attempt.along`. Checks declared with `disabled: true` on the step declaration (permitted only when `allowDisable !== false`) MUST be cleanly omitted from predicate execution for that coordinate.
+1. **Active Check Resolution**: Resolve the effective bindings for `attempt.to`, classified `attempt.along`, and every bypassed step through `resolveEffectiveBindings` (see [`core:transition-checks`](../transition-checks/spec.md)). Checks declared with `disabled: true` on the step declaration (permitted only when `allowDisable !== false`) MUST be cleanly omitted from predicate execution for that coordinate.
 2. **Bypass Verification**: For each check identifier present in `skipChecks`:
    - If the check is unregistered, the orchestrator MUST throw an `UnknownCheckError`.
    - If the check is an effect (`kind: 'effect'`), the orchestrator MUST reject the bypass with a `CheckNotSkippableError`, because effect checks (hooks) are governed exclusively by `skipHookPhases`.
-   - If the check declares `skippable !== true`, the orchestrator MUST throw a `CheckNotSkippableError`.
+   - If the resolved binding of that check for this attempt declares `skippable !== true`, the orchestrator MUST throw a `CheckNotSkippableError`. Skippability is read from the resolved bindings for the attempt, never from the first base binding that shares the check id.
    - If the check is skippable, the orchestrator MUST bypass calling `check.execute()` and inject a synthetic `{ outcome: 'skip', details: { bypassedByUser: true } }`.
-3. **Check Execution**: For all non-bypassed checks, invoke `check.execute(ctx)` passing the active change aggregate, resolved schema, attempt coordinates, and isolated effective `ctx.config`.
-4. **Failure Abort**: If any evaluated check returns `outcome: 'fail'`, the transition MUST be aborted immediately. The Use Case MUST throw a unified `CheckPredicateFailedError` containing the failed check's `checkId`, `label`, `code`, `message`, `command`, and `details`.
+3. **Check Execution**: For all non-bypassed checks, invoke `check.execute(ctx)` passing the active change aggregate, resolved schema, attempt coordinates, and the binding's single-pass resolved `ctx.config`.
+4. **Failure Abort**: A failing `protocol.edge` stops evaluation before any other predicate runs. Otherwise every matching predicate of the candidate is evaluated (so collected failures can be reported together), and if any returned `outcome: 'fail'` the transition MUST be aborted before any effect, hook, or persistence, and the failure MUST be thrown as defined in "Shared runner errors propagate on transition". The thrown `CheckPredicateFailedError.skippable` SHALL come from the resolved binding of the failing check.
+5. **Committed recovery reporting**: When reconciliation commits an automatic recovery that moves the change away from the source state, the thrown error SHALL report the committed state and recommend the command produced by lifecycle guidance for that committed state and the change's schema. It MUST NOT hardcode a skill such as `/specd-verify`; when the change schema disables `verifying`, the recommendation MUST NOT route to verification.
 
 ### Requirement: Workflow requires enforcement
 
@@ -218,24 +221,44 @@ Hook checks MUST NOT emit first-class `{ type: 'hook-start' }` / `{ type: 'hook-
 
 `TransitionChange.execute` input `to` MUST accept a lifecycle `ChangeState` or the sentinel `'next'`.
 
-When `to` is `'next'`, Core MUST resolve it to the **happy-path next lifecycle state** from the current state (the forward delivery hop a human would normally take: e.g. `ready` → `implementing`, `implementing` → `verifying`, `signed-off` → `archivable`). This MUST NOT use `GetStatus.nextAction.targetStep` (that field may recommend staying, approving, or archiving).
+When `to` is `'next'`, Core MUST resolve the change's sovereign schema through `ResolveChangeSchema` and resolve the destination via `nextWorkflowStep(current, schema, approvals)` to determine the next active lifecycle state along the ordered pipeline. Disabled steps are skipped automatically.
 
-Core MUST reject `'next'` when there is no such hop, including at least `pending-spec-approval`, `pending-signoff`, `archivable`, and `archiving`, with a typed `SpecdError` (not a CLI-only table). After resolution, evaluation is the same as an explicit `to`.
+Core MUST reject `'next'` when there is no subsequent active hop (such as from `archivable` or `archiving`) with a typed `HappyPathNextUnavailableError`. After resolution, evaluation is identical to an explicit destination `to`.
 
 Predicate `protocol.edge` fail-fast applies to this execute path. GetStatus MUST still collect every matching predicate for the same edge.
 
+### Requirement: Bypassed step evaluation and hook suppression
+
+When a transition `from → to` bypasses one or more intermediate steps as identified by `listBypassedWorkflowSteps(from, to, schema, approvals)`, where `schema` is resolved through `ResolveChangeSchema`:
+
+1. **Sovereign Schema Authority**: The change's recorded `change.schemaName` is the immutable sovereign authority for lifecycle topology, bypass legality, and step configuration.
+2. **Precondition Validation**: Every active step strictly between `from` and `to` MUST be declared `optional: true` in the sovereign schema. Disabled steps are absent from the pipeline and never count as bypassed. If any intermediate active step is not optional, the transition SHALL be rejected by `protocol.edge`.
+3. **Shared Candidate Evaluation**: `TransitionChange` SHALL invoke the shared transition candidate evaluator used by `GetStatus`, which dynamically composes and evaluates all normal target predicates and all checks matching `{ scope: 'step-skip', step }` for every optional bypassed step. If any predicate fails, the transition is aborted with the error mapped by "Shared runner errors propagate on transition".
+   - Registry-provided bindings and schema-declared `skipChecks` form the effective check set.
+   - When the effective set is empty, the optional-step bypass is permitted unconditionally.
+   - This empty-set rule is deliberate and MUST NOT be replaced by skill-level judgment.
+4. **Freshness and Ownership**: The shared candidate MUST be recalculated from fresh persisted state. `TransitionChange` alone owns matching effects, hook execution, aggregate mutation, and persistence after the predicate verdict passes.
+5. **Hook Non-Execution**: For any bypassed step, neither `pre` nor `post` hooks configured on that step SHALL be executed. Hooks execute only when a step is explicitly entered and exited.
+
 ### Requirement: Shared runner errors propagate on transition
 
-All lifecycle predicate check failures SHALL throw the unified domain error `CheckPredicateFailedError`.
-Duplicated, check-specific error classes (including `ArchiveImplementationStateError` and `ArchiveDependencyMismatchError`) SHALL be retired from `_mapFailedPredicate`.
-The `CheckPredicateFailedError` MUST encapsulate:
+Predicate failures SHALL be mapped to exactly one of two typed errors:
 
-- `checkId`: The canonical identifier of the failed check.
-- `label`: Human-readable gerund phrase describing the check.
-- `code`: Diagnostic error code.
-- `message`: Diagnostic error message explaining the failure.
-- `command`: Optional suggested remediation CLI command.
-- `details`: Optional structured details from the check result.
+1. **Canonical reasons** — `InvalidStateTransitionError` with a structured reason for the built-in predicates whose failure has a dedicated lifecycle meaning:
+   - `protocol.edge` → `invalid-transition`
+   - `workflow.requires` → `incomplete-artifact` (with `artifactId`, optional `status`, and optional `blockedBy` parent)
+   - `workflow.taskCompletion` → `incomplete-tasks` (with counts) or `missing-task-capability`
+   - `approval.spec` / `approval.signoff` → `approval-required` (with `gate`)
+2. **Generic predicate failure** — `CheckPredicateFailedError` for every other predicate, including Category C checks, plugin checks, and `scope: 'step-skip'` checks. It MUST encapsulate:
+   - `checkId`: the canonical identifier of the failed check
+   - `label`: the human-readable gerund phrase describing the check
+   - `code`: diagnostic error code (default `CHECK_FAILED`)
+   - `message`: diagnostic message explaining the failure
+   - `command`: optional suggested remediation CLI command
+   - `details`: optional structured details from the check result
+   - `skippable`: whether the failed binding permits `--skip-checks`, so the CLI can suggest the bypass
+
+Duplicated, check-specific error classes (including `ArchiveImplementationStateError` and `ArchiveDependencyMismatchError`) SHALL be retired from `_mapFailedPredicate`. No predicate failure may be reported through any other error type.
 
 ### Requirement: Config-based factory delegates through resolveTransitionChangeDeps
 
@@ -269,7 +292,6 @@ For an in-flight change already in `pending-spec-approval` or `pending-signoff`,
 - Pre-hook and before-persist post-hook aborts prevent the requested transition. Post effects run only on forward movement; source-post effects do not run for backward, redesign, or recovery.
 - `verifying → implementing` MUST NOT clear unchanged artifact validation. Schema `implementing.requires` still governs later forward readiness, not retry-side clearing.
 - A `designing → designing` request is a neutral application no-op: it MUST NOT append a transition event or invalidate approval/artifacts. The entity continues to reject real self-transitions. `verifying → verifying` remains invalid, not a renewal protocol.
-- `allowOutOfScope` MAY skip `impl.linksInScope` where the registered check permits it, but cannot skip `impl.filesResolved`.
 - Schema resolution failure MUST throw; absence of a target workflow row only skips workflow-specific requires/task checks, not protocol or other predicates.
 - Composition MUST inject application `create*` transition bindings, not domain stubs; `RunStepHooks` belongs in hook checks rather than the use-case constructor.
 - Enter-ready and forward exit-implementing failures MUST preserve their existing typed errors. A missing happy-path next hop MUST throw `HappyPathNextUnavailableError`.
@@ -286,3 +308,6 @@ For an in-flight change already in `pending-spec-approval` or `pending-signoff`,
 - [`core:composition-resolver`](../composition-resolver/spec.md)
 - [`core:count-tasks`](../count-tasks/spec.md) — supplies shared task-completion counts.
 - [`core:transition-checks`](../transition-checks/spec.md) — predicate evaluation then matching effects.
+- [`core:check-registry`](../check-registry/spec.md) — registers step-skip checks for bypassed states.
+- [`core:workflow-topology`](../workflow-topology/spec.md) — authoritative domain service for legal transitions and bypassed steps.
+- [`core:resolve-change-schema`](../resolve-change-schema/spec.md) — sovereign schema lookup, identity integrity, and version advisory.

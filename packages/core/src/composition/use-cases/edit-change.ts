@@ -1,6 +1,7 @@
 import { type ActorResolver } from '../../application/ports/actor-resolver.js'
 import { type ChangeRepository } from '../../application/ports/change-repository.js'
 import { type SchemaProvider } from '../../application/ports/schema-provider.js'
+import { type ResolveChangeSchema } from '../../application/services/resolve-change-schema.js'
 import { EditChange } from '../../application/use-cases/edit-change.js'
 import { type ReconcileChangeValidity } from '../../application/use-cases/reconcile-change-validity.js'
 import { type ListWorkspaces } from '../../application/use-cases/list-workspaces.js'
@@ -21,6 +22,7 @@ export interface EditChangeDeps {
   readonly listWorkspaces: ListWorkspaces
   readonly actor: ActorResolver
   readonly schemaProvider: SchemaProvider
+  readonly resolveChangeSchema?: ResolveChangeSchema
   readonly refreshImplementationTracking?: RefreshImplementationTracking
   readonly reconcile: ReconcileChangeValidity
 }
@@ -37,6 +39,7 @@ export function resolveEditChangeDeps(resolver: CompositionResolver): EditChange
     listWorkspaces: resolver.getListWorkspaces(),
     actor: resolver.getActorResolver(),
     schemaProvider: resolver.getSchemaProvider(),
+    resolveChangeSchema: resolver.getResolveChangeSchema(),
     refreshImplementationTracking: resolver.getRefreshImplementationTracking(),
     reconcile: resolver.getReconcileChangeValidity(),
   }
@@ -97,6 +100,7 @@ function createEditChangeFromNormalized(
       schemaProvider,
       refreshImplementationTracking,
       reconcile,
+      resolveChangeSchema,
     } = input.deps
     return new EditChange(
       changes,
@@ -105,6 +109,7 @@ function createEditChangeFromNormalized(
       schemaProvider,
       refreshImplementationTracking,
       reconcile,
+      resolveChangeSchema,
     )
   }
 

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { LazySchemaProvider } from '../../src/composition/lazy-schema-provider.js'
+import { SchemaNotFoundError } from '../../src/application/errors/schema-not-found-error.js'
 import { makeSchema } from '../application/use-cases/helpers.js'
 
 function makeResolveSchema(schema = makeSchema()) {
@@ -58,5 +59,61 @@ describe('LazySchemaProvider', () => {
 
     expect(result).toBe(schema)
     expect(resolve.execute).toHaveBeenCalledTimes(2)
+  })
+  it('resolves a named lookup without touching a broken default', async () => {
+    const named = makeSchema({ name: 'custom' })
+    const resolve = {
+      schemaRef: '@specd/schema-std',
+      execute: vi.fn(async (ref?: string) => {
+        if (ref === undefined) throw new Error('broken default')
+        return named
+      }),
+    }
+    const provider = new LazySchemaProvider(resolve as never)
+
+    await expect(provider.get('custom')).resolves.toBe(named)
+    expect(resolve.execute).toHaveBeenCalledOnce()
+    expect(resolve.execute).toHaveBeenCalledWith('custom')
+    await expect(provider.get()).rejects.toThrow('broken default')
+  })
+
+  it('serves the default from a named lookup of the configured schema ref', async () => {
+    const schema = makeSchema()
+    const resolve = {
+      schemaRef: '@specd/schema-std',
+      execute: vi.fn().mockResolvedValue(schema),
+    }
+    const provider = new LazySchemaProvider(resolve as never)
+
+    await provider.get('@specd/schema-std')
+    await provider.get()
+
+    expect(resolve.execute).toHaveBeenCalledOnce()
+  })
+
+  it('caches named lookups by ref and by resolved name', async () => {
+    const named = makeSchema({ name: 'custom' })
+    const resolve = { execute: vi.fn().mockResolvedValue(named) }
+    const provider = new LazySchemaProvider(resolve as never)
+
+    await provider.get('custom-ref')
+    await provider.get('custom-ref')
+    await provider.get('custom')
+
+    expect(resolve.execute).toHaveBeenCalledOnce()
+  })
+  it('falls back to the default only when it carries the requested bare name', async () => {
+    const schema = makeSchema({ name: 'schema-std' })
+    const resolve = {
+      schemaRef: '@specd/schema-std',
+      execute: vi.fn(async (ref?: string) => {
+        if (ref === undefined || ref === '@specd/schema-std') return schema
+        throw new SchemaNotFoundError(ref)
+      }),
+    }
+    const provider = new LazySchemaProvider(resolve as never)
+
+    await expect(provider.get('schema-std')).resolves.toBe(schema)
+    await expect(provider.get('other')).rejects.toBeInstanceOf(SchemaNotFoundError)
   })
 })

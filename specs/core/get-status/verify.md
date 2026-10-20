@@ -219,6 +219,37 @@ Scenarios:
 - **THEN** the result includes check rows with `id`, `kind`, and `outcome`
 - **AND** `effect` rows are not required for `allowed`
 
+### Requirement: Shared transition candidate evaluation
+
+#### Scenario: Passing bypass predicates advertise the shortcut
+
+- **GIVEN** a protocol-legal shortcut over an optional step
+- **AND** all normal and effective `step-skip` predicates pass
+- **WHEN** status is projected
+- **THEN** the target is present in `availableTransitions`
+- **AND** `checksByTarget` contains the complete candidate results
+
+#### Scenario: Failed bypass predicate suppresses the shortcut
+
+- **GIVEN** a protocol-legal shortcut whose normal predicates pass
+- **AND** one effective `step-skip` predicate fails
+- **WHEN** status is projected
+- **THEN** the target is absent from `availableTransitions`
+- **AND** its failed check remains visible in `checksByTarget`
+
+#### Scenario: Empty bypass predicate set is allowed
+
+- **GIVEN** a bypassed optional step with no effective `step-skip` predicates
+- **WHEN** status evaluates the shortcut
+- **THEN** no synthetic blocker is created
+- **AND** the shortcut is available when its normal predicates pass
+
+#### Scenario: Status evaluation has no transition effects
+
+- **WHEN** status evaluates every candidate
+- **THEN** it runs no hook, aggregate mutation, or persistence
+- **AND** a later transition must reevaluate the candidate against fresh state
+
 ### Requirement: Throws ChangeNotFoundError for unknown changes
 
 #### Scenario: Change does not exist
@@ -268,15 +299,51 @@ Scenarios:
 
 #### Scenario: Schema resolution failure returns actionable read-only status
 
-- **GIVEN** `SchemaProvider.get()` throws `SchemaNotFoundError`
+- **GIVEN** `SchemaProvider.get(change.schemaName)` throws `SchemaNotFoundError`
 - **WHEN** `GetStatus.execute()` is called
 - **THEN** the result does not throw
-- **AND** `lifecycle.validTransitions` and `lifecycle.approvals` are populated normally
-- **AND** `lifecycle.availableTransitions` is an empty array
+- **AND** `lifecycle.validTransitions` and `lifecycle.availableTransitions` are empty arrays
+- **AND** `lifecycle.approvals` is populated normally
 - **AND** `lifecycle.blockers` is an empty array
 - **AND** the public `blockers` array contains `SCHEMA_RESOLUTION_FAILED` with recovery guidance
 - **AND** `lifecycle.nextArtifact` is `null`, `lifecycle.changePath` is populated normally, and `lifecycle.schemaInfo` is `null`
 - **AND** the result does not enable a lifecycle mutation
+
+#### Scenario: Resolves change sovereign schema when workspace default differs
+
+- **GIVEN** an active change with `schemaName: 'custom-workflow'`
+- **AND** workspace default schema is `@specd/schema-std`
+- **WHEN** `GetStatus.execute()` is called
+- **THEN** it resolves `custom-workflow` via `SchemaProvider.get('custom-workflow')`
+- **AND** reports workflow steps and artifact projection defined by `custom-workflow`
+
+#### Scenario: Provider identity mismatch has a distinct blocker
+
+- **GIVEN** named resolution returns a schema whose canonical name differs from `change.schemaName`
+- **WHEN** `GetStatus.execute()` is called
+- **THEN** the result does not throw
+- **AND** public blockers contain `SCHEMA_IDENTITY_MISMATCH`
+- **AND** `lifecycle.validTransitions` and `lifecycle.availableTransitions` are empty arrays
+- **AND** no topology or action is projected from the untrusted schema
+
+#### Scenario: Identity mismatch blocker carries structured names
+
+- **GIVEN** a schema provider that returns `other-schema` when `custom-workflow` is requested (the provider returns a wrong-name schema; it does not throw itself)
+- **WHEN** `GetStatus.execute()` runs
+- **THEN** the public blockers contain `SCHEMA_IDENTITY_MISMATCH` with `details.requestedName: 'custom-workflow'` and `details.returnedName: 'other-schema'`
+
+#### Scenario: Drafted status degrades instead of throwing
+
+- **GIVEN** a drafted change whose schema resolution fails or returns a wrong-name schema
+- **WHEN** `GetStatus.execute()` runs
+- **THEN** it does not throw
+- **AND** `schemaInfo` is `null` and the matching `SCHEMA_RESOLUTION_FAILED` or `SCHEMA_IDENTITY_MISMATCH` blocker is reported
+
+#### Scenario: Version advisory appears on the status result
+
+- **GIVEN** `ResolveChangeSchema` returns a same-name version advisory
+- **WHEN** `GetStatus.execute()` runs
+- **THEN** the result exposes that advisory as a structured warning
 
 ### Requirement: Accepts a change name as input
 
@@ -339,13 +406,19 @@ Scenarios:
 
 - **GIVEN** a failed `impl.filesResolved` check with code `IMPLEMENTATION_STATE`
 - **WHEN** `GetStatus` merges blockers from checks
-- **THEN** the blocker does not include `bypassFlag` `--allow-out-of-scope`
+- **THEN** the blocker carries no `bypassFlag` and is not skippable
 
 #### Scenario: Links-in-scope IMPLEMENTATION_STATE keeps out-of-scope bypass
 
 - **GIVEN** a failed `impl.linksInScope` check with code `IMPLEMENTATION_STATE`
 - **WHEN** `GetStatus` merges blockers from checks
-- **THEN** the blocker is skippable with `bypassFlag` `--allow-out-of-scope`
+- **THEN** the blocker is skippable with `bypassFlag` `--skip-checks impl.linksInScope`
+
+#### Scenario: Schema-declared skippability drives the bypass flag
+
+- **GIVEN** a schema that declares a Category C check with `skippable: true` on the evaluated step, overriding a non-skippable code default that permits overrides
+- **WHEN** that check fails and `GetStatus` merges blockers
+- **THEN** the blocker is skippable with `bypassFlag` `--skip-checks <checkId>`
 
 #### Scenario: Invalidation overlap is review not OVERLAP_CONFLICT blocker
 
@@ -361,7 +434,7 @@ Scenarios:
 - **GIVEN** a change in `archivable` whose specs overlap another active change
 - **WHEN** `GetStatus.execute()` is called
 - **THEN** `spec.overlap.execute` fails
-- **AND** `blockers` includes skippable `OVERLAP_CONFLICT` with `--allow-overlap`
+- **AND** `blockers` includes skippable `OVERLAP_CONFLICT` with `bypassFlag` `--skip-checks spec.overlap`
 
 #### Scenario: Archivable live overlap does not advertise Ready to archive
 
@@ -370,7 +443,7 @@ Scenarios:
 - **THEN** `nextAction.command` is `/specd-archive`
 - **AND** `nextAction.targetStep` is `archivable`
 - **AND** `nextAction.reason` is not `Ready to archive`
-- **AND** `nextAction.reason` names overlap and `--allow-overlap`
+- **AND** `nextAction.reason` names overlap and `--skip-checks spec.overlap`
 
 #### Scenario: CountTasks memo is per evaluation pass
 

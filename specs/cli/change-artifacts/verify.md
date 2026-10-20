@@ -55,3 +55,11 @@
 - **WHEN** `specd change artifacts nonexistent` is run
 - **THEN** the command exits with code 1
 - **AND** stderr contains an `error:` message
+
+### Requirement: Artifact listing from the change's schema
+
+#### Scenario: Listing follows the change schema
+
+- **GIVEN** a change whose `schemaName` is `custom-workflow` with a workspace default exposing different artifacts
+- **WHEN** `specd changes artifacts <name>` runs
+- **THEN** it lists exactly the `custom-workflow` artifacts in that schema's declared order

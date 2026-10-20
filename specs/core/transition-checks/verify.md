@@ -36,7 +36,7 @@
 #### Scenario: Execute does not take a global snapshot bag
 
 - **WHEN** `execute` is invoked
-- **THEN** its argument is `CheckExecutionContext` (change, schema, attempt, baked `approvals`, skip flags)
+- **THEN** its argument is `CheckExecutionContext` (change, schema, attempt, baked `approvals`, resolved `config`, `skipChecks`, and `checkRegistry`)
 - **AND** it does not accept `PredicateSnapshots`
 
 #### Scenario: CountTasks memo lives on passMemo not the check instance
@@ -89,12 +89,19 @@
 - **THEN** `along` is `recovery`
 - **AND** it is not classified as `backward`
 
-#### Scenario: Omitted workflow row is not removed from the axis
+#### Scenario: Disabled steps are excluded from progress axis
 
-- **GIVEN** `workflow[]` omits `implementing`
-- **WHEN** the attempt is `ready → verifying`
-- **THEN** `along` is `forward`
-- **AND** `VALID_TRANSITIONS` still lists `implementing` as a state
+- **GIVEN** a schema where `verifying` is `disabled: true`
+- **WHEN** evaluating direction from `implementing` to `done`
+- **THEN** `along` is classified as `forward`
+- **AND** `verifying` does not participate in axis ordering
+
+#### Scenario: Direction delegates to the authoritative topology axis
+
+- **GIVEN** a noncanonical declared workflow order and an explicit approval snapshot
+- **WHEN** `classifyAlong` evaluates a transition
+- **THEN** it obtains the axis from `resolveWorkflowPipeline(schema, approvals)`
+- **AND** no parallel fallback axis is constructed locally
 
 #### Scenario: Omitted implementing keeps retry backward
 
@@ -108,12 +115,113 @@
 - **WHEN** the attempt is `ready → implementing`
 - **THEN** `along` is `forward`
 
-#### Scenario: Unknown workflow step does not occupy the axis
+### Requirement: Step-skip check scope and applicability
 
-- **GIVEN** `workflow[]` includes `step: reviewing` among known states
-- **WHEN** `along` is classified for `ready → implementing`
-- **THEN** `reviewing` is not an axis slot
-- **AND** the hop is still `forward`
+#### Scenario: Step-skip checks match attempt step
+
+- **GIVEN** a check bound with `{ scope: 'step-skip', step: 'implementing' }`
+- **WHEN** evaluating an attempt with `{ scope: 'step-skip', step: 'implementing', from: 'ready', to: 'verifying' }`
+- **THEN** `checkMatches` returns `true`
+
+#### Scenario: Step-skip checks do not match different step
+
+- **GIVEN** a check bound with `{ scope: 'step-skip', step: 'implementing' }`
+- **WHEN** evaluating an attempt with `{ scope: 'step-skip', step: 'verifying', from: 'implementing', to: 'done' }`
+- **THEN** `checkMatches` returns `false`
+
+### Requirement: Dynamic runtime binding composition and cascaded config resolution
+
+#### Scenario: Target step incorporates schema-declared checks with step-level config
+
+- **GIVEN** a schema workflow step `implementing` declaring a custom check `@security.code-scan` with `config: { severity: 'critical' }`
+- **WHEN** `resolveEffectiveBindings` resolves bindings for target step `implementing`
+- **THEN** a transition binding for `@security.code-scan` is synthesized
+- **AND** the check receives `{ severity: 'critical' }` in `ctx.config`
+
+#### Scenario: Schema disabled check is omitted from matching execution
+
+- **GIVEN** a schema workflow step declaring `impl.linksInScope: { disabled: true }`
+- **WHEN** `resolveEffectiveBindings` resolves bindings for that step
+- **THEN** `impl.linksInScope` is excluded from the active evaluation list
+
+#### Scenario: Bypassed step incorporates schema-declared skipChecks
+
+- **GIVEN** a schema workflow step `implementing` declaring a skip check `@qa.verify-clean`
+- **WHEN** `resolveEffectiveBindings` resolves step-skip bindings for bypassed step `implementing`
+- **THEN** a step-skip binding for `@qa.verify-clean` is synthesized under `scope: 'step-skip'`
+
+#### Scenario: Synthesized bindings preserve restrictive governance
+
+- **GIVEN** a registered check whose governance sets `allowBindingOverride`, `allowConfigOverride`, and `allowDisable` to false
+- **WHEN** `resolveEffectiveBindings` synthesizes a transition or step-skip coordinate for it
+- **THEN** all three effective lock values remain false
+- **AND** no synthesized binding relaxes registry governance
+
+#### Scenario: Cascaded config resolution deep merges check, binding, and step configs
+
+- **GIVEN** a check with `defaultConfig: { timeout: 1000, tags: ['a'] }`
+- **AND** a binding with `config: { timeout: 2000, tags: ['b'] }`
+- **AND** a schema step check with `config: { retries: 3 }`
+- **WHEN** the binding is resolved by `resolveEffectiveBindings` and then executed by the predicate runner (the real end-to-end path, not the runner alone)
+- **THEN** `ctx.config` contains exactly `{ timeout: 2000, tags: ['a', 'b'], retries: 3 }`
+- **AND** no array entry is duplicated (for example `tags` is not `['a', 'b', 'a', 'b']`)
+
+#### Scenario: Disabling a step check leaves its skip check intact
+
+- **GIVEN** an optional step `implementing` whose `checks` declares `impl.linksInScope` with `disabled: true`
+- **AND** whose `skipChecks` declares `impl.linksInScope` enabled
+- **WHEN** a transition enters `implementing` and, separately, a transition bypasses it
+- **THEN** `impl.linksInScope` does not run on the transition entering `implementing`
+- **AND** it runs as a `step-skip` predicate when `implementing` is bypassed
+
+#### Scenario: Disabling a skip check leaves the step check intact
+
+- **GIVEN** an optional step whose `skipChecks` disables a Category C check that its `checks` keeps enabled
+- **WHEN** a transition enters the step
+- **THEN** the check still runs on that transition coordinate
+
+#### Scenario: Step checks ignore non-matching along and from
+
+- **GIVEN** a step `verifying` declaring a check with default `along: forward` and `from: '*'`
+- **AND** another check on the same step declaring `from: 'implementing'`
+- **WHEN** the attempts `done → verifying` (backward), `ready → verifying` (forward shortcut), and `implementing → verifying` are evaluated
+- **THEN** neither check runs on `done → verifying`
+- **AND** only the first check runs on `ready → verifying`
+- **AND** both checks run on `implementing → verifying`
+
+#### Scenario: Overlay of a default-bound check honors the declaration's from and along
+
+- **GIVEN** `verifying.checks` declares `impl.linksInScope` (which has a code-defined binding entering `verifying`) with `config: { strict: true }` and default `along: forward`
+- **WHEN** the attempts `done → verifying` (backward), `ready → verifying` (forward shortcut), and `implementing → verifying` are resolved and executed
+- **THEN** the step-configured binding does not run on `done → verifying`
+- **AND** it runs with `{ strict: true }` on both forward attempts
+
+#### Scenario: Wildcard step-skip row is narrowed per bypassed step
+
+- **GIVEN** a plugin check registered with a default `step-skip` binding for `step: '*'`
+- **AND** `implementing` and `verifying` are optional and each declares that check in `skipChecks` with a different `config`
+- **WHEN** a shortcut `ready → done` bypasses both steps
+- **THEN** each step-skip attempt runs the check once with its own step's configuration
+- **AND** the binding resolved for `implementing` does not match the `verifying` attempt
+
+#### Scenario: Predicate runner executes only resolved bindings
+
+- **GIVEN** a step declaration for a check whose code-defined row is claimed by an overlay that does not match the current attempt
+- **WHEN** the predicate runner evaluates that attempt
+- **THEN** the check does not run through any fallback path
+- **AND** the runner performs no `disabled` filtering or configuration merging of its own
+
+#### Scenario: Synthesized binding uses the executable instance
+
+- **GIVEN** a schema embedding `deps.consistent` on a step where no code-defined binding serves it
+- **WHEN** `resolveEffectiveBindings` synthesizes the binding with the composition registry
+- **THEN** the binding's check is the application implementation that reads real facts
+
+#### Scenario: Derived policy is read from resolved bindings
+
+- **GIVEN** a schema declaration that sets `skippable: true` for a Category C check whose code-defined binding is non-skippable and permits overrides
+- **WHEN** the check fails in `TransitionChange` and in `GetStatus`
+- **THEN** `CheckPredicateFailedError.skippable` is `true`, `--skip-checks <checkId>` is accepted, and the status blocker advertises `--skip-checks <checkId>`
 
 ### Requirement: Archive is an operation not an edge
 
@@ -159,9 +267,18 @@
 
 #### Scenario: Protocol fails fast before other predicates
 
-- **GIVEN** a requested pair absent from `VALID_TRANSITIONS`
-- **WHEN** the attempt is evaluated
+- **GIVEN** a requested pair not in `listWorkflowTransitions(from, schema, approvals)`
+- **AND** other matching predicates that would also fail
+- **WHEN** `TransitionChange` evaluates the attempt (execute mode)
 - **THEN** `protocol.edge` fails first with `INVALID_TRANSITION`
+- **AND** no other predicate's `execute` is called
+- **AND** the thrown error is `InvalidStateTransitionError` with reason `invalid-transition`
+
+#### Scenario: Status collects every predicate for an illegal edge
+
+- **GIVEN** the same illegal pair
+- **WHEN** `GetStatus` evaluates it (projection mode)
+- **THEN** `protocol.edge` and every other matching predicate result are collected
 
 #### Scenario: No routing to pending
 
@@ -171,6 +288,35 @@
 - **THEN** the change remains in `ready`
 - **AND** `approval.spec` fails with `APPROVAL_REQUIRED`
 - **AND** the persisted state is not `pending-spec-approval`
+
+### Requirement: Shared transition candidate evaluator
+
+#### Scenario: Candidate combines target and bypass predicates
+
+- **GIVEN** a protocol-legal shortcut over an optional step
+- **WHEN** the shared candidate evaluator runs
+- **THEN** it evaluates every normal target predicate
+- **AND** it evaluates every effective `step-skip` predicate for every bypassed optional step
+
+#### Scenario: Failed step-skip predicate rejects candidate
+
+- **GIVEN** all normal target predicates pass
+- **AND** one effective `step-skip` predicate fails
+- **WHEN** the shared candidate evaluator returns its verdict
+- **THEN** the candidate is not allowed
+
+#### Scenario: Empty effective skip set passes
+
+- **GIVEN** a bypassed optional step has no effective `step-skip` predicates
+- **WHEN** the shared candidate evaluator runs
+- **THEN** that step contributes no failure and the bypass remains allowed
+
+#### Scenario: Candidate evaluation is pure and shared
+
+- **WHEN** `GetStatus` projects a candidate and `TransitionChange` later attempts it
+- **THEN** both use the same evaluator contract
+- **AND** evaluation itself performs no effects, hooks, mutation, or persistence
+- **AND** `TransitionChange` recalculates the candidate from fresh persisted state
 
 ### Requirement: Shared validity verdict and recovery priority
 
@@ -216,17 +362,35 @@
 - **WHEN** inspecting the binding's `skippable` property
 - **THEN** `skippable` is true
 
-#### Scenario: Core workflow and protocol check bindings are non-skippable
+#### Scenario: workflow.tasksEmpty step-skip binding is non-skippable
 
-- **GIVEN** step bindings for `protocol.edge`, `workflow.requires`, and `workflow.taskCompletion`
-- **WHEN** inspecting their `skippable` properties
-- **THEN** all report `skippable: false`
+- **GIVEN** the standard step-skip binding for `workflow.tasksEmpty` on step `implementing`
+- **WHEN** inspecting the binding's `skippable` property
+- **THEN** `skippable` is false
 
-#### Scenario: Core protocol invariants enforce allowDisable false
+#### Scenario: impl.filesResolved step-skip binding is non-skippable
 
-- **GIVEN** built-in check bindings for `protocol.edge`, `verification.current`, `archive.archivable`, and `schema.nameMatch`
-- **WHEN** inspecting their `allowDisable` properties
-- **THEN** all report `allowDisable: false`
+- **GIVEN** the standard step-skip binding for `impl.filesResolved` on step `implementing`
+- **WHEN** inspecting the binding's `skippable` property
+- **THEN** `skippable` is false
+
+#### Scenario: Category C checks can be disabled or skippable per schema binding
+
+- **GIVEN** built-in checks `impl.linksInScope` and `impl.filesResolved`
+- **WHEN** inspecting their registered governance locks in `TRANSITION_BINDING_SPECS`
+- **THEN** both declare `allowBindingOverride: true` and `allowDisable: true`
+
+#### Scenario: Built-in binding specs declare governance explicitly
+
+- **WHEN** every entry of `TRANSITION_BINDING_SPECS`, `ARCHIVE_BINDING_SPECS`, and the built-in step-skip binding specs is inspected
+- **THEN** each declares `allowBindingOverride` and `allowDisable` explicitly with its category's values
+- **AND** Category A and B bindings declare both as `false`
+
+#### Scenario: Omitted binding governance inherits check-level governance
+
+- **GIVEN** a plugin check registered with `allowBindingOverride: false` whose default binding omits `allowBindingOverride`
+- **WHEN** the binding is constructed
+- **THEN** the binding's effective `allowBindingOverride` is `false`, not a permissive default
 
 ### Requirement: Projections
 

@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import { ResolveChangeSchema } from '../../../src/application/services/resolve-change-schema.js'
 import { Change } from '../../../src/domain/entities/change.js'
 import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
 import { ArtifactFile } from '../../../src/domain/value-objects/artifact-file.js'
@@ -7,6 +8,7 @@ import { ReconcileChangeValidity } from '../../../src/application/use-cases/reco
 import { ValidityFingerprintService } from '../../../src/application/services/validity-fingerprint-service.js'
 import { type RefreshImplementationTracking } from '../../../src/application/use-cases/refresh-implementation-tracking.js'
 import { type ChangeRepository } from '../../../src/application/ports/change-repository.js'
+import { type SchemaProvider } from '../../../src/application/ports/schema-provider.js'
 import { type Schema } from '../../../src/domain/value-objects/schema.js'
 import { NodeContentHasher } from '../../../src/infrastructure/node/content-hasher.js'
 import { NodeBinaryContentHasher } from '../../../src/infrastructure/node/binary-content-hasher.js'
@@ -19,6 +21,7 @@ import {
   makeSchemaProvider,
   makeSchema,
   makeArtifactType,
+  makeWorkflowStep,
   makeSpecApprovalFingerprint,
   testActor,
 } from './helpers.js'
@@ -105,11 +108,15 @@ function makeChangeWithDAG(name: string): Change {
 }
 
 describe('InvalidateChange', () => {
-  const schema = makeSchema([
-    makeArtifactType('proposal'),
-    makeArtifactType('design', { requires: ['proposal'] }),
-    makeArtifactType('tasks', { requires: ['design'] }),
-  ])
+  const schema = makeSchema(
+    [
+      makeArtifactType('proposal'),
+      makeArtifactType('design', { requires: ['proposal'] }),
+      makeArtifactType('tasks', { requires: ['design'] }),
+    ],
+    [],
+    { name: '@specd/schema-std' },
+  )
 
   function createInvalidate(
     repo: ChangeRepository,
@@ -118,11 +125,12 @@ describe('InvalidateChange', () => {
       spec: false,
       signoff: false,
     },
+    providedSchemaProvider?: SchemaProvider,
   ): InvalidateChange {
-    const schemaProvider = makeSchemaProvider(activeSchema)
+    const schemaProvider = providedSchemaProvider ?? makeSchemaProvider(activeSchema)
     const reconcile = new ReconcileChangeValidity({
       changes: repo,
-      schemaProvider,
+      resolveChangeSchema: new ResolveChangeSchema(schemaProvider),
       actor: makeActorResolver(),
       refreshImplementationTracking: {
         execute: async () => {
@@ -137,7 +145,14 @@ describe('InvalidateChange', () => {
       }),
       approvals,
     })
-    return new InvalidateChange(repo, makeActorResolver(), schemaProvider, reconcile)
+    return new InvalidateChange(
+      repo,
+      makeActorResolver(),
+      schemaProvider,
+      reconcile,
+      undefined,
+      approvals,
+    )
   }
 
   it('throws ChangeNotFoundError when change does not exist', async () => {
@@ -148,6 +163,47 @@ describe('InvalidateChange', () => {
   })
 
   describe('target validation', () => {
+    it('resolves invalidation targets from the change sovereign schema', async () => {
+      const change = makeChangeWithDAG('c1')
+      const repo = makeChangeRepository([change])
+      const get = vi.fn(async (ref?: string) => {
+        if (ref !== '@specd/schema-std') throw new Error('workspace default must not be used')
+        return schema
+      })
+      const uc = createInvalidate(repo, schema, { spec: false, signoff: false }, {
+        get,
+      } as SchemaProvider)
+
+      await uc.execute({
+        name: 'c1',
+        reason: 'sovereign target',
+        targets: [{ artifactId: 'design' }],
+        policyOverride: { artifacts: 'surgical' },
+      })
+
+      expect(get).toHaveBeenCalledWith('@specd/schema-std')
+      expect(get.mock.calls.every(([ref]) => ref === '@specd/schema-std')).toBe(true)
+    })
+
+    it('does not persist invalidation when sovereign schema resolution fails', async () => {
+      const change = makeChangeWithDAG('c1')
+      const repo = makeChangeRepository([change])
+      const historyLength = change.history.length
+      const failure = new Error('sovereign schema unavailable')
+      const provider = { get: vi.fn(async () => Promise.reject(failure)) } as SchemaProvider
+      const uc = createInvalidate(repo, schema, { spec: false, signoff: false }, provider)
+
+      await expect(
+        uc.execute({
+          name: 'c1',
+          reason: 'must not persist',
+          targets: [{ artifactId: 'design' }],
+          policyOverride: { artifacts: 'surgical' },
+        }),
+      ).rejects.toBe(failure)
+      expect(repo.store.get('c1')?.history).toHaveLength(historyLength)
+    })
+
     it('rejects targets with none policy', async () => {
       const change = makeChangeWithDAG('c1')
       const repo = makeChangeRepository([change])
@@ -388,6 +444,54 @@ describe('InvalidateChange', () => {
     })
   })
 
+  describe('recovery next action follows lifecycle guidance', () => {
+    const withVerifying = (disabled: boolean) =>
+      makeSchema(
+        [
+          makeArtifactType('proposal'),
+          makeArtifactType('design', { requires: ['proposal'] }),
+          makeArtifactType('tasks', { requires: ['design'] }),
+        ],
+        [makeWorkflowStep('verifying', { disabled })],
+        { name: '@specd/schema-std' },
+      )
+
+    const forcedSignoffWithdrawal = async (activeSchema: Schema) => {
+      const change = makeChangeWithDAG('c1')
+      change.transition('verifying', testActor)
+      change.transition('done', testActor)
+      change.transition('archivable', testActor)
+      change.recordSignoff('Ship it', {}, testActor)
+      return createInvalidate(makeChangeRepository([change]), activeSchema, {
+        spec: false,
+        signoff: true,
+      }).execute({
+        name: change.name,
+        reason: 'withdraw sign-off',
+        targets: [{ artifactId: 'design' }],
+        policyOverride: { artifacts: 'surgical', workflow: 'preserve' },
+        force: true,
+      })
+    }
+
+    it('never recommends verification when verifying is disabled', async () => {
+      const result = await forcedSignoffWithdrawal(withVerifying(true))
+
+      expect(result.automaticReturn).toMatchObject({ to: 'done' })
+      // The invalidated design artifact is pending review, so guidance sends the user to design.
+      expect(result.nextAction.command).toBe('/specd-design')
+      expect(result.nextAction.command).not.toBe('/specd-verify')
+      expect(result.nextAction.command).not.toContain('verification start')
+      expect(result.nextAction.reason).toContain('returned the change to done')
+    })
+
+    it('still routes to verification when verifying is enabled', async () => {
+      const result = await forcedSignoffWithdrawal(withVerifying(false))
+
+      expect(result.nextAction.command).toBe('/specd-verify')
+    })
+  })
+
   describe('policy none', () => {
     it('reopens nothing and returns an empty affected set', async () => {
       const change = makeChangeWithDAG('c1')
@@ -451,13 +555,17 @@ describe('InvalidateChange', () => {
     })
 
     it('reports downstream affected artifacts in schema topological order', async () => {
-      const schemaWithBranches = makeSchema([
-        makeArtifactType('proposal'),
-        makeArtifactType('design', { requires: ['proposal'] }),
-        makeArtifactType('verify', { requires: ['proposal'] }),
-        makeArtifactType('tasks', { requires: ['design'] }),
-        makeArtifactType('notes', { requires: ['verify'] }),
-      ])
+      const schemaWithBranches = makeSchema(
+        [
+          makeArtifactType('proposal'),
+          makeArtifactType('design', { requires: ['proposal'] }),
+          makeArtifactType('verify', { requires: ['proposal'] }),
+          makeArtifactType('tasks', { requires: ['design'] }),
+          makeArtifactType('notes', { requires: ['verify'] }),
+        ],
+        [],
+        { name: '@specd/schema-std' },
+      )
       const at = new Date('2024-01-15T10:00:00.000Z')
       const change = new Change({
         name: 'c1',

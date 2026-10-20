@@ -7,6 +7,7 @@ import {
   InvalidPluginNameError,
   UnknownCheckError,
 } from '../../../src/domain/errors/check-registry-errors.js'
+import { InvalidInputError } from '../../../src/domain/errors/invalid-input-error.js'
 import type { CustomCheckDefinition } from '../../../src/domain/services/transition-checks.js'
 
 describe('CheckRegistry', () => {
@@ -60,10 +61,21 @@ describe('CheckRegistry', () => {
     }
 
     expect(() => registry.register('', checkDef)).toThrow(InvalidPluginNameError)
-    expect(() => registry.register('123plugin', checkDef)).toThrow(InvalidPluginNameError)
-    expect(() => registry.register('MyPlugin', checkDef)).toThrow(InvalidPluginNameError)
     expect(() => registry.register('plugin@invalid', checkDef)).toThrow(InvalidPluginNameError)
   })
+
+  it.each(['MyPlugin', '123plugin', 'my_plugin'])(
+    'accepts the complete documented plugin namespace grammar: %s',
+    (pluginName) => {
+      const registry = new CheckRegistry()
+      const id = registry.register(pluginName, {
+        id: 'check',
+        label: 'Check',
+        execute: async () => ({ id: 'check', label: 'Check', kind: 'predicate', outcome: 'pass' }),
+      })
+      expect(id).toBe(`@${pluginName}.check`)
+    },
+  )
 
   it('rejects effect check registrations for plugins with InvalidCheckKindError', () => {
     const registry = new CheckRegistry()
@@ -221,16 +233,11 @@ describe('CheckRegistry', () => {
       '',
       ' ',
       '  ',
-      'Plugin',
-      'PLUGIN',
       '../escape',
       'plugin/sub',
       'plugin.name',
       'plugin:name',
       '@scope',
-      '__proto__',
-      '-leading-dash',
-      '9leadingnumber',
       'plugin with spaces',
       'plugin$dollar',
     ]
@@ -346,5 +353,147 @@ describe('CheckRegistry', () => {
     const bindings = registry.getBindings('@compliance.audit')
     expect(bindings).toHaveLength(1)
     expect(bindings[0]?.allowDisable).toBe(false)
+  })
+
+  it('rejects duplicate bindings for scope step-skip on the same step', () => {
+    const registry = new CheckRegistry()
+    const checkDef: CustomCheckDefinition = {
+      id: 'task-gate',
+      label: 'Task Gate',
+      execute: async () => ({ id: 'c', label: 'C', kind: 'predicate', outcome: 'pass' }),
+    }
+
+    registry.register('workflow', checkDef, [
+      {
+        scope: 'step-skip',
+        step: 'implementing',
+      },
+    ])
+
+    expect(() =>
+      registry.register('workflow', { ...checkDef, id: 'task-gate-2' }, [
+        {
+          scope: 'step-skip',
+          step: 'implementing',
+        },
+      ]),
+    ).not.toThrow() // Different check id is allowed to bind to same coordinate unless it's the SAME check id
+
+    // Same check id duplicate coordinate binding
+    expect(() =>
+      registry.register('workflow-dup', checkDef, [
+        {
+          scope: 'step-skip',
+          step: 'implementing',
+        },
+        {
+          scope: 'step-skip',
+          step: 'implementing',
+        },
+      ]),
+    ).toThrow(DuplicateCheckBindingError)
+  })
+
+  it('allows registering step-skip bindings on different steps for the same check', () => {
+    const registry = new CheckRegistry()
+    const checkDef: CustomCheckDefinition = {
+      id: 'validator',
+      label: 'Validator',
+      execute: async () => ({ id: 'c', label: 'C', kind: 'predicate', outcome: 'pass' }),
+    }
+
+    expect(() =>
+      registry.register('workflow', checkDef, [
+        {
+          scope: 'step-skip',
+          step: 'implementing',
+        },
+        {
+          scope: 'step-skip',
+          step: 'verifying',
+        },
+      ]),
+    ).not.toThrow()
+
+    const bindings = registry.getBindings('@workflow.validator')
+    expect(bindings).toHaveLength(2)
+  })
+  it('lists the sixteen built-ins plus registered plugin checks and reports has() accurately', () => {
+    const registry = new CheckRegistry()
+    expect(registry.list()).toHaveLength(16)
+    const definition = (id: string) =>
+      ({
+        id,
+        label: id,
+        kind: 'predicate',
+        execute: () => ({ ok: true }),
+      }) as unknown as CustomCheckDefinition
+    registry.register('p', definition('one'))
+    registry.register('p', definition('two'))
+
+    expect(registry.list()).toHaveLength(18)
+    expect(registry.has('@p.one')).toBe(true)
+    expect(registry.has('@p.two')).toBe(true)
+    expect(registry.has('@p.three')).toBe(false)
+    expect(registry.has('impl.linksInScope')).toBe(true)
+  })
+
+  it('sets allowSchemaEmbedding false for Category A/B and true for Category C built-ins', () => {
+    const registry = new CheckRegistry()
+    for (const id of ['protocol.edge', 'hook.pre', 'workflow.requires', 'approval.spec']) {
+      expect(registry.getGovernance(id)?.allowSchemaEmbedding).toBe(false)
+    }
+    for (const id of ['impl.linksInScope', 'spec.overlap', 'deps.consistent']) {
+      expect(registry.getGovernance(id)?.allowSchemaEmbedding).toBe(true)
+    }
+  })
+
+  it('locks every governance flag on the Category B workflow.tasksEmpty built-in', () => {
+    const governance = new CheckRegistry().getGovernance('workflow.tasksEmpty')
+
+    expect(governance).toMatchObject({
+      allowSchemaEmbedding: false,
+      allowBindingOverride: false,
+      allowConfigOverride: false,
+      allowDisable: false,
+    })
+  })
+
+  it('defaults plugin allowSchemaEmbedding from the presence of default bindings', () => {
+    const registry = new CheckRegistry()
+    const check: CustomCheckDefinition = {
+      id: 'free',
+      label: 'free',
+      kind: 'predicate',
+      execute: () => ({ ok: true }),
+    } as unknown as CustomCheckDefinition
+    registry.register('p', check)
+    registry.register('p', { ...check, id: 'bound' }, [{ scope: 'archive' }])
+    registry.register('p', { ...check, id: 'explicit' }, [{ scope: 'archive' }], {
+      allowSchemaEmbedding: true,
+    })
+    expect(registry.getGovernance('@p.free')?.allowSchemaEmbedding).toBe(true)
+    expect(registry.getGovernance('@p.bound')?.allowSchemaEmbedding).toBe(false)
+    expect(registry.getGovernance('@p.explicit')?.allowSchemaEmbedding).toBe(true)
+  })
+
+  it('withExecutableBuiltins replaces built-ins and rejects non-built-ins or kind mismatches', () => {
+    const registry = new CheckRegistry()
+    const original = registry.get('impl.linksInScope')!
+    const instance = { ...original, label: 'executable' }
+    const copy = registry.withExecutableBuiltins({ 'impl.linksInScope': instance })
+    expect(copy.get('impl.linksInScope')).toBe(instance)
+    expect(registry.get('impl.linksInScope')).toBe(original)
+    expect(copy.list()).toHaveLength(registry.list().length)
+    expect(copy.bindings()).toHaveLength(registry.bindings().length)
+    expect(copy.getGovernance('impl.linksInScope')).toEqual(
+      registry.getGovernance('impl.linksInScope'),
+    )
+    expect(() => registry.withExecutableBuiltins({ '@p.x': instance })).toThrow(InvalidInputError)
+    expect(() =>
+      registry.withExecutableBuiltins({
+        'impl.linksInScope': { ...original, kind: 'effect' } as never,
+      }),
+    ).toThrow(InvalidInputError)
   })
 })

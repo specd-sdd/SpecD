@@ -1,8 +1,9 @@
 import { describe, it, expect, vi } from 'vitest'
+import { ResolveChangeSchema } from '../../../src/application/services/resolve-change-schema.js'
 import { makeSpec } from '../../helpers/make-spec.js'
 import { ChangeNotFoundError } from '../../../src/application/errors/change-not-found-error.js'
 import { SchemaNotFoundError } from '../../../src/application/errors/schema-not-found-error.js'
-import { SchemaMismatchError } from '../../../src/application/errors/schema-mismatch-error.js'
+import { SchemaProviderIdentityMismatchError } from '../../../src/application/errors/schema-provider-identity-mismatch-error.js'
 import { HookFailedError } from '../../../src/domain/errors/hook-failed-error.js'
 import { InvalidStateTransitionError } from '../../../src/domain/errors/invalid-state-transition-error.js'
 import { ReconciledOperationBlockedError } from '../../../src/application/errors/reconciled-operation-blocked-error.js'
@@ -65,6 +66,8 @@ import {
   makeContentHasher,
   newArchiveChange,
   testActor,
+  makeWorkflowStep,
+  makeRealReconcile,
 } from './helpers.js'
 
 function makeMaterializeMetadataMock(
@@ -308,8 +311,8 @@ describe('ArchiveChange', () => {
     })
   })
 
-  describe('given the active schema name differs from the change schema name', () => {
-    it('throws SchemaMismatchError without listing peer changes', async () => {
+  describe('given the provider returns a schema inconsistent with the recorded schema request', () => {
+    it('rejects the sovereign lookup integrity failure without listing peer changes', async () => {
       const change = makeArchivableChange('my-change', { schemaName: 'schema-a' })
       const changeRepo = makeChangeRepository([change])
       const list = vi.spyOn(changeRepo, 'list')
@@ -323,8 +326,122 @@ describe('ArchiveChange', () => {
         makeSchemaProvider(makeSchema({ name: 'schema-b' })),
         makeMaterializeMetadata(),
       )
-      await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(SchemaMismatchError)
+      await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(
+        SchemaProviderIdentityMismatchError,
+      )
       expect(list).not.toHaveBeenCalled()
+    })
+
+    it('uses the recorded sovereign schema on a successful archive', async () => {
+      const change = makeArchivableChange('my-change', { schemaName: 'custom-workflow' })
+      const sovereign = makeSchema({ name: 'custom-workflow' })
+      const workspaceDefault = makeSchema({ name: 'workspace-default' })
+      const get = vi.fn(async (name?: string) =>
+        name === 'custom-workflow' ? sovereign : workspaceDefault,
+      )
+      const uc = newArchiveChange(
+        makeChangeRepository([change]),
+        makeListWorkspaces(new Map()),
+        makeArchiveRepository(),
+        makeRunStepHooks(),
+        makeActorResolver(),
+        makeParsers(),
+        { get } as never,
+        makeMaterializeMetadata(),
+      )
+
+      await expect(uc.execute({ name: 'my-change' })).resolves.toMatchObject({
+        archivedChange: { name: 'my-change' },
+      })
+      expect(get).toHaveBeenCalledWith('custom-workflow')
+    })
+  })
+
+  describe('verification with the real validity reconciler', () => {
+    const disabledVerifying = makeSchema({
+      workflow: [makeWorkflowStep('verifying', { disabled: true })],
+    })
+    const enabledVerifying = makeSchema({ workflow: [makeWorkflowStep('verifying')] })
+
+    const build = (change: Change, schema: ReturnType<typeof makeSchema>) => {
+      const repo = makeChangeRepository([change])
+      const provider = makeSchemaProvider(schema)
+      return newArchiveChange(
+        repo,
+        makeListWorkspaces(new Map()),
+        makeArchiveRepository(),
+        makeRunStepHooks(),
+        makeActorResolver(),
+        makeParsers(),
+        provider,
+        makeMaterializeMetadata(),
+        new Map(),
+        [],
+        process.cwd(),
+        undefined,
+        undefined,
+        makeRealReconcile(repo, provider),
+      )
+    }
+
+    it('archives without any verification evidence when verifying is disabled', async () => {
+      const change = makeArchivableChange('no-verify')
+      const result = await build(change, disabledVerifying).execute({ name: 'no-verify' })
+      expect(result.archivedChange).toBeDefined()
+    })
+
+    it('rejects archive when verifying is enabled and no evidence exists', async () => {
+      const change = makeArchivableChange('needs-verify')
+      const error = await build(change, enabledVerifying)
+        .execute({ name: 'needs-verify' })
+        .catch((e: unknown) => e)
+      expect(error).toBeInstanceOf(ArchiveImplementationStateError)
+      expect(String(error)).toContain('Completed verification is required')
+    })
+
+    it('rejects archive when verifying is enabled and the completed evidence is stale', async () => {
+      const change = makeArchivableChange('stale-verify')
+      // Evidence recorded against a file that no longer matches the live fingerprint.
+      change.startVerification(
+        {
+          version: 1,
+          artifacts: { version: 1, algorithm: 'artifact-pre-hash-v1', files: {} },
+          implementation: {
+            version: 1,
+            hashAlgorithm: 'sha256',
+            textNormalization: 'text-v1',
+            binaryNormalization: 'bytes-v1',
+            files: { 'src/gone.ts': 'sha256:' + 'f'.repeat(64) },
+          },
+        } as never,
+        testActor,
+      )
+      change.completeVerification(testActor)
+      const archive = makeArchiveRepository()
+      const archiveSpy = vi.spyOn(archive, 'archive')
+      const repo = makeChangeRepository([change])
+      const provider = makeSchemaProvider(enabledVerifying)
+      const uc = newArchiveChange(
+        repo,
+        makeListWorkspaces(new Map()),
+        archive,
+        makeRunStepHooks(),
+        makeActorResolver(),
+        makeParsers(),
+        provider,
+        makeMaterializeMetadata(),
+        new Map(),
+        [],
+        process.cwd(),
+        undefined,
+        undefined,
+        makeRealReconcile(repo, provider),
+      )
+
+      const error = await uc.execute({ name: 'stale-verify' }).catch((e: unknown) => e)
+      expect(error).toBeInstanceOf(ArchiveImplementationStateError)
+      expect(String(error)).toContain('Verification evidence is stale')
+      expect(archiveSpy).not.toHaveBeenCalled()
     })
   })
 
@@ -486,6 +603,72 @@ describe('ArchiveChange', () => {
         dependsOn: ['core:storage'],
         implementation: [],
       })
+    })
+
+    it('materializes metadata with the change schema when the workspace default differs', async () => {
+      const artifactType = makeArtifactType('spec', { delta: false, scope: 'spec' })
+      const sovereign = makeSchema({ name: 'custom-workflow', artifacts: [artifactType] })
+      const workspaceDefault = makeSchema({ name: 'workspace-default', artifacts: [artifactType] })
+      const get = vi.fn(async (name?: string) =>
+        name === 'custom-workflow' ? sovereign : workspaceDefault,
+      )
+      const specRepo = makeSpecRepository({
+        specs: [makeSpec({ workspace: 'default', name: 'auth/oauth', filenames: ['spec.md'] })],
+        artifacts: { 'auth/oauth/spec.md': '# Spec' },
+      })
+      const materializeMetadata = makeMaterializeMetadataMock({
+        title: 'OAuth',
+        description: 'desc',
+        contentHashes: { 'spec.md': 'sha256:' + 'a'.repeat(64) },
+      })
+      const change = makeArchivableChange('my-change', {
+        specIds: ['default:auth/oauth'],
+        schemaName: 'custom-workflow',
+      })
+      change.setArtifact(
+        new ChangeArtifact({
+          type: 'spec',
+          files: new Map([
+            [
+              'default:auth/oauth',
+              new ArtifactFile({
+                key: 'default:auth/oauth',
+                filename: 'specs/default/auth/oauth/spec.md',
+                status: 'complete',
+                validatedHash: 'abc123',
+              }),
+            ],
+          ]),
+        }),
+      )
+      const changeRepo = Object.assign(makeChangeRepository([change]), {
+        async artifact() {
+          return new SpecArtifact('spec.md', '# Spec')
+        },
+      })
+      const uc = newArchiveChange(
+        changeRepo,
+        makeListWorkspaces(new Map([['default', specRepo]])),
+        makeArchiveRepository(),
+        makeRunStepHooks(),
+        makeActorResolver(),
+        makeParsers(),
+        { get } as never,
+        materializeMetadata,
+      )
+
+      await uc.execute({ name: 'my-change' })
+
+      const calls = (materializeMetadata.execute as ReturnType<typeof vi.fn>).mock.calls
+      expect(calls.length).toBeGreaterThan(0)
+      for (const call of calls) {
+        expect(call[0]).toMatchObject({
+          specId: 'default:auth/oauth',
+          policy: 'force',
+          schemaName: 'custom-workflow',
+        })
+      }
+      expect(get).not.toHaveBeenCalledWith('workspace-default')
     })
 
     it('No-lock spec resolves initial dependsOn through resolveInitialPersistedDependsOn', async () => {
@@ -1409,7 +1592,11 @@ describe('ArchiveChange', () => {
       expect((materializeMetadata.execute as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(1)
       const materializeInput = (materializeMetadata.execute as ReturnType<typeof vi.fn>).mock
         .calls[0]?.[0]
-      expect(materializeInput).toMatchObject({ specId: 'default:auth/oauth', policy: 'force' })
+      expect(materializeInput).toMatchObject({
+        specId: 'default:auth/oauth',
+        policy: 'force',
+        schemaName: schema.name(),
+      })
       expect({
         title: 'OAuth',
         description: 'desc',
@@ -3999,7 +4186,7 @@ describe('ArchiveChange', () => {
       const makeReconciler = (specGate: boolean) =>
         new ReconcileChangeValidity({
           changes: repo,
-          schemaProvider,
+          resolveChangeSchema: new ResolveChangeSchema(schemaProvider),
           actor: makeActorResolver(),
           refreshImplementationTracking: {
             execute: async () => ({ implementationTracking: null as never }),

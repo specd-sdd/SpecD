@@ -115,6 +115,8 @@ SpecD enforces two tiers of governance locks to ensure that project schemas cann
 
 ### 4.3 Cascading Configuration Merge
 
+For an optional workflow step, Core composes registry `step-skip` bindings with the step's inline `skipChecks`. An empty effective set passes vacuously, so bypass is unconditional by default. A non-empty set makes bypass conditional on every predicate passing. Failure does not disable the step: Core recommends entering it. Disabled steps are different—they are removed from the active pipeline and cannot declare skip checks. Lifecycle skills consume Core's `nextAction` and must not recreate this decision from tasks or YAML.
+
 Configuration cascades across three layers, deeply merging nested configuration objects via `deepMergeConfig`:
 
 ```

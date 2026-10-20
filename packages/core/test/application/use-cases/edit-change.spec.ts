@@ -1,6 +1,8 @@
 import { describe, it, expect, vi } from 'vitest'
+import { ResolveChangeSchema } from '../../../src/application/services/resolve-change-schema.js'
 import { makeSpec } from '../../helpers/make-spec.js'
 import { EditChange } from '../../../src/application/use-cases/edit-change.js'
+import { type RefreshImplementationTracking } from '../../../src/application/use-cases/refresh-implementation-tracking.js'
 import { ReconcileChangeValidity } from '../../../src/application/use-cases/reconcile-change-validity.js'
 import { ValidityFingerprintService } from '../../../src/application/services/validity-fingerprint-service.js'
 import { NodeBinaryContentHasher } from '../../../src/infrastructure/node/binary-content-hasher.js'
@@ -21,6 +23,7 @@ import {
   makeSpecApprovalFingerprint,
 } from './helpers.js'
 import { type SpecRepository } from '../../../src/application/ports/spec-repository.js'
+import { type SchemaProvider } from '../../../src/application/ports/schema-provider.js'
 import { Spec } from '../../../src/domain/entities/spec.js'
 import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
 
@@ -326,7 +329,7 @@ describe('EditChange', () => {
       const schemaProvider = makeSchemaProvider(makeSchema())
       const reconcile = new ReconcileChangeValidity({
         changes: repo,
-        schemaProvider,
+        resolveChangeSchema: new ResolveChangeSchema(schemaProvider),
         actor: makeActorResolver(),
         refreshImplementationTracking: {
           execute: async () => ({ implementationTracking: null as never }),
@@ -428,10 +431,115 @@ describe('EditChange', () => {
         result.change.history.filter((event) => event.type === 'approval-invalidated'),
       ).toHaveLength(beforeEvents)
     })
+
+    it('keeps the persisted scope atomic when reconciliation rejects', async () => {
+      const change = makeChange('atomic', { specIds: ['auth/login'] })
+      const repo = makeChangeRepository([change])
+      const failure = new Error('reconciliation failed')
+      const callbackReached = vi.fn()
+      const reconcile = {
+        mutate: vi.fn(
+          async (
+            _input: unknown,
+            operation: (
+              context: import('../../../src/application/use-cases/reconcile-change-validity.js').ReconciledMutationContext,
+            ) => Promise<unknown>,
+          ) => {
+            const fresh = makeChange('atomic', { specIds: [...change.specIds] })
+            return operation({
+              change: fresh,
+              before: {} as never,
+              fingerprint: null,
+              reconcileAfter: async () => {
+                callbackReached()
+                throw failure
+              },
+            })
+          },
+        ),
+      }
+      const uc = new EditChange(
+        repo,
+        makeListWorkspaces(),
+        makeActorResolver(),
+        makeSchemaProvider(makeSchema()),
+        undefined,
+        reconcile as never,
+      )
+
+      await expect(uc.execute({ name: 'atomic', addSpecIds: ['auth/logout'] })).rejects.toBe(
+        failure,
+      )
+      expect(reconcile.mutate).toHaveBeenCalledOnce()
+      expect(callbackReached).toHaveBeenCalledOnce()
+      const persisted = await repo.get('atomic')
+      expect(persisted?.specIds).toEqual(['auth/login'])
+      expect(persisted?.history).toEqual(change.history)
+      expect(persisted?.artifacts).toEqual(change.artifacts)
+      expect(persisted?.specApproval).toEqual(change.specApproval)
+      expect(persisted?.signoff).toEqual(change.signoff)
+      expect(persisted?.verification).toEqual(change.verification)
+    })
   })
 
   describe('schema compatibility guardrail', () => {
-    it('allows uninitialized spec fallback when global schema matches change', async () => {
+    it('uses the change schema for compatibility and fresh mutation DAG synchronization', async () => {
+      const schema = makeSchema({ name: 'custom-workflow' })
+      const change = makeChange('c', {
+        specIds: ['auth/login'],
+        schemaName: 'custom-workflow',
+      })
+      const repo = makeChangeRepository([change])
+      const specs = new Map([
+        [
+          'default',
+          makeSpecRepository({
+            specs: [
+              makeSpec({ workspace: 'default', name: 'auth/logout', filenames: ['spec.md'] }),
+            ],
+          }),
+        ],
+      ])
+      const get = vi.fn(async (ref?: string) => {
+        if (ref !== 'custom-workflow') throw new Error('workspace default must not be used')
+        return schema
+      })
+      const uc = new EditChange(
+        repo,
+        makeListWorkspaces(specs),
+        makeActorResolver(),
+        { get } as SchemaProvider,
+        undefined,
+        makeObservingReconcile(repo),
+      )
+
+      const result = await uc.execute({ name: 'c', addSpecIds: ['default:auth/logout'] })
+
+      expect(result.change.specIds).toContain('default:auth/logout')
+      expect(get).toHaveBeenCalledOnce()
+      expect(get).toHaveBeenCalledWith('custom-workflow')
+    })
+
+    it('leaves scope unchanged when sovereign schema resolution fails', async () => {
+      const change = makeChange('c', { specIds: ['auth/login'], schemaName: 'missing-workflow' })
+      const repo = makeChangeRepository([change])
+      const failure = new Error('sovereign schema unavailable')
+      const uc = new EditChange(
+        repo,
+        makeListWorkspaces(new Map()),
+        makeActorResolver(),
+        { get: vi.fn(async () => Promise.reject(failure)) } as SchemaProvider,
+        undefined,
+        makeObservingReconcile(repo),
+      )
+
+      await expect(uc.execute({ name: 'c', addSpecIds: ['default:auth/logout'] })).rejects.toBe(
+        failure,
+      )
+      expect(repo.store.get('c')?.specIds).toEqual(['auth/login'])
+    })
+
+    it('allows uninitialized spec fallback when the change schema is resolved by its recorded name', async () => {
       const change = makeChange('c', { specIds: ['auth/login'], schemaName: 'test-schema' })
       const repo = makeChangeRepository([change])
       const specs = new Map([
@@ -452,6 +560,52 @@ describe('EditChange', () => {
       })
 
       expect(result.change.specIds).toContain('default:auth/logout')
+    })
+
+    it('resolves the actor once and shares it between the edit and reconciliation', async () => {
+      const change = makeChange('c', { specIds: ['auth/login'], schemaName: 'test-schema' })
+      const repo = makeChangeRepository([change])
+      const specs = new Map([
+        [
+          'default',
+          makeSpecRepository({
+            specs: [
+              makeSpec({ workspace: 'default', name: 'auth/logout', filenames: ['spec.md'] }),
+            ],
+          }),
+        ],
+      ])
+      const schema = makeSchema({ name: 'test-schema' })
+      const schemaProvider = makeSchemaProvider(schema)
+      const identity = vi.fn(async () => testActor)
+      const actor = { identity }
+      const reconcile = new ReconcileChangeValidity({
+        changes: repo,
+        resolveChangeSchema: new ResolveChangeSchema(schemaProvider),
+        actor,
+        refreshImplementationTracking: {
+          execute: async () => undefined,
+        } as unknown as RefreshImplementationTracking,
+        fingerprint: new ValidityFingerprintService({
+          changes: repo,
+          hasher: new NodeContentHasher(),
+          binaryHasher: new NodeBinaryContentHasher(),
+          schemaProvider,
+        }),
+        approvals: { spec: false, signoff: false },
+      })
+      const uc = new EditChange(
+        repo,
+        makeListWorkspaces(specs),
+        actor,
+        schemaProvider,
+        undefined,
+        reconcile,
+      )
+
+      await uc.execute({ name: 'c', addSpecIds: ['default:auth/logout'] })
+
+      expect(identity).toHaveBeenCalledTimes(1)
     })
 
     it('succeeds when adding a spec with identical schema', async () => {

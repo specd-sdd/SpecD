@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
+import { ResolveChangeSchema } from '../../src/application/services/resolve-change-schema.js'
 import { type ActorResolver } from '../../src/application/ports/actor-resolver.js'
 import { type PrivacyConfig, type SpecdConfig } from '../../src/application/specd-config.js'
 import { ValidityFingerprintService } from '../../src/application/services/validity-fingerprint-service.js'
@@ -199,7 +200,7 @@ describe('privacy-decorated approval and verification identities', () => {
       })
       const approvalReconcile = createReconcileChangeValidity({
         changes: approvalRepo,
-        schemaProvider,
+        resolveChangeSchema: new ResolveChangeSchema(schemaProvider),
         actor,
         refreshImplementationTracking: refresh,
         fingerprint: approvalFingerprint,
@@ -228,7 +229,7 @@ describe('privacy-decorated approval and verification identities', () => {
       })
       const verifyReconcile = createReconcileChangeValidity({
         changes: verifyRepo,
-        schemaProvider,
+        resolveChangeSchema: new ResolveChangeSchema(schemaProvider),
         actor,
         refreshImplementationTracking: refresh,
         fingerprint: verifyFingerprint,
@@ -281,7 +282,7 @@ describe('privacy-decorated approval and verification identities', () => {
       })
       const signoffReconcile = createReconcileChangeValidity({
         changes: signoffRepo,
-        schemaProvider,
+        resolveChangeSchema: new ResolveChangeSchema(schemaProvider),
         actor,
         refreshImplementationTracking: refresh,
         fingerprint: signoffFingerprint,
@@ -319,7 +320,7 @@ describe('privacy-decorated approval and verification identities', () => {
       })
       const invalidateReconcile = createReconcileChangeValidity({
         changes: invalidateRepo,
-        schemaProvider,
+        resolveChangeSchema: new ResolveChangeSchema(schemaProvider),
         actor,
         refreshImplementationTracking: refresh,
         fingerprint: invalidateFingerprint,
@@ -329,6 +330,7 @@ describe('privacy-decorated approval and verification identities', () => {
         changes: invalidateRepo,
         actor,
         reconcileChangeValidity: invalidateReconcile,
+        resolveChangeSchema: new ResolveChangeSchema(schemaProvider),
       }).execute({ name: 'drop-me', reason: 'evidence withdrawn' })
       const invalidatedEvent = invalidated.change.history.find(
         (event) => event.type === 'verification-invalidated',

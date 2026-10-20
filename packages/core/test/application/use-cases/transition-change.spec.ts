@@ -9,6 +9,7 @@ import { InvalidStateTransitionError } from '../../../src/domain/errors/invalid-
 import { ReconciledOperationBlockedError } from '../../../src/application/errors/reconciled-operation-blocked-error.js'
 import { HappyPathNextUnavailableError } from '../../../src/domain/errors/happy-path-next-unavailable-error.js'
 import { HookFailedError } from '../../../src/domain/errors/hook-failed-error.js'
+import { SchemaValidationError } from '../../../src/domain/errors/schema-validation-error.js'
 import { Change, type ChangeEvent } from '../../../src/domain/entities/change.js'
 import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
 import { ArtifactFile } from '../../../src/domain/value-objects/artifact-file.js'
@@ -32,6 +33,7 @@ import { detectImplLinksInScope } from '../../../src/application/services/detect
 import { type ReconcileChangeValidity } from '../../../src/application/use-cases/reconcile-change-validity.js'
 import { type ChangeValidityVerdict } from '../../../src/domain/services/change-validity.js'
 import { type ValidityFingerprint } from '../../../src/domain/value-objects/validity-fingerprint.js'
+import { type SchemaProvider } from '../../../src/application/ports/schema-provider.js'
 import {
   makeChangeRepository,
   makeActorResolver,
@@ -47,12 +49,16 @@ import {
   testActor,
 } from './helpers.js'
 
-function makeChangeInState(name: string, events: ChangeEvent[]): Change {
+function makeChangeInState(
+  name: string,
+  events: ChangeEvent[],
+  schemaName: string = 'test-schema',
+): Change {
   return new Change({
     name,
     createdAt: new Date('2024-01-01T00:00:00Z'),
     specIds: ['auth/login'],
-    schemaName: '@specd/schema-std',
+    schemaName,
     schemaVersion: 1,
     history: [
       {
@@ -60,7 +66,7 @@ function makeChangeInState(name: string, events: ChangeEvent[]): Change {
         at: new Date('2024-01-01T00:00:00Z'),
         by: actor,
         specIds: ['auth/login'],
-        schemaName: '@specd/schema-std',
+        schemaName,
         schemaVersion: 1,
       },
       ...events,
@@ -81,6 +87,7 @@ function makeUseCase(
   repo: ReturnType<typeof makeChangeRepository>,
   overrides?: {
     schema?: ReturnType<typeof makeSchema> | null
+    schemaProvider?: SchemaProvider
     runStepHooks?: ReturnType<typeof makeRunStepHooks>
     refresh?: RefreshImplementationTracking
     refreshExecute?: ReturnType<typeof vi.fn>
@@ -96,9 +103,9 @@ function makeUseCase(
     makeRefreshImplementationTracking(
       overrides?.refreshExecute ?? vi.fn().mockResolvedValue({ trackedFiles: [], links: [] }),
     )
-  const schemaProvider = makeSchemaProvider(
-    overrides?.schema !== undefined ? overrides.schema : makeSchema(),
-  )
+  const schemaProvider =
+    overrides?.schemaProvider ??
+    makeSchemaProvider(overrides?.schema !== undefined ? overrides.schema : makeSchema())
   const runStepHooks = overrides?.runStepHooks ?? makeRunStepHooks()
   const countTasks = overrides?.countTasks ?? new CountTasks(repo, schemaProvider)
   const registry = createWorkflowCheckRegistry({
@@ -167,6 +174,54 @@ describe('TransitionChange', () => {
       blockers: verdict.blockers,
       nextAction: { targetStep: 'done', command: '/specd-verify' },
     })
+  })
+
+  it('never recommends /specd-verify for a committed recovery when verifying is disabled', async () => {
+    const change = makeChangeInState('recovered-no-verify', [
+      { type: 'transitioned', from: 'drafting', to: 'archivable', at: new Date(), by: actor },
+    ])
+    const repo = makeChangeRepository([change])
+    const recovery = { cause: 'signoff' as const, from: 'archivable' as const, to: 'done' as const }
+    const verdict: ChangeValidityVerdict = {
+      artifactReviewRequired: false,
+      affectedArtifacts: [],
+      projectionChanges: [],
+      specApproval: 'not-required',
+      signoff: 'stale',
+      verification: 'not-required',
+      blockers: [{ code: 'SIGNOFF_STALE', message: 'Sign-off is stale' }],
+      recovery,
+    }
+    const reconcile = {
+      execute: async () => {
+        change.recover(recovery, actor)
+        return {
+          change,
+          verdict,
+          projectionChanges: [],
+          affectedArtifacts: [],
+          automaticReturn: recovery,
+          changed: true,
+        }
+      },
+    } as unknown as ReconcileChangeValidity
+    const schema = makeSchema({
+      workflow: [
+        makeWorkflowStep('implementing'),
+        makeWorkflowStep('verifying', { disabled: true }),
+      ],
+    })
+    const useCase = makeUseCase(repo, { reconcile, schema })
+
+    const error = await useCase
+      .execute({ name: change.name, to: 'archiving' })
+      .then(() => undefined)
+      .catch((e: unknown) => e)
+
+    expect(error).toBeInstanceOf(ReconciledOperationBlockedError)
+    const nextAction = (error as ReconciledOperationBlockedError).nextAction
+    expect(nextAction.command).not.toBe('/specd-verify')
+    expect(nextAction.reason).toContain('returned the change to done')
   })
 
   it.each(['signed-off', 'archivable', 'archiving'] as const)(
@@ -2886,7 +2941,32 @@ describe('TransitionChange', () => {
       )
     })
 
-    it('skips impl.linksInScope when allowOutOfScope is true', async () => {
+    it('blocks verifying when a hook creates an open tracked file, even with the pre-refresh disabled', async () => {
+      const change = makeImplementingChange('my-change')
+      const repo = makeChangeRepository([change])
+      // With the pre-evaluation refresh disabled, the only refresh is the post-hook one.
+      const refreshExecute = vi.fn().mockImplementation(async () => {
+        const fresh = makeImplementingChange('my-change')
+        fresh.trackImplementationFile('packages/core/src/from-hook.ts', 'open')
+        repo.store.set('my-change', fresh)
+        return {
+          trackedFiles: [{ file: 'packages/core/src/from-hook.ts', state: 'open' }],
+          links: [],
+        }
+      })
+      const uc = makeUseCase(repo, { schema: verifyingSchema, refreshExecute })
+
+      await expect(
+        uc.execute({
+          name: 'my-change',
+          to: 'verifying',
+          refreshImplementationTrackingBefore: false,
+        }),
+      ).rejects.toThrow(CheckPredicateFailedError)
+      expect(refreshExecute).toHaveBeenCalled()
+    })
+
+    it('skips impl.linksInScope through the uniform skipChecks contract', async () => {
       const change = makeImplementingChange('my-change')
       change.addImplementationLink({
         specId: 'auth/shared',
@@ -2898,23 +2978,141 @@ describe('TransitionChange', () => {
       const result = await uc.execute({
         name: 'my-change',
         to: 'verifying',
-        allowOutOfScope: true,
+        skipChecks: ['impl.linksInScope'],
       })
 
       expect(result.change.state).toBe('verifying')
     })
 
-    it('still fails open tracked files when allowOutOfScope is true', async () => {
+    it('still fails open tracked files when only impl.linksInScope is skipped', async () => {
       const change = makeImplementingChange('my-change')
       change.trackImplementationFile('packages/core/src/foo.ts', 'open')
       const uc = makeUseCase(makeChangeRepository([change]), { schema: verifyingSchema })
 
       await expect(
-        uc.execute({ name: 'my-change', to: 'verifying', allowOutOfScope: true }),
+        uc.execute({ name: 'my-change', to: 'verifying', skipChecks: ['impl.linksInScope'] }),
       ).rejects.toThrow(CheckPredicateFailedError)
     })
 
-    it('fails impl.linksInScope without allowOutOfScope', async () => {
+    describe('policy from resolved bindings', () => {
+      const skippableFilesSchema = makeSchema({
+        workflow: [
+          makeWorkflowStep('implementing'),
+          makeWorkflowStep('verifying', {
+            checks: [{ id: 'impl.filesResolved', skippable: true }],
+          }),
+        ],
+      })
+
+      const withOpenFile = () => {
+        const change = makeImplementingChange('my-change')
+        change.trackImplementationFile('packages/core/src/foo.ts', 'open')
+        return change
+      }
+
+      it('rejects skipping a non-skippable default binding when the schema does not declare it', async () => {
+        const uc = makeUseCase(makeChangeRepository([withOpenFile()]), { schema: verifyingSchema })
+
+        await expect(
+          uc.execute({ name: 'my-change', to: 'verifying', skipChecks: ['impl.filesResolved'] }),
+        ).rejects.toThrow(CheckNotSkippableError)
+      })
+
+      it('honors schema-declared skippable in skip validation', async () => {
+        const uc = makeUseCase(makeChangeRepository([withOpenFile()]), {
+          schema: skippableFilesSchema,
+        })
+
+        const result = await uc.execute({
+          name: 'my-change',
+          to: 'verifying',
+          skipChecks: ['impl.filesResolved'],
+        })
+
+        expect(result.change.state).toBe('verifying')
+      })
+
+      it('marks the failure skippable from the resolved binding', async () => {
+        const uc = makeUseCase(makeChangeRepository([withOpenFile()]), {
+          schema: skippableFilesSchema,
+        })
+
+        const failure = await uc
+          .execute({ name: 'my-change', to: 'verifying' })
+          .then(() => undefined)
+          .catch((error: unknown) => error)
+
+        expect(failure).toBeInstanceOf(CheckPredicateFailedError)
+        expect((failure as CheckPredicateFailedError).skippable).toBe(true)
+      })
+    })
+
+    describe('schema-embedded Category C check uses the executable registry instance', () => {
+      const embeddedSchema = makeSchema({
+        workflow: [
+          makeWorkflowStep('implementing', { disabled: true }),
+          makeWorkflowStep('verifying', { disabled: true }),
+          makeWorkflowStep('done', { checks: [{ id: 'impl.linksInScope' }] }),
+        ],
+      })
+
+      const makeReadyChangeWithOutOfScopeLink = (): Change => {
+        const change = makeChangeInState('my-change', [
+          { type: 'transitioned', from: 'drafting', to: 'designing', at: new Date(), by: actor },
+          { type: 'transitioned', from: 'designing', to: 'ready', at: new Date(), by: actor },
+        ])
+        change.addImplementationLink({
+          specId: 'auth/shared',
+          file: 'src/shared.ts',
+          fileLinkExplicit: true,
+        })
+        return change
+      }
+
+      const executableRegistry = (repo: ReturnType<typeof makeChangeRepository>) => {
+        const schemaProvider = makeSchemaProvider(embeddedSchema)
+        const built = createWorkflowCheckRegistry({
+          countTasks: new CountTasks(repo, schemaProvider),
+          runStepHooks: makeRunStepHooks(),
+          readyFacts: {
+            changes: repo,
+            listWorkspaces: makeListWorkspaces(),
+            parsers: makeNoopParsers(),
+            extractorTransforms: new Map(),
+            workspaceRoutes: [],
+          },
+          detectImplLinksInScope,
+        })
+        return new CheckRegistry().withExecutableBuiltins(built.checks)
+      }
+
+      it('fails the hop when the embedded check finds out-of-scope links', async () => {
+        const repo = makeChangeRepository([makeReadyChangeWithOutOfScopeLink()])
+        const uc = makeUseCase(repo, {
+          schema: embeddedSchema,
+          checkRegistry: executableRegistry(repo),
+        })
+
+        const failure = await uc
+          .execute({ name: 'my-change', to: 'done' })
+          .then(() => undefined)
+          .catch((error: unknown) => error)
+
+        expect(failure).toBeInstanceOf(CheckPredicateFailedError)
+        expect((failure as CheckPredicateFailedError).checkId).toBe('impl.linksInScope')
+      })
+
+      it('would not fail with the domain stub registry, proving the executable swap matters', async () => {
+        const repo = makeChangeRepository([makeReadyChangeWithOutOfScopeLink()])
+        const uc = makeUseCase(repo, { schema: embeddedSchema, checkRegistry: new CheckRegistry() })
+
+        const result = await uc.execute({ name: 'my-change', to: 'done' }).catch((e: unknown) => e)
+
+        expect(result).not.toBeInstanceOf(CheckPredicateFailedError)
+      })
+    })
+
+    it('fails impl.linksInScope without its skipChecks entry', async () => {
       const change = makeImplementingChange('my-change')
       change.addImplementationLink({
         specId: 'auth/shared',
@@ -2945,7 +3143,7 @@ describe('TransitionChange', () => {
       const result = await uc.execute({
         name: 'my-change',
         to: 'next',
-        allowOutOfScope: true,
+        skipChecks: ['impl.linksInScope'],
         refreshImplementationTrackingBefore: false,
       })
 
@@ -3533,6 +3731,787 @@ describe('TransitionChange', () => {
       })
 
       expect(result.change.state).toBe('ready')
+    })
+  })
+
+  describe('shortcut transitions, step-skip checks, and hook suppression', () => {
+    it('evaluates step-skip checks when shortcutting over optional implementing', async () => {
+      const optionalImplSchema = makeSchema({
+        workflow: [
+          makeWorkflowStep('drafting'),
+          makeWorkflowStep('designing'),
+          makeWorkflowStep('ready'),
+          makeWorkflowStep('implementing', { optional: true }),
+          makeWorkflowStep('verifying'),
+          makeWorkflowStep('done'),
+          makeWorkflowStep('archivable'),
+          makeWorkflowStep('archiving'),
+        ],
+      })
+      const change = makeChangeInState('my-change', [
+        { type: 'transitioned', from: 'drafting', to: 'designing', at: new Date(), by: actor },
+        { type: 'transitioned', from: 'designing', to: 'ready', at: new Date(), by: actor },
+      ])
+      const repo = makeChangeRepository([change])
+
+      // When incomplete tasks exist, shortcut transition fails fast
+      const countTasksWithIncomplete = {
+        execute: vi.fn().mockResolvedValue({
+          byArtifact: {},
+          total: { complete: 1, incomplete: 2, total: 3 },
+        }),
+      } as unknown as CountTasks
+
+      const ucFailing = makeUseCase(repo, {
+        schema: optionalImplSchema,
+        countTasks: countTasksWithIncomplete,
+      })
+
+      await expect(ucFailing.execute({ name: 'my-change', to: 'verifying' })).rejects.toThrow(
+        CheckPredicateFailedError,
+      )
+
+      // When tasks are completed, shortcut transition succeeds
+      const countTasksEmpty = {
+        execute: vi.fn().mockResolvedValue({
+          byArtifact: {},
+          total: { complete: 3, incomplete: 0, total: 3 },
+        }),
+      } as unknown as CountTasks
+
+      const ucPassing = makeUseCase(repo, {
+        schema: optionalImplSchema,
+        countTasks: countTasksEmpty,
+      })
+
+      const result = await ucPassing.execute({ name: 'my-change', to: 'verifying' })
+      expect(result.change.state).toBe('verifying')
+    })
+
+    it('rejects a shortcut when a plugin step-skip default binding fails end to end', async () => {
+      const optionalImplSchema = makeSchema({
+        workflow: [
+          makeWorkflowStep('designing'),
+          makeWorkflowStep('ready'),
+          makeWorkflowStep('implementing', { optional: true }),
+          makeWorkflowStep('verifying'),
+        ],
+      })
+      const change = makeChangeInState('my-change', [
+        { type: 'transitioned', from: 'drafting', to: 'designing', at: new Date(), by: actor },
+        { type: 'transitioned', from: 'designing', to: 'ready', at: new Date(), by: actor },
+      ])
+      const repo = makeChangeRepository([change])
+      const schemaProvider = makeSchemaProvider(optionalImplSchema)
+      const builtins = createWorkflowCheckRegistry({
+        countTasks: {
+          execute: vi.fn().mockResolvedValue({
+            byArtifact: {},
+            total: { complete: 1, incomplete: 0, total: 1 },
+          }),
+        } as unknown as CountTasks,
+        runStepHooks: makeRunStepHooks(),
+        readyFacts: {
+          changes: repo,
+          listWorkspaces: makeListWorkspaces(),
+          parsers: makeNoopParsers(),
+          extractorTransforms: new Map(),
+          workspaceRoutes: [],
+        },
+        detectImplLinksInScope,
+      })
+      const build = (outcome: 'pass' | 'fail') => {
+        const registry = new CheckRegistry()
+        registry.register(
+          'qa',
+          {
+            id: 'freeze',
+            label: 'Checking code freeze',
+            execute: async () => ({
+              id: '@qa.freeze',
+              label: 'Checking code freeze',
+              kind: 'predicate' as const,
+              outcome,
+              ...(outcome === 'fail' ? { code: 'CODE_FREEZE', message: 'freeze active' } : {}),
+            }),
+          },
+          [{ scope: 'step-skip', step: 'implementing' }],
+        )
+        return makeUseCase(repo, {
+          schema: optionalImplSchema,
+          schemaProvider,
+          checkRegistry: registry,
+          transitionBindings: [
+            ...builtins.transitionBindings,
+            ...registry.bindings().filter((binding) => binding.check.id.startsWith('@')),
+          ],
+        })
+      }
+
+      const failure = await build('fail')
+        .execute({ name: 'my-change', to: 'verifying' })
+        .then(() => undefined)
+        .catch((error: unknown) => error)
+      expect(failure).toBeInstanceOf(CheckPredicateFailedError)
+      expect((failure as CheckPredicateFailedError).checkId).toBe('@qa.freeze')
+      expect(repo.store.get('my-change')?.state).toBe('ready')
+
+      const result = await build('pass').execute({ name: 'my-change', to: 'verifying' })
+      expect(result.change.state).toBe('verifying')
+    })
+
+    it('suppresses hook execution for bypassed intermediate steps', async () => {
+      const optionalImplSchema = makeSchema({
+        workflow: [
+          makeWorkflowStep('drafting'),
+          makeWorkflowStep('designing'),
+          makeWorkflowStep('ready'),
+          makeWorkflowStep('implementing', {
+            optional: true,
+            hooks: {
+              pre: [{ id: 'impl-pre', type: 'run', command: 'echo impl-pre' }],
+              post: [{ id: 'impl-post', type: 'run', command: 'echo impl-post' }],
+            },
+          }),
+          makeWorkflowStep('verifying', {
+            hooks: {
+              pre: [{ id: 'verif-pre', type: 'run', command: 'echo verif-pre' }],
+              post: [{ id: 'verif-post', type: 'run', command: 'echo verif-post' }],
+            },
+          }),
+          makeWorkflowStep('done'),
+          makeWorkflowStep('archivable'),
+          makeWorkflowStep('archiving'),
+        ],
+      })
+      const change = makeChangeInState('my-change', [
+        { type: 'transitioned', from: 'drafting', to: 'designing', at: new Date(), by: actor },
+        { type: 'transitioned', from: 'designing', to: 'ready', at: new Date(), by: actor },
+      ])
+      const repo = makeChangeRepository([change])
+      const hookExecuteSpy = vi.fn().mockResolvedValue({
+        success: true,
+        hooks: [],
+        failedHooks: [],
+        warnings: [],
+      })
+      const runStepHooks = makeRunStepHooks({ execute: hookExecuteSpy })
+      const countTasks = {
+        execute: vi.fn().mockResolvedValue({
+          byArtifact: {},
+          total: { complete: 0, incomplete: 0, total: 0 },
+        }),
+      } as unknown as CountTasks
+
+      const uc = makeUseCase(repo, {
+        schema: optionalImplSchema,
+        runStepHooks,
+        countTasks,
+      })
+
+      const result = await uc.execute({ name: 'my-change', to: 'verifying' })
+      expect(result.change.state).toBe('verifying')
+
+      // Verify that hooks for implementing were NEVER executed
+      const executedSteps = hookExecuteSpy.mock.calls.map(
+        (call) => (call[0] as { step: string }).step,
+      )
+      expect(executedSteps).not.toContain('implementing')
+      // Only verifying hooks were executed
+      expect(executedSteps).toContain('verifying')
+    })
+
+    it('resolves sovereign schema by change.schemaName', async () => {
+      const customSchema = makeSchema({
+        name: 'custom-sovereign-schema',
+        workflow: [
+          makeWorkflowStep('drafting'),
+          makeWorkflowStep('designing'),
+          makeWorkflowStep('ready'),
+          makeWorkflowStep('implementing', { optional: true }),
+          makeWorkflowStep('verifying', { disabled: true }),
+          makeWorkflowStep('done'),
+          makeWorkflowStep('archivable'),
+          makeWorkflowStep('archiving'),
+        ],
+      })
+      const change = new Change({
+        name: 'sovereign-change',
+        createdAt: new Date('2024-01-01T00:00:00Z'),
+        specIds: ['auth/login'],
+        schemaName: 'custom-sovereign-schema',
+        schemaVersion: 1,
+        history: [
+          {
+            type: 'created',
+            at: new Date('2024-01-01T00:00:00Z'),
+            by: actor,
+            specIds: ['auth/login'],
+            schemaName: 'custom-sovereign-schema',
+            schemaVersion: 1,
+          },
+          {
+            type: 'transitioned',
+            from: 'drafting',
+            to: 'designing',
+            at: new Date(),
+            by: actor,
+          },
+          {
+            type: 'transitioned',
+            from: 'designing',
+            to: 'ready',
+            at: new Date(),
+            by: actor,
+          },
+          {
+            type: 'transitioned',
+            from: 'ready',
+            to: 'implementing',
+            at: new Date(),
+            by: actor,
+          },
+        ],
+      })
+      const repo = makeChangeRepository([change])
+      const schemaProvider: SchemaProvider = {
+        get: vi.fn().mockImplementation(async (ref?: string) => {
+          if (ref === 'custom-sovereign-schema') {
+            return customSchema
+          }
+          return makeSchema()
+        }),
+      }
+      const countTasks = {
+        execute: vi.fn().mockResolvedValue({
+          byArtifact: {},
+          total: { complete: 0, incomplete: 0, total: 0 },
+        }),
+      } as unknown as CountTasks
+
+      const uc = makeUseCase(repo, {
+        schemaProvider,
+        countTasks,
+      })
+
+      // In customSchema, verifying is disabled.
+      // Transitioning with to: 'next' from 'implementing' resolves to 'done' directly
+      const result = await uc.execute({ name: 'sovereign-change', to: 'next' })
+      expect(result.change.state).toBe('done')
+      expect(schemaProvider.get).toHaveBeenCalledWith('custom-sovereign-schema')
+    })
+
+    it('passes configured approvals to next-step topology resolution', async () => {
+      const schema = makeSchema({
+        workflow: [makeWorkflowStep('ready', { disabled: true })],
+      })
+      const change = makeChangeInState('approval-aware-change', [
+        {
+          type: 'transitioned',
+          from: 'drafting',
+          to: 'designing',
+          at: new Date(),
+          by: actor,
+        },
+      ])
+      const uc = makeUseCase(makeChangeRepository([change]), {
+        schema,
+        approvals: { spec: true, signoff: false },
+      })
+
+      await expect(uc.execute({ name: 'approval-aware-change', to: 'next' })).rejects.toThrow(
+        SchemaValidationError,
+      )
+    })
+  })
+
+  describe('Declarative schema checks and skipChecks integration', () => {
+    it('evaluates custom transition check declared dynamically in schema step.checks', async () => {
+      const change = makeChangeInState(
+        'my-change',
+        [{ type: 'transitioned', from: 'drafting', to: 'designing', at: new Date(), by: actor }],
+        'gate-schema',
+      )
+      const repo = makeChangeRepository([change])
+      const registry = new CheckRegistry()
+      let executeCount = 0
+      registry.register(
+        'custom',
+        {
+          id: 'schema-gate',
+          label: 'Schema Gate Check',
+          execute: async () => {
+            executeCount++
+            return {
+              id: '@custom.schema-gate',
+              label: 'Schema Gate Check',
+              kind: 'predicate',
+              outcome: 'fail',
+              code: 'GATE_FAILED',
+              message: 'Custom schema gate failed',
+            }
+          },
+        },
+        [],
+      )
+
+      const schemaWithGate = makeSchema({
+        name: 'gate-schema',
+        workflow: [
+          makeWorkflowStep('drafting'),
+          makeWorkflowStep('designing'),
+          makeWorkflowStep('ready', {
+            checks: [
+              {
+                id: '@custom.schema-gate',
+                onFailure: 'abort',
+                skippable: true,
+              },
+            ],
+          }),
+          makeWorkflowStep('implementing'),
+          makeWorkflowStep('verifying'),
+          makeWorkflowStep('done'),
+          makeWorkflowStep('archivable'),
+          makeWorkflowStep('archiving'),
+        ],
+      })
+
+      const schemaProvider: SchemaProvider = {
+        get: vi.fn().mockResolvedValue(schemaWithGate),
+      }
+
+      const uc = makeUseCase(repo, {
+        schemaProvider,
+        checkRegistry: registry,
+        transitionBindings: registry.bindings(),
+      })
+
+      // When transitioning to ready without skipChecks, fails with CheckPredicateFailedError
+      await expect(uc.execute({ name: 'my-change', to: 'ready' })).rejects.toThrow(
+        CheckPredicateFailedError,
+      )
+      expect(executeCount).toBe(1)
+
+      // When transitioning with skipChecks: ['@custom.schema-gate'], succeeds because skippable: true
+      const result = await uc.execute({
+        name: 'my-change',
+        to: 'ready',
+        skipChecks: ['@custom.schema-gate'],
+      })
+      expect(result.change.state).toBe('ready')
+    })
+
+    it('evaluates custom skipChecks declared in schema when bypassing optional step', async () => {
+      const change = makeChangeInState(
+        'my-change',
+        [
+          { type: 'transitioned', from: 'drafting', to: 'designing', at: new Date(), by: actor },
+          { type: 'transitioned', from: 'designing', to: 'ready', at: new Date(), by: actor },
+        ],
+        'skip-gate-schema',
+      )
+      const repo = makeChangeRepository([change])
+      const registry = new CheckRegistry()
+      let skipCheckCalled = false
+      registry.register(
+        'qa',
+        {
+          id: 'bypass-gate',
+          label: 'Bypass Gate Check',
+          execute: async () => {
+            skipCheckCalled = true
+            return {
+              id: '@qa.bypass-gate',
+              label: 'Bypass Gate Check',
+              kind: 'predicate',
+              outcome: 'pass',
+              details: {},
+            }
+          },
+        },
+        [],
+      )
+
+      const runStepHooks = makeRunStepHooks({
+        execute: vi.fn().mockResolvedValue({
+          hooks: [],
+          success: true,
+          failedHooks: [],
+          warnings: [],
+        }),
+      })
+
+      const schemaWithSkipGate = makeSchema({
+        name: 'skip-gate-schema',
+        workflow: [
+          makeWorkflowStep('drafting'),
+          makeWorkflowStep('designing'),
+          makeWorkflowStep('ready'),
+          makeWorkflowStep('implementing', {
+            optional: true,
+            skipChecks: [
+              {
+                id: '@qa.bypass-gate',
+                onFailure: 'abort',
+              },
+            ],
+            hooks: {
+              pre: [{ id: 'impl-pre', type: 'instruction', text: 'implement' }],
+              post: [],
+            },
+          }),
+          makeWorkflowStep('verifying'),
+          makeWorkflowStep('done'),
+          makeWorkflowStep('archivable'),
+          makeWorkflowStep('archiving'),
+        ],
+      })
+
+      const countTasks = {
+        execute: vi.fn().mockResolvedValue({
+          byArtifact: {},
+          total: { complete: 0, incomplete: 0, total: 0 },
+        }),
+      } as unknown as CountTasks
+
+      const uc = makeUseCase(repo, {
+        schemaProvider: { get: vi.fn().mockResolvedValue(schemaWithSkipGate) },
+        checkRegistry: registry,
+        transitionBindings: registry.bindings(),
+        countTasks,
+        runStepHooks,
+      })
+
+      // Shortcut ready -> verifying (bypassing implementing)
+      const result = await uc.execute({ name: 'my-change', to: 'verifying' })
+      expect(result.change.state).toBe('verifying')
+      expect(skipCheckCalled).toBe(true)
+      // implementing hooks were suppressed
+      expect(runStepHooks.execute).not.toHaveBeenCalledWith(
+        expect.objectContaining({ step: 'implementing' }),
+      )
+    })
+
+    it('isolates sovereign schema checks from workspace default schema', async () => {
+      const changeCustom = new Change({
+        name: 'custom-change',
+        createdAt: new Date('2024-01-01T00:00:00Z'),
+        specIds: ['auth'],
+        schemaName: 'schema-custom',
+        schemaVersion: 1,
+        history: [
+          {
+            type: 'created',
+            at: new Date('2024-01-01T00:00:00Z'),
+            by: actor,
+            specIds: ['auth'],
+            schemaName: 'schema-custom',
+            schemaVersion: 1,
+          },
+          { type: 'transitioned', from: 'drafting', to: 'designing', at: new Date(), by: actor },
+        ],
+      })
+
+      const changeDefault = new Change({
+        name: 'default-change',
+        createdAt: new Date('2024-01-01T00:00:00Z'),
+        specIds: ['auth'],
+        schemaName: 'default',
+        schemaVersion: 1,
+        history: [
+          {
+            type: 'created',
+            at: new Date('2024-01-01T00:00:00Z'),
+            by: actor,
+            specIds: ['auth'],
+            schemaName: 'default',
+            schemaVersion: 1,
+          },
+          { type: 'transitioned', from: 'drafting', to: 'designing', at: new Date(), by: actor },
+        ],
+      })
+
+      const repo = makeChangeRepository([changeCustom, changeDefault])
+      const registry = new CheckRegistry()
+      registry.register(
+        'custom',
+        {
+          id: 'strict-audit',
+          label: 'Strict Audit',
+          execute: async () => ({
+            id: '@custom.strict-audit',
+            label: 'Strict Audit',
+            kind: 'predicate',
+            outcome: 'fail',
+            code: 'AUDIT_FAILED',
+            message: 'Strict audit failed',
+          }),
+        },
+        [],
+      )
+
+      const customSchema = makeSchema({
+        name: 'schema-custom',
+        workflow: [
+          makeWorkflowStep('drafting'),
+          makeWorkflowStep('designing'),
+          makeWorkflowStep('ready', {
+            checks: [{ id: '@custom.strict-audit', onFailure: 'abort' }],
+          }),
+          makeWorkflowStep('implementing'),
+          makeWorkflowStep('verifying'),
+          makeWorkflowStep('done'),
+          makeWorkflowStep('archivable'),
+          makeWorkflowStep('archiving'),
+        ],
+      })
+
+      const defaultSchema = makeSchema({
+        name: 'default',
+        workflow: [
+          makeWorkflowStep('drafting'),
+          makeWorkflowStep('designing'),
+          makeWorkflowStep('ready'),
+          makeWorkflowStep('implementing'),
+          makeWorkflowStep('verifying'),
+          makeWorkflowStep('done'),
+          makeWorkflowStep('archivable'),
+          makeWorkflowStep('archiving'),
+        ],
+      })
+
+      const schemaProvider: SchemaProvider = {
+        get: vi.fn().mockImplementation(async (ref?: string) => {
+          if (ref === 'schema-custom') return customSchema
+          return defaultSchema
+        }),
+      }
+
+      const uc = makeUseCase(repo, {
+        schemaProvider,
+        checkRegistry: registry,
+        transitionBindings: registry.bindings(),
+      })
+
+      // custom change must evaluate custom schema checks and fail
+      await expect(uc.execute({ name: 'custom-change', to: 'ready' })).rejects.toThrow(
+        CheckPredicateFailedError,
+      )
+
+      // default change does not declare custom checks and must succeed
+      const result = await uc.execute({ name: 'default-change', to: 'ready' })
+      expect(result.change.state).toBe('ready')
+    })
+  })
+
+  describe('collect failure aggregation', () => {
+    function auditCheck(name: string, code: string) {
+      return {
+        id: name,
+        label: `Auditing ${name}`,
+        execute: async () => ({
+          id: `@custom.${name}`,
+          label: `Auditing ${name}`,
+          kind: 'predicate' as const,
+          outcome: 'fail' as const,
+          code,
+          message: `${name} failed`,
+        }),
+      }
+    }
+
+    function setup(onFailure: 'abort' | 'collect') {
+      const change = new Change({
+        name: 'collect-change',
+        createdAt: new Date('2024-01-01T00:00:00Z'),
+        specIds: ['auth'],
+        schemaName: 'schema-custom',
+        schemaVersion: 1,
+        history: [
+          {
+            type: 'created',
+            at: new Date('2024-01-01T00:00:00Z'),
+            by: actor,
+            specIds: ['auth'],
+            schemaName: 'schema-custom',
+            schemaVersion: 1,
+          },
+          { type: 'transitioned', from: 'drafting', to: 'designing', at: new Date(), by: actor },
+        ],
+      })
+      const registry = new CheckRegistry()
+      registry.register('custom', auditCheck('first', 'FIRST_FAILED'), [])
+      registry.register('custom', auditCheck('second', 'SECOND_FAILED'), [])
+      const schema = makeSchema({
+        name: 'schema-custom',
+        workflow: [
+          makeWorkflowStep('drafting'),
+          makeWorkflowStep('designing'),
+          makeWorkflowStep('ready', {
+            checks: [
+              { id: '@custom.first', onFailure },
+              { id: '@custom.second', onFailure },
+            ],
+          }),
+          makeWorkflowStep('implementing'),
+          makeWorkflowStep('verifying'),
+          makeWorkflowStep('done'),
+          makeWorkflowStep('archivable'),
+          makeWorkflowStep('archiving'),
+        ],
+      })
+      const schemaProvider: SchemaProvider = { get: vi.fn().mockResolvedValue(schema) }
+      return makeUseCase(makeChangeRepository([change]), {
+        schemaProvider,
+        checkRegistry: registry,
+        transitionBindings: registry.bindings(),
+      })
+    }
+
+    it('throws one error for the first collected failure listing every collected failure', async () => {
+      const error = await setup('collect')
+        .execute({ name: 'collect-change', to: 'ready' })
+        .catch((e: unknown) => e)
+
+      expect(error).toBeInstanceOf(CheckPredicateFailedError)
+      const failure = error as CheckPredicateFailedError
+      expect(failure.checkId).toBe('@custom.first')
+      expect(failure.details?.failures).toEqual([
+        expect.objectContaining({ checkId: '@custom.first', code: 'FIRST_FAILED' }),
+        expect.objectContaining({ checkId: '@custom.second', code: 'SECOND_FAILED' }),
+      ])
+    })
+
+    it('keeps abort failures mapped to the first failing check', async () => {
+      const error = await setup('abort')
+        .execute({ name: 'collect-change', to: 'ready' })
+        .catch((e: unknown) => e)
+
+      expect(error).toBeInstanceOf(CheckPredicateFailedError)
+      expect((error as CheckPredicateFailedError).checkId).toBe('@custom.first')
+      expect((error as CheckPredicateFailedError).details?.failures).toBeUndefined()
+    })
+  })
+
+  describe('freshness and effects ownership', () => {
+    it('reevaluates shared candidate and rejects transition when facts change to fail after status projection', async () => {
+      const at = new Date('2024-01-01T00:00:00Z')
+      const change = makeChangeInState('stale-candidate-change', [
+        { type: 'transitioned', from: 'drafting', to: 'designing', at, by: actor },
+        { type: 'transitioned', from: 'designing', to: 'ready', at, by: actor },
+      ])
+      const repo = makeChangeRepository([change])
+
+      const schema = makeSchema(
+        [
+          makeArtifactType('tasks', {
+            hasTasks: true,
+            taskCompletionCheck: {
+              incompletePattern: '^\\s*-\\s*\\[ \\]\\s+',
+              completePattern: '^\\s*-\\s*\\[x\\]\\s+',
+            },
+          }),
+        ],
+        [
+          makeWorkflowStep('ready'),
+          makeWorkflowStep('implementing', { optional: true }),
+          makeWorkflowStep('verifying'),
+          makeWorkflowStep('done'),
+        ],
+      )
+
+      const tasksArtifact = new ChangeArtifact({ type: 'tasks' })
+      tasksArtifact.setFile(
+        new ArtifactFile({ key: 'tasks', filename: 'tasks.md', status: 'complete' }),
+      )
+      change.setArtifact(tasksArtifact)
+      vi.spyOn(repo, 'artifact').mockResolvedValue(
+        new SpecArtifact('tasks.md', '# Tasks\n- [ ] 1.1 Incomplete Task'),
+      )
+
+      const runHooksSpy = vi.fn().mockResolvedValue({
+        success: true,
+        hooks: [],
+        failedHooks: [],
+        warnings: [],
+      })
+      const runStepHooks = makeRunStepHooks({ execute: runHooksSpy })
+      const mutateSpy = vi.spyOn(repo, 'mutate')
+
+      const uc = makeUseCase(repo, {
+        schema,
+        runStepHooks,
+      })
+
+      await expect(uc.execute({ name: 'stale-candidate-change', to: 'verifying' })).rejects.toThrow(
+        CheckPredicateFailedError,
+      )
+
+      expect(runHooksSpy).not.toHaveBeenCalled()
+      expect(mutateSpy).not.toHaveBeenCalled()
+      expect(change.state).toBe('ready')
+    })
+
+    it('executes effects and hooks only after candidate passes complete verdict', async () => {
+      const at = new Date('2024-01-01T00:00:00Z')
+      const change = makeChangeInState('passing-candidate-change', [
+        { type: 'transitioned', from: 'drafting', to: 'designing', at, by: actor },
+        { type: 'transitioned', from: 'designing', to: 'ready', at, by: actor },
+      ])
+      const repo = makeChangeRepository([change])
+
+      const schema = makeSchema(
+        [
+          makeArtifactType('tasks', {
+            hasTasks: true,
+            taskCompletionCheck: {
+              incompletePattern: '^\\s*-\\s*\\[ \\]\\s+',
+              completePattern: '^\\s*-\\s*\\[x\\]\\s+',
+            },
+          }),
+        ],
+        [
+          makeWorkflowStep('ready'),
+          makeWorkflowStep('implementing', { optional: true }),
+          makeWorkflowStep('verifying', {
+            hooks: {
+              pre: [{ id: 'pre-verify', type: 'run', command: 'echo pre' }],
+              post: [],
+            },
+          }),
+          makeWorkflowStep('done'),
+        ],
+      )
+
+      const tasksArtifact = new ChangeArtifact({ type: 'tasks' })
+      tasksArtifact.setFile(
+        new ArtifactFile({ key: 'tasks', filename: 'tasks.md', status: 'complete' }),
+      )
+      change.setArtifact(tasksArtifact)
+      vi.spyOn(repo, 'artifact').mockResolvedValue(
+        new SpecArtifact('tasks.md', '# Tasks\n- [x] 1.1 Completed Task'),
+      )
+
+      const runHooksSpy = vi.fn().mockResolvedValue({
+        success: true,
+        hooks: [],
+        failedHooks: [],
+        warnings: [],
+      })
+      const runStepHooks = makeRunStepHooks({ execute: runHooksSpy })
+      const mutateSpy = vi.spyOn(repo, 'mutate')
+
+      const uc = makeUseCase(repo, {
+        schema,
+        runStepHooks,
+      })
+
+      const result = await uc.execute({ name: 'passing-candidate-change', to: 'verifying' })
+
+      expect(result.change.state).toBe('verifying')
+      expect(runHooksSpy).toHaveBeenCalled()
+      expect(mutateSpy).toHaveBeenCalled()
     })
   })
 })

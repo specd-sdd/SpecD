@@ -4,6 +4,47 @@
 
 ### Requirement: Schema resolution
 
+#### Scenario: Explicit schemaName wins
+
+- **GIVEN** a spec whose `spec-lock.json` records schema `@specd/schema-std`
+- **WHEN** `GenerateSpecMetadata.execute({ specId, schemaName: 'custom-workflow' })` is called
+- **THEN** the provider is called with `get('custom-workflow')`
+- **AND** extraction uses `custom-workflow`'s `metadataExtraction`
+- **AND** `provenance.schema` is `custom-workflow`'s `canonicalSpecSchema()`
+
+#### Scenario: Unarchived spec in a change uses the change schema
+
+- **GIVEN** a new spec created by an unarchived change recorded with schema `custom-workflow`, so it has no `spec-lock.json`
+- **WHEN** the change-bound caller materializes its metadata passing the change's schema name
+- **THEN** extraction uses `custom-workflow`, not the project default
+
+#### Scenario: Persisted spec schema is used without an explicit name
+
+- **GIVEN** a spec whose `spec-lock.json` records schema identity `{ name: 'team-std', version: 2 }`
+- **AND** the project default is a different schema
+- **WHEN** `GenerateSpecMetadata.execute({ specId })` is called
+- **THEN** the provider is called with `get('team-std')`
+- **AND** `provenance.schema` is the persisted identity
+
+#### Scenario: Legacy lock-less spec outside a change uses the project default
+
+- **GIVEN** a spec with no `spec-lock.json`
+- **WHEN** `GenerateSpecMetadata.execute({ specId })` is called (for example from a CLI command with no change)
+- **THEN** the provider is called with `get()` (project default)
+- **AND** `provenance.schema` is the default's `canonicalSpecSchema()`
+
+#### Scenario: Named lookup failure does not fall back
+
+- **GIVEN** `schemaName` is supplied (or a lock identity exists) and the provider throws `SchemaNotFoundError` for that name
+- **WHEN** the use case runs
+- **THEN** the error propagates and the project default is never requested
+
+#### Scenario: Provider identity mismatch is rejected
+
+- **GIVEN** `get('custom-workflow')` returns a schema named `other`
+- **WHEN** the use case runs
+- **THEN** it throws `SchemaProviderIdentityMismatchError`
+
 #### Scenario: Schema resolution failure propagates
 
 - **WHEN** `SchemaProvider.get()` throws `SchemaNotFoundError`
@@ -11,7 +52,7 @@
 
 #### Scenario: Schema has no metadataExtraction
 
-- **WHEN** the resolved schema has no `metadataExtraction` declarations
+- **WHEN** the selected schema has no `metadataExtraction` declarations
 - **THEN** the use case returns `{ metadata: {}, hasExtraction: false }`
 
 ### Requirement: Spec resolution

@@ -208,6 +208,94 @@ This table is the protocol graph (`VALID_TRANSITIONS`). Status **available** tra
 
 ---
 
+## Skippable and disabled workflow steps
+
+Custom schemas can configure individual lifecycle steps as `optional: true` or `disabled: true` in their `workflow[]` declaration:
+
+```yaml
+workflow:
+  - step: drafting
+  - step: designing
+  - step: ready
+  - step: implementing
+    optional: true
+  - step: verifying
+    disabled: true
+  - step: done
+  - step: archivable
+  - step: archiving
+```
+
+### Topology invariants and rules
+
+The workflow-topology domain functions (`resolveWorkflowPipeline`, `isWorkflowStepEnabled`, `listWorkflowTransitions`, `isWorkflowTransitionLegal`, `listBypassedWorkflowSteps`, `nextWorkflowStep`) validate the graph structure and govern allowed state transitions. The pipeline is always in canonical order; the order of `workflow` rows is not significant:
+
+1. **Bedrock state immutability**: Bedrock states (`drafting`, `designing`, `done`, `archivable`, `archiving`) are permanently active and **cannot** be disabled or marked optional. Attempting to mark any bedrock state `disabled: true` or `optional: true` triggers a schema validation error.
+2. **Approval anchor locks**:
+   - If `approvals.spec` is enabled in configuration, `ready` cannot be disabled.
+   - `done` is unconditional bedrock; signoff is an evaluation-time check on `done -> archivable` that returns `skip` when signoff is disabled without altering topology.
+3. **Forward connectivity by construction**: Bedrock states cannot be disabled and disabled steps are simply removed, so an active path from `designing` forward to `archivable` always exists.
+4. **Disabled steps**: A disabled step (`disabled: true`) is completely excluded from the active pipeline. It cannot be entered directly or recommended as a next step.
+
+### Optional-step decision table
+
+| Step      | Effective `step-skip` set | Core recommendation                                                  |
+| --------- | ------------------------- | -------------------------------------------------------------------- |
+| mandatory | any                       | enter the step                                                       |
+| optional  | empty                     | bypass unconditionally by default                                    |
+| optional  | all checks pass           | bypass to the furthest legal target after consecutive optional steps |
+| optional  | any check fails           | enter the closest optional step                                      |
+| disabled  | not applicable            | omit it from the pipeline                                            |
+
+Registry bindings and schema `skipChecks` are composed into the effective set. For example, `implementing` can be conditional because Core binds `workflow.tasksEmpty` even if the YAML row has no inline `skipChecks`. Passing the bypass policy changes only the recommendation: explicit entry into an optional step remains a legal alternative. Skills consume `nextAction.command` and `nextAction.targetStep`; they do not inspect tasks or choose a path independently.
+
+### Shortcut transitions via `--next`
+
+When intermediate steps are skipped or disabled, changes do not need to pause in every intermediate state. The CLI supports shortcut transitions:
+
+```bash
+# Transition directly to next available topological step
+specd changes transition <name> --next
+```
+
+`--next` evaluates `nextWorkflowStep(current, schema, approvals)` to determine the closest forward step in the pipeline that is currently enabled. For instance, if `verifying` is disabled, transitioning with `--next` from `implementing` advances directly to `done`.
+
+`nextWorkflowStep` is deliberately only a topology primitive. Status guidance applies the optional-step policy above to the predicate-filtered `availableTransitions` and may recommend a farther shortcut. Agents should follow that published `nextAction` instead of treating `--next` as a path-selection policy.
+
+### Step-skip check semantics
+
+Skipping a step is not a blind jump. When a transition bypasses an active optional step (e.g., `ready → verifying` bypassing optional `implementing`), SpecD runs **step-skip checks** for each bypassed step before allowing the transition:
+
+- Checks registered under `{ scope: 'step-skip', step: '<bypassedStep>' }` are evaluated.
+- For example, `workflow.tasksEmpty` verifies that any task checklists in the change have zero incomplete tasks before allowing `implementing` to be skipped. If uncompleted tasks exist, the shortcut transition fails fast with a `CheckPredicateFailedError`.
+- If an intermediate step is completely `disabled: true`, it is excluded from the active pipeline and is not treated as a bypassed active step.
+
+### Hook suppression
+
+When a transition shortcuts across intermediate steps, hooks for the intermediate steps are **suppressed**:
+
+- Only the source step's post-transition hooks (if applicable) and the destination step's pre-transition hooks execute.
+- Bypassed steps never execute intermediate pre-hooks or post-hooks, ensuring idempotency and avoiding unintended side-effects.
+
+### Workflow examples
+
+#### 1. Documentation or spec-only changes (optional `implementing`)
+
+For changes that modify documentation, specifications, or schemas without executable code, `implementing` can be marked `optional: true`:
+
+- If no implementation tasks are added to `tasks.md`, `ready → verifying` or `ready → done` succeeds immediately.
+- If tasks are declared in `tasks.md`, they must all be completed before skipping `implementing` or `workflow.tasksEmpty` will reject the bypass.
+
+#### 2. Rapid prototyping / Spikes (disabled `verifying`)
+
+For quick experiments or spikes where formal verification test runs are omitted:
+
+- Mark `verifying: disabled: true`.
+- The verification boundary is relaxed: `verificationBoundary` returns `false`, meaning in-place verification renewal is not mandated.
+- Lifecycle guidance advances directly from `implementing` to `done` or `/specd-archive`.
+
+---
+
 ## Identity and audit trails
 
 specd records the identity of the person or system performing every significant operation — creating a change, transitioning states, approving specs, and signing off on completed work. These records create a tamper-evident audit trail persisted in the change manifest and history.

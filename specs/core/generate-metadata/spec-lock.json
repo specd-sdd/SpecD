@@ -10,7 +10,9 @@
     "core:spec-id-format",
     "core:spec-repository-port",
     "core:composition-resolver",
-    "core:spec-optimization"
+    "core:spec-optimization",
+    "core:resolve-change-schema",
+    "core:spec-lock"
   ],
   "implementation": [
     {

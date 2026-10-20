@@ -688,16 +688,34 @@ selector:
 
 ## workflow
 
-`workflow` is a lookup table: each `step` names an existing Change lifecycle state and attaches artifact gates and hooks to it. It does not define which states a change may occupy, and omitting a `step` does not delete that state from the protocol. The order of entries is the **progress axis** used to classify a transition as `forward` or `backward` (`along`); delivery states missing from the list are still classified (spliced by canonical delivery order, not pushed after later listed names). It is also the intended display order for tooling. Sequential blocking still comes from each step's own `requires` / `requiresTaskCompletion`, not from mere adjacency in the list.
+`workflow` declares extras and topology policy for existing Change lifecycle states. Omitted canonical states default to enabled and mandatory. The active pipeline is always in canonical order (`drafting, designing, ready, implementing, verifying, done, archivable, archiving`); the order of `workflow` rows carries no meaning and rows declared out of order are normalized silently. Direction classification, legal transitions, and recommendations all consume that same authoritative pipeline.
 
 ### Step fields
 
-| Field                    | Type                  | Required | Description                                                                      |
-| ------------------------ | --------------------- | -------- | -------------------------------------------------------------------------------- |
-| `step`                   | string                | yes      | Lookup key: existing lifecycle state name (`designing`, `implementing`, …).      |
-| `requires`               | array of artifact IDs | no       | Artifacts that must be `complete` (or `skipped`) before this step is available.  |
-| `requiresTaskCompletion` | array of artifact IDs | no       | Artifacts whose `taskCompletionCheck` must pass before **this** step is entered. |
-| `hooks`                  | object                | no       | `pre` and/or `post` arrays of hook entries for this step's boundaries.           |
+| Field                    | Type                  | Required | Description                                                                                           |
+| ------------------------ | --------------------- | -------- | ----------------------------------------------------------------------------------------------------- |
+| `step`                   | string                | yes      | Lookup key: existing lifecycle state name (`designing`, `implementing`, …).                           |
+| `optional`               | boolean               | no       | When `true`, the step is skippable in the topology if step-skip checks pass. Defaults to `false`.     |
+| `disabled`               | boolean               | no       | When `true`, the step is omitted from the active pipeline and cannot be entered. Defaults to `false`. |
+| `requires`               | array of artifact IDs | no       | Artifacts that must be `complete` (or `skipped`) before this step is available.                       |
+| `requiresTaskCompletion` | array of artifact IDs | no       | Artifacts whose `taskCompletionCheck` must pass before **this** step is entered.                      |
+| `hooks`                  | object                | no       | `pre` and/or `post` arrays of hook entries for this step's boundaries.                                |
+
+### Workflow topology rules
+
+The workflow-topology functions (`resolveWorkflowPipeline`, `listWorkflowTransitions`, `isWorkflowTransitionLegal`, `listBypassedWorkflowSteps`, `nextWorkflowStep`) enforce graph invariants over `workflow` definitions:
+
+1. **Bedrock State Immutability**: Canonical bedrock states (`drafting`, `designing`, `done`, `archivable`, `archiving`) are permanently active and CANNOT be disabled (`disabled: true`) or marked optional (`optional: true`). Declaring `disabled: true` or `optional: true` on any bedrock state fails with `SchemaValidationError`.
+2. **Approval Anchor Protection**:
+   - If `approvals.spec` is enabled in project configuration, `ready` CANNOT be disabled.
+   - `done` is unconditional bedrock and CANNOT be disabled or made optional regardless of signoff configuration. Signoff is an evaluation-time check on `done -> archivable`, which skips when signoff is off without bypassing `done`.
+3. **Forward connectivity by construction**: Bedrock states cannot be disabled and disabled steps are removed from the canonical pipeline, so a forward path from `designing` to `archivable` always exists (disabling `ready`, `implementing`, and `verifying` together is valid). There is no reachability error.
+4. **Skippable Steps & Bypass Checks**:
+   - When intermediate steps are marked `optional: true` (or `disabled: true`), changes can jump directly over them (e.g., `ready → verifying` or `implementing → archivable`).
+   - For every bypassed active step, step-skip checks registered for `{ scope: 'step-skip', step }` are evaluated (for example, `workflow.tasksEmpty` verifies that tasks are empty or completed before skipping `implementing`).
+   - Hooks for bypassed intermediate steps are strictly suppressed (only source post-hooks and target pre-hooks fire).
+   - An optional step with an empty effective skip-check set is bypassable unconditionally. With one or more effective bindings, every binding must pass. The effective set includes registry bindings plus schema `skipChecks`.
+   - Core recommends the furthest passing shortcut across consecutive optional steps, falls back to entering the closest optional step when a bypass predicate fails, and preserves explicit entry as an alternative. Skills consume this recommendation rather than selecting a route.
 
 ### Hook entries
 

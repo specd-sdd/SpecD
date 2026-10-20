@@ -1,0 +1,26 @@
+- op: modified
+  description: Resolve sovereign change schema without throwing SchemaMismatchError
+  selector:
+    type: section
+    matches: 'Requirement: Schema name guard'
+  rename: 'Requirement: Sovereign schema resolution'
+  content: |
+    `CompileContext` MUST resolve the change's sovereign schema through `ResolveChangeSchema`. The change's recorded schema is the sovereign authority governing instructions and artifact templates. A different workspace default MUST remain irrelevant; provider identity mismatch MUST propagate as `SchemaProviderIdentityMismatchError`.
+- op: added
+  description: Declare the shared sovereign change-schema resolution dependency
+  position:
+    parent:
+      type: section
+      matches: 'Spec Dependencies'
+  content: |
+    - [core:resolve-change-schema](../resolve-change-schema/spec.md) — named sovereign lookup, provider identity validation, and same-name version advisory
+- op: added
+  description: Scope the change schema to the change's own specs during metadata materialization
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Change schema applies to change specs only
+
+    When `CompileContext` materializes spec metadata (through `GetSpecMetadata`), it MUST pass the change's resolved schema name as `schemaName` only for specs that belong to the change (`change.specIds`). Specs outside the change — such as dependency or project-context specs — MUST be materialized without `schemaName`, so their own persisted lock schema (or the project default) governs extraction and their metadata is neither regenerated nor overwritten under a schema they were not authored with.

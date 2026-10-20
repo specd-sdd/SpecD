@@ -15,7 +15,12 @@ import { type ChangeState, VALID_TRANSITIONS } from '../../domain/value-objects/
 import { type ChangeRepository } from '../ports/change-repository.js'
 import { type SchemaProvider } from '../ports/schema-provider.js'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
-import { SchemaNotFoundError } from '../errors/schema-not-found-error.js'
+import { SchemaProviderIdentityMismatchError } from '../errors/schema-provider-identity-mismatch-error.js'
+import {
+  ResolveChangeSchema,
+  type ChangeSchemaAdvisory,
+} from '../services/resolve-change-schema.js'
+import { type Schema } from '../../domain/value-objects/schema.js'
 import {
   type LifecycleReviewSummary,
   type LifecycleBlocker,
@@ -32,7 +37,7 @@ import { type CheckRegistry } from '../../domain/services/check-registry.js'
 import { Logger } from '../logger.js'
 import {
   buildCheckExecutionContext,
-  executeChecksByLegalTargets,
+  evaluateLegalTargets,
   executeMatchingPredicates,
 } from '../services/execute-matching-predicates.js'
 import {
@@ -261,6 +266,8 @@ export interface Blocker {
   readonly label?: string
   /** Check id that produced this blocker when projected from a predicate. */
   readonly checkId?: string
+  /** Structured diagnostic context (for example schema identity mismatch names). */
+  readonly details?: Readonly<Record<string, unknown>>
 }
 
 /** A recommended next step for the user or agent. */
@@ -368,6 +375,29 @@ export interface GetStatusResult {
   readonly nextAction: NextAction
   /** Canonical validity verdict when status reconciled before projecting. */
   readonly validity?: ValidityStatusProjection
+  /** Advisories from change schema resolution (empty when none). */
+  readonly schemaWarnings: readonly ChangeSchemaAdvisory[]
+}
+
+/**
+ * Projects a schema resolution failure to a public blocker.
+ *
+ * @param error - Resolution error, when one was thrown
+ * @returns `SCHEMA_IDENTITY_MISMATCH` with structured names, or `SCHEMA_RESOLUTION_FAILED`
+ */
+function schemaResolutionBlocker(error: Error | undefined): Blocker {
+  if (error instanceof SchemaProviderIdentityMismatchError) {
+    return {
+      code: 'SCHEMA_IDENTITY_MISMATCH',
+      message: error.message,
+      details: { requestedName: error.expectedSchemaName, returnedName: error.actualSchemaName },
+    }
+  }
+  return {
+    code: 'SCHEMA_RESOLUTION_FAILED',
+    message:
+      'Schema resolution failed; lifecycle transitions are unavailable until the schema is restored.',
+  }
 }
 
 /**
@@ -379,6 +409,7 @@ export interface GetStatusResult {
 export class GetStatus {
   private readonly _changes: ChangeRepository
   private readonly _schemaProvider: SchemaProvider
+  private readonly _resolveChangeSchema: ResolveChangeSchema
   private readonly _approvals: { readonly spec: boolean; readonly signoff: boolean }
   private readonly _refresh: RefreshImplementationTracking
   private readonly _transitionBindings: readonly CheckBinding[]
@@ -390,7 +421,7 @@ export class GetStatus {
    * Creates a new `GetStatus` use case instance.
    *
    * @param changes - Repository for loading the change
-   * @param schemaProvider - Provider for the fully-resolved schema
+   * @param schemaProvider - Provider for the fully-resolved schema or shared resolver
    * @param approvals - Whether approval gates are active
    * @param approvals.spec - Whether the spec approval gate is enabled
    * @param approvals.signoff - Whether the signoff gate is enabled
@@ -399,19 +430,31 @@ export class GetStatus {
    * @param archiveBindings - Composed archive check bindings (status in `archivable`)
    * @param reconcile - Optional validity reconciler applied before projection
    * @param checkRegistry - Optional CheckRegistry for open check catalog and bindings
+   * @param resolveChangeSchema - Optional shared resolver for sovereign change schemas
    */
   constructor(
     changes: ChangeRepository,
-    schemaProvider: SchemaProvider,
+    schemaProvider: SchemaProvider | ResolveChangeSchema,
     approvals: { readonly spec: boolean; readonly signoff: boolean },
     refreshImplementationTracking: RefreshImplementationTracking,
     transitionBindings: readonly CheckBinding[],
     archiveBindings: readonly CheckBinding[],
     reconcile?: ReconcileChangeValidity,
     checkRegistry?: CheckRegistry,
+    resolveChangeSchema?: ResolveChangeSchema,
   ) {
     this._changes = changes
-    this._schemaProvider = schemaProvider
+    if (
+      schemaProvider instanceof ResolveChangeSchema ||
+      ('execute' in schemaProvider &&
+        typeof (schemaProvider as unknown as ResolveChangeSchema).execute === 'function')
+    ) {
+      this._resolveChangeSchema = schemaProvider as unknown as ResolveChangeSchema
+      this._schemaProvider = schemaProvider as unknown as SchemaProvider
+    } else {
+      this._schemaProvider = schemaProvider
+      this._resolveChangeSchema = resolveChangeSchema ?? new ResolveChangeSchema(schemaProvider)
+    }
     this._approvals = approvals
     this._refresh = refreshImplementationTracking
     this._transitionBindings = transitionBindings
@@ -445,18 +488,36 @@ export class GetStatus {
       return await this._buildDraftedResult(draftView)
     }
 
-    let schema: Awaited<ReturnType<SchemaProvider['get']>>
+    let schema: Schema
+    let schemaWarnings: readonly ChangeSchemaAdvisory[] = []
     try {
-      schema = await this._schemaProvider.get()
-    } catch {
-      return this._buildActiveResult(change, undefined, null)
+      const resolved = await this._resolveChangeSchema.execute({
+        changeName: change.name,
+        schemaName: change.schemaName,
+        schemaVersion: change.schemaVersion,
+      })
+      schema = resolved.schema
+      schemaWarnings = resolved.warnings
+    } catch (err) {
+      return this._buildActiveResult(
+        change,
+        undefined,
+        null,
+        err instanceof Error ? err : undefined,
+      )
     }
 
     const reconciled = await this._reconcile.execute({
       name: input.name,
       refreshImplementationTracking: input.refreshImplementationTracking !== false,
     })
-    return this._buildActiveResult(reconciled.change, reconciled.verdict, schema)
+    return this._buildActiveResult(
+      reconciled.change,
+      reconciled.verdict,
+      schema,
+      undefined,
+      schemaWarnings,
+    )
   }
 
   /**
@@ -465,12 +526,16 @@ export class GetStatus {
    * @param change - Active change loaded from the repository
    * @param validity - Reconciled validity verdict when a reconciler ran
    * @param schema - Schema resolved before any active-status mutation, or null on degradation
+   * @param failureError - Error causing schema resolution failure when schema is null
+   * @param schemaWarnings - Advisories emitted by change schema resolution
    * @returns Full status result
    */
   private async _buildActiveResult(
     change: Change,
     validity?: ChangeValidityVerdict,
-    schema: Awaited<ReturnType<SchemaProvider['get']>> | null = null,
+    schema: Schema | null = null,
+    failureError?: Error,
+    schemaWarnings: readonly ChangeSchemaAdvisory[] = [],
   ): Promise<GetStatusResult> {
     const changePath = this._changes.changePath(change)
     const artifactStatuses: ArtifactStatusEntry[] = []
@@ -498,14 +563,21 @@ export class GetStatus {
     let checks: readonly CheckResult[] = []
 
     if (schema === null) {
-      blockers = [
-        {
-          code: 'SCHEMA_RESOLUTION_FAILED',
-          message:
-            'Schema resolution failed; lifecycle transitions are unavailable until the schema is restored.',
-        },
-      ]
-      validTransitions = VALID_TRANSITIONS[change.state]
+      const isIdentityMismatch = failureError instanceof SchemaProviderIdentityMismatchError
+      blockers = [schemaResolutionBlocker(failureError)]
+      validTransitions = []
+      availableTransitions = []
+      checksByTarget = {}
+      nextArtifact = null
+      schemaInfo = null
+      nextAction = {
+        targetStep: change.state,
+        actionType: 'cognitive',
+        reason: isIdentityMismatch
+          ? 'Provider returned the wrong schema identity'
+          : 'Schema resolution failed; lifecycle transitions are unavailable until the schema is restored.',
+        command: null,
+      }
       for (const [type, artifact] of change.artifacts) {
         const files: ArtifactFileStatus[] = [...artifact.files.values()].map((file) => ({
           key: file.key,
@@ -548,6 +620,7 @@ export class GetStatus {
         review,
         blockers,
         nextAction,
+        schemaWarnings,
       }
     }
 
@@ -561,7 +634,7 @@ export class GetStatus {
       projectedArtifacts.map((artifact) => [artifact.type, artifact.effectiveStatus]),
     )
     const passMemo = new Map<string, unknown>()
-    const checksByTargetMap = await executeChecksByLegalTargets(this._transitionBindings, {
+    const legalTargets = await evaluateLegalTargets(this._transitionBindings, {
       change,
       schema,
       approvals: this._approvals,
@@ -570,6 +643,7 @@ export class GetStatus {
       ...(this._checkRegistry !== undefined ? { checkRegistry: this._checkRegistry } : {}),
       ...(validity !== undefined ? { validity } : {}),
     })
+    const checksByTargetMap = legalTargets.checksByTarget
     let archiveChecks: readonly CheckResult[] = []
     if (change.state === 'archivable') {
       const archiveEvaluation = await executeMatchingPredicates(
@@ -627,7 +701,12 @@ export class GetStatus {
     }
 
     review = this._projectReview(verdict.review, changePath)
-    blockers = this._mergeBlockers(verdict.blockers, verdict.checksByTarget, archiveChecks)
+    blockers = this._mergeBlockers(
+      verdict.blockers,
+      verdict.checksByTarget,
+      legalTargets.bindingsByTarget,
+      archiveChecks,
+    )
     nextAction = this._nextActionAfterArchiveOverlap(verdict.nextAction, blockers)
     validTransitions = verdict.validTransitions
     availableTransitions = verdict.availableTransitions
@@ -684,6 +763,7 @@ export class GetStatus {
       review,
       blockers,
       nextAction,
+      schemaWarnings,
       ...(validity !== undefined
         ? { validity: projectValidityStatus(change, validity, nextAction) }
         : {}),
@@ -735,6 +815,7 @@ export class GetStatus {
         reason: 'Client revision is current',
         command: null,
       },
+      schemaWarnings: [],
     }
   }
 
@@ -753,14 +834,20 @@ export class GetStatus {
       getArtifact: (type: string) => draftView.artifacts.get(type) ?? null,
     }
 
-    let schema
+    let schema: Schema | undefined
+    let schemaWarnings: readonly ChangeSchemaAdvisory[] = []
+    let resolutionBlocker: Blocker | undefined
     try {
-      schema = await this._schemaProvider.get()
+      const resolved = await this._resolveChangeSchema.execute({
+        changeName: draftView.name,
+        schemaName: draftView.schemaName,
+        schemaVersion: draftView.schemaVersion,
+      })
+      schema = resolved.schema
+      schemaWarnings = resolved.warnings
     } catch (err) {
-      if (!(err instanceof SchemaNotFoundError)) {
-        throw err
-      }
       schema = undefined
+      resolutionBlocker = schemaResolutionBlocker(err instanceof Error ? err : undefined)
     }
 
     const projected = schema === undefined ? null : projectArtifacts(source, schema)
@@ -803,11 +890,14 @@ export class GetStatus {
       approvals: this._approvals,
       nextArtifact: null,
       changePath,
-      schemaInfo: {
-        name: draftView.schemaName,
-        version: draftView.schemaVersion,
-        artifacts: schema === undefined ? [] : schema.artifacts(),
-      },
+      schemaInfo:
+        schema === undefined
+          ? null
+          : {
+              name: draftView.schemaName,
+              version: draftView.schemaVersion,
+              artifacts: schema.artifacts(),
+            },
       checksByTarget: {},
       checks: [],
     }
@@ -830,13 +920,14 @@ export class GetStatus {
         affectedArtifacts: [],
         overlapDetail: [],
       },
-      blockers: [],
+      blockers: resolutionBlocker === undefined ? [] : [resolutionBlocker],
       nextAction: {
         targetStep: draftView.state,
         actionType: 'cognitive',
         reason: 'Change is drafted; restore before lifecycle transitions',
         command: null,
       },
+      schemaWarnings,
     }
   }
 
@@ -847,47 +938,67 @@ export class GetStatus {
    *
    * @param reviewBlockers - Verdict review/requested-target blockers
    * @param checksByTarget - Predicate results per protocol-legal target
+   * @param bindingsByTarget - Resolved bindings per target (derived policy)
    * @param archiveChecks - Archive-scope predicates when `state === 'archivable'`
    * @returns Deduplicated public blockers
    */
   private _mergeBlockers(
     reviewBlockers: readonly LifecycleBlocker[],
     checksByTarget: Readonly<Partial<Record<ChangeState, readonly CheckResult[]>>>,
+    bindingsByTarget: Readonly<Partial<Record<ChangeState, readonly CheckBinding[]>>>,
     archiveChecks: readonly CheckResult[] = [],
   ): Blocker[] {
+    // Skippability comes from the resolved bindings of the target the failure belongs to
+    // (schema-composed), or from the archive bindings for archive checks.
+    const candidates: { check: CheckResult; bindings: readonly CheckBinding[] }[] = [
+      ...Object.entries(checksByTarget).flatMap(([target, rows]) =>
+        (rows ?? []).map((check) => ({
+          check,
+          bindings: bindingsByTarget[target as ChangeState] ?? this._transitionBindings,
+        })),
+      ),
+      ...archiveChecks.map((check) => ({ check, bindings: this._archiveBindings })),
+    ]
+    const skippableByCheckId = new Map<string, boolean>()
+    for (const { check, bindings } of candidates) {
+      if (check.outcome !== 'fail') continue
+      const skippable = bindings.find((b) => b.check.id === check.id)?.skippable === true
+      skippableByCheckId.set(check.id, (skippableByCheckId.get(check.id) ?? false) || skippable)
+    }
+
     const merged = new Map<string, Blocker>()
     for (const blocker of reviewBlockers) {
+      // The lifecycle verdict pre-computes bypass hints; resolved bindings are authoritative.
+      const resolved =
+        blocker.checkId !== undefined ? skippableByCheckId.get(blocker.checkId) : undefined
+      const bypassFlag =
+        resolved === undefined
+          ? blocker.bypassFlag
+          : resolved
+            ? `--skip-checks ${blocker.checkId}`
+            : undefined
       merged.set(`${blocker.code}:${blocker.message}`, {
         code: blocker.code,
         message: blocker.message,
-        ...(blocker.bypassFlag !== undefined ? { bypassFlag: blocker.bypassFlag } : {}),
+        ...(bypassFlag !== undefined ? { bypassFlag } : {}),
         ...(blocker.label !== undefined ? { label: blocker.label } : {}),
         ...(blocker.checkId !== undefined ? { checkId: blocker.checkId } : {}),
       })
     }
 
-    const allBindings = this._checkRegistry
-      ? this._checkRegistry.bindings()
-      : [...this._transitionBindings, ...this._archiveBindings]
-
-    const checks = [
-      ...Object.values(checksByTarget).flatMap((rows) => rows ?? []),
-      ...archiveChecks,
-    ]
-
-    for (const check of checks) {
+    for (const { check } of candidates) {
       if (check.outcome !== 'fail' || check.code === undefined) continue
       const message = check.message ?? `Check '${check.id}' failed`
       const key = `${check.code}:${message}`
       if (merged.has(key)) continue
-      const matchingBinding = allBindings.find((b) => b.check.id === check.id)
-      const isSkippable = matchingBinding?.skippable === true
       merged.set(key, {
         code: check.code,
         message,
         label: check.label,
         checkId: check.id,
-        ...(isSkippable ? { bypassFlag: `--skip-checks ${check.id}` } : {}),
+        ...(skippableByCheckId.get(check.id) === true
+          ? { bypassFlag: `--skip-checks ${check.id}` }
+          : {}),
       })
     }
 

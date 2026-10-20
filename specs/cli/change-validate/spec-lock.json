@@ -8,12 +8,20 @@
     "core:change",
     "core:validate-artifacts",
     "core:spec-id-format",
-    "core:preview-spec"
+    "core:preview-spec",
+    "core:resolve-change-schema"
   ],
   "implementation": [
     {
-      "file": "cli:src/commands/change/validate.ts",
-      "symbols": ["registerChangeValidate", "executeSingle", "executeBatch"]
+      "file": "cli:src/helpers/change-schema.ts",
+      "symbols": ["resolveChangeSchemaForCli"]
+    },
+    {
+      "file": "cli:src/commands/change/validate.ts"
+    },
+    {
+      "file": "cli:src/handle-error.ts",
+      "symbols": ["handleError"]
     }
   ]
 }

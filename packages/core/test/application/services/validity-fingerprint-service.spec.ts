@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import { type SchemaProvider } from '../../../src/application/ports/schema-provider.js'
 import { ArtifactFile } from '../../../src/domain/value-objects/artifact-file.js'
 import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
 import { Change } from '../../../src/domain/entities/change.js'
@@ -166,6 +167,54 @@ describe('ValidityFingerprintService', () => {
       'proposal:proposal': hasher.hash('hello'),
     })
     expect(result.fingerprint?.artifacts.files).not.toHaveProperty('checklist:checklist')
+  })
+
+  it('uses the change sovereign schema for every artifact-bearing fingerprint API', async () => {
+    const change = changeWithProposal('hello\n')
+    const sovereignSchema = makeSchema([
+      makeArtifactType('proposal'),
+      makeArtifactType('tasks', { hasTasks: true }),
+    ])
+    const get = vi.fn(async (ref?: string) => {
+      if (ref !== 'test-schema') throw new Error('workspace default must not be used')
+      return sovereignSchema
+    })
+    const service = new ValidityFingerprintService({
+      changes: new FingerprintRepo(change),
+      hasher,
+      binaryHasher: new NodeBinaryContentHasher(),
+      schemaProvider: { get } as SchemaProvider,
+    })
+
+    const artifact = await service.artifactFingerprint(change)
+    const approval = await service.specApprovalFingerprint(change)
+    const complete = await service.completeFingerprint(change)
+
+    expect(get).toHaveBeenCalledTimes(3)
+    expect(get.mock.calls.every(([ref]) => ref === 'test-schema')).toBe(true)
+    expect(artifact.fingerprint?.artifacts.files).toEqual({
+      'proposal:proposal': hasher.hash('hello'),
+    })
+    expect(approval.fingerprint?.artifacts.files).toEqual(artifact.fingerprint?.artifacts.files)
+    expect(complete.fingerprint?.artifacts.files).toEqual(artifact.fingerprint?.artifacts.files)
+    expect(complete.fingerprint?.artifacts.files).not.toHaveProperty('tasks:tasks')
+  })
+
+  it('propagates sovereign schema failures without returning fallback evidence', async () => {
+    const change = changeWithProposal('hello\n')
+    const failure = new Error('sovereign schema unavailable')
+    const get = vi.fn(async (_ref?: string) => Promise.reject(failure))
+    const service = new ValidityFingerprintService({
+      changes: new FingerprintRepo(change),
+      hasher,
+      binaryHasher: new NodeBinaryContentHasher(),
+      schemaProvider: { get } as SchemaProvider,
+    })
+
+    await expect(service.artifactFingerprint(change)).rejects.toBe(failure)
+    await expect(service.specApprovalFingerprint(change)).rejects.toBe(failure)
+    await expect(service.completeFingerprint(change)).rejects.toBe(failure)
+    expect(get.mock.calls.every(([ref]) => ref === 'test-schema')).toBe(true)
   })
 
   it('returns a null fingerprint when an implementation file is missing', async () => {

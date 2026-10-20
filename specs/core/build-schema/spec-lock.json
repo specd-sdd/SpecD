@@ -22,36 +22,36 @@
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Pure buildSchema: SchemaYamlData+templates → Schema with ID/DAG/template/workflow semantic validation.",
+      "value": "Pure buildSchema converts validated SchemaYamlData and templates into governed Schema entities with semantic validation.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:7091e2e7cb0eb7fd4a1e68d7c75a9fef48734bcf194d9ef1e35dc02fc76a0639",
-          "lastModified": "2026-05-25T06:02:58.413Z"
+          "hash": "sha256:9d4c7d2c9600a5e680f112be4b7b6d9b46c4d84a99807422186608138a502a92",
+          "lastModified": "2026-10-01T14:53:50.003Z"
         },
         "verify.md": {
-          "hash": "sha256:62918b5d6ac173f0f363488ea6d3f5bf8b491fac541d27a6f4d7000398fda9a7",
-          "lastModified": "2026-05-25T06:02:58.413Z"
+          "hash": "sha256:37af849fa8565611d7c572f5d64910fe14fbc076b22f365cb3538a41064ca236",
+          "lastModified": "2026-10-01T14:53:50.004Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# buildSchema\n\n## Rules\n- Sync pure fn: `buildSchema(ref, data: SchemaYamlData, templates) → Schema` in `domain/services/build-schema.ts`. No I/O.\n- SchemaYamlData plain interface (not Zod): name, version, description?, kind schema|schema-plugin, extends?, artifacts, workflow?, metadataExtraction?.\n- Validate artifact.id `/^[a-z][a-z0-9-]*$/`; array entry ids `/^[a-z][a-z0-9]*(-[a-z0-9]+)*$/` unique in array; hooks unique across ALL workflow steps. Dup artifact/step → SchemaValidationError.\n- Template path must exist in templates map. requiresTaskCompletion ⊂ requires + taskCompletionCheck on type.\n- Artifact DAG: known requires refs; non-optional must not depend on optional; acyclic (detectCycle DFS).\n- Helpers: buildSelector, buildValidationRule, buildFieldMapping, buildExtractor, buildMetadataExtractorEntry, buildMetadataExtraction, buildArtifactType (defaults optional/delta false, requires []). Relocate buildSelector from infra Zod module.\n- Construct `new Schema(name, version, artifacts, workflow, metadataExtraction)` + kind/extends.\n\n## Constraints\n- Pure: no fs/yaml/zod. domain/services only. Intermediate types plain TS. Errors: SchemaValidationError. Templates pre-loaded.",
+      "value": "# buildSchema\n\n## Rules\n- Pure synchronous `buildSchema(ref, data: SchemaYamlData, templates) → Schema` in `domain/services/build-schema.ts`; no I/O.\n- `SchemaYamlData` and raw helpers are plain TypeScript, never Zod/infrastructure types.\n- Validate artifact IDs `/^[a-z][a-z0-9-]*$/`; array-entry IDs `/^[a-z][a-z0-9]*(-[a-z0-9]+)*$/`, length 1–64, unique per array; hook IDs unique across all workflow steps. Duplicate artifacts/steps throw `SchemaValidationError`.\n- Template keys must exist. Artifact `requires` references must exist; non-optional artifacts cannot depend on optional artifacts; dependency DAG must be acyclic.\n- `requiresTaskCompletion` must be subset of step `requires`; referenced artifact type must declare `taskCompletionCheck`.\n- Helpers `buildSelector`, `buildValidationRule`, `buildFieldMapping`, `buildExtractor`, `buildMetadataExtractorEntry`, `buildMetadataExtraction`, `buildArtifactType` recursively convert plain raw data, strip `undefined`; defaults: `optional=false`, `delta=false`, `requires=[]`. `detectCycle` uses DFS.\n- Compile checks against active `CheckRegistry`; unknown IDs throw `UnknownCheckError`. Exact duplicate `{ checkId, to, along }` coordinates throw `DuplicateCheckBindingError`.\n- Governance comes from definitions/bindings, never check-name prefixes. `allowBindingOverride: false` forbids embedding or changing locked `onFailure`/`skippable`; `allowConfigOverride: false` forbids `config`; `allowDisable: false` forbids `disabled: true`.\n- Governance restrictions are monotonic across schema layers, redeclarations, and `merge-schema-layers`; later layers cannot relax locks or clobber declarations.\n- Executable `run`/`external` hook `onFailure` accepts only `abort|warn`; invalid values are schema syntax errors.\n- Construct `new Schema(name, version, artifacts, workflow, metadataExtraction)`, including `kind`, `extends`, and declared `requiresTaskCompletion`.\n\n## Constraints\n- Domain-only, synchronous, no fs/yaml/zod/application/infrastructure/composition imports.\n- Templates preloaded; `buildSchema` never reads files.\n- Semantic validation failures use specified typed errors; otherwise `SchemaValidationError`.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:7091e2e7cb0eb7fd4a1e68d7c75a9fef48734bcf194d9ef1e35dc02fc76a0639",
-          "lastModified": "2026-05-25T06:02:58.413Z"
+          "hash": "sha256:9d4c7d2c9600a5e680f112be4b7b6d9b46c4d84a99807422186608138a502a92",
+          "lastModified": "2026-10-01T14:53:50.003Z"
         },
         "verify.md": {
-          "hash": "sha256:62918b5d6ac173f0f363488ea6d3f5bf8b491fac541d27a6f4d7000398fda9a7",
-          "lastModified": "2026-05-25T06:02:58.413Z"
+          "hash": "sha256:37af849fa8565611d7c572f5d64910fe14fbc076b22f365cb3538a41064ca236",
+          "lastModified": "2026-10-01T14:53:50.004Z"
         }
       }
     }

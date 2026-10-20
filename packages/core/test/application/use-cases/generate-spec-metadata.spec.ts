@@ -1,6 +1,8 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { makeSpec } from '../../helpers/make-spec.js'
 import { GenerateSpecMetadata } from '../../../src/application/use-cases/generate-spec-metadata.js'
+import { SchemaProviderIdentityMismatchError } from '../../../src/application/errors/schema-provider-identity-mismatch-error.js'
+import { type SchemaProvider } from '../../../src/application/ports/schema-provider.js'
 import { Spec } from '../../../src/domain/entities/spec.js'
 import { ExtractorTransformError } from '../../../src/domain/errors/extractor-transform-error.js'
 import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
@@ -281,7 +283,7 @@ describe('GenerateSpecMetadata', () => {
       artifacts: {
         'change/spec.md': '# Change\n',
         'change/spec-lock.json': JSON.stringify({
-          schema: { name: 'specd', version: 1 },
+          schema: { name: 'test-schema', version: 1 },
           dependsOn: [],
           implementation: [
             { file: 'core:src/domain/entities/change.ts' },
@@ -340,7 +342,7 @@ describe('GenerateSpecMetadata', () => {
       artifacts: {
         'change/spec.md': '# Change\n',
         'change/spec-lock.json': JSON.stringify({
-          schema: { name: 'specd', version: 1 },
+          schema: { name: 'test-schema', version: 1 },
           dependsOn: ['core:spec-lock', 'core:spec-metadata'],
           implementation: [],
         }),
@@ -396,7 +398,7 @@ describe('GenerateSpecMetadata', () => {
         'auth/login/spec.md':
           '# Auth Login\n\n## Spec Dependencies\n\n- [`default:auth/shared`](../shared/spec.md)\n',
         'auth/login/spec-lock.json': JSON.stringify({
-          schema: { name: 'specd', version: 1 },
+          schema: { name: 'test-schema', version: 1 },
           dependsOn: ['default:auth/other'],
           implementation: [],
         }),
@@ -594,7 +596,7 @@ describe('GenerateSpecMetadata', () => {
       artifacts: {
         'auth/login/spec.md': content,
         'auth/login/spec-lock.json': JSON.stringify({
-          schema: { name: 'specd-std', version: 1 },
+          schema: { name: 'test-schema', version: 1 },
           dependsOn: [],
           implementation: [],
           optimizations: {
@@ -603,7 +605,7 @@ describe('GenerateSpecMetadata', () => {
               artifactState: {
                 'spec.md': { hash: 'sha256:placeholder', lastModified: '2020-01-01T00:00:00.000Z' },
               },
-              schema: { name: 'specd-std', version: 1 },
+              schema: { name: 'test-schema', version: 1 },
             },
           },
         }),
@@ -621,5 +623,93 @@ describe('GenerateSpecMetadata', () => {
     const result = await useCase.execute({ specId: 'default:auth/login' })
     expect(result.metadata.optimizedDescription).toBeUndefined()
     expect(result.sourceState.persistedStateHash).not.toBeNull()
+  })
+  describe('schema precedence', () => {
+    const makeFixture = (lockSchemaName: string | null) => {
+      const files = ['spec.md', ...(lockSchemaName !== null ? ['spec-lock.json'] : [])]
+      const spec = makeSpec({ workspace: 'default', name: 'auth/login', filenames: files })
+      const repo = makeSpecRepository({
+        specs: [spec],
+        artifacts: {
+          'auth/login/spec.md': '# Auth Login\n',
+          ...(lockSchemaName !== null
+            ? {
+                'auth/login/spec-lock.json': JSON.stringify({
+                  schema: { name: lockSchemaName, version: 1 },
+                  dependsOn: [],
+                  implementation: [],
+                  optimizations: {},
+                }),
+              }
+            : {}),
+        },
+      })
+      const schemas: Record<string, ReturnType<typeof makeSchema>> = {
+        'change-schema': makeSchema({ name: 'change-schema' }),
+        'lock-schema': makeSchema({ name: 'lock-schema' }),
+        'default-schema': makeSchema({ name: 'default-schema' }),
+      }
+      const get = vi.fn(async (name?: string) => schemas[name ?? 'default-schema']!)
+      const useCase = new GenerateSpecMetadata(
+        makeListWorkspaces(new Map([['default', repo]])),
+        { get } as unknown as SchemaProvider,
+        makeParsers(),
+        makeContentHasher(),
+        createBuiltinExtractorTransforms(),
+      )
+      return { useCase, get }
+    }
+
+    it('prefers the explicit change schema over the lock and the default', async () => {
+      const { useCase, get } = makeFixture('lock-schema')
+
+      const result = await useCase.execute({
+        specId: 'default:auth/login',
+        schemaName: 'change-schema',
+      })
+
+      expect(get).toHaveBeenCalledWith('change-schema')
+      expect(get).not.toHaveBeenCalledWith('lock-schema')
+      expect(result.sourceState.schema.name).toBe('change-schema')
+    })
+
+    it('uses the persisted lock schema when no change schema is given', async () => {
+      const { useCase, get } = makeFixture('lock-schema')
+
+      const result = await useCase.execute({ specId: 'default:auth/login' })
+
+      expect(get).toHaveBeenCalledWith('lock-schema')
+      expect(result.sourceState.schema.name).toBe('lock-schema')
+    })
+
+    it('falls back to the project default only for a lock-less spec', async () => {
+      const { useCase, get } = makeFixture(null)
+
+      const result = await useCase.execute({ specId: 'default:auth/login' })
+
+      expect(get).toHaveBeenCalledWith()
+      expect(result.sourceState.schema.name).toBe('default-schema')
+    })
+
+    it('does not fall back to the default when the lock schema cannot be resolved', async () => {
+      const { useCase, get } = makeFixture('lock-schema')
+      get.mockImplementation(async (name?: string) => {
+        if (name === 'lock-schema') throw new Error('lock schema missing')
+        return makeSchema({ name: 'default-schema' })
+      })
+
+      await expect(useCase.execute({ specId: 'default:auth/login' })).rejects.toThrow(
+        'lock schema missing',
+      )
+    })
+
+    it('rejects a provider that returns a different schema than requested', async () => {
+      const { useCase, get } = makeFixture('lock-schema')
+      get.mockResolvedValue(makeSchema({ name: 'default-schema' }))
+
+      await expect(useCase.execute({ specId: 'default:auth/login' })).rejects.toBeInstanceOf(
+        SchemaProviderIdentityMismatchError,
+      )
+    })
   })
 })

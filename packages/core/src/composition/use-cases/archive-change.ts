@@ -8,6 +8,7 @@ import { type SpecRepository } from '../../application/ports/spec-repository.js'
 import { type SchemaProvider } from '../../application/ports/schema-provider.js'
 import { type ContentHasher } from '../../application/ports/content-hasher.js'
 import { ArchiveChange } from '../../application/use-cases/archive-change.js'
+import { type ResolveChangeSchema } from '../../application/services/resolve-change-schema.js'
 import { type MaterializeSpecMetadata } from '../../application/use-cases/materialize-spec-metadata.js'
 import {
   ListWorkspaces,
@@ -116,6 +117,7 @@ export interface ArchiveChangeDeps {
   readonly archiveBindings: readonly import('../../domain/services/transition-checks.js').CheckBinding[]
   readonly contentHasher: ContentHasher
   readonly reconcile: import('../../application/use-cases/reconcile-change-validity.js').ReconcileChangeValidity
+  readonly resolveChangeSchema?: ResolveChangeSchema
 }
 
 export function resolveArchiveChangeDeps(resolver: CompositionResolver): ArchiveChangeDeps {
@@ -148,6 +150,7 @@ export function resolveArchiveChangeDeps(resolver: CompositionResolver): Archive
     archiveBindings: registry.archiveBindings,
     contentHasher: resolver.getContentHasher(),
     reconcile: resolver.getReconcileChangeValidity(),
+    resolveChangeSchema: resolver.getResolveChangeSchema(),
   }
 }
 
@@ -188,6 +191,7 @@ function createArchiveChangeFromNormalized(
       archiveBindings,
       contentHasher,
       reconcile,
+      resolveChangeSchema,
     } = input.deps
 
     return new ArchiveChange(
@@ -205,6 +209,7 @@ function createArchiveChangeFromNormalized(
       batchSnapshot,
       contentHasher,
       reconcile,
+      resolveChangeSchema,
     )
   }
 

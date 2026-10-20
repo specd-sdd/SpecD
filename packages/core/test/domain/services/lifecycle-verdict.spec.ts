@@ -5,6 +5,8 @@ import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
 import { ArtifactFile } from '../../../src/domain/value-objects/artifact-file.js'
 import {
   evaluateLifecycleVerdict,
+  isAtOrAfterVerificationBoundary,
+  recommendedForwardTarget,
   projectArtifacts,
   findBlockingParent,
   type LifecycleVerdictInput,
@@ -48,6 +50,66 @@ function tableBindingMatches(
   }
   return spec.applicability.some((row) => checkMatches(row, attempt))
 }
+
+describe('recommendedForwardTarget', () => {
+  const approvals = { spec: false, signoff: false } as const
+  const optionalImplementing = makeSchema({
+    workflow: [
+      makeWorkflowStep('ready'),
+      makeWorkflowStep('implementing', { optional: true }),
+      makeWorkflowStep('verifying'),
+      makeWorkflowStep('done'),
+    ],
+  })
+
+  it('returns the immediate mandatory successor', () => {
+    expect(recommendedForwardTarget('designing', ['ready'], optionalImplementing, approvals)).toBe(
+      'ready',
+    )
+  })
+
+  it('recommends the checked shortcut while retaining explicit optional entry', () => {
+    expect(
+      recommendedForwardTarget(
+        'ready',
+        ['implementing', 'verifying'],
+        optionalImplementing,
+        approvals,
+      ),
+    ).toBe('verifying')
+  })
+
+  it('falls back to entering the optional step when its shortcut is unavailable', () => {
+    expect(
+      recommendedForwardTarget('ready', ['implementing'], optionalImplementing, approvals),
+    ).toBe('implementing')
+  })
+
+  it('treats an empty effective skip-check set as an available unconditional bypass', () => {
+    expect(
+      recommendedForwardTarget(
+        'ready',
+        ['implementing', 'verifying'],
+        optionalImplementing,
+        approvals,
+      ),
+    ).toBe('verifying')
+  })
+
+  it('selects the furthest target after consecutive optional steps', () => {
+    const schema = makeSchema({
+      workflow: [
+        makeWorkflowStep('ready'),
+        makeWorkflowStep('implementing', { optional: true }),
+        makeWorkflowStep('verifying', { optional: true }),
+        makeWorkflowStep('done'),
+      ],
+    })
+    expect(
+      recommendedForwardTarget('ready', ['implementing', 'verifying', 'done'], schema, approvals),
+    ).toBe('done')
+  })
+})
 
 function implStateFail(id: 'impl.filesResolved' | 'impl.linksInScope'): CheckResult {
   return {
@@ -103,11 +165,7 @@ function domainChecksByTarget(
     >
   > = {}
   for (const target of VALID_TRANSITIONS[change.state]) {
-    const along = classifyAlong(
-      change.state,
-      target,
-      schema.workflow().map((step) => step.step),
-    )
+    const along = classifyAlong(change.state, target, schema, approvals)
     const protocol = runProtocolEdge({ from: change.state, to: target })
     const requires =
       along === 'recovery'
@@ -1079,5 +1137,110 @@ describe('canonical validity guidance', () => {
     expect(verdict.availableTransitions).not.toContain('done')
     expect(verdict.nextHop.targetStep).toBe('verifying')
     expect(verdict.nextAction.command).toBe('/specd-verify')
+  })
+
+  it('preserves failed step-skip check evidence in checksByTarget while keeping shortcut unavailable', () => {
+    const change = makeChange()
+    change.transition('designing', testActor)
+    change.transition('ready', testActor)
+
+    const schema = makeSchema({
+      workflow: [
+        makeWorkflowStep('ready'),
+        makeWorkflowStep('implementing', { optional: true }),
+        makeWorkflowStep('verifying'),
+        makeWorkflowStep('done'),
+      ],
+    })
+
+    const failedSkipCheck = fail(
+      'workflow.tasksEmpty',
+      'INCOMPLETE_TASKS',
+      'Cannot skip implementing: 2 incomplete tasks',
+    )
+
+    const verdict = evaluate(change, schema, {
+      checksByTarget: {
+        implementing: [pass('protocol.edge')],
+        verifying: [pass('protocol.edge'), failedSkipCheck],
+      },
+    })
+
+    expect(verdict.checksByTarget.verifying).toBeDefined()
+    expect(verdict.checksByTarget.verifying).toContain(failedSkipCheck)
+    expect(verdict.availableTransitions).not.toContain('verifying')
+    expect(verdict.availableTransitions).toContain('implementing')
+  })
+
+  it('keeps designing selectable in availableTransitions and availableSteps when advertised even if another nextAction is preferred', () => {
+    const change = makeChange()
+    change.transition('designing', testActor)
+    change.transition('ready', testActor)
+    change.transition('implementing', testActor)
+
+    const schema = makeSchema({
+      workflow: [
+        makeWorkflowStep('designing'),
+        makeWorkflowStep('ready'),
+        makeWorkflowStep('implementing'),
+        makeWorkflowStep('verifying'),
+        makeWorkflowStep('done'),
+      ],
+    })
+
+    const verdict = evaluate(change, schema, {
+      checksByTarget: {
+        verifying: [pass('protocol.edge')],
+        designing: [pass('protocol.edge')],
+      },
+    })
+
+    expect(verdict.nextHop.targetStep).toBe('verifying')
+    expect(verdict.nextAction.command).not.toBe('/specd-design')
+
+    expect(verdict.availableTransitions).toContain('designing')
+    expect(verdict.availableTransitions).toContain('verifying')
+    const designingStep = verdict.availableSteps.find((s) => s.step === 'designing')
+    expect(designingStep).toBeDefined()
+    expect(designingStep?.available).toBe(true)
+  })
+})
+
+describe('isAtOrAfterVerificationBoundary', () => {
+  const approvals = { spec: false, signoff: false }
+  const enabled = makeSchema(
+    [],
+    [makeWorkflowStep('implementing'), makeWorkflowStep('verifying'), makeWorkflowStep('done')],
+  )
+
+  it('is false before verifying and true from verifying onward', () => {
+    expect(isAtOrAfterVerificationBoundary('implementing', enabled, approvals)).toBe(false)
+    expect(isAtOrAfterVerificationBoundary('verifying', enabled, approvals)).toBe(true)
+    expect(isAtOrAfterVerificationBoundary('done', enabled, approvals)).toBe(true)
+    expect(isAtOrAfterVerificationBoundary('archivable', enabled, approvals)).toBe(true)
+    expect(isAtOrAfterVerificationBoundary('archiving', enabled, approvals)).toBe(true)
+  })
+
+  it('places drain states after their anchor', () => {
+    const gated = { spec: false, signoff: true }
+    expect(isAtOrAfterVerificationBoundary('pending-signoff', enabled, gated)).toBe(true)
+    expect(isAtOrAfterVerificationBoundary('signed-off', enabled, gated)).toBe(true)
+    expect(
+      isAtOrAfterVerificationBoundary('spec-approved', enabled, { spec: true, signoff: false }),
+    ).toBe(false)
+  })
+
+  it('is always false when verifying is disabled', () => {
+    const disabled = makeSchema(
+      [],
+      [
+        makeWorkflowStep('implementing'),
+        makeWorkflowStep('verifying', { disabled: true }),
+        makeWorkflowStep('done'),
+      ],
+    )
+    for (const state of ['verifying', 'done', 'archivable', 'archiving'] as const) {
+      expect(isAtOrAfterVerificationBoundary(state, disabled, approvals)).toBe(false)
+    }
   })
 })

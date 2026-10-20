@@ -30,6 +30,33 @@ changes; archive with `--allow-overlap` only for that case. If `review.reason` i
 
 Extract the `path:` field from the "lifecycle:" section.
 
+### Schema-aware lifecycle routing
+
+Read a fresh structured status projection before any archive entry or hook:
+
+```bash
+specd changes status <name> --format toon
+```
+
+Treat `nextAction.command` as the preferred default recommendation and select a target
+only from `lifecycle.availableTransitions`. When explicitly invoked, map `/specd-archive`
+to its advertised archive target (`archiving` or `archivable`): if another lifecycle skill
+is recommended, report that recommendation but continue toward the mapped target if it is
+present in `lifecycle.availableTransitions`. If the target is absent from `availableTransitions`,
+stop before running any hooks and report the blockers along with the recommended command.
+Do not assume a canonical predecessor sequence. Refresh before acting; if the structured
+routing fields are missing, malformed, stale, or do not advertise the intended target,
+stop with the diagnostic text status. Hooks run only for the actual selected hop, never
+for bypassed intermediate states.
+
+Routed blocks (`<!-- route: target -->` … `<!-- /route -->`) use placeholders instead of
+fixed state names: `<target>` is the lifecycle step selected from a fresh
+`lifecycle.availableTransitions` (this skill's intended target when advertised,
+otherwise `nextAction.targetStep`) and `<source>` is the change's current `state`.
+Run `run-hooks` / `hook-instruction` only for the source (`--phase post`) and the
+selected target (`--phase pre`) of an actual hop, and never substitute a fixed state
+sequence.
+
 If the status output shows `review: required: yes`, tell the user:
 
 > Artifacts need review before archiving. Run `/specd-design <name>` to update them.
@@ -64,10 +91,12 @@ summary specs, evaluate and load any that are relevant (see `shared.md` — "Pro
 
 ### 4. Pre-archive hooks
 
+<!-- route: target -->
 ```bash
-specd changes run-hooks <name> archiving --phase pre
-specd changes hook-instruction <name> archiving --phase pre --format text
+specd changes run-hooks <name> <target> --phase pre
+specd changes hook-instruction <name> <target> --phase pre --format text
 ```
+<!-- /route -->
 
 Follow guidance — review deltas to ensure specs match what was built.
 
@@ -200,11 +229,13 @@ specd changes archive <name> --skip-hooks pre --allow-out-of-scope --format toon
 ### 6. Post-archive instructions
 
 Post `run:` hooks already ran inside `changes archive` (after persist). Do **not**
-call `run-hooks <name> archiving --phase post` — that would run them twice.
+call `run-hooks <name> <source> --phase post` — that would run them twice.
 
+<!-- route: target -->
 ```bash
-specd changes hook-instruction <name> archiving --phase post --format text
+specd changes hook-instruction <name> <source> --phase post --format text
 ```
+<!-- /route -->
 
 Follow guidance.
 
@@ -254,9 +285,11 @@ Follow the recommended repair command based on the target recommendation.
 If during the pre-archive review you discover that the artifacts need revision, stop and explain.
 If the user agrees:
 
+<!-- route: target -->
 ```bash
-specd changes transition <name> designing --skip-hooks all
+specd changes transition <name> <target> --skip-hooks all
 ```
+<!-- /route -->
 
 > Specs need revision before archiving. Run `/specd-design <name>` to update them.
 

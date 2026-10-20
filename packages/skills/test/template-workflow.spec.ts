@@ -192,7 +192,7 @@ describe('workflow skill templates', () => {
     const implement = readTemplate('skills', 'specd-implement', 'SKILL.md.tpl')
     expect(implement).toContain('zero open')
     expect(implement).toContain('implementation list')
-    expect(implement).toContain('do **not** tell the user to run `/specd-verify` yet')
+    expect(implement).toContain('do **not** recommend the next phase yet')
     expect(implement).toContain(
       'Never recommend `/specd-verify` while `implementation list` still shows `open` files',
     )
@@ -206,7 +206,7 @@ describe('workflow skill templates', () => {
     expect(archive).toContain('--skip-hooks pre')
     expect(archive).not.toMatch(/archive <name> --skip-hooks all/)
     expect(archive).not.toMatch(/```bash\n[^\n]*run-hooks <name> archiving --phase post/)
-    expect(archive).toContain('hook-instruction <name> archiving --phase post')
+    expect(archive).toContain('hook-instruction <name> <source> --phase post')
   })
 
   it('design skill does not treat the text review header as a file list', () => {
@@ -335,5 +335,29 @@ describe('workflow skill templates', () => {
     expect(archive.indexOf('### 4b. Live preflight after hooks')).toBeLessThan(
       archive.indexOf('### 5. Archive'),
     )
+  })
+
+  it('routes through advertised schema steps without hooks for disabled or optional intermediates', () => {
+    const verify = readTemplate('skills', 'specd-verify', 'SKILL.md.tpl')
+    const implement = readTemplate('skills', 'specd-implement', 'SKILL.md.tpl')
+    expect(verify).toContain('never run verifying hooks when verification is disabled or bypassed')
+    expect(verify).toContain('lifecycle.availableTransitions')
+    expect(implement).toMatch(/When `implementing` is bypassed,\s+do not enter it or run its hooks/)
+    expect(implement).toContain('nextAction.command')
+  })
+
+  it('treats nextAction as preferred default while permitting advertised explicit targets', () => {
+    for (const skill of [
+      'specd-design',
+      'specd-implement',
+      'specd-verify',
+      'specd-archive',
+    ] as const) {
+      const template = readTemplate('skills', skill, 'SKILL.md.tpl')
+      expect(template).toContain('preferred default recommendation')
+      expect(template).toContain('lifecycle.availableTransitions')
+      expect(template).toMatch(/When explicitly\s+invoked/)
+      expect(template).toContain('stop before running any hooks')
+    }
   })
 })

@@ -10,6 +10,7 @@ import {
 } from './transition-checks.js'
 import { type ChangeState } from '../value-objects/change-state.js'
 import { type Schema } from '../value-objects/schema.js'
+import { type ApprovalGates } from './workflow-topology.js'
 
 export { runDepsConsistent } from '../checks/deps-consistent.js'
 export { runWorkspaceReadOnly } from '../checks/workspace-read-only.js'
@@ -41,18 +42,16 @@ export function bindingMatches(
  * @param from - Current state
  * @param requestedTarget - Requested target
  * @param schema - Active schema
+ * @param approvals - Exact approval-gate snapshot used by topology
  * @returns Attempt triple
  */
 export function transitionAttempt(
   from: ChangeState,
   requestedTarget: ChangeState,
   schema: Schema,
+  approvals: ApprovalGates,
 ): Extract<CheckAttempt, { scope: 'transition' }> {
-  const along = classifyAlong(
-    from,
-    requestedTarget,
-    schema.workflow().map((step) => step.step),
-  )
+  const along = classifyAlong(from, requestedTarget, schema, approvals)
   return { scope: 'transition', from, to: requestedTarget, along }
 }
 

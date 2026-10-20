@@ -28,6 +28,33 @@ Extract the `path:` field from the "lifecycle:" section.
 From the `artifacts (DAG):` section, note which artifact IDs are marked with
 `[hasTasks]`; those are the task-bearing artifacts to read and update later.
 
+### Schema-aware lifecycle routing
+
+Read a fresh structured routing projection before entering or leaving a phase:
+
+```bash
+specd changes status <name> --format toon
+```
+
+Treat `nextAction.command` as the preferred default recommendation and choose targets
+only from `lifecycle.availableTransitions`. When explicitly invoked, map `/specd-implement`
+to its intended target `implementing`: if a different command is recommended, report that
+recommendation but continue toward `implementing` if `implementing` is present in
+`lifecycle.availableTransitions`. If `implementing` is absent from `availableTransitions`,
+stop before running any hooks and report the blockers along with the recommended command;
+never fall back to a fixed `ready → implementing → verifying` sequence. Refresh status
+before advancing and hard-stop on absent, malformed, or stale routing data. Run hooks only
+for the source and selected target of an actual hop. When `implementing` is bypassed,
+do not enter it or run its hooks.
+
+Routed blocks (`<!-- route: target -->` … `<!-- /route -->`) use placeholders instead of
+fixed state names: `<target>` is the lifecycle step selected from a fresh
+`lifecycle.availableTransitions` (this skill's intended target when advertised,
+otherwise `nextAction.targetStep`) and `<source>` is the change's current `state`.
+Run `run-hooks` / `hook-instruction` only for the source (`--phase post`) and the
+selected target (`--phase pre`) of an actual hop, and never substitute a fixed state
+sequence.
+
 Trust reconciled status. Do not calculate fingerprints, edit projections, or
 roll the lifecycle back yourself.
 
@@ -55,7 +82,7 @@ Redirect based on the **next action:** `target` recommendation.
 **Stop — do not continue.**
 
 If in `ready` and the spec gate is on with no recorded spec approval (status
-`approvals.spec=on` and an `APPROVAL_REQUIRED` blocker, or next action pointing at
+`lifecycle.approvals.spec` true in the fresh toon status and an `APPROVAL_REQUIRED` blocker, or next action pointing at
 human `approve spec`): **stay in `ready`**. Tell the user to run
 `specd changes approve spec <name> --reason "..."`. Do **not** `transition implementing`.
 
@@ -63,23 +90,29 @@ human `approve spec`): **stay in `ready`**. Tell the user to run
 
 If in `ready` with spec gate off (or spec already approved) or `spec-approved`, run pre-hooks and transition:
 
+<!-- route: target -->
 ```bash
-specd changes run-hooks <name> implementing --phase pre
-specd changes hook-instruction <name> implementing --phase pre --format text
+specd changes run-hooks <name> <target> --phase pre
+specd changes hook-instruction <name> <target> --phase pre --format text
 ```
+<!-- /route -->
 
 Follow guidance — it tells you which change artifacts to read.
 
+<!-- route: target -->
 ```bash
-specd changes transition <name> implementing --skip-hooks all
+specd changes transition <name> <target> --skip-hooks all
 ```
+<!-- /route -->
 
 If already in `implementing` (resuming), run pre-hooks but skip the transition:
 
+<!-- route: target -->
 ```bash
-specd changes run-hooks <name> implementing --phase pre
-specd changes hook-instruction <name> implementing --phase pre --format text
+specd changes run-hooks <name> <target> --phase pre
+specd changes hook-instruction <name> <target> --phase pre --format text
 ```
+<!-- /route -->
 
 ### 2. Check workspace ownership
 
@@ -276,24 +309,31 @@ For each task in order:
 **Trigger:** the moment the last `- [ ]` across ALL task-bearing artifacts is marked
 `- [x]`, run the post-implementing hooks.
 
+<!-- route: target -->
 ```bash
-specd changes run-hooks <name> implementing --phase post
-specd changes hook-instruction <name> implementing --phase post --format text
+specd changes run-hooks <name> <source> --phase post
+specd changes hook-instruction <name> <source> --phase post --format text
 ```
+<!-- /route -->
 
 Follow guidance. If hooks fail (tests, lint), fix and re-run until they pass.
 
 **Before recommending verify:** run `specd changes implementation list <name>`.
 There MUST be **zero open** tracked files (`resolve` or `ignore` per `shared.md` —
 "Implementation tracking"). If `changes status` still shows `IMPLEMENTATION_STATE`,
-keep draining — do **not** tell the user to run `/specd-verify` yet.
+keep draining — do **not** recommend the next phase yet.
 
 When open files are gone:
 
-> Implementation complete. Run `/specd-verify <name>` to verify against scenarios.
+<!-- route: target -->
+Read a fresh `specd changes status <name> --format toon` and tell the user:
+
+> Implementation complete. Next: the command in `nextAction.command`.
+
+<!-- /route -->
 
 **Stop.**
-Do not invoke `/specd-verify` automatically; wait for explicit user confirmation.
+Do not invoke the recommended command automatically; wait for explicit user confirmation.
 
 ## Session tasks
 
@@ -314,9 +354,11 @@ Follow the recommended repair command based on the target recommendation.
 If during implementation you discover that the artifacts need changes, stop and explain
 the issue. If the user agrees:
 
+<!-- route: target -->
 ```bash
-specd changes transition <name> designing --skip-hooks all
+specd changes transition <name> <target> --skip-hooks all
 ```
+<!-- /route -->
 
 > Artifacts need revision. Run `/specd-design <name>` to update them.
 

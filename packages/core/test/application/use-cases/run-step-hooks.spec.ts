@@ -5,13 +5,14 @@ import {
 } from '../../../src/application/use-cases/run-step-hooks.js'
 import { ChangeNotFoundError } from '../../../src/application/errors/change-not-found-error.js'
 import { SchemaNotFoundError } from '../../../src/application/errors/schema-not-found-error.js'
-import { SchemaMismatchError } from '../../../src/application/errors/schema-mismatch-error.js'
+import { SchemaProviderIdentityMismatchError } from '../../../src/application/errors/schema-provider-identity-mismatch-error.js'
 import { ExternalHookTypeNotRegisteredError } from '../../../src/application/errors/external-hook-type-not-registered-error.js'
 import { StepNotValidError } from '../../../src/domain/errors/step-not-valid-error.js'
 import { HookNotFoundError } from '../../../src/domain/errors/hook-not-found-error.js'
 import { HookResult } from '../../../src/domain/value-objects/hook-result.js'
 import { type HookEntry } from '../../../src/domain/value-objects/workflow-step.js'
 import { type ExternalHookRunner } from '../../../src/application/ports/external-hook-runner.js'
+import { type SchemaProvider } from '../../../src/application/ports/schema-provider.js'
 import {
   type HookRunner,
   type OnHookRunnerProgress,
@@ -34,13 +35,15 @@ function makeUseCase(opts: {
   hookRunner?: HookRunner
   externalHookRunners?: ReadonlyMap<string, ExternalHookRunner>
   schema?: ReturnType<typeof makeSchema> | null
+  schemaProvider?: SchemaProvider
 }): RunStepHooks {
   return new RunStepHooks(
     opts.changes ?? makeChangeRepository(),
     opts.archive ?? makeArchiveRepository(),
     opts.hookRunner ?? makeHookRunner(),
     opts.externalHookRunners ?? new Map(),
-    makeSchemaProvider(opts.schema === undefined ? makeSchema() : opts.schema),
+    opts.schemaProvider ??
+      makeSchemaProvider(opts.schema === undefined ? makeSchema() : opts.schema),
   )
 }
 
@@ -85,17 +88,35 @@ describe('RunStepHooks', () => {
       ).rejects.toThrow(SchemaNotFoundError)
     })
 
-    it('throws SchemaMismatchError when schema name does not match change schema name', async () => {
+    it('resolves schema by change.schemaName', async () => {
       const change = makeChange('my-change', {}, 'alpha-schema')
-      const schema = makeSchema({ name: 'beta-schema' })
+      const schema = makeSchema({ name: 'alpha-schema' })
+      const schemaProvider: SchemaProvider = {
+        get: vi.fn().mockResolvedValue(schema),
+      }
       const uc = makeUseCase({
         changes: makeChangeRepository([change]),
-        schema,
+        schemaProvider,
       })
+
+      const result = await uc.execute({ name: 'my-change', step: 'implementing', phase: 'pre' })
+      expect(result.success).toBe(true)
+      expect(schemaProvider.get).toHaveBeenCalledWith('alpha-schema')
+    })
+
+    it('propagates a provider identity mismatch instead of using the default schema', async () => {
+      const change = makeChange('my-change', {}, 'alpha-schema')
+      // The default differs from the change schema: answers are keyed by requested name.
+      const schemaProvider: SchemaProvider = {
+        get: vi.fn(async (name?: string) =>
+          makeSchema({ name: name === 'alpha-schema' ? 'beta-schema' : 'default-schema' }),
+        ),
+      }
+      const uc = makeUseCase({ changes: makeChangeRepository([change]), schemaProvider })
 
       await expect(
         uc.execute({ name: 'my-change', step: 'implementing', phase: 'pre' }),
-      ).rejects.toThrow(SchemaMismatchError)
+      ).rejects.toThrow(SchemaProviderIdentityMismatchError)
     })
   })
 
@@ -339,6 +360,63 @@ describe('RunStepHooks', () => {
   })
 
   // ── Execution Semantics ──────────────────────────────────────────
+
+  describe('disabled steps', () => {
+    const hook: HookEntry = { id: 'lint', type: 'run', command: 'pnpm lint' }
+    const disabledSchema = makeSchema({
+      workflow: [
+        {
+          step: 'implementing',
+          disabled: true,
+          requires: [],
+          requiresTaskCompletion: [],
+          hooks: { pre: [hook], post: [hook] },
+        },
+      ],
+    })
+
+    it.each(['pre', 'post'] as const)(
+      'returns no hooks for a disabled step (%s)',
+      async (phase) => {
+        const commands: string[] = []
+        const hookRunner = {
+          async run(command: string): Promise<HookResult> {
+            commands.push(command)
+            return new HookResult(0, '', '')
+          },
+        }
+        const uc = makeUseCase({
+          changes: makeChangeRepository([makeChange('my-change')]),
+          schema: disabledSchema,
+          hookRunner,
+        })
+
+        const result = await uc.execute({ name: 'my-change', step: 'implementing', phase })
+
+        expect(result).toEqual({ hooks: [], success: true, failedHooks: [], warnings: [] })
+        expect(commands).toEqual([])
+      },
+    )
+
+    it('does not let --only run a disabled step hook', async () => {
+      const run = vi.fn(async () => new HookResult(0, '', ''))
+      const uc = makeUseCase({
+        changes: makeChangeRepository([makeChange('my-change')]),
+        schema: disabledSchema,
+        hookRunner: { run },
+      })
+
+      const result = await uc.execute({
+        name: 'my-change',
+        step: 'implementing',
+        phase: 'pre',
+        only: 'lint',
+      })
+
+      expect(result.hooks).toEqual([])
+      expect(run).not.toHaveBeenCalled()
+    })
+  })
 
   describe('execution semantics', () => {
     it('pre-phase fail-fast: stops on first failure, subsequent hooks NOT run', async () => {

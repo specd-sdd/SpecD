@@ -79,36 +79,36 @@
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Facade wiring domain use cases from SpecdConfig into changes/specs/project groups; config mutation via createConfigWriter().",
+      "value": "Immutable Kernel facade wires grouped domain use cases; ConfigWriter separately owns configuration mutation.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:ea03e5b09b1431af2475f900d31013f25208db881953d065b8d4708a91d4373a",
-          "lastModified": "2026-07-25T13:14:44.911Z"
+          "hash": "sha256:43be4953248c0c1fcede1610c745f5b4f76b3a1bfd214a49df1151ab0923086e",
+          "lastModified": "2026-10-06T10:29:46.123Z"
         },
         "verify.md": {
-          "hash": "sha256:a68d363a8f72f9b164d399c3a595777d7c938657c15ac81f334b2fd0c9847be6",
-          "lastModified": "2026-07-25T13:14:44.928Z"
+          "hash": "sha256:e4d830c85b0071d4956649d313d606bcf17e7d64c4b8135cf153eb7dec268bcd",
+          "lastModified": "2026-10-06T10:31:16.491Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# Kernel\n\n## Rules\n- `Kernel` groups use cases: `changes`, `specs`, `project` — never top-level.\n- `kernel.specs` MUST NOT expose `SaveSpecMetadata`/`InvalidateSpecMetadata`; `PersistSpecMetadata` not mounted (internal to `MaterializeSpecMetadata`).\n- Every exported application use case (except `_shared/`) MUST have `Kernel` entry + `createKernel` wiring.\n- Entries typed as concrete use-case classes; callers use `kernel.<group>.<uc>.execute(...)`.\n- `createKernel(config, options?)` uses shared `CompositionResolver` path; one shared `ChangeRepository`, per-workspace `SpecRepository`, `SchemaRegistry`, lazy caching `SchemaProvider` (via `ResolveSchema`; failures not cached; never `null`), `HookRunner`, `RunStepHooks`, `ContentHasher`, `ArtifactParserRegistry`.\n- No use case calls `SchemaRegistry.resolve()` directly — only `SchemaProvider.get()`.\n- Hooks come from schema via `schemaOverrides`; kernel ignores `config.workflow`.\n- Registry/view helpers composition-owned; kernel facade only — no second merged-registry source.\n- VCS/actor via `createVcsAdapter`/`createVcsActorResolver` — no hardcoding `Git*`.\n- `FsChangeRepository.get()` auto-invalidates on artifact drift when past `designing` OR active approval; cause `artifact-drift`; legacy `\"artifact-change\"` normalized.\n- Expose `changes.repo` + `specs.repos`.\n- `KernelOptions.extraNodeModulesPaths` appends schema search paths; supports repo overrides + additive registries (storage/VCS/actor/parsers/external hooks). Graph-store NOT core.\n- Expose merged registries (final built-in+external); reject conflicts/unknown refs.\n- Binding map: `changes.*` (create/status/countTasks/transition/approveSpec/approveSignoff/draft/restore/discard/archive/validate/compile/list/listDrafts/listDiscarded/edit/skipArtifact/updateSpecDeps/listArchived/getArchived/runStepHooks/getHookInstructions/getArtifactInstruction/detectOverlap + repo); `specs.*` (list/search/get/getActiveSchema/validate/generateMetadata/materializeMetadata/getMetadata/regenerateMetadata/initializePersistedState/getPersistedSchema/updatePersistedSchema/getPersistedDeps/updatePersistedDeps/getPersistedImplementation/updatePersistedImplementation/getPersistedOptimizations/updatePersistedOptimizations/getContext/resolveSchema/getHealth + repos); `project.*` (listWorkspaces/getProjectContext/getConfig/getMetadata/updateMetadata).\n- No `listPlugins` / skills-manifest / config-mutation on kernel — plugins via `getConfig().plugins`; writes via `createConfigWriter()`.\n- `execute()` inputs MUST NOT re-pass construction-time config. Allowed overrides only: `CompileContext`, `GetProjectContext`, `GetSpecContext`, `TransitionChange`, `ArchiveChange`, `RunStepHooks`, `GetStatus`, `CreateChange`, `ValidateArtifacts` (fields per full spec).\n- `createKernel` returns plain immutable object, not class.\n\n## Constraints\n- Kernel = mandatory domain use-case entry; config mutation = `createConfigWriter()`.\n- Missing Kernel entry for exported domain UC = violation (except ConfigWriter ops).\n- Removing Kernel entry = breaking change.\n- No business logic in kernel — wiring/grouping only.\n- `createKernelInternals` not exported; `Kernel` + `createKernel` public.",
+      "value": "# Kernel\n\n## Rules\n- `Kernel` groups concrete use-case instances under `changes`, `specs`, `project`; callers use `kernel.<group>.<useCase>.execute(...)`. Every exported application use case except `_shared/` and ConfigWriter operations requires entry + wiring.\n- `createKernel(config, options?)` returns immutable plain object. Shared `CompositionResolver` supplies one `ChangeRepository`, per-workspace `SpecRepository`, `SchemaRegistry`, lazy caching `SchemaProvider` via `ResolveSchema`, `HookRunner`, `RunStepHooks`, `ContentHasher`, merged `ArtifactParserRegistry`; failed schema resolutions not cached.\n- Use cases never call `SchemaRegistry.resolve()`; use `SchemaProvider.get()`. Hooks derive from schema/`schemaOverrides`, never `config.workflow`.\n- VCS/actor use `createVcsAdapter`/`createVcsActorResolver`. `KernelOptions.extraNodeModulesPaths` appends schema search roots. Built-in + external registries merge additively; conflicts/unknown refs fail. Graph store remains outside core.\n- `FsChangeRepository.get()` auto-invalidates artifact drift after `designing` or with active approval; cause `artifact-drift`; normalize legacy `artifact-change`.\n- Expose `changes.repo`, `specs.repos`. `kernel.specs` excludes `saveMetadata`/`invalidateMetadata`; `PersistSpecMetadata` remains internal to `MaterializeSpecMetadata`.\n- Change group includes lifecycle, approvals, tracking/review, verification, artifact validation/preview/context, overlap, archive, draft/discard, hooks, repository operations. Specs group includes listing/search/get/outline/schema validation/resolution, health, metadata materialization, persisted schema/deps/implementation/optimizations, context. Project group includes workspaces, summary/context resolution, readonly config, project metadata.\n- Plugin declarations come from `kernel.project.getConfig.execute()` or loaded `SpecdConfig`; no kernel `listPlugins`. Config writes use `createConfigWriter()`; no `initProject|addPlugin|removePlugin` kernel paths. Obsolete skills-manifest use cases excluded and unexported.\n- Execute inputs never re-pass construction-time config. Runtime overrides allowed only for documented per-call controls on `CompileContext`, `GetProjectContext`, `GetSpecContext`, `TransitionChange`, `ArchiveChange`, `RunStepHooks`, `GetStatus`, `CreateChange`, `ValidateArtifacts`.\n\n## Constraints\n- Kernel mandatory public domain-use-case facade; config mutation separate via `createConfigWriter()`.\n- Adding exported domain use case without Kernel entry is violation; removal is breaking.\n- Kernel contains wiring/grouping only, no business logic.\n- `Kernel` and `createKernel` public; `createKernelInternals` private.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:ea03e5b09b1431af2475f900d31013f25208db881953d065b8d4708a91d4373a",
-          "lastModified": "2026-07-25T13:14:44.911Z"
+          "hash": "sha256:43be4953248c0c1fcede1610c745f5b4f76b3a1bfd214a49df1151ab0923086e",
+          "lastModified": "2026-10-06T10:29:46.123Z"
         },
         "verify.md": {
-          "hash": "sha256:a68d363a8f72f9b164d399c3a595777d7c938657c15ac81f334b2fd0c9847be6",
-          "lastModified": "2026-07-25T13:14:44.928Z"
+          "hash": "sha256:e4d830c85b0071d4956649d313d606bcf17e7d64c4b8135cf153eb7dec268bcd",
+          "lastModified": "2026-10-06T10:31:16.491Z"
         }
       }
     }

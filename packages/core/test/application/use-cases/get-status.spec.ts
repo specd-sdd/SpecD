@@ -1,4 +1,8 @@
+import { NodeBinaryContentHasher } from '../../../src/infrastructure/node/binary-content-hasher.js'
+import { NodeContentHasher } from '../../../src/infrastructure/node/content-hasher.js'
+import { ValidityFingerprintService } from '../../../src/application/services/validity-fingerprint-service.js'
 import { describe, it, expect, vi } from 'vitest'
+import { ResolveChangeSchema } from '../../../src/application/services/resolve-change-schema.js'
 import { GetStatus } from '../../../src/application/use-cases/get-status.js'
 import { CountTasks } from '../../../src/application/use-cases/count-tasks.js'
 import { RefreshImplementationTracking } from '../../../src/application/use-cases/refresh-implementation-tracking.js'
@@ -9,6 +13,7 @@ import { ArtifactFile } from '../../../src/domain/value-objects/artifact-file.js
 import { SpecArtifact } from '../../../src/domain/value-objects/spec-artifact.js'
 import { VALID_TRANSITIONS } from '../../../src/domain/value-objects/change-state.js'
 import { type Schema } from '../../../src/domain/value-objects/schema.js'
+import { type SchemaProvider } from '../../../src/application/ports/schema-provider.js'
 import { evaluateLifecycle } from '../../../src/application/services/lifecycle-evaluation.js'
 import * as lifecycleEvaluation from '../../../src/application/services/lifecycle-evaluation.js'
 import {
@@ -34,6 +39,7 @@ import {
   makeRunStepHooks,
   makeObservingReconcile,
   testActor,
+  makeRealReconcile,
 } from './helpers.js'
 
 const defaultApprovals = { spec: false, signoff: false }
@@ -60,6 +66,7 @@ function makeGetStatus(
   changes: ReturnType<typeof makeChangeRepository>,
   opts: {
     schema?: Schema | null
+    schemaProvider?: SchemaProvider
     approvals?: { spec: boolean; signoff: boolean }
     failSchema?: boolean
     refresh?: RefreshImplementationTracking
@@ -74,7 +81,7 @@ function makeGetStatus(
   } = {},
 ) {
   const schema = opts.schema === undefined ? makeStdSchema() : opts.schema
-  const schemaProvider = makeSchemaProvider(schema)
+  const schemaProvider = opts.schemaProvider ?? makeSchemaProvider(schema)
   const countTasks = opts.countTasks ?? new CountTasks(changes, schemaProvider)
   const refresh =
     opts.refresh ??
@@ -111,6 +118,33 @@ describe('GetStatus', () => {
       const uc = makeGetStatus(makeChangeRepository())
       await expect(uc.execute({ name: 'missing' })).rejects.toThrow(ChangeNotFoundError)
     })
+  })
+
+  it('projects workflow from the recorded sovereign schema instead of the workspace default', async () => {
+    const change = makeChange('sovereign', { schemaName: 'custom-workflow' })
+    change.transition('designing', testActor)
+    const sovereign = makeSchema({
+      name: 'custom-workflow',
+      workflow: [
+        {
+          step: 'verifying',
+          disabled: true,
+          requires: [],
+          requiresTaskCompletion: [],
+          hooks: { pre: [], post: [] },
+        },
+      ],
+    })
+    const workspaceDefault = makeStdSchema()
+    const get = vi.fn(async (name?: string) =>
+      name === 'custom-workflow' ? sovereign : workspaceDefault,
+    )
+    const result = await makeGetStatus(makeChangeRepository([change]), {
+      schemaProvider: { get } as SchemaProvider,
+    }).execute({ name: 'sovereign' })
+
+    expect(get).toHaveBeenCalledWith('custom-workflow')
+    expect(result.lifecycle.availableSteps.map((step) => step.step)).not.toContain('verifying')
   })
 
   describe('basic status fields', () => {
@@ -329,7 +363,7 @@ describe('GetStatus', () => {
       const refresh = makeRefreshImplementationTracking(refreshExecute)
       const reconcile = new ReconcileChangeValidity({
         changes,
-        schemaProvider: schemaProvider as never,
+        resolveChangeSchema: new ResolveChangeSchema(schemaProvider as never),
         actor: makeActorResolver(),
         refreshImplementationTracking: refresh,
         fingerprint: {} as never,
@@ -358,6 +392,143 @@ describe('GetStatus', () => {
       expect(reconcileExecute).not.toHaveBeenCalled()
       expect(mutate).not.toHaveBeenCalled()
       expect(change.history).toEqual(historyBefore)
+    })
+
+    it('emits SCHEMA_IDENTITY_MISMATCH and fail-closed empty transitions when schema provider returns wrong identity', async () => {
+      const change = makeChange('identity-mismatch', { schemaName: 'expected-schema' })
+      change.transition('designing', testActor)
+      const schemaProvider = {
+        get: async () => makeSchema({ name: 'wrong-schema' }),
+      }
+      const uc = makeGetStatus(makeChangeRepository([change]), {
+        schemaProvider: schemaProvider as never,
+      })
+
+      const result = await uc.execute({ name: 'identity-mismatch' })
+
+      expect(result.blockers).toEqual([
+        {
+          code: 'SCHEMA_IDENTITY_MISMATCH',
+          message:
+            "Schema provider returned 'wrong-schema' for change 'identity-mismatch' when 'expected-schema' was requested.",
+          details: { requestedName: 'expected-schema', returnedName: 'wrong-schema' },
+        },
+      ])
+      expect(result.lifecycle.validTransitions).toEqual([])
+      expect(result.lifecycle.availableTransitions).toEqual([])
+      expect(result.lifecycle.availableSteps).toEqual([])
+      expect(result.lifecycle.checksByTarget).toEqual({})
+      expect(result.lifecycle.nextArtifact).toBeNull()
+      expect(result.lifecycle.schemaInfo).toBeNull()
+      expect(result.nextAction).toEqual({
+        targetStep: 'designing',
+        actionType: 'cognitive',
+        reason: 'Provider returned the wrong schema identity',
+        command: null,
+      })
+    })
+  })
+
+  describe('candidate evaluation and skippable steps', () => {
+    it('populates complete checksByTarget and includes shortcut target in availableTransitions when optional step skip passes', async () => {
+      const change = makeChange('opt-change')
+      change.transition('designing', testActor)
+      change.transition('ready', testActor)
+
+      const schema = makeSchema(
+        [],
+        [
+          makeWorkflowStep('ready'),
+          makeWorkflowStep('implementing', { optional: true }),
+          makeWorkflowStep('verifying'),
+          makeWorkflowStep('done'),
+        ],
+      )
+
+      const uc = makeGetStatus(makeChangeRepository([change]), { schema })
+      const result = await uc.execute({ name: 'opt-change' })
+
+      const verifyingChecks = result.lifecycle.checksByTarget['verifying']
+      expect(verifyingChecks).toBeDefined()
+      expect(verifyingChecks!.some((c) => c.id === 'protocol.edge')).toBe(true)
+      expect(verifyingChecks!.some((c) => c.id === 'workflow.tasksEmpty')).toBe(true)
+
+      expect(result.lifecycle.availableTransitions).toContain('implementing')
+      expect(result.lifecycle.availableTransitions).toContain('verifying')
+    })
+
+    it('populates complete checksByTarget with failing skip check and excludes shortcut from availableTransitions', async () => {
+      const change = makeChange('opt-change-tasks')
+      change.transition('designing', testActor)
+      change.transition('ready', testActor)
+
+      const tasksArtifact = new ChangeArtifact({ type: 'tasks' })
+      tasksArtifact.setFile(
+        new ArtifactFile({ key: 'tasks', filename: 'tasks.md', status: 'complete' }),
+      )
+      change.setArtifact(tasksArtifact)
+
+      const changesRepo = makeChangeRepository([change])
+      vi.spyOn(changesRepo, 'artifact').mockResolvedValue(
+        new SpecArtifact('tasks.md', '# Tasks\n- [ ] 1.1 Incomplete Task'),
+      )
+
+      const schema = makeSchema(
+        [
+          makeArtifactType('tasks', {
+            hasTasks: true,
+            taskCompletionCheck: {
+              incompletePattern: '^\\s*-\\s*\\[ \\]\\s+',
+              completePattern: '^\\s*-\\s*\\[x\\]\\s+',
+            },
+          }),
+        ],
+        [
+          makeWorkflowStep('ready'),
+          makeWorkflowStep('implementing', { optional: true }),
+          makeWorkflowStep('verifying'),
+          makeWorkflowStep('done'),
+        ],
+      )
+
+      const uc = makeGetStatus(changesRepo, { schema })
+      const result = await uc.execute({ name: 'opt-change-tasks' })
+
+      const verifyingChecks = result.lifecycle.checksByTarget['verifying']
+      expect(verifyingChecks).toBeDefined()
+      const tasksEmptyCheck = verifyingChecks!.find((c) => c.id === 'workflow.tasksEmpty')
+      expect(tasksEmptyCheck).toBeDefined()
+      expect(tasksEmptyCheck!.outcome).toBe('fail')
+
+      expect(result.lifecycle.availableTransitions).not.toContain('verifying')
+      expect(result.lifecycle.availableTransitions).toContain('implementing')
+    })
+
+    it('permits shortcut when step-skip check set is empty for a bypassed optional step', async () => {
+      const change = makeChange('opt-verifying')
+      change.transition('designing', testActor)
+      change.transition('ready', testActor)
+      change.transition('implementing', testActor)
+
+      const schema = makeSchema(
+        [],
+        [
+          makeWorkflowStep('ready'),
+          makeWorkflowStep('implementing'),
+          makeWorkflowStep('verifying', { optional: true }),
+          makeWorkflowStep('done'),
+        ],
+      )
+
+      const uc = makeGetStatus(makeChangeRepository([change]), { schema })
+      const result = await uc.execute({ name: 'opt-verifying' })
+
+      const doneChecks = result.lifecycle.checksByTarget['done']
+      expect(doneChecks).toBeDefined()
+      expect(doneChecks!.every((c) => c.outcome !== 'fail')).toBe(true)
+
+      expect(result.lifecycle.availableTransitions).toContain('verifying')
+      expect(result.lifecycle.availableTransitions).toContain('done')
     })
   })
 
@@ -605,6 +776,62 @@ describe('GetStatus', () => {
     const blocker = result.blockers.find((entry) => entry.code === 'IMPLEMENTATION_STATE')
     expect(blocker).toBeDefined()
     expect(blocker?.bypassFlag).toBeUndefined()
+    expect(blocker?.checkId).toBe('impl.filesResolved')
+    expect(blocker?.label).toBe('Checking open implementation files')
+  })
+
+  it('given a schema-declared skippable impl.filesResolved, when GetStatus merges blockers, then bypassFlag derives from the resolved bindings', async () => {
+    const change = makeChange('impl-open-skippable')
+    change.transition('designing', testActor)
+    change.transition('ready', testActor)
+    change.transition('implementing', testActor)
+    const schema = makeSchema(
+      [makeArtifactType('proposal'), makeArtifactType('tasks')],
+      [
+        makeWorkflowStep('designing'),
+        makeWorkflowStep('ready'),
+        makeWorkflowStep('implementing'),
+        makeWorkflowStep('verifying', { checks: [{ id: 'impl.filesResolved', skippable: true }] }),
+      ],
+    )
+    const failingFiles = {
+      id: 'impl.filesResolved' as const,
+      label: 'Checking open implementation files',
+      kind: 'predicate' as const,
+      execute: async () => ({
+        id: 'impl.filesResolved' as const,
+        label: 'Checking open implementation files',
+        kind: 'predicate' as const,
+        outcome: 'fail' as const,
+        code: 'IMPLEMENTATION_STATE',
+        message: '1 open tracked file remain open: a.ts',
+      }),
+    }
+    const repo = makeChangeRepository([change])
+    const schemaProvider = makeSchemaProvider(schema)
+    const countTasks = new CountTasks(repo, schemaProvider)
+    const registry = createWorkflowCheckRegistry({
+      countTasks,
+      runStepHooks: makeRunStepHooks(),
+      readyFacts: {
+        changes: repo,
+        listWorkspaces: makeListWorkspaces(),
+        parsers: makeNoopParsers(),
+        extractorTransforms: new Map(),
+        workspaceRoutes: [],
+      },
+      detectImplLinksInScope,
+    })
+    const transitionBindings = registry.transitionBindings.map((binding) =>
+      binding.check.id === 'impl.filesResolved' ? { ...binding, check: failingFiles } : binding,
+    )
+    const uc = makeGetStatus(repo, { schema, transitionBindings, countTasks })
+
+    const result = await uc.execute({ name: 'impl-open-skippable' })
+
+    const blocker = result.blockers.find((entry) => entry.code === 'IMPLEMENTATION_STATE')
+    expect(blocker).toBeDefined()
+    expect(blocker?.bypassFlag).toBe('--skip-checks impl.filesResolved')
     expect(blocker?.checkId).toBe('impl.filesResolved')
     expect(blocker?.label).toBe('Checking open implementation files')
   })
@@ -939,6 +1166,74 @@ describe('GetStatus', () => {
     })
   })
 
+  describe('change schema resolution advisories and degradation', () => {
+    it('degrades drafted status with a structured identity blocker', async () => {
+      const change = makeChange('my-change', { schemaName: 'expected-schema' })
+      change.transition('designing', testActor)
+      change.draft(testActor)
+      const repo = makeChangeRepository()
+      repo.store.set(change.name, change)
+      const schemaProvider = { get: async () => makeSchema({ name: 'wrong-schema' }) }
+
+      const uc = makeGetStatus(repo, { schemaProvider: schemaProvider as never })
+      const result = await uc.execute({ name: 'my-change' })
+
+      expect(result.lifecycle.schemaInfo).toBeNull()
+      expect(result.blockers).toEqual([
+        expect.objectContaining({
+          code: 'SCHEMA_IDENTITY_MISMATCH',
+          details: { requestedName: 'expected-schema', returnedName: 'wrong-schema' },
+        }),
+      ])
+    })
+
+    it('degrades drafted status for any resolution error', async () => {
+      const change = makeChange('my-change')
+      change.transition('designing', testActor)
+      change.draft(testActor)
+      const repo = makeChangeRepository()
+      repo.store.set(change.name, change)
+      const schemaProvider = {
+        get: async () => {
+          throw new Error('boom')
+        },
+      }
+
+      const uc = makeGetStatus(repo, { schemaProvider: schemaProvider as never })
+      const result = await uc.execute({ name: 'my-change' })
+
+      expect(result.lifecycle.schemaInfo).toBeNull()
+      expect(result.blockers).toEqual([
+        expect.objectContaining({ code: 'SCHEMA_RESOLUTION_FAILED' }),
+      ])
+    })
+
+    it('exposes same-name version drift as schemaWarnings and no warnings otherwise', async () => {
+      const drifted = makeChange('my-change', { schemaName: 'custom-schema', schemaVersion: 1 })
+      drifted.transition('designing', testActor)
+      const matching = makeChange('other-change', { schemaName: 'custom-schema', schemaVersion: 2 })
+      matching.transition('designing', testActor)
+      const schemaProvider = {
+        get: async () => makeSchema([], [], { name: 'custom-schema', version: 2 }),
+      }
+
+      const uc = makeGetStatus(makeChangeRepository([drifted, matching]), {
+        schemaProvider: schemaProvider as never,
+      })
+
+      const driftResult = await uc.execute({ name: 'my-change' })
+      expect(driftResult.schemaWarnings).toEqual([
+        expect.objectContaining({
+          code: 'SCHEMA_VERSION_DRIFT',
+          recordedVersion: 1,
+          resolvedVersion: 2,
+        }),
+      ])
+      const cleanResult = await uc.execute({ name: 'other-change' })
+      expect(cleanResult.schemaWarnings).toEqual([])
+    })
+  })
+
   describe('ifModifiedSince revision checks', () => {
     it('reconciles even when client revision matches updatedAt', async () => {
       const createdAt = new Date('2024-01-01T00:00:00Z')
@@ -1052,7 +1347,7 @@ describe('GetStatus', () => {
       name: 'overlap-victim',
       createdAt,
       specIds: ['default:auth/login'],
-      schemaName: '@specd/schema-std',
+      schemaName: 'test-schema',
       schemaVersion: 1,
       history: [
         {
@@ -1060,7 +1355,7 @@ describe('GetStatus', () => {
           at: createdAt,
           by: testActor,
           specIds: ['default:auth/login'],
-          schemaName: '@specd/schema-std',
+          schemaName: 'test-schema',
           schemaVersion: 1,
         },
         {
@@ -1347,5 +1642,68 @@ describe('GetStatus', () => {
       expect(blocker).toBeDefined()
       expect(blocker?.bypassFlag).toBe('--skip-checks impl.linksInScope')
     })
+  })
+})
+
+describe('GetStatus with verifying disabled and the real reconciler', () => {
+  const disabledVerifying = makeSchema({
+    workflow: [makeWorkflowStep('implementing'), makeWorkflowStep('verifying', { disabled: true })],
+  })
+
+  const doneChange = (name: string) => {
+    const change = makeChange(name)
+    change.transition('designing', testActor)
+    change.transition('ready', testActor)
+    change.transition('implementing', testActor)
+    change.transition('verifying', testActor)
+    change.transition('done', testActor)
+    return change
+  }
+
+  const statusFor = async (change: Change, approvals: { spec: boolean; signoff: boolean }) => {
+    const repo = makeChangeRepository([change])
+    const uc = makeGetStatus(repo, {
+      schema: disabledVerifying,
+      approvals,
+      reconcile: makeRealReconcile(repo, makeSchemaProvider(disabledVerifying), approvals),
+    })
+    return uc.execute({ name: change.name })
+  }
+
+  it('routes a blocked done to the sign-off command, never to verification', async () => {
+    const result = await statusFor(doneChange('blocked-done'), { spec: false, signoff: true })
+
+    expect(result.change?.state).toBe('done')
+    expect(result.nextAction.command).toBe('specd changes approve signoff')
+    expect(result.blockers.some((blocker) => blocker.code === 'SIGNOFF_REQUIRED')).toBe(true)
+    expect(result.nextAction.command).not.toContain('verif')
+  })
+
+  it('raises no verification blocker and passes the sign-off gate once signed off', async () => {
+    const change = doneChange('signed-done')
+    const repo = makeChangeRepository([change])
+    const provider = makeSchemaProvider(disabledVerifying)
+    const collected = await new ValidityFingerprintService({
+      changes: repo,
+      hasher: new NodeContentHasher(),
+      binaryHasher: new NodeBinaryContentHasher(),
+      schemaProvider: provider,
+    }).completeFingerprint(change)
+    change.recordSignoff('Ship it', collected.fingerprint!, testActor)
+    const approvals = { spec: false, signoff: true }
+    const result = await makeGetStatus(repo, {
+      schema: disabledVerifying,
+      approvals,
+      reconcile: makeRealReconcile(repo, provider, approvals),
+    }).execute({ name: change.name })
+
+    const codes = result.blockers.map((blocker) => blocker.code)
+    expect(codes).not.toContain('VERIFICATION_REQUIRED')
+    expect(codes).not.toContain('VERIFICATION_IN_PROGRESS')
+    expect(codes).not.toContain('VERIFICATION_STALE')
+    const signoffCheck = result.lifecycle.checksByTarget.archivable?.find(
+      (check) => check.id === 'approval.signoff',
+    )
+    expect(signoffCheck?.outcome).toBe('pass')
   })
 })

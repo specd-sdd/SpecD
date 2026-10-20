@@ -65,9 +65,9 @@ Merge extraction is the `deps.consistent` guard against the sealed set. It MUST 
 - `allowOverlap` (boolean, optional, default `false`) — when `true`, the use case skips the overlap check and permits archiving even when other active changes target the same specs
 - `allowOutOfScope` (boolean, optional, default `false`) — skippable `impl.linksInScope` semantics (`--allow-out-of-scope`); MUST NOT bypass `impl.filesResolved`
 
-### Requirement: Schema name guard
+### Requirement: Sovereign schema resolution
 
-After obtaining the schema from `SchemaProvider`, `ArchiveChange` MUST evaluate the `schema.nameMatch` check on operation `archive`: compare `schema.name()` with `change.schemaName`. If they differ, it MUST throw `SchemaMismatchError`. This MUST happen before the archivable guard, any hooks, or file modifications. Matching archive predicates MUST `failFastOn: 'schema.nameMatch'` so later archive checks do not `execute` after a schema mismatch.
+`ArchiveChange` MUST obtain the schema for the change through `ResolveChangeSchema`. The change's recorded schema is the sovereign authority governing its artifact types, verification requirement, pre-publication metadata extraction and sidecar consistency checks, and archive hooks. Post-commit `metadata.json` regeneration operates on canonical project specs after the change has been published and is a project-level operation outside this boundary. A different workspace default MUST remain irrelevant. General resolution failures and `SchemaProviderIdentityMismatchError` MUST propagate before archive preflight, hooks, or commit work begins.
 
 The host MUST NOT `list()` / `get()` other active changes before predicates return. Overlap peer loading MAY run after a failed `spec.overlap` check or when `allowOverlap` invalidation is required.
 
@@ -91,7 +91,7 @@ After pre-archive hooks and before permanent writes, `ArchiveChange` SHALL refre
 
 The reconciler is a mandatory dependency in every constructor and factory form. Missing explicit dependencies MUST fail through the standard composition-configuration error. `ArchiveChange` MUST NOT call `Change.invalidate` or another legacy mutation path as a fallback.
 
-Archive SHALL fail when required approval is absent, stale, or revoked; verification is absent, legacy-unknown, or stale; any non-task artifact has unresolved drift or pending review; or a required task artifact is missing, unreadable, structurally invalid, or contains incomplete tasks.
+Archive SHALL fail when required approval is absent, stale, or revoked; verification is required (per `core:change` "Verification requirement follows workflow topology") and is absent, legacy-unknown, or stale; any non-task artifact has unresolved drift or pending review; or a required task artifact is missing, unreadable, structurally invalid, or contains incomplete tasks. When the change schema disables `verifying`, the `verification.current` archive predicate and the post-hook validity re-check SHALL NOT block archive for missing verification evidence.
 
 If reconciliation commits a mandatory return to `designing` or `done`, archive SHALL stop and return a typed application diagnostic containing the committed state, automatic return, canonical blockers, and next action. It MUST NOT reduce recovery to a generic invalid-state error. Missing or stale verification recommends renewing evidence in the current state; it does not force a transition to `verifying`. A failed archive MUST NOT undo committed gate recovery.
 
@@ -339,7 +339,7 @@ For each modified spec, preflight MUST:
 
 Persisted `metadata.json` regeneration MUST occur only after `archiveRepository.archive()` succeeds and after all `.specd-archive-backup/` directories for the batch have been deleted — canonical artifacts and the lock must already be committed.
 
-For each modified spec, `ArchiveChange` MUST then call `MaterializeSpecMetadata.execute({ specId, policy: 'force' })` against the canonical persisted spec. This performs deterministic generation and guarded cache persistence in one step; `ArchiveChange` does not call `GenerateSpecMetadata` or write the cache itself. A forced cache-persistence failure for a spec is reported, not silently ignored — affected spec paths are reported in `staleMetadataSpecPaths`; failures do not abort the archive.
+For each modified spec, `ArchiveChange` MUST then call `MaterializeSpecMetadata.execute({ specId, policy: 'force', schemaName })` against the canonical persisted spec, where `schemaName` is the archived change's sovereign schema name obtained through `ResolveChangeSchema`. Metadata for the archived change's specs MUST NOT be generated with the workspace default schema. This performs deterministic generation and guarded cache persistence in one step; `ArchiveChange` does not call `GenerateSpecMetadata` or write the cache itself. A forced cache-persistence failure for a spec is reported, not silently ignored — affected spec paths are reported in `staleMetadataSpecPaths`; failures do not abort the archive.
 
 Sidecar consistency failures during preflight remain fatal before publication begins. Post-commit metadata regeneration failures are non-fatal to the archive outcome.
 
@@ -507,3 +507,4 @@ When archive composition cannot derive explicit workspace layouts, `resolveArchi
 - [`core:initialize-persisted-spec-state`](../initialize-persisted-spec-state/spec.md)
 - [`core:composition-resolver`](../composition-resolver/spec.md)
 - [`core:transition-checks`](../transition-checks/spec.md) — canonical archive predicates and reconciliation
+- [core:resolve-change-schema](../resolve-change-schema/spec.md) — named sovereign lookup, provider identity validation, and same-name version advisory

@@ -177,9 +177,9 @@ When disabled, the approval predicate skips, but artifact freshness still applie
 
 ### Requirement: Signoff gate
 
-When `approvals.signoff: true`, `done → archivable` requires materialized sign-off status `valid` for current non-task artifacts and implementation files, plus valid verification evidence. Sign-off is granted only while the change remains in `done`. New work never parks in pending sign-off states.
+When `approvals.signoff: true`, `done → archivable` requires materialized sign-off status `valid` for current non-task artifacts and implementation files, plus valid verification evidence when verification is required by "Verification requirement follows workflow topology". Sign-off is granted only while the change remains in `done`. New work never parks in pending sign-off states.
 
-When disabled, the sign-off predicate skips, but verification, artifact freshness, tasks, and archive checks still apply. Historic pending/signed-off states remain drain-only compatibility values.
+When disabled, the sign-off predicate skips, but required verification, artifact freshness, tasks, and archive checks still apply. Historic pending/signed-off states remain drain-only compatibility values.
 
 ### Requirement: Materialized approval and verification projections
 
@@ -202,6 +202,21 @@ Both use cases SHALL expose typed input/result/deps contracts, canonical `create
 Explicit withdrawal of completed verification SHALL append `verification-invalidated` with actor, time, reason, and completed verification identity while retaining the original verified fingerprint.
 
 `verifying → verifying` is never permitted or required. A new explicit start renews the attempt in place. Prior attempts, invalidations, and completed-verification evidence remain in append-only history.
+
+### Requirement: StartVerification sovereign schema resolution
+
+`StartVerification` MUST resolve the change's schema through the shared change-schema resolution boundary before constructing the operation-specific readiness context. Required artifacts, workflow topology, checks, task semantics, and all other schema-derived readiness facts MUST come from the schema recorded on the change.
+
+The workspace default schema MUST NOT affect whether an existing change can start verification when it differs from `change.schemaName`. Schema resolution errors MUST propagate and MUST NOT create an active verification attempt.
+
+### Requirement: Verification requirement follows workflow topology
+
+Whether completed verification evidence is required for a change SHALL be decided from both its lifecycle position and the change's sovereign schema:
+
+- When `verifying` is enabled (`isWorkflowStepEnabled('verifying', schema)`), verification is required at `verifying` and every later state (`done`, `pending-signoff`, `signed-off`, `archivable`, `archiving`).
+- When `verifying` is disabled, verification is never required for that change. The validity reconciler SHALL project verification as `not-required` when no attempt or completed evidence exists, SHALL NOT raise `VERIFICATION_REQUIRED`, `VERIFICATION_IN_PROGRESS`, or `VERIFICATION_STALE` blockers, and `verification.current` (transition and archive) and `approval.signoff` SHALL treat verification as not required.
+
+The reconciler SHALL obtain that schema through `ResolveChangeSchema`, the same boundary every other change-bound operation uses, so identity integrity applies to persisted validity projections.
 
 ### Requirement: Artifacts
 
@@ -239,7 +254,7 @@ Dependency satisfaction for persisted facts uses persisted artifact `state`. Onl
 
 ### Requirement: Artifact sync
 
-A Change can reconcile its artifact map against the current schema's artifact types via the `syncArtifacts(artifactTypes)` method. This method:
+A Change can reconcile its artifact map against its own schema's artifact types via the `syncArtifacts(artifactTypes)` method. Callers SHALL supply `artifactTypes` resolved from the schema recorded on the change (`change.schemaName`) through `ResolveChangeSchema`; artifact types from the workspace default schema MUST NOT be used to sync an existing change. This method:
 
 1. Compares the current artifact map against the provided `artifactTypes` array.
 2. Adds new artifact types and their expected files (based on scope and specIds).
@@ -339,9 +354,11 @@ The signal is historical, not state-based. It remains true once reached unless t
 
 The `Change` entity is initialized with `schemaName` and `schemaVersion` as top-level properties hydrated at creation time. These properties are the definitive source of truth, decoupled from the `created` event in the history.
 
-A **`schemaName` mismatch** (e.g. `schema-std` → `custom-schema`) indicates structural incompatibility. When a use case detects that `schema.name() !== change.schemaName`, it MUST throw `SchemaMismatchError` before performing any work.
+Every operation on an existing active, drafted, discarded, or archived change MUST resolve the schema recorded by that object through the shared `ResolveChangeSchema` boundary. A different schema configured as the current workspace default MUST NOT reject loading or operation execution, MUST NOT replace the recorded schema identity, and MUST NOT cause fallback to the workspace default.
 
-A **`schemaVersion` mismatch** within the same schema name is advisory. When a change is loaded and the active schema version differs from the one recorded in the change, the system MUST emit a warning. The change remains fully usable. Archiving with a `schemaVersion` mismatch is allowed.
+After resolving the recorded schema reference, a provider integrity mismatch in which the returned schema identity does not equal the requested `schemaName` indicates a provider contract violation. The operation MUST throw `SchemaProviderIdentityMismatchError` before using that schema-derived topology, artifact model, checks, hooks, or validation rules.
+
+A `schemaVersion` mismatch within the same schema name is advisory. `ResolveChangeSchema` MUST compare the persisted version with the version returned by the sovereign named lookup and return a typed advisory in its `warnings` when they differ. It MUST NOT derive this advisory from the workspace default, and no other component (including change repositories and manifest loaders) SHALL compare a change's schema version against the workspace default. The change remains fully usable and archiving is allowed.
 
 ### Requirement: Drafting and discarding
 
@@ -439,6 +456,12 @@ Text fingerprint algorithm `text-v1` removes an initial UTF-8 BOM, converts CRLF
 
 Artifacts marked `hasTasks: true` SHALL be excluded from approval and verification fingerprints and automatic content-drift invalidation. They remain required when declared, structurally validated, live-counted for task completion, and checked again before archive.
 
+### Requirement: Sovereign schema for validity fingerprints
+
+Every artifact or complete validity fingerprint computed for an existing change MUST use the shared change-schema resolution boundary. The fingerprint's artifact type set, task-artifact exclusions, and file selection MUST be derived exclusively from the schema recorded on that change.
+
+The workspace default schema MUST NOT influence approval, verification, sign-off, archive, or reconciliation fingerprints when it differs from `change.schemaName`. Schema resolution errors MUST propagate as fingerprint collection failures or operation failures according to the calling contract; the service MUST NOT retry with the workspace default or produce evidence from another schema.
+
 ## Constraints
 
 - `name` and `createdAt` are immutable; `workspaces` is derived from `specIds`, never persisted independently.
@@ -466,3 +489,4 @@ Artifacts marked `hasTasks: true` SHALL be excluded from approval and verificati
 - [`default:_global/logging`](../../_global/logging/spec.md) — debug logging conventions for archive-attempt diagnostics reflected in change history
 - [`core:implementation-detector-port`](../implementation-detector-port/spec.md) — triggers autodetection before status load and transitions
 - [`core:transition-checks`](../transition-checks/spec.md) — shared transition-attempt evaluation consumed by status and execute
+- [`core:workflow-topology`](../workflow-topology/spec.md) — step enablement (`isWorkflowStepEnabled`) used to decide verification and hook applicability

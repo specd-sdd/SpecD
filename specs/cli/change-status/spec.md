@@ -55,6 +55,15 @@ JSON/toon output SHALL include both canonical state and display-state fields whe
 
 Displayed `validTransitions`, `availableTransitions`, `nextAction`, and repair-oriented blockers MUST be the check-derived projections from `GetStatus`. The CLI MUST NOT filter the protocol graph locally in a way that reintroduces a list execute would reject (for example advertising `verifying` while tasks are incomplete, or recommending `/specd-implement` when `verifying` is allowed).
 
+The command SHALL project the ordered workflow pipeline from `GetStatus`:
+
+- Show the pipeline in canonical lifecycle order as projected by Core, regardless of the order in which schema rows are declared.
+- Annotate optional steps with `[optional]` in text output, and expose the `optional` flag on each structured `availableSteps` entry; the `--help` JSON/TOON schema SHALL document that field.
+- Exclude steps marked `disabled: true` (Core omits them; the CLI MUST NOT re-add them).
+- Display shortcut and bypass paths in `availableTransitions` when step-skip checks allow bypassing intermediate optional steps.
+
+The artifact DAG rendered by the command (text `artifacts (DAG)` and structured `schema.artifactDag` / `artifactDag`) SHALL come from the change's sovereign schema, resolved through `ResolveChangeSchema` (directly or through `GetStatus`). The command MUST NOT render a change's DAG from the workspace default schema. When the change's schema cannot be resolved, the DAG SHALL be omitted and the `SCHEMA_RESOLUTION_FAILED` or `SCHEMA_IDENTITY_MISMATCH` blocker from `GetStatus` SHALL be shown.
+
 ### Requirement: Reconciled validity and next-action output
 
 The command SHALL treat `GetStatus` as the sole source of current validity and routing. It MUST render the lifecycle state returned after reconciliation, not a state captured before the call, and MUST make any automatic return visible with its cause.
@@ -85,15 +94,11 @@ JSON/TOON MUST serialize `label` (and `checkId` when present) on those blocker o
 
 ### Requirement: Schema version warning
 
-If the change's recorded `schemaName`/`schemaVersion` differs from the currently active schema, the command prints a warning to stderr:
+Schema version drift SHALL be reported only through the advisories `GetStatus` returns in `schemaWarnings`, which come from `ResolveChangeSchema` comparing the change's recorded schema version with the resolved same-name schema. A different workspace default schema is not drift and MUST NOT produce a warning.
 
-```
-warning: change was created with schema <recorded> but active schema is <current>
-```
+In text mode, when `schemaWarnings` is non-empty, the command SHALL render a `warnings:` section on stdout with one line per advisory in the form `! <code>: <message>` (for example `! SCHEMA_VERSION_DRIFT: …`). In `json` / `toon` mode the result SHALL include `schemaWarnings` as an array of `{ code, changeName, schemaName, recordedVersion, resolvedVersion, message }`; the array is empty when there is no drift.
 
-The command still exits with code 0.
-
-The CLI command MUST NOT resolve the schema independently. It SHALL compare `change.schemaName`/`change.schemaVersion` against `lifecycle.schemaInfo` from the `GetStatusResult`. If `lifecycle.schemaInfo` is `null` (schema resolution failed), the warning is skipped.
+The command MUST NOT print a schema-mismatch warning to stderr and MUST NOT compute drift itself by comparing the change against the workspace default. It still exits with code 0 when advisories are present. When the change's schema cannot be resolved, no version advisory is shown; the resolution blocker from `GetStatus` is shown instead.
 
 ### Requirement: Change not found
 
@@ -129,7 +134,7 @@ Text-mode DAG node labels MUST use each artifact's **display status** from `GetS
 
 When the DAG has convergent edges (one artifact required by multiple parents), the text tree MUST render each artifact type id **at most once**. Dependents reached again via another branch MUST NOT repeat the full subtree; the renderer MAY omit duplicate child expansion or annotate with a short reference (for example `└── (see <id> above)`).
 
-When the CLI has resolved the active `Schema` instance, structured and text DAG derivation MUST use `schema.artifactDag()` (cached) rather than rebuilding `ArtifactDag.from` on a detached artifact list, so ordering matches every other consumer.
+The `Schema` instance used for DAG derivation SHALL be the change's schema resolved through `ResolveChangeSchema` (the kernel's shared resolver). Structured and text DAG derivation MUST use `schema.artifactDag()` (cached) rather than rebuilding `ArtifactDag.from` on a detached artifact list, so ordering matches every other consumer.
 
 This allows design/implement skills to replace `schema show` calls.
 
@@ -215,3 +220,5 @@ lifecycle:
 - [`core:get-status`](../../core/get-status/spec.md) — lifecycle status projection
 - [`sdk:build-implementation-review`](../../sdk/build-implementation-review/spec.md) — shared implementation resolution projection
 - [`core:transition-checks`](../../core/transition-checks/spec.md) — check-derived projections and gerund labels
+- [`core:lifecycle-engine`](../../core/lifecycle-engine/spec.md) — lifecycle evaluation and verdict projection
+- [`core:resolve-change-schema`](../../core/resolve-change-schema/spec.md) — sovereign change schema for the artifact DAG

@@ -552,13 +552,15 @@ Scenarios:
 - **THEN** validation runs for the proposal artifact files
 - **AND** no `SpecNotInChangeError` is thrown solely because `specPath` was omitted
 
-### Requirement: Schema name guard
+### Requirement: Sovereign schema resolution
 
-#### Scenario: Schema mismatch throws before validation
+#### Scenario: Resolves sovereign schema when workspace default differs
 
-- **GIVEN** the change was created under a different schema name
+- **GIVEN** the change was created under schema `custom-workflow@1.0.0`
+- **AND** the workspace default schema is `@specd/schema-std`
 - **WHEN** `ValidateArtifacts.execute` is called
-- **THEN** it throws `SchemaMismatchError` before validating artifacts
+- **THEN** it resolves the schema via `SchemaProvider.get('custom-workflow@1.0.0')`
+- **AND** validates artifacts against `custom-workflow@1.0.0` without throwing `SchemaMismatchError`
 
 ### Requirement: MetadataExtraction validation failures are validation failures
 

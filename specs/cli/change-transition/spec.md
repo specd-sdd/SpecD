@@ -10,9 +10,8 @@ Because transitions may trigger long-running hooks, the command must also keep h
 
 ### Requirement: Command signature
 
-The command SHALL be invoked as `specd change transition [name] [target]`.
-If `name` is omitted, it defaults to the active workspace change.
-If `target` is omitted, it attempts to resolve the next logical transition.
+The command SHALL be invoked as `specd change transition <name> [step] [--next]`.
+`<name>` is required. Exactly one of `<step>` or `--next` MUST be provided: passing both SHALL fail with `<step> and --next are mutually exclusive`, and passing neither SHALL fail with `either <step> or --next is required`, both as CLI usage errors (exit code 1) without calling `TransitionChange`.
 
 The command MUST accept a `--skip-checks <ids>` option accepting a comma-separated list of check IDs.
 The command MUST maintain backward compatibility with legacy flags by translating them into `skipChecks`:
@@ -24,9 +23,11 @@ The CLI adapter MUST pass the compiled `skipChecks` array directly to `Transitio
 
 ### Requirement: Next-transition resolution
 
-When `--next` is used, the CLI MUST call `TransitionChange.execute` with `to: 'next'`. Core MUST resolve the happy-path next lifecycle state (see [`core:transition-change`](../../core/transition-change/spec.md)). The CLI MUST NOT maintain a from→to routing table and MUST NOT treat `GetStatus.nextAction` as that resolution.
+When the command is invoked with `--next`, it SHALL pass `to: 'next'` to `TransitionChange.execute`. The CLI MUST NOT resolve the target itself through a local from→to table.
 
-After Core resolves `next` to a concrete state, the command MUST execute the normal `TransitionChange` flow for that state. Approval-gate checks, requires enforcement, hook execution, and error handling remain unchanged.
+Core resolves `'next'` to the closest subsequent enabled step via `nextWorkflowStep`. Disabled steps are absent from the active pipeline and are therefore skipped. An enabled optional step remains the `'next'` target; `--next` SHALL NOT evaluate optional-step shortcut policy or bypass that step merely because its `step-skip` checks pass.
+
+Optional-step shortcut recommendation belongs to `GetStatus.nextAction`: callers that want the recommended shortcut use the explicit target projected there. `--next` remains a deterministic one-hop operation over the enabled topology.
 
 When Core rejects `to: 'next'` (no happy-path hop: at least `pending-spec-approval`, `pending-signoff`, `archivable`, `archiving`), the command MUST exit with code 1 and print an explanatory `error:` message to stderr.
 
@@ -122,9 +123,15 @@ When `TransitionChange` emits generic check progress events, the CLI MUST render
 ✓ <label>
 # or
 ✗ <label>: <reason>
+# or
+⊘ <label> (skipped: <reason>)
 ```
 
 Labels are gerund phrases from each check. The CLI MUST NOT print an `Executing:` prefix. Hooks MUST appear on this same bus (`Running pre hooks` / `Running post hooks`), not as a separate public progress contract.
+
+A `check-done` with `outcome: 'skip'` MUST be rendered with the skipped marker and its reason (for example `--skip-hooks`, `--skip-checks`, or "not applicable"), never with the passed marker `✓`. In particular, when `--skip-hooks` disables a hook phase, that phase MUST render as skipped.
+
+When Core re-evaluates predicates after hooks, the CLI SHALL render that second pass only if at least one hook phase actually ran, and SHALL label it as a re-check (for example a `Re-checking after hooks` heading). When no hook ran, the re-evaluation MUST NOT be printed as a duplicate check list.
 
 ### Requirement: Unsatisfied requires error
 
@@ -156,3 +163,4 @@ specd change transition add-login --skip-hooks all
 - [`core:hook-execution-model`](../../core/hook-execution-model/spec.md) — hook ordering and failure semantics
 - [`core:get-status`](../../core/get-status/spec.md) — pre-transition and repair-guide status reads
 - [`core:transition-checks`](../../core/transition-checks/spec.md) — check progress bus; no pending rewrite
+- [`core:lifecycle-engine`](../../core/lifecycle-engine/spec.md) — lifecycle evaluation and available transition routing

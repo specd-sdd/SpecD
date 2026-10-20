@@ -66,11 +66,11 @@ Any normalization that changes the representation class of a tracked artifact fi
 
 ### Requirement: Schema version
 
-The root `schema` object (`schema.name` and `schema.version`) in `manifest.json` is the definitive source of truth used to hydrate the `Change` domain entity at runtime. It is written once at change creation and never updated. The `type: 'created'` event in the history also contains schema information for historical tracking, but the root `schema` object takes precedence for operational checks.
+The root `schema` object (`schema.name` and `schema.version`) in `manifest.json` is the definitive source of truth used to hydrate the `Change` domain entity at runtime. It is written once at change creation and is the immutable sovereign authority governing the change. The `type: 'created'` event in the history also contains schema information for historical tracking, but the root `schema` object takes precedence for operational checks.
 
-When a change is loaded and the active schema's version differs from what is recorded in the manifest, specd MUST emit a warning. The change remains usable — the version mismatch warning is advisory, not a hard error. Archiving a change with a schema version mismatch MUST still be possible; the warning surfaces the mismatch so the user can decide whether to proceed.
+Loading the manifest MUST NOT compare its schema version with the workspace default. A same-name version advisory belongs to `ResolveChangeSchema`, which compares the recorded version with the schema returned by the sovereign named lookup. The change remains fully usable.
 
-When a change is loaded and the active schema's name differs from what is recorded in the manifest, the repository MUST reject the load with `SchemaMismatchError`. A schema-name mismatch indicates that the change was created against a different schema family rather than a later compatible revision of the same schema.
+When a change is loaded and the workspace default schema's name differs from what is recorded in the manifest, the repository MUST NOT reject the load. The change's recorded schema is its sovereign authority; loading and mutating the change hydrates it with its recorded schema identity. Schema lookup, provider identity integrity, and version advisories belong to the shared change-schema resolution boundary, not repository hydration.
 
 The manifest's schema fields remain persisted facts only; enforcement behavior is defined by the change and repository contracts that consume them.
 

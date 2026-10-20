@@ -202,3 +202,26 @@
 - **GIVEN** the destination exists and its bytes differ from the source
 - **WHEN** the write finishes
 - **THEN** the result is not treated as success
+
+### Requirement: Artifact types come from the change's own schema
+
+#### Scenario: Custom-schema change syncs against its own artifact types
+
+- **GIVEN** a change whose `schemaName` is `custom-workflow`
+- **AND** a workspace default (`config.schemaRef`) with a different artifact set
+- **WHEN** the repository loads the change via `get` and persists it via `mutate`
+- **THEN** `resolveArtifactTypes` is called with the change and returns `custom-workflow` artifact types
+- **AND** the persisted artifact map contains no artifact types from the workspace default
+
+#### Scenario: Unresolvable change schema skips artifact sync
+
+- **GIVEN** a change whose recorded schema cannot be resolved
+- **WHEN** the repository loads it
+- **THEN** the persisted artifact map is left unchanged
+- **AND** no `artifacts-synced` event is appended
+
+#### Scenario: Repository emits no version warning against the workspace default
+
+- **GIVEN** a change recording `schema-std` version 1 and a workspace default `schema-std` version 2
+- **WHEN** the repository loads the change
+- **THEN** no schema-version warning is emitted

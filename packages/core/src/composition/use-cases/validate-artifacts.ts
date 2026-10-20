@@ -3,6 +3,7 @@ import { type ArtifactParserRegistry } from '../../application/ports/artifact-pa
 import { type ChangeRepository } from '../../application/ports/change-repository.js'
 import { type ContentHasher } from '../../application/ports/content-hasher.js'
 import { type SchemaProvider } from '../../application/ports/schema-provider.js'
+import { type ResolveChangeSchema } from '../../application/services/resolve-change-schema.js'
 import { type SpecWorkspaceRoute } from '../../application/use-cases/_shared/spec-reference-resolver.js'
 import { type ListWorkspaces } from '../../application/use-cases/list-workspaces.js'
 import { type ReconcileChangeValidity } from '../../application/use-cases/reconcile-change-validity.js'
@@ -23,6 +24,7 @@ export interface ValidateArtifactsDeps {
   readonly changes: ChangeRepository
   readonly listWorkspaces: ListWorkspaces
   readonly schemaProvider: SchemaProvider
+  readonly resolveChangeSchema?: ResolveChangeSchema
   readonly parsers: ArtifactParserRegistry
   readonly actor: ActorResolver
   readonly contentHasher: ContentHasher
@@ -48,6 +50,7 @@ export function resolveValidateArtifactsDeps(resolver: CompositionResolver): Val
     changes,
     listWorkspaces,
     schemaProvider: resolver.getSchemaProvider(),
+    resolveChangeSchema: resolver.getResolveChangeSchema(),
     parsers,
     actor: resolver.getActorResolver(),
     contentHasher: resolver.getContentHasher(),
@@ -115,6 +118,7 @@ function createValidateArtifactsFromNormalized(
       extractorTransforms,
       workspaceRoutes,
       reconcile,
+      resolveChangeSchema,
     } = input.deps
     return new ValidateArtifacts(
       changes,
@@ -126,6 +130,7 @@ function createValidateArtifactsFromNormalized(
       extractorTransforms,
       workspaceRoutes,
       reconcile,
+      resolveChangeSchema,
     )
   }
 

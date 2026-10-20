@@ -4,16 +4,17 @@ import { type ActorResolver } from '../ports/actor-resolver.js'
 import { ApprovalGateDisabledError } from '../errors/approval-gate-disabled-error.js'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 import { FingerprintInputError } from '../errors/fingerprint-input-error.js'
-import { SchemaMismatchError } from '../errors/schema-mismatch-error.js'
 import { VerificationNotFoundError } from '../errors/verification-not-found-error.js'
 import { VerificationInProgressError } from '../errors/verification-in-progress-error.js'
 import { VerificationStaleError } from '../errors/verification-stale-error.js'
 import { VerificationFingerprintMismatchError } from '../errors/verification-fingerprint-mismatch-error.js'
 import { InvalidStateTransitionError } from '../../domain/errors/invalid-state-transition-error.js'
 import { type SchemaProvider } from '../ports/schema-provider.js'
+import { ResolveChangeSchema } from '../services/resolve-change-schema.js'
 import { type ChangeValidityVerdict } from '../../domain/services/change-validity.js'
 import { compareValidityFingerprints } from '../../domain/value-objects/validity-fingerprint.js'
 import { type Schema } from '../../domain/value-objects/schema.js'
+import { isWorkflowStepEnabled } from '../../domain/services/workflow-topology.js'
 import { type ValidityFingerprintService } from '../services/validity-fingerprint-service.js'
 import { type ApprovalGates } from './transition-change.js'
 import { type ReconcileChangeValidity } from './reconcile-change-validity.js'
@@ -41,6 +42,7 @@ export class ApproveSignoff {
   private readonly _reconcile: ReconcileChangeValidity
   private readonly _fingerprint: ValidityFingerprintService
   private readonly _refresh: RefreshImplementationTracking
+  private readonly _resolveChangeSchema: ResolveChangeSchema
 
   /**
    * Creates a new `ApproveSignoff` use case instance.
@@ -52,6 +54,7 @@ export class ApproveSignoff {
    * @param reconcile - Canonical validity reconciler
    * @param fingerprint - Shared complete fingerprint collector
    * @param refresh - Implementation tracking refresh run before reconciliation
+   * @param resolveChangeSchema - Shared change schema resolver
    */
   constructor(
     changes: ChangeRepository,
@@ -61,6 +64,7 @@ export class ApproveSignoff {
     reconcile: ReconcileChangeValidity,
     fingerprint: ValidityFingerprintService,
     refresh: RefreshImplementationTracking,
+    resolveChangeSchema?: ResolveChangeSchema,
   ) {
     this._changes = changes
     this._actor = actor
@@ -69,6 +73,7 @@ export class ApproveSignoff {
     this._reconcile = reconcile
     this._fingerprint = fingerprint
     this._refresh = refresh
+    this._resolveChangeSchema = resolveChangeSchema ?? new ResolveChangeSchema(schemaProvider)
   }
 
   /**
@@ -79,7 +84,6 @@ export class ApproveSignoff {
    * @throws {ApprovalGateDisabledError} If the signoff gate is not enabled
    * @throws {ChangeNotFoundError} If no change with the given name exists
    * @throws {InvalidStateTransitionError} If the reconciled change cannot accept sign-off
-   * @throws {SchemaMismatchError} If the change schema differs from the active schema
    * @throws {VerificationNotFoundError} If completed verification is missing
    * @throws {VerificationFingerprintMismatchError} If the fresh fingerprint differs from verification
    * @throws {FingerprintInputError} If the complete fingerprint cannot be collected
@@ -94,10 +98,13 @@ export class ApproveSignoff {
       throw new ChangeNotFoundError(input.name)
     }
 
-    const schema = await this._schemaProvider.get()
-    if (schema.name() !== change.schemaName) {
-      throw new SchemaMismatchError(change.name, change.schemaName, schema.name())
-    }
+    const { schema } = await this._resolveChangeSchema.execute({
+      changeName: change.name,
+      schemaName: change.schemaName,
+      schemaVersion: change.schemaVersion,
+    })
+
+    const verifyingEnabled = isWorkflowStepEnabled('verifying', schema)
 
     await this._refresh.execute({ name: input.name })
     const actor = await this._actor.identity()
@@ -107,37 +114,48 @@ export class ApproveSignoff {
         return { outcome: 'state' as const, state }
       }
       const completed = ctx.change.verification.completed
-      if (completed === undefined) {
-        return {
-          outcome:
-            ctx.change.verification.activeAttempt === undefined
-              ? ('verification-missing' as const)
-              : ('verification-active' as const),
+      if (verifyingEnabled) {
+        if (completed === undefined) {
+          return {
+            outcome:
+              ctx.change.verification.activeAttempt === undefined
+                ? ('verification-missing' as const)
+                : ('verification-active' as const),
+          }
         }
-      }
-      if (completed.status !== 'valid' || completed.fingerprint.implementation === null) {
-        return { outcome: 'verification-stale' as const }
+        if (completed.status !== 'valid' || completed.fingerprint.implementation === null) {
+          return { outcome: 'verification-stale' as const }
+        }
       }
       const collected = await this._fingerprint.completeFingerprint(ctx.change)
       if (collected.fingerprint === null) {
         return { outcome: 'fingerprint' as const, failures: collected.failures }
       }
-      const comparison = compareValidityFingerprints(
-        {
-          version: 1,
-          artifacts: completed.fingerprint.artifacts,
-          implementation: completed.fingerprint.implementation,
-        },
-        collected.fingerprint,
-      )
-      if (!comparison.equal) {
-        return { outcome: 'mismatch' as const, differences: comparison.differences }
+      if (verifyingEnabled && completed !== undefined) {
+        if (completed.fingerprint.implementation === null) {
+          return { outcome: 'verification-stale' as const }
+        }
+        const comparison = compareValidityFingerprints(
+          {
+            version: 1,
+            artifacts: completed.fingerprint.artifacts,
+            implementation: completed.fingerprint.implementation,
+          },
+          collected.fingerprint,
+        )
+        if (!comparison.equal) {
+          return { outcome: 'mismatch' as const, differences: comparison.differences }
+        }
       }
       const artifactId = blockingArtifact(ctx.change, schema, ctx.before)
       if (artifactId !== null) {
         return { outcome: 'ineligible' as const, state, artifactId }
       }
-      ctx.change.recordSignoff(input.reason, collected.fingerprint, completed.id, actor)
+      if (verifyingEnabled && completed !== undefined) {
+        ctx.change.recordSignoff(input.reason, collected.fingerprint, completed.id, actor)
+      } else {
+        ctx.change.recordSignoff(input.reason, collected.fingerprint, actor)
+      }
       if (ctx.change.state === 'pending-signoff') {
         ctx.change.transition('signed-off', actor)
       }

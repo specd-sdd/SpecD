@@ -8,7 +8,8 @@
     "core:lifecycle-engine",
     "core:config",
     "default:_global/architecture",
-    "core:composition-resolver"
+    "core:composition-resolver",
+    "core:resolve-change-schema"
   ],
   "implementation": [
     {
@@ -16,8 +17,7 @@
       "symbols": ["InvalidateChange"]
     },
     {
-      "file": "core:src/application/errors/invalidate-requires-force-error.ts",
-      "symbols": ["InvalidateRequiresForceError", "ForceInvalidationRecovery"]
+      "file": "core:test/application/use-cases/invalidate-change.spec.ts"
     }
   ]
 }

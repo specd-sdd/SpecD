@@ -79,6 +79,18 @@ When review only needs one spec-scoped artifact, agents SHOULD prefer `specd cha
 
 Every lifecycle skill SHALL begin from fresh `change status` guidance and SHALL treat the returned reconciled state, validity projections, blockers, and next action as canonical.
 
+Agent skills MUST consume `nextAction.command`, `nextAction.targetStep`, and `lifecycle.availableTransitions` dynamically from `changes status --format toon` rather than assuming static, hardcoded state progressions. `nextAction` is the preferred route when the user has not selected a lifecycle action; it is not the complete legal action set.
+
+When a user explicitly invokes a lifecycle skill, that skill SHALL map the invocation to its intended target and MAY continue when the target is present in `lifecycle.availableTransitions`, even if `nextAction.command` recommends a different lifecycle skill. It MUST stop and report current blockers when its explicit target is absent. A skill MUST NOT treat a different recommendation as an automatic veto of an explicitly requested, Core-advertised alternative.
+
+When intermediate steps are optional and bypassed (or disabled by the active schema), default routing SHALL advance directly along the legal path recommended by `nextAction`. Explicit selection of an available optional step, retry, or redesign remains valid.
+
+Skills MUST NOT decide whether `optional: true` is sufficient, require an undeclared check, inspect task content to invent a bypass rule, or reinterpret an empty effective `step-skip` set. Schema declarations and Core check evaluation are the sole authorities; skills consume only the resulting projection.
+
+When an intermediate step is bypassed during transition, agent skills SHALL NOT execute hooks for the bypassed step; pre- and post-execution hooks run exclusively for steps that are explicitly entered and exited.
+
+Lifecycle skill templates SHALL NOT contain unconditional lifecycle recipes. Every transition instruction SHALL derive its target from fresh `nextAction.targetStep` / `nextAction.command` or from the skill's explicit target confirmed in `lifecycle.availableTransitions`, and every hook instruction SHALL name only the source and target of the hop actually taken. In particular, `specd-verify` SHALL run `verifying` hooks and enter `verifying` only when `verifying` is an advertised target; when the change schema disables `verifying`, it SHALL produce verification evidence (when required) or route forward without `verifying` hooks. Completion messages SHALL suggest the command from `nextAction.command` instead of a fixed next skill. Approval gating SHALL be read from structured status (`lifecycle.approvals` and `availableTransitions`), not from parsing text output.
+
 Under `workflow: preserve` without required spec-gate recovery, the active skill MAY review drifted artifacts in place: inspect semantic consistency and dependent artifacts, correct content when within that skill's authorized scope, and run structural validation to establish a new baseline. Structural success MUST NOT be presented as semantic review, approval renewal, or verification renewal.
 
 The skill SHALL redirect to `specd-design` when artifact authoring, design correction, a new design decision, or required spec-approval recovery is necessary. Implement, verify, and change-scoped compliance SHALL respect mandatory spec-consent recovery. `changes verification invalidate <name> --reason <text>` withdraws completed evidence; explicit `start` begins a new attempt. Archive refuses stale or unknown required verification and incomplete live tasks.
@@ -92,6 +104,16 @@ Verify alone completes after both scenario verification and audit succeed. Simpl
 If fingerprints change, the owning skill SHALL inspect differences, resolve their cause, explicitly start again, and repeat verification work before completion. It MUST NOT start after testing and immediately complete using earlier results. Failed checks, interrupted work, or failed delegated audits MUST NOT record successful completion. Renewing evidence requires neither a self-transition nor leaving and re-entering a phase.
 
 Skills MUST NOT independently calculate fingerprints, invalidate projections, select recovery targets, or assume that `preserve` permits forward progress with unresolved non-task review.
+
+### Requirement: Lifecycle template protocol validation
+
+The skills package SHALL include an automated check that parses the real lifecycle skill templates (`specd-design`, `specd-implement`, `specd-verify`, `specd-archive`) and every installed generated copy, and fails when a template:
+
+- instructs a `changes transition` to a fixed target that is not conditioned on `nextAction` or on the skill's explicit target being present in `lifecycle.availableTransitions`;
+- instructs `run-hooks` / `hook-instruction` for a step that is not the source or target of the routed hop, or for a step that may be disabled or bypassed;
+- hardcodes the next skill in a completion message instead of using `nextAction.command`.
+
+Tests for routing behavior MUST exercise the real template content. Tests that only evaluate a routing function defined inside the test file SHALL NOT count as coverage of the skills and SHALL be removed or replaced.
 
 ### Requirement: Implementation traceability policy
 
@@ -122,3 +144,5 @@ If subagent flows are not supported, the orchestrator agent SHALL perform optimi
 - [`core:get-status`](../../core/get-status/spec.md) — reconciled lifecycle, validity, blockers, and next action
 - [`core:validate-artifacts`](../../core/validate-artifacts/spec.md) — structural validation and baseline establishment
 - [`core:transition-checks`](../../core/transition-checks/spec.md) — canonical validity verdict and recovery priority
+- [`cli:change-status`](../../cli/change-status/spec.md) — dynamic pipeline and available transitions display
+- [`cli:change-transition`](../../cli/change-transition/spec.md) — topology-driven next advancement and bypass execution

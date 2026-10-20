@@ -2,10 +2,10 @@ import { type Change } from '../../domain/entities/change.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
 import { type ActorResolver } from '../ports/actor-resolver.js'
 import { type SchemaProvider } from '../ports/schema-provider.js'
+import { ResolveChangeSchema } from '../services/resolve-change-schema.js'
 import { ApprovalGateDisabledError } from '../errors/approval-gate-disabled-error.js'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 import { FingerprintInputError } from '../errors/fingerprint-input-error.js'
-import { SchemaMismatchError } from '../errors/schema-mismatch-error.js'
 import { InvalidStateTransitionError } from '../../domain/errors/invalid-state-transition-error.js'
 import { type ChangeValidityVerdict } from '../../domain/services/change-validity.js'
 import { type Schema } from '../../domain/value-objects/schema.js'
@@ -34,6 +34,7 @@ export class ApproveSpec {
   private readonly _approvals: ApprovalGates
   private readonly _reconcile: ReconcileChangeValidity
   private readonly _fingerprint: ValidityFingerprintService
+  private readonly _resolveChangeSchema: ResolveChangeSchema
 
   /**
    * Creates a new `ApproveSpec` use case instance.
@@ -44,6 +45,7 @@ export class ApproveSpec {
    * @param approvals - Whether approval gates are active in the project configuration
    * @param reconcile - Canonical validity reconciler
    * @param fingerprint - Shared artifact fingerprint collector
+   * @param resolveChangeSchema - Shared change schema resolver
    */
   constructor(
     changes: ChangeRepository,
@@ -52,6 +54,7 @@ export class ApproveSpec {
     approvals: ApprovalGates,
     reconcile: ReconcileChangeValidity,
     fingerprint: ValidityFingerprintService,
+    resolveChangeSchema?: ResolveChangeSchema,
   ) {
     this._changes = changes
     this._actor = actor
@@ -59,6 +62,7 @@ export class ApproveSpec {
     this._approvals = approvals
     this._reconcile = reconcile
     this._fingerprint = fingerprint
+    this._resolveChangeSchema = resolveChangeSchema ?? new ResolveChangeSchema(schemaProvider)
   }
 
   /**
@@ -69,7 +73,6 @@ export class ApproveSpec {
    * @throws {ApprovalGateDisabledError} If the spec approval gate is not enabled
    * @throws {ChangeNotFoundError} If no change with the given name exists
    * @throws {InvalidStateTransitionError} If the reconciled change cannot accept spec consent
-   * @throws {SchemaMismatchError} If the change schema differs from the active schema
    * @throws {FingerprintInputError} If a required artifact fingerprint cannot be collected
    */
   async execute(input: ApproveSpecInput): Promise<Change> {
@@ -82,10 +85,11 @@ export class ApproveSpec {
       throw new ChangeNotFoundError(input.name)
     }
 
-    const schema = await this._schemaProvider.get()
-    if (schema.name() !== change.schemaName) {
-      throw new SchemaMismatchError(change.name, change.schemaName, schema.name())
-    }
+    const { schema } = await this._resolveChangeSchema.execute({
+      changeName: change.name,
+      schemaName: change.schemaName,
+      schemaVersion: change.schemaVersion,
+    })
 
     const actor = await this._actor.identity()
     const mutation = await this._reconcile.mutate({ name: input.name, actor }, async (ctx) => {

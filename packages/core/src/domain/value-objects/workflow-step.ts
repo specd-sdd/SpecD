@@ -52,6 +52,7 @@ export type HookEntry =
 
 /**
  * Declaration associating a transition check with a workflow step in schema.yaml.
+ * Evaluated when transitioning INTO this step (scope: 'transition').
  */
 export interface WorkflowStepCheckDeclaration {
   /** Check identifier (must be registered in CheckRegistry). */
@@ -71,8 +72,25 @@ export interface WorkflowStepCheckDeclaration {
 }
 
 /**
+ * Declaration associating a step-skip check with an optional workflow step in schema.yaml.
+ * Evaluated when this optional step is BYPASSED during a transition (scope: 'step-skip').
+ */
+export interface WorkflowStepSkipCheckDeclaration {
+  /** Check identifier (must be registered in CheckRegistry). */
+  readonly id: string
+  /** Failure policy ('abort' or 'collect'). Defaults to 'abort'. */
+  readonly onFailure?: 'abort' | 'collect'
+  /** Permission to bypass via `--skip-checks`, subject to governance locks. */
+  readonly skippable?: boolean
+  /** Whether this check is disabled for skipping this step, subject to governance locks. */
+  readonly disabled?: boolean
+  /** Step-specific configuration merged over check defaults. */
+  readonly config?: Readonly<Record<string, unknown>>
+}
+
+/**
  * A lookup row in schema `workflow[]`. `step` names an existing `ChangeState`;
- * the row attaches extras (`requires`, `requiresTaskCompletion`, `hooks`, `checks`).
+ * the row attaches extras (`requires`, `requiresTaskCompletion`, `hooks`, `checks`, `skipChecks`).
  * It does not define protocol membership or legal hops.
  */
 export interface WorkflowStep {
@@ -80,6 +98,20 @@ export interface WorkflowStep {
    * The lifecycle step name (e.g. `"designing"`, `"implementing"`, `"archiving"`).
    */
   readonly step: string
+
+  /**
+   * Whether this step is optional in the active workflow topology.
+   * When true, the step may be bypassed if its associated step-skip checks pass.
+   * Bedrock states cannot be optional. Defaults to false.
+   */
+  readonly optional?: boolean
+
+  /**
+   * Whether this step is disabled in the active workflow topology.
+   * When true, the step is excluded from the active lifecycle graph.
+   * Bedrock states cannot be disabled. Defaults to false.
+   */
+  readonly disabled?: boolean
 
   /**
    * Artifact IDs that must be complete/skipped for this lookup row’s extras.
@@ -103,6 +135,9 @@ export interface WorkflowStep {
     readonly post: readonly HookEntry[]
   }
 
-  /** Checks declared for this workflow step. */
+  /** Checks declared for this workflow step (evaluated when entering this step). */
   readonly checks?: readonly WorkflowStepCheckDeclaration[]
+
+  /** Checks declared for skipping this workflow step (evaluated when bypassing this optional step). */
+  readonly skipChecks?: readonly WorkflowStepSkipCheckDeclaration[]
 }

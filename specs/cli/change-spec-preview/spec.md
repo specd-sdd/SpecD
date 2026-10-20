@@ -20,6 +20,10 @@ specd changes spec-preview <name> <specId> [--artifact <name>] [--diff] [--forma
 
 Canonical agent-facing guidance MUST use plural command groups (for example `changes`). Singular groups remain alias-compatible.
 
+### Requirement: Artifact names from the change's schema
+
+`--artifact <name>` resolution, the artifact scope check, and the filename lookup SHALL use the change's sovereign schema, resolved through `ResolveChangeSchema` (directly or through `PreviewSpec`). The workspace default schema MUST NOT be consulted. Schema resolution failures and `SchemaProviderIdentityMismatchError` SHALL be reported as errors with a non-zero exit code.
+
 ### Requirement: Text output — merged mode (no --diff)
 
 When `--diff` is not present, the command MUST output the merged spec content. Artifact files MUST be concatenated in order: `spec.md` first (if present), then remaining files alphabetically. Each file MUST be preceded by a separator line formatted as `--- <filename> --- <label>`, where `<label>` depends on the file's status:
@@ -86,3 +90,4 @@ When only one spec-scoped artifact is required for that review, guidance SHOULD 
 ## Spec Dependencies
 
 - `core:preview-spec` — the use case this command delegates to
+- [`core:resolve-change-schema`](../../core/resolve-change-schema/spec.md) — sovereign change schema lookup, identity integrity, and version advisory

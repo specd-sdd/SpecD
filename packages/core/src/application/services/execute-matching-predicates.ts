@@ -14,10 +14,15 @@ import {
 } from '../../domain/services/transition-checks.js'
 import { deepMergeConfig } from '../../domain/services/deep-merge-config.js'
 import { type CheckRegistry } from '../../domain/services/check-registry.js'
-import { type ChangeState, VALID_TRANSITIONS } from '../../domain/value-objects/change-state.js'
+import {
+  listWorkflowTransitions,
+  type ApprovalGates,
+} from '../../domain/services/workflow-topology.js'
+import { type ChangeState } from '../../domain/value-objects/change-state.js'
 import { type Schema } from '../../domain/value-objects/schema.js'
 import { type Change } from '../../domain/entities/change.js'
 import { type ArtifactStatus } from '../../domain/value-objects/artifact-status.js'
+import { evaluateTransitionCandidate } from './evaluate-transition-candidate.js'
 
 /** Result of running matching predicates for one attempt. */
 export interface PredicateExecutionResult {
@@ -159,22 +164,11 @@ export async function executeMatchingPredicates(
   const skipChecksSet = new Set<string>(options.skipChecks ?? ctx.skipChecks ?? [])
   const registry = options.checkRegistry ?? ctx.checkRegistry
 
-  const targetStepName = ctx.attempt.scope === 'transition' ? ctx.attempt.to : undefined
-  const workflowStep = targetStepName ? ctx.schema.workflowStep(targetStepName) : null
-
-  // Collect step-declared checks that might not be in default bindings
-  const stepCheckDecls = workflowStep?.checks ?? []
-
   for (const binding of matchingPredicates(bindings)) {
     const matches = bindingMatches(binding, ctx.attempt, along)
     if (matches) {
       if (seen.has(binding.check.id)) continue
       seen.add(binding.check.id)
-
-      const stepDecl = stepCheckDecls.find((c) => c.id === binding.check.id)
-      if (stepDecl?.disabled === true) {
-        continue
-      }
 
       if (skipChecksSet.has(binding.check.id)) {
         ctx.onCheckProgress?.({
@@ -193,18 +187,11 @@ export async function executeMatchingPredicates(
         continue
       }
 
-      // Compute cascading config
-      const gov = registry?.getGovernance(binding.check.id)
-      let effectiveConfig: Record<string, unknown> = {}
-      if (gov?.defaultConfig) {
-        effectiveConfig = deepMergeConfig(effectiveConfig, gov.defaultConfig)
-      }
-      if (binding.config) {
-        effectiveConfig = deepMergeConfig(effectiveConfig, binding.config)
-      }
-      if (stepDecl?.config) {
-        effectiveConfig = deepMergeConfig(effectiveConfig, stepDecl.config)
-      }
+      // Resolved bindings carry the single-pass cascade; unresolved ones (e.g. archive)
+      // merge check default and binding config once. Step config is never merged here.
+      const effectiveConfig =
+        binding.effectiveConfig ??
+        deepMergeConfig(registry?.getGovernance(binding.check.id)?.defaultConfig, binding.config)
 
       const checkCtx: CheckExecutionContext = {
         ...ctx,
@@ -226,51 +213,6 @@ export async function executeMatchingPredicates(
     }
   }
 
-  // Also execute any step-declared checks not present in static bindings
-  if (registry) {
-    for (const stepDecl of stepCheckDecls) {
-      if (seen.has(stepDecl.id)) continue
-      if (stepDecl.disabled === true) continue
-      const check = registry.get(stepDecl.id)
-      if (!check || isEffectCheck(check)) continue
-      seen.add(stepDecl.id)
-
-      if (skipChecksSet.has(stepDecl.id)) {
-        checks.push({
-          id: check.id,
-          label: check.label,
-          kind: check.kind,
-          outcome: 'skip',
-          details: { bypassedByUser: true },
-        })
-        continue
-      }
-
-      const gov = registry.getGovernance(stepDecl.id)
-      let effectiveConfig: Record<string, unknown> = {}
-      if (gov?.defaultConfig) {
-        effectiveConfig = deepMergeConfig(effectiveConfig, gov.defaultConfig)
-      }
-      if (stepDecl.config) {
-        effectiveConfig = deepMergeConfig(effectiveConfig, stepDecl.config)
-      }
-
-      const checkCtx: CheckExecutionContext = {
-        ...ctx,
-        config: effectiveConfig,
-      }
-
-      const result = await executeCheckWithProgress(check, checkCtx)
-      checks.push(result)
-      if (
-        result.outcome === 'fail' &&
-        (options.failFast === true || options.failFastOn === result.id)
-      ) {
-        break
-      }
-    }
-  }
-
   return {
     allowed: checks.every((check) => check.outcome !== 'fail'),
     checks,
@@ -284,29 +226,35 @@ export async function executeMatchingPredicates(
  * @param from - Current state
  * @param to - Requested target
  * @param schema - Active schema
+ * @param approvals - Exact approval-gate snapshot used by topology
  * @returns Attempt + along
  */
 export function transitionAttemptFor(
   from: ChangeState,
   to: ChangeState,
   schema: Schema,
+  approvals: ApprovalGates,
 ): {
   readonly attempt: Extract<CheckAttempt, { scope: 'transition' }>
   readonly along: TransitionAlong
 } {
-  const along = classifyAlong(
-    from,
-    to,
-    schema.workflow().map((step) => step.step),
-  )
+  const along = classifyAlong(from, to, schema, approvals)
   return {
     along,
     attempt: { scope: 'transition', from, to, along },
   }
 }
 
+/** Check results and resolved bindings for every protocol-legal target. */
+export interface LegalTargetEvaluations {
+  /** Predicate results keyed by target. */
+  readonly checksByTarget: Partial<Record<ChangeState, readonly CheckResult[]>>
+  /** Resolved (schema-composed) bindings keyed by target; the source of derived policy. */
+  readonly bindingsByTarget: Partial<Record<ChangeState, readonly CheckBinding[]>>
+}
+
 /**
- * Executes matching predicates for every protocol-legal target from the current state.
+ * Evaluates the candidate for every protocol-legal target from the current state.
  *
  * @param bindings - Transition binding table
  * @param input - Host fields shared across targets
@@ -320,9 +268,9 @@ export function transitionAttemptFor(
  * @param input.validity - Reconciled validity verdict for this pass
  * @param input.checkRegistry - Optional CheckRegistry
  * @param input.skipChecks - Optional list of check IDs to bypass
- * @returns Predicate results keyed by target
+ * @returns Predicate results and resolved bindings keyed by target
  */
-export async function executeChecksByLegalTargets(
+export async function evaluateLegalTargets(
   bindings: readonly CheckBinding[],
   input: {
     readonly change: Change
@@ -334,26 +282,41 @@ export async function executeChecksByLegalTargets(
     readonly checkRegistry?: CheckRegistry
     readonly skipChecks?: readonly string[]
   },
-): Promise<Partial<Record<ChangeState, readonly CheckResult[]>>> {
+): Promise<LegalTargetEvaluations> {
   const passMemo = input.passMemo ?? new Map<string, unknown>()
   const checksByTarget: Partial<Record<ChangeState, readonly CheckResult[]>> = {}
-  for (const target of VALID_TRANSITIONS[input.change.state]) {
-    const { attempt } = transitionAttemptFor(input.change.state, target, input.schema)
-    const evaluation = await executeMatchingPredicates(
-      bindings,
-      buildCheckExecutionContext({
-        change: input.change,
-        schema: input.schema,
-        attempt,
-        approvals: input.approvals,
-        effectiveStatusByArtifact: input.effectiveStatusByArtifact,
-        passMemo,
-        ...(input.validity !== undefined ? { validity: input.validity } : {}),
-        ...(input.checkRegistry !== undefined ? { checkRegistry: input.checkRegistry } : {}),
-        ...(input.skipChecks !== undefined ? { skipChecks: input.skipChecks } : {}),
-      }),
-    )
-    checksByTarget[target] = evaluation.checks
+  const bindingsByTarget: Partial<Record<ChangeState, readonly CheckBinding[]>> = {}
+  const targets = listWorkflowTransitions(input.change.state, input.schema, input.approvals)
+  for (const target of targets) {
+    const candidate = await evaluateTransitionCandidate({
+      change: input.change,
+      schema: input.schema,
+      approvals: input.approvals,
+      target,
+      mode: 'projection',
+      baseBindings: bindings,
+      passMemo,
+      effectiveStatusByArtifact: input.effectiveStatusByArtifact,
+      ...(input.validity !== undefined ? { validity: input.validity } : {}),
+      ...(input.checkRegistry !== undefined ? { checkRegistry: input.checkRegistry } : {}),
+      ...(input.skipChecks !== undefined ? { skipChecks: input.skipChecks } : {}),
+    })
+    checksByTarget[target] = candidate.checks
+    bindingsByTarget[target] = candidate.bindings
   }
-  return checksByTarget
+  return { checksByTarget, bindingsByTarget }
+}
+
+/**
+ * Executes matching predicates for every protocol-legal target from the current state.
+ *
+ * @param bindings - Transition binding table
+ * @param input - Same host fields as {@link evaluateLegalTargets}
+ * @returns Predicate results keyed by target
+ */
+export async function executeChecksByLegalTargets(
+  bindings: readonly CheckBinding[],
+  input: Parameters<typeof evaluateLegalTargets>[1],
+): Promise<Partial<Record<ChangeState, readonly CheckResult[]>>> {
+  return (await evaluateLegalTargets(bindings, input)).checksByTarget
 }

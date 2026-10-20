@@ -1,6 +1,7 @@
 import { type ArtifactParserRegistry } from '../../application/ports/artifact-parser.js'
 import { type ChangeRepository } from '../../application/ports/change-repository.js'
 import { type SchemaProvider } from '../../application/ports/schema-provider.js'
+import { type ResolveChangeSchema } from '../../application/services/resolve-change-schema.js'
 import { type SpecRepository } from '../../application/ports/spec-repository.js'
 import { type TemplateExpander } from '../../application/template-expander.js'
 import { GetArtifactInstruction } from '../../application/use-cases/get-artifact-instruction.js'
@@ -22,6 +23,8 @@ export interface GetArtifactInstructionDeps {
   readonly specs: ReadonlyMap<string, SpecRepository>
   /** Schema provider used by the use case. */
   readonly schemaProvider: SchemaProvider
+  /** Shared change schema resolver. */
+  readonly resolveChangeSchema?: ResolveChangeSchema
   /** Artifact parser registry used by the use case. */
   readonly parsers: ArtifactParserRegistry
   /** Template expander used by the use case. */
@@ -43,6 +46,7 @@ export function resolveGetArtifactInstructionDeps(
     changes,
     specs: resolver.getSpecRepositories(),
     schemaProvider: resolver.getSchemaProvider(),
+    resolveChangeSchema: resolver.getResolveChangeSchema(),
     parsers,
     templateExpander: resolver.getTemplateExpander(),
   }
@@ -98,8 +102,16 @@ function createGetArtifactInstructionFromNormalized(
   input: FactoryInput<GetArtifactInstructionDeps, CompositionResolutionOptions>,
 ): GetArtifactInstruction {
   if (input.kind === 'deps') {
-    const { changes, specs, schemaProvider, parsers, templateExpander } = input.deps
-    return new GetArtifactInstruction(changes, specs, schemaProvider, parsers, templateExpander)
+    const { changes, specs, schemaProvider, parsers, templateExpander, resolveChangeSchema } =
+      input.deps
+    return new GetArtifactInstruction(
+      changes,
+      specs,
+      schemaProvider,
+      parsers,
+      templateExpander,
+      resolveChangeSchema,
+    )
   }
 
   const resolver = createCompositionResolver(input.config, input.options)

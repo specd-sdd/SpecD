@@ -595,15 +595,30 @@ after the last scenario is verified (verifying), etc. Do NOT wait, do NOT ask th
 anything first, do NOT present a summary before running them. The hooks are part of the
 phase completion, not a separate step that follows user interaction.
 
-Execute hooks for every **delivery** state the change passes through
-(`designing`, `ready`, `implementing`, `verifying`, `done`, `archivable`). Do **not**
-list `pending-spec-approval` / `pending-signoff` as happy-path intermediates. Drain from
-an already-pending change MAY still run hooks for those step ids. Skills that skip
+Execute hooks for every state the change actually enters or leaves. Which states those
+are comes from a fresh `specd changes status <name> --format toon`: the selected target is
+chosen from `lifecycle.availableTransitions` (default `nextAction.targetStep`), and states
+the schema disables or a shortcut bypasses are never entered and have no hooks run. Do **not**
+list `pending-spec-approval` / `pending-signoff` as happy-path intermediates; drain
+from an already-pending change MAY still run hooks for those step ids. Skills that skip
 auto-hooks and run them manually MUST NOT run `source.post` on `along` backward,
 redesign, or recovery. In code, all 12 `ChangeState` values are valid hook steps — the
 system accepts them all and silently returns empty results if the schema doesn't define
-hooks for that step. Always call them for states you actually pass; never skip a state
-assuming it has no hooks.
+hooks for that step (and returns no hooks for a step the schema marks disabled). Always
+call them for the states you actually pass; never skip a state assuming it has no hooks.
+
+Lifecycle skills write their hook and transition recipes as routed blocks:
+
+```text
+<!-- route: target -->
+specd changes run-hooks <name> <target> --phase pre
+specd changes hook-instruction <name> <target> --phase pre --format text
+specd changes transition <name> <target> --skip-hooks all
+<!-- /route -->
+```
+
+`<target>` is selected from fresh `lifecycle.availableTransitions` and `<source>` is the
+current `state`; templates never name a fixed delivery-state sequence.
 
 ## Code graph intelligence
 

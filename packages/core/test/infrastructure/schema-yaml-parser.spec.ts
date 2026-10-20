@@ -815,3 +815,148 @@ describe('formatZodPath', () => {
     expect(formatZodPath([])).toBe('')
   })
 })
+
+describe('parseSchemaYaml — workflow step checks and skipChecks', () => {
+  it('parses valid checks and skipChecks blocks with all attributes', () => {
+    const yaml = `
+kind: schema
+name: test
+version: 1
+artifacts:
+  - id: spec
+    scope: spec
+    output: spec.md
+workflow:
+  - step: implementing
+    optional: true
+    disabled: false
+    checks:
+      - id: '@security.code-scan'
+        from: '*'
+        along: forward
+        onFailure: abort
+        skippable: true
+        disabled: false
+        config:
+          minSeverity: critical
+      - id: 'impl.linksInScope'
+        along: '*'
+        onFailure: collect
+        disabled: true
+    skipChecks:
+      - id: 'workflow.tasksEmpty'
+        onFailure: abort
+        skippable: false
+        disabled: false
+      - id: '@qa.allow-bypass'
+        skippable: true
+        config:
+          requireSignoff: true
+`
+    const data = parseSchemaYaml('#test', yaml)
+    expect(data.workflow).toHaveLength(1)
+    const step = data.workflow![0]!
+    expect(step.step).toBe('implementing')
+    expect(step.optional).toBe(true)
+    expect(step.disabled).toBe(false)
+    expect(step.checks).toEqual([
+      {
+        id: '@security.code-scan',
+        from: '*',
+        along: 'forward',
+        onFailure: 'abort',
+        skippable: true,
+        disabled: false,
+        config: { minSeverity: 'critical' },
+      },
+      {
+        id: 'impl.linksInScope',
+        along: '*',
+        onFailure: 'collect',
+        disabled: true,
+      },
+    ])
+    expect(step.skipChecks).toEqual([
+      {
+        id: 'workflow.tasksEmpty',
+        onFailure: 'abort',
+        skippable: false,
+        disabled: false,
+      },
+      {
+        id: '@qa.allow-bypass',
+        skippable: true,
+        config: { requireSignoff: true },
+      },
+    ])
+  })
+
+  it('rejects an unknown workflow checks.from lifecycle state', () => {
+    const yaml = `
+kind: schema
+name: test
+version: 1
+artifacts: []
+workflow:
+  - step: implementing
+    checks:
+      - id: '@qa.guard'
+        from: reviewing
+`
+    expect(() => parseSchemaYaml('#test', yaml)).toThrow(/reviewing/)
+  })
+
+  it('rejects invalid enum values for along in checks', () => {
+    const yaml = `
+kind: schema
+name: test
+version: 1
+artifacts:
+  - id: spec
+    scope: spec
+    output: spec.md
+workflow:
+  - step: implementing
+    checks:
+      - id: 'impl.linksInScope'
+        along: sideways
+`
+    expect(() => parseSchemaYaml('#test', yaml)).toThrow(SchemaValidationError)
+  })
+
+  it('rejects invalid enum values for onFailure in checks', () => {
+    const yaml = `
+kind: schema
+name: test
+version: 1
+artifacts:
+  - id: spec
+    scope: spec
+    output: spec.md
+workflow:
+  - step: implementing
+    checks:
+      - id: 'impl.linksInScope'
+        onFailure: explode
+`
+    expect(() => parseSchemaYaml('#test', yaml)).toThrow(SchemaValidationError)
+  })
+
+  it('rejects invalid enum values for onFailure in skipChecks', () => {
+    const yaml = `
+kind: schema
+name: test
+version: 1
+artifacts:
+  - id: spec
+    scope: spec
+    output: spec.md
+workflow:
+  - step: implementing
+    skipChecks:
+      - id: 'workflow.tasksEmpty'
+        onFailure: ignore
+`
+    expect(() => parseSchemaYaml('#test', yaml)).toThrow(SchemaValidationError)
+  })
+})

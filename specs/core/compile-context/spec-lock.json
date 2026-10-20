@@ -10,55 +10,24 @@
     "core:schema-format",
     "core:delta-format",
     "core:selector-model",
+    "core:content-extraction",
     "core:spec-id-format",
     "core:workspace",
     "core:get-artifact-instruction",
     "core:get-hook-instructions",
     "core:preview-spec",
     "core:refresh-implementation-tracking",
-    "core:composition-resolver",
     "core:project-metadata",
-    "core:spec-optimization",
     "core:get-spec-metadata",
-    "core:content-extraction",
-    "core:resolve-context-specs"
+    "core:spec-optimization",
+    "core:composition-resolver",
+    "core:resolve-context-specs",
+    "core:resolve-change-schema"
   ],
   "implementation": [
     {
-      "file": "core:src/application/use-cases/_shared/resolve-configured-context-specs.ts",
-      "symbols": [
-        "resolveConfiguredContextSpecs",
-        "ConfiguredContextSpecCollector",
-        "ResolveConfiguredContextSpecsInput",
-        "ConfiguredContextSpecSource",
-        "ConfiguredContextSpecOperationListener"
-      ]
-    },
-    {
       "file": "core:src/application/use-cases/compile-context.ts",
       "symbols": ["CompileContext"]
-    },
-    {
-      "file": "core:src/application/use-cases/resolve-context-specs.ts",
-      "symbols": ["ResolveContextSpecs", "ResolveContextSpecsInput", "ResolveContextSpecsResult"]
-    },
-    {
-      "file": "core:src/composition/use-cases/resolve-context-specs.ts",
-      "symbols": [
-        "createResolveContextSpecs",
-        "resolveResolveContextSpecsDeps",
-        "ResolveContextSpecsDeps"
-      ]
-    },
-    {
-      "file": "core:src/composition/kernel.ts",
-      "symbols": ["createKernel", "resolveContextSpecs"]
-    },
-    {
-      "file": "core:test/application/use-cases/resolve-context-specs.spec.ts"
-    },
-    {
-      "file": "core:test/application/use-cases/configured-context-parity.spec.ts"
     }
   ],
   "optimizations": {

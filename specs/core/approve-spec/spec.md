@@ -12,9 +12,8 @@ The gate guard sequence is:
 
 1. If `approvals.spec` is `false` (baked at construction), throw `ApprovalGateDisabledError` with gate `'spec'`. No repository access occurs.
 2. Load the change by name from the `ChangeRepository`. If no change exists, throw `ChangeNotFoundError`.
-3. Resolve the current actor identity via `ActorResolver`.
-4. Obtain the active schema from `SchemaProvider`. If the schema cannot be resolved, `get()` throws `SchemaNotFoundError` or `SchemaValidationError` — the use case does not catch these.
-5. Compare `schema.name()` with `change.schemaName`. If they differ, throw `SchemaMismatchError`.
+3. Obtain the change's sovereign schema through `ResolveChangeSchema`. General resolution failures and `SchemaProviderIdentityMismatchError` propagate before the actor is resolved and before consent is recorded.
+4. Resolve the current actor identity via `ActorResolver`.
 
 ### Requirement: Change lookup
 
@@ -88,3 +87,4 @@ The public factory SHALL retain both established forms: canonical `createApprove
 - [`core:kernel`](../kernel/spec.md)
 - [`core:composition-resolver`](../composition-resolver/spec.md)
 - [`core:transition-checks`](../transition-checks/spec.md) — `from` states for `approval.spec` come from check registry bindings
+- [core:resolve-change-schema](../resolve-change-schema/spec.md) — named sovereign lookup, provider identity validation, and same-name version advisory

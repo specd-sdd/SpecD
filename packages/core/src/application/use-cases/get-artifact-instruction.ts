@@ -2,10 +2,10 @@ import * as path from 'node:path'
 import { type ChangeRepository } from '../ports/change-repository.js'
 import { type SpecRepository } from '../ports/spec-repository.js'
 import { type SchemaProvider } from '../ports/schema-provider.js'
+import { ResolveChangeSchema } from '../services/resolve-change-schema.js'
 import { type ArtifactParserRegistry } from '../ports/artifact-parser.js'
 import { type TemplateExpander } from '../template-expander.js'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
-import { SchemaMismatchError } from '../errors/schema-mismatch-error.js'
 import { ArtifactNotFoundError } from '../errors/artifact-not-found-error.js'
 import { ParserNotRegisteredError } from '../errors/parser-not-registered-error.js'
 import { Spec, ABSENT_SPEC_SIDECAR } from '../../domain/entities/spec.js'
@@ -53,6 +53,7 @@ export class GetArtifactInstruction {
   private readonly _schemaProvider: SchemaProvider
   private readonly _parsers: ArtifactParserRegistry
   private readonly _templates: TemplateExpander
+  private readonly _resolveChangeSchema: ResolveChangeSchema
 
   /**
    * Creates a new `GetArtifactInstruction` use case.
@@ -62,6 +63,7 @@ export class GetArtifactInstruction {
    * @param schemaProvider - Provider for the fully-resolved schema
    * @param parsers - Registry of artifact parsers by format
    * @param templates - Template expander for variable substitution
+   * @param resolveChangeSchema - Shared change schema resolver
    */
   constructor(
     changes: ChangeRepository,
@@ -69,12 +71,14 @@ export class GetArtifactInstruction {
     schemaProvider: SchemaProvider,
     parsers: ArtifactParserRegistry,
     templates: TemplateExpander,
+    resolveChangeSchema?: ResolveChangeSchema,
   ) {
     this._changes = changes
     this._specs = specs
     this._schemaProvider = schemaProvider
     this._parsers = parsers
     this._templates = templates
+    this._resolveChangeSchema = resolveChangeSchema ?? new ResolveChangeSchema(schemaProvider)
   }
 
   /**
@@ -87,11 +91,11 @@ export class GetArtifactInstruction {
     const change = await this._changes.get(input.name)
     if (change === null) throw new ChangeNotFoundError(input.name)
 
-    const schema = await this._schemaProvider.get()
-
-    if (schema.name() !== change.schemaName) {
-      throw new SchemaMismatchError(change.name, change.schemaName, schema.name())
-    }
+    const { schema } = await this._resolveChangeSchema.execute({
+      changeName: change.name,
+      schemaName: change.schemaName,
+      schemaVersion: change.schemaVersion,
+    })
 
     // Resolve artifact ID — explicit or auto-detected from dependency graph
     const lifecycle = evaluateLifecycleVerdict(change, schema, {

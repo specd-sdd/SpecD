@@ -8,21 +8,14 @@ import {
   hookFailureMode,
   matchingEffects,
 } from '../../../src/application/services/execute-hook-effect.js'
+import { makeSchema } from '../use-cases/helpers.js'
 
-const SCHEMA_STD_STEPS = [
-  'drafting',
-  'designing',
-  'ready',
-  'implementing',
-  'verifying',
-  'done',
-  'archivable',
-  'archiving',
-]
+const SCHEMA_STD = makeSchema()
+const APPROVALS = { spec: false, signoff: false } as const
 
 describe('matchingEffects', () => {
   it('given transition before-persist, when selecting effects, then returns post then pre without hardcoding ids for the slot', () => {
-    const along = classifyAlong('implementing', 'verifying', SCHEMA_STD_STEPS)
+    const along = classifyAlong('implementing', 'verifying', SCHEMA_STD, APPROVALS)
     const rows = matchingEffects(
       TRANSITION_BINDINGS,
       { scope: 'transition', from: 'implementing', to: 'verifying', along },
@@ -34,7 +27,7 @@ describe('matchingEffects', () => {
   })
 
   it('given redesign, when selecting before-persist, then omits hook.post by along filter', () => {
-    const along = classifyAlong('implementing', 'designing', SCHEMA_STD_STEPS)
+    const along = classifyAlong('implementing', 'designing', SCHEMA_STD, APPROVALS)
     const rows = matchingEffects(
       TRANSITION_BINDINGS,
       { scope: 'transition', from: 'implementing', to: 'designing', along },
@@ -45,7 +38,7 @@ describe('matchingEffects', () => {
   })
 
   it('given backward, when selecting before-persist, then omits hook.post', () => {
-    const along = classifyAlong('verifying', 'implementing', SCHEMA_STD_STEPS)
+    const along = classifyAlong('verifying', 'implementing', SCHEMA_STD, APPROVALS)
     const rows = matchingEffects(
       TRANSITION_BINDINGS,
       { scope: 'transition', from: 'verifying', to: 'implementing', along },
@@ -57,7 +50,7 @@ describe('matchingEffects', () => {
   })
 
   it('given recovery, when selecting before-persist, then omits hook.pre and hook.post', () => {
-    const along = classifyAlong('archiving', 'archivable', SCHEMA_STD_STEPS)
+    const along = classifyAlong('archiving', 'archivable', SCHEMA_STD, APPROVALS)
     const rows = matchingEffects(
       TRANSITION_BINDINGS,
       { scope: 'transition', from: 'archiving', to: 'archivable', along },

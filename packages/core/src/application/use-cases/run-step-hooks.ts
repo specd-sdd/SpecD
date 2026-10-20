@@ -1,4 +1,5 @@
 import { type ChangeState, VALID_TRANSITIONS } from '../../domain/value-objects/change-state.js'
+import { isWorkflowStepEnabled } from '../../domain/services/workflow-topology.js'
 import { type HookEntry } from '../../domain/value-objects/workflow-step.js'
 import { StepNotValidError } from '../../domain/errors/step-not-valid-error.js'
 import { HookNotFoundError } from '../../domain/errors/hook-not-found-error.js'
@@ -12,9 +13,9 @@ import {
   type TemplateVariables,
 } from '../ports/hook-runner.js'
 import { type SchemaProvider } from '../ports/schema-provider.js'
+import { ResolveChangeSchema } from '../services/resolve-change-schema.js'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 import { ExternalHookTypeNotRegisteredError } from '../errors/external-hook-type-not-registered-error.js'
-import { SchemaMismatchError } from '../errors/schema-mismatch-error.js'
 
 /** Valid `ChangeState` values for step validation. */
 const CHANGE_STATES = Object.keys(VALID_TRANSITIONS) as ChangeState[]
@@ -69,6 +70,7 @@ export class RunStepHooks {
   private readonly _hooks: HookRunner
   private readonly _externalHookRunners: ReadonlyMap<string, ExternalHookRunner>
   private readonly _schemaProvider: SchemaProvider
+  private readonly _resolveChangeSchema: ResolveChangeSchema
 
   /**
    * Creates a new `RunStepHooks` use case.
@@ -78,6 +80,7 @@ export class RunStepHooks {
    * @param hooks - Hook runner for executing shell commands
    * @param externalHookRunners - External hook runners indexed by accepted type
    * @param schemaProvider - Provider for the fully-resolved schema
+   * @param resolveChangeSchema - Shared change schema resolver
    */
   constructor(
     changes: ChangeRepository,
@@ -85,12 +88,14 @@ export class RunStepHooks {
     hooks: HookRunner,
     externalHookRunners: ReadonlyMap<string, ExternalHookRunner>,
     schemaProvider: SchemaProvider,
+    resolveChangeSchema?: ResolveChangeSchema,
   ) {
     this._changes = changes
     this._archive = archive
     this._hooks = hooks
     this._externalHookRunners = externalHookRunners
     this._schemaProvider = schemaProvider
+    this._resolveChangeSchema = resolveChangeSchema ?? new ResolveChangeSchema(schemaProvider)
   }
 
   /**
@@ -112,18 +117,18 @@ export class RunStepHooks {
         const archived = await this._archive.get(input.name)
         if (archived === null) throw new ChangeNotFoundError(input.name)
 
-        const schema = await this._schemaProvider.get()
-
-        if (schema.name() !== archived.schemaName) {
-          throw new SchemaMismatchError(input.name, archived.schemaName, schema.name())
-        }
+        const { schema } = await this._resolveChangeSchema.execute({
+          changeName: archived.name,
+          schemaName: archived.schemaName,
+          schemaVersion: archived.schemaVersion,
+        })
 
         if (!(CHANGE_STATES as string[]).includes(input.step)) {
           throw new StepNotValidError(input.step)
         }
 
         const workflowStep = schema.workflowStep(input.step)
-        if (workflowStep === null) {
+        if (workflowStep === null || !isWorkflowStepEnabled(input.step as ChangeState, schema)) {
           return { hooks: [], success: true, failedHooks: [], warnings: [] }
         }
 
@@ -159,19 +164,20 @@ export class RunStepHooks {
       throw new ChangeNotFoundError(input.name)
     }
 
-    const schema = await this._schemaProvider.get()
-
-    if (schema.name() !== change.schemaName) {
-      throw new SchemaMismatchError(change.name, change.schemaName, schema.name())
-    }
+    const { schema } = await this._resolveChangeSchema.execute({
+      changeName: change.name,
+      schemaName: change.schemaName,
+      schemaVersion: change.schemaVersion,
+    })
 
     // Validate step is a valid ChangeState
     if (!(CHANGE_STATES as string[]).includes(input.step)) {
       throw new StepNotValidError(input.step)
     }
 
+    // A disabled step is never entered: no hooks in either phase, even with --only.
     const workflowStep = schema.workflowStep(input.step)
-    if (workflowStep === null) {
+    if (workflowStep === null || !isWorkflowStepEnabled(input.step as ChangeState, schema)) {
       return { hooks: [], success: true, failedHooks: [], warnings: [] }
     }
 

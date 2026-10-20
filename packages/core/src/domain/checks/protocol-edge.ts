@@ -8,21 +8,35 @@ import {
   type CheckExecutionContext,
   type CheckResult,
 } from '../services/transition-checks.js'
+import { isWorkflowTransitionLegal } from '../services/workflow-topology.js'
+import { type Schema } from '../value-objects/schema.js'
 
 /** Facts for `protocol.edge`. */
 export interface ProtocolEdgeFacts {
   readonly from: ChangeState
   readonly to: ChangeState
+  readonly schema?: Schema
+  readonly approvals?: { readonly spec: boolean; readonly signoff: boolean }
 }
 
 /**
- * Protocol-edge predicate: requested pair must be in `VALID_TRANSITIONS`.
+ * Protocol-edge predicate: validates that transition is permitted by workflow topology
+ * (or fallback to `VALID_TRANSITIONS` if schema not supplied).
  *
- * @param facts - Attempt endpoints
+ * @param facts - Attempt endpoints and optional schema/approvals
  * @returns Pass or `INVALID_TRANSITION`
  */
 export function run(facts: ProtocolEdgeFacts): CheckResult {
-  if (isValidTransition(facts.from, facts.to)) {
+  const isLegal = facts.schema
+    ? isWorkflowTransitionLegal(
+        facts.from,
+        facts.to,
+        facts.schema,
+        facts.approvals ?? { spec: false, signoff: false },
+      )
+    : isValidTransition(facts.from, facts.to)
+
+  if (isLegal) {
     return pass('protocol.edge')
   }
   return fail(
@@ -42,7 +56,14 @@ function execute(ctx: CheckExecutionContext): Promise<CheckResult> {
   if (ctx.attempt.scope !== 'transition') {
     return Promise.resolve(skip('protocol.edge'))
   }
-  return Promise.resolve(run({ from: ctx.attempt.from, to: ctx.attempt.to }))
+  return Promise.resolve(
+    run({
+      from: ctx.attempt.from,
+      to: ctx.attempt.to,
+      schema: ctx.schema,
+      ...(ctx.approvals !== undefined ? { approvals: ctx.approvals } : {}),
+    }),
+  )
 }
 
 /** Reusable `protocol.edge` check. Registry bindings decide when it runs. */

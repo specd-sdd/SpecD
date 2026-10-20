@@ -1,5 +1,5 @@
+import { ResolveChangeSchema } from '../services/resolve-change-schema.js'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
-import { SchemaMismatchError } from '../errors/schema-mismatch-error.js'
 import { SpecNotInChangeError } from '../errors/spec-not-in-change-error.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
 import { type SpecRepository } from '../ports/spec-repository.js'
@@ -121,6 +121,7 @@ export class ValidateArtifacts {
   private readonly _extractorTransforms: ExtractorTransformRegistry
   private readonly _workspaceRoutes: readonly SpecWorkspaceRoute[]
   private readonly _reconcile: ReconcileChangeValidity
+  private readonly _resolveChangeSchema: ResolveChangeSchema
 
   /**
    * Creates a new `ValidateArtifacts` use case instance.
@@ -134,6 +135,7 @@ export class ValidateArtifacts {
    * @param extractorTransforms - Shared extractor transform registry
    * @param workspaceRoutes - Workspace routing metadata for cross-workspace resolution
    * @param reconcile - Canonical reconciler. When supplied, drift and recovery are applied inside the validation mutation and stale evidence is not renewed.
+   * @param resolveChangeSchema - Resolves the change's named schema; defaults to a provider-backed resolver
    */
   constructor(
     changes: ChangeRepository,
@@ -145,6 +147,7 @@ export class ValidateArtifacts {
     extractorTransforms: ExtractorTransformRegistry = new Map(),
     workspaceRoutes: readonly SpecWorkspaceRoute[] = [],
     reconcile?: ReconcileChangeValidity,
+    resolveChangeSchema?: ResolveChangeSchema,
   ) {
     this._changes = changes
     this._listWorkspaces = listWorkspaces
@@ -160,6 +163,7 @@ export class ValidateArtifacts {
       )
     }
     this._reconcile = reconcile
+    this._resolveChangeSchema = resolveChangeSchema ?? new ResolveChangeSchema(schemaProvider)
   }
 
   /**
@@ -174,7 +178,11 @@ export class ValidateArtifacts {
     const change = await this._changes.get(input.name)
     if (change === null) throw new ChangeNotFoundError(input.name)
 
-    const schema = await this._schemaProvider.get()
+    const { schema } = await this._resolveChangeSchema.execute({
+      changeName: change.name,
+      schemaName: change.schemaName,
+      schemaVersion: change.schemaVersion,
+    })
 
     const targetArtifactType =
       input.artifactId !== undefined
@@ -190,11 +198,6 @@ export class ValidateArtifacts {
       if (targetArtifactType?.scope === 'spec') {
         throw new SpecNotInChangeError('<specPath required>', input.name)
       }
-    }
-
-    // --- Schema name guard ---
-    if (schema.name() !== change.schemaName) {
-      throw new SchemaMismatchError(change.name, change.schemaName, schema.name())
     }
 
     // --- Unknown artifact ID guard ---

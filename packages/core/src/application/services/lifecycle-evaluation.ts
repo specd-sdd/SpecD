@@ -35,6 +35,7 @@ export function evaluateLifecycle(
     domain.review,
     domain.availableTransitions,
     approvals,
+    schema,
     options.validity,
   )
   return {

@@ -7,33 +7,11 @@
   "implementation": [
     {
       "file": "core:src/domain/services/check-registry.ts",
-      "symbols": ["CheckRegistry", "CheckGovernance", "PluginCheckRegistrationOptions"]
-    },
-    {
-      "file": "core:src/domain/errors/check-registry-errors.ts",
-      "symbols": [
-        "InvalidPluginNameError",
-        "DuplicateCheckError",
-        "DuplicateCheckBindingError",
-        "InvalidCheckKindError",
-        "CheckEmbeddingForbiddenError",
-        "CheckBindingOverrideForbiddenError",
-        "CheckConfigOverrideForbiddenError",
-        "CheckNotSkippableError",
-        "UnknownCheckError"
-      ]
+      "symbols": ["CheckRegistry"]
     },
     {
       "file": "core:src/composition/composition-registries.ts",
-      "symbols": ["PluginCheckRegistration"]
-    },
-    {
-      "file": "core:src/composition/kernel-builder.ts",
-      "symbols": ["KernelBuilder"]
-    },
-    {
-      "file": "core:src/composition/use-cases/workflow-check-registry.ts",
-      "symbols": ["resolveWorkflowCheckRegistry"]
+      "symbols": ["createCompositionRegistryView"]
     }
   ]
 }

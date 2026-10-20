@@ -1,5 +1,12 @@
 /* eslint-disable jsdoc/require-jsdoc */
 import * as path from 'node:path'
+import {
+  ChangeNotFoundError,
+  SchemaProviderIdentityMismatchError,
+  type ChangeSchemaAdvisory,
+  type Schema,
+} from '@specd/sdk'
+import { formatSchemaAdvisories, resolveChangeSchemaForCli } from '../../helpers/change-schema.js'
 import chalk from 'chalk'
 import { type Command } from 'commander'
 import { output, parseFormat } from '../../formatter.js'
@@ -70,12 +77,24 @@ export function registerChangeSpecPreview(parent: Command): void {
             console.error(`warning: ${warning}`)
           }
 
+          let schemaWarnings: readonly ChangeSchemaAdvisory[] = []
           if (opts.artifact !== undefined) {
-            const schemaResult = await kernel.specs.getActiveSchema.execute()
-            if (schemaResult.raw) {
-              throw new Error('Unexpected raw schema result')
+            let schema: Schema
+            try {
+              const resolved = await resolveChangeSchemaForCli(kernel, name)
+              schema = resolved.schema
+              schemaWarnings = resolved.warnings
+            } catch (err) {
+              if (err instanceof ChangeNotFoundError) throw err
+              cliError(
+                err instanceof Error ? err.message : String(err),
+                opts.format,
+                3,
+                err instanceof SchemaProviderIdentityMismatchError
+                  ? 'SCHEMA_PROVIDER_IDENTITY_MISMATCH'
+                  : 'SCHEMA_RESOLUTION_FAILED',
+              )
             }
-            const schema = schemaResult.schema
             const artifactType = schema.artifact(opts.artifact)
 
             if (artifactType === null) {
@@ -108,6 +127,10 @@ export function registerChangeSpecPreview(parent: Command): void {
           }
 
           const fmt = parseFormat(opts.format)
+
+          // Advisories go to stderr in text mode so piped preview content stays clean.
+          const advisoryBlock = formatSchemaAdvisories(schemaWarnings)
+          if (fmt === 'text' && advisoryBlock !== null) process.stderr.write(`${advisoryBlock}\n`)
 
           if (fmt === 'text') {
             if (result.files.length === 0) {
@@ -158,7 +181,7 @@ export function registerChangeSpecPreview(parent: Command): void {
               }
             }
           } else {
-            output(result, fmt)
+            output(schemaWarnings.length > 0 ? { ...result, schemaWarnings } : result, fmt)
           }
         } catch (err) {
           handleError(err, opts.format)

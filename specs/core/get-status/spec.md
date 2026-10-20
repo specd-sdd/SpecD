@@ -110,9 +110,9 @@ When the artifact file does not exist or the file content is empty, the `taskCom
 
 ### Requirement: Execute matching predicates then project
 
-Before composing lifecycle guidance, `GetStatus` MUST, for each protocol-legal candidate target, select matching **predicates** from the binding table and call `check.execute(ctx)` (see [`core:transition-checks`](../transition-checks/spec.md)). GetStatus MUST collect **every** matching predicate for each hop (no `protocol.edge` fail-fast) so blockers and the repair guide show the full why.
+Before composing lifecycle guidance, `GetStatus` MUST, for each protocol-legal candidate target, select matching **predicates** from the effective bindings resolved for that candidate (`resolveEffectiveBindings`, including schema `checks` / `skipChecks` declarations) and call `check.execute(ctx)` (see [`core:transition-checks`](../transition-checks/spec.md)). GetStatus MUST collect **every** matching predicate for each hop (no `protocol.edge` fail-fast) so blockers and the repair guide show the full why.
 
-When `change.state` is `archivable`, GetStatus MUST also execute **all archive-scope predicates** (not `hook.pre` / `hook.post` effects) with `allowOverlap` and `allowOutOfScope` false. Live `spec.overlap` failure MAY then appear as public `OVERLAP_CONFLICT` with `--allow-overlap`. Invalidation-from-another-archive MUST NOT use that blocker (see review).
+When `change.state` is `archivable`, GetStatus MUST also execute **all archive-scope predicates** (not `hook.pre` / `hook.post` effects) without any user bypass (`skipChecks` empty). Live `spec.overlap` failure MAY then appear as public `OVERLAP_CONFLICT` with `bypassFlag: '--skip-checks spec.overlap'`. Invalidation-from-another-archive MUST NOT use that blocker (see review).
 
 `CountTasks` MUST be memoized on the **current evaluation pass** so one `GetStatus.execute` counts once for all legal targets. The check MUST NOT cache counts on the Kernel-lived instance across executes.
 
@@ -123,6 +123,14 @@ When `change.state` is `archivable`, GetStatus MUST also execute **all archive-s
 `GetStatus` MUST call `evaluateLifecycle` (domain verdict + application guidance) to obtain public `nextAction.command`. It MUST NOT read command strings from domain `nextHop`.
 
 The status result MUST expose check-derived `availableTransitions` and `nextAction`. It MUST expose enough check rows (id, kind, outcome, code/message on fail) that a later dry-run UI does not need a second result type. `effect` rows MUST NOT be required for `allowed` on status.
+
+### Requirement: Shared transition candidate evaluation
+
+For every protocol-legal candidate target, `GetStatus` MUST use the same shared candidate evaluator as `TransitionChange`. The evaluator MUST compute `listBypassedWorkflowSteps(from, to, schema, approvals)`, evaluate the normal transition predicate set, and evaluate each applicable `scope: 'step-skip'` predicate set for optional bypassed steps.
+
+`availableTransitions`, `checksByTarget`, blockers, and `nextAction` MUST be projected only from those complete candidate results. A failed step-skip predicate removes that shortcut from `availableTransitions`; an empty effective step-skip predicate set passes unconditionally.
+
+Status evaluation is projection-only and MUST NOT run effects, hooks, mutation, or persistence. `TransitionChange` MUST recalculate the same candidate through the shared evaluator against fresh state before it owns effects and persistence.
 
 ### Requirement: Throws ChangeNotFoundError for unknown changes
 
@@ -169,13 +177,13 @@ Blockers MUST be collected for:
 - **Incomplete artifacts**: code `'INCOMPLETE_ARTIFACT'` for each required artifact whose effective status is `missing` or `in-progress`. There is no separate `MISSING_ARTIFACT` code — absence and in-progress share `INCOMPLETE_ARTIFACT`.
   Failed predicates for candidate hops MUST appear on public `blockers` with their check codes (`INCOMPLETE_ARTIFACT`, `APPROVAL_REQUIRED`, `INCOMPLETE_TASKS`, `DEPS_INCONSISTENT`, `READ_ONLY_WORKSPACE`, `IMPLEMENTATION_STATE`, `INVALID_TRANSITION`, archive codes when in scope including `OVERLAP_CONFLICT` **only** from archive predicates while `state === 'archivable'`). `review.reason === 'spec-overlap-conflict'` MUST NOT add `OVERLAP_CONFLICT` to `blockers`. `GetStatus` MUST NOT drop requires or approval failures from `blockers` while omitting those hops from `availableTransitions`.
 
-When a failed predicate has code `IMPLEMENTATION_STATE`, `bypassFlag: '--allow-out-of-scope'` (and skippable for that flag) MUST attach only if the failing check id is `impl.linksInScope`. Open-file failures from `impl.filesResolved` MUST NOT advertise that bypass even though they share the same code.
+A blocker projected from a failed predicate SHALL carry `isSkippable` and `bypassFlag: '--skip-checks <checkId>'` only when the resolved binding of that check for the evaluated candidate is skippable, including skippability declared by the schema. For code `IMPLEMENTATION_STATE`, only `impl.linksInScope` failures are skippable; open-file failures from `impl.filesResolved` MUST NOT advertise a bypass even though they share the same code.
 
 Blockers projected from a failed check MUST include that check’s gerund `label` (and SHOULD include `checkId`) alongside `code` and `message`. Review-only blockers (`ARTIFACT_DRIFT`, `REVIEW_REQUIRED`) MAY omit `label`. Agents use `label` as a human hint for what the machine code means (for example `DEPS_INCONSISTENT` → `Checking spec dependencies`).
 
 When `review.required` is true, `review` MUST include a human `message`. For `spec-overlap-conflict` the message MUST explain conflict with archived overlapping specs (not the kebab token alone). `nextAction.reason` SHOULD use that message.
 
-When public `blockers` include `OVERLAP_CONFLICT`, `nextAction.command` MUST remain `/specd-archive` and `targetStep` MUST remain `archivable`. `nextAction.reason` MUST NOT be `Ready to archive`. It MUST name live overlap and `--allow-overlap`. Overlap is an archive operation predicate, not a hop, so `availableTransitions` MAY still list `archiving`.
+When public `blockers` include `OVERLAP_CONFLICT`, `nextAction.command` MUST remain `/specd-archive` and `targetStep` MUST remain `archivable`. `nextAction.reason` MUST NOT be `Ready to archive`. It MUST name live overlap and the projected bypass flag (`--skip-checks spec.overlap`). Overlap is an archive operation predicate, not a hop, so `availableTransitions` MAY still list `archiving`.
 
 `GetStatus` MAY assemble these blockers directly or obtain them from `evaluateLifecycle`, but the blocker set MUST be derived from the same authoritative evaluation used for effective statuses and `availableTransitions`.
 
@@ -199,9 +207,11 @@ Under ungated `workflow: preserve`, artifact review remains in the current state
 
 ### Requirement: Graceful degradation when schema resolution fails
 
-If `SchemaProvider.get()` throws, the `lifecycle` object MUST still be present with degraded values:
+`GetStatus` MUST resolve the active change's sovereign schema through `ResolveChangeSchema` using the recorded name and version (or the corresponding read-only view fields for drafts).
 
-- `validTransitions` MUST be populated normally (it is a static lookup, independent of schema)
+If schema resolution throws, the `lifecycle` object MUST still be present with degraded values:
+
+- `validTransitions` MUST be an empty array because trusted topology cannot be derived
 - `availableTransitions` MUST be an empty array
 - `lifecycle.blockers` MUST be an empty array because target-specific transition checks cannot run without a schema
 - `approvals` MUST be populated normally (it is injected config, independent of schema)
@@ -209,7 +219,11 @@ If `SchemaProvider.get()` throws, the `lifecycle` object MUST still be present w
 - `changePath` MUST be populated normally
 - `schemaInfo` MUST be `null`
 
-The public result `blockers` array MUST contain the stable `SCHEMA_RESOLUTION_FAILED` blocker with actionable recovery guidance. The use case MUST NOT throw when schema resolution fails, MUST remain read-only, and MUST NOT enable a lifecycle mutation or weaken fail-closed transition validation.
+A general lookup or resolution failure MUST produce the stable `SCHEMA_RESOLUTION_FAILED` blocker. `SchemaProviderIdentityMismatchError` MUST instead produce `SCHEMA_IDENTITY_MISMATCH` whose structured `details` contain `requestedName` and `returnedName`. The use case MUST NOT throw for either read-only status condition, MUST remain read-only, and MUST NOT project topology, actions, artifact rules, or lifecycle mutations from an unresolved or untrusted schema.
+
+The same degradation applies to drafted changes: drafted status MUST NOT throw for any schema resolution failure (including identity mismatch), MUST report `schemaInfo: null`, and MUST emit the same blocker codes.
+
+Typed advisories returned by `ResolveChangeSchema` (for example same-name version drift) MUST be exposed on the status result as structured warnings rather than only logged.
 
 ### Requirement: Config-based factory delegates through resolveGetStatusDeps
 
@@ -249,3 +263,4 @@ The helper is the only use-case-specific composition entry for config-based boot
 - [`core:composition-resolver`](../composition-resolver/spec.md)
 - [`core:count-tasks`](../count-tasks/spec.md) — supplies shared task-completion counts.
 - [`core:transition-checks`](../transition-checks/spec.md) — shared evaluation consumed by status projections.
+- [core:resolve-change-schema](../resolve-change-schema/spec.md) — named sovereign lookup, provider identity validation, and same-name version advisory

@@ -1,4 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import { ResolveChangeSchema } from '../../../src/application/services/resolve-change-schema.js'
+import { type SchemaProvider } from '../../../src/application/ports/schema-provider.js'
 import { ArchiveImplementationStateError } from '../../../src/domain/errors/archive-implementation-state-error.js'
 import { Change } from '../../../src/domain/entities/change.js'
 import { fail, pass } from '../../../src/domain/services/transition-checks.js'
@@ -50,6 +52,7 @@ function change(): Change {
 function harness(options?: {
   readonly failCheck?: boolean
   readonly fingerprint?: ValidityFingerprint | null
+  readonly schemaProvider?: SchemaProvider
 }) {
   const repo = new StubChangeRepository([change()])
   const schema = makeSchema()
@@ -58,7 +61,7 @@ function harness(options?: {
   const useCase = new StartVerification({
     changes: repo,
     actor: makeActorResolver(),
-    schemaProvider: makeSchemaProvider(schema),
+    schemaProvider: options?.schemaProvider ?? makeSchemaProvider(schema),
     refreshImplementationTracking: {
       execute: async () => {
         refreshed += 1
@@ -104,7 +107,7 @@ function harness(options?: {
     ],
     reconcileChangeValidity: new ReconcileChangeValidity({
       changes: repo,
-      schemaProvider: makeSchemaProvider(schema),
+      resolveChangeSchema: new ResolveChangeSchema(makeSchemaProvider(schema)),
       actor: makeActorResolver(),
       refreshImplementationTracking: {
         execute: async () => {
@@ -121,6 +124,29 @@ function harness(options?: {
 }
 
 describe('StartVerification', () => {
+  it('builds readiness from the change sovereign schema', async () => {
+    const sovereignSchema = makeSchema({ name: 'test-schema' })
+    const get = vi.fn(async (ref?: string) => {
+      if (ref !== 'test-schema') throw new Error('workspace default must not be used')
+      return sovereignSchema
+    })
+    const { useCase } = harness({ schemaProvider: { get } as SchemaProvider })
+
+    await useCase.execute({ name: 'c1' })
+
+    expect(get).toHaveBeenCalledWith('test-schema')
+  })
+
+  it('does not create an attempt when sovereign schema resolution fails', async () => {
+    const failure = new Error('sovereign schema unavailable')
+    const provider = { get: vi.fn(async () => Promise.reject(failure)) } as SchemaProvider
+    const { useCase, repo } = harness({ schemaProvider: provider })
+
+    await expect(useCase.execute({ name: 'c1' })).rejects.toBe(failure)
+    expect(provider.get).toHaveBeenCalledWith('test-schema')
+    expect(repo.store.get('c1')?.verification.activeAttempt).toBeUndefined()
+  })
+
   it('starts an attempt without moving lifecycle state', async () => {
     const { useCase, refreshed, seenContexts } = harness()
     const result = await useCase.execute({ name: 'c1' })

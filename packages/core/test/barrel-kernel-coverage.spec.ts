@@ -14,6 +14,7 @@ const KERNEL_ASSEMBLY_EXPORTS: Record<string, string> = {
   'changes.create': 'createCreateChange',
   'changes.status': 'createGetStatus',
   'changes.countTasks': 'createCountTasks',
+  'changes.resolveSchema': 'createResolveChangeSchema',
   'changes.transition': 'createTransitionChange',
   'changes.draft': 'createDraftChange',
   'changes.restore': 'createRestoreChange',

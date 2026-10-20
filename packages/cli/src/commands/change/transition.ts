@@ -11,6 +11,7 @@ import {
   CheckPredicateFailedError,
   CheckNotSkippableError,
   UnknownCheckError,
+  HappyPathNextUnavailableError,
 } from '@specd/sdk'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat, serializeOutput, type OutputFormat } from '../../formatter.js'
@@ -91,13 +92,15 @@ function isRepairGuideError(err: unknown): boolean {
     err instanceof CheckPredicateFailedError ||
     err instanceof CheckNotSkippableError ||
     err instanceof UnknownCheckError ||
+    err instanceof HappyPathNextUnavailableError ||
     name === 'InvalidStateTransitionError' ||
     name === 'ReadOnlyWorkspaceError' ||
     name === 'ArchiveDependencyMismatchError' ||
     name === 'ArchiveImplementationStateError' ||
     name === 'CheckPredicateFailedError' ||
     name === 'CheckNotSkippableError' ||
-    name === 'UnknownCheckError'
+    name === 'UnknownCheckError' ||
+    name === 'HappyPathNextUnavailableError'
   )
 }
 
@@ -211,9 +214,15 @@ function validateRequestedTarget(
  * feedback to stderr in text format and stdout stream records for structured formats.
  *
  * @param format - The CLI output format for visual or structured progress
+ * @param skips - User-requested check and hook bypasses used to label skipped rows
+ * @param skips.skipChecks - Check ids bypassed with `--skip-checks`
+ * @param skips.skipHooks - Whether any hook phase is skipped with `--skip-hooks`
  * @returns The progress callback and collected events
  */
-function makeProgressRenderer(format: OutputFormat): {
+function makeProgressRenderer(
+  format: OutputFormat,
+  skips: { readonly skipChecks: ReadonlySet<string>; readonly skipHooks: boolean },
+): {
   onProgress: OnTransitionProgress
   events: TransitionProgressEvent[]
 } {
@@ -222,6 +231,8 @@ function makeProgressRenderer(format: OutputFormat): {
     format,
     streamName: 'change-transition',
     stream: format === 'text' ? process.stderr : process.stdout,
+    skipChecks: skips.skipChecks,
+    skipHooks: skips.skipHooks,
   })
 
   const onProgress: OnTransitionProgress = (evt) => {
@@ -361,7 +372,10 @@ JSON/TOON output schema:
           const requestedTarget: ChangeState | 'next' =
             opts.next === true ? 'next' : (step as ChangeState)
 
-          const progressRenderer = makeProgressRenderer(fmt)
+          const progressRenderer = makeProgressRenderer(fmt, {
+            skipChecks,
+            skipHooks: skipHookPhases.size > 0,
+          })
 
           try {
             const result = await kernel.changes.transition.execute(

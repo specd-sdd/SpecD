@@ -5,7 +5,8 @@ import {
   type PreviewSpecInput,
 } from '../../../src/application/use-cases/preview-spec.js'
 import { SpecNotInChangeError } from '../../../src/application/errors/spec-not-in-change-error.js'
-import { SchemaMismatchError } from '../../../src/application/errors/schema-mismatch-error.js'
+import { SchemaProviderIdentityMismatchError } from '../../../src/application/errors/schema-provider-identity-mismatch-error.js'
+import { type SchemaProvider } from '../../../src/application/ports/schema-provider.js'
 import { Change } from '../../../src/domain/entities/change.js'
 import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
 import { ArtifactFile } from '../../../src/domain/value-objects/artifact-file.js'
@@ -136,14 +137,69 @@ describe('PreviewSpec', () => {
     })
   })
 
-  describe('schema mismatch throws', () => {
-    it('throws SchemaMismatchError when change schema differs from active schema', async () => {
-      const change = makeChangeWithArtifacts([SPEC_ID], [], 'other-schema')
-      const { useCase } = makeSut({ change, schemaName: SCHEMA_NAME })
+  describe('schema resolution', () => {
+    it('resolves schema by change.schemaName', async () => {
+      const change = makeChangeWithArtifacts([SPEC_ID], [], 'custom-schema')
+      const artifactType = makeArtifactType('specs', { scope: 'spec', delta: true })
+      const customSchema = makeSchema({ artifacts: [artifactType], name: 'custom-schema' })
+      const schemaProvider: SchemaProvider = {
+        get: vi.fn().mockResolvedValue(customSchema),
+      }
+      const changes = makeChangeRepository([change])
+      const parsers = makeParsers()
+      const diffGenerator = makeDiffGenerator()
+      const useCase = new PreviewSpec(changes, new Map(), schemaProvider, parsers, diffGenerator)
 
       const input: PreviewSpecInput = { name: CHANGE_NAME, specId: SPEC_ID }
+      const result = await useCase.execute(input)
 
-      await expect(useCase.execute(input)).rejects.toThrow(SchemaMismatchError)
+      expect(result).toBeDefined()
+      expect(schemaProvider.get).toHaveBeenCalledWith('custom-schema')
+    })
+  })
+
+  describe('schema identity', () => {
+    it('fails closed on a provider identity mismatch instead of using the default schema', async () => {
+      const change = makeChangeWithArtifacts([SPEC_ID], [], 'custom-schema')
+      const schemaProvider: SchemaProvider = {
+        get: vi
+          .fn()
+          .mockImplementation(async (ref?: string) =>
+            makeSchema({ name: ref === 'custom-schema' ? 'other-schema' : 'default-schema' }),
+          ),
+      }
+      const useCase = new PreviewSpec(
+        makeChangeRepository([change]),
+        new Map(),
+        schemaProvider,
+        makeParsers(),
+        makeDiffGenerator(),
+      )
+
+      await expect(useCase.execute({ name: CHANGE_NAME, specId: SPEC_ID })).rejects.toBeInstanceOf(
+        SchemaProviderIdentityMismatchError,
+      )
+    })
+  })
+
+  describe('schema resolution failure', () => {
+    it('propagates the provider error for the change schema without touching specs', async () => {
+      const change = makeChangeWithArtifacts([SPEC_ID], [], 'custom-schema')
+      const failure = new Error('custom-schema is unresolvable')
+      const get = vi.fn().mockRejectedValue(failure)
+      const specRepo = { get: vi.fn() }
+      const useCase = new PreviewSpec(
+        makeChangeRepository([change]),
+        new Map([['core', specRepo as never]]),
+        { get } as unknown as SchemaProvider,
+        makeParsers(),
+        makeDiffGenerator(),
+      )
+
+      await expect(useCase.execute({ name: CHANGE_NAME, specId: SPEC_ID })).rejects.toBe(failure)
+      expect(get).toHaveBeenCalledWith('custom-schema')
+      expect(get).not.toHaveBeenCalledWith()
+      expect(specRepo.get).not.toHaveBeenCalled()
     })
   })
 

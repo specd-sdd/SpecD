@@ -14,7 +14,13 @@ vi.mock('../../src/helpers/cli-context.js', () => ({
 }))
 
 import { resolveCliContext } from '../../src/helpers/cli-context.js'
-import { ArtifactType, ChangeNotFoundError, Schema, SpecNotInChangeError } from '@specd/sdk'
+import {
+  ArtifactType,
+  ChangeNotFoundError,
+  Schema,
+  SchemaProviderIdentityMismatchError,
+  SpecNotInChangeError,
+} from '@specd/sdk'
 import { registerChangeValidate } from '../../src/commands/change/validate.js'
 
 function mockBatchSchema(
@@ -715,5 +721,134 @@ describe('change validate', () => {
 
     expect(stderr()).toContain('<specPath> is required for scope: spec artifacts')
     expect(process.exit).toHaveBeenCalledWith(1)
+  })
+})
+
+describe('change validate — change schema resolution', () => {
+  it('resolves the artifact model from the change schema, not the workspace default', async () => {
+    const { kernel, stdout } = setup()
+    kernel.specs.getActiveSchema.execute.mockRejectedValue(new Error('must not be consulted'))
+    kernel.changes.resolveSchema.execute.mockResolvedValue({
+      schema: mockBatchSchema().schema,
+      warnings: [],
+    })
+    kernel.changes.status.execute.mockResolvedValue({
+      change: { name: 'feat', specIds: ['default:auth/login'], state: 'designing' },
+    })
+    kernel.changes.validate.execute.mockResolvedValue({ failures: [], notes: [], files: [] })
+
+    const program = makeProgram()
+    registerChangeValidate(program.command('change'))
+    await program.parseAsync(['node', 'specd', 'change', 'validate', 'feat', '--all'])
+
+    expect(kernel.changes.resolveSchema.execute).toHaveBeenCalledWith({
+      changeName: 'feat',
+      schemaName: '@specd/schema-std',
+      schemaVersion: 1,
+    })
+    expect(kernel.specs.getActiveSchema.execute).not.toHaveBeenCalled()
+    expect(stdout()).toContain('feat')
+  })
+
+  it('exits 3 with the resolution error when the change schema cannot be resolved', async () => {
+    const { kernel, stderr } = setup()
+    kernel.changes.resolveSchema.execute.mockRejectedValue(new Error('schema is broken'))
+    kernel.changes.status.execute.mockResolvedValue({
+      change: { name: 'feat', specIds: ['default:auth/login'], state: 'designing' },
+    })
+
+    const program = makeProgram()
+    registerChangeValidate(program.command('change'))
+    await program
+      .parseAsync(['node', 'specd', 'change', 'validate', 'feat', '--all'])
+      .catch(() => {})
+
+    expect(process.exit).toHaveBeenCalledWith(3)
+    expect(stderr()).toContain('schema is broken')
+  })
+})
+
+describe('change validate — resolver diagnostics', () => {
+  const drift = {
+    code: 'SCHEMA_VERSION_DRIFT' as const,
+    changeName: 'feat',
+    schemaName: 'test-schema',
+    recordedVersion: 1,
+    resolvedVersion: 2,
+    message: 'schema moved from v1 to v2',
+  }
+
+  it('exits 3 with a fatal error and the identity code on provider mismatch', async () => {
+    const { kernel, stdout, stderr } = setup()
+    kernel.changes.status.execute.mockResolvedValue({ change: { specIds: ['default:auth/login'] } })
+    kernel.changes.resolveSchema.execute.mockRejectedValue(
+      new SchemaProviderIdentityMismatchError('feat', 'custom', 'schema-std'),
+    )
+
+    const program = makeProgram()
+    registerChangeValidate(program.command('change'))
+    await program
+      .parseAsync(['node', 'specd', 'change', 'validate', 'feat', '--all', '--format', 'json'])
+      .catch(() => {})
+
+    expect(process.exit).toHaveBeenCalledWith(3)
+    expect(stderr()).toContain('fatal:')
+    expect(stdout()).toContain('SCHEMA_PROVIDER_IDENTITY_MISMATCH')
+  })
+
+  it('maps a provider mismatch raised by single-spec validation to exit 3', async () => {
+    const { kernel, stderr } = setup()
+    kernel.changes.validate.execute.mockRejectedValue(
+      new SchemaProviderIdentityMismatchError('feat', 'custom', 'schema-std'),
+    )
+
+    const program = makeProgram()
+    registerChangeValidate(program.command('change'))
+    await program
+      .parseAsync(['node', 'specd', 'change', 'validate', 'feat', 'auth/login'])
+      .catch(() => {})
+
+    expect(process.exit).toHaveBeenCalledWith(3)
+    expect(stderr()).toContain('fatal:')
+  })
+
+  it('renders resolver advisories as a warnings block in text mode', async () => {
+    const { kernel, stdout } = setup()
+    kernel.changes.resolveSchema.execute.mockResolvedValue({
+      ...mockBatchSchema(),
+      warnings: [drift],
+    })
+    kernel.changes.validate.execute.mockResolvedValue({ failures: [], warnings: [], files: [] })
+
+    const program = makeProgram()
+    registerChangeValidate(program.command('change'))
+    await program.parseAsync(['node', 'specd', 'change', 'validate', 'feat', 'auth/login'])
+
+    expect(stdout()).toContain('warnings:')
+    expect(stdout()).toContain('! SCHEMA_VERSION_DRIFT: schema moved from v1 to v2')
+  })
+
+  it('emits structured schemaWarnings in json mode', async () => {
+    const { kernel, stdout } = setup()
+    kernel.changes.resolveSchema.execute.mockResolvedValue({
+      ...mockBatchSchema(),
+      warnings: [drift],
+    })
+    kernel.changes.validate.execute.mockResolvedValue({ failures: [], warnings: [], files: [] })
+
+    const program = makeProgram()
+    registerChangeValidate(program.command('change'))
+    await program.parseAsync([
+      'node',
+      'specd',
+      'change',
+      'validate',
+      'feat',
+      'auth/login',
+      '--format',
+      'json',
+    ])
+
+    expect(JSON.parse(stdout()).schemaWarnings).toEqual([drift])
   })
 })

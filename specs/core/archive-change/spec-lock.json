@@ -25,7 +25,8 @@
     "core:spec-optimization",
     "core:initialize-persisted-spec-state",
     "core:composition-resolver",
-    "core:transition-checks"
+    "core:transition-checks",
+    "core:resolve-change-schema"
   ],
   "implementation": [
     {
@@ -33,14 +34,7 @@
       "symbols": ["ArchiveChange"]
     },
     {
-      "file": "core:src/composition/use-cases/archive-change.ts",
-      "symbols": ["ArchiveChangeDeps", "createArchiveChange", "resolveArchiveChangeDeps"]
-    },
-    {
       "file": "core:test/application/use-cases/archive-change.spec.ts"
-    },
-    {
-      "file": "core:test/composition/use-cases/archive-change.spec.ts"
     }
   ],
   "optimizations": {

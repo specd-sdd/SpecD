@@ -73,6 +73,9 @@ import {
 } from '../../../src/application/ports/artifact-parser.js'
 import { type FileReader } from '../../../src/application/ports/file-reader.js'
 import { type ContentHasher } from '../../../src/application/ports/content-hasher.js'
+import { NodeBinaryContentHasher } from '../../../src/infrastructure/node/binary-content-hasher.js'
+import { ResolveChangeSchema } from '../../../src/application/services/resolve-change-schema.js'
+import { ValidityFingerprintService } from '../../../src/application/services/validity-fingerprint-service.js'
 import { NodeContentHasher } from '../../../src/infrastructure/node/content-hasher.js'
 import {
   type RunStepHooks,
@@ -80,7 +83,8 @@ import {
 } from '../../../src/application/use-cases/run-step-hooks.js'
 import { type ActorResolver } from '../../../src/application/ports/actor-resolver.js'
 import { SpecArtifact } from '../../../src/domain/value-objects/spec-artifact.js'
-import { type ReconcileChangeValidity } from '../../../src/application/use-cases/reconcile-change-validity.js'
+import { type RefreshImplementationTracking } from '../../../src/application/use-cases/refresh-implementation-tracking.js'
+import { ReconcileChangeValidity } from '../../../src/application/use-cases/reconcile-change-validity.js'
 import { type ChangeValidityVerdict } from '../../../src/domain/services/change-validity.js'
 import {
   toDiscardedChangeView,
@@ -1278,6 +1282,41 @@ export const openValidityVerdict: ChangeValidityVerdict = {
   verification: 'not-required',
   blockers: [],
   recovery: null,
+}
+
+/**
+ * Creates the real {@link ReconcileChangeValidity} wired to the given repository
+ * and schema provider. Use it when the subject depends on the true validity verdict
+ * (for example disabled-verifying behavior) instead of an injected double.
+ *
+ * @param changes - Change repository the reconciler reads and mutates
+ * @param schemaProvider - Provider resolved through {@link ResolveChangeSchema}
+ * @param approvals - Approval gates passed to the reconciler
+ * @returns A real reconciler with an empty refresh primitive
+ */
+export function makeRealReconcile(
+  changes: ChangeRepository,
+  schemaProvider: SchemaProvider,
+  approvals: { readonly spec: boolean; readonly signoff: boolean } = {
+    spec: false,
+    signoff: false,
+  },
+): ReconcileChangeValidity {
+  return new ReconcileChangeValidity({
+    changes,
+    resolveChangeSchema: new ResolveChangeSchema(schemaProvider),
+    actor: { identity: async () => testActor },
+    refreshImplementationTracking: {
+      execute: async () => undefined,
+    } as unknown as RefreshImplementationTracking,
+    fingerprint: new ValidityFingerprintService({
+      changes,
+      hasher: new NodeContentHasher(),
+      binaryHasher: new NodeBinaryContentHasher(),
+      schemaProvider,
+    }),
+    approvals,
+  })
 }
 
 /**

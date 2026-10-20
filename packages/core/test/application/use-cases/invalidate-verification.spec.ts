@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { ResolveChangeSchema } from '../../../src/application/services/resolve-change-schema.js'
 import { Change } from '../../../src/domain/entities/change.js'
 import { VerificationNotFoundError } from '../../../src/application/errors/verification-not-found-error.js'
 import { InvalidateVerification } from '../../../src/application/use-cases/invalidate-verification.js'
@@ -77,12 +78,14 @@ function moveTo(change: Change, target: 'archivable' | 'archiving'): void {
 function harness(current: Change) {
   const repo = new StubChangeRepository([current])
   const schema = makeSchema()
+  const resolveChangeSchema = new ResolveChangeSchema(makeSchemaProvider(schema))
   const useCase = new InvalidateVerification({
     changes: repo,
     actor: makeActorResolver(),
+    resolveChangeSchema,
     reconcileChangeValidity: new ReconcileChangeValidity({
       changes: repo,
-      schemaProvider: makeSchemaProvider(schema),
+      resolveChangeSchema,
       actor: makeActorResolver(),
       refreshImplementationTracking: {
         execute: async () => undefined,

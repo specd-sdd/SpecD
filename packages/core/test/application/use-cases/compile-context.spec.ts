@@ -11,7 +11,6 @@ import { type PreviewSpec } from '../../../src/application/use-cases/preview-spe
 import { type GetSpecMetadata } from '../../../src/application/use-cases/get-spec-metadata.js'
 import { ChangeNotFoundError } from '../../../src/application/errors/change-not-found-error.js'
 import { SchemaNotFoundError } from '../../../src/application/errors/schema-not-found-error.js'
-import { SchemaMismatchError } from '../../../src/application/errors/schema-mismatch-error.js'
 import { Change, type ChangeEvent } from '../../../src/domain/entities/change.js'
 import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
 import { ArtifactFile } from '../../../src/domain/value-objects/artifact-file.js'
@@ -25,6 +24,7 @@ import { ExtractorTransformError } from '../../../src/domain/errors/extractor-tr
 import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
 import { type ChangeRepository } from '../../../src/application/ports/change-repository.js'
 import { type SpecRepository } from '../../../src/application/ports/spec-repository.js'
+import { SchemaProviderIdentityMismatchError } from '../../../src/application/errors/schema-provider-identity-mismatch-error.js'
 import { type SchemaProvider } from '../../../src/application/ports/schema-provider.js'
 import { type FileReader } from '../../../src/application/ports/file-reader.js'
 import {
@@ -94,6 +94,7 @@ function makeChange(
 
 function makeSchema(
   opts: {
+    name?: string
     artifactId?: string
     artifacts?: ArtifactType[]
     workflow?: WorkflowStep[]
@@ -103,7 +104,7 @@ function makeSchema(
   const artifactId = opts.artifactId ?? 'spec'
   return makeSchemaBase({
     ...opts,
-    name: '@specd/schema-std',
+    name: opts.name ?? '@specd/schema-std',
     artifacts: opts.artifacts ?? [
       makeArtifactType(artifactId, {
         scope: 'spec',
@@ -426,10 +427,10 @@ function makeStubChangeRepo(change?: Change) {
 
 function makeStubSchemaProvider(schema: Schema | null): SchemaProvider {
   return {
-    get: async () => {
+    get: vi.fn(async (_ref?: string) => {
       if (schema === null) throw new SchemaNotFoundError('(test)')
       return schema
-    },
+    }),
   }
 }
 
@@ -541,19 +542,93 @@ describe('CompileContext', () => {
       ).rejects.toThrow(SchemaNotFoundError)
     })
 
-    it('throws SchemaMismatchError when active schema name differs from change schema name', async () => {
+    it('resolves sovereign schema by change.schemaName', async () => {
       const change = makeChange('my-change', { schemaName: 'schema-a' })
-      const schema = new Schema('schema', 'schema-b', 1, [], [])
+      const schema = makeSchema({ name: 'schema-a' })
 
-      const { sut } = makeSut({ change, schema })
+      const { sut, schemaProvider } = makeSut({ change, schema })
+
+      const result = await sut.execute({
+        name: 'my-change',
+        step: 'designing',
+        config: noOp,
+      })
+
+      expect(result).toBeDefined()
+      expect(schemaProvider.get).toHaveBeenCalledWith('schema-a')
+    })
+  })
+
+  describe('Requirement: change schema applies to change specs only', () => {
+    it('passes schemaName for change specs and omits it for specs outside the change', async () => {
+      const loginSpec = makeSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
+      const otherSpec = makeSpec({
+        workspace: 'default',
+        name: 'auth/other',
+        filenames: ['spec.md'],
+      })
+      const loginContent = '# Login\n'
+      const otherContent = '# Other\n'
+      const loginMetadata = freshMetadata(loginContent, { description: 'Login spec.' })
+      const otherMetadata = freshMetadata(otherContent, { description: 'Other spec.' })
+      const specRepo = makeSpecRepo([loginSpec, otherSpec], {
+        'auth/login/.specd-metadata.yaml': loginMetadata,
+        'auth/login/spec.md': loginContent,
+        'auth/other/.specd-metadata.yaml': otherMetadata,
+        'auth/other/spec.md': otherContent,
+      })
+      const getMetadata = {
+        execute: vi.fn(async (input: { specId: string }) => ({
+          metadata: input.specId.endsWith('login') ? loginMetadata : otherMetadata,
+          metadataFingerprint: 'fp',
+          source: 'persisted' as const,
+          regenerated: false,
+          warnings: [],
+        })),
+      }
+      const change = makeChange('my-change', {
+        specIds: ['default:auth/login'],
+        schemaName: 'custom-workflow',
+      })
+      const { sut } = makeSut({
+        change,
+        schema: makeSchema({ name: 'custom-workflow' }),
+        specRepos: new Map([['default', specRepo]]),
+        getMetadata: getMetadata as never,
+      })
+      await sut.execute({
+        name: 'my-change',
+        step: 'designing',
+        config: { contextIncludeSpecs: ['default:auth/*'] },
+      })
+
+      const inputs = getMetadata.execute.mock.calls.map(
+        (call) => call[0] as Record<string, unknown>,
+      )
+      const login = inputs.filter((input) => input['specId'] === 'default:auth/login')
+      const other = inputs.filter((input) => input['specId'] === 'default:auth/other')
+      expect(login.length).toBeGreaterThan(0)
+      expect(other.length).toBeGreaterThan(0)
+      for (const input of login) expect(input['schemaName']).toBe('custom-workflow')
+      for (const input of other) expect(input).not.toHaveProperty('schemaName')
+    })
+  })
+
+  describe('Requirement: schema identity is enforced', () => {
+    it('fails closed on a provider identity mismatch instead of using the default schema', async () => {
+      const change = makeChange('my-change', { schemaName: 'schema-a' })
+      const { sut, schemaProvider } = makeSut({ change, schema: makeSchema({ name: 'schema-a' }) })
+      vi.mocked(schemaProvider.get).mockImplementation(async (ref?: string) =>
+        makeSchema({ name: ref === 'schema-a' ? 'schema-b' : 'default-schema' }),
+      )
 
       await expect(
-        sut.execute({
-          name: 'my-change',
-          step: 'designing',
-          config: noOp,
-        }),
-      ).rejects.toThrow(SchemaMismatchError)
+        sut.execute({ name: 'my-change', step: 'designing', config: noOp }),
+      ).rejects.toBeInstanceOf(SchemaProviderIdentityMismatchError)
     })
   })
 

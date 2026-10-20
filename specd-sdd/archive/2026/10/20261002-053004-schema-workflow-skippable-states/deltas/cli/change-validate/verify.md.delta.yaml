@@ -1,0 +1,45 @@
+- op: added
+  description: Verify the artifact model comes from the change's sovereign schema
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Artifact model from the change's schema
+
+    #### Scenario: --all walks the change schema DAG
+
+    - **GIVEN** a change whose `schemaName` is `custom-workflow` with a workspace default exposing a different artifact DAG
+    - **WHEN** `specd changes validate <name> --all` runs
+    - **THEN** it validates exactly the artifacts of the `custom-workflow` DAG in its topological order
+
+    #### Scenario: Artifact ID is resolved against the change schema
+
+    - **GIVEN** an artifact ID that exists only in `custom-workflow`
+    - **WHEN** `specd changes validate <name> --artifact <id>` runs
+    - **THEN** the artifact is found and validated
+
+    #### Scenario: Unresolvable change schema exits with code 3
+
+    - **GIVEN** a change whose recorded schema cannot be resolved
+    - **WHEN** `specd changes validate` runs
+    - **THEN** it exits with code 3 and a `fatal:` message on stderr, per `cli:entrypoint`
+
+    #### Scenario: Single-spec mode exits 3 when the change schema cannot be resolved
+
+    - **GIVEN** a change whose recorded schema cannot be resolved
+    - **WHEN** `specd changes validate <name> <specId>` is run without `--artifact`
+    - **THEN** the command exits with code 3 and stderr contains a `fatal:` message
+
+    #### Scenario: Identity mismatch keeps its own code
+
+    - **GIVEN** a provider that returns a schema whose canonical name differs from the change's recorded schema
+    - **WHEN** `specd changes validate <name> <specId> --format json` is run
+    - **THEN** the command exits with code 3
+    - **AND** the structured error code is `SCHEMA_PROVIDER_IDENTITY_MISMATCH`, not `SCHEMA_RESOLUTION_FAILED`
+
+    #### Scenario: Version advisories are rendered
+
+    - **GIVEN** a change whose recorded schema version differs from the resolved same-name schema
+    - **WHEN** `specd changes validate <name> --all` is run
+    - **THEN** the output includes the `SCHEMA_VERSION_DRIFT` advisory

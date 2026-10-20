@@ -1,0 +1,42 @@
+- op: added
+  description: Count tasks using the schema recorded by the input change
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Sovereign schema resolution
+
+    `CountTasks.execute({ change })` MUST resolve the change's schema through `ResolveChangeSchema` and derive task-bearing artifacts and task patterns from that sovereign schema.
+
+    The workspace default schema MUST NOT influence task discovery or counts for an existing change, including when it declares a different task artifact or pattern. Schema resolution errors MUST propagate rather than returning counts produced from another schema.
+- op: added
+  description: Declare the shared sovereign change-schema resolution dependency
+  position:
+    parent:
+      type: section
+      matches: 'Spec Dependencies'
+  content: |
+    - [core:resolve-change-schema](../resolve-change-schema/spec.md) — named sovereign lookup, provider identity validation, and same-name version advisory
+
+- op: modified
+  description: Schema obtained through ResolveChangeSchema
+  selector:
+    type: section
+    matches: 'Requirement: Counts qualifying task artifacts'
+  content: |
+    `CountTasks.execute()` MUST accept a `Change` and obtain that change's sovereign schema through `ResolveChangeSchema`.
+
+    For each artifact attached to the change, the use case MUST consider it task-capable only when its schema artifact type declares both `hasTasks: true` and `taskCompletionCheck`. It MUST read the artifact files through `ChangeRepository.artifact()` and aggregate matches across all existing, non-empty files for that artifact.
+
+    For every schema artifact type with `hasTasks: true`, the resolved schema MUST materialize `taskCompletionCheck` before `CountTasks.execute()` inspects it. `CountTasks` MUST consume the resolved `incompletePattern` and `completePattern` and MUST NOT define or substitute fallback patterns. The schema defaults are `^\s*-\s+\[ \]` for incomplete items and `^\s*-\s+\[[xX]\]` for complete items. The use case MUST compile the resolved patterns with `safeRegex` using the `gm` flags. A pattern that cannot be safely compiled MUST produce no matches and MUST NOT throw; a qualifying artifact with non-empty content MUST still receive a zero-valued entry.
+
+- op: modified
+  description: Constructor depends on the shared resolver
+  selector:
+    type: section
+    matches: 'Requirement: Supports composition and kernel wiring'
+  content: |
+    `CountTasks` MUST accept `ChangeRepository` and the shared `ResolveChangeSchema` as constructor dependencies. `createCountTasks(deps)` and `createCountTasks(config, options?)` MUST follow the shared normalized factory-argument contract and construct the config form through `resolveCountTasksDeps(resolver)`.
+
+    As an exported application use case, `CountTasks` MUST be exposed as `kernel.changes.countTasks` and use the same resolver-backed dependencies as its standalone factory.

@@ -47,6 +47,34 @@ spec-overlap-conflict` → `/specd-design`, not `--allow-overlap`.
 
 Extract the `path:` field from the "lifecycle:" section.
 
+### Schema-aware lifecycle routing
+
+Read a fresh structured projection before choosing any lifecycle target:
+
+```bash
+specd changes status <name> --format toon
+```
+
+Treat `nextAction.command` as the preferred default recommendation and
+`lifecycle.availableTransitions` as the only legal target set. When explicitly
+invoked, map `/specd-design` to its intended target `designing`: if a different
+command is recommended, report that recommendation but continue toward `designing`
+if `designing` is present in `lifecycle.availableTransitions`. If `designing` is
+absent from `availableTransitions`, stop before running any hooks and report the
+blockers along with the recommended command. Do not infer a fixed happy-path target.
+Before a transition, refresh this projection and ensure the actual target is advertised;
+if routing fields are missing, malformed, or stale, stop with the diagnostic text status.
+Run hooks only for the source and target of the actual visited hop—never for a disabled
+or bypassed intermediate step.
+
+Routed blocks (`<!-- route: target -->` … `<!-- /route -->`) use placeholders instead of
+fixed state names: `<target>` is the lifecycle step selected from a fresh
+`lifecycle.availableTransitions` (this skill's intended target when advertised,
+otherwise `nextAction.targetStep`) and `<source>` is the change's current `state`.
+Run `run-hooks` / `hook-instruction` only for the source (`--phase post`) and the
+selected target (`--phase pre`) of an actual hop, and never substitute a fixed state
+sequence.
+
 If the status output shows `review: required: yes`, enter **artifact review mode**:
 
 - Treat artifacts marked `pending-review` / `[drift]` under `artifacts (details):` as the first review scope (JSON/TOON: `review.affectedArtifacts`). Text `review:` only has `required` / `route` / `reason` — not file paths.
@@ -60,16 +88,20 @@ If the status output shows `review: required: yes`, enter **artifact review mode
 
 If state is `drafting` or `designing`, transition to `designing`:
 
+<!-- route: target -->
 ```bash
-specd changes run-hooks <name> designing --phase pre
-specd changes hook-instruction <name> designing --phase pre --format text
+specd changes run-hooks <name> <target> --phase pre
+specd changes hook-instruction <name> <target> --phase pre --format text
 ```
+<!-- /route -->
 
 Follow guidance.
 
+<!-- route: target -->
 ```bash
-specd changes transition <name> designing --skip-hooks all
+specd changes transition <name> <target> --skip-hooks all
 ```
+<!-- /route -->
 
 Follow canonical recovery from status. Do not calculate fingerprints or roll
 state back yourself.
@@ -320,10 +352,12 @@ Wait for user response. **Stop completely.**
 
 ### 9. All artifacts done — run exit hooks immediately
 
+<!-- route: target -->
 ```bash
-specd changes run-hooks <name> designing --phase post
-specd changes hook-instruction <name> designing --phase post --format text
+specd changes run-hooks <name> <source> --phase post
+specd changes hook-instruction <name> <source> --phase post --format text
 ```
+<!-- /route -->
 
 Follow guidance.
 
@@ -369,16 +403,20 @@ whether to update scope or continue. **Stop and wait.**
 
 Run ready pre-hooks, then transition:
 
+<!-- route: target -->
 ```bash
-specd changes run-hooks <name> ready --phase pre
-specd changes hook-instruction <name> ready --phase pre --format text
+specd changes run-hooks <name> <target> --phase pre
+specd changes hook-instruction <name> <target> --phase pre --format text
 ```
+<!-- /route -->
 
 Follow guidance.
 
+<!-- route: target -->
 ```bash
-specd changes transition <name> ready --skip-hooks all
+specd changes transition <name> <target> --skip-hooks all
 ```
+<!-- /route -->
 
 ### 10. Mandatory review stop
 
@@ -396,31 +434,38 @@ Show summary of all artifacts and specs.
 
 Run ready post hooks:
 
+<!-- route: target -->
 ```bash
-specd changes run-hooks <name> ready --phase post
-specd changes hook-instruction <name> ready --phase post --format text
+specd changes run-hooks <name> <source> --phase post
+specd changes hook-instruction <name> <source> --phase post --format text
 ```
+<!-- /route -->
 
 ### 11. Handle approval gate
 
-Run `changes status <name> --format text` and check the **state:** and **approvals:** fields.
+Run `changes status <name> --format text` and check the **state:** field.
 
 **If state is not `ready`:** Do not suggest implementation. Ask the user:
 > Change is in **`<state>`**, not `ready`. Do you want to continue transitioning to `ready` before implementing?
 
 **If state is `ready`:** Continue with approval checks.
 
-**If spec=off:** Suggest `/specd-implement <name>`
+<!-- route: target -->
+Read a fresh `specd changes status <name> --format toon` and use its `lifecycle.approvals`.
+
+**If spec=off:** Suggest the command in `nextAction.command`.
 
 **If spec=on:** Tell user:
 
 > Approval required. Run: `specd changes approve spec <name> --reason "..."`
-> Then: `/specd-implement <name>`
+> Then: the command in `nextAction.command`.
+
+<!-- /route -->
 
 Stay in `ready`.
 
 **Stop.**
-Do not invoke `/specd-implement` automatically; wait for explicit user confirmation.
+Do not invoke the recommended command automatically; wait for explicit user confirmation.
 
 ## Session tasks
 

@@ -22,36 +22,36 @@
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Orchestrate implementation review combining Core tracking with Code Graph symbol resolution via single provider lifecycle.",
+      "value": "Builds one delivery-neutral implementation-review projection from Core tracking and Code Graph batch resolution.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:622555476e06b46806369c26ae77b1549b5c49fd7860243f10d8c3ec5047f876",
-          "lastModified": "2026-08-16T08:12:47.220Z"
+          "hash": "sha256:bbda7fba0a976ba89f8b3f6ad430374757bdcfa85c8ddce19c912fd929680265",
+          "lastModified": "2026-09-28T11:19:59.273Z"
         },
         "verify.md": {
-          "hash": "sha256:8945edeee114e2bdc1e495038319296ac55586902e2e37941de6d4629038b906",
-          "lastModified": "2026-08-16T08:12:47.221Z"
+          "hash": "sha256:bf07ef6d3f3a668bd95c892dc44756dadd2e8b0b88d8d86ec2b08631a2ea64d4",
+          "lastModified": "2026-09-28T11:19:59.275Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# Build Implementation Review\n\n## Rules\n\n- Signature: `buildImplementationReview(ctx, input)` obtains raw review via `ctx.kernel.changes.getImplementationReview`, opens graph via `withOpenGraphProvider`, gets graph health, resolves symbol links via `ResolveSymbolReference`.\n- SDK must not parse source syntax, reimplement symbol matching, or perform presenter formatting. Core owns stored tracking; Code Graph owns resolution.\n- Result retains stored spec, file, symbol values unchanged. Symbol links gain structured resolution projection: `status`, `reason`, graph `health` and `coverage`, canonical logical `target`, declarations, `candidates`, `provenance`, and resolution `path`.\n- File-level links remain valid without symbol forcing. Never mutate active manifests, links, or archived sidecars.\n- Single health evaluation and batch symbol resolution under one opened-provider lifecycle; do not re-open provider per link.\n- Graph availability: non-current/incomplete graph yields per-link `unresolved` outcomes; provider initialization/read failures throw standard infrastructure errors, not fake missing links.\n- Shared host behavior: CLI `change implementation` and `change status --implementation` consume this identical projection; hosts must not maintain independent fallbacks.\n\n## Constraints\n\n- Returns structured data only.\n- Depends on Core and Code Graph through public APIs.\n- Resolution diagnostics do not block verification or archive.",
+      "value": "# Build Implementation Review\n\n## Rules\n- `buildImplementationReview(ctx, input)` gets raw review via `ctx.kernel.changes.getImplementationReview`, opens graph with `withOpenGraphProvider`, obtains canonical health, resolves symbol links through `ResolveSymbolReference`.\n- SDK never parses source syntax, owner-qualified syntax, package specifiers, canonical logical IDs, chooses language adapters, reimplements matching, or formats presentation. Core owns tracking; Code Graph owns resolution.\n- Preserve stored spec/file/symbol strings exactly. Symbol links gain structured resolution: status, reason, graph health/coverage, canonical logical target, declarations, candidates, public/local provenance, ordered path.\n- Pass stored symbol text unchanged with link file when present. Provider unresolved/ambiguous result remains unchanged; no SDK fallback.\n- File-level links remain valid without symbol resolution. Never mutate active manifests, links, or archived sidecars.\n- Evaluate health once and batch-resolve under one opened-provider lifecycle; never reopen/scan graph per link.\n- Readable non-current/incomplete graph becomes per-link `unresolved`; provider initialization/read/lifecycle failures propagate standard infrastructure errors, never fake missing links.\n- CLI implementation review, status enrichment, and future hosts consume identical projection; no same-file, rightmost-segment, or workspace-name fallback.\n\n## Constraints\n- Structured data only.\n- Depend on Core and Code Graph public APIs.\n- Resolution diagnostics never become verification/archive blockers.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:622555476e06b46806369c26ae77b1549b5c49fd7860243f10d8c3ec5047f876",
-          "lastModified": "2026-08-16T08:12:47.220Z"
+          "hash": "sha256:bbda7fba0a976ba89f8b3f6ad430374757bdcfa85c8ddce19c912fd929680265",
+          "lastModified": "2026-09-28T11:19:59.273Z"
         },
         "verify.md": {
-          "hash": "sha256:8945edeee114e2bdc1e495038319296ac55586902e2e37941de6d4629038b906",
-          "lastModified": "2026-08-16T08:12:47.221Z"
+          "hash": "sha256:bf07ef6d3f3a668bd95c892dc44756dadd2e8b0b88d8d86ec2b08631a2ea64d4",
+          "lastModified": "2026-09-28T11:19:59.275Z"
         }
       }
     }

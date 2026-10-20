@@ -1,0 +1,13 @@
+- op: modified
+  description: Establish change manifest schema as sovereign authority without rejecting on workspace schema mismatch
+  selector:
+    type: section
+    matches: 'Requirement: Schema version'
+  content: |
+    The root `schema` object (`schema.name` and `schema.version`) in `manifest.json` is the definitive source of truth used to hydrate the `Change` domain entity at runtime. It is written once at change creation and is the immutable sovereign authority governing the change. The `type: 'created'` event in the history also contains schema information for historical tracking, but the root `schema` object takes precedence for operational checks.
+
+    Loading the manifest MUST NOT compare its schema version with the workspace default. A same-name version advisory belongs to `ResolveChangeSchema`, which compares the recorded version with the schema returned by the sovereign named lookup. The change remains fully usable.
+
+    When a change is loaded and the workspace default schema's name differs from what is recorded in the manifest, the repository MUST NOT reject the load. The change's recorded schema is its sovereign authority; loading and mutating the change hydrates it with its recorded schema identity. Schema lookup, provider identity integrity, and version advisories belong to the shared change-schema resolution boundary, not repository hydration.
+
+    The manifest's schema fields remain persisted facts only; enforcement behavior is defined by the change and repository contracts that consume them.

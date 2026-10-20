@@ -162,6 +162,15 @@ The schema also defines the lifecycle phases a change moves through. In `@specd/
 
 Each step is independently gated by its own `requires`. A step becomes available once all listed artifacts are complete.
 
+Steps can also declare topology flags:
+
+- **`optional: true`** — the step is skippable in the topology if its registered step-skip checks pass (e.g., bypassing `implementing` when no uncompleted tasks exist).
+- **`disabled: true`** — the step is completely excluded from the active pipeline and cannot be entered or targeted.
+
+Bedrock states (`drafting`, `designing`, `done`, `archivable`, `archiving`) can never be disabled or marked optional. The `ready` delivery anchor cannot be disabled when the spec gate is enabled. Signoff gate configuration skips the `approval.signoff` check on `done -> archivable` when disabled without removing or bypassing `done`. See [workflow.md](workflow.md#skippable-and-disabled-workflow-steps) for full topology invariants and step-skip check semantics.
+
+Optional does not mean disabled. An optional step remains enterable. With no effective `step-skip` bindings its bypass is unconditional; with effective bindings it is conditional on all of them passing. Effective bindings are the composition of registry bindings and schema `skipChecks`, so YAML may omit `skipChecks` while Core still supplies a policy such as `workflow.tasksEmpty`. Core publishes the preferred target in `nextAction`; lifecycle skills do not choose between alternatives themselves.
+
 Steps can have `pre` and `post` hooks. Hooks are either instructions injected into the AI context or shell commands run at the phase boundary:
 
 ```yaml
@@ -254,9 +263,22 @@ schemaOverrides:
         requires: [specs]
 ```
 
+**Example: configure a workflow step as optional or disabled**
+
+```yaml
+schemaOverrides:
+  append:
+    workflow:
+      - step: implementing
+        optional: true # allows skipping implementing if tasks are complete or empty
+      - step: verifying
+        disabled: true # excludes verifying from pipeline for rapid prototyping
+```
+
 `schemaOverrides` is the right tool for:
 
 - Adding or removing hooks on existing workflow steps
+- Configuring workflow steps as `optional: true` or `disabled: true`
 - Appending rules or instructions to existing artifacts
 - Adding a new artifact type that is unique to your project
 

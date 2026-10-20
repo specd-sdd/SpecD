@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { ChangeNotFoundError } from '@specd/sdk'
+import { ChangeNotFoundError, SchemaProviderIdentityMismatchError } from '@specd/sdk'
 import {
   makeMockConfig,
   makeMockChange,
@@ -258,5 +258,137 @@ describe('change artifacts', () => {
 
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toMatch(/error:/)
+  })
+})
+
+describe('change artifacts — change schema', () => {
+  it('reads delta metadata from the change schema, not the workspace default', async () => {
+    const { kernel } = setup()
+    kernel.specs.getActiveSchema.execute.mockRejectedValue(new Error('must not be consulted'))
+    kernel.changes.resolveSchema.execute.mockResolvedValue({
+      schema: { artifacts: () => [{ id: 'specs', delta: true, output: 'spec.md' }] },
+      warnings: [],
+    })
+    kernel.changes.status.execute.mockResolvedValue({
+      change: makeMockChange({ name: 'my-change' }),
+      artifactStatuses: [],
+      lifecycle: { changePath: '/tmp/changes/my-change' },
+    })
+
+    const program = makeProgram()
+    registerChangeArtifacts(program.command('change'))
+    await program.parseAsync([
+      'node',
+      'specd',
+      'change',
+      'artifacts',
+      'my-change',
+      '--format',
+      'json',
+    ])
+
+    expect(kernel.changes.resolveSchema.execute).toHaveBeenCalledWith({
+      changeName: 'my-change',
+      schemaName: '@specd/schema-std',
+      schemaVersion: 1,
+    })
+    expect(kernel.specs.getActiveSchema.execute).not.toHaveBeenCalled()
+  })
+})
+
+describe('change artifacts — resolver advisories', () => {
+  const drift = {
+    code: 'SCHEMA_VERSION_DRIFT' as const,
+    changeName: 'my-change',
+    schemaName: 'test',
+    recordedVersion: 1,
+    resolvedVersion: 2,
+    message: 'schema moved from v1 to v2',
+  }
+
+  function arrange() {
+    const ctx = setup()
+    ctx.kernel.changes.status.execute.mockResolvedValue({
+      change: makeMockChange({ name: 'my-change' }),
+      artifactStatuses: [],
+      lifecycle: { changePath: '/project/.specd/changes/my-change' },
+    })
+    ctx.kernel.changes.resolveSchema.execute.mockResolvedValue({
+      schema: { artifacts: () => [] },
+      warnings: [drift],
+    })
+    return ctx
+  }
+
+  it('renders advisories as a warnings block in text mode', async () => {
+    const { stdout } = arrange()
+
+    const program = makeProgram()
+    registerChangeArtifacts(program.command('change'))
+    await program.parseAsync(['node', 'specd', 'change', 'artifacts', 'my-change'])
+
+    expect(stdout()).toContain('warnings:')
+    expect(stdout()).toContain('! SCHEMA_VERSION_DRIFT: schema moved from v1 to v2')
+  })
+
+  it('emits schemaWarnings in json mode', async () => {
+    const { stdout } = arrange()
+
+    const program = makeProgram()
+    registerChangeArtifacts(program.command('change'))
+    await program.parseAsync([
+      'node',
+      'specd',
+      'change',
+      'artifacts',
+      'my-change',
+      '--format',
+      'json',
+    ])
+
+    expect(JSON.parse(stdout()).schemaWarnings).toEqual([drift])
+  })
+})
+
+describe('change artifacts — schema resolution failures', () => {
+  function arrangeFailing(error: Error) {
+    const ctx = setup()
+    ctx.kernel.changes.status.execute.mockResolvedValue({
+      change: makeMockChange({ name: 'my-change' }),
+      artifactStatuses: [],
+      lifecycle: { changePath: '/project/.specd/changes/my-change' },
+    })
+    ctx.kernel.changes.resolveSchema.execute.mockRejectedValue(error)
+    return ctx
+  }
+
+  it('exits non-zero and prints no rows when schema resolution fails', async () => {
+    const { stdout, stderr } = arrangeFailing(new Error('schema is broken'))
+
+    const program = makeProgram()
+    registerChangeArtifacts(program.command('change'))
+    await program.parseAsync(['node', 'specd', 'change', 'artifacts', 'my-change']).catch(() => {})
+
+    expect(process.exit).toHaveBeenCalledWith(3)
+    expect(process.exit).not.toHaveBeenCalledWith(0)
+    expect(stderr()).toContain('schema is broken')
+    expect(stdout()).toBe('')
+  })
+
+  it('exits 3 with the identity-mismatch code on a provider identity mismatch', async () => {
+    const { stdout, stderr } = arrangeFailing(
+      new SchemaProviderIdentityMismatchError('my-change', 'custom', 'schema-std'),
+    )
+
+    const program = makeProgram()
+    registerChangeArtifacts(program.command('change'))
+    await program
+      .parseAsync(['node', 'specd', 'change', 'artifacts', 'my-change', '--format', 'json'])
+      .catch(() => {})
+
+    expect(process.exit).toHaveBeenCalledWith(3)
+    expect(stderr()).toContain('fatal:')
+    expect(stdout()).toContain('SCHEMA_PROVIDER_IDENTITY_MISMATCH')
+    expect(stdout()).not.toContain('"artifacts"')
   })
 })

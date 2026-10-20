@@ -1,0 +1,24 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["core:change", "core:schema-format", "default:_global/error-handling-conventions"],
+  "implementation": [
+    {
+      "file": "core:src/application/errors/schema-provider-identity-mismatch-error.ts",
+      "symbols": ["SchemaProviderIdentityMismatchError"]
+    },
+    {
+      "file": "core:src/application/services/resolve-change-schema.ts",
+      "symbols": ["ResolveChangeSchema"]
+    },
+    {
+      "file": "core:test/application/services/resolve-change-schema.spec.ts"
+    },
+    {
+      "file": "core:src/composition/use-cases/resolve-change-schema.ts",
+      "symbols": ["createResolveChangeSchema"]
+    }
+  ]
+}

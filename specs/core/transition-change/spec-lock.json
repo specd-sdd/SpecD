@@ -13,9 +13,24 @@
     "core:refresh-implementation-tracking",
     "core:composition-resolver",
     "core:count-tasks",
-    "core:transition-checks"
+    "core:transition-checks",
+    "core:check-registry",
+    "core:workflow-topology",
+    "core:resolve-change-schema"
   ],
-  "implementation": [],
+  "implementation": [
+    {
+      "file": "core:src/domain/checks/protocol-edge.ts",
+      "symbols": ["protocolEdge"]
+    },
+    {
+      "file": "core:src/application/use-cases/transition-change.ts",
+      "symbols": ["TransitionChange"]
+    },
+    {
+      "file": "core:test/application/use-cases/transition-change.spec.ts"
+    }
+  ],
   "optimizations": {
     "optimizedDescription": {
       "value": "Centralizes schema-bound lifecycle transitions, reconciliation, checks, approvals, hooks, verification evidence, and atomic persistence.",

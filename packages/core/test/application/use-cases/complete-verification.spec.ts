@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { ResolveChangeSchema } from '../../../src/application/services/resolve-change-schema.js'
 import { Change } from '../../../src/domain/entities/change.js'
 import { VerificationAttemptNotFoundError } from '../../../src/application/errors/verification-attempt-not-found-error.js'
 import { VerificationFingerprintMismatchError } from '../../../src/application/errors/verification-fingerprint-mismatch-error.js'
@@ -76,7 +77,7 @@ function harness(fingerprint: ValidityFingerprint | null, current = startedChang
     } as never,
     reconcileChangeValidity: new ReconcileChangeValidity({
       changes: repo,
-      schemaProvider: makeSchemaProvider(schema),
+      resolveChangeSchema: new ResolveChangeSchema(makeSchemaProvider(schema)),
       actor: makeActorResolver(),
       refreshImplementationTracking: {
         execute: async () => undefined,

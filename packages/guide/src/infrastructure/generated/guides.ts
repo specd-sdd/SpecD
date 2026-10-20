@@ -724,19 +724,19 @@ export const GUIDES_CATALOG: readonly GuideTopic[] = [
     "title": "Change Lifecycle Guide",
     "description": "Guide to SpecD change lifecycles, states, transitions, approvals, hooks, and verification.",
     "order": 2,
-    "content": "# Change Lifecycle Guide\n\nEvery piece of work in specd is a **change**. A change tracks everything related to modifying one or more specs — the proposal, the spec files, the design, the implementation tasks, and the final archive record. This guide explains how changes move through their lifecycle, what each state means, and how approval gates, task completion checks, and hooks affect that progression.\n\n## How the pieces fit together\n\nspecd has three layers that work together to drive a change from idea to completion:\n\n**The CLI** is the engine. It manages changes, transitions between states, validates artifacts, compiles context, and enforces gates. Every operation — creating a change, checking status, transitioning states, archiving — is a CLI command. The CLI is the source of truth for what is happening.\n\n**The workflow rules** come from two places. The Change lifecycle (`ChangeState` and `VALID_TRANSITIONS`) defines which states exist and which hops are legal. The schema’s `workflow[]` array does not add or remove those states: each `step` is a lookup onto an existing state and only attaches extras (`requires`, task gates, hooks). Artifact types and their dependency order also come from the schema. Project config enables approval gates and extra hooks. Together they determine what must be produced and which gates apply on a legal hop.\n\n**The skills** are the interface. They are slash commands installed in your coding assistant (`/specd`, `/specd-new`, `/specd-design`, etc.) that orchestrate the workflow by calling the CLI. Each skill knows how to guide the agent through one phase — loading context, writing artifacts, validating, transitioning. You interact with skills; skills interact with the CLI; the CLI enforces the workflow.\n\n```text\nYou ←→ Skills ←→ CLI ←→ Workflow (schema + config)\n         │                    │\n         │  calls commands    │  enforces rules\n         │  reads context     │  validates artifacts\n         │  writes artifacts  │  manages transitions\n```\n\nIn practice, you type `/specd` and the skill figures out where you are, what to do next, and which CLI commands to run. You can also use the CLI directly — for scripting, CI pipelines, or when you want fine-grained control — but for day-to-day work the skills provide the guided experience.\n\n---\n\n## The lifecycle at a glance\n\n```\n                        ┌──────────────────────────────────────────────────────┐\n                        │    redesign — transition back to designing            │\n                        │    available from any active state (including        │\n                        │    archiving when recovery is needed)               │\n                        └──────────────────────────────────────────────────────┘\n                                              ↑\ndrafting → designing ⇄ ready → implementing ⇄ verifying → done → archivable → archiving\n```\n\nThat is the happy path whether or not approval gates are enabled. Optional spec and signoff gates do **not** insert extra wait states. The change stays in `ready` or `done` until a human records consent with `specd changes approve spec` or `specd changes approve signoff`; then the same `ready → implementing` / `done → archivable` transition is allowed.\n\n`specd changes status` lists **available** transitions from the same checks that `change transition` runs (artifact `requires`, task completion on the target step, enter-`ready` guards, exit-`implementing` implementation integrity, and approval on the delivery edge). The protocol graph (`VALID_TRANSITIONS`) is larger than what status shows as available.\n\nFrom `done`, `signed-off`, or `archivable` you can hop back to `implementing` or `verifying` (skill-aligned retry) without going through `ready` again.\n\n`pending-spec-approval`, `spec-approved`, `pending-signoff`, and `signed-off` remain in the protocol for **drain only** — in-flight changes that already sit there. New work does not enter those states via `change transition`.\n\n## States explained\n\n### `drafting`\n\nThe initial state. A newly created change starts here before any work has been done.\n\n- **What it means:** The change exists but has not entered the design phase.\n- **What you do:** Nothing yet. Transition to `designing` when you are ready to start.\n- **Transition out:** `specd changes transition <name> designing`\n- **What can block it:** Nothing — this transition is always allowed.\n\n---\n\n### `designing`\n\nThe active design and specification phase. This is where the bulk of artifact work happens.\n\n- **What it means:** You are writing the proposal, specs, verify files, design, and tasks.\n- **What you do:** Create and refine the five standard artifacts (proposal, specs, verify, design, tasks). Run `specd changes status <name>` to check artifact progress. Before writing `design.md`, use the [Code Graph](./code-graph.md) to locate symbols (`specd graph search`) and record blast radius (`specd graph impact`) for the files and symbols the design will change.\n- **Transition out:** `specd changes transition <name> ready` once all required artifacts are complete and validated.\n- **What can block it:** The `ready` step requires all artifacts listed in the schema's `requires` field (by default: proposal, specs, verify, design, tasks) to have `complete` status. The CLI reports which artifacts are still missing or in progress.\n\n`designing → designing` is the sole neutral self-entry accepted by the application boundary. It returns the unchanged change and records no event or timestamp update. Other self-transitions, including `verifying → verifying`, are invalid.\n\n---\n\n### `ready`\n\nAll design artifacts are complete. The change is ready to hand off to implementation.\n\n- **What it means:** Every required artifact has been written and validated. The change is cleared for implementation, subject to optional spec approval.\n- **What you do:** Transition to `implementing`. If `approvals.spec` is enabled, a reviewer first runs `specd changes approve spec <name> --reason \"...\"`; the change **stays in `ready`**. Then run the same `ready → implementing` transition.\n- **Transition out:** `implementing`, or back to `designing` (redesign). Do not use `change transition` into `pending-spec-approval`.\n- **What can block it:** Incomplete required artifacts, enter-`ready` dependency/read-only checks (on the way in), and — if the spec gate is on — a missing recorded spec approval (`APPROVAL_REQUIRED`). The change remains in `ready` until approval is recorded.\n\n---\n\n### `pending-spec-approval` (drain only)\n\nHistoric wait state for in-flight changes that already sit here. New work does not enter this state.\n\n- **What it means:** An older change is waiting for human spec approval under the previous parking model.\n- **What you do:** A reviewer runs `specd changes approve spec <name> --reason \"...\"` (drain to `spec-approved`), or redesign to `designing`.\n- **Transition out:** `spec-approved`, or `designing`.\n\nSee [Approval gates](#approval-gates).\n\n---\n\n### `spec-approved` (drain only)\n\nHistoric post-approval parking state. New work records spec approval in `ready` and goes `ready → implementing`.\n\n- **What it means:** Specs were signed off while the change was in the old pending path.\n- **What you do:** Transition to `implementing`, or back to `designing`.\n- **Transition out:** `implementing`, or `designing`.\n- **What can block it:** If specs were modified after approval, the materialized approval becomes stale and the change returns to `designing`. The approval and invalidation events remain in append-only history; later approval replaces only the current projection.\n\n---\n\n### `implementing`\n\nActive development is in progress.\n\n- **What it means:** The implementation tasks are being worked through.\n- **What you do:** Work through the task list in `tasks.md`, checking off items as you go (`- [x]`). Run `specd changes status <name>` to see task progress. Re-check `specd graph impact` when a task touches a symbol or file that `design.md` did not already cover, and prefer `specd graph search` over repository-wide text search.\n- **Transition out:** `verifying` once task-completion checks on the **target** step pass, or back to `designing` (redesign).\n- **What can block it:** The `workflow.taskCompletion` check on the target step (typically `verifying`), driven by `taskCompletionCheck` on task-bearing artifacts listed in that step's `requiresTaskCompletion`. By default, any unchecked `- [ ]` line in `tasks.md` prevents advancing to `verifying`. Open implementation-tracking files can also block leaving `implementing`. The CLI reports \"N/M tasks complete\" when the task gate is active.\n\n---\n\n### `verifying`\n\nImplementation is complete. Verification scenarios are being run.\n\n- **What it means:** All tasks are done. You are now confirming the implementation satisfies every scenario in `verify.md`.\n- **What you do:** Run through every scenario in `verify.md`. Confirm each one passes by inspecting the code and running the relevant tests.\n- **Transition out:** `done` when all scenarios pass, back to `implementing` if a scenario fails (the schema may clear artifact validations on this backward transition), or back to `designing` (redesign).\n- **What can block it:** Nothing prevents the transition — it is up to you to judge readiness.\n\n---\n\n### `done`\n\nImplementation and verification are complete.\n\n- **What it means:** The change is finished from a development perspective. It can now be archived, or you can hop back to implementation or verification.\n- **What you do:** Transition to `archivable`. If `approvals.signoff` is enabled, a reviewer first runs `specd changes approve signoff <name> --reason \"...\"`; the change **stays in `done`**. Then run the same `done → archivable` transition. You may also hop to `implementing` or `verifying`.\n- **Transition out:** `archivable`, `implementing`, `verifying`, or `designing`. Do not use `change transition` into `pending-signoff`.\n- **What can block it:** If the signoff gate is on, a missing recorded signoff (`APPROVAL_REQUIRED`). The change remains in `done` until signoff is recorded.\n\n---\n\n### `pending-signoff` (drain only)\n\nHistoric wait state for in-flight changes that already sit here. New work does not enter this state.\n\n- **What it means:** An older change is waiting for human sign-off under the previous parking model.\n- **What you do:** A reviewer runs `specd changes approve signoff <name> --reason \"...\"` (drain to `signed-off`), or redesign to `designing`.\n- **Transition out:** `signed-off`, or `designing`.\n\nSee [Approval gates](#approval-gates).\n\n---\n\n### `signed-off` (drain only)\n\nHistoric post-signoff parking state. New work records signoff in `done` and goes `done → archivable`.\n\n- **What it means:** Sign-off was recorded while the change was in the old pending path.\n- **What you do:** Transition to `archivable`, hop to `implementing` or `verifying`, or redesign to `designing`.\n- **Transition out:** `archivable`, `implementing`, `verifying`, or `designing`.\n- **What can block it:** Nothing on the protocol edge; archive still has its own operation checks.\n\n---\n\n### `archivable`\n\nThe change is ready to be archived.\n\n- **What it means:** All gates have been passed. The change can run the archive operation.\n- **What you do:** Run `specd changes archive <name>` to perform the archive.\n- **Transition out:** `archiving` (only after archive preflight succeeds and canonical publication is about to start — see [Archiving](#archiving)), `implementing` or `verifying` (skill-aligned hops), or back to `designing` (redesign).\n- **What can block it:** Archive pre-hooks, overlap/read-only guards, or preflight failures keep the change here (the archive command does not transition to `archiving` until commit preparation has passed).\n\n---\n\n### `archiving`\n\nThe change is in the archive **commit phase** (canonical publication, archive move, and post-archive work), or it completed successfully and was moved to the archive directory.\n\n- **What it means:** While `specd changes archive` is running, the change transitions to `archiving` immediately before the first spec publication, after guards, pre-archive hooks, orphan detection, and batch snapshot. If publication or the archive move fails and batch restore succeeds, the change returns to `archivable` so you can fix the problem and retry. If restore is incomplete, the change stays in `archiving` until you recover manually.\n- **What you do:** If archive failed and the change is back in `archivable`, review restored specs and run `specd changes archive <name>` again. If the change is stuck in `archiving` after a partial restore, use `specd changes transition <name> designing` to revise artifacts, or `specd changes transition <name> archivable` after you have manually restored canonical specs (lifecycle rollback only — no archive hooks).\n- **Transition out:** `archivable` (recovery after a failed commit when canonical storage was restored), `designing` (manual escape to revise specs/deltas), or none after a **successful** archive (the change directory is moved to the archive and is no longer an active change).\n\n---\n\n## Full transition table\n\n| From                    | To                                                                                                          |\n| ----------------------- | ----------------------------------------------------------------------------------------------------------- |\n| `drafting`              | `designing`                                                                                                 |\n| `designing`             | `ready`, `designing`                                                                                        |\n| `ready`                 | `implementing`, `designing`                                                                                 |\n| `pending-spec-approval` | `spec-approved`, `designing` _(drain only)_                                                                 |\n| `spec-approved`         | `implementing`, `designing` _(drain only)_                                                                  |\n| `implementing`          | `verifying`, `designing`                                                                                    |\n| `verifying`             | `implementing`, `done`, `designing`                                                                         |\n| `done`                  | `archivable`, `designing`, `implementing`, `verifying`                                                      |\n| `pending-signoff`       | `signed-off`, `designing` _(drain only)_                                                                    |\n| `signed-off`            | `archivable`, `designing`, `implementing`, `verifying` _(drain hops from signed-off)_                       |\n| `archivable`            | `archiving`, `designing`, `implementing`, `verifying`                                                       |\n| `archiving`             | `archivable`, `designing` _(active change only; successful archive removes the change from the active set)_ |\n\nThis table is the protocol graph (`VALID_TRANSITIONS`). Status **available** transitions are the protocol targets whose checks currently pass.\n\n---\n\n## Identity and audit trails\n\nspecd records the identity of the person or system performing every significant operation — creating a change, transitioning states, approving specs, and signing off on completed work. These records create a tamper-evident audit trail persisted in the change manifest and history.\n\n### How identity is resolved\n\nSpecD uses a pluggable identity resolution system. By default, it auto-detects the active Version Control System (Git, Mercurial, or Subversion) and retrieves the user's name and email from its configuration.\n\nIn specific environments, you can force a provider or use custom identity plugins. See the [Configuration Guide](configuration.md#identity-resolution) for details.\n\n### Privacy in public repositories\n\nFor projects hosted in public repositories, you can enable **privacy modes** to obfuscate real names and emails before they are persisted in the repository.\n\nSupported modes include:\n\n- **Hashing**: deterministic HMAC-SHA256 obfuscation of emails.\n- **Masking**: partial obfuscation (e.g., `j***z@e***.com`).\n- **Anonymization**: replacement with generic placeholders.\n\nPrivacy settings also automatically filter out sensitive metadata. For more details on configuring privacy, see the [Privacy section](configuration.md#privacy) in the Configuration Guide.\n\n---\n\n## Redesign: going back to designing\n\nAlmost every active state can transition back to `designing`:\n\n```bash\nspecd changes transition <name> designing\n```\n\nThat command moves the lifecycle. It does not start or complete verification, and it does not restart an attempt. There is no transition flag for that. A backward move alone leaves matching verification evidence in place. An explicit return below a valid sign-off revokes that sign-off and does not broadly revoke spec approval.\n\nRedesign from `archiving` is allowed via `specd changes transition <name> designing`. Use it when batch restore failed partially or you need to change deltas before retrying archive. After a successful archive, the change is no longer active — create a new change instead.\n\nAutomatic returns are a different, recovery-only path. Status and other mutations reconcile validity first, then apply the recovery rules in [Validity and verification](#validity-and-verification). Recovery that has already been committed is kept even when a later requested transition fails. In particular, `signed-off → done`, `archivable → done`, and `archiving → done` may be selected for stale or revoked sign-off, but users cannot request those edges with `changes transition`.\n\n## Validity and verification\n\nCurrent approval and verification state is a materialized projection on a version 2 manifest. History stays append-only audit. `stale` means a reviewed input changed or cannot be proven. `revoked` means consent was withdrawn. Restoring the old bytes does not make either status valid again. A missing projection means that evidence was never recorded. A `null` implementation fingerprint is legacy unknown evidence and cannot authorize a required gate. An empty `files` map is a real observation that no implementation files were linked.\n\nFingerprints cover non-task artifacts (`artifact-pre-hash-v1`) and linked implementation files (`text-v1` or `bytes-v1`). A partial fingerprint is `null` and cannot authorize approval or verification. Artifacts whose schema type has `hasTasks` are excluded from those fingerprints and from automatic drift. They still have to exist, pass structural validation, and satisfy live task checks.\n\nArtifact policy, workflow policy, and gate recovery are independent. Gate recovery wins. Recovery never advances an earlier state.\n\n1. A required spec approval that becomes stale or revoked returns the change to `designing` when the state is after `designing`.\n2. Otherwise a required sign-off that becomes stale or revoked returns the change to `done` only when the state is later than `done`.\n3. Otherwise `workflow: redesign` plus unresolved non-task drift or review returns the change to `designing`.\n4. Otherwise the phase is preserved.\n\n`artifacts: none` adds no review reopening. Existing drift remains a blocker. `workflow: preserve` keeps the phase when no stricter gate applies, so drifted artifacts are reviewed in place. Verification staleness never moves the lifecycle. Before `verifying` it is context for the phase's normal work. At `verifying → done`, sign-off, and archive it blocks, and the repair is to verify again in the current state.\n\nVerification evidence is created only by these commands:\n\n```bash\nspecd changes verification start <name>\nspecd changes verification complete <name>\nspecd changes verification invalidate <name> --reason \"<text>\"\n```\n\n`start` and `complete` are valid in any active state. Starting first refreshes tracking, reconciles, and runs the same implementation readiness checks used when exiting `implementing` or entering `verifying`. Entering `verifying` does not capture a baseline, and `verifying → done` only checks that completed evidence is current. A missing validity verdict fails closed; only an explicit `not-required` verdict skips freshness. `complete` records success only when the fresh fingerprint still matches the attempt baseline. It does not infer success from tests or from the transition. If inputs changed, start again, repeat the verification work against the new baseline, then complete. Details are in [change verification](../cli/change-verification.md).\n\nActive `changes status` reconciles before it renders. It may persist a recovery when it discovers invalidity. Draft status stays read-only. The status projection separates the active attempt from completed evidence and names the committed recovery, blockers, and the next command for the current phase.\n\n---\n\n## Approval gates\n\nspecd supports two optional human-approval gates. Both are disabled by default. When enabled, the change **stays in `ready` or `done`**. Approval is recorded in place; it is not a `change transition` into a parking state.\n\n### Spec approval gate\n\nBlocks `ready → implementing` until a human approves the spec artifacts. The change remains in `ready`.\n\nConsent covers both the canonical spec scope and the validated non-task artifact fingerprint. Adding or removing a spec invalidates that consent; reordering or duplicating the same IDs does not. Transitional manifests that lack the approved scope are readable but treated as stale `legacy-unknown` evidence.\n\n**Path when enabled:**\n\n```\nready  —(approve spec, still ready)—→  ready → implementing\n```\n\n**Enabling in `specd.yaml`:**\n\n```yaml\napprovals:\n  spec: true\n```\n\n**Performing the approval:**\n\n```bash\nspecd changes approve spec add-auth --reason \"Specs reviewed and approved — all requirements are clear\"\n```\n\nThe approver reviews the spec and verify artifacts in the change directory. The command records consent only from `ready` and leaves the change there. The approval stores an artifact fingerprint. Task artifacts are not part of that fingerprint. If a required approval later becomes stale or revoked, recovery follows [Validity and verification](#validity-and-verification): the change returns to `designing` only when it is already past `designing`.\n\n### Signoff gate\n\nBlocks `done → archivable` until a human signs off the completed work. The change remains in `done`.\n\n**Path when enabled:**\n\n```\ndone  —(approve signoff, still done)—→  done → archivable\n```\n\n**Enabling in `specd.yaml`:**\n\n```yaml\napprovals:\n  signoff: true\n```\n\n**Performing the signoff:**\n\n```bash\nspecd changes approve signoff add-auth --reason \"Implementation reviewed — all scenarios verified\"\n```\n\nThe command records consent only from `done` and leaves the change there. Sign-off stores a complete fingerprint, including an empty implementation map when no files are linked, and the completed verification id. Legacy unknown implementation evidence (`null`) cannot satisfy the gate until it is renewed.\n\nApproval renewal is append-only. A new approval or sign-off replaces the current materialized projection and appends a new event; it never deletes earlier pending-state transitions, approvals, sign-offs, or invalidations. Both commands continue to persist the privacy-decorated actor returned by the configured `ActorResolver`.\n\nBoth gates can be enabled simultaneously:\n\n```yaml\napprovals:\n  spec: true\n  signoff: true\n```\n\n---\n\n## Task completion gating\n\nThe transition from `implementing` to `verifying` is gated on task completion. This is the `workflow.taskCompletion` check on the **target** step (`verifying`), not a `requires` rule on `implementing`. The schema lists which artifacts participate via that step's `requiresTaskCompletion`; each of those artifacts declares `taskCompletionCheck`.\n\nThe default schema (`@specd/schema-std`) checks for unchecked checkbox lines in `tasks.md`:\n\n- **Incomplete pattern:** `^\\s*-\\s+\\[ \\]` — any `- [ ]` line blocks the transition.\n- **Complete pattern:** `^\\s*-\\s+\\[x\\]` — `- [x]` lines count toward completion.\n\nWhen you run `specd changes transition <name> verifying` and tasks remain incomplete, the CLI reports the current progress:\n\n```\n3/5 tasks complete — transition to verifying is blocked\n```\n\nMark tasks complete by changing `- [ ]` to `- [x]` in `tasks.md`. Once all tasks are checked, the transition is allowed.\n\nChecking tasks off does not invalidate approval or verification fingerprints. Artifacts marked `hasTasks` are operational state: they are excluded from those fingerprints and from automatic drift. A missing or invalid required task artifact, and incomplete live tasks, still block the transitions and archive that require them.\n\n---\n\n## Hooks\n\nHooks let you attach automated actions or AI guidance to lifecycle transitions. They are defined in the schema's `workflow` section and optionally extended in `specd.yaml` via `schemaOverrides`.\n\n### Pre and post hooks\n\n- **Pre hooks** run before the change enters a step (`to` = that step). If a pre hook fails with `onFailure: abort` (the default), the transition is blocked. When `onFailure: warn` is configured, non-zero exits are captured as non-fatal warnings without halting the transition. Pre `run:` hooks apply for any `along` classification, including redesign into `designing`.\n- **Post hooks** on the **source** step run only when the transition is classified as **forward** (`along = forward`) — leaving a step toward a later delivery state. Backward hops, redesign, and archive recovery do not run source `post` `run:` hooks. If a post hook fails after a forward persist, the transition is not rolled back.\n\n### Hook failure policies (`onFailure`)\n\nEvery `run:` and `external:` hook supports an optional `onFailure` policy:\n\n- **`abort` (default):** Any non-zero exit code halts hook execution immediately, prevents the state transition, and logs the process failure.\n- **`warn`:** Non-zero exit codes emit non-blocking warning diagnostics (`warnings[]`) and allow the transition pipeline to complete successfully.\n\n```yaml\nworkflow:\n  - step: implementing\n    hooks:\n      pre:\n        - id: optional-lint\n          run: pnpm lint\n          onFailure: warn\n```\n\nWhen shell hooks are long-running, SpecD keeps them observable while they are\nin flight. In human-facing `text` output, completed hooks remain visible,\nactive hooks show recent output plus a running indicator, and quiet hooks emit\nliveness updates. In `json` and `toon`, in-flight check/hook progress is\nemitted on **stdout** as NDJSON (`stream: \"change-transition\"` for\n`change transition`, `stream: \"change-archive\"` for `change archive`,\n`stream: \"hook-progress\"` for `change run-hooks`). The terminal record is a\n`complete` event on that command's stream. `stderr` is reserved for text-mode\nprogress, the transition Repair Guide, and non-structured diagnostics.\n\n### Hook types\n\n| Type           | Description                                                                               |\n| -------------- | ----------------------------------------------------------------------------------------- |\n| `run:`         | A shell command executed in the project root. Exit code behavior governed by `onFailure`. |\n| `instruction:` | An AI context block injected into the agent context for the step. Not directly runnable.  |\n| `external:`    | An explicit external hook dispatched to a registered external hook runner by `type`.      |\n\nAn `instruction:` hook provides guidance to an AI agent about what to do in that step. It is informational — it does not execute code. A `run:` hook executes a shell command through the internal `HookRunner`. An `external:` hook is routed to a separate `ExternalHookRunner` selected by `external.type`.\n\n```yaml\nworkflow:\n  - step: implementing\n    checks:\n      - id: '@security.code-scan'\n        skippable: true\n    hooks:\n      pre:\n        - id: run-lint\n          run: pnpm lint\n          onFailure: warn\n        - id: docker-test\n          external:\n            type: docker\n            config:\n              image: node:20\n              command: pnpm test\n      post:\n        - id: notify\n          run: echo \"Implementation started for {{change.name}}\"\n```\n\nExternal hooks use the same workflow phase semantics as shell hooks:\n\n- a failing `pre` external hook blocks the transition\n- a failing `post` external hook does not roll the state back\n- an unknown `external.type` is a hard error, not a silent skip\n\n### Template variables\n\nHook commands (`run:`) and instructions (`instruction:`) support dynamic template variable substitution:\n\n| Variable                  | Availability       | Description                                                              |\n| :------------------------ | :----------------- | :----------------------------------------------------------------------- |\n| `{{project.root}}`        | All hooks          | Absolute path to the repository root directory                           |\n| `{{change.name}}`         | All hooks          | The change's slug name (e.g. `add-auth`)                                 |\n| `{{change.path}}`         | All hooks          | Absolute path to the active change (or archive) directory                |\n| `{{change.archivedName}}` | Post-archive hooks | The timestamped archive directory name (e.g. `20260924-143511-add-auth`) |\n\n#### Substitution\n\n`{{...}}` is replaced with the value exactly as it is. SpecD does not add quotes around it. You write the quotes in the command, around the whole string you want:\n\n```yaml\nrun: echo \"Resultado: {{change.name}}\"\nrun: mkdir \"{{project.root}}/out/{{change.name}}\"\n```\n\n`{{change.name}}` is a kebab-case slug. `{{project.root}}` and `{{change.path}}` are absolute paths and can contain spaces, so quote the whole path. A value inserted into the middle of a path stays one path: `mkdir \"{{project.root}}/{{change.name}}\"` becomes `mkdir \"/repo/add-auth\"`.\n\n`instruction:` text is also substituted verbatim. It is not a shell command, so the quote translation below does not apply.\n\n#### Running on macOS, Linux, and Windows\n\nA `run:` command is a shell command. macOS and Linux run it with the absolute `$SHELL` or `/bin/sh`. Windows runs it with `cmd.exe`. SpecD does not translate program names, flags, or pipes (`mkdir -p`, `rm -rf`, `$(...)`).\n\nIt does translate quote syntax the host shell does not understand:\n\n| You write                     | On `$SHELL` or `/bin/sh`                  | On `cmd.exe`                         |\n| ----------------------------- | ----------------------------------------- | ------------------------------------ |\n| `mkdir '{{change.path}}'`     | unchanged, `sh` understands single quotes | `mkdir \"C:\\Users\\Ada Lovelace\\repo\"` |\n| `mkdir \"{{change.path}}\"`     | unchanged                                 | unchanged                            |\n| `echo \"Resultado: \"\"listo\"\"\"` | `echo \"Resultado: \\\"listo\\\"\"`             | unchanged                            |\n| `echo \"100%\"`                 | unchanged                                 | unchanged                            |\n\n`cmd.exe` still expands `%NAME%` even inside double quotes. SpecD does not rewrite `%`. If you want a literal percent on Windows, write it the way `cmd.exe` expects.\n\nWhen the hook must run different commands per operating system, put that choice in your own script and call the script from the hook:\n\n```yaml\nrun: node scripts/prepare-hook.js \"{{change.path}}\"\n```\n\nThe script decides what to run. SpecD will not rewrite it.\n\n### Hook execution order\n\nWhen a step is entered, schema-level hooks fire first, then any project-level hooks added via `schemaOverrides` in `specd.yaml`. Within each source, hooks run in the order they are declared.\n\n---\n\n## Drafting and discarding\n\nDrafting and discarding are sidebars to the main lifecycle — they do not affect the change's lifecycle state.\n\n### Drafting\n\nDrafting shelves a change temporarily without abandoning it.\n\n```bash\nspecd drafts move add-auth         # move to drafts/\nspecd drafts restore add-auth      # move back to changes/\n```\n\nA drafted change retains its current lifecycle state. When restored, it continues from where it left off. Drafting is useful when you need to context-switch to another change and want to keep the current work safely out of the way.\n\n**Guard:** When a change has previously reached the `implementing` state, drafting is blocked by default — the code and specs may be out of sync, and shelving without archival risks leaving partial implementation behind. If you are certain you want to draft anyway, use `--force`:\n\n```bash\nspecd changes draft add-auth --force\n```\n\n### Discarding\n\nDiscarding permanently abandons a change. A reason is required.\n\n```bash\nspecd discard add-auth --reason \"Approach superseded by add-oauth-flow\"\n```\n\nA discarded change is moved to the discarded directory and is never archived. This is permanent — there is no restore from discard. You can optionally name the change or changes that supersede it:\n\n```bash\nspecd discard add-auth --reason \"Superseded\" --superseded-by add-oauth-flow\n```\n\n**Guard:** When a change has previously reached the `implementing` state, discarding is blocked by default — code that has been implemented should ideally be archived, not silently abandoned. If you are certain you want to discard anyway, use `--force`:\n\n```bash\nspecd changes discard add-auth --reason \"No longer needed\" --force\n```\n\n---\n\n## Archiving\n\nArchiving is the final operation in the lifecycle. The change must be in `archivable`. When you run:\n\n```bash\nspecd changes archive <name>\n```\n\n### Phases and lifecycle state\n\nThe change stays in **`archivable`** through early archive work. It runs initial guards and pre-archive hooks, then refreshes implementation tracking, reconciles validity, reruns the guards, and builds the publication plan/full-batch preflight from that accepted post-hook state. It moves to **`archiving`** only immediately before the first canonical spec publication, after orphan backup detection and a per-spec batch snapshot under `.specd-archive-backup/` in each affected spec directory.\n\n| Phase                                | Lifecycle state | On failure                                                                                |\n| ------------------------------------ | --------------- | ----------------------------------------------------------------------------------------- |\n| Guards, pre-archive hooks, preflight | `archivable`    | Stays `archivable`; no backup dirs                                                        |\n| Orphan detection + batch snapshot    | `archivable`    | Stays `archivable` (matching orphan: auto-restore + abort with guidance)                  |\n| Canonical publication + archive move | `archiving`     | Batch restore; `→ archivable` if restore succeeds, stay `archiving` if restore is partial |\n| Metadata + post-archive hooks        | `archiving`     | Archive already committed; failures are reported but do not roll back specs               |\n\nPre-archive hooks use the workflow step name `archiving`; they do **not** require the change to already be in lifecycle state `archiving`.\n\nWhen overlap is explicitly allowed, archiving sends a `spec-overlap-conflict` intent to the central reconciler for every active peer. Each peer uses its own stored workflow policy and the project's enabled gates: an ungated `preserve` peer stays in place with blockers, while `redesign` or stale required spec consent may return that peer to `designing`. Archive never hard-codes that return.\n\n### Commit steps (after transition to `archiving`)\n\n1. **Canonical publication:** For each spec in the batch, delta artifacts are merged into the base spec in the repository (or full spec files are copied). Publication is staged per spec; created files are recorded for restore.\n2. **Archive move:** The change directory is moved to the archive. An `ArchivedChange` record is created with the change name, timestamp, and spec IDs.\n3. **Backup cleanup:** `.specd-archive-backup/` directories are removed after a successful commit.\n4. **Metadata generation:** Persisted `metadata.json` is written **after** the archive move (in-memory preflight checks still run earlier).\n5. **Post-archive hooks:** Optional hooks configured for the `archiving` workflow step.\n\n### Batch restore and retry\n\nIf publication fails partway through a multi-spec batch, specd restores already-published specs from the batch backup (reverse publication order) and rolls the change back to **`archivable`** when restore completes. Retry archive merges deltas against the restored canonical base — not against partially merged content.\n\nIf restore cannot complete for every spec, the change remains in **`archiving`**. `specd changes status` recommends transitioning to **`designing`** for manual recovery.\n\n### Orphan backups\n\nIf `.specd-archive-backup/` already exists when archive starts:\n\n- **Same change name** in the manifest: canonical specs are auto-restored, the backup is removed, and the current archive attempt aborts (review and retry).\n- **Different change name**: archive aborts with a repair message; live files are not overwritten.\n\n### Recovery transitions from `archiving`\n\n| Transition               | Purpose                                                                                                             |\n| ------------------------ | ------------------------------------------------------------------------------------------------------------------- |\n| `archiving → archivable` | Lifecycle rollback after you fixed canonical specs manually; does not re-run archive hooks                          |\n| `archiving → designing`  | Revise change artifacts (downgrades files to `pending-review`); use after partial restore or when specs need rework |\n\nTransitions to `implementing`, `verifying`, or `done` from `archiving` are not valid.\n\n### After a successful archive\n\nSpecs in the repository reflect the merged requirements. The change history is preserved under `.specd/archive/`. To rework merged specs, open a **new** change — the archived record is not transitioned back.\n\n---\n\n## Practical example: a full lifecycle with `/specd`\n\nHere is a complete lifecycle walkthrough for a change that adds an authentication feature, showing what the agent does at each step. In practice, you drive this through your coding assistant using the `/specd` skill — the agent handles transitions, artifact creation, and validation automatically.\n\n### 1. Starting — `/specd`\n\nYou open your coding assistant and type `/specd`. The skill shows the project status:\n\n```\n# specd\n\n**Schema:** @specd/schema-std\n**Workspaces:** default (8 specs)\n**Active changes:** none\n**Drafts:** none\n\nNo active changes. What would you like to work on?\n```\n\nYou describe what you want: \"I want to add login and logout authentication flows.\"\n\nThe skill suggests creating a change and invokes `/specd-new`.\n\n### 2. Creation — `/specd-new`\n\nThe agent has a discovery conversation with you — understanding the problem, discussing the approach, identifying affected specs, and reaching agreements about scope. Once the picture is clear, it creates the change:\n\n```bash\nspecd changes create add-auth --spec default:auth/login --spec default:auth/logout\n```\n\nBefore handing off, the agent writes a `specd-exploration.md` file to the change directory. This captures everything from the conversation — the problem, the agreed approach, design decisions, rejected alternatives, codebase observations, and open questions. It is the agent's working memory, persisted so that the next phase can pick up where you left off even in a different session. See [Exploration context](#exploration-context-specd-explorationmd) for details.\n\nState: `drafting` → the agent suggests running `/specd-design`.\n\n### 3. Designing — `/specd-design`\n\nThe agent loads the change state, the schema, and the compiled context. It also reads `specd-exploration.md` from the change directory to recover the full discovery context — if time has passed since creation, it verifies that referenced files and spec IDs still exist and flags any drift before proceeding.\n\nThis is the longest phase. The agent works through each artifact in dependency order. The artifacts below follow `@specd/schema-std` — other schemas may define a different set or order:\n\n**Step 3a: Proposal** — The agent writes `proposal.md`:\n\n- Explains the motivation (why the project needs authentication)\n- Describes the current behaviour (no auth exists)\n- Outlines the proposed solution at a high level\n- Lists the specs that will be created: `default:auth/login` and `default:auth/logout`\n- Notes the impact on existing code (new middleware, new routes)\n\nOnce written, the agent validates the proposal and marks it complete.\n\n**Step 3b: Specs** — The agent writes `spec.md` for each spec:\n\n- `specs/default/auth/login/spec.md` — Requirements for login: valid credentials return a session token, invalid credentials return a generic error, sessions expire after 24 hours, rate limiting on the endpoint\n- `specs/default/auth/logout/spec.md` — Requirements for logout: session is invalidated, subsequent requests are rejected\n\nEach spec uses SHALL/MUST language and groups requirements under `### Requirement:` headings.\n\n**Step 3c: Verify** — The agent writes `verify.md` for each spec:\n\n- `specs/default/auth/login/verify.md` — WHEN/THEN scenarios for each login requirement: valid credentials, invalid credentials, expired sessions, rate limit exceeded\n- `specs/default/auth/logout/verify.md` — WHEN/THEN scenarios for logout: successful invalidation, already-expired session\n\nEach scenario mirrors a requirement from `spec.md`.\n\n**Step 3d: Design** — The agent writes `design.md`:\n\n- Reads the proposal, specs, and verify files\n- Analyses the existing codebase with `specd graph search` and `specd graph impact` (see [Code Graph](./code-graph.md)) to identify affected areas, and records `HIGH` or `CRITICAL` risk in the design\n- Lists new constructs: `AuthService`, `SessionStore`, login/logout route handlers, auth middleware\n- Documents the approach, key decisions, and trade-offs\n- Maps every requirement and scenario to a concrete implementation path\n\n**Step 3e: Tasks** — The agent writes `tasks.md`:\n\n- Derives discrete tasks from `design.md`\n- Each task is a checkbox with indented context: which file, which symbol, what to change\n- Groups tasks logically (e.g., \"1. Session infrastructure\", \"2. Login flow\", \"3. Logout flow\", \"4. Tests\")\n\nOnce all five artifacts are complete and validated, the agent transitions to `ready`, then to `implementing`.\n\n### 4. Implementing — `/specd-implement`\n\nThe agent reads the compiled context for the `implementing` step — which includes the specs, design, and task list — and works through tasks one by one:\n\n```\n## 1. Session infrastructure\n- [x] 1.1 Create SessionStore interface\n      `src/auth/session-store.ts`: New interface — get, set, delete session\n      Approach: In-memory store with TTL from design.md\n      (Req: Sessions expire after 24 hours)\n\n- [x] 1.2 Implement InMemorySessionStore\n      `src/auth/in-memory-session-store.ts`: Implement SessionStore\n      Approach: Map<string, Session> with setTimeout cleanup\n\n## 2. Login flow\n- [x] 2.1 Create login handler\n      `src/auth/login.ts`: POST /login route handler\n      ...\n- [ ] 2.2 Add rate limiting middleware\n      `src/auth/rate-limit.ts`: ...\n```\n\nThe agent checks off each task as it completes the work. Pre/post hooks run at the step boundaries — for example, `pnpm test` runs after implementation.\n\nOnce all checkboxes are `[x]`, the agent transitions to `verifying`.\n\n### 5. Verifying — `/specd-verify`\n\nVerification is not the same as running tests. Tests check that code behaves as programmed — verification checks that the implementation satisfies the _requirements_. These are different questions:\n\n- **Not every project has tests.** Documentation changes, configuration changes, infrastructure work, early prototypes — many changes have no test suite at all. Verification still applies: the agent inspects the implementation against each scenario and confirms it holds.\n- **Tests can pass while requirements are missed.** A test suite exercises the code paths the developer thought to write. Verification scenarios come from the spec — they represent what was _agreed_ the system should do. A passing test suite does not guarantee that every requirement was addressed.\n- **Verification checks more than code.** The agent inspects the implementation holistically: does the code structure match the design? Were all tasks completed? Do the changes satisfy the GIVEN/WHEN/THEN conditions from `verify.md`? It runs tests where they exist, but also reads code, checks behaviour, and confirms edge cases that tests may not cover.\n\nThe agent reads each scenario from `verify.md` and confirms the implementation satisfies it — by inspecting code, running tests where applicable, and verifying GIVEN/WHEN/THEN conditions:\n\n```\n### Requirement: Valid credentials\n#### Scenario: Successful login\n- WHEN a user submits valid credentials\n- THEN they receive an authenticated session token\n→ ✓ Verified: login handler returns JWT on valid credentials\n\n#### Scenario: Invalid credentials\n- WHEN a user submits invalid credentials\n- THEN they receive a generic error with no field-specific information\n→ ✓ Verified: handler returns 401 with generic message\n```\n\n`/specd-verify` owns the attempt. It runs `specd changes verification start`, checks the scenarios, and runs `specd changes verification complete` only after that work succeeds. The transition into `verifying` does not start the attempt, and the transition to `done` does not complete it. If a scenario fails, or the inputs change, the agent fixes the issue, starts again, and repeats the checks against the new baseline before completing. A stale verification result does not move the lifecycle backward by itself.\n\nIn full mode, verify passes the same attempt explicitly to\n`/specd-compliance --change <name> --delegated --attempt <id>`. Delegated\ncompliance neither starts nor completes an attempt, but otherwise follows the\nordinary change-scoped path: status, project context, change specs, direct\ndependencies, merged `spec-preview` reads, the change's reports directory, and\nthe change-scoped filename. Independent compliance owns its own start/complete;\nproject-wide, diff, PR, single-spec, and selection modes are report-only.\n\nOnce completed evidence is current and every scenario passes, the agent transitions to `done`.\n\n### 6. Archiving — `/specd-archive`\n\nThe agent runs `specd changes archive add-auth`. specd:\n\n1. Syncs `spec.md` and `verify.md` into `specs/default/auth/login/` and `specs/default/auth/logout/`\n2. Applies any delta files to existing specs\n3. Generates metadata for each spec\n4. Moves the change directory to `.specd/archive/`\n\nThe specs are now permanent. The change is a historical record.\n\n### Redesign mid-lifecycle\n\nIf you discover during implementation that a requirement is wrong:\n\n```\n> The rate limiting should be per-IP, not global. Let's go back and fix the spec.\n```\n\nThe agent transitions back to `designing`. This changes the lifecycle and may reopen artifact review according to the transition effects. Current consent is represented by materialized projections: validity reconciliation marks affected approval or sign-off evidence stale/revoked and appends audit events; it does not erase prior approval history. A plain backward hop does not manufacture verification evidence or discard matching completed evidence.\n\nThe agent updates the spec, verify, design, and tasks, then works forward through the lifecycle again.\n\n---\n\n## Exploration context (`specd-exploration.md`)\n\nWhen an AI agent runs `/specd-new`, it has a discovery conversation with the user — understanding the problem, discussing approaches, identifying affected specs, and reaching agreements about scope and direction. All of this context is captured in a file called `specd-exploration.md`, written to the change directory (`<changePath>/specd-exploration.md`) before the agent hands off to `/specd-design`.\n\n### Why it exists\n\nDesign happens in a different session — often hours or days after creation. The agent that writes artifacts has no memory of the discovery conversation. Without a persistent record, it would need to start from scratch: ask the user to re-explain everything, or worse, guess based on the change name and one-line description alone.\n\n`specd-exploration.md` bridges this gap. It is the agent's working memory, persisted to disk so that any future session can pick up exactly where the conversation left off.\n\n### How it differs from `proposal.md`\n\nThey may look similar at first glance, but they serve fundamentally different purposes:\n\n|                              | `specd-exploration.md`                                                                                        | `proposal.md`                                                                     |\n| ---------------------------- | ------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |\n| **What it is**               | Agent working memory — raw conversation context                                                               | Formal schema artifact — structured document                                      |\n| **Who it's for**             | The AI agent in future sessions                                                                               | Humans and agents reviewing the change                                            |\n| **When it's written**        | During `/specd-new`, before any artifacts exist                                                               | During `/specd-design`, as the first artifact                                     |\n| **Part of the schema DAG?**  | No — it's outside the artifact pipeline                                                                       | Yes — other artifacts depend on it                                                |\n| **Validated?**               | No — no schema validation applies                                                                             | Yes — must pass schema validations                                                |\n| **Required by all schemas?** | Yes — every schema needs exploration context                                                                  | No — a schema can omit `proposal` entirely                                        |\n| **Content**                  | Everything discussed: rejected ideas, tangential topics, agreements, codebase observations, conversation flow | Curated: motivation, current behaviour, proposed solution, specs affected, impact |\n\nThe key distinction: **`proposal.md` is a schema artifact that a schema may or may not include.** A custom schema could replace `proposal` with a different first artifact, or skip it entirely and go straight to specs. But even without a proposal, the agent still needs to know what the user wants to build and why. That's what `specd-exploration.md` provides — it is schema-independent context that ensures continuity across sessions regardless of which artifacts the schema defines.\n\n### What it contains\n\nThe file captures everything from the discovery conversation:\n\n- **Problem statement** — what the user wants to achieve and why\n- **Approach / solution outline** — the agreed strategy\n- **Affected areas** — packages, modules, files, specs discussed\n- **Spec IDs** — attached to the change and mentioned as relevant\n- **Design decisions and agreements** — anything confirmed, rejected, or constrained\n- **Steps or plan** — if specific phases or ordering were agreed\n- **Rejected alternatives** — with reasons, so the agent doesn't re-propose them\n- **Open questions** — unresolved items for design to clarify\n- **Codebase observations** — file paths, patterns, current behaviour\n- **Tangential topics** — related issues, future ideas, things mentioned in passing\n- **Conversation flow** — how the discussion evolved\n\nEach item includes concrete anchors (file paths, spec IDs, function names) so the reader can verify whether they still hold, and reasons behind decisions so edge cases can be judged even if details have changed.\n\n### Staleness\n\nTime passes between exploration and design. Code changes, specs get renamed, decisions become outdated. The file includes a `Generated: YYYY-MM-DD` timestamp, and `/specd-design` performs a staleness check before trusting its content — verifying that referenced paths and spec IDs still exist, and flagging any significant drift to the user.\n\n---\n\n## Where to go next\n\n- [Schema format reference](../schemas/schema-format.md) — define custom workflow steps, artifacts, hooks, and task completion checks for your project.\n- [Configuration guide](configuration.md) — enable approval gates, configure workspaces, and add schema overrides.\n- [Code Graph](./code-graph.md) — search symbols, specs, and documents, and measure blast radius before design and implementation.\n- [CLI reference](../cli/cli-reference.md) — all `specd changes`, `specd drafts`, `specd discard`, and `specd archives` commands.\n- [Change verification](../cli/change-verification.md) — `verification start`, `complete`, and `invalidate`.\n- [Domain model](../core/domain-model.md) — the `Change`, `ChangeState`, `ChangeEvent`, and `ChangeArtifact` types returned by `@specd/core` use cases.\n",
-    "lineCount": 816,
-    "byteLength": 54278,
+    "content": "# Change Lifecycle Guide\n\nEvery piece of work in specd is a **change**. A change tracks everything related to modifying one or more specs — the proposal, the spec files, the design, the implementation tasks, and the final archive record. This guide explains how changes move through their lifecycle, what each state means, and how approval gates, task completion checks, and hooks affect that progression.\n\n## How the pieces fit together\n\nspecd has three layers that work together to drive a change from idea to completion:\n\n**The CLI** is the engine. It manages changes, transitions between states, validates artifacts, compiles context, and enforces gates. Every operation — creating a change, checking status, transitioning states, archiving — is a CLI command. The CLI is the source of truth for what is happening.\n\n**The workflow rules** come from two places. The Change lifecycle (`ChangeState` and `VALID_TRANSITIONS`) defines which states exist and which hops are legal. The schema’s `workflow[]` array does not add or remove those states: each `step` is a lookup onto an existing state and only attaches extras (`requires`, task gates, hooks). Artifact types and their dependency order also come from the schema. Project config enables approval gates and extra hooks. Together they determine what must be produced and which gates apply on a legal hop.\n\n**The skills** are the interface. They are slash commands installed in your coding assistant (`/specd`, `/specd-new`, `/specd-design`, etc.) that orchestrate the workflow by calling the CLI. Each skill knows how to guide the agent through one phase — loading context, writing artifacts, validating, transitioning. You interact with skills; skills interact with the CLI; the CLI enforces the workflow.\n\n```text\nYou ←→ Skills ←→ CLI ←→ Workflow (schema + config)\n         │                    │\n         │  calls commands    │  enforces rules\n         │  reads context     │  validates artifacts\n         │  writes artifacts  │  manages transitions\n```\n\nIn practice, you type `/specd` and the skill figures out where you are, what to do next, and which CLI commands to run. You can also use the CLI directly — for scripting, CI pipelines, or when you want fine-grained control — but for day-to-day work the skills provide the guided experience.\n\n---\n\n## The lifecycle at a glance\n\n```\n                        ┌──────────────────────────────────────────────────────┐\n                        │    redesign — transition back to designing            │\n                        │    available from any active state (including        │\n                        │    archiving when recovery is needed)               │\n                        └──────────────────────────────────────────────────────┘\n                                              ↑\ndrafting → designing ⇄ ready → implementing ⇄ verifying → done → archivable → archiving\n```\n\nThat is the happy path whether or not approval gates are enabled. Optional spec and signoff gates do **not** insert extra wait states. The change stays in `ready` or `done` until a human records consent with `specd changes approve spec` or `specd changes approve signoff`; then the same `ready → implementing` / `done → archivable` transition is allowed.\n\n`specd changes status` lists **available** transitions from the same checks that `change transition` runs (artifact `requires`, task completion on the target step, enter-`ready` guards, exit-`implementing` implementation integrity, and approval on the delivery edge). The protocol graph (`VALID_TRANSITIONS`) is larger than what status shows as available.\n\nFrom `done`, `signed-off`, or `archivable` you can hop back to `implementing` or `verifying` (skill-aligned retry) without going through `ready` again.\n\n`pending-spec-approval`, `spec-approved`, `pending-signoff`, and `signed-off` remain in the protocol for **drain only** — in-flight changes that already sit there. New work does not enter those states via `change transition`.\n\n## States explained\n\n### `drafting`\n\nThe initial state. A newly created change starts here before any work has been done.\n\n- **What it means:** The change exists but has not entered the design phase.\n- **What you do:** Nothing yet. Transition to `designing` when you are ready to start.\n- **Transition out:** `specd changes transition <name> designing`\n- **What can block it:** Nothing — this transition is always allowed.\n\n---\n\n### `designing`\n\nThe active design and specification phase. This is where the bulk of artifact work happens.\n\n- **What it means:** You are writing the proposal, specs, verify files, design, and tasks.\n- **What you do:** Create and refine the five standard artifacts (proposal, specs, verify, design, tasks). Run `specd changes status <name>` to check artifact progress. Before writing `design.md`, use the [Code Graph](./code-graph.md) to locate symbols (`specd graph search`) and record blast radius (`specd graph impact`) for the files and symbols the design will change.\n- **Transition out:** `specd changes transition <name> ready` once all required artifacts are complete and validated.\n- **What can block it:** The `ready` step requires all artifacts listed in the schema's `requires` field (by default: proposal, specs, verify, design, tasks) to have `complete` status. The CLI reports which artifacts are still missing or in progress.\n\n`designing → designing` is the sole neutral self-entry accepted by the application boundary. It returns the unchanged change and records no event or timestamp update. Other self-transitions, including `verifying → verifying`, are invalid.\n\n---\n\n### `ready`\n\nAll design artifacts are complete. The change is ready to hand off to implementation.\n\n- **What it means:** Every required artifact has been written and validated. The change is cleared for implementation, subject to optional spec approval.\n- **What you do:** Transition to `implementing`. If `approvals.spec` is enabled, a reviewer first runs `specd changes approve spec <name> --reason \"...\"`; the change **stays in `ready`**. Then run the same `ready → implementing` transition.\n- **Transition out:** `implementing`, or back to `designing` (redesign). Do not use `change transition` into `pending-spec-approval`.\n- **What can block it:** Incomplete required artifacts, enter-`ready` dependency/read-only checks (on the way in), and — if the spec gate is on — a missing recorded spec approval (`APPROVAL_REQUIRED`). The change remains in `ready` until approval is recorded.\n\n---\n\n### `pending-spec-approval` (drain only)\n\nHistoric wait state for in-flight changes that already sit here. New work does not enter this state.\n\n- **What it means:** An older change is waiting for human spec approval under the previous parking model.\n- **What you do:** A reviewer runs `specd changes approve spec <name> --reason \"...\"` (drain to `spec-approved`), or redesign to `designing`.\n- **Transition out:** `spec-approved`, or `designing`.\n\nSee [Approval gates](#approval-gates).\n\n---\n\n### `spec-approved` (drain only)\n\nHistoric post-approval parking state. New work records spec approval in `ready` and goes `ready → implementing`.\n\n- **What it means:** Specs were signed off while the change was in the old pending path.\n- **What you do:** Transition to `implementing`, or back to `designing`.\n- **Transition out:** `implementing`, or `designing`.\n- **What can block it:** If specs were modified after approval, the materialized approval becomes stale and the change returns to `designing`. The approval and invalidation events remain in append-only history; later approval replaces only the current projection.\n\n---\n\n### `implementing`\n\nActive development is in progress.\n\n- **What it means:** The implementation tasks are being worked through.\n- **What you do:** Work through the task list in `tasks.md`, checking off items as you go (`- [x]`). Run `specd changes status <name>` to see task progress. Re-check `specd graph impact` when a task touches a symbol or file that `design.md` did not already cover, and prefer `specd graph search` over repository-wide text search.\n- **Transition out:** `verifying` once task-completion checks on the **target** step pass, or back to `designing` (redesign).\n- **What can block it:** The `workflow.taskCompletion` check on the target step (typically `verifying`), driven by `taskCompletionCheck` on task-bearing artifacts listed in that step's `requiresTaskCompletion`. By default, any unchecked `- [ ]` line in `tasks.md` prevents advancing to `verifying`. Open implementation-tracking files can also block leaving `implementing`. The CLI reports \"N/M tasks complete\" when the task gate is active.\n\n---\n\n### `verifying`\n\nImplementation is complete. Verification scenarios are being run.\n\n- **What it means:** All tasks are done. You are now confirming the implementation satisfies every scenario in `verify.md`.\n- **What you do:** Run through every scenario in `verify.md`. Confirm each one passes by inspecting the code and running the relevant tests.\n- **Transition out:** `done` when all scenarios pass, back to `implementing` if a scenario fails (the schema may clear artifact validations on this backward transition), or back to `designing` (redesign).\n- **What can block it:** Nothing prevents the transition — it is up to you to judge readiness.\n\n---\n\n### `done`\n\nImplementation and verification are complete.\n\n- **What it means:** The change is finished from a development perspective. It can now be archived, or you can hop back to implementation or verification.\n- **What you do:** Transition to `archivable`. If `approvals.signoff` is enabled, a reviewer first runs `specd changes approve signoff <name> --reason \"...\"`; the change **stays in `done`**. Then run the same `done → archivable` transition. You may also hop to `implementing` or `verifying`.\n- **Transition out:** `archivable`, `implementing`, `verifying`, or `designing`. Do not use `change transition` into `pending-signoff`.\n- **What can block it:** If the signoff gate is on, a missing recorded signoff (`APPROVAL_REQUIRED`). The change remains in `done` until signoff is recorded.\n\n---\n\n### `pending-signoff` (drain only)\n\nHistoric wait state for in-flight changes that already sit here. New work does not enter this state.\n\n- **What it means:** An older change is waiting for human sign-off under the previous parking model.\n- **What you do:** A reviewer runs `specd changes approve signoff <name> --reason \"...\"` (drain to `signed-off`), or redesign to `designing`.\n- **Transition out:** `signed-off`, or `designing`.\n\nSee [Approval gates](#approval-gates).\n\n---\n\n### `signed-off` (drain only)\n\nHistoric post-signoff parking state. New work records signoff in `done` and goes `done → archivable`.\n\n- **What it means:** Sign-off was recorded while the change was in the old pending path.\n- **What you do:** Transition to `archivable`, hop to `implementing` or `verifying`, or redesign to `designing`.\n- **Transition out:** `archivable`, `implementing`, `verifying`, or `designing`.\n- **What can block it:** Nothing on the protocol edge; archive still has its own operation checks.\n\n---\n\n### `archivable`\n\nThe change is ready to be archived.\n\n- **What it means:** All gates have been passed. The change can run the archive operation.\n- **What you do:** Run `specd changes archive <name>` to perform the archive.\n- **Transition out:** `archiving` (only after archive preflight succeeds and canonical publication is about to start — see [Archiving](#archiving)), `implementing` or `verifying` (skill-aligned hops), or back to `designing` (redesign).\n- **What can block it:** Archive pre-hooks, overlap/read-only guards, or preflight failures keep the change here (the archive command does not transition to `archiving` until commit preparation has passed).\n\n---\n\n### `archiving`\n\nThe change is in the archive **commit phase** (canonical publication, archive move, and post-archive work), or it completed successfully and was moved to the archive directory.\n\n- **What it means:** While `specd changes archive` is running, the change transitions to `archiving` immediately before the first spec publication, after guards, pre-archive hooks, orphan detection, and batch snapshot. If publication or the archive move fails and batch restore succeeds, the change returns to `archivable` so you can fix the problem and retry. If restore is incomplete, the change stays in `archiving` until you recover manually.\n- **What you do:** If archive failed and the change is back in `archivable`, review restored specs and run `specd changes archive <name>` again. If the change is stuck in `archiving` after a partial restore, use `specd changes transition <name> designing` to revise artifacts, or `specd changes transition <name> archivable` after you have manually restored canonical specs (lifecycle rollback only — no archive hooks).\n- **Transition out:** `archivable` (recovery after a failed commit when canonical storage was restored), `designing` (manual escape to revise specs/deltas), or none after a **successful** archive (the change directory is moved to the archive and is no longer an active change).\n\n---\n\n## Full transition table\n\n| From                    | To                                                                                                          |\n| ----------------------- | ----------------------------------------------------------------------------------------------------------- |\n| `drafting`              | `designing`                                                                                                 |\n| `designing`             | `ready`, `designing`                                                                                        |\n| `ready`                 | `implementing`, `designing`                                                                                 |\n| `pending-spec-approval` | `spec-approved`, `designing` _(drain only)_                                                                 |\n| `spec-approved`         | `implementing`, `designing` _(drain only)_                                                                  |\n| `implementing`          | `verifying`, `designing`                                                                                    |\n| `verifying`             | `implementing`, `done`, `designing`                                                                         |\n| `done`                  | `archivable`, `designing`, `implementing`, `verifying`                                                      |\n| `pending-signoff`       | `signed-off`, `designing` _(drain only)_                                                                    |\n| `signed-off`            | `archivable`, `designing`, `implementing`, `verifying` _(drain hops from signed-off)_                       |\n| `archivable`            | `archiving`, `designing`, `implementing`, `verifying`                                                       |\n| `archiving`             | `archivable`, `designing` _(active change only; successful archive removes the change from the active set)_ |\n\nThis table is the protocol graph (`VALID_TRANSITIONS`). Status **available** transitions are the protocol targets whose checks currently pass.\n\n---\n\n## Skippable and disabled workflow steps\n\nCustom schemas can configure individual lifecycle steps as `optional: true` or `disabled: true` in their `workflow[]` declaration:\n\n```yaml\nworkflow:\n  - step: drafting\n  - step: designing\n  - step: ready\n  - step: implementing\n    optional: true\n  - step: verifying\n    disabled: true\n  - step: done\n  - step: archivable\n  - step: archiving\n```\n\n### Topology invariants and rules\n\nThe workflow-topology domain functions (`resolveWorkflowPipeline`, `isWorkflowStepEnabled`, `listWorkflowTransitions`, `isWorkflowTransitionLegal`, `listBypassedWorkflowSteps`, `nextWorkflowStep`) validate the graph structure and govern allowed state transitions. The pipeline is always in canonical order; the order of `workflow` rows is not significant:\n\n1. **Bedrock state immutability**: Bedrock states (`drafting`, `designing`, `done`, `archivable`, `archiving`) are permanently active and **cannot** be disabled or marked optional. Attempting to mark any bedrock state `disabled: true` or `optional: true` triggers a schema validation error.\n2. **Approval anchor locks**:\n   - If `approvals.spec` is enabled in configuration, `ready` cannot be disabled.\n   - `done` is unconditional bedrock; signoff is an evaluation-time check on `done -> archivable` that returns `skip` when signoff is disabled without altering topology.\n3. **Forward connectivity by construction**: Bedrock states cannot be disabled and disabled steps are simply removed, so an active path from `designing` forward to `archivable` always exists.\n4. **Disabled steps**: A disabled step (`disabled: true`) is completely excluded from the active pipeline. It cannot be entered directly or recommended as a next step.\n\n### Optional-step decision table\n\n| Step      | Effective `step-skip` set | Core recommendation                                                  |\n| --------- | ------------------------- | -------------------------------------------------------------------- |\n| mandatory | any                       | enter the step                                                       |\n| optional  | empty                     | bypass unconditionally by default                                    |\n| optional  | all checks pass           | bypass to the furthest legal target after consecutive optional steps |\n| optional  | any check fails           | enter the closest optional step                                      |\n| disabled  | not applicable            | omit it from the pipeline                                            |\n\nRegistry bindings and schema `skipChecks` are composed into the effective set. For example, `implementing` can be conditional because Core binds `workflow.tasksEmpty` even if the YAML row has no inline `skipChecks`. Passing the bypass policy changes only the recommendation: explicit entry into an optional step remains a legal alternative. Skills consume `nextAction.command` and `nextAction.targetStep`; they do not inspect tasks or choose a path independently.\n\n### Shortcut transitions via `--next`\n\nWhen intermediate steps are skipped or disabled, changes do not need to pause in every intermediate state. The CLI supports shortcut transitions:\n\n```bash\n# Transition directly to next available topological step\nspecd changes transition <name> --next\n```\n\n`--next` evaluates `nextWorkflowStep(current, schema, approvals)` to determine the closest forward step in the pipeline that is currently enabled. For instance, if `verifying` is disabled, transitioning with `--next` from `implementing` advances directly to `done`.\n\n`nextWorkflowStep` is deliberately only a topology primitive. Status guidance applies the optional-step policy above to the predicate-filtered `availableTransitions` and may recommend a farther shortcut. Agents should follow that published `nextAction` instead of treating `--next` as a path-selection policy.\n\n### Step-skip check semantics\n\nSkipping a step is not a blind jump. When a transition bypasses an active optional step (e.g., `ready → verifying` bypassing optional `implementing`), SpecD runs **step-skip checks** for each bypassed step before allowing the transition:\n\n- Checks registered under `{ scope: 'step-skip', step: '<bypassedStep>' }` are evaluated.\n- For example, `workflow.tasksEmpty` verifies that any task checklists in the change have zero incomplete tasks before allowing `implementing` to be skipped. If uncompleted tasks exist, the shortcut transition fails fast with a `CheckPredicateFailedError`.\n- If an intermediate step is completely `disabled: true`, it is excluded from the active pipeline and is not treated as a bypassed active step.\n\n### Hook suppression\n\nWhen a transition shortcuts across intermediate steps, hooks for the intermediate steps are **suppressed**:\n\n- Only the source step's post-transition hooks (if applicable) and the destination step's pre-transition hooks execute.\n- Bypassed steps never execute intermediate pre-hooks or post-hooks, ensuring idempotency and avoiding unintended side-effects.\n\n### Workflow examples\n\n#### 1. Documentation or spec-only changes (optional `implementing`)\n\nFor changes that modify documentation, specifications, or schemas without executable code, `implementing` can be marked `optional: true`:\n\n- If no implementation tasks are added to `tasks.md`, `ready → verifying` or `ready → done` succeeds immediately.\n- If tasks are declared in `tasks.md`, they must all be completed before skipping `implementing` or `workflow.tasksEmpty` will reject the bypass.\n\n#### 2. Rapid prototyping / Spikes (disabled `verifying`)\n\nFor quick experiments or spikes where formal verification test runs are omitted:\n\n- Mark `verifying: disabled: true`.\n- The verification boundary is relaxed: `verificationBoundary` returns `false`, meaning in-place verification renewal is not mandated.\n- Lifecycle guidance advances directly from `implementing` to `done` or `/specd-archive`.\n\n---\n\n## Identity and audit trails\n\nspecd records the identity of the person or system performing every significant operation — creating a change, transitioning states, approving specs, and signing off on completed work. These records create a tamper-evident audit trail persisted in the change manifest and history.\n\n### How identity is resolved\n\nSpecD uses a pluggable identity resolution system. By default, it auto-detects the active Version Control System (Git, Mercurial, or Subversion) and retrieves the user's name and email from its configuration.\n\nIn specific environments, you can force a provider or use custom identity plugins. See the [Configuration Guide](configuration.md#identity-resolution) for details.\n\n### Privacy in public repositories\n\nFor projects hosted in public repositories, you can enable **privacy modes** to obfuscate real names and emails before they are persisted in the repository.\n\nSupported modes include:\n\n- **Hashing**: deterministic HMAC-SHA256 obfuscation of emails.\n- **Masking**: partial obfuscation (e.g., `j***z@e***.com`).\n- **Anonymization**: replacement with generic placeholders.\n\nPrivacy settings also automatically filter out sensitive metadata. For more details on configuring privacy, see the [Privacy section](configuration.md#privacy) in the Configuration Guide.\n\n---\n\n## Redesign: going back to designing\n\nAlmost every active state can transition back to `designing`:\n\n```bash\nspecd changes transition <name> designing\n```\n\nThat command moves the lifecycle. It does not start or complete verification, and it does not restart an attempt. There is no transition flag for that. A backward move alone leaves matching verification evidence in place. An explicit return below a valid sign-off revokes that sign-off and does not broadly revoke spec approval.\n\nRedesign from `archiving` is allowed via `specd changes transition <name> designing`. Use it when batch restore failed partially or you need to change deltas before retrying archive. After a successful archive, the change is no longer active — create a new change instead.\n\nAutomatic returns are a different, recovery-only path. Status and other mutations reconcile validity first, then apply the recovery rules in [Validity and verification](#validity-and-verification). Recovery that has already been committed is kept even when a later requested transition fails. In particular, `signed-off → done`, `archivable → done`, and `archiving → done` may be selected for stale or revoked sign-off, but users cannot request those edges with `changes transition`.\n\n## Validity and verification\n\nCurrent approval and verification state is a materialized projection on a version 2 manifest. History stays append-only audit. `stale` means a reviewed input changed or cannot be proven. `revoked` means consent was withdrawn. Restoring the old bytes does not make either status valid again. A missing projection means that evidence was never recorded. A `null` implementation fingerprint is legacy unknown evidence and cannot authorize a required gate. An empty `files` map is a real observation that no implementation files were linked.\n\nFingerprints cover non-task artifacts (`artifact-pre-hash-v1`) and linked implementation files (`text-v1` or `bytes-v1`). A partial fingerprint is `null` and cannot authorize approval or verification. Artifacts whose schema type has `hasTasks` are excluded from those fingerprints and from automatic drift. They still have to exist, pass structural validation, and satisfy live task checks.\n\nArtifact policy, workflow policy, and gate recovery are independent. Gate recovery wins. Recovery never advances an earlier state.\n\n1. A required spec approval that becomes stale or revoked returns the change to `designing` when the state is after `designing`.\n2. Otherwise a required sign-off that becomes stale or revoked returns the change to `done` only when the state is later than `done`.\n3. Otherwise `workflow: redesign` plus unresolved non-task drift or review returns the change to `designing`.\n4. Otherwise the phase is preserved.\n\n`artifacts: none` adds no review reopening. Existing drift remains a blocker. `workflow: preserve` keeps the phase when no stricter gate applies, so drifted artifacts are reviewed in place. Verification staleness never moves the lifecycle. Before `verifying` it is context for the phase's normal work. At `verifying → done`, sign-off, and archive it blocks, and the repair is to verify again in the current state.\n\nVerification evidence is created only by these commands:\n\n```bash\nspecd changes verification start <name>\nspecd changes verification complete <name>\nspecd changes verification invalidate <name> --reason \"<text>\"\n```\n\n`start` and `complete` are valid in any active state. Starting first refreshes tracking, reconciles, and runs the same implementation readiness checks used when exiting `implementing` or entering `verifying`. Entering `verifying` does not capture a baseline, and `verifying → done` only checks that completed evidence is current. A missing validity verdict fails closed; only an explicit `not-required` verdict skips freshness. `complete` records success only when the fresh fingerprint still matches the attempt baseline. It does not infer success from tests or from the transition. If inputs changed, start again, repeat the verification work against the new baseline, then complete. Details are in [change verification](../cli/change-verification.md).\n\nActive `changes status` reconciles before it renders. It may persist a recovery when it discovers invalidity. Draft status stays read-only. The status projection separates the active attempt from completed evidence and names the committed recovery, blockers, and the next command for the current phase.\n\n---\n\n## Approval gates\n\nspecd supports two optional human-approval gates. Both are disabled by default. When enabled, the change **stays in `ready` or `done`**. Approval is recorded in place; it is not a `change transition` into a parking state.\n\n### Spec approval gate\n\nBlocks `ready → implementing` until a human approves the spec artifacts. The change remains in `ready`.\n\nConsent covers both the canonical spec scope and the validated non-task artifact fingerprint. Adding or removing a spec invalidates that consent; reordering or duplicating the same IDs does not. Transitional manifests that lack the approved scope are readable but treated as stale `legacy-unknown` evidence.\n\n**Path when enabled:**\n\n```\nready  —(approve spec, still ready)—→  ready → implementing\n```\n\n**Enabling in `specd.yaml`:**\n\n```yaml\napprovals:\n  spec: true\n```\n\n**Performing the approval:**\n\n```bash\nspecd changes approve spec add-auth --reason \"Specs reviewed and approved — all requirements are clear\"\n```\n\nThe approver reviews the spec and verify artifacts in the change directory. The command records consent only from `ready` and leaves the change there. The approval stores an artifact fingerprint. Task artifacts are not part of that fingerprint. If a required approval later becomes stale or revoked, recovery follows [Validity and verification](#validity-and-verification): the change returns to `designing` only when it is already past `designing`.\n\n### Signoff gate\n\nBlocks `done → archivable` until a human signs off the completed work. The change remains in `done`.\n\n**Path when enabled:**\n\n```\ndone  —(approve signoff, still done)—→  done → archivable\n```\n\n**Enabling in `specd.yaml`:**\n\n```yaml\napprovals:\n  signoff: true\n```\n\n**Performing the signoff:**\n\n```bash\nspecd changes approve signoff add-auth --reason \"Implementation reviewed — all scenarios verified\"\n```\n\nThe command records consent only from `done` and leaves the change there. Sign-off stores a complete fingerprint, including an empty implementation map when no files are linked, and the completed verification id. Legacy unknown implementation evidence (`null`) cannot satisfy the gate until it is renewed.\n\nApproval renewal is append-only. A new approval or sign-off replaces the current materialized projection and appends a new event; it never deletes earlier pending-state transitions, approvals, sign-offs, or invalidations. Both commands continue to persist the privacy-decorated actor returned by the configured `ActorResolver`.\n\nBoth gates can be enabled simultaneously:\n\n```yaml\napprovals:\n  spec: true\n  signoff: true\n```\n\n---\n\n## Task completion gating\n\nThe transition from `implementing` to `verifying` is gated on task completion. This is the `workflow.taskCompletion` check on the **target** step (`verifying`), not a `requires` rule on `implementing`. The schema lists which artifacts participate via that step's `requiresTaskCompletion`; each of those artifacts declares `taskCompletionCheck`.\n\nThe default schema (`@specd/schema-std`) checks for unchecked checkbox lines in `tasks.md`:\n\n- **Incomplete pattern:** `^\\s*-\\s+\\[ \\]` — any `- [ ]` line blocks the transition.\n- **Complete pattern:** `^\\s*-\\s+\\[x\\]` — `- [x]` lines count toward completion.\n\nWhen you run `specd changes transition <name> verifying` and tasks remain incomplete, the CLI reports the current progress:\n\n```\n3/5 tasks complete — transition to verifying is blocked\n```\n\nMark tasks complete by changing `- [ ]` to `- [x]` in `tasks.md`. Once all tasks are checked, the transition is allowed.\n\nChecking tasks off does not invalidate approval or verification fingerprints. Artifacts marked `hasTasks` are operational state: they are excluded from those fingerprints and from automatic drift. A missing or invalid required task artifact, and incomplete live tasks, still block the transitions and archive that require them.\n\n---\n\n## Hooks\n\nHooks let you attach automated actions or AI guidance to lifecycle transitions. They are defined in the schema's `workflow` section and optionally extended in `specd.yaml` via `schemaOverrides`.\n\n### Pre and post hooks\n\n- **Pre hooks** run before the change enters a step (`to` = that step). If a pre hook fails with `onFailure: abort` (the default), the transition is blocked. When `onFailure: warn` is configured, non-zero exits are captured as non-fatal warnings without halting the transition. Pre `run:` hooks apply for any `along` classification, including redesign into `designing`.\n- **Post hooks** on the **source** step run only when the transition is classified as **forward** (`along = forward`) — leaving a step toward a later delivery state. Backward hops, redesign, and archive recovery do not run source `post` `run:` hooks. If a post hook fails after a forward persist, the transition is not rolled back.\n\n### Hook failure policies (`onFailure`)\n\nEvery `run:` and `external:` hook supports an optional `onFailure` policy:\n\n- **`abort` (default):** Any non-zero exit code halts hook execution immediately, prevents the state transition, and logs the process failure.\n- **`warn`:** Non-zero exit codes emit non-blocking warning diagnostics (`warnings[]`) and allow the transition pipeline to complete successfully.\n\n```yaml\nworkflow:\n  - step: implementing\n    hooks:\n      pre:\n        - id: optional-lint\n          run: pnpm lint\n          onFailure: warn\n```\n\nWhen shell hooks are long-running, SpecD keeps them observable while they are\nin flight. In human-facing `text` output, completed hooks remain visible,\nactive hooks show recent output plus a running indicator, and quiet hooks emit\nliveness updates. In `json` and `toon`, in-flight check/hook progress is\nemitted on **stdout** as NDJSON (`stream: \"change-transition\"` for\n`change transition`, `stream: \"change-archive\"` for `change archive`,\n`stream: \"hook-progress\"` for `change run-hooks`). The terminal record is a\n`complete` event on that command's stream. `stderr` is reserved for text-mode\nprogress, the transition Repair Guide, and non-structured diagnostics.\n\n### Hook types\n\n| Type           | Description                                                                               |\n| -------------- | ----------------------------------------------------------------------------------------- |\n| `run:`         | A shell command executed in the project root. Exit code behavior governed by `onFailure`. |\n| `instruction:` | An AI context block injected into the agent context for the step. Not directly runnable.  |\n| `external:`    | An explicit external hook dispatched to a registered external hook runner by `type`.      |\n\nAn `instruction:` hook provides guidance to an AI agent about what to do in that step. It is informational — it does not execute code. A `run:` hook executes a shell command through the internal `HookRunner`. An `external:` hook is routed to a separate `ExternalHookRunner` selected by `external.type`.\n\n```yaml\nworkflow:\n  - step: implementing\n    checks:\n      - id: '@security.code-scan'\n        skippable: true\n    hooks:\n      pre:\n        - id: run-lint\n          run: pnpm lint\n          onFailure: warn\n        - id: docker-test\n          external:\n            type: docker\n            config:\n              image: node:20\n              command: pnpm test\n      post:\n        - id: notify\n          run: echo \"Implementation started for {{change.name}}\"\n```\n\nExternal hooks use the same workflow phase semantics as shell hooks:\n\n- a failing `pre` external hook blocks the transition\n- a failing `post` external hook does not roll the state back\n- an unknown `external.type` is a hard error, not a silent skip\n\n### Template variables\n\nHook commands (`run:`) and instructions (`instruction:`) support dynamic template variable substitution:\n\n| Variable                  | Availability       | Description                                                              |\n| :------------------------ | :----------------- | :----------------------------------------------------------------------- |\n| `{{project.root}}`        | All hooks          | Absolute path to the repository root directory                           |\n| `{{change.name}}`         | All hooks          | The change's slug name (e.g. `add-auth`)                                 |\n| `{{change.path}}`         | All hooks          | Absolute path to the active change (or archive) directory                |\n| `{{change.archivedName}}` | Post-archive hooks | The timestamped archive directory name (e.g. `20260924-143511-add-auth`) |\n\n#### Substitution\n\n`{{...}}` is replaced with the value exactly as it is. SpecD does not add quotes around it. You write the quotes in the command, around the whole string you want:\n\n```yaml\nrun: echo \"Resultado: {{change.name}}\"\nrun: mkdir \"{{project.root}}/out/{{change.name}}\"\n```\n\n`{{change.name}}` is a kebab-case slug. `{{project.root}}` and `{{change.path}}` are absolute paths and can contain spaces, so quote the whole path. A value inserted into the middle of a path stays one path: `mkdir \"{{project.root}}/{{change.name}}\"` becomes `mkdir \"/repo/add-auth\"`.\n\n`instruction:` text is also substituted verbatim. It is not a shell command, so the quote translation below does not apply.\n\n#### Running on macOS, Linux, and Windows\n\nA `run:` command is a shell command. macOS and Linux run it with the absolute `$SHELL` or `/bin/sh`. Windows runs it with `cmd.exe`. SpecD does not translate program names, flags, or pipes (`mkdir -p`, `rm -rf`, `$(...)`).\n\nIt does translate quote syntax the host shell does not understand:\n\n| You write                     | On `$SHELL` or `/bin/sh`                  | On `cmd.exe`                         |\n| ----------------------------- | ----------------------------------------- | ------------------------------------ |\n| `mkdir '{{change.path}}'`     | unchanged, `sh` understands single quotes | `mkdir \"C:\\Users\\Ada Lovelace\\repo\"` |\n| `mkdir \"{{change.path}}\"`     | unchanged                                 | unchanged                            |\n| `echo \"Resultado: \"\"listo\"\"\"` | `echo \"Resultado: \\\"listo\\\"\"`             | unchanged                            |\n| `echo \"100%\"`                 | unchanged                                 | unchanged                            |\n\n`cmd.exe` still expands `%NAME%` even inside double quotes. SpecD does not rewrite `%`. If you want a literal percent on Windows, write it the way `cmd.exe` expects.\n\nWhen the hook must run different commands per operating system, put that choice in your own script and call the script from the hook:\n\n```yaml\nrun: node scripts/prepare-hook.js \"{{change.path}}\"\n```\n\nThe script decides what to run. SpecD will not rewrite it.\n\n### Hook execution order\n\nWhen a step is entered, schema-level hooks fire first, then any project-level hooks added via `schemaOverrides` in `specd.yaml`. Within each source, hooks run in the order they are declared.\n\n---\n\n## Drafting and discarding\n\nDrafting and discarding are sidebars to the main lifecycle — they do not affect the change's lifecycle state.\n\n### Drafting\n\nDrafting shelves a change temporarily without abandoning it.\n\n```bash\nspecd drafts move add-auth         # move to drafts/\nspecd drafts restore add-auth      # move back to changes/\n```\n\nA drafted change retains its current lifecycle state. When restored, it continues from where it left off. Drafting is useful when you need to context-switch to another change and want to keep the current work safely out of the way.\n\n**Guard:** When a change has previously reached the `implementing` state, drafting is blocked by default — the code and specs may be out of sync, and shelving without archival risks leaving partial implementation behind. If you are certain you want to draft anyway, use `--force`:\n\n```bash\nspecd changes draft add-auth --force\n```\n\n### Discarding\n\nDiscarding permanently abandons a change. A reason is required.\n\n```bash\nspecd discard add-auth --reason \"Approach superseded by add-oauth-flow\"\n```\n\nA discarded change is moved to the discarded directory and is never archived. This is permanent — there is no restore from discard. You can optionally name the change or changes that supersede it:\n\n```bash\nspecd discard add-auth --reason \"Superseded\" --superseded-by add-oauth-flow\n```\n\n**Guard:** When a change has previously reached the `implementing` state, discarding is blocked by default — code that has been implemented should ideally be archived, not silently abandoned. If you are certain you want to discard anyway, use `--force`:\n\n```bash\nspecd changes discard add-auth --reason \"No longer needed\" --force\n```\n\n---\n\n## Archiving\n\nArchiving is the final operation in the lifecycle. The change must be in `archivable`. When you run:\n\n```bash\nspecd changes archive <name>\n```\n\n### Phases and lifecycle state\n\nThe change stays in **`archivable`** through early archive work. It runs initial guards and pre-archive hooks, then refreshes implementation tracking, reconciles validity, reruns the guards, and builds the publication plan/full-batch preflight from that accepted post-hook state. It moves to **`archiving`** only immediately before the first canonical spec publication, after orphan backup detection and a per-spec batch snapshot under `.specd-archive-backup/` in each affected spec directory.\n\n| Phase                                | Lifecycle state | On failure                                                                                |\n| ------------------------------------ | --------------- | ----------------------------------------------------------------------------------------- |\n| Guards, pre-archive hooks, preflight | `archivable`    | Stays `archivable`; no backup dirs                                                        |\n| Orphan detection + batch snapshot    | `archivable`    | Stays `archivable` (matching orphan: auto-restore + abort with guidance)                  |\n| Canonical publication + archive move | `archiving`     | Batch restore; `→ archivable` if restore succeeds, stay `archiving` if restore is partial |\n| Metadata + post-archive hooks        | `archiving`     | Archive already committed; failures are reported but do not roll back specs               |\n\nPre-archive hooks use the workflow step name `archiving`; they do **not** require the change to already be in lifecycle state `archiving`.\n\nWhen overlap is explicitly allowed, archiving sends a `spec-overlap-conflict` intent to the central reconciler for every active peer. Each peer uses its own stored workflow policy and the project's enabled gates: an ungated `preserve` peer stays in place with blockers, while `redesign` or stale required spec consent may return that peer to `designing`. Archive never hard-codes that return.\n\n### Commit steps (after transition to `archiving`)\n\n1. **Canonical publication:** For each spec in the batch, delta artifacts are merged into the base spec in the repository (or full spec files are copied). Publication is staged per spec; created files are recorded for restore.\n2. **Archive move:** The change directory is moved to the archive. An `ArchivedChange` record is created with the change name, timestamp, and spec IDs.\n3. **Backup cleanup:** `.specd-archive-backup/` directories are removed after a successful commit.\n4. **Metadata generation:** Persisted `metadata.json` is written **after** the archive move (in-memory preflight checks still run earlier).\n5. **Post-archive hooks:** Optional hooks configured for the `archiving` workflow step.\n\n### Batch restore and retry\n\nIf publication fails partway through a multi-spec batch, specd restores already-published specs from the batch backup (reverse publication order) and rolls the change back to **`archivable`** when restore completes. Retry archive merges deltas against the restored canonical base — not against partially merged content.\n\nIf restore cannot complete for every spec, the change remains in **`archiving`**. `specd changes status` recommends transitioning to **`designing`** for manual recovery.\n\n### Orphan backups\n\nIf `.specd-archive-backup/` already exists when archive starts:\n\n- **Same change name** in the manifest: canonical specs are auto-restored, the backup is removed, and the current archive attempt aborts (review and retry).\n- **Different change name**: archive aborts with a repair message; live files are not overwritten.\n\n### Recovery transitions from `archiving`\n\n| Transition               | Purpose                                                                                                             |\n| ------------------------ | ------------------------------------------------------------------------------------------------------------------- |\n| `archiving → archivable` | Lifecycle rollback after you fixed canonical specs manually; does not re-run archive hooks                          |\n| `archiving → designing`  | Revise change artifacts (downgrades files to `pending-review`); use after partial restore or when specs need rework |\n\nTransitions to `implementing`, `verifying`, or `done` from `archiving` are not valid.\n\n### After a successful archive\n\nSpecs in the repository reflect the merged requirements. The change history is preserved under `.specd/archive/`. To rework merged specs, open a **new** change — the archived record is not transitioned back.\n\n---\n\n## Practical example: a full lifecycle with `/specd`\n\nHere is a complete lifecycle walkthrough for a change that adds an authentication feature, showing what the agent does at each step. In practice, you drive this through your coding assistant using the `/specd` skill — the agent handles transitions, artifact creation, and validation automatically.\n\n### 1. Starting — `/specd`\n\nYou open your coding assistant and type `/specd`. The skill shows the project status:\n\n```\n# specd\n\n**Schema:** @specd/schema-std\n**Workspaces:** default (8 specs)\n**Active changes:** none\n**Drafts:** none\n\nNo active changes. What would you like to work on?\n```\n\nYou describe what you want: \"I want to add login and logout authentication flows.\"\n\nThe skill suggests creating a change and invokes `/specd-new`.\n\n### 2. Creation — `/specd-new`\n\nThe agent has a discovery conversation with you — understanding the problem, discussing the approach, identifying affected specs, and reaching agreements about scope. Once the picture is clear, it creates the change:\n\n```bash\nspecd changes create add-auth --spec default:auth/login --spec default:auth/logout\n```\n\nBefore handing off, the agent writes a `specd-exploration.md` file to the change directory. This captures everything from the conversation — the problem, the agreed approach, design decisions, rejected alternatives, codebase observations, and open questions. It is the agent's working memory, persisted so that the next phase can pick up where you left off even in a different session. See [Exploration context](#exploration-context-specd-explorationmd) for details.\n\nState: `drafting` → the agent suggests running `/specd-design`.\n\n### 3. Designing — `/specd-design`\n\nThe agent loads the change state, the schema, and the compiled context. It also reads `specd-exploration.md` from the change directory to recover the full discovery context — if time has passed since creation, it verifies that referenced files and spec IDs still exist and flags any drift before proceeding.\n\nThis is the longest phase. The agent works through each artifact in dependency order. The artifacts below follow `@specd/schema-std` — other schemas may define a different set or order:\n\n**Step 3a: Proposal** — The agent writes `proposal.md`:\n\n- Explains the motivation (why the project needs authentication)\n- Describes the current behaviour (no auth exists)\n- Outlines the proposed solution at a high level\n- Lists the specs that will be created: `default:auth/login` and `default:auth/logout`\n- Notes the impact on existing code (new middleware, new routes)\n\nOnce written, the agent validates the proposal and marks it complete.\n\n**Step 3b: Specs** — The agent writes `spec.md` for each spec:\n\n- `specs/default/auth/login/spec.md` — Requirements for login: valid credentials return a session token, invalid credentials return a generic error, sessions expire after 24 hours, rate limiting on the endpoint\n- `specs/default/auth/logout/spec.md` — Requirements for logout: session is invalidated, subsequent requests are rejected\n\nEach spec uses SHALL/MUST language and groups requirements under `### Requirement:` headings.\n\n**Step 3c: Verify** — The agent writes `verify.md` for each spec:\n\n- `specs/default/auth/login/verify.md` — WHEN/THEN scenarios for each login requirement: valid credentials, invalid credentials, expired sessions, rate limit exceeded\n- `specs/default/auth/logout/verify.md` — WHEN/THEN scenarios for logout: successful invalidation, already-expired session\n\nEach scenario mirrors a requirement from `spec.md`.\n\n**Step 3d: Design** — The agent writes `design.md`:\n\n- Reads the proposal, specs, and verify files\n- Analyses the existing codebase with `specd graph search` and `specd graph impact` (see [Code Graph](./code-graph.md)) to identify affected areas, and records `HIGH` or `CRITICAL` risk in the design\n- Lists new constructs: `AuthService`, `SessionStore`, login/logout route handlers, auth middleware\n- Documents the approach, key decisions, and trade-offs\n- Maps every requirement and scenario to a concrete implementation path\n\n**Step 3e: Tasks** — The agent writes `tasks.md`:\n\n- Derives discrete tasks from `design.md`\n- Each task is a checkbox with indented context: which file, which symbol, what to change\n- Groups tasks logically (e.g., \"1. Session infrastructure\", \"2. Login flow\", \"3. Logout flow\", \"4. Tests\")\n\nOnce all five artifacts are complete and validated, the agent transitions to `ready`, then to `implementing`.\n\n### 4. Implementing — `/specd-implement`\n\nThe agent reads the compiled context for the `implementing` step — which includes the specs, design, and task list — and works through tasks one by one:\n\n```\n## 1. Session infrastructure\n- [x] 1.1 Create SessionStore interface\n      `src/auth/session-store.ts`: New interface — get, set, delete session\n      Approach: In-memory store with TTL from design.md\n      (Req: Sessions expire after 24 hours)\n\n- [x] 1.2 Implement InMemorySessionStore\n      `src/auth/in-memory-session-store.ts`: Implement SessionStore\n      Approach: Map<string, Session> with setTimeout cleanup\n\n## 2. Login flow\n- [x] 2.1 Create login handler\n      `src/auth/login.ts`: POST /login route handler\n      ...\n- [ ] 2.2 Add rate limiting middleware\n      `src/auth/rate-limit.ts`: ...\n```\n\nThe agent checks off each task as it completes the work. Pre/post hooks run at the step boundaries — for example, `pnpm test` runs after implementation.\n\nOnce all checkboxes are `[x]`, the agent transitions to `verifying`.\n\n### 5. Verifying — `/specd-verify`\n\nVerification is not the same as running tests. Tests check that code behaves as programmed — verification checks that the implementation satisfies the _requirements_. These are different questions:\n\n- **Not every project has tests.** Documentation changes, configuration changes, infrastructure work, early prototypes — many changes have no test suite at all. Verification still applies: the agent inspects the implementation against each scenario and confirms it holds.\n- **Tests can pass while requirements are missed.** A test suite exercises the code paths the developer thought to write. Verification scenarios come from the spec — they represent what was _agreed_ the system should do. A passing test suite does not guarantee that every requirement was addressed.\n- **Verification checks more than code.** The agent inspects the implementation holistically: does the code structure match the design? Were all tasks completed? Do the changes satisfy the GIVEN/WHEN/THEN conditions from `verify.md`? It runs tests where they exist, but also reads code, checks behaviour, and confirms edge cases that tests may not cover.\n\nThe agent reads each scenario from `verify.md` and confirms the implementation satisfies it — by inspecting code, running tests where applicable, and verifying GIVEN/WHEN/THEN conditions:\n\n```\n### Requirement: Valid credentials\n#### Scenario: Successful login\n- WHEN a user submits valid credentials\n- THEN they receive an authenticated session token\n→ ✓ Verified: login handler returns JWT on valid credentials\n\n#### Scenario: Invalid credentials\n- WHEN a user submits invalid credentials\n- THEN they receive a generic error with no field-specific information\n→ ✓ Verified: handler returns 401 with generic message\n```\n\n`/specd-verify` owns the attempt. It runs `specd changes verification start`, checks the scenarios, and runs `specd changes verification complete` only after that work succeeds. The transition into `verifying` does not start the attempt, and the transition to `done` does not complete it. If a scenario fails, or the inputs change, the agent fixes the issue, starts again, and repeats the checks against the new baseline before completing. A stale verification result does not move the lifecycle backward by itself.\n\nIn full mode, verify passes the same attempt explicitly to\n`/specd-compliance --change <name> --delegated --attempt <id>`. Delegated\ncompliance neither starts nor completes an attempt, but otherwise follows the\nordinary change-scoped path: status, project context, change specs, direct\ndependencies, merged `spec-preview` reads, the change's reports directory, and\nthe change-scoped filename. Independent compliance owns its own start/complete;\nproject-wide, diff, PR, single-spec, and selection modes are report-only.\n\nOnce completed evidence is current and every scenario passes, the agent transitions to `done`.\n\n### 6. Archiving — `/specd-archive`\n\nThe agent runs `specd changes archive add-auth`. specd:\n\n1. Syncs `spec.md` and `verify.md` into `specs/default/auth/login/` and `specs/default/auth/logout/`\n2. Applies any delta files to existing specs\n3. Generates metadata for each spec\n4. Moves the change directory to `.specd/archive/`\n\nThe specs are now permanent. The change is a historical record.\n\n### Redesign mid-lifecycle\n\nIf you discover during implementation that a requirement is wrong:\n\n```\n> The rate limiting should be per-IP, not global. Let's go back and fix the spec.\n```\n\nThe agent transitions back to `designing`. This changes the lifecycle and may reopen artifact review according to the transition effects. Current consent is represented by materialized projections: validity reconciliation marks affected approval or sign-off evidence stale/revoked and appends audit events; it does not erase prior approval history. A plain backward hop does not manufacture verification evidence or discard matching completed evidence.\n\nThe agent updates the spec, verify, design, and tasks, then works forward through the lifecycle again.\n\n---\n\n## Exploration context (`specd-exploration.md`)\n\nWhen an AI agent runs `/specd-new`, it has a discovery conversation with the user — understanding the problem, discussing approaches, identifying affected specs, and reaching agreements about scope and direction. All of this context is captured in a file called `specd-exploration.md`, written to the change directory (`<changePath>/specd-exploration.md`) before the agent hands off to `/specd-design`.\n\n### Why it exists\n\nDesign happens in a different session — often hours or days after creation. The agent that writes artifacts has no memory of the discovery conversation. Without a persistent record, it would need to start from scratch: ask the user to re-explain everything, or worse, guess based on the change name and one-line description alone.\n\n`specd-exploration.md` bridges this gap. It is the agent's working memory, persisted to disk so that any future session can pick up exactly where the conversation left off.\n\n### How it differs from `proposal.md`\n\nThey may look similar at first glance, but they serve fundamentally different purposes:\n\n|                              | `specd-exploration.md`                                                                                        | `proposal.md`                                                                     |\n| ---------------------------- | ------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |\n| **What it is**               | Agent working memory — raw conversation context                                                               | Formal schema artifact — structured document                                      |\n| **Who it's for**             | The AI agent in future sessions                                                                               | Humans and agents reviewing the change                                            |\n| **When it's written**        | During `/specd-new`, before any artifacts exist                                                               | During `/specd-design`, as the first artifact                                     |\n| **Part of the schema DAG?**  | No — it's outside the artifact pipeline                                                                       | Yes — other artifacts depend on it                                                |\n| **Validated?**               | No — no schema validation applies                                                                             | Yes — must pass schema validations                                                |\n| **Required by all schemas?** | Yes — every schema needs exploration context                                                                  | No — a schema can omit `proposal` entirely                                        |\n| **Content**                  | Everything discussed: rejected ideas, tangential topics, agreements, codebase observations, conversation flow | Curated: motivation, current behaviour, proposed solution, specs affected, impact |\n\nThe key distinction: **`proposal.md` is a schema artifact that a schema may or may not include.** A custom schema could replace `proposal` with a different first artifact, or skip it entirely and go straight to specs. But even without a proposal, the agent still needs to know what the user wants to build and why. That's what `specd-exploration.md` provides — it is schema-independent context that ensures continuity across sessions regardless of which artifacts the schema defines.\n\n### What it contains\n\nThe file captures everything from the discovery conversation:\n\n- **Problem statement** — what the user wants to achieve and why\n- **Approach / solution outline** — the agreed strategy\n- **Affected areas** — packages, modules, files, specs discussed\n- **Spec IDs** — attached to the change and mentioned as relevant\n- **Design decisions and agreements** — anything confirmed, rejected, or constrained\n- **Steps or plan** — if specific phases or ordering were agreed\n- **Rejected alternatives** — with reasons, so the agent doesn't re-propose them\n- **Open questions** — unresolved items for design to clarify\n- **Codebase observations** — file paths, patterns, current behaviour\n- **Tangential topics** — related issues, future ideas, things mentioned in passing\n- **Conversation flow** — how the discussion evolved\n\nEach item includes concrete anchors (file paths, spec IDs, function names) so the reader can verify whether they still hold, and reasons behind decisions so edge cases can be judged even if details have changed.\n\n### Staleness\n\nTime passes between exploration and design. Code changes, specs get renamed, decisions become outdated. The file includes a `Generated: YYYY-MM-DD` timestamp, and `/specd-design` performs a staleness check before trusting its content — verifying that referenced paths and spec IDs still exist, and flagging any significant drift to the user.\n\n---\n\n## Where to go next\n\n- [Schema format reference](../schemas/schema-format.md) — define custom workflow steps, artifacts, hooks, and task completion checks for your project.\n- [Configuration guide](configuration.md) — enable approval gates, configure workspaces, and add schema overrides.\n- [Code Graph](./code-graph.md) — search symbols, specs, and documents, and measure blast radius before design and implementation.\n- [CLI reference](../cli/cli-reference.md) — all `specd changes`, `specd drafts`, `specd discard`, and `specd archives` commands.\n- [Change verification](../cli/change-verification.md) — `verification start`, `complete`, and `invalidate`.\n- [Domain model](../core/domain-model.md) — the `Change`, `ChangeState`, `ChangeEvent`, and `ChangeArtifact` types returned by `@specd/core` use cases.\n",
+    "lineCount": 904,
+    "byteLength": 60206,
     "outline": [
       {
         "index": 1,
         "heading": "Change Lifecycle Guide",
         "level": 1,
         "startLine": 1,
-        "endLine": 816,
-        "lines": 816,
+        "endLine": 904,
+        "lines": 904,
         "startOffset": 0,
-        "endOffset": 53762
+        "endOffset": 59684
       },
       {
         "index": 2,
@@ -900,413 +900,503 @@ export const GUIDES_CATALOG: readonly GuideTopic[] = [
       },
       {
         "index": 18,
-        "heading": "Identity and audit trails",
+        "heading": "Skippable and disabled workflow steps",
         "level": 2,
         "startLine": 205,
-        "endLine": 228,
-        "lines": 24,
+        "endLine": 292,
+        "lines": 88,
         "startOffset": 15243,
-        "endOffset": 16559
+        "endOffset": 21164
       },
       {
         "index": 19,
-        "heading": "How identity is resolved",
+        "heading": "Topology invariants and rules",
         "level": 3,
-        "startLine": 209,
-        "endLine": 214,
-        "lines": 6,
-        "startOffset": 15555,
-        "endOffset": 15959
+        "startLine": 223,
+        "endLine": 233,
+        "lines": 11,
+        "startOffset": 15632,
+        "endOffset": 16957
       },
       {
         "index": 20,
-        "heading": "Privacy in public repositories",
+        "heading": "Optional-step decision table",
         "level": 3,
-        "startLine": 215,
-        "endLine": 228,
-        "lines": 14,
-        "startOffset": 15960,
-        "endOffset": 16559
+        "startLine": 234,
+        "endLine": 245,
+        "lines": 12,
+        "startOffset": 16958,
+        "endOffset": 18248
       },
       {
         "index": 21,
-        "heading": "Redesign: going back to designing",
-        "level": 2,
-        "startLine": 229,
-        "endLine": 242,
-        "lines": 14,
-        "startOffset": 16560,
-        "endOffset": 17804
+        "heading": "Shortcut transitions via `--next`",
+        "level": 3,
+        "startLine": 246,
+        "endLine": 258,
+        "lines": 13,
+        "startOffset": 18249,
+        "endOffset": 19121
       },
       {
         "index": 22,
-        "heading": "Validity and verification",
-        "level": 2,
-        "startLine": 243,
-        "endLine": 271,
-        "lines": 29,
-        "startOffset": 17805,
-        "endOffset": 21005
+        "heading": "Step-skip check semantics",
+        "level": 3,
+        "startLine": 259,
+        "endLine": 266,
+        "lines": 8,
+        "startOffset": 19122,
+        "endOffset": 19883
       },
       {
         "index": 23,
-        "heading": "Approval gates",
-        "level": 2,
-        "startLine": 272,
-        "endLine": 339,
-        "lines": 68,
-        "startOffset": 21006,
-        "endOffset": 23604
+        "heading": "Hook suppression",
+        "level": 3,
+        "startLine": 267,
+        "endLine": 273,
+        "lines": 7,
+        "startOffset": 19884,
+        "endOffset": 20263
       },
       {
         "index": 24,
-        "heading": "Spec approval gate",
+        "heading": "Workflow examples",
         "level": 3,
-        "startLine": 276,
-        "endLine": 302,
-        "lines": 27,
-        "startOffset": 21248,
-        "endOffset": 22444
+        "startLine": 274,
+        "endLine": 292,
+        "lines": 19,
+        "startOffset": 20264,
+        "endOffset": 21164
       },
       {
         "index": 25,
-        "heading": "Signoff gate",
-        "level": 3,
-        "startLine": 303,
-        "endLine": 339,
-        "lines": 37,
-        "startOffset": 22445,
-        "endOffset": 23604
+        "heading": "1. Documentation or spec-only changes (optional `implementing`)",
+        "level": 4,
+        "startLine": 276,
+        "endLine": 282,
+        "lines": 7,
+        "startOffset": 20287,
+        "endOffset": 20756
       },
       {
         "index": 26,
-        "heading": "Task completion gating",
-        "level": 2,
-        "startLine": 340,
-        "endLine": 360,
-        "lines": 21,
-        "startOffset": 23605,
-        "endOffset": 24882
+        "heading": "2. Rapid prototyping / Spikes (disabled `verifying`)",
+        "level": 4,
+        "startLine": 283,
+        "endLine": 292,
+        "lines": 10,
+        "startOffset": 20757,
+        "endOffset": 21164
       },
       {
         "index": 27,
-        "heading": "Hooks",
+        "heading": "Identity and audit trails",
         "level": 2,
-        "startLine": 361,
-        "endLine": 487,
-        "lines": 127,
-        "startOffset": 24883,
-        "endOffset": 31898
+        "startLine": 293,
+        "endLine": 316,
+        "lines": 24,
+        "startOffset": 21165,
+        "endOffset": 22481
       },
       {
         "index": 28,
-        "heading": "Pre and post hooks",
+        "heading": "How identity is resolved",
         "level": 3,
-        "startLine": 365,
-        "endLine": 369,
-        "lines": 5,
-        "startOffset": 25089,
-        "endOffset": 25815
+        "startLine": 297,
+        "endLine": 302,
+        "lines": 6,
+        "startOffset": 21477,
+        "endOffset": 21881
       },
       {
         "index": 29,
-        "heading": "Hook failure policies (`onFailure`)",
+        "heading": "Privacy in public repositories",
         "level": 3,
-        "startLine": 370,
-        "endLine": 396,
-        "lines": 27,
-        "startOffset": 25816,
-        "endOffset": 27037
+        "startLine": 303,
+        "endLine": 316,
+        "lines": 14,
+        "startOffset": 21882,
+        "endOffset": 22481
       },
       {
         "index": 30,
-        "heading": "Hook types",
-        "level": 3,
-        "startLine": 397,
-        "endLine": 434,
-        "lines": 38,
-        "startOffset": 27038,
-        "endOffset": 28627
+        "heading": "Redesign: going back to designing",
+        "level": 2,
+        "startLine": 317,
+        "endLine": 330,
+        "lines": 14,
+        "startOffset": 22482,
+        "endOffset": 23726
       },
       {
         "index": 31,
-        "heading": "Template variables",
-        "level": 3,
-        "startLine": 435,
-        "endLine": 481,
-        "lines": 47,
-        "startOffset": 28628,
-        "endOffset": 31675
+        "heading": "Validity and verification",
+        "level": 2,
+        "startLine": 331,
+        "endLine": 359,
+        "lines": 29,
+        "startOffset": 23727,
+        "endOffset": 26927
       },
       {
         "index": 32,
-        "heading": "Substitution",
-        "level": 4,
-        "startLine": 446,
-        "endLine": 458,
-        "lines": 13,
-        "startOffset": 29515,
-        "endOffset": 30210
+        "heading": "Approval gates",
+        "level": 2,
+        "startLine": 360,
+        "endLine": 427,
+        "lines": 68,
+        "startOffset": 26928,
+        "endOffset": 29526
       },
       {
         "index": 33,
-        "heading": "Running on macOS, Linux, and Windows",
-        "level": 4,
-        "startLine": 459,
-        "endLine": 481,
-        "lines": 23,
-        "startOffset": 30211,
-        "endOffset": 31675
+        "heading": "Spec approval gate",
+        "level": 3,
+        "startLine": 364,
+        "endLine": 390,
+        "lines": 27,
+        "startOffset": 27170,
+        "endOffset": 28366
       },
       {
         "index": 34,
-        "heading": "Hook execution order",
+        "heading": "Signoff gate",
         "level": 3,
-        "startLine": 482,
-        "endLine": 487,
-        "lines": 6,
-        "startOffset": 31676,
-        "endOffset": 31898
+        "startLine": 391,
+        "endLine": 427,
+        "lines": 37,
+        "startOffset": 28367,
+        "endOffset": 29526
       },
       {
         "index": 35,
-        "heading": "Drafting and discarding",
+        "heading": "Task completion gating",
         "level": 2,
-        "startLine": 488,
-        "endLine": 530,
-        "lines": 43,
-        "startOffset": 31899,
-        "endOffset": 33596
+        "startLine": 428,
+        "endLine": 448,
+        "lines": 21,
+        "startOffset": 29527,
+        "endOffset": 30804
       },
       {
         "index": 36,
-        "heading": "Drafting",
-        "level": 3,
-        "startLine": 492,
-        "endLine": 508,
-        "lines": 17,
-        "startOffset": 32038,
-        "endOffset": 32803
+        "heading": "Hooks",
+        "level": 2,
+        "startLine": 449,
+        "endLine": 575,
+        "lines": 127,
+        "startOffset": 30805,
+        "endOffset": 37820
       },
       {
         "index": 37,
-        "heading": "Discarding",
+        "heading": "Pre and post hooks",
         "level": 3,
-        "startLine": 509,
-        "endLine": 530,
-        "lines": 22,
-        "startOffset": 32804,
-        "endOffset": 33596
+        "startLine": 453,
+        "endLine": 457,
+        "lines": 5,
+        "startOffset": 31011,
+        "endOffset": 31737
       },
       {
         "index": 38,
-        "heading": "Archiving",
-        "level": 2,
-        "startLine": 531,
-        "endLine": 589,
-        "lines": 59,
-        "startOffset": 33597,
-        "endOffset": 38309
+        "heading": "Hook failure policies (`onFailure`)",
+        "level": 3,
+        "startLine": 458,
+        "endLine": 484,
+        "lines": 27,
+        "startOffset": 31738,
+        "endOffset": 32959
       },
       {
         "index": 39,
-        "heading": "Phases and lifecycle state",
+        "heading": "Hook types",
         "level": 3,
-        "startLine": 539,
-        "endLine": 553,
-        "lines": 15,
-        "startOffset": 33755,
-        "endOffset": 35722
+        "startLine": 485,
+        "endLine": 522,
+        "lines": 38,
+        "startOffset": 32960,
+        "endOffset": 34549
       },
       {
         "index": 40,
-        "heading": "Commit steps (after transition to `archiving`)",
+        "heading": "Template variables",
         "level": 3,
-        "startLine": 554,
-        "endLine": 561,
-        "lines": 8,
-        "startOffset": 35723,
-        "endOffset": 36481
+        "startLine": 523,
+        "endLine": 569,
+        "lines": 47,
+        "startOffset": 34550,
+        "endOffset": 37597
       },
       {
         "index": 41,
-        "heading": "Batch restore and retry",
-        "level": 3,
-        "startLine": 562,
-        "endLine": 567,
-        "lines": 6,
-        "startOffset": 36482,
-        "endOffset": 37002
+        "heading": "Substitution",
+        "level": 4,
+        "startLine": 534,
+        "endLine": 546,
+        "lines": 13,
+        "startOffset": 35437,
+        "endOffset": 36132
       },
       {
         "index": 42,
-        "heading": "Orphan backups",
-        "level": 3,
-        "startLine": 568,
-        "endLine": 574,
-        "lines": 7,
-        "startOffset": 37003,
-        "endOffset": 37344
+        "heading": "Running on macOS, Linux, and Windows",
+        "level": 4,
+        "startLine": 547,
+        "endLine": 569,
+        "lines": 23,
+        "startOffset": 36133,
+        "endOffset": 37597
       },
       {
         "index": 43,
-        "heading": "Recovery transitions from `archiving`",
+        "heading": "Hook execution order",
         "level": 3,
-        "startLine": 575,
-        "endLine": 583,
-        "lines": 9,
-        "startOffset": 37345,
-        "endOffset": 38063
+        "startLine": 570,
+        "endLine": 575,
+        "lines": 6,
+        "startOffset": 37598,
+        "endOffset": 37820
       },
       {
         "index": 44,
-        "heading": "After a successful archive",
-        "level": 3,
-        "startLine": 584,
-        "endLine": 589,
-        "lines": 6,
-        "startOffset": 38064,
-        "endOffset": 38309
+        "heading": "Drafting and discarding",
+        "level": 2,
+        "startLine": 576,
+        "endLine": 618,
+        "lines": 43,
+        "startOffset": 37821,
+        "endOffset": 39518
       },
       {
         "index": 45,
-        "heading": "Practical example: a full lifecycle with `/specd`",
-        "level": 2,
-        "startLine": 590,
-        "endLine": 757,
-        "lines": 168,
-        "startOffset": 38310,
-        "endOffset": 47884
+        "heading": "Drafting",
+        "level": 3,
+        "startLine": 580,
+        "endLine": 596,
+        "lines": 17,
+        "startOffset": 37960,
+        "endOffset": 38725
       },
       {
         "index": 46,
-        "heading": "1. Starting — `/specd`",
+        "heading": "Discarding",
         "level": 3,
-        "startLine": 594,
-        "endLine": 612,
-        "lines": 19,
-        "startOffset": 38663,
-        "endOffset": 39101
+        "startLine": 597,
+        "endLine": 618,
+        "lines": 22,
+        "startOffset": 38726,
+        "endOffset": 39518
       },
       {
         "index": 47,
-        "heading": "2. Creation — `/specd-new`",
-        "level": 3,
-        "startLine": 613,
-        "endLine": 624,
-        "lines": 12,
-        "startOffset": 39102,
-        "endOffset": 39980
+        "heading": "Archiving",
+        "level": 2,
+        "startLine": 619,
+        "endLine": 677,
+        "lines": 59,
+        "startOffset": 39519,
+        "endOffset": 44231
       },
       {
         "index": 48,
-        "heading": "3. Designing — `/specd-design`",
+        "heading": "Phases and lifecycle state",
         "level": 3,
-        "startLine": 625,
-        "endLine": 670,
-        "lines": 46,
-        "startOffset": 39981,
-        "endOffset": 42793
+        "startLine": 627,
+        "endLine": 641,
+        "lines": 15,
+        "startOffset": 39677,
+        "endOffset": 41644
       },
       {
         "index": 49,
-        "heading": "4. Implementing — `/specd-implement`",
+        "heading": "Commit steps (after transition to `archiving`)",
         "level": 3,
-        "startLine": 671,
-        "endLine": 697,
-        "lines": 27,
-        "startOffset": 42794,
-        "endOffset": 43825
+        "startLine": 642,
+        "endLine": 649,
+        "lines": 8,
+        "startOffset": 41645,
+        "endOffset": 42403
       },
       {
         "index": 50,
-        "heading": "5. Verifying — `/specd-verify`",
+        "heading": "Batch restore and retry",
         "level": 3,
-        "startLine": 698,
-        "endLine": 732,
-        "lines": 35,
-        "startOffset": 43826,
-        "endOffset": 46741
+        "startLine": 650,
+        "endLine": 655,
+        "lines": 6,
+        "startOffset": 42404,
+        "endOffset": 42924
       },
       {
         "index": 51,
-        "heading": "6. Archiving — `/specd-archive`",
+        "heading": "Orphan backups",
         "level": 3,
-        "startLine": 733,
-        "endLine": 743,
-        "lines": 11,
-        "startOffset": 46742,
-        "endOffset": 47134
+        "startLine": 656,
+        "endLine": 662,
+        "lines": 7,
+        "startOffset": 42925,
+        "endOffset": 43266
       },
       {
         "index": 52,
-        "heading": "Redesign mid-lifecycle",
+        "heading": "Recovery transitions from `archiving`",
         "level": 3,
-        "startLine": 744,
-        "endLine": 757,
-        "lines": 14,
-        "startOffset": 47135,
-        "endOffset": 47884
+        "startLine": 663,
+        "endLine": 671,
+        "lines": 9,
+        "startOffset": 43267,
+        "endOffset": 43985
       },
       {
         "index": 53,
-        "heading": "Exploration context (`specd-exploration.md`)",
-        "level": 2,
-        "startLine": 758,
-        "endLine": 807,
-        "lines": 50,
-        "startOffset": 47885,
-        "endOffset": 52951
+        "heading": "After a successful archive",
+        "level": 3,
+        "startLine": 672,
+        "endLine": 677,
+        "lines": 6,
+        "startOffset": 43986,
+        "endOffset": 44231
       },
       {
         "index": 54,
-        "heading": "Why it exists",
-        "level": 3,
-        "startLine": 762,
-        "endLine": 767,
-        "lines": 6,
-        "startOffset": 48338,
-        "endOffset": 48862
+        "heading": "Practical example: a full lifecycle with `/specd`",
+        "level": 2,
+        "startLine": 678,
+        "endLine": 845,
+        "lines": 168,
+        "startOffset": 44232,
+        "endOffset": 53806
       },
       {
         "index": 55,
-        "heading": "How it differs from `proposal.md`",
+        "heading": "1. Starting — `/specd`",
         "level": 3,
-        "startLine": 768,
-        "endLine": 783,
-        "lines": 16,
-        "startOffset": 48863,
-        "endOffset": 51537
+        "startLine": 682,
+        "endLine": 700,
+        "lines": 19,
+        "startOffset": 44585,
+        "endOffset": 45023
       },
       {
         "index": 56,
-        "heading": "What it contains",
+        "heading": "2. Creation — `/specd-new`",
         "level": 3,
-        "startLine": 784,
-        "endLine": 801,
-        "lines": 18,
-        "startOffset": 51538,
-        "endOffset": 52588
+        "startLine": 701,
+        "endLine": 712,
+        "lines": 12,
+        "startOffset": 45024,
+        "endOffset": 45902
       },
       {
         "index": 57,
-        "heading": "Staleness",
+        "heading": "3. Designing — `/specd-design`",
         "level": 3,
-        "startLine": 802,
-        "endLine": 807,
-        "lines": 6,
-        "startOffset": 52589,
-        "endOffset": 52951
+        "startLine": 713,
+        "endLine": 758,
+        "lines": 46,
+        "startOffset": 45903,
+        "endOffset": 48715
       },
       {
         "index": 58,
+        "heading": "4. Implementing — `/specd-implement`",
+        "level": 3,
+        "startLine": 759,
+        "endLine": 785,
+        "lines": 27,
+        "startOffset": 48716,
+        "endOffset": 49747
+      },
+      {
+        "index": 59,
+        "heading": "5. Verifying — `/specd-verify`",
+        "level": 3,
+        "startLine": 786,
+        "endLine": 820,
+        "lines": 35,
+        "startOffset": 49748,
+        "endOffset": 52663
+      },
+      {
+        "index": 60,
+        "heading": "6. Archiving — `/specd-archive`",
+        "level": 3,
+        "startLine": 821,
+        "endLine": 831,
+        "lines": 11,
+        "startOffset": 52664,
+        "endOffset": 53056
+      },
+      {
+        "index": 61,
+        "heading": "Redesign mid-lifecycle",
+        "level": 3,
+        "startLine": 832,
+        "endLine": 845,
+        "lines": 14,
+        "startOffset": 53057,
+        "endOffset": 53806
+      },
+      {
+        "index": 62,
+        "heading": "Exploration context (`specd-exploration.md`)",
+        "level": 2,
+        "startLine": 846,
+        "endLine": 895,
+        "lines": 50,
+        "startOffset": 53807,
+        "endOffset": 58873
+      },
+      {
+        "index": 63,
+        "heading": "Why it exists",
+        "level": 3,
+        "startLine": 850,
+        "endLine": 855,
+        "lines": 6,
+        "startOffset": 54260,
+        "endOffset": 54784
+      },
+      {
+        "index": 64,
+        "heading": "How it differs from `proposal.md`",
+        "level": 3,
+        "startLine": 856,
+        "endLine": 871,
+        "lines": 16,
+        "startOffset": 54785,
+        "endOffset": 57459
+      },
+      {
+        "index": 65,
+        "heading": "What it contains",
+        "level": 3,
+        "startLine": 872,
+        "endLine": 889,
+        "lines": 18,
+        "startOffset": 57460,
+        "endOffset": 58510
+      },
+      {
+        "index": 66,
+        "heading": "Staleness",
+        "level": 3,
+        "startLine": 890,
+        "endLine": 895,
+        "lines": 6,
+        "startOffset": 58511,
+        "endOffset": 58873
+      },
+      {
+        "index": 67,
         "heading": "Where to go next",
         "level": 2,
-        "startLine": 808,
-        "endLine": 816,
+        "startLine": 896,
+        "endLine": 904,
         "lines": 9,
-        "startOffset": 52952,
-        "endOffset": 53762
+        "startOffset": 58874,
+        "endOffset": 59684
       }
     ]
   },
@@ -2952,19 +3042,19 @@ export const GUIDES_CATALOG: readonly GuideTopic[] = [
     "title": "Workflow Schemas",
     "description": "Understanding and customizing development workflow schemas and lifecycle phases.",
     "order": 6,
-    "content": "# Schemas\n\nA schema defines the shape of your development workflow. It declares which artifact files exist, what order they are produced in, what rules govern them, and which extras (`requires`, task gates, hooks) attach to **existing** lifecycle states. It does not invent or delete those states — the Change protocol owns membership and legal hops.\n\nEvery SpecD project has exactly one active schema. You declare it in `specd.yaml` via the `schema` field:\n\n```yaml\nschema: '@specd/schema-std'\n```\n\nSpecD ships a standard schema — `@specd/schema-std` — that works for most projects. This guide explains what that schema does and how to adapt it to your needs.\n\n## The standard schema\n\n`@specd/schema-std` encodes the workflow: **proposal → specs → verify → design → tasks**. Five artifact types, a dependency graph between them, and a lifecycle that takes a change from idea to archived spec.\n\n### Artifacts\n\n#### 1. proposal (scope: change)\n\nThe proposal answers _why_ this change is needed. It is the entry point for every change — no other artifact can be written until a proposal exists.\n\nA proposal covers motivation, current behaviour, proposed solution, the list of specs that will be created or modified, affected code areas, and open questions. The \"Specs affected\" section is the contract that drives everything downstream: every spec listed there must eventually be covered by a `spec.md` file or a delta.\n\nProposals are working documents. They live in the change directory and are not archived into the spec repository — they describe intent, not permanent requirements.\n\n#### 2. specs (scope: spec)\n\nThe spec artifact (`spec.md`) defines _what_ the system should do. One spec file per capability. Specs use SHALL / MUST language, group requirements under `### Requirement: <name>` headings, and explicitly avoid WHEN/THEN scenarios (those belong in `verify.md`).\n\nUnlike `proposal.md`, specs are permanent. They are synced into the `specs/` directory when the change is archived and remain there as the authoritative record of requirements.\n\nSpecs also support delta files: instead of rewriting an existing spec, the agent produces a `.delta.yaml` that expresses the changes as structured operations (add, modify, remove a requirement). SpecD applies deltas deterministically at archive time.\n\nRequires: `proposal`\n\n#### 3. verify (scope: spec)\n\nThe verify artifact (`verify.md`) defines _how to confirm_ the spec is satisfied. It groups GIVEN/WHEN/THEN scenarios under `### Requirement: <name>` headings that mirror `spec.md` exactly. Each scenario describes a concrete check, not a restatement of the requirement.\n\nLike `spec.md`, verify files are permanent and synced to the spec directory at archive time.\n\nRequires: `specs`\n\n#### 4. design (scope: change)\n\nThe design document explains _how to implement_ the change. It analyses the codebase, lists affected files and symbols, defines new constructs with full signatures, documents the implementation approach, and maps every spec requirement and verify scenario to a concrete implementation path.\n\nDesign is a working document — it belongs to the change, not the permanent spec record. It is not optional, but its depth scales with the nature of the change: a large code refactor warrants detailed interface signatures; a documentation change warrants a content analysis.\n\nRequires: `proposal`, `specs`, `verify` — the agent reads all three before writing the design.\n\n#### 5. tasks (scope: change)\n\nTasks is the implementation checklist. Each task is a markdown checkbox (`- [ ]`) with indented context: which file, which symbol, what to change, and the specific approach from `design.md`. The agent works through tasks one by one and marks each complete (`- [x]`) as it goes.\n\nSpecD uses task completion to gate the transition from `implementing` to `verifying` — the transition is blocked while any `- [ ]` items remain. Checking off tasks does not change the artifact's hash (pre-hash cleanup normalises checkboxes), so progress tracking does not trigger re-validation.\n\nRequires: `specs`, `design` — the agent derives tasks from design.md and maps them back to spec requirements.\n\n### Dependency graph\n\n```\nproposal\n  ↓\nspecs\n  ↓\nverify\n  ↓\ndesign   (requires: proposal, specs, verify)\n  ↓\ntasks    (requires: specs, design)\n```\n\nThe graph is acyclic and enforced by SpecD. An artifact's status is `pending` until all of its `requires` are `complete` (or `skipped`, for optional ones). You cannot start writing `verify.md` before `spec.md` is complete; you cannot start design before verify is done; you cannot start tasks before design is done.\n\n## Artifact scope explained\n\nEvery artifact is either `scope: spec` or `scope: change`. This is the single most important property for understanding what survives a change.\n\n**`scope: spec`** — the artifact is a permanent part of the spec record. When a change is archived, SpecD syncs every `scope: spec` artifact from the change directory into the `specs/` repository. The `specd validate` command checks that every spec directory contains all required `scope: spec` artifacts. In the standard schema, `spec.md` and `verify.md` are `scope: spec`.\n\n**`scope: change`** — the artifact is a working document. It is validated during the change but never synced to the spec directory. `proposal.md`, `design.md`, and `tasks.md` are `scope: change` — they capture thinking and process, not permanent requirements.\n\nAt archive time the picture is:\n\n- The change's `specs/` subdirectory (new `spec.md` and `verify.md` files, or delta files) is applied to the spec repository.\n- `proposal.md`, `design.md`, and `tasks.md` remain in the change's archive directory as a record of the work, but they do not become part of the living spec.\n\n## Templates\n\nEach artifact type in `@specd/schema-std` ships with a template — a Markdown file used as scaffolding when the agent creates the artifact for the first time.\n\nSpecD performs template variable expansion across artifact `template`, `instruction`, `deltaInstruction`, and `rules` fields. The following variables are substituted dynamically:\n\n- `{{project.root}}` — Absolute path to the project root directory\n- `{{change.name}}` — The slug name of the active change\n- `{{change.path}}` — Absolute filesystem path to the active change directory\n\nHTML comments (`<!-- ... -->`) are preserved as-is and serve as guidance hints for the AI agent, pointing it toward intent, format requirements, and common pitfalls.\n\nHere is the shape of each template:\n\n**proposal.md** — opens with an HTML comment reminding the agent to focus on _why_, then provides sections for Motivation, Current behaviour, Proposed solution, Specs affected (split into New specs and Modified specs), Impact, and Open questions.\n\n**spec.md** — opens with an HTML comment on the SHALL/MUST convention and the prohibition on WHEN/THEN, then provides a Purpose section, a Requirements section with one placeholder `### Requirement:` heading, a Constraints section, and a Spec Dependencies section.\n\n**verify.md** — opens with a comment on the GIVEN/WHEN/THEN format and when to use AND/OR, then provides a structure with a `### Requirement:` heading and a `#### Scenario:` block with placeholders for GIVEN, WHEN, and THEN.\n\n**design.md** — opens with a comment on the required depth and concrete specificity, then provides sections for Non-goals, Affected areas, New constructs, Approach, Key decisions, Trade-offs, Migration/Rollback, Testing, and Open questions.\n\n**tasks.md** — opens with a comment on deriving tasks from design.md and including the approach inline, then provides two numbered task group sections with checkbox placeholders.\n\nTemplates can be replaced or extended when you extend or fork the schema. See [Customising your schema](#customising-your-schema) below.\n\n## Artifact rules\n\nEvery artifact can carry `instruction` text and `rules` blocks. These are injected into the AI context when the agent is working on that artifact.\n\n`instruction` is the main prompt for that artifact — what to write, how to structure it, and what to watch out for.\n\n`rules` are pre- and post-instruction blocks injected around the instruction:\n\n```yaml\n- id: tasks\n  scope: change\n  output: tasks.md\n  instruction: |\n    Create the implementation checklist...\n  rules:\n    pre:\n      - id: read-design-first\n        instruction: 'Read design.md in full before creating any tasks.'\n    post:\n      - id: design-tasks-coverage\n        instruction: |\n          Cross-reference design.md against the tasks just written.\n          Every item in Affected areas must map to at least one task.\n```\n\nIn the standard schema, every artifact has a post-rule that cross-references the previous artifact for coverage: proposals check open questions are resolved before proceeding; specs check every listed spec has a file; verify checks every requirement has a scenario; and so on.\n\n`requires` and `optional` control the dependency graph described above. A non-optional artifact cannot hard-depend on an optional one — that would make the non-optional artifact effectively optional too.\n\n## Workflow steps\n\nThe schema also defines the lifecycle phases a change moves through. In `@specd/schema-std`:\n\n| Step           | Requires (artifacts)                   |\n| -------------- | -------------------------------------- |\n| `designing`    | _(none — always available)_            |\n| `ready`        | proposal, specs, verify, design, tasks |\n| `implementing` | proposal, specs, verify, design, tasks |\n| `verifying`    | verify, tasks                          |\n| `archiving`    | specs, tasks                           |\n\nEach step is independently gated by its own `requires`. A step becomes available once all listed artifacts are complete.\n\nSteps can have `pre` and `post` hooks. Hooks are either instructions injected into the AI context or shell commands run at the phase boundary:\n\n```yaml\n- step: implementing\n  requires: [proposal, specs, verify, design, tasks]\n  hooks:\n    pre:\n      - id: implementing-guidance\n        instruction: |\n          Read all change artifacts before starting...\n    post:\n      - id: run-tests\n        run: 'pnpm test'\n```\n\n**Pre-hook failure** — if a `run:` hook exits non-zero, the step is aborted. The agent should fix the problem and retry.\n\n**Post-hook failure** — the step has already completed and is not rolled back. The user is prompted to continue with the remaining hooks or stop.\n\nShell hooks support template variables:\n\n| Variable           | Value                                                  |\n| ------------------ | ------------------------------------------------------ |\n| `{{change.name}}`  | The change's slug name                                 |\n| `{{change.path}}`  | Absolute path to the change directory                  |\n| `{{project.root}}` | Absolute path to the directory containing `specd.yaml` |\n\n## Customising your schema\n\nThere are three ways to customise schema behaviour, ranging from a single-line config change to a complete rewrite.\n\n### 1. schemaOverrides in specd.yaml\n\n`schemaOverrides` is the lightest-weight option. It modifies the active schema at load time without touching any file on disk. Use it for project-specific tweaks: an extra hook, an additional rule, a new artifact type that only this project needs.\n\nIt supports five operations:\n\n| Operation | Effect                                                                                   |\n| --------- | ---------------------------------------------------------------------------------------- |\n| `create`  | Adds a new entry (artifact, workflow step). Fails if the ID already exists.              |\n| `append`  | Appends entries to arrays (rules, hooks, metadataExtraction entries).                    |\n| `prepend` | Prepends entries to arrays.                                                              |\n| `set`     | Replaces scalar fields or whole array entries by identity.                               |\n| `remove`  | Removes entries from arrays by identity (`id` for artifacts, `step` for workflow steps). |\n\n**Example: add a post-implementing hook with onFailure policy and transition checks**\n\n```yaml\nschemaOverrides:\n  append:\n    workflow:\n      - step: implementing\n        checks:\n          - id: '@security.code-scan'\n            skippable: true\n            config:\n              minSeverity: critical\n        hooks:\n          post:\n            - id: run-tests\n              run: 'pnpm test'\n              onFailure: warn\n```\n\n**Example: add a rule to an existing artifact**\n\n```yaml\nschemaOverrides:\n  append:\n    artifacts:\n      - id: design\n        rules:\n          post:\n            - id: check-compliance\n              text: >-\n                Cross-reference this design against the global compliance spec before proceeding.\n```\n\n**Example: add a new artifact type (an ADR)**\n\n```yaml\nschemaOverrides:\n  create:\n    artifacts:\n      - id: adr\n        scope: spec\n        output: 'specs/**/adr.md'\n        optional: true\n        description: Architecture Decision Record\n        requires: [specs]\n```\n\n`schemaOverrides` is the right tool for:\n\n- Adding or removing hooks on existing workflow steps\n- Appending rules or instructions to existing artifacts\n- Adding a new artifact type that is unique to your project\n\n### 2. Extend — specd schema extend\n\n`specd schema extend` creates a new schema package that inherits from a parent and adds to it. The parent schema stays intact; the child schema describes only the delta. This is the right approach when you want to share a schema across multiple projects but each project needs additions.\n\n```sh\nspecd schema extend @specd/schema-std my-workflow\n```\n\nThe generated schema declares its parent and adds or modifies entries. Any artifact or workflow step from the parent is inherited as-is; you only declare what changes.\n\nUse extend when:\n\n- You want to add a new artifact type that multiple projects will share\n- You want to publish the customisation as a reusable plugin\n- The base schema stays structurally intact — you are adding, not restructuring\n\n### 3. Fork — specd schema fork\n\n`specd schema fork` makes a complete copy of a schema. You own every field. Use it when you need structural changes incompatible with the parent — different artifact ordering, renamed lifecycle steps, or a workflow that looks nothing like the original.\n\n```sh\nspecd schema fork @specd/schema-std custom-workflow\n```\n\nUse fork when:\n\n- You want to completely redesign the artifact dependency graph\n- You need to rename lifecycle steps\n- The base schema's structure would need to be dismantled more than extended\n\n### Choosing the right approach\n\n| Situation                                      | Approach          |\n| ---------------------------------------------- | ----------------- |\n| Add a hook after `implementing`                | `schemaOverrides` |\n| Add a rule to the `design` artifact            | `schemaOverrides` |\n| Add a new artifact type for this project only  | `schemaOverrides` |\n| Add a new artifact type shared across projects | extend            |\n| Publish schema additions as a reusable plugin  | extend            |\n| Rename lifecycle steps                         | fork              |\n| Restructure artifact dependencies from scratch | fork              |\n\n## Validation rules\n\nSchemas can declare structural validation rules for artifact content. Validations check that an artifact's AST matches the declared structure — for example, that `spec.md` always has a `## Requirements` section with at least one `### Requirement:` subsection.\n\nThe standard schema ships validations for `spec.md` and `verify.md` out of the box, so malformed artifacts fail before they can be archived.\n\nRules can also enforce **cardinality** (exactly N matches, min/max bounds) and **uniqueness** (no duplicate keys among selected nodes) via the `count` field.\n\nFor the full validation rule syntax and selector system, see [selectors.md](selectors.md).\n\n## Cross-artifact validation\n\nSchemas can also declare **relational** rules that compare multiple artifacts of the same spec. For example, that requirement IDs in `spec.md` and `verify.md` are always mirrored, or that every spec requirement is covered by a YAML model artifact.\n\nThese rules are declared in the top-level `crossArtifactValidations` array and are evaluated only after all participating artifacts pass their local structural validation.\n\nFor the full syntax, see the [schema format reference](../schemas/schema-format.md#crossartifactvalidations).\n\n## Metadata extraction\n\nSchemas also declare how to extract structured metadata from artifact content — titles, descriptions, requirements, scenarios, and dependency references. This extracted metadata is what `specd context` uses to compile the structured instruction block for the agent.\n\nFor the full extractor syntax, see [selectors.md](selectors.md).\n\n## Where to go next\n\n- [standard-schema.md](standard-schema.md) — complete reference for `@specd/schema-std` artifacts, DAG, and gates\n- [custom-schemas.md](custom-schemas.md) — authoring custom schemas, `schemaOverrides`, plugins, and forks\n- [selectors.md](selectors.md) — deep dive into selectors, extractors, and validation rules\n- [workflow.md](workflow.md) — lifecycle states, transitions, and approval gates\n- [docs/schemas/schema-format.md](../schemas/schema-format.md) — complete technical reference for the schema YAML format\n- [configuration.md](configuration.md) — `specd.yaml` reference, including `schemaOverrides` and `schemaPlugins`\n",
-    "lineCount": 331,
-    "byteLength": 17649,
+    "content": "# Schemas\n\nA schema defines the shape of your development workflow. It declares which artifact files exist, what order they are produced in, what rules govern them, and which extras (`requires`, task gates, hooks) attach to **existing** lifecycle states. It does not invent or delete those states — the Change protocol owns membership and legal hops.\n\nEvery SpecD project has exactly one active schema. You declare it in `specd.yaml` via the `schema` field:\n\n```yaml\nschema: '@specd/schema-std'\n```\n\nSpecD ships a standard schema — `@specd/schema-std` — that works for most projects. This guide explains what that schema does and how to adapt it to your needs.\n\n## The standard schema\n\n`@specd/schema-std` encodes the workflow: **proposal → specs → verify → design → tasks**. Five artifact types, a dependency graph between them, and a lifecycle that takes a change from idea to archived spec.\n\n### Artifacts\n\n#### 1. proposal (scope: change)\n\nThe proposal answers _why_ this change is needed. It is the entry point for every change — no other artifact can be written until a proposal exists.\n\nA proposal covers motivation, current behaviour, proposed solution, the list of specs that will be created or modified, affected code areas, and open questions. The \"Specs affected\" section is the contract that drives everything downstream: every spec listed there must eventually be covered by a `spec.md` file or a delta.\n\nProposals are working documents. They live in the change directory and are not archived into the spec repository — they describe intent, not permanent requirements.\n\n#### 2. specs (scope: spec)\n\nThe spec artifact (`spec.md`) defines _what_ the system should do. One spec file per capability. Specs use SHALL / MUST language, group requirements under `### Requirement: <name>` headings, and explicitly avoid WHEN/THEN scenarios (those belong in `verify.md`).\n\nUnlike `proposal.md`, specs are permanent. They are synced into the `specs/` directory when the change is archived and remain there as the authoritative record of requirements.\n\nSpecs also support delta files: instead of rewriting an existing spec, the agent produces a `.delta.yaml` that expresses the changes as structured operations (add, modify, remove a requirement). SpecD applies deltas deterministically at archive time.\n\nRequires: `proposal`\n\n#### 3. verify (scope: spec)\n\nThe verify artifact (`verify.md`) defines _how to confirm_ the spec is satisfied. It groups GIVEN/WHEN/THEN scenarios under `### Requirement: <name>` headings that mirror `spec.md` exactly. Each scenario describes a concrete check, not a restatement of the requirement.\n\nLike `spec.md`, verify files are permanent and synced to the spec directory at archive time.\n\nRequires: `specs`\n\n#### 4. design (scope: change)\n\nThe design document explains _how to implement_ the change. It analyses the codebase, lists affected files and symbols, defines new constructs with full signatures, documents the implementation approach, and maps every spec requirement and verify scenario to a concrete implementation path.\n\nDesign is a working document — it belongs to the change, not the permanent spec record. It is not optional, but its depth scales with the nature of the change: a large code refactor warrants detailed interface signatures; a documentation change warrants a content analysis.\n\nRequires: `proposal`, `specs`, `verify` — the agent reads all three before writing the design.\n\n#### 5. tasks (scope: change)\n\nTasks is the implementation checklist. Each task is a markdown checkbox (`- [ ]`) with indented context: which file, which symbol, what to change, and the specific approach from `design.md`. The agent works through tasks one by one and marks each complete (`- [x]`) as it goes.\n\nSpecD uses task completion to gate the transition from `implementing` to `verifying` — the transition is blocked while any `- [ ]` items remain. Checking off tasks does not change the artifact's hash (pre-hash cleanup normalises checkboxes), so progress tracking does not trigger re-validation.\n\nRequires: `specs`, `design` — the agent derives tasks from design.md and maps them back to spec requirements.\n\n### Dependency graph\n\n```\nproposal\n  ↓\nspecs\n  ↓\nverify\n  ↓\ndesign   (requires: proposal, specs, verify)\n  ↓\ntasks    (requires: specs, design)\n```\n\nThe graph is acyclic and enforced by SpecD. An artifact's status is `pending` until all of its `requires` are `complete` (or `skipped`, for optional ones). You cannot start writing `verify.md` before `spec.md` is complete; you cannot start design before verify is done; you cannot start tasks before design is done.\n\n## Artifact scope explained\n\nEvery artifact is either `scope: spec` or `scope: change`. This is the single most important property for understanding what survives a change.\n\n**`scope: spec`** — the artifact is a permanent part of the spec record. When a change is archived, SpecD syncs every `scope: spec` artifact from the change directory into the `specs/` repository. The `specd validate` command checks that every spec directory contains all required `scope: spec` artifacts. In the standard schema, `spec.md` and `verify.md` are `scope: spec`.\n\n**`scope: change`** — the artifact is a working document. It is validated during the change but never synced to the spec directory. `proposal.md`, `design.md`, and `tasks.md` are `scope: change` — they capture thinking and process, not permanent requirements.\n\nAt archive time the picture is:\n\n- The change's `specs/` subdirectory (new `spec.md` and `verify.md` files, or delta files) is applied to the spec repository.\n- `proposal.md`, `design.md`, and `tasks.md` remain in the change's archive directory as a record of the work, but they do not become part of the living spec.\n\n## Templates\n\nEach artifact type in `@specd/schema-std` ships with a template — a Markdown file used as scaffolding when the agent creates the artifact for the first time.\n\nSpecD performs template variable expansion across artifact `template`, `instruction`, `deltaInstruction`, and `rules` fields. The following variables are substituted dynamically:\n\n- `{{project.root}}` — Absolute path to the project root directory\n- `{{change.name}}` — The slug name of the active change\n- `{{change.path}}` — Absolute filesystem path to the active change directory\n\nHTML comments (`<!-- ... -->`) are preserved as-is and serve as guidance hints for the AI agent, pointing it toward intent, format requirements, and common pitfalls.\n\nHere is the shape of each template:\n\n**proposal.md** — opens with an HTML comment reminding the agent to focus on _why_, then provides sections for Motivation, Current behaviour, Proposed solution, Specs affected (split into New specs and Modified specs), Impact, and Open questions.\n\n**spec.md** — opens with an HTML comment on the SHALL/MUST convention and the prohibition on WHEN/THEN, then provides a Purpose section, a Requirements section with one placeholder `### Requirement:` heading, a Constraints section, and a Spec Dependencies section.\n\n**verify.md** — opens with a comment on the GIVEN/WHEN/THEN format and when to use AND/OR, then provides a structure with a `### Requirement:` heading and a `#### Scenario:` block with placeholders for GIVEN, WHEN, and THEN.\n\n**design.md** — opens with a comment on the required depth and concrete specificity, then provides sections for Non-goals, Affected areas, New constructs, Approach, Key decisions, Trade-offs, Migration/Rollback, Testing, and Open questions.\n\n**tasks.md** — opens with a comment on deriving tasks from design.md and including the approach inline, then provides two numbered task group sections with checkbox placeholders.\n\nTemplates can be replaced or extended when you extend or fork the schema. See [Customising your schema](#customising-your-schema) below.\n\n## Artifact rules\n\nEvery artifact can carry `instruction` text and `rules` blocks. These are injected into the AI context when the agent is working on that artifact.\n\n`instruction` is the main prompt for that artifact — what to write, how to structure it, and what to watch out for.\n\n`rules` are pre- and post-instruction blocks injected around the instruction:\n\n```yaml\n- id: tasks\n  scope: change\n  output: tasks.md\n  instruction: |\n    Create the implementation checklist...\n  rules:\n    pre:\n      - id: read-design-first\n        instruction: 'Read design.md in full before creating any tasks.'\n    post:\n      - id: design-tasks-coverage\n        instruction: |\n          Cross-reference design.md against the tasks just written.\n          Every item in Affected areas must map to at least one task.\n```\n\nIn the standard schema, every artifact has a post-rule that cross-references the previous artifact for coverage: proposals check open questions are resolved before proceeding; specs check every listed spec has a file; verify checks every requirement has a scenario; and so on.\n\n`requires` and `optional` control the dependency graph described above. A non-optional artifact cannot hard-depend on an optional one — that would make the non-optional artifact effectively optional too.\n\n## Workflow steps\n\nThe schema also defines the lifecycle phases a change moves through. In `@specd/schema-std`:\n\n| Step           | Requires (artifacts)                   |\n| -------------- | -------------------------------------- |\n| `designing`    | _(none — always available)_            |\n| `ready`        | proposal, specs, verify, design, tasks |\n| `implementing` | proposal, specs, verify, design, tasks |\n| `verifying`    | verify, tasks                          |\n| `archiving`    | specs, tasks                           |\n\nEach step is independently gated by its own `requires`. A step becomes available once all listed artifacts are complete.\n\nSteps can also declare topology flags:\n\n- **`optional: true`** — the step is skippable in the topology if its registered step-skip checks pass (e.g., bypassing `implementing` when no uncompleted tasks exist).\n- **`disabled: true`** — the step is completely excluded from the active pipeline and cannot be entered or targeted.\n\nBedrock states (`drafting`, `designing`, `done`, `archivable`, `archiving`) can never be disabled or marked optional. The `ready` delivery anchor cannot be disabled when the spec gate is enabled. Signoff gate configuration skips the `approval.signoff` check on `done -> archivable` when disabled without removing or bypassing `done`. See [workflow.md](workflow.md#skippable-and-disabled-workflow-steps) for full topology invariants and step-skip check semantics.\n\nOptional does not mean disabled. An optional step remains enterable. With no effective `step-skip` bindings its bypass is unconditional; with effective bindings it is conditional on all of them passing. Effective bindings are the composition of registry bindings and schema `skipChecks`, so YAML may omit `skipChecks` while Core still supplies a policy such as `workflow.tasksEmpty`. Core publishes the preferred target in `nextAction`; lifecycle skills do not choose between alternatives themselves.\n\nSteps can have `pre` and `post` hooks. Hooks are either instructions injected into the AI context or shell commands run at the phase boundary:\n\n```yaml\n- step: implementing\n  requires: [proposal, specs, verify, design, tasks]\n  hooks:\n    pre:\n      - id: implementing-guidance\n        instruction: |\n          Read all change artifacts before starting...\n    post:\n      - id: run-tests\n        run: 'pnpm test'\n```\n\n**Pre-hook failure** — if a `run:` hook exits non-zero, the step is aborted. The agent should fix the problem and retry.\n\n**Post-hook failure** — the step has already completed and is not rolled back. The user is prompted to continue with the remaining hooks or stop.\n\nShell hooks support template variables:\n\n| Variable           | Value                                                  |\n| ------------------ | ------------------------------------------------------ |\n| `{{change.name}}`  | The change's slug name                                 |\n| `{{change.path}}`  | Absolute path to the change directory                  |\n| `{{project.root}}` | Absolute path to the directory containing `specd.yaml` |\n\n## Customising your schema\n\nThere are three ways to customise schema behaviour, ranging from a single-line config change to a complete rewrite.\n\n### 1. schemaOverrides in specd.yaml\n\n`schemaOverrides` is the lightest-weight option. It modifies the active schema at load time without touching any file on disk. Use it for project-specific tweaks: an extra hook, an additional rule, a new artifact type that only this project needs.\n\nIt supports five operations:\n\n| Operation | Effect                                                                                   |\n| --------- | ---------------------------------------------------------------------------------------- |\n| `create`  | Adds a new entry (artifact, workflow step). Fails if the ID already exists.              |\n| `append`  | Appends entries to arrays (rules, hooks, metadataExtraction entries).                    |\n| `prepend` | Prepends entries to arrays.                                                              |\n| `set`     | Replaces scalar fields or whole array entries by identity.                               |\n| `remove`  | Removes entries from arrays by identity (`id` for artifacts, `step` for workflow steps). |\n\n**Example: add a post-implementing hook with onFailure policy and transition checks**\n\n```yaml\nschemaOverrides:\n  append:\n    workflow:\n      - step: implementing\n        checks:\n          - id: '@security.code-scan'\n            skippable: true\n            config:\n              minSeverity: critical\n        hooks:\n          post:\n            - id: run-tests\n              run: 'pnpm test'\n              onFailure: warn\n```\n\n**Example: add a rule to an existing artifact**\n\n```yaml\nschemaOverrides:\n  append:\n    artifacts:\n      - id: design\n        rules:\n          post:\n            - id: check-compliance\n              text: >-\n                Cross-reference this design against the global compliance spec before proceeding.\n```\n\n**Example: add a new artifact type (an ADR)**\n\n```yaml\nschemaOverrides:\n  create:\n    artifacts:\n      - id: adr\n        scope: spec\n        output: 'specs/**/adr.md'\n        optional: true\n        description: Architecture Decision Record\n        requires: [specs]\n```\n\n**Example: configure a workflow step as optional or disabled**\n\n```yaml\nschemaOverrides:\n  append:\n    workflow:\n      - step: implementing\n        optional: true # allows skipping implementing if tasks are complete or empty\n      - step: verifying\n        disabled: true # excludes verifying from pipeline for rapid prototyping\n```\n\n`schemaOverrides` is the right tool for:\n\n- Adding or removing hooks on existing workflow steps\n- Configuring workflow steps as `optional: true` or `disabled: true`\n- Appending rules or instructions to existing artifacts\n- Adding a new artifact type that is unique to your project\n\n### 2. Extend — specd schema extend\n\n`specd schema extend` creates a new schema package that inherits from a parent and adds to it. The parent schema stays intact; the child schema describes only the delta. This is the right approach when you want to share a schema across multiple projects but each project needs additions.\n\n```sh\nspecd schema extend @specd/schema-std my-workflow\n```\n\nThe generated schema declares its parent and adds or modifies entries. Any artifact or workflow step from the parent is inherited as-is; you only declare what changes.\n\nUse extend when:\n\n- You want to add a new artifact type that multiple projects will share\n- You want to publish the customisation as a reusable plugin\n- The base schema stays structurally intact — you are adding, not restructuring\n\n### 3. Fork — specd schema fork\n\n`specd schema fork` makes a complete copy of a schema. You own every field. Use it when you need structural changes incompatible with the parent — different artifact ordering, renamed lifecycle steps, or a workflow that looks nothing like the original.\n\n```sh\nspecd schema fork @specd/schema-std custom-workflow\n```\n\nUse fork when:\n\n- You want to completely redesign the artifact dependency graph\n- You need to rename lifecycle steps\n- The base schema's structure would need to be dismantled more than extended\n\n### Choosing the right approach\n\n| Situation                                      | Approach          |\n| ---------------------------------------------- | ----------------- |\n| Add a hook after `implementing`                | `schemaOverrides` |\n| Add a rule to the `design` artifact            | `schemaOverrides` |\n| Add a new artifact type for this project only  | `schemaOverrides` |\n| Add a new artifact type shared across projects | extend            |\n| Publish schema additions as a reusable plugin  | extend            |\n| Rename lifecycle steps                         | fork              |\n| Restructure artifact dependencies from scratch | fork              |\n\n## Validation rules\n\nSchemas can declare structural validation rules for artifact content. Validations check that an artifact's AST matches the declared structure — for example, that `spec.md` always has a `## Requirements` section with at least one `### Requirement:` subsection.\n\nThe standard schema ships validations for `spec.md` and `verify.md` out of the box, so malformed artifacts fail before they can be archived.\n\nRules can also enforce **cardinality** (exactly N matches, min/max bounds) and **uniqueness** (no duplicate keys among selected nodes) via the `count` field.\n\nFor the full validation rule syntax and selector system, see [selectors.md](selectors.md).\n\n## Cross-artifact validation\n\nSchemas can also declare **relational** rules that compare multiple artifacts of the same spec. For example, that requirement IDs in `spec.md` and `verify.md` are always mirrored, or that every spec requirement is covered by a YAML model artifact.\n\nThese rules are declared in the top-level `crossArtifactValidations` array and are evaluated only after all participating artifacts pass their local structural validation.\n\nFor the full syntax, see the [schema format reference](../schemas/schema-format.md#crossartifactvalidations).\n\n## Metadata extraction\n\nSchemas also declare how to extract structured metadata from artifact content — titles, descriptions, requirements, scenarios, and dependency references. This extracted metadata is what `specd context` uses to compile the structured instruction block for the agent.\n\nFor the full extractor syntax, see [selectors.md](selectors.md).\n\n## Where to go next\n\n- [standard-schema.md](standard-schema.md) — complete reference for `@specd/schema-std` artifacts, DAG, and gates\n- [custom-schemas.md](custom-schemas.md) — authoring custom schemas, `schemaOverrides`, plugins, and forks\n- [selectors.md](selectors.md) — deep dive into selectors, extractors, and validation rules\n- [workflow.md](workflow.md) — lifecycle states, transitions, and approval gates\n- [docs/schemas/schema-format.md](../schemas/schema-format.md) — complete technical reference for the schema YAML format\n- [configuration.md](configuration.md) — `specd.yaml` reference, including `schemaOverrides` and `schemaPlugins`\n",
+    "lineCount": 353,
+    "byteLength": 19349,
     "outline": [
       {
         "index": 1,
         "heading": "Schemas",
         "level": 1,
         "startLine": 1,
-        "endLine": 331,
-        "lines": 331,
+        "endLine": 353,
+        "lines": 353,
         "startOffset": 0,
-        "endOffset": 17557
+        "endOffset": 19253
       },
       {
         "index": 2,
@@ -3081,100 +3171,100 @@ export const GUIDES_CATALOG: readonly GuideTopic[] = [
         "heading": "Workflow steps",
         "level": 2,
         "startLine": 145,
-        "endLine": 185,
-        "lines": 41,
+        "endLine": 194,
+        "lines": 50,
         "startOffset": 9104,
-        "endOffset": 10888
+        "endOffset": 12181
       },
       {
         "index": 14,
         "heading": "Customising your schema",
         "level": 2,
-        "startLine": 186,
-        "endLine": 298,
-        "lines": 113,
-        "startOffset": 10889,
-        "endOffset": 15312
+        "startLine": 195,
+        "endLine": 320,
+        "lines": 126,
+        "startOffset": 12182,
+        "endOffset": 17008
       },
       {
         "index": 15,
         "heading": "1. schemaOverrides in specd.yaml",
         "level": 3,
-        "startLine": 190,
-        "endLine": 256,
-        "lines": 67,
-        "startOffset": 11034,
-        "endOffset": 13306
+        "startLine": 199,
+        "endLine": 278,
+        "lines": 80,
+        "startOffset": 12327,
+        "endOffset": 15002
       },
       {
         "index": 16,
         "heading": "2. Extend — specd schema extend",
         "level": 3,
-        "startLine": 257,
-        "endLine": 272,
+        "startLine": 279,
+        "endLine": 294,
         "lines": 16,
-        "startOffset": 13307,
-        "endOffset": 14094
+        "startOffset": 15003,
+        "endOffset": 15790
       },
       {
         "index": 17,
         "heading": "3. Fork — specd schema fork",
         "level": 3,
-        "startLine": 273,
-        "endLine": 286,
+        "startLine": 295,
+        "endLine": 308,
         "lines": 14,
-        "startOffset": 14095,
-        "endOffset": 14639
+        "startOffset": 15791,
+        "endOffset": 16335
       },
       {
         "index": 18,
         "heading": "Choosing the right approach",
         "level": 3,
-        "startLine": 287,
-        "endLine": 298,
+        "startLine": 309,
+        "endLine": 320,
         "lines": 12,
-        "startOffset": 14640,
-        "endOffset": 15312
+        "startOffset": 16336,
+        "endOffset": 17008
       },
       {
         "index": 19,
         "heading": "Validation rules",
         "level": 2,
-        "startLine": 299,
-        "endLine": 308,
+        "startLine": 321,
+        "endLine": 330,
         "lines": 10,
-        "startOffset": 15313,
-        "endOffset": 15987
+        "startOffset": 17009,
+        "endOffset": 17683
       },
       {
         "index": 20,
         "heading": "Cross-artifact validation",
         "level": 2,
-        "startLine": 309,
-        "endLine": 316,
+        "startLine": 331,
+        "endLine": 338,
         "lines": 8,
-        "startOffset": 15988,
-        "endOffset": 16550
+        "startOffset": 17684,
+        "endOffset": 18246
       },
       {
         "index": 21,
         "heading": "Metadata extraction",
         "level": 2,
-        "startLine": 317,
-        "endLine": 322,
+        "startLine": 339,
+        "endLine": 344,
         "lines": 6,
-        "startOffset": 16551,
-        "endOffset": 16907
+        "startOffset": 18247,
+        "endOffset": 18603
       },
       {
         "index": 22,
         "heading": "Where to go next",
         "level": 2,
-        "startLine": 323,
-        "endLine": 331,
+        "startLine": 345,
+        "endLine": 353,
         "lines": 9,
-        "startOffset": 16908,
-        "endOffset": 17557
+        "startOffset": 18604,
+        "endOffset": 19253
       }
     ]
   },
@@ -4750,29 +4840,29 @@ export const GUIDES_CATALOG: readonly GuideTopic[] = [
     "title": "Authoring Custom Schemas",
     "description": "Creating and publishing custom SpecD workflow schemas, extensions, and schema plugins.",
     "order": 12,
-    "content": "# Authoring Custom Schemas\n\nWhile `@specd/schema-std` fits most software engineering workflows, teams often need customized processes: adding Architecture Decision Records (ADRs), integrating security audits, enforcing database migration reviews, or custom validation rules.\n\nSpecD provides three progressive mechanisms to customize workflows:\n\n1. **`schemaOverrides`** in `specd.yaml` (lightweight inline customization)\n2. **`schemaPlugins`** (composable schema layers)\n3. **`specd schema extend` / `specd schema fork`** (custom schema packages)\n\n---\n\n## 1. Inline Customization with `schemaOverrides`\n\n`schemaOverrides` allows you to modify the active schema directly in `specd.yaml` without publishing a separate package.\n\nSupported operations:\n\n- `create`: Add new artifact types or workflow steps.\n- `append`: Add rules, hooks, or validators to existing lists.\n- `prepend`: Insert rules or hooks at the start of lists.\n- `set`: Replace fields or objects by key.\n- `remove`: Remove entries by `id` or `step`.\n\n### Example: Adding an ADR Artifact Type\n\n```yaml\n# specd.yaml\nschema: '@specd/schema-std'\n\nschemaOverrides:\n  create:\n    artifacts:\n      - id: adr\n        scope: spec\n        output: 'specs/**/adr.md'\n        optional: true\n        description: 'Architecture Decision Record for significant design choices'\n        requires:\n          - specs\n        template: |\n          # ADR: {{change.name}}\n\n          ## Context\n          ## Decision\n          ## Consequences\n```\n\n### Example: Adding Quality Gate Hooks\n\n```yaml\n# specd.yaml\nschemaOverrides:\n  append:\n    workflow:\n      - step: implementing\n        hooks:\n          post:\n            - id: run-typecheck\n              run: 'pnpm typecheck'\n            - id: run-unit-tests\n              run: 'pnpm test'\n```\n\n---\n\n## 2. Composable Schema Plugins (`schemaPlugins`)\n\nWhen multiple repositories share standard additions (e.g. corporate security rules, compliance checklists), you can package them as schema plugins.\n\n```yaml\n# specd.yaml\nschema: '@specd/schema-std'\n\nschemaPlugins:\n  - '@acme/specd-compliance-plugin'\n  - '@acme/specd-security-plugin'\n\nschemaOverrides:\n  # Local project overrides applied on top of plugins\n  append:\n    workflow:\n      - step: archiving\n        hooks:\n          pre:\n            - id: notify-slack\n              run: './scripts/notify.sh'\n```\n\nPlugins are applied in declaration order before `schemaOverrides`.\n\n---\n\n## 3. Creating Schema Packages (`extend` vs `fork`)\n\n### Extending a Schema (`specd schema extend`)\n\nUse `specd schema extend` when your custom workflow is based on an existing schema:\n\n```bash\nspecd schema extend @specd/schema-std my-workflow-schema\n```\n\nThis creates a new package where:\n\n- The base schema is declared as parent.\n- Only differences (new artifacts, modified rules) are specified.\n- Upstream updates to the parent schema are inherited automatically.\n\n### Forking a Schema (`specd schema fork`)\n\nUse `specd schema fork` when you need a fundamentally different workflow (e.g., non-code project, hardware spec workflow, or completely renamed lifecycle steps):\n\n```bash\nspecd schema fork @specd/schema-std standalone-schema\n```\n\nThis copies the entire schema definition, giving you full ownership of every artifact, rule, and lifecycle transition.\n\n---\n\n## Choosing the Right Approach\n\n| Use Case                                                         | Recommended Approach              |\n| :--------------------------------------------------------------- | :-------------------------------- |\n| Add a test hook or lint rule to your project                     | `schemaOverrides` in `specd.yaml` |\n| Add an optional project-specific artifact (e.g. `openapi.yaml`)  | `schemaOverrides`                 |\n| Share custom rules across multiple company repositories          | `schemaPlugins`                   |\n| Build an organization-wide standard based on `@specd/schema-std` | `specd schema extend`             |\n| Complete redesign of lifecycle states and dependencies           | `specd schema fork`               |\n",
-    "lineCount": 131,
-    "byteLength": 4059,
+    "content": "# Authoring Custom Schemas\n\nWhile `@specd/schema-std` fits most software engineering workflows, teams often need customized processes: adding Architecture Decision Records (ADRs), integrating security audits, enforcing database migration reviews, or custom validation rules.\n\nSpecD provides three progressive mechanisms to customize workflows:\n\n1. **`schemaOverrides`** in `specd.yaml` (lightweight inline customization)\n2. **`schemaPlugins`** (composable schema layers)\n3. **`specd schema extend` / `specd schema fork`** (custom schema packages)\n\n---\n\n## 1. Inline Customization with `schemaOverrides`\n\n`schemaOverrides` allows you to modify the active schema directly in `specd.yaml` without publishing a separate package.\n\nSupported operations:\n\n- `create`: Add new artifact types or workflow steps.\n- `append`: Add rules, hooks, or validators to existing lists.\n- `prepend`: Insert rules or hooks at the start of lists.\n- `set`: Replace fields or objects by key.\n- `remove`: Remove entries by `id` or `step`.\n\n### Example: Adding an ADR Artifact Type\n\n```yaml\n# specd.yaml\nschema: '@specd/schema-std'\n\nschemaOverrides:\n  create:\n    artifacts:\n      - id: adr\n        scope: spec\n        output: 'specs/**/adr.md'\n        optional: true\n        description: 'Architecture Decision Record for significant design choices'\n        requires:\n          - specs\n        template: |\n          # ADR: {{change.name}}\n\n          ## Context\n          ## Decision\n          ## Consequences\n```\n\n### Example: Adding Quality Gate Hooks\n\n```yaml\n# specd.yaml\nschemaOverrides:\n  append:\n    workflow:\n      - step: implementing\n        hooks:\n          post:\n            - id: run-typecheck\n              run: 'pnpm typecheck'\n            - id: run-unit-tests\n              run: 'pnpm test'\n```\n\n### Example: Making a Step Optional or Disabled\n\nYou can customize lifecycle step execution in `schemaOverrides` by setting `optional: true` (skippable if step-skip checks pass) or `disabled: true` (excluded from the active pipeline):\n\n```yaml\n# specd.yaml\nschemaOverrides:\n  append:\n    workflow:\n      - step: implementing\n        optional: true # can be bypassed for spec-only or doc-only changes\n      - step: verifying\n        disabled: true # excludes formal verification for fast prototyping\n```\n\nBedrock states (`drafting`, `designing`, `done`, `archivable`, `archiving`) can never be disabled or marked optional; attempting to set `optional: true` or `disabled: true` on any bedrock state fails schema validation. The `ready` delivery anchor cannot be disabled when `approvals.spec` is enabled, while signoff gate configuration skips the `approval.signoff` check on `done -> archivable` without altering topology. For full topology rules, see the [Workflow Guide](workflow.md#skippable-and-disabled-workflow-steps).\n\nThe four cases are distinct:\n\n| Declaration      | Effective skip checks | Default route                                                                        |\n| ---------------- | --------------------- | ------------------------------------------------------------------------------------ |\n| neither flag     | irrelevant            | the step is mandatory                                                                |\n| `optional: true` | none                  | Core recommends bypassing it unconditionally                                         |\n| `optional: true` | one or more           | Core recommends bypass only when all pass; otherwise it recommends entering the step |\n| `disabled: true` | none allowed          | the step is absent and cannot be entered                                             |\n\n“Effective” includes registry bindings supplied by Core or plugins, not only inline `skipChecks`. Skills never infer the route: they execute the `nextAction` selected by Core. Explicit entry into an optional step remains available even when Core recommends the shortcut.\n\n---\n\n## 2. Composable Schema Plugins (`schemaPlugins`)\n\nWhen multiple repositories share standard additions (e.g. corporate security rules, compliance checklists), you can package them as schema plugins.\n\n```yaml\n# specd.yaml\nschema: '@specd/schema-std'\n\nschemaPlugins:\n  - '@acme/specd-compliance-plugin'\n  - '@acme/specd-security-plugin'\n\nschemaOverrides:\n  # Local project overrides applied on top of plugins\n  append:\n    workflow:\n      - step: archiving\n        hooks:\n          pre:\n            - id: notify-slack\n              run: './scripts/notify.sh'\n```\n\nPlugins are applied in declaration order before `schemaOverrides`.\n\n---\n\n## 3. Creating Schema Packages (`extend` vs `fork`)\n\n### Extending a Schema (`specd schema extend`)\n\nUse `specd schema extend` when your custom workflow is based on an existing schema:\n\n```bash\nspecd schema extend @specd/schema-std my-workflow-schema\n```\n\nThis creates a new package where:\n\n- The base schema is declared as parent.\n- Only differences (new artifacts, modified rules) are specified.\n- Upstream updates to the parent schema are inherited automatically.\n\n### Forking a Schema (`specd schema fork`)\n\nUse `specd schema fork` when you need a fundamentally different workflow (e.g., non-code project, hardware spec workflow, or completely renamed lifecycle steps):\n\n```bash\nspecd schema fork @specd/schema-std standalone-schema\n```\n\nThis copies the entire schema definition, giving you full ownership of every artifact, rule, and lifecycle transition.\n\n---\n\n## Choosing the Right Approach\n\n| Use Case                                                         | Recommended Approach              |\n| :--------------------------------------------------------------- | :-------------------------------- |\n| Add a test hook or lint rule to your project                     | `schemaOverrides` in `specd.yaml` |\n| Make a step optional or disabled (e.g. skip implementing/verify) | `schemaOverrides` in `specd.yaml` |\n| Add an optional project-specific artifact (e.g. `openapi.yaml`)  | `schemaOverrides`                 |\n| Share custom rules across multiple company repositories          | `schemaPlugins`                   |\n| Build an organization-wide standard based on `@specd/schema-std` | `specd schema extend`             |\n| Complete redesign of lifecycle states and dependencies           | `specd schema fork`               |\n",
+    "lineCount": 160,
+    "byteLength": 6289,
     "outline": [
       {
         "index": 1,
         "heading": "Authoring Custom Schemas",
         "level": 1,
         "startLine": 1,
-        "endLine": 131,
-        "lines": 131,
+        "endLine": 160,
+        "lines": 160,
         "startOffset": 0,
-        "endOffset": 4059
+        "endOffset": 6285
       },
       {
         "index": 2,
         "heading": "1. Inline Customization with `schemaOverrides`",
         "level": 2,
         "startLine": 13,
-        "endLine": 66,
-        "lines": 54,
+        "endLine": 94,
+        "lines": 82,
         "startOffset": 553,
-        "endOffset": 1789
+        "endOffset": 3910
       },
       {
         "index": 3,
@@ -4789,60 +4879,70 @@ export const GUIDES_CATALOG: readonly GuideTopic[] = [
         "heading": "Example: Adding Quality Gate Hooks",
         "level": 3,
         "startLine": 49,
-        "endLine": 66,
-        "lines": 18,
+        "endLine": 64,
+        "lines": 16,
         "startOffset": 1488,
-        "endOffset": 1789
+        "endOffset": 1784
       },
       {
         "index": 5,
-        "heading": "2. Composable Schema Plugins (`schemaPlugins`)",
-        "level": 2,
-        "startLine": 67,
-        "endLine": 93,
-        "lines": 27,
-        "startOffset": 1790,
-        "endOffset": 2424
+        "heading": "Example: Making a Step Optional or Disabled",
+        "level": 3,
+        "startLine": 65,
+        "endLine": 94,
+        "lines": 30,
+        "startOffset": 1785,
+        "endOffset": 3910
       },
       {
         "index": 6,
-        "heading": "3. Creating Schema Packages (`extend` vs `fork`)",
+        "heading": "2. Composable Schema Plugins (`schemaPlugins`)",
         "level": 2,
-        "startLine": 94,
+        "startLine": 95,
         "endLine": 121,
-        "lines": 28,
-        "startOffset": 2425,
-        "endOffset": 3291
+        "lines": 27,
+        "startOffset": 3911,
+        "endOffset": 4545
       },
       {
         "index": 7,
-        "heading": "Extending a Schema (`specd schema extend`)",
-        "level": 3,
-        "startLine": 96,
-        "endLine": 109,
-        "lines": 14,
-        "startOffset": 2478,
-        "endOffset": 2892
+        "heading": "3. Creating Schema Packages (`extend` vs `fork`)",
+        "level": 2,
+        "startLine": 122,
+        "endLine": 149,
+        "lines": 28,
+        "startOffset": 4546,
+        "endOffset": 5412
       },
       {
         "index": 8,
-        "heading": "Forking a Schema (`specd schema fork`)",
+        "heading": "Extending a Schema (`specd schema extend`)",
         "level": 3,
-        "startLine": 110,
-        "endLine": 121,
-        "lines": 12,
-        "startOffset": 2893,
-        "endOffset": 3291
+        "startLine": 124,
+        "endLine": 137,
+        "lines": 14,
+        "startOffset": 4599,
+        "endOffset": 5013
       },
       {
         "index": 9,
+        "heading": "Forking a Schema (`specd schema fork`)",
+        "level": 3,
+        "startLine": 138,
+        "endLine": 149,
+        "lines": 12,
+        "startOffset": 5014,
+        "endOffset": 5412
+      },
+      {
+        "index": 10,
         "heading": "Choosing the Right Approach",
         "level": 2,
-        "startLine": 122,
-        "endLine": 131,
-        "lines": 10,
-        "startOffset": 3292,
-        "endOffset": 4059
+        "startLine": 150,
+        "endLine": 160,
+        "lines": 11,
+        "startOffset": 5413,
+        "endOffset": 6285
       }
     ]
   }

@@ -8,9 +8,16 @@
     "core:change",
     "core:get-status",
     "sdk:build-implementation-review",
-    "core:transition-checks"
+    "core:transition-checks",
+    "core:lifecycle-engine",
+    "core:resolve-change-schema"
   ],
-  "implementation": [],
+  "implementation": [
+    {
+      "file": "cli:src/commands/change/status.ts",
+      "symbols": ["registerChangeStatus"]
+    }
+  ],
   "optimizations": {
     "optimizedDescription": {
       "value": "Render read-only lifecycle, drift-aware artifact DAG, task progress, dependencies, and optional implementation review.",

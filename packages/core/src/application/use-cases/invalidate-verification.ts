@@ -9,6 +9,8 @@ import { type ActorResolver } from '../ports/actor-resolver.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
 import { type NextAction } from './get-status.js'
 import { type ReconcileChangeValidity } from './reconcile-change-validity.js'
+import { type ResolveChangeSchema } from '../services/resolve-change-schema.js'
+import { isWorkflowStepEnabled } from '../../domain/services/workflow-topology.js'
 
 /** Input for marking completed verification stale. */
 export interface InvalidateVerificationInput {
@@ -33,6 +35,7 @@ export interface InvalidateVerificationDeps {
   readonly changes: ChangeRepository
   readonly actor: ActorResolver
   readonly reconcileChangeValidity: ReconcileChangeValidity
+  readonly resolveChangeSchema: ResolveChangeSchema
 }
 
 /**
@@ -67,6 +70,12 @@ export class InvalidateVerification {
     if (current === null) {
       throw new ChangeNotFoundError(input.name)
     }
+    const { schema } = await this._deps.resolveChangeSchema.execute({
+      changeName: current.name,
+      schemaName: current.schemaName,
+      schemaVersion: current.schemaVersion,
+    })
+    const verifyingEnabled = isWorkflowStepEnabled('verifying', schema)
     const completed = current.verification.completed
     if (completed === undefined) {
       throw new VerificationNotFoundError(input.name)
@@ -85,7 +94,7 @@ export class InvalidateVerification {
         ),
         automaticReturn: observed.automaticReturn,
         blockers: observed.verdict.blockers,
-        nextAction: nextFrom(observed.change, observed.automaticReturn),
+        nextAction: nextFrom(observed.change, observed.automaticReturn, verifyingEnabled),
       }
     }
     const committed = await this._deps.reconcileChangeValidity.execute({
@@ -106,7 +115,7 @@ export class InvalidateVerification {
       signoffChanged: committed.projectionChanges.some((change) => change.projection === 'signoff'),
       automaticReturn: committed.automaticReturn,
       blockers: committed.verdict.blockers,
-      nextAction: nextFrom(committed.change, committed.automaticReturn),
+      nextAction: nextFrom(committed.change, committed.automaticReturn, verifyingEnabled),
     }
   }
 }
@@ -116,17 +125,23 @@ export class InvalidateVerification {
  *
  * @param change - change
  * @param recovery - recovery
+ * @param verifyingEnabled - whether the change schema enables verifying
  * @returns next from result
  */
-function nextFrom(change: Change, recovery: AutomaticRecovery | null): NextAction {
+function nextFrom(
+  change: Change,
+  recovery: AutomaticRecovery | null,
+  verifyingEnabled: boolean,
+): NextAction {
   if (recovery === null) {
     const verificationBoundary =
-      change.state === 'verifying' ||
-      change.state === 'done' ||
-      change.state === 'pending-signoff' ||
-      change.state === 'signed-off' ||
-      change.state === 'archivable' ||
-      change.state === 'archiving'
+      verifyingEnabled &&
+      (change.state === 'verifying' ||
+        change.state === 'done' ||
+        change.state === 'pending-signoff' ||
+        change.state === 'signed-off' ||
+        change.state === 'archivable' ||
+        change.state === 'archiving')
     return {
       targetStep: change.state,
       actionType: 'mechanical',

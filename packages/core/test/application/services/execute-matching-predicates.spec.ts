@@ -6,6 +6,7 @@ import {
 import {
   CHECK_LABELS,
   fail,
+  resolveEffectiveBindings,
   type Check,
   type CheckBinding,
 } from '../../../src/domain/services/transition-checks.js'
@@ -306,7 +307,15 @@ describe('executeMatchingPredicates', () => {
       checkRegistry: registry,
     })
 
-    const result = await executeMatchingPredicates([binding], ctx, { checkRegistry: registry })
+    const resolved = resolveEffectiveBindings({
+      baseBindings: [binding],
+      schema,
+      targetStep: 'ready',
+      from: 'designing',
+      along: 'forward',
+      registry,
+    })
+    const result = await executeMatchingPredicates(resolved, ctx, { checkRegistry: registry })
 
     expect(result.allowed).toBe(true)
     expect(capturedConfig).toEqual({
@@ -401,11 +410,243 @@ describe('executeMatchingPredicates', () => {
       approvals: { spec: false, signoff: false },
     })
 
-    const result = await executeMatchingPredicates([binding], ctx)
+    const resolved = resolveEffectiveBindings({
+      baseBindings: [binding],
+      schema: schemaWithDisabledCheck,
+      targetStep: 'verifying',
+      from: 'implementing',
+      along: 'forward',
+    })
+    const result = await executeMatchingPredicates(resolved, ctx)
 
     // Check should NOT have been executed
     expect(executed).toBe(false)
     expect(result.allowed).toBe(true)
     expect(result.checks).toHaveLength(0)
+  })
+
+  describe('single-pass config cascade', () => {
+    function arrayCheck(
+      id: string,
+      capture: (config: Record<string, unknown> | undefined) => void,
+    ) {
+      const check: Check = {
+        id,
+        label: 'Array Check',
+        kind: 'predicate',
+        execute: async (ctx) => {
+          capture(ctx.config)
+          return { id, label: 'Array Check', kind: 'predicate', outcome: 'pass' }
+        },
+      }
+      return check
+    }
+
+    it('concatenates arrays exactly once through resolveEffectiveBindings and the executor', async () => {
+      let captured: Record<string, unknown> | undefined
+      const registry = new CheckRegistry()
+      registry.register(
+        'qa',
+        {
+          id: 'arrays',
+          label: 'Array Check',
+          execute: async () => ({
+            id: '@qa.arrays',
+            label: 'x',
+            kind: 'predicate',
+            outcome: 'pass',
+          }),
+        },
+        undefined,
+        { defaultConfig: { tags: ['default'] } },
+      )
+      const check = arrayCheck('@qa.arrays', (config) => {
+        captured = config
+      })
+      const binding = makeBinding(
+        check,
+        [{ scope: 'transition', from: 'designing', to: 'ready', along: 'forward' }],
+        { config: { tags: ['a'] } },
+      )
+      const schema = makeSchema({
+        workflow: [
+          {
+            step: 'ready',
+            requires: [],
+            requiresTaskCompletion: [],
+            hooks: { pre: [], post: [] },
+            checks: [{ id: '@qa.arrays', config: { tags: ['b'] } }],
+          },
+        ],
+      })
+      const ctx = buildCheckExecutionContext({
+        change: makeChange(),
+        schema,
+        attempt: { scope: 'transition', from: 'designing', to: 'ready', along: 'forward' },
+        approvals: { spec: false, signoff: false },
+        checkRegistry: registry,
+      })
+      const resolved = resolveEffectiveBindings({
+        baseBindings: [binding],
+        schema,
+        targetStep: 'ready',
+        from: 'designing',
+        along: 'forward',
+        registry,
+      })
+
+      await executeMatchingPredicates(resolved, ctx, { checkRegistry: registry })
+
+      expect(captured).toEqual({ tags: ['default', 'a', 'b'] })
+    })
+
+    it('merges check default and binding config once for unresolved bindings', async () => {
+      let captured: Record<string, unknown> | undefined
+      const registry = new CheckRegistry()
+      registry.register(
+        'qa',
+        {
+          id: 'plain',
+          label: 'Plain',
+          execute: async () => ({
+            id: '@qa.plain',
+            label: 'x',
+            kind: 'predicate',
+            outcome: 'pass',
+          }),
+        },
+        undefined,
+        { defaultConfig: { tags: ['default'] } },
+      )
+      const check = arrayCheck('@qa.plain', (config) => {
+        captured = config
+      })
+      const binding = makeBinding(
+        check,
+        [{ scope: 'transition', from: 'designing', to: 'ready', along: 'forward' }],
+        { config: { tags: ['a'] } },
+      )
+      const ctx = buildCheckExecutionContext({
+        change: makeChange(),
+        schema: makeSchema(),
+        attempt: { scope: 'transition', from: 'designing', to: 'ready', along: 'forward' },
+        approvals: { spec: false, signoff: false },
+        checkRegistry: registry,
+      })
+
+      await executeMatchingPredicates([binding], ctx, { checkRegistry: registry })
+
+      expect(captured).toEqual({ tags: ['default', 'a'] })
+    })
+  })
+
+  describe('step-declared checks honor from and along', () => {
+    function setup(
+      decl: { from?: 'designing' | 'implementing' | '*'; along?: 'forward' | 'any' },
+      attempt: 'forward' | 'redesign',
+    ) {
+      const execute = vi.fn(async () => ({
+        id: '@qa.step' as const,
+        label: 'Step',
+        kind: 'predicate' as const,
+        outcome: 'pass' as const,
+      }))
+      const registry = new CheckRegistry()
+      registry.register('qa', {
+        id: 'step',
+        label: 'Step',
+        execute,
+      })
+      const schema = makeSchema({
+        workflow: [
+          {
+            step: 'ready',
+            requires: [],
+            requiresTaskCompletion: [],
+            hooks: { pre: [], post: [] },
+            checks: [{ id: '@qa.step', ...decl }],
+          },
+        ],
+      })
+      const ctx = buildCheckExecutionContext({
+        change: makeChange(),
+        schema,
+        attempt: { scope: 'transition', from: 'designing', to: 'ready', along: attempt },
+        approvals: { spec: false, signoff: false },
+        checkRegistry: registry,
+      })
+      const run = () =>
+        executeMatchingPredicates(
+          resolveEffectiveBindings({
+            baseBindings: [],
+            schema,
+            targetStep: 'ready',
+            from: 'designing',
+            along: attempt,
+            registry,
+          }),
+          ctx,
+          { checkRegistry: registry },
+        )
+      return { execute, ctx, registry, run }
+    }
+
+    it('runs by default only on forward hops', async () => {
+      const forward = setup({}, 'forward')
+      await forward.run()
+      expect(forward.execute).toHaveBeenCalledOnce()
+
+      const redesign = setup({}, 'redesign')
+      await redesign.run()
+      expect(redesign.execute).not.toHaveBeenCalled()
+    })
+
+    it('skips declarations whose from does not match the source state', async () => {
+      const { execute, run } = setup({ from: 'implementing' }, 'forward')
+      await run()
+      expect(execute).not.toHaveBeenCalled()
+    })
+
+    it('runs declarations with an explicit matching from and along any', async () => {
+      const { execute, run } = setup({ from: 'designing', along: 'any' }, 'redesign')
+      await run()
+      expect(execute).toHaveBeenCalledOnce()
+    })
+
+    it('does not execute step declarations when the runner receives no resolved bindings', async () => {
+      const { execute, ctx, registry } = setup({}, 'forward')
+      const result = await executeMatchingPredicates([], ctx, { checkRegistry: registry })
+      expect(execute).not.toHaveBeenCalled()
+      expect(result.checks).toHaveLength(0)
+    })
+  })
+  it('emits check-done with a skip outcome when the user bypasses a check', async () => {
+    const execute = vi.fn()
+    const check: Check = {
+      id: '@qa.bypassed',
+      label: 'Bypassed',
+      kind: 'predicate',
+      execute,
+    }
+    const binding = makeBinding(check, [
+      { scope: 'transition', from: 'designing', to: 'ready', along: 'forward' },
+    ])
+    const events: unknown[] = []
+    const ctx = buildCheckExecutionContext({
+      change: makeChange(),
+      schema: makeSchema(),
+      attempt: { scope: 'transition', from: 'designing', to: 'ready', along: 'forward' },
+      approvals: { spec: false, signoff: false },
+      skipChecks: ['@qa.bypassed'],
+      onCheckProgress: (event) => events.push(event),
+    })
+
+    const result = await executeMatchingPredicates([binding], ctx)
+
+    expect(execute).not.toHaveBeenCalled()
+    expect(result.checks[0]).toMatchObject({ outcome: 'skip', details: { bypassedByUser: true } })
+    expect(events).toContainEqual(
+      expect.objectContaining({ type: 'check-done', id: '@qa.bypassed', outcome: 'skip' }),
+    )
   })
 })

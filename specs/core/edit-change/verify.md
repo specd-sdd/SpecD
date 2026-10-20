@@ -246,12 +246,6 @@ Scenarios:
 
 ### Requirement: Schema compatibility guardrail
 
-#### Scenario: Uninitialized spec fallback allows addition if global schema matches change
-
-- **GIVEN** a spec with no persisted semantic state
-- **WHEN** the spec is included in `addSpecIds` on a change using the global project schema
-- **THEN** the edit succeeds
-
 #### Scenario: Adding a spec with identical schema succeeds
 
 - **GIVEN** a spec whose persisted schema identity matches the Change's schema name
@@ -271,3 +265,39 @@ Scenarios:
 - **AND** the Change uses `schema-ui` (no compat mapping to `schema-api`)
 - **WHEN** the spec is included in `addSpecIds`
 - **THEN** the use case throws `IncompatibleSchemaError` and the change is not modified
+
+#### Scenario: Uninitialized spec is compatible without consulting the global schema
+
+- **GIVEN** a change whose `schemaName` is `custom-workflow`
+- **AND** an added spec with no persisted semantic state
+- **AND** a workspace default schema that is incompatible with `custom-workflow`
+- **WHEN** `EditChange` validates the added spec
+- **THEN** the spec is accepted as compatible
+- **AND** `GetActiveSchema` and the workspace default are never consulted
+
+### Requirement: Sovereign schema resolution
+
+#### Scenario: Added-spec compatibility ignores a different workspace default
+
+- **GIVEN** a change whose `schemaName` is `custom-workflow`
+- **AND** the workspace default is another schema with incompatible compatibility declarations
+- **WHEN** `EditChange` validates an added spec
+- **THEN** it calls `SchemaProvider.get('custom-workflow')`
+- **AND** decides compatibility using the custom schema only
+
+#### Scenario: Serialized reconciliation owns artifact topology
+
+- **GIVEN** the fresh change loaded inside `ChangeRepository.mutate` records `schemaName: 'custom-workflow'`
+- **AND** the workspace default exposes a different artifact DAG
+- **WHEN** `EditChange` applies the canonical scope edit
+- **THEN** it updates the fresh entity through `replaceSpecIds()` and invokes `ctx.reconcileAfter()`
+- **AND** it does not call `updateSpecIds()` or perform a second direct `SchemaProvider.get()` lookup
+- **AND** the reconciler determines artifact topology and validity from the fresh persisted change
+
+#### Scenario: Schema resolution failure leaves scope unchanged
+
+- **GIVEN** the serialized mutation callback has invoked `replaceSpecIds()` on the fresh aggregate
+- **WHEN** `ctx.reconcileAfter()` then rejects
+- **THEN** the corresponding error propagates
+- **AND** no partial scope mutation is persisted
+- **AND** persisted spec IDs, history, artifact topology, and validity remain unchanged

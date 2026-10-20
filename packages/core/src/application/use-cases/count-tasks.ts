@@ -2,6 +2,7 @@ import { type Change } from '../../domain/entities/change.js'
 import { safeRegex } from '../../domain/services/safe-regex.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
 import { type SchemaProvider } from '../ports/schema-provider.js'
+import { ResolveChangeSchema } from '../services/resolve-change-schema.js'
 
 /** Completed, incomplete, and total task counts. */
 export interface TaskCompletionStatus {
@@ -20,15 +21,21 @@ export interface CountTasksResult {
 }
 /** Reads task-capable artifacts and aggregates their checkbox counts. */
 export class CountTasks {
+  private readonly _resolveChangeSchema: ResolveChangeSchema
+
   /**
    * Creates the query.
    * @param _changes - Change content repository.
    * @param _schemaProvider - Active schema provider.
+   * @param resolveChangeSchema - Shared change schema resolver.
    */
   constructor(
     private readonly _changes: ChangeRepository,
     private readonly _schemaProvider: SchemaProvider,
-  ) {}
+    resolveChangeSchema?: ResolveChangeSchema,
+  ) {
+    this._resolveChangeSchema = resolveChangeSchema ?? new ResolveChangeSchema(_schemaProvider)
+  }
   /**
    * Counts task items.
    * @param input - Change to inspect.
@@ -38,7 +45,11 @@ export class CountTasks {
     const byArtifact: Record<string, TaskCompletionStatus> = {}
     let complete = 0
     let incomplete = 0
-    const schema = await this._schemaProvider.get()
+    const { schema } = await this._resolveChangeSchema.execute({
+      changeName: input.change.name,
+      schemaName: input.change.schemaName,
+      schemaVersion: input.change.schemaVersion,
+    })
     for (const type of schema.artifacts()) {
       const check = type.taskCompletionCheck
       const artifact = input.change.getArtifact(type.id)

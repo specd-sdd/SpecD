@@ -6,6 +6,7 @@ import { type ApprovalGates } from '../../application/use-cases/transition-chang
 import { type ReconcileChangeValidity } from '../../application/use-cases/reconcile-change-validity.js'
 import { type ValidityFingerprintService } from '../../application/services/validity-fingerprint-service.js'
 import { ApproveSpec } from '../../application/use-cases/approve-spec.js'
+import { type ResolveChangeSchema } from '../../application/services/resolve-change-schema.js'
 import { type SpecdConfig } from '../../application/specd-config.js'
 import {
   createCompositionResolver,
@@ -32,6 +33,8 @@ export interface ApproveSpecDeps {
   readonly reconcile: ReconcileChangeValidity
   /** Shared artifact fingerprint collector. */
   readonly fingerprint: ValidityFingerprintService
+  /** Shared change schema resolver. */
+  readonly resolveChangeSchema?: ResolveChangeSchema
 }
 
 /**
@@ -49,6 +52,7 @@ export function resolveApproveSpecDeps(resolver: CompositionResolver): ApproveSp
     approvals: resolver.config.approvals,
     reconcile: resolver.getReconcileChangeValidity(),
     fingerprint: resolver.getValidityFingerprintService(),
+    resolveChangeSchema: resolver.getResolveChangeSchema(),
   }
 }
 
@@ -100,8 +104,24 @@ function createApproveSpecFromNormalized(
   input: FactoryInput<ApproveSpecDeps, CompositionResolutionOptions>,
 ): ApproveSpec {
   if (input.kind === 'deps') {
-    const { changes, actor, schemaProvider, approvals, reconcile, fingerprint } = input.deps
-    return new ApproveSpec(changes, actor, schemaProvider, approvals, reconcile, fingerprint)
+    const {
+      changes,
+      actor,
+      schemaProvider,
+      approvals,
+      reconcile,
+      fingerprint,
+      resolveChangeSchema,
+    } = input.deps
+    return new ApproveSpec(
+      changes,
+      actor,
+      schemaProvider,
+      approvals,
+      reconcile,
+      fingerprint,
+      resolveChangeSchema,
+    )
   }
 
   const resolver = createCompositionResolver(input.config, input.options)

@@ -100,4 +100,38 @@ describe('generated skill protocol parity', () => {
       expect(decisionTable(generated), `${copyRoot}/specd-compliance`).toEqual(expected)
     }
   })
+
+  it('keeps schema-aware routing and bypassed-hook suppression in every lifecycle skill copy', () => {
+    for (const skill of ['specd-design', 'specd-implement', 'specd-verify', 'specd-archive']) {
+      const source = readFileSync(
+        join(packageRoot, 'templates', 'skills', skill, 'SKILL.md.tpl'),
+        'utf8',
+      )
+      for (const phrase of ['nextAction.command', 'lifecycle.availableTransitions', 'bypassed']) {
+        expect(source, `${skill} template`).toContain(phrase)
+        for (const copyRoot of copies) {
+          expect(readRepo(copyRoot, skill, 'SKILL.md'), `${copyRoot}/${skill}`).toContain(phrase)
+        }
+      }
+    }
+  })
+
+  describe('semantic routing invariants for generated lifecycle skills', () => {
+    it('all installed copies mandate preferred default recommendation and explicit target validation', () => {
+      for (const skill of [
+        'specd-design',
+        'specd-implement',
+        'specd-verify',
+        'specd-archive',
+      ] as const) {
+        for (const copyRoot of copies) {
+          const generated = readRepo(copyRoot, skill, 'SKILL.md')
+          expect(generated, `${copyRoot}/${skill}`).toContain('preferred default recommendation')
+          expect(generated, `${copyRoot}/${skill}`).toContain('lifecycle.availableTransitions')
+          expect(generated, `${copyRoot}/${skill}`).toMatch(/When explicitly\s+invoked/)
+          expect(generated, `${copyRoot}/${skill}`).toContain('stop before running any hooks')
+        }
+      }
+    })
+  })
 })

@@ -12,3 +12,15 @@ export {
   type SpecdContextEntry,
   isSpecdConfig,
 } from './specd-config.js'
+export {
+  ResolveChangeSchema,
+  type ResolveChangeSchemaInput,
+  type ResolvedChangeSchema,
+  type ChangeSchemaAdvisory,
+  type ChangeSchemaVersionAdvisory,
+} from './services/resolve-change-schema.js'
+export {
+  evaluateTransitionCandidate,
+  type TransitionCandidateEvaluationInput,
+  type TransitionCandidateEvaluation,
+} from './services/evaluate-transition-candidate.js'

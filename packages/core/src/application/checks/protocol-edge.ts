@@ -40,7 +40,14 @@ class ProtocolEdgeCheck extends WorkflowCheck {
     if (ctx.attempt.scope !== 'transition') {
       return Promise.resolve(skip('protocol.edge'))
     }
-    return Promise.resolve(runProtocolEdge({ from: ctx.attempt.from, to: ctx.attempt.to }))
+    return Promise.resolve(
+      runProtocolEdge({
+        from: ctx.attempt.from,
+        to: ctx.attempt.to,
+        schema: ctx.schema,
+        ...(ctx.approvals !== undefined ? { approvals: ctx.approvals } : {}),
+      }),
+    )
   }
 }
 

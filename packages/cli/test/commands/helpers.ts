@@ -295,6 +295,14 @@ export function makeMockKernel(overrides: Record<string, unknown> = {}): TestKer
     discard: { execute: vi.fn() },
     archive: { execute: vi.fn() },
     validate: { execute: vi.fn() },
+    // The change schema defaults to whatever `specs.getActiveSchema` is mocked to return,
+    // so tests configure one schema fixture for both paths.
+    resolveSchema: {
+      execute: vi.fn(async () => {
+        const active = (await specs.getActiveSchema.execute()) as { schema: unknown }
+        return { schema: active.schema, warnings: [] }
+      }),
+    },
     edit: { execute: vi.fn() },
     skipArtifact: { execute: vi.fn() },
     compile: { execute: vi.fn() },

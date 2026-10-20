@@ -22,6 +22,16 @@ function stripTerminalControlSequences(text: string): string {
 }
 
 /**
+ * Whether a check id is a hook effect (`hook.pre` / `hook.post`).
+ *
+ * @param id - Check id
+ * @returns True for hook effects
+ */
+function isHookCheck(id: string): boolean {
+  return id === 'hook.pre' || id === 'hook.post'
+}
+
+/**
  * Creates a presenter that renders `check-start` / `check-progress` / `check-done`
  * for transition and archive CLI commands.
  *
@@ -39,13 +49,29 @@ function stripTerminalControlSequences(text: string): string {
  * @param options.format - Output format
  * @param options.streamName - Structured stream discriminator
  * @param options.stream - Destination write stream
+ * @param options.skipChecks - Check ids bypassed with `--skip-checks` (text skip reasons)
+ * @param options.skipHooks - Whether any hook phase is skipped with `--skip-hooks`
  * @returns Presenter that accepts check progress events
  */
 export function createCheckProgressPresenter(options: {
   format: OutputFormat
   streamName: CheckProgressStreamName
   stream: NodeJS.WriteStream
+  skipChecks?: ReadonlySet<string>
+  skipHooks?: boolean
 }): CheckProgressPresenter {
+  const completed = new Set<string>()
+  const suppressed = new Set<string>()
+  const pending = new Set<string>()
+  let hookRan = false
+  let recheckLabelled = false
+
+  const skipReason = (event: Extract<CheckProgressEvent, { type: 'check-done' }>): string => {
+    if (isHookCheck(event.id) && options.skipHooks === true) return '--skip-hooks'
+    if (options.skipChecks?.has(event.id) === true) return '--skip-checks'
+    return event.reason ?? 'not applicable'
+  }
+
   const writeStructured = (event: CheckProgressEvent): void => {
     options.stream.write(
       `${serializeOutput({ stream: options.streamName, event }, options.format)}\n`,
@@ -95,15 +121,40 @@ export function createCheckProgressPresenter(options: {
 
       switch (event.type) {
         case 'check-start':
+          if (completed.has(event.id)) {
+            // A repeated check id is the post-hook re-check: hide it unless a hook ran.
+            if (!hookRan) {
+              suppressed.add(event.id)
+              return
+            }
+            if (!recheckLabelled) {
+              recheckLabelled = true
+              options.stream.write('Re-checking after hooks\n')
+            }
+          }
+          pending.add(event.id)
           options.stream.write(`${event.label} (${event.id})\n`)
           return
         case 'check-progress':
+          if (suppressed.has(event.id)) return
           writeProgressLine(event)
           return
         case 'check-done': {
+          const wasStarted = pending.delete(event.id)
+          if (suppressed.delete(event.id)) return
+          // A repeated skip row without a start is still the hidden re-check.
+          if (!wasStarted && completed.has(event.id) && !hookRan) return
+          completed.add(event.id)
+          if (isHookCheck(event.id) && event.outcome !== 'skip') {
+            hookRan = true
+          }
           if (event.outcome === 'fail') {
             const reason = event.reason !== undefined ? `: ${event.reason}` : ''
             options.stream.write(`✗ ${event.label}${reason}\n`)
+            return
+          }
+          if (event.outcome === 'skip') {
+            options.stream.write(`⊘ ${event.label} (skipped: ${skipReason(event)})\n`)
             return
           }
           options.stream.write(`✓ ${event.label}\n`)

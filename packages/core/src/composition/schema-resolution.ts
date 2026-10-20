@@ -78,6 +78,8 @@ export function createResolveSchemaForConfig(
     config.schemaRef,
     config.schemaPlugins ?? [],
     config.schemaOverrides,
+    undefined,
+    config.approvals,
   )
 }
 

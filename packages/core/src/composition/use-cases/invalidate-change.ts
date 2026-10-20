@@ -1,6 +1,7 @@
 import { type ActorResolver } from '../../application/ports/actor-resolver.js'
 import { type ChangeRepository } from '../../application/ports/change-repository.js'
 import { type SchemaProvider } from '../../application/ports/schema-provider.js'
+import { type ResolveChangeSchema } from '../../application/services/resolve-change-schema.js'
 import { InvalidateChange } from '../../application/use-cases/invalidate-change.js'
 import { type ReconcileChangeValidity } from '../../application/use-cases/reconcile-change-validity.js'
 import { type SpecdConfig } from '../../application/specd-config.js'
@@ -21,8 +22,12 @@ export interface InvalidateChangeDeps {
   readonly actor: ActorResolver
   /** Schema provider used by the use case. */
   readonly schemaProvider: SchemaProvider
+  /** Shared change schema resolver. */
+  readonly resolveChangeSchema?: ResolveChangeSchema
   /** Canonical reconciler for this invalidation. */
   readonly reconcile: ReconcileChangeValidity
+  /** Configured approval gates used to route the post-invalidation next action. */
+  readonly approvals?: { readonly spec: boolean; readonly signoff: boolean }
 }
 
 /**
@@ -36,7 +41,9 @@ export function resolveInvalidateChangeDeps(resolver: CompositionResolver): Inva
     changes: resolver.getChangeRepository(),
     actor: resolver.getActorResolver(),
     schemaProvider: resolver.getSchemaProvider(),
+    resolveChangeSchema: resolver.getResolveChangeSchema(),
     reconcile: resolver.getReconcileChangeValidity(),
+    approvals: resolver.config.approvals,
   }
 }
 
@@ -88,8 +95,15 @@ function createInvalidateChangeFromNormalized(
   input: FactoryInput<InvalidateChangeDeps, CompositionResolutionOptions>,
 ): InvalidateChange {
   if (input.kind === 'deps') {
-    const { changes, actor, schemaProvider, reconcile } = input.deps
-    return new InvalidateChange(changes, actor, schemaProvider, reconcile)
+    const { changes, actor, schemaProvider, reconcile, resolveChangeSchema, approvals } = input.deps
+    return new InvalidateChange(
+      changes,
+      actor,
+      schemaProvider,
+      reconcile,
+      resolveChangeSchema,
+      approvals,
+    )
   }
 
   const resolver = createCompositionResolver(input.config, input.options)

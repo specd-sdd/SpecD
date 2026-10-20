@@ -44,7 +44,7 @@ export function resolveReconcileChangeValidityDeps(
 ): ReconcileChangeValidityDeps {
   return {
     changes: resolver.getChangeRepository(),
-    schemaProvider: resolver.getSchemaProvider(),
+    resolveChangeSchema: resolver.getResolveChangeSchema(),
     actor: resolver.getActorResolver(),
     refreshImplementationTracking: resolver.getRefreshImplementationTracking(),
     fingerprint: resolver.getValidityFingerprintService(),
@@ -122,6 +122,7 @@ export function resolveStartVerificationDeps(resolver: CompositionResolver): Sta
     implementationChecks: registry.transitionBindings
       .map((binding) => binding.check)
       .filter((check) => check.id === 'impl.filesResolved' || check.id === 'impl.linksInScope'),
+    resolveChangeSchema: resolver.getResolveChangeSchema(),
   }
 }
 
@@ -245,6 +246,7 @@ export function resolveInvalidateVerificationDeps(
     changes: resolver.getChangeRepository(),
     actor: resolver.getActorResolver(),
     reconcileChangeValidity: resolver.getReconcileChangeValidity(),
+    resolveChangeSchema: resolver.getResolveChangeSchema(),
   }
 }
 

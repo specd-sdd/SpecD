@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import { type SchemaProvider } from '../../../src/application/ports/schema-provider.js'
 import { CountTasks } from '../../../src/application/use-cases/count-tasks.js'
 import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
 import { buildSchema } from '../../../src/domain/services/build-schema.js'
@@ -13,8 +14,50 @@ import {
 } from './helpers.js'
 
 describe('CountTasks', () => {
+  it('resolves task declarations from the change sovereign schema', async () => {
+    const change = makeChange('sovereign-count', { schemaName: 'custom-workflow' })
+    const checklist = new ChangeArtifact({ type: 'checklist' })
+    checklist.setFile(new ArtifactFile({ key: 'checklist', filename: 'checklist.md' }))
+    change.setArtifact(checklist)
+    const repo = makeChangeRepository([change])
+    repo.artifact = async () => new SpecArtifact('checklist.md', '- [x] done\n- [ ] open\n')
+    const sovereignSchema = makeSchema(
+      [
+        makeArtifactType('checklist', {
+          hasTasks: true,
+          taskCompletionCheck: {
+            incompletePattern: '^\\s*-\\s+\\[ \\]',
+            completePattern: '^\\s*-\\s+\\[[xX]\\]',
+          },
+        }),
+      ],
+      [],
+      { name: 'custom-workflow' },
+    )
+    const get = vi.fn(async (ref?: string) => {
+      if (ref !== 'custom-workflow') throw new Error('workspace default must not be used')
+      return sovereignSchema
+    })
+
+    const result = await new CountTasks(repo, { get } as SchemaProvider).execute({ change })
+
+    expect(get).toHaveBeenCalledWith('custom-workflow')
+    expect(result.byArtifact.checklist).toEqual({ complete: 1, incomplete: 1, total: 2 })
+  })
+
+  it('propagates sovereign schema resolution failures without fallback counts', async () => {
+    const change = makeChange('missing-schema', { schemaName: 'missing-workflow' })
+    const failure = new Error('sovereign schema unavailable')
+    const provider = { get: vi.fn(async () => Promise.reject(failure)) } as SchemaProvider
+
+    await expect(
+      new CountTasks(makeChangeRepository([change]), provider).execute({ change }),
+    ).rejects.toBe(failure)
+    expect(provider.get).toHaveBeenCalledWith('missing-workflow')
+  })
+
   it('aggregates files and accepts uppercase default complete markers', async () => {
-    const change = makeChange('count')
+    const change = makeChange('count', {}, 'test')
     const tasks = new ChangeArtifact({ type: 'tasks' })
     tasks.setFile(new ArtifactFile({ key: 'one', filename: 'one.md' }))
     tasks.setFile(new ArtifactFile({ key: 'two', filename: 'two.md' }))
@@ -40,7 +83,7 @@ describe('CountTasks', () => {
   })
 
   it('counts a hasTasks artifact whose output is checklist.md', async () => {
-    const change = makeChange('count')
+    const change = makeChange('count', {}, 'test')
     const checklist = new ChangeArtifact({ type: 'checklist' })
     checklist.setFile(new ArtifactFile({ key: 'checklist', filename: 'checklist.md' }))
     change.setArtifact(checklist)

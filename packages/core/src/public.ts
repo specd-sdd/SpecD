@@ -334,6 +334,8 @@ export {
   type GetStatusDeps,
   createCountTasks,
   type CountTasksDeps,
+  createResolveChangeSchema,
+  type ResolveChangeSchemaDeps,
   createTransitionChange,
   type TransitionChangeDeps,
   createDraftChange,
@@ -454,6 +456,7 @@ export {
   ReconciledOperationBlockedError,
   type ReconciledOperation,
   type ReconciledOperationBlockedInput,
+  SchemaProviderIdentityMismatchError,
 } from './application/errors/index.js'
 
 // Domain entities
@@ -720,6 +723,18 @@ export {
   type LifecycleVerdict,
   type LifecycleNextAction,
 } from './application/services/lifecycle-evaluation.js'
+export {
+  ResolveChangeSchema,
+  type ResolveChangeSchemaInput,
+  type ResolvedChangeSchema,
+  type ChangeSchemaAdvisory,
+  type ChangeSchemaVersionAdvisory,
+} from './application/services/resolve-change-schema.js'
+export {
+  evaluateTransitionCandidate,
+  type TransitionCandidateEvaluationInput,
+  type TransitionCandidateEvaluation,
+} from './application/services/evaluate-transition-candidate.js'
 export {
   classifyAlong,
   checkMatches,

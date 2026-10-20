@@ -1,0 +1,192 @@
+- op: modified
+  description: Update next resolution scenarios with topology-aware skipping
+  selector:
+    type: section
+    matches: 'Requirement: to next is the happy-path next state'
+  content: |
+    #### Scenario: next from implementing is verifying
+
+    - **GIVEN** a change in `implementing`
+    - **WHEN** `execute` is called with `to: 'next'`
+    - **THEN** Core resolves the target to `verifying` before predicate evaluation
+
+    #### Scenario: next skips disabled step
+
+    - **GIVEN** a change in `implementing`
+    - **AND** a schema where `verifying` is `disabled: true`
+    - **WHEN** `execute` is called with `to: 'next'`
+    - **THEN** Core resolves the target to `done` via `nextWorkflowStep`
+
+    #### Scenario: next is rejected from archivable
+
+    - **GIVEN** a change in `archivable`
+    - **WHEN** `execute` is called with `to: 'next'`
+    - **THEN** it throws `HappyPathNextUnavailableError` (a typed `SpecdError`)
+    - **AND** it does not invent an archive execute
+
+- op: added
+  description: Add verification scenarios for bypassed step evaluation, dynamic check composition, and hook suppression
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: to next is the happy-path next state'
+  content: |
+    ### Requirement: Bypassed step evaluation and hook suppression
+
+    #### Scenario: Bypassed step executes step-skip checks
+
+    - **GIVEN** a transition from `ready` to `verifying` bypassing optional step `implementing`
+    - **AND** check `workflow.tasksEmpty` bound under `scope: 'step-skip'`
+    - **WHEN** `TransitionChange.execute` runs
+    - **THEN** the step-skip checks for `implementing` are executed
+    - **AND** neither `implementing.hooks.pre` nor `implementing.hooks.post` are executed
+
+    #### Scenario: Failed step-skip check aborts transition
+
+    - **GIVEN** a transition from `ready` to `verifying` bypassing optional step `implementing`
+    - **AND** `tasks.md` has incomplete tasks causing `workflow.tasksEmpty` to fail
+    - **WHEN** `TransitionChange.execute` runs
+    - **THEN** the transition aborts and throws `CheckPredicateFailedError`
+
+    #### Scenario: Bypassed step evaluation queries sovereign change schema
+
+    - **GIVEN** a change with recorded schema `custom-workflow`
+    - **WHEN** `TransitionChange.execute` resolves topology and bypassed steps
+    - **THEN** it resolves `custom-workflow` through `ResolveChangeSchema`
+    - **AND** it does not evaluate against the default project schema
+
+    #### Scenario: Target step executes schema-declared checks
+
+    - **GIVEN** a schema workflow step `implementing` declaring `@security.code-scan` with `config: { severity: 'critical' }`
+    - **WHEN** `TransitionChange.execute` transitions to `implementing`
+    - **THEN** `@security.code-scan` is executed as part of transition predicates
+    - **AND** it receives `{ severity: 'critical' }` in `ctx.config`
+
+    #### Scenario: Target step omits schema-disabled check
+
+    - **GIVEN** a schema workflow step `implementing` declaring `impl.linksInScope: { disabled: true }`
+    - **WHEN** `TransitionChange.execute` transitions to `implementing`
+    - **THEN** `impl.linksInScope` is not executed
+
+    #### Scenario: Bypassed step executes custom skipChecks declared in schema
+
+    - **GIVEN** an optional step declaring `skipChecks: [{ id: '@qa.allow-bypass' }]`
+    - **WHEN** `TransitionChange.execute` bypasses this step
+    - **THEN** `@qa.allow-bypass` is executed under `scope: 'step-skip'`
+
+    #### Scenario: Empty effective skip-check set permits bypass
+
+    - **GIVEN** an intermediate step declared `optional: true`
+    - **AND** no registry binding or schema `skipChecks` declaration applies to it
+    - **WHEN** `TransitionChange.execute` requests a legal shortcut across the step
+    - **THEN** the bypass succeeds without inventing a predicate
+
+    #### Scenario: Status projection cannot authorize a stale transition
+
+    - **GIVEN** status previously projected a candidate as available
+    - **AND** persisted facts change before mutation
+    - **WHEN** `TransitionChange.execute` attempts that target
+    - **THEN** it recalculates the complete candidate through the shared evaluator
+    - **AND** it rejects the transition if the fresh predicates fail
+
+    #### Scenario: Effects begin only after the complete candidate passes
+
+    - **GIVEN** a candidate with normal and step-skip predicates
+    - **WHEN** any predicate fails
+    - **THEN** no hook, aggregate mutation, or persistence occurs
+    - **AND** `TransitionChange` owns those effects only after a passing verdict
+- op: modified
+  description: Verify the documented hybrid predicate failure error contract
+  selector:
+    type: section
+    matches: 'Requirement: Shared runner errors propagate on transition'
+  content: |
+    #### Scenario: Failed predicate check throws unified CheckPredicateFailedError
+
+    - **GIVEN** an active check returning `outcome: 'fail'` with code `'SPEC_OVERLAP'`
+    - **WHEN** `TransitionChange.execute` evaluates transition preflight
+    - **THEN** it throws `CheckPredicateFailedError` containing the check's `checkId`, `label`, `code`, `message`, `command`, and `skippable`
+    - **AND** legacy error classes like `ArchiveImplementationStateError` are not thrown
+
+    #### Scenario: Multiple failed checks with collect policy populate details
+
+    - **GIVEN** multiple checks failing under `onFailure: 'collect'`
+    - **WHEN** transition preflight completes
+    - **THEN** `CheckPredicateFailedError` contains structured diagnostic details for all failed checks
+
+    #### Scenario: Canonical built-in failures map to InvalidStateTransitionError reasons
+
+    - **WHEN** `protocol.edge`, `workflow.requires`, `workflow.taskCompletion`, or `approval.spec` fails during `TransitionChange.execute`
+    - **THEN** it throws `InvalidStateTransitionError` with reason `invalid-transition`, `incomplete-artifact`, `incomplete-tasks` (or `missing-task-capability`), or `approval-required` respectively
+    - **AND** it does not throw `CheckPredicateFailedError` for those checks
+
+    #### Scenario: Failed step-skip and plugin checks use CheckPredicateFailedError
+
+    - **GIVEN** a failing `workflow.tasksEmpty` step-skip predicate or a failing plugin check
+    - **WHEN** `TransitionChange.execute` evaluates the candidate
+    - **THEN** it throws `CheckPredicateFailedError` with that check's `checkId` and `skippable` flag
+
+- op: modified
+  description: Opt-out skips only the pre-evaluation refresh
+  selector:
+    type: section
+    matches: 'Requirement: Optional pre-transition implementation tracking refresh'
+  content: |
+    #### Scenario: TransitionChange does not invoke detector directly
+
+    - **GIVEN** a change has entered `implementing` at least once
+    - **WHEN** `TransitionChange.execute()` runs
+    - **THEN** it does not invoke `ImplementationDetector` directly
+    - **AND** it does not duplicate refresh merge logic
+
+    #### Scenario: Active change refreshes by default
+
+    - **GIVEN** an active change exists in `changes/` storage
+    - **GIVEN** `TransitionChange` is constructed with project approval configuration
+    - **WHEN** `TransitionChange.execute({ name, to })` is called without `refreshImplementationTrackingBefore`
+    - **THEN** it invokes `RefreshImplementationTracking.execute({ name })` before lifecycle evaluation
+
+    #### Scenario: Explicit opt-out skips only the pre-evaluation refresh
+
+    - **GIVEN** an active change exists in `changes/` storage
+    - **GIVEN** `TransitionChange` is constructed with project approval configuration
+    - **WHEN** `TransitionChange.execute({ name, to, refreshImplementationTrackingBefore: false })` is called and the candidate passes
+    - **THEN** no tracking refresh runs before lifecycle evaluation
+    - **AND** the post-hook reconciliation before persistence still refreshes implementation tracking
+
+    #### Scenario: Post-hook refresh catches files changed by hooks
+
+    - **GIVEN** a pre-persist `run:` hook that creates an implementation file outside the change's resolved tracking
+    - **WHEN** `TransitionChange.execute({ name, to: 'verifying' })` runs that hook
+    - **THEN** post-hook reconciliation refreshes tracking, `impl.filesResolved` re-runs against the new open file, and the transition is not persisted
+
+- op: added
+  description: Resolved-binding skippability and topology-aware recovery command
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Canonical pre-transition validity reconciliation'
+  content: |
+    #### Scenario: Skip validation uses the attempt's resolved binding
+
+    - **GIVEN** a check whose first base binding is non-skippable but whose resolved binding for this attempt is skippable by schema declaration
+    - **WHEN** `TransitionChange.execute({ skipChecks: [checkId] })` is called for that attempt
+    - **THEN** no `CheckNotSkippableError` is thrown and the check is reported as bypassed by the user
+
+    #### Scenario: Collected failures abort before effects
+
+    - **GIVEN** two non-protocol predicates that both fail for a protocol-legal candidate
+    - **WHEN** `TransitionChange` evaluates the candidate
+    - **THEN** both predicates are evaluated and reported
+    - **AND** no hook, effect, or persistence runs
+
+    #### Scenario: Committed recovery with verifying disabled does not route to verification
+
+    - **GIVEN** a change whose schema disables `verifying`
+    - **AND** post-hook reconciliation commits an automatic recovery away from the source state
+    - **WHEN** `TransitionChange` throws the committed-recovery error
+    - **THEN** the error reports the committed state and the command from lifecycle guidance for that state
+    - **AND** the command is not `/specd-verify` or `specd changes verification start`

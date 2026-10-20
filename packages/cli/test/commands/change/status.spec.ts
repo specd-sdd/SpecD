@@ -74,6 +74,7 @@ it('help documents nested schema.artifactDag and overlapDetail', async () => {
 it('JSON drafted status includes isDrafted and empty transitions', async () => {
   const { kernel, stdout } = setup()
   kernel.changes.status.execute.mockResolvedValue({
+    schemaWarnings: [],
     draftView: {
       name: 'my-change',
       state: 'designing',
@@ -107,6 +108,7 @@ it('JSON drafted status includes isDrafted and empty transitions', async () => {
 it('text drafted status marks drafted and omits transition commands', async () => {
   const { kernel, stdout } = setup()
   kernel.changes.status.execute.mockResolvedValue({
+    schemaWarnings: [],
     draftView: {
       name: 'my-change',
       state: 'designing',
@@ -157,6 +159,7 @@ describe('Output format', () => {
       specIds: ['auth/login'],
     })
     kernel.changes.status.execute.mockResolvedValue({
+      schemaWarnings: [],
       change,
       specDependsOn: {},
       implementationTracking: { trackedFiles: [], links: [] },
@@ -193,6 +196,7 @@ describe('Output format', () => {
     const { kernel, stdout } = setup()
     const change = makeMockChange({ name: 'my-change', state: 'designing' })
     kernel.changes.status.execute.mockResolvedValue({
+      schemaWarnings: [],
       change,
       specDependsOn: {},
       implementationTracking: { trackedFiles: [], links: [] },
@@ -220,6 +224,7 @@ describe('Output format', () => {
     const { kernel, stdout } = setup()
     const change = makeMockChange({ name: 'my-change', state: 'designing' })
     kernel.changes.status.execute.mockResolvedValue({
+      schemaWarnings: [],
       change,
       specDependsOn: {},
       implementationTracking: { trackedFiles: [], links: [] },
@@ -242,6 +247,7 @@ describe('Output format', () => {
     const { kernel, stdout } = setup()
     const change = makeMockChange({ name: 'my-change', state: 'designing' })
     kernel.changes.status.execute.mockResolvedValue({
+      schemaWarnings: [],
       change,
       specDependsOn: {},
       implementationTracking: { trackedFiles: [], links: [] },
@@ -270,6 +276,7 @@ describe('Output format', () => {
     const { kernel, stdout } = setup()
     const change = makeMockChange({ name: 'my-change', state: 'designing' })
     kernel.changes.status.execute.mockResolvedValue({
+      schemaWarnings: [],
       change,
       specDependsOn: {},
       implementationTracking: { trackedFiles: [], links: [] },
@@ -291,6 +298,7 @@ describe('Output format', () => {
     const { kernel, stdout } = setup()
     const change = makeMockChange({ name: 'my-change', state: 'designing' })
     kernel.changes.status.execute.mockResolvedValue({
+      schemaWarnings: [],
       change,
       specDependsOn: {},
       implementationTracking: { trackedFiles: [], links: [] },
@@ -317,6 +325,7 @@ describe('Output format', () => {
     const { kernel, stdout } = setup()
     const change = makeMockChange({ name: 'my-change', state: 'designing' })
     kernel.changes.status.execute.mockResolvedValue({
+      schemaWarnings: [],
       change,
       specDependsOn: {},
       implementationTracking: { trackedFiles: [], links: [] },
@@ -346,6 +355,7 @@ describe('Output format', () => {
     const { kernel, stdout } = setup()
     const change = makeMockChange({ name: 'my-change', state: 'designing' })
     kernel.changes.status.execute.mockResolvedValue({
+      schemaWarnings: [],
       change,
       specDependsOn: {},
       implementationTracking: { trackedFiles: [], links: [] },
@@ -367,6 +377,7 @@ describe('Output format', () => {
     const { kernel, stdout } = setup()
     const change = makeMockChange({ name: 'my-change', state: 'designing' })
     kernel.changes.status.execute.mockResolvedValue({
+      schemaWarnings: [],
       change,
       specDependsOn: {},
       implementationTracking: { trackedFiles: [], links: [] },
@@ -394,6 +405,7 @@ describe('Output format', () => {
       schemaVersion: 1,
     })
     kernel.changes.status.execute.mockResolvedValue({
+      schemaWarnings: [],
       change,
       specDependsOn: {},
       implementationTracking: { trackedFiles: [], links: [] },
@@ -431,6 +443,7 @@ describe('Output format', () => {
     const { kernel, stdout } = setup()
     const change = makeMockChange({ name: 'dag-change', state: 'designing' })
     kernel.changes.status.execute.mockResolvedValue({
+      schemaWarnings: [],
       change,
       specDependsOn: {},
       implementationTracking: { trackedFiles: [], links: [] },
@@ -504,6 +517,7 @@ describe('Output format', () => {
       state: 'implementing',
     })
     kernel.changes.status.execute.mockResolvedValue({
+      schemaWarnings: [],
       change,
       specDependsOn: {},
       implementationTracking: { trackedFiles: [], links: [] },
@@ -548,6 +562,7 @@ describe('Output format', () => {
       specIds: ['core:change'],
     })
     kernel.changes.status.execute.mockResolvedValue({
+      schemaWarnings: [],
       change,
       specDependsOn: {},
       artifactStatuses: [],
@@ -607,6 +622,7 @@ describe('Output format', () => {
       state: 'implementing',
     })
     kernel.changes.status.execute.mockResolvedValue({
+      schemaWarnings: [],
       change,
       specDependsOn: {},
       artifactStatuses: [],
@@ -634,6 +650,7 @@ describe('Output format', () => {
       state: 'implementing',
     })
     kernel.changes.status.execute.mockResolvedValue({
+      schemaWarnings: [],
       change,
       specDependsOn: {},
       artifactStatuses: [],
@@ -663,17 +680,26 @@ describe('Output format', () => {
   })
 })
 
-describe('Schema version warning', () => {
-  it('Schema mismatch', async () => {
-    const { kernel, stderr } = setup()
-    const change = makeMockChange({
-      name: 'my-change',
-      state: 'designing',
-      schemaName: '@specd/schema-std',
-      schemaVersion: 1,
-    })
-    kernel.changes.status.execute.mockResolvedValue({
-      change,
+describe('Schema advisories', () => {
+  const advisory = {
+    code: 'SCHEMA_VERSION_DRIFT',
+    changeName: 'my-change',
+    schemaName: '@specd/schema-std',
+    recordedVersion: 1,
+    resolvedVersion: 2,
+    message:
+      "Change 'my-change' was created with schema '@specd/schema-std' version 1 but resolved version 2.",
+  }
+
+  function statusWith(warnings: unknown[]) {
+    return {
+      schemaWarnings: warnings,
+      change: makeMockChange({
+        name: 'my-change',
+        state: 'designing',
+        schemaName: '@specd/schema-std',
+        schemaVersion: 1,
+      }),
       specDependsOn: {},
       implementationTracking: { trackedFiles: [], links: [] },
       artifactStatuses: [],
@@ -683,16 +709,62 @@ describe('Schema version warning', () => {
       },
       blockers: [],
       nextAction: defaultNextAction,
-    })
+    }
+  }
+
+  it('prints resolver advisories under warnings in text output', async () => {
+    const { kernel, stdout, stderr } = setup()
+    kernel.changes.status.execute.mockResolvedValue(statusWith([advisory]))
 
     const program = makeProgram()
     registerChangeStatus(program.command('change'))
     await program.parseAsync(['node', 'specd', 'change', 'status', 'my-change'])
 
-    const err = stderr()
-    expect(err).toContain('warning:')
-    expect(err).toContain('@specd/schema-std@1')
-    expect(err).toContain('@specd/schema-std@2')
+    expect(stdout()).toContain('warnings:')
+    expect(stdout()).toContain('SCHEMA_VERSION_DRIFT')
+    expect(stdout()).toContain('version 1 but resolved version 2')
+    // No separate workspace-default comparison on stderr (single advisory source).
+    expect(stderr()).not.toContain('active schema')
+  })
+
+  it('omits the warnings section when there are no advisories', async () => {
+    const { kernel, stdout } = setup()
+    kernel.changes.status.execute.mockResolvedValue(statusWith([]))
+
+    const program = makeProgram()
+    registerChangeStatus(program.command('change'))
+    await program.parseAsync(['node', 'specd', 'change', 'status', 'my-change'])
+
+    expect(stdout()).not.toContain('warnings:')
+  })
+
+  it('includes schemaWarnings in json output', async () => {
+    const { kernel, stdout } = setup()
+    kernel.changes.status.execute.mockResolvedValue(statusWith([advisory]))
+
+    const program = makeProgram()
+    registerChangeStatus(program.command('change'))
+    await program.parseAsync(['node', 'specd', 'change', 'status', 'my-change', '--format', 'json'])
+
+    expect(JSON.parse(stdout()).schemaWarnings).toEqual([advisory])
+  })
+
+  it('renders the DAG from the change schema instead of the workspace default', async () => {
+    const { kernel, stdout } = setup()
+    kernel.changes.status.execute.mockResolvedValue(statusWith([]))
+    const getActive = kernel.specs.getActiveSchema.execute
+
+    const program = makeProgram()
+    registerChangeStatus(program.command('change'))
+    await program.parseAsync(['node', 'specd', 'change', 'status', 'my-change'])
+
+    expect(kernel.changes.resolveSchema.execute).toHaveBeenCalledWith({
+      changeName: 'my-change',
+      schemaName: '@specd/schema-std',
+      schemaVersion: 1,
+    })
+    expect(stdout()).toContain('artifacts (DAG):')
+    expect(getActive).toHaveBeenCalledTimes(1) // only via the resolveSchema test default
   })
 })
 
@@ -715,6 +787,7 @@ describe('Overlap conflict display', () => {
     const { kernel, stdout } = setup()
     const change = makeMockChange({ name: 'overlap-change', state: 'designing' })
     kernel.changes.status.execute.mockResolvedValue({
+      schemaWarnings: [],
       change,
       specDependsOn: {},
       implementationTracking: { trackedFiles: [], links: [] },
@@ -766,6 +839,7 @@ describe('Overlap conflict display', () => {
     const { kernel, stdout } = setup()
     const change = makeMockChange({ name: 'overlap-change', state: 'designing' })
     kernel.changes.status.execute.mockResolvedValue({
+      schemaWarnings: [],
       change,
       specDependsOn: {},
       implementationTracking: { trackedFiles: [], links: [] },
@@ -800,6 +874,7 @@ describe('Overlap conflict display', () => {
     const { kernel, stdout } = setup()
     const change = makeMockChange({ name: 'archivable-change', state: 'archivable' })
     kernel.changes.status.execute.mockResolvedValue({
+      schemaWarnings: [],
       change,
       specDependsOn: {},
       implementationTracking: { trackedFiles: [], links: [] },
@@ -837,6 +912,7 @@ describe('Overlap conflict display', () => {
       specIds: ['core:core/config'],
     })
     kernel.changes.status.execute.mockResolvedValue({
+      schemaWarnings: [],
       change,
       specDependsOn: {},
       implementationTracking: { trackedFiles: [], links: [] },
@@ -877,6 +953,7 @@ describe('Overlap conflict display', () => {
     const { kernel, stdout } = setup()
     const change = makeMockChange({ name: 'no-overlap', state: 'designing' })
     kernel.changes.status.execute.mockResolvedValue({
+      schemaWarnings: [],
       change,
       specDependsOn: {},
       implementationTracking: { trackedFiles: [], links: [] },
@@ -916,6 +993,7 @@ describe('Artifact DAG rendering', () => {
     const change = makeMockChange({ name: 'my-change', state: 'designing' })
 
     kernel.changes.status.execute.mockResolvedValue({
+      schemaWarnings: [],
       change,
       specDependsOn: {},
       implementationTracking: { trackedFiles: [], links: [] },
@@ -968,6 +1046,7 @@ describe('Artifact DAG rendering', () => {
     const change = makeMockChange({ name: 'my-change', state: 'implementing' })
 
     kernel.changes.status.execute.mockResolvedValue({
+      schemaWarnings: [],
       change,
       specDependsOn: {},
       implementationTracking: { trackedFiles: [], links: [] },
@@ -998,6 +1077,7 @@ describe('Artifact DAG rendering', () => {
     const change = makeMockChange({ name: 'my-change', state: 'designing' })
 
     kernel.changes.status.execute.mockResolvedValue({
+      schemaWarnings: [],
       change,
       specDependsOn: {},
       implementationTracking: { trackedFiles: [], links: [] },
@@ -1038,6 +1118,7 @@ describe('Lifecycle projections from GetStatus', () => {
     const { kernel, stdout } = setup()
     const change = makeMockChange({ name: 'my-change', state: 'implementing' })
     kernel.changes.status.execute.mockResolvedValue({
+      schemaWarnings: [],
       change,
       specDependsOn: {},
       implementationTracking: { trackedFiles: [], links: [] },
@@ -1064,6 +1145,7 @@ describe('Lifecycle projections from GetStatus', () => {
     const { kernel, stdout } = setup()
     const change = makeMockChange({ name: 'my-change', state: 'implementing' })
     kernel.changes.status.execute.mockResolvedValue({
+      schemaWarnings: [],
       change,
       specDependsOn: {},
       implementationTracking: { trackedFiles: [], links: [] },
@@ -1091,6 +1173,7 @@ describe('Lifecycle projections from GetStatus', () => {
     const { kernel, stdout } = setup()
     const change = makeMockChange({ name: 'my-change', state: 'designing' })
     kernel.changes.status.execute.mockResolvedValue({
+      schemaWarnings: [],
       change,
       specDependsOn: {},
       implementationTracking: { trackedFiles: [], links: [] },
@@ -1124,6 +1207,7 @@ describe('artifact-drift review rendering', () => {
   it('given artifact drift, when text status renders, then omits duplicated review file paths', async () => {
     const { kernel, stdout } = setup()
     kernel.changes.status.execute.mockResolvedValue({
+      schemaWarnings: [],
       change: makeMockChange({ name: 'add-login', state: 'designing' }),
       artifactStatuses: [
         {
@@ -1183,6 +1267,7 @@ describe('artifact-drift review rendering', () => {
   it('given artifact-review-required, when text status renders, then omits duplicated review file paths', async () => {
     const { kernel, stdout } = setup()
     kernel.changes.status.execute.mockResolvedValue({
+      schemaWarnings: [],
       change: makeMockChange({ name: 'add-login', state: 'designing' }),
       artifactStatuses: [
         {
@@ -1238,6 +1323,7 @@ describe('artifact-drift review rendering', () => {
   it('JSON output includes review files with filename and absolute path', async () => {
     const { kernel, stdout } = setup()
     kernel.changes.status.execute.mockResolvedValue({
+      schemaWarnings: [],
       change: makeMockChange({ name: 'add-login', state: 'designing' }),
       artifactStatuses: [
         {
@@ -1300,6 +1386,7 @@ describe('reconciled validity and next action', () => {
     async (format) => {
       const { kernel, stdout } = setup()
       kernel.changes.status.execute.mockResolvedValue({
+        schemaWarnings: [],
         change: makeMockChange({ name: 'my-change', state: 'designing' }),
         specDependsOn: {},
         implementationTracking: { trackedFiles: [], links: [] },
@@ -1351,6 +1438,7 @@ describe('reconciled validity and next action', () => {
     const hash = 'sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee'
     const { kernel, stdout } = setup()
     kernel.changes.status.execute.mockResolvedValue({
+      schemaWarnings: [],
       change: makeMockChange({
         name: 'my-change',
         state: 'verifying',
@@ -1434,5 +1522,213 @@ describe('reconciled validity and next action', () => {
     expect(parsed.verification.completed.status).toBe('stale')
     expect(parsed.nextAction.command).toBe('specd changes verification start my-change')
     expect(stdout()).not.toContain(hash)
+  })
+
+  it('renders the pipeline in the order Core reports and omits disabled steps', async () => {
+    const step = (name: string, optional = false) => ({
+      step: name,
+      optional,
+      available: true,
+      isReady: true,
+      isPermitted: true,
+      blockingArtifacts: [],
+    })
+    const statusFor = () => ({
+      schemaWarnings: [],
+      change: makeMockChange({ name: 'skippy', state: 'designing' }),
+      specDependsOn: {},
+      artifactStatuses: [],
+      lifecycle: {
+        ...defaultLifecycle,
+        availableTransitions: ['ready'],
+        // Core omits the disabled `verifying` step and orders by the active pipeline.
+        availableSteps: [step('ready'), step('implementing', true), step('done')],
+      },
+      blockers: [],
+      nextAction: defaultNextAction,
+    })
+
+    const { kernel, stdout } = setup()
+    kernel.changes.status.execute.mockResolvedValue(statusFor())
+    const text = makeProgram()
+    registerChangeStatus(text.command('change'))
+    await text.parseAsync(['node', 'specd', 'change', 'status', 'skippy'])
+
+    expect(stdout()).toContain('extras:      ready, implementing [optional], done')
+    expect(stdout()).not.toMatch(/extras:.*verifying/)
+
+    const { kernel: jsonKernel, stdout: jsonOut } = setup()
+    jsonKernel.changes.status.execute.mockResolvedValue(statusFor())
+    const json = makeProgram()
+    registerChangeStatus(json.command('change'))
+    await json.parseAsync(['node', 'specd', 'change', 'status', 'skippy', '--format', 'json'])
+
+    const steps = (
+      JSON.parse(jsonOut()) as { lifecycle: { availableSteps: Array<{ step: string }> } }
+    ).lifecycle.availableSteps.map((entry) => entry.step)
+    expect(steps).toEqual(['ready', 'implementing', 'done'])
+  })
+
+  it('displays [optional] annotations in text extras and in structured JSON availableSteps', async () => {
+    const { kernel, stdout } = setup()
+    const change = makeMockChange({ name: 'optional-change', state: 'ready' })
+    kernel.changes.status.execute.mockResolvedValue({
+      schemaWarnings: [],
+      change,
+      specDependsOn: {},
+      artifactStatuses: [],
+      lifecycle: {
+        ...defaultLifecycle,
+        availableTransitions: ['implementing', 'verifying'],
+        availableSteps: [
+          {
+            step: 'implementing',
+            optional: true,
+            available: true,
+            isReady: true,
+            isPermitted: true,
+            blockingArtifacts: [],
+          },
+          {
+            step: 'verifying',
+            optional: false,
+            available: true,
+            isReady: true,
+            isPermitted: true,
+            blockingArtifacts: [],
+          },
+        ],
+      },
+      blockers: [],
+      nextAction: { ...defaultNextAction, targetStep: 'verifying', command: '/specd-verify' },
+    })
+
+    const programText = makeProgram()
+    registerChangeStatus(programText.command('change'))
+    await programText.parseAsync(['node', 'specd', 'change', 'status', 'optional-change'])
+
+    expect(stdout()).toContain('implementing [optional]')
+    expect(stdout()).toContain('verifying')
+    expect(stdout()).toContain('transitions:  implementing, verifying')
+
+    const { kernel: kernelJson, stdout: stdoutJson } = setup()
+    kernelJson.changes.status.execute.mockResolvedValue({
+      schemaWarnings: [],
+      change,
+      specDependsOn: {},
+      artifactStatuses: [],
+      lifecycle: {
+        ...defaultLifecycle,
+        availableTransitions: ['implementing', 'verifying'],
+        availableSteps: [
+          {
+            step: 'implementing',
+            optional: true,
+            available: true,
+            isReady: true,
+            isPermitted: true,
+            blockingArtifacts: [],
+          },
+        ],
+      },
+      blockers: [],
+      nextAction: { ...defaultNextAction, targetStep: 'verifying', command: '/specd-verify' },
+    })
+
+    const programJson = makeProgram()
+    registerChangeStatus(programJson.command('change'))
+    await programJson.parseAsync([
+      'node',
+      'specd',
+      'change',
+      'status',
+      'optional-change',
+      '--format',
+      'json',
+    ])
+
+    const parsed = JSON.parse(stdoutJson())
+    expect(parsed.lifecycle.availableTransitions).toEqual(['implementing', 'verifying'])
+    expect(parsed.lifecycle.availableSteps[0]).toMatchObject({
+      step: 'implementing',
+      optional: true,
+    })
+  })
+
+  it('renders custom check blockers with check label, message, and checkId', async () => {
+    const { kernel, stdout } = setup()
+    const change = makeMockChange({ name: 'blocked-change', state: 'implementing' })
+    kernel.changes.status.execute.mockResolvedValue({
+      schemaWarnings: [],
+      change,
+      specDependsOn: {},
+      artifactStatuses: [],
+      lifecycle: {
+        ...defaultLifecycle,
+        availableTransitions: [],
+        availableSteps: [],
+      },
+      blockers: [
+        {
+          code: 'CUSTOM_AUDIT_FAILED',
+          message: 'Found high severity vulnerability',
+          label: 'Code Audit',
+          checkId: '@security.code-audit',
+        },
+      ],
+      nextAction: { ...defaultNextAction, targetStep: 'verifying', command: null },
+    })
+
+    const programText = makeProgram()
+    registerChangeStatus(programText.command('change'))
+    await programText.parseAsync(['node', 'specd', 'change', 'status', 'blocked-change'])
+
+    expect(stdout()).toContain(
+      '! CUSTOM_AUDIT_FAILED — Code Audit: Found high severity vulnerability',
+    )
+
+    const { kernel: kernelJson, stdout: stdoutJson } = setup()
+    kernelJson.changes.status.execute.mockResolvedValue({
+      schemaWarnings: [],
+      change,
+      specDependsOn: {},
+      artifactStatuses: [],
+      lifecycle: {
+        ...defaultLifecycle,
+        availableTransitions: [],
+        availableSteps: [],
+      },
+      blockers: [
+        {
+          code: 'CUSTOM_AUDIT_FAILED',
+          message: 'Found high severity vulnerability',
+          label: 'Code Audit',
+          checkId: '@security.code-audit',
+        },
+      ],
+      nextAction: { ...defaultNextAction, targetStep: 'verifying', command: null },
+    })
+
+    const programJson = makeProgram()
+    registerChangeStatus(programJson.command('change'))
+    await programJson.parseAsync([
+      'node',
+      'specd',
+      'change',
+      'status',
+      'blocked-change',
+      '--format',
+      'json',
+    ])
+
+    const parsed = JSON.parse(stdoutJson())
+    expect(parsed.blockers).toEqual([
+      {
+        code: 'CUSTOM_AUDIT_FAILED',
+        message: 'Found high severity vulnerability',
+        label: 'Code Audit',
+        checkId: '@security.code-audit',
+      },
+    ])
   })
 })

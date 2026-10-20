@@ -3,6 +3,14 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": ["core:preview-spec"],
-  "implementation": []
+  "dependsOn": ["core:preview-spec", "core:resolve-change-schema"],
+  "implementation": [
+    {
+      "file": "cli:src/helpers/change-schema.ts",
+      "symbols": ["resolveChangeSchemaForCli"]
+    },
+    {
+      "file": "cli:src/commands/change/spec-preview.ts"
+    }
+  ]
 }

@@ -22,6 +22,8 @@ export interface MaterializeSpecMetadataInput {
   readonly policy?: 'if-needed' | 'force'
   /** When true, allow regenerated metadata to change persisted dependsOn. */
   readonly allowDependsOnOverwrite?: boolean
+  /** Schema to extract with when acting inside a change; see {@link GenerateSpecMetadata}. */
+  readonly schemaName?: string
 }
 
 /** Warning emitted when metadata cache persistence fails. */
@@ -66,7 +68,7 @@ export class MaterializeSpecMetadata {
     const { spec, repo } = await this._resolveSpec(input.specId)
 
     if (policy === 'if-needed') {
-      const reused = await this._tryReusePersisted(input.specId, spec, repo)
+      const reused = await this._tryReusePersisted(input.specId, spec, repo, input.schemaName)
       if (reused !== null) {
         return reused
       }
@@ -78,6 +80,7 @@ export class MaterializeSpecMetadata {
       repo,
       policy,
       input.allowDependsOnOverwrite === true,
+      input.schemaName,
     )
   }
 
@@ -108,19 +111,24 @@ export class MaterializeSpecMetadata {
    * @param specId - Canonical spec ID
    * @param spec - Target spec entity
    * @param repo - Owning spec repository
+   * @param schemaName - Optional change schema forwarded to generation
    * @returns Reused metadata result, or `null` when regeneration is required
    */
   private async _tryReusePersisted(
     specId: string,
     spec: Spec,
     repo: SpecRepository,
+    schemaName?: string,
   ): Promise<MaterializeSpecMetadataResult | null> {
     const snapshot = await repo.readMetadataSnapshot(spec)
     if (snapshot.kind !== 'present') {
       return null
     }
 
-    const generated = await this.generateSpecMetadata.execute({ specId })
+    const generated = await this.generateSpecMetadata.execute({
+      specId,
+      ...(schemaName !== undefined ? { schemaName } : {}),
+    })
     const assessment = assessMetadataFreshness(snapshot.metadata, generated.sourceState)
     if (!assessment.fresh) {
       return null
@@ -137,6 +145,7 @@ export class MaterializeSpecMetadata {
    * @param repo - Owning spec repository
    * @param policy - Materialization policy
    * @param allowDependsOnOverwrite - Whether regenerated dependsOn may overwrite persisted values
+   * @param schemaName - Optional change schema forwarded to generation
    * @param attempt - Conflict retry counter
    * @returns Generated or reused metadata result
    */
@@ -146,6 +155,7 @@ export class MaterializeSpecMetadata {
     repo: SpecRepository,
     policy: 'if-needed' | 'force',
     allowDependsOnOverwrite = false,
+    schemaName?: string,
     attempt = 0,
   ): Promise<MaterializeSpecMetadataResult> {
     const initialSnapshot = await repo.readMetadataSnapshot(spec)
@@ -154,8 +164,13 @@ export class MaterializeSpecMetadata {
     const generated = await this.generateSpecMetadata.execute({
       specId,
       allowDependsOnOverwrite,
+      ...(schemaName !== undefined ? { schemaName } : {}),
     })
-    const currentSource = await this._readCurrentSourceState(specId, allowDependsOnOverwrite)
+    const currentSource = await this._readCurrentSourceState(
+      specId,
+      allowDependsOnOverwrite,
+      schemaName,
+    )
     if (!sourceStatesEqual(generated.sourceState, currentSource)) {
       throw new Error(
         `Metadata source state changed during materialization for '${specId}' — refusing to persist stale projection`,
@@ -188,6 +203,7 @@ export class MaterializeSpecMetadata {
           repo,
           policy,
           allowDependsOnOverwrite,
+          schemaName,
           attempt + 1,
         )
       }
@@ -213,15 +229,18 @@ export class MaterializeSpecMetadata {
    *
    * @param specId - Canonical spec ID
    * @param allowDependsOnOverwrite - Whether regenerated dependsOn may overwrite persisted values
+   * @param schemaName - Optional change schema forwarded to generation
    * @returns Current metadata source state
    */
   private async _readCurrentSourceState(
     specId: string,
     allowDependsOnOverwrite: boolean,
+    schemaName?: string,
   ): Promise<SpecMetadataSourceState> {
     const generated = await this.generateSpecMetadata.execute({
       specId,
       allowDependsOnOverwrite,
+      ...(schemaName !== undefined ? { schemaName } : {}),
     })
     return generated.sourceState
   }

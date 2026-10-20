@@ -1,5 +1,6 @@
 import { type ChangeRepository } from '../../application/ports/change-repository.js'
 import { type SchemaProvider } from '../../application/ports/schema-provider.js'
+import { type ResolveChangeSchema } from '../../application/services/resolve-change-schema.js'
 import { CountTasks } from '../../application/use-cases/count-tasks.js'
 import { type SpecdConfig } from '../../application/specd-config.js'
 import {
@@ -12,6 +13,7 @@ import { normalizeCompositionFactoryArgs, type FactoryInput } from '../normalize
 export interface CountTasksDeps {
   readonly changes: ChangeRepository
   readonly schemaProvider: SchemaProvider
+  readonly resolveChangeSchema?: ResolveChangeSchema
 }
 /**
  * Resolves CountTasks dependencies.
@@ -19,7 +21,11 @@ export interface CountTasksDeps {
  * @returns Resolved dependencies.
  */
 export function resolveCountTasksDeps(resolver: CompositionResolver): CountTasksDeps {
-  return { changes: resolver.getChangeRepository(), schemaProvider: resolver.getSchemaProvider() }
+  return {
+    changes: resolver.getChangeRepository(),
+    schemaProvider: resolver.getSchemaProvider(),
+    resolveChangeSchema: resolver.getResolveChangeSchema(),
+  }
 }
 /**
  * Creates CountTasks from explicit dependencies.
@@ -61,7 +67,13 @@ export function createCountTasks(
 function createCountTasksFromNormalized(
   input: FactoryInput<CountTasksDeps, CompositionResolutionOptions>,
 ): CountTasks {
-  if (input.kind === 'deps') return new CountTasks(input.deps.changes, input.deps.schemaProvider)
+  if (input.kind === 'deps') {
+    return new CountTasks(
+      input.deps.changes,
+      input.deps.schemaProvider,
+      input.deps.resolveChangeSchema,
+    )
+  }
   return createCountTasks(
     resolveCountTasksDeps(createCompositionResolver(input.config, input.options)),
   )

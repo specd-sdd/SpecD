@@ -2,9 +2,10 @@ import { describe, it, expect, vi } from 'vitest'
 import { GetArtifactInstruction } from '../../../src/application/use-cases/get-artifact-instruction.js'
 import { ChangeNotFoundError } from '../../../src/application/errors/change-not-found-error.js'
 import { SchemaNotFoundError } from '../../../src/application/errors/schema-not-found-error.js'
-import { SchemaMismatchError } from '../../../src/application/errors/schema-mismatch-error.js'
 import { ArtifactNotFoundError } from '../../../src/application/errors/artifact-not-found-error.js'
 import { TemplateExpander } from '../../../src/application/template-expander.js'
+import { SchemaProviderIdentityMismatchError } from '../../../src/application/errors/schema-provider-identity-mismatch-error.js'
+import { type SchemaProvider } from '../../../src/application/ports/schema-provider.js'
 import { Change, type ChangeEvent } from '../../../src/domain/entities/change.js'
 import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
 import { ArtifactFile } from '../../../src/domain/value-objects/artifact-file.js'
@@ -169,11 +170,13 @@ describe('GetArtifactInstruction', () => {
       )
     })
 
-    it('throws SchemaMismatchError when change schema differs from active schema', async () => {
-      const change = makeChange('my-change', { schemaName: 'old-schema' })
-      const schema = makeSchema({ name: 'new-schema', artifacts: [makeArtifactType('spec')] })
+    it('resolves sovereign schema by change.schemaName', async () => {
+      const change = makeChange('my-change', { schemaName: 'custom-schema' })
+      const schema = makeSchema({ name: 'custom-schema', artifacts: [makeArtifactType('spec')] })
       const changeRepo = makeChangeRepository([change])
-      const schemaProvider = makeSchemaProvider(schema)
+      const schemaProvider: SchemaProvider = {
+        get: vi.fn().mockResolvedValue(schema),
+      }
       const templates = makeTemplateExpander()
 
       const sut = new GetArtifactInstruction(
@@ -184,8 +187,31 @@ describe('GetArtifactInstruction', () => {
         templates,
       )
 
-      await expect(sut.execute({ name: 'my-change', artifactId: 'spec' })).rejects.toThrow(
-        SchemaMismatchError,
+      const result = await sut.execute({ name: 'my-change', artifactId: 'spec' })
+      expect(result.artifactId).toBe('spec')
+      expect(schemaProvider.get).toHaveBeenCalledWith('custom-schema')
+    })
+
+    it('fails closed on a provider identity mismatch instead of using the default schema', async () => {
+      const change = makeChange('my-change', { schemaName: 'custom-schema' })
+      const schemaProvider: SchemaProvider = {
+        get: vi.fn().mockImplementation(async (ref?: string) =>
+          makeSchema({
+            name: ref === 'custom-schema' ? 'other-schema' : 'default-schema',
+            artifacts: [makeArtifactType('spec')],
+          }),
+        ),
+      }
+      const sut = new GetArtifactInstruction(
+        makeChangeRepository([change]),
+        new Map([['default', makeSpecRepository()]]),
+        schemaProvider,
+        makeParsers(),
+        makeTemplateExpander(),
+      )
+
+      await expect(sut.execute({ name: 'my-change', artifactId: 'spec' })).rejects.toBeInstanceOf(
+        SchemaProviderIdentityMismatchError,
       )
     })
 

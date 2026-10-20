@@ -1,9 +1,12 @@
 import { InvalidInputError } from '../errors/invalid-input-error.js'
-import { VALID_TRANSITIONS, type ChangeState } from '../value-objects/change-state.js'
+import { type ChangeState } from '../value-objects/change-state.js'
 import { type Change } from '../entities/change.js'
 import { type ChangeValidityVerdict } from './change-validity.js'
 import { type ArtifactStatus } from '../value-objects/artifact-status.js'
 import { type Schema } from '../value-objects/schema.js'
+import { deepMergeConfig } from './deep-merge-config.js'
+import { type CheckGovernance, type CheckRegistry } from './check-registry.js'
+import { resolveWorkflowPipeline, type ApprovalGates } from './workflow-topology.js'
 
 /**
  * Matcher, `classifyAlong`, and check types. Predicate `evaluate*` lives in
@@ -25,6 +28,7 @@ export type BuiltinCheckId =
   | 'protocol.edge'
   | 'workflow.requires'
   | 'workflow.taskCompletion'
+  | 'workflow.tasksEmpty'
   | 'deps.consistent'
   | 'workspace.readOnly'
   | 'impl.filesResolved'
@@ -48,6 +52,7 @@ export const CHECK_LABELS: Readonly<Record<BuiltinCheckId, string>> = {
   'protocol.edge': 'Validating transition edge',
   'workflow.requires': 'Checking required artifacts',
   'workflow.taskCompletion': 'Checking task completion',
+  'workflow.tasksEmpty': 'Checking empty tasks',
   'deps.consistent': 'Checking spec dependencies',
   'workspace.readOnly': 'Checking workspace ownership',
   'impl.filesResolved': 'Checking open implementation files',
@@ -102,6 +107,10 @@ export type CheckApplicability =
     }
   | { readonly scope: 'archive' }
   | { readonly scope: 'operation'; readonly operation: 'verification-start' }
+  | {
+      readonly scope: 'step-skip'
+      readonly step: ChangeState | '*'
+    }
 
 /** Per-artifact checkbox counts gathered by `workflow.taskCompletion`. */
 export interface TaskCompletionCounts {
@@ -112,15 +121,6 @@ export interface TaskCompletionCounts {
   /** Complete plus incomplete. */
   readonly total: number
 }
-
-const AXIS_FALLBACK: readonly ChangeState[] = [
-  'ready',
-  'implementing',
-  'verifying',
-  'done',
-  'archivable',
-  'archiving',
-]
 
 /**
  * Maps pending/approved parking states onto the delivery step on the progress axis.
@@ -139,44 +139,19 @@ function deliveryState(state: ChangeState): ChangeState {
 }
 
 /**
- * Progress axis: listed known ChangeState names, with missing AXIS_FALLBACK
- * states spliced by canonical index (not tail-appended).
- *
- * @param workflowSteps - Schema workflow step names
- * @returns Ordered axis including fallback states
- */
-function buildAxis(workflowSteps: readonly string[]): string[] {
-  const axis = workflowSteps.filter((step) => step in VALID_TRANSITIONS)
-  for (const fallback of AXIS_FALLBACK) {
-    if (axis.includes(fallback)) {
-      continue
-    }
-    const fallbackIndex = AXIS_FALLBACK.indexOf(fallback)
-    let insertAt = axis.length
-    for (let i = 0; i < axis.length; i++) {
-      const listedIndex = AXIS_FALLBACK.indexOf(axis[i] as ChangeState)
-      if (listedIndex >= 0 && listedIndex >= fallbackIndex) {
-        insertAt = i
-        break
-      }
-    }
-    axis.splice(insertAt, 0, fallback)
-  }
-  return axis
-}
-
-/**
  * Classifies a lifecycle attempt as forward, backward, redesign, recovery, or any.
  *
  * @param from - Source change state
  * @param to - Requested target state
- * @param workflowSteps - Schema `workflow[]` step names in display/progress order
+ * @param schema - Sovereign change schema
+ * @param approvals - Exact approval-gate snapshot for this evaluation
  * @returns Direction used by check matching
  */
 export function classifyAlong(
   from: ChangeState,
   to: ChangeState,
-  workflowSteps: readonly string[],
+  schema: Schema,
+  approvals: ApprovalGates,
 ): TransitionAlong {
   if (from === 'archiving' && to === 'archivable') {
     return 'recovery'
@@ -191,7 +166,7 @@ export function classifyAlong(
     return 'forward'
   }
 
-  const axis = buildAxis(workflowSteps)
+  const axis = resolveWorkflowPipeline(schema, approvals).map((entry) => entry.step)
   const fromDelivery = deliveryState(from)
   const toDelivery = deliveryState(to)
   const fromIndex =
@@ -212,7 +187,7 @@ export function classifyAlong(
   return 'any'
 }
 
-/** Transition or archive attempt used for matching. */
+/** Transition, archive, or step-skip attempt used for matching. */
 export type CheckAttempt =
   | {
       readonly scope: 'transition'
@@ -222,11 +197,17 @@ export type CheckAttempt =
     }
   | { readonly scope: 'archive' }
   | { readonly scope: 'operation'; readonly operation: 'verification-start' }
+  | {
+      readonly scope: 'step-skip'
+      readonly step: ChangeState
+      readonly from: ChangeState
+      readonly to: ChangeState
+    }
 
 /**
  * Whether a check applies to this attempt.
  *
- * @param applicability - Declared from/to/along or archive scope
+ * @param applicability - Declared from/to/along, archive, or step-skip scope
  * @param attempt - Classified attempt
  * @returns True when the check should run
  */
@@ -236,6 +217,12 @@ export function checkMatches(applicability: CheckApplicability, attempt: CheckAt
   }
   if (applicability.scope === 'operation') {
     return attempt.scope === 'operation' && applicability.operation === attempt.operation
+  }
+  if (applicability.scope === 'step-skip') {
+    return (
+      attempt.scope === 'step-skip' &&
+      (applicability.step === '*' || applicability.step === attempt.step)
+    )
   }
   if (attempt.scope !== 'transition') {
     return false
@@ -505,6 +492,11 @@ export interface CheckBinding {
   readonly allowDisable?: boolean
   /** Default binding-level configuration. */
   readonly config?: Readonly<Record<string, unknown>>
+  /**
+   * Fully cascaded config (check default, binding config, step config) computed once
+   * by {@link resolveEffectiveBindings}. Consumers use it unchanged.
+   */
+  readonly effectiveConfig?: Readonly<Record<string, unknown>>
 }
 
 /**
@@ -512,11 +504,13 @@ export interface CheckBinding {
  *
  * @param specs - Domain applicability rows
  * @param checks - Check instances keyed by id
+ * @param governanceOf - Optional check-level governance lookup inherited when a spec omits a lock
  * @returns Bindings in spec order
  */
 export function applyBindingSpecs(
   specs: readonly CheckBindingSpec[],
   checks: Readonly<Partial<Record<string, Check>>>,
+  governanceOf?: (checkId: string) => CheckGovernance | undefined,
 ): readonly CheckBinding[] {
   return specs.map((spec) => {
     const check = checks[spec.id]
@@ -527,9 +521,11 @@ export function applyBindingSpecs(
       check,
       applicability: spec.applicability,
       skippable: spec.skippable ?? false,
-      allowBindingOverride: spec.allowBindingOverride ?? true,
-      allowConfigOverride: spec.allowConfigOverride ?? true,
-      ...(spec.allowDisable !== undefined ? { allowDisable: spec.allowDisable } : {}),
+      allowBindingOverride:
+        spec.allowBindingOverride ?? governanceOf?.(spec.id)?.allowBindingOverride ?? false,
+      allowConfigOverride:
+        spec.allowConfigOverride ?? governanceOf?.(spec.id)?.allowConfigOverride ?? false,
+      allowDisable: spec.allowDisable ?? governanceOf?.(spec.id)?.allowDisable ?? false,
       ...(spec.config !== undefined ? { config: spec.config } : {}),
       ...(spec.reportSkipWhenUnmatched === true ? { reportSkipWhenUnmatched: true } : {}),
       ...(spec.exceptAlong !== undefined ? { exceptAlong: spec.exceptAlong } : {}),
@@ -537,4 +533,253 @@ export function applyBindingSpecs(
       ...(spec.onFailure !== undefined ? { onFailure: spec.onFailure } : {}),
     }
   })
+}
+
+/**
+ * Input for dynamic runtime binding composition.
+ */
+export interface ResolveEffectiveBindingsInput {
+  /** Baseline bindings (built-ins and kernel plugins). */
+  readonly baseBindings: readonly CheckBinding[]
+  /** Change sovereign schema. */
+  readonly schema: Schema
+  /** Optional target step for a candidate transition (scope: 'transition'). */
+  readonly targetStep?: ChangeState | undefined
+  /** Optional intermediate steps bypassed by shortcut transition (scope: 'step-skip'). */
+  readonly bypassedSteps?: readonly ChangeState[] | undefined
+  /** Source state of the attempt. Required with `targetStep`. */
+  readonly from?: ChangeState | undefined
+  /** Transition direction along the active pipeline. Required with `targetStep`. */
+  readonly along?: TransitionAlong | undefined
+  /** Optional check registry for catalog lookups and governance default configs. */
+  readonly registry?: CheckRegistry | undefined
+}
+
+/**
+ * Copies a binding without any previously cascaded `effectiveConfig`.
+ *
+ * @param binding - Binding to copy
+ * @returns A copy whose effective config can be recomputed
+ */
+function withoutEffectiveConfig(binding: CheckBinding): CheckBinding {
+  const copy: { -readonly [K in keyof CheckBinding]: CheckBinding[K] } = { ...binding }
+  delete copy.effectiveConfig
+  return copy
+}
+
+/** One schema overlay applied to a base binding at a single coordinate. */
+interface BindingEdit {
+  /** Applicability rows of the base binding replaced by this overlay. */
+  readonly rows: readonly CheckApplicability[]
+  /** Concrete applicability carried by the clone this overlay produces. */
+  readonly applicability: readonly CheckApplicability[]
+  /** Bypassed step this overlay is concrete for (step-skip overlays only). */
+  readonly step?: ChangeState
+  /** Schema declaration that produced the edit. */
+  readonly decl: {
+    readonly disabled?: boolean | undefined
+    readonly skippable?: boolean | undefined
+    readonly onFailure?: EffectOnFailure | undefined
+    readonly config?: Readonly<Record<string, unknown>> | undefined
+  }
+}
+
+/**
+ * Pure domain function that resolves effective check bindings by overlaying
+ * schema-declared checks (`checks:` and `skipChecks:`) onto base bindings,
+ * synthesizing bindings for declarations no base row serves, and cascading
+ * configuration via `deepMergeConfig`.
+ *
+ * This is the only place step declarations are applied: the result is the complete,
+ * concrete set of bindings for one attempt, executed unchanged by the predicate runner.
+ * Each declaration applies only to the attempt it matches (`from`/`to`/`along`); the
+ * base rows it overlays are replaced by one clone whose applicability is the concrete
+ * attempt (transition) or the concrete bypassed step (step-skip). A base binding that
+ * serves several coordinates keeps its non-overlaid rows in a remainder copy.
+ *
+ * @param input - Dynamic binding resolution inputs
+ * @returns Fully composed effective check bindings
+ * @throws {@link InvalidInputError} When `targetStep` is given without `from` and `along`
+ */
+export function resolveEffectiveBindings(
+  input: ResolveEffectiveBindingsInput,
+): readonly CheckBinding[] {
+  const { baseBindings, schema, targetStep, bypassedSteps = [], from, along, registry } = input
+
+  const editsByIndex = new Map<number, BindingEdit[]>()
+  const synthesizedBindings: CheckBinding[] = []
+
+  // Single-pass config cascade: check default -> binding config -> step config.
+  const cascadeConfig = (
+    checkId: string,
+    bindingConfig?: Readonly<Record<string, unknown>>,
+    stepConfig?: Readonly<Record<string, unknown>>,
+  ): Readonly<Record<string, unknown>> | undefined => {
+    const gov = registry?.getGovernance(checkId)
+    const merged = deepMergeConfig(deepMergeConfig(gov?.defaultConfig, bindingConfig), stepConfig)
+    return Object.keys(merged).length > 0 ? merged : undefined
+  }
+
+  const recordEdit = (index: number, edit: BindingEdit): void => {
+    const list = editsByIndex.get(index) ?? []
+    list.push(edit)
+    editsByIndex.set(index, list)
+  }
+
+  // 1. Overlay targetStep checks (scope: 'transition')
+  if (targetStep !== undefined) {
+    if (from === undefined || along === undefined) {
+      throw new InvalidInputError(
+        'resolveEffectiveBindings requires `from` and `along` when `targetStep` is given',
+      )
+    }
+    const attempt: CheckAttempt = { scope: 'transition', from, to: targetStep, along }
+    const concrete: CheckApplicability = { scope: 'transition', from, to: targetStep, along }
+    const targetStepDef = schema.workflowStep(targetStep)
+    for (const chk of targetStepDef?.checks ?? []) {
+      const declMatchesAttempt = checkMatches(
+        {
+          scope: 'transition',
+          from: chk.from ?? '*',
+          to: targetStep,
+          along: chk.along ?? 'forward',
+        },
+        attempt,
+      )
+      // A declaration for another from/along coordinate leaves base bindings untouched.
+      if (!declMatchesAttempt) continue
+
+      let matchedAny = false
+
+      for (let i = 0; i < baseBindings.length; i++) {
+        const b = baseBindings[i]!
+        if (b.check.id !== chk.id) continue
+
+        const rows = b.applicability.filter(
+          (a) => a.scope === 'transition' && checkMatches(a, attempt),
+        )
+
+        if (rows.length > 0) {
+          matchedAny = true
+          recordEdit(i, { rows, applicability: [concrete], decl: chk })
+        }
+      }
+
+      if (!matchedAny && chk.disabled !== true && registry) {
+        const check = registry.get(chk.id)
+        if (check) {
+          const governance = registry.getGovernance(chk.id)
+          const effectiveConfig = cascadeConfig(chk.id, undefined, chk.config)
+          const onFailure = chk.onFailure ?? 'abort'
+          synthesizedBindings.push({
+            check,
+            applicability: [concrete],
+            skippable: chk.skippable ?? false,
+            allowBindingOverride: governance?.allowBindingOverride ?? false,
+            allowConfigOverride: governance?.allowConfigOverride ?? false,
+            allowDisable: governance?.allowDisable ?? false,
+            onFailure,
+            ...(effectiveConfig !== undefined ? { effectiveConfig } : {}),
+          })
+        }
+      }
+    }
+  }
+
+  // 2. Overlay bypassedSteps checks (scope: 'step-skip'), one concrete clone per declared step
+  for (const bypassedStep of bypassedSteps) {
+    const stepDef = schema.workflowStep(bypassedStep)
+    const concrete: CheckApplicability = { scope: 'step-skip', step: bypassedStep }
+    for (const chk of stepDef?.skipChecks ?? []) {
+      let matchedAny = false
+
+      for (let i = 0; i < baseBindings.length; i++) {
+        const b = baseBindings[i]!
+        if (b.check.id !== chk.id) continue
+
+        const rows = b.applicability.filter(
+          (a) => a.scope === 'step-skip' && (a.step === '*' || a.step === bypassedStep),
+        )
+
+        if (rows.length > 0) {
+          matchedAny = true
+          recordEdit(i, { rows, applicability: [concrete], step: bypassedStep, decl: chk })
+        }
+      }
+
+      if (!matchedAny && chk.disabled !== true && registry) {
+        const check = registry.get(chk.id)
+        if (check) {
+          const governance = registry.getGovernance(chk.id)
+          const effectiveConfig = cascadeConfig(chk.id, undefined, chk.config)
+          const onFailure = chk.onFailure ?? 'abort'
+          synthesizedBindings.push({
+            check,
+            applicability: [concrete],
+            skippable: chk.skippable ?? false,
+            allowBindingOverride: governance?.allowBindingOverride ?? false,
+            allowConfigOverride: governance?.allowConfigOverride ?? false,
+            allowDisable: governance?.allowDisable ?? false,
+            onFailure,
+            ...(effectiveConfig !== undefined ? { effectiveConfig } : {}),
+          })
+        }
+      }
+    }
+  }
+
+  // 3. Assemble combined result, splitting bindings that were edited per coordinate
+  const result: CheckBinding[] = []
+  for (let i = 0; i < baseBindings.length; i++) {
+    const b = baseBindings[i]!
+    const edits = editsByIndex.get(i)
+    if (edits === undefined) {
+      const effectiveConfig = cascadeConfig(b.check.id, b.config)
+      result.push(effectiveConfig !== undefined ? { ...b, effectiveConfig } : b)
+      continue
+    }
+
+    const claimed = new Set<CheckApplicability>()
+    for (const edit of edits) {
+      for (const row of edit.rows) claimed.add(row)
+      if (edit.decl.disabled === true) continue
+      const effectiveConfig = cascadeConfig(b.check.id, b.config, edit.decl.config)
+      const onFailure = edit.decl.onFailure ?? b.onFailure
+      result.push({
+        ...withoutEffectiveConfig(b),
+        applicability: edit.applicability,
+        skippable: edit.decl.skippable !== undefined ? edit.decl.skippable : b.skippable,
+        ...(onFailure !== undefined ? { onFailure } : {}),
+        ...(effectiveConfig !== undefined ? { effectiveConfig } : {}),
+      })
+    }
+
+    const residual: CheckApplicability[] = b.applicability.filter((row) => !claimed.has(row))
+    // A claimed wildcard step-skip row also served the bypassed steps no declaration
+    // named: keep those as concrete rows with the base policy.
+    if (
+      claimed.size > 0 &&
+      b.applicability.some(
+        (row) => claimed.has(row) && row.scope === 'step-skip' && row.step === '*',
+      )
+    ) {
+      const declaredSteps = new Set(
+        edits.flatMap((edit) => (edit.step !== undefined ? [edit.step] : [])),
+      )
+      for (const bypassed of bypassedSteps) {
+        if (!declaredSteps.has(bypassed)) residual.push({ scope: 'step-skip', step: bypassed })
+      }
+    }
+    if (residual.length > 0) {
+      const effectiveConfig = cascadeConfig(b.check.id, b.config)
+      result.push({
+        ...b,
+        applicability: residual,
+        ...(effectiveConfig !== undefined ? { effectiveConfig } : {}),
+      })
+    }
+  }
+
+  result.push(...synthesizedBindings)
+  return result
 }

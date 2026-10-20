@@ -16,36 +16,36 @@
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "ConfigWriter port defines project initialization and plugin declaration mutation without application-layer filesystem coupling.",
+      "value": "ConfigWriter initializes projects and mutates plugin declarations without coupling application code to filesystem or YAML.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:3cd5446fe99def7a8fc11c7b23672fa27a83d2775931921e294f108da3594303",
-          "lastModified": "2026-09-19T19:11:11.829Z"
+          "hash": "sha256:468de844969947e53ce2dcabc9e645bd26aef6d9cad4fc6f591020094ecfa434",
+          "lastModified": "2026-10-06T08:24:27.573Z"
         },
         "verify.md": {
-          "hash": "sha256:4e90b97c10437e6f7b31f17bd20432042cb77089acadb13b768d46c390ee0e5d",
-          "lastModified": "2026-09-19T19:11:11.831Z"
+          "hash": "sha256:baf3625062112450d0fb6a56253bb64c2b344e70d3ce8cf0d14b2a1f3ea0e27a",
+          "lastModified": "2026-10-06T08:24:27.575Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# ConfigWriter\n\n## Rules\n- TypeScript interface, not abstract class: `initProject`, `addPlugin`, `removePlugin`, `listPlugins`. Port lives application/ports.\n- `initProject(InitProjectOptions): Promise<InitProjectResult>`. Options: absolute projectRoot, schemaRef, workspaceId, relative specsPath, optional force. Result: configPath, schemaRef, readonly workspaces, project-relative metadataCachePath.\n- Initialize specd.yaml with schema/default workspace and omit storage; create specs plus `.specd/{changes,drafts,discarded,archive}`; ensure metadata cache. For default fs metadata only, append rooted `/.specd/metadata/` to root .gitignore. Create `{configPath}/tmp/.gitignore` with normative tmp-ignore contents. Add `specd.local.yaml` and `specd.local.*.yaml` ignores idempotently.\n- Existing specd.yaml without force throws `AlreadyInitialisedError`; force overwrites.\n- `addPlugin(configPath,type,name,config?)` adds unique `{name,config?}` under plugins[type]; `removePlugin` removes named entry; both return Promise<void>. Optional config remains absent unless supplied/required.\n- Delivery obtains wired port via `createConfigWriter()` from `@specd/core`; never imports `FsConfigWriter`. Prefer existing `SpecdConfig` snapshot over `listPlugins` for declaration reads.\n\n## Constraints\n- Port has no node:fs/yaml/I/O dependency. `AlreadyInitialisedError` application-layer.\n- Plugin shape: `{ agents: Array<{name, config?}> }`.",
+      "value": "# ConfigWriter\n\n## Rules\n- TypeScript interface `ConfigWriter`, not abstract class: `initProject`, `addPlugin`, `removePlugin`, `listPlugins`.\n- `initProject(InitProjectOptions): Promise<InitProjectResult>`. Options: absolute `projectRoot`, `schemaRef`, `workspaceId`, relative `specsPath`, optional `force`. Result: absolute `configPath`, `schemaRef`, readonly workspaces, project-relative `metadataCachePath`.\n- Initialize `specd.yaml` with schema/default workspace, omitting storage; create specs and `.specd/{changes,drafts,discarded,archive}`; ensure metadata cache. For default fs metadata only, append rooted `/.specd/metadata/` to root `.gitignore`.\n- Create `{configPath}/tmp/.gitignore` idempotently with normative tmp-ignore contents. Add `specd.local.yaml` and `specd.local.*.yaml` ignores idempotently.\n- Existing `specd.yaml` without force throws `AlreadyInitialisedError`; force overwrites.\n- `addPlugin(configPath,type,name,config?)` adds unique `{name,config?}` under `plugins[type]`; `removePlugin` removes named entry; both return `Promise<void>`.\n- `listPlugins(configPath,type?)` returns matching declarations or all categories; missing file/no declarations returns `[]`.\n- Delivery obtains port through `createConfigWriter()` from `@specd/core`; never imports `FsConfigWriter`. Prefer existing `SpecdConfig` snapshot over `listPlugins` for reads.\n- Validate only required configuration; optional plugin config remains absent unless supplied/required.\n\n## Constraints\n- Port lives `application/ports/`; no `node:fs`, yaml, or I/O dependency.\n- `AlreadyInitialisedError` application-layer.\n- Plugin shape: `{ agents: Array<{ name, config? }> }`.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:3cd5446fe99def7a8fc11c7b23672fa27a83d2775931921e294f108da3594303",
-          "lastModified": "2026-09-19T19:11:11.829Z"
+          "hash": "sha256:468de844969947e53ce2dcabc9e645bd26aef6d9cad4fc6f591020094ecfa434",
+          "lastModified": "2026-10-06T08:24:27.573Z"
         },
         "verify.md": {
-          "hash": "sha256:4e90b97c10437e6f7b31f17bd20432042cb77089acadb13b768d46c390ee0e5d",
-          "lastModified": "2026-09-19T19:11:11.831Z"
+          "hash": "sha256:baf3625062112450d0fb6a56253bb64c2b344e70d3ce8cf0d14b2a1f3ea0e27a",
+          "lastModified": "2026-10-06T08:24:27.575Z"
         }
       }
     }

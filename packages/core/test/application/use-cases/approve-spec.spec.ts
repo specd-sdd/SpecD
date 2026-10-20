@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from 'vitest'
+import { ResolveChangeSchema } from '../../../src/application/services/resolve-change-schema.js'
 import { ApproveSpec } from '../../../src/application/use-cases/approve-spec.js'
 import { ChangeNotFoundError } from '../../../src/application/errors/change-not-found-error.js'
 import { ApprovalGateDisabledError } from '../../../src/application/errors/approval-gate-disabled-error.js'
-import { SchemaMismatchError } from '../../../src/application/errors/schema-mismatch-error.js'
 import { InvalidStateTransitionError } from '../../../src/domain/errors/invalid-state-transition-error.js'
 import { Change, type ChangeEvent } from '../../../src/domain/entities/change.js'
 import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
@@ -13,6 +13,8 @@ import { ReconcileChangeValidity } from '../../../src/application/use-cases/reco
 import { type RefreshImplementationTracking } from '../../../src/application/use-cases/refresh-implementation-tracking.js'
 import { type ActorResolver } from '../../../src/application/ports/actor-resolver.js'
 import { NodeBinaryContentHasher } from '../../../src/infrastructure/node/binary-content-hasher.js'
+import { SchemaProviderIdentityMismatchError } from '../../../src/application/errors/schema-provider-identity-mismatch-error.js'
+import { type SchemaProvider } from '../../../src/application/ports/schema-provider.js'
 import {
   makeChangeRepository,
   makeActorResolver,
@@ -29,6 +31,7 @@ function buildApproveSpec(
   repo: ReturnType<typeof makeChangeRepository>,
   options?: {
     schema?: ReturnType<typeof makeSchema>
+    schemaProvider?: SchemaProvider
     approvals?: { readonly spec: boolean; readonly signoff: boolean }
     actor?: ActorResolver
   },
@@ -36,7 +39,7 @@ function buildApproveSpec(
   const schema = options?.schema ?? makeSchema()
   const approvals = options?.approvals ?? { spec: true, signoff: false }
   const actor = options?.actor ?? makeActorResolver()
-  const schemaProvider = makeSchemaProvider(schema)
+  const schemaProvider = options?.schemaProvider ?? makeSchemaProvider(schema)
   const fingerprint = new ValidityFingerprintService({
     changes: repo,
     hasher: makeContentHasher(),
@@ -45,7 +48,7 @@ function buildApproveSpec(
   })
   const reconcile = new ReconcileChangeValidity({
     changes: repo,
-    schemaProvider,
+    resolveChangeSchema: new ResolveChangeSchema(schemaProvider),
     actor,
     refreshImplementationTracking: {
       execute: async () => undefined,
@@ -384,20 +387,42 @@ describe('ApproveSpec', () => {
     })
   })
 
-  describe('given the active schema differs from the change schema', () => {
-    it('throws SchemaMismatchError before mutate', async () => {
+  describe('given the change schema is resolved by sovereign reference', () => {
+    it('resolves schema by change.schemaName and succeeds', async () => {
       const change = makePendingSpecApprovalChange('my-change', 'schema-a')
       const repo = makeChangeRepository([change])
-      const mutateSpy = vi.spyOn(repo, 'mutate')
-      const uc = buildApproveSpec(repo, { schema: makeSchema({ name: 'schema-b' }) })
-
-      await expect(
-        uc.execute({
-          name: 'my-change',
-          reason: 'ok',
+      const schemaA = makeSchema({ name: 'schema-a' })
+      const schemaProvider: SchemaProvider = {
+        get: vi.fn().mockImplementation(async (ref?: string) => {
+          if (ref === 'schema-a') return schemaA
+          return makeSchema({ name: 'fallback' })
         }),
-      ).rejects.toThrow(SchemaMismatchError)
-      expect(mutateSpy).not.toHaveBeenCalled()
+      }
+      const uc = buildApproveSpec(repo, { schemaProvider })
+
+      const result = await uc.execute({
+        name: 'my-change',
+        reason: 'ok',
+      })
+      expect(result.name).toBe('my-change')
+      expect(schemaProvider.get).toHaveBeenCalledWith('schema-a')
+    })
+
+    it('fails closed on a provider identity mismatch instead of using the default schema', async () => {
+      const change = makePendingSpecApprovalChange('my-change', 'schema-a')
+      const repo = makeChangeRepository([change])
+      const schemaProvider: SchemaProvider = {
+        get: vi
+          .fn()
+          .mockImplementation(async (ref?: string) =>
+            makeSchema({ name: ref === 'schema-a' ? 'schema-b' : 'default-schema' }),
+          ),
+      }
+      const uc = buildApproveSpec(repo, { schemaProvider })
+
+      await expect(uc.execute({ name: 'my-change', reason: 'ok' })).rejects.toBeInstanceOf(
+        SchemaProviderIdentityMismatchError,
+      )
     })
   })
 

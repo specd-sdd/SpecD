@@ -7,17 +7,10 @@
     "core:change",
     "core:composition",
     "core:composition-resolver",
-    "core:list-workspaces"
+    "core:list-workspaces",
+    "core:resolve-change-schema"
   ],
   "implementation": [
-    {
-      "file": "core:src/domain/errors/incompatible-schema-error.ts",
-      "symbols": ["IncompatibleSchemaError"]
-    },
-    {
-      "file": "core:src/application/use-cases/_shared/load-persisted-spec-schema.ts",
-      "symbols": ["loadPersistedSpecSchema"]
-    },
     {
       "file": "core:src/application/use-cases/edit-change.ts",
       "symbols": ["EditChange"]

@@ -138,6 +138,14 @@
 - **WHEN** the status command is rendered
 - **THEN** it does not recommend `/specd-implement` instead
 
+#### Scenario: Pipeline display annotates optional steps and omits disabled steps
+
+- **GIVEN** a schema with optional step `implementing` and disabled step `verifying`
+- **WHEN** `specd changes status <name>` is rendered
+- **THEN** the pipeline output annotates `implementing` as optional
+- **AND** `verifying` is excluded from the pipeline rendering
+- **AND** available transitions include bypass paths permitted by step-skip checks
+
 #### Scenario: Drafted JSON empties hops even if Core leaks them
 
 - **GIVEN** a drafted change
@@ -147,6 +155,20 @@
 - **THEN** JSON `availableTransitions` is `[]`
 - **AND** JSON `availableSteps` is `[]`
 - **AND** JSON `nextAction.command` is `null`
+
+#### Scenario: Pipeline follows canonical order and omits disabled steps
+
+- **GIVEN** a schema whose rows are declared as `verifying [disabled]`, `implementing [optional]`, `ready`
+- **WHEN** `specd change status <name>` is rendered in text and JSON
+- **THEN** the pipeline lists `ready`, `implementing [optional]` in canonical order
+- **AND** `verifying` is absent from both outputs
+- **AND** JSON `availableSteps` entries expose `optional`
+
+#### Scenario: Artifact DAG comes from the change's schema
+
+- **GIVEN** a change whose `schemaName` is `custom-workflow` with a workspace default exposing a different artifact DAG
+- **WHEN** `specd change status <name>` is rendered
+- **THEN** the artifact DAG shown is the `custom-workflow` DAG
 
 ### Requirement: Reconciled validity and next-action output
 
@@ -212,10 +234,18 @@
 
 #### Scenario: Schema mismatch
 
-- **GIVEN** the change was created with schema version 1 and the active schema is version 2
+- **GIVEN** the change was created with schema `custom-workflow` version 1 and the provider resolves `custom-workflow` version 2
 - **WHEN** `specd change status <name>` is run
-- **THEN** stderr contains a `warning:` line mentioning both schema versions
+- **THEN** stdout contains a `warnings:` section with `! SCHEMA_VERSION_DRIFT: …` naming both versions
+- **AND** stderr contains no schema warning
+- **AND** `--format json` includes `schemaWarnings` with `recordedVersion: 1` and `resolvedVersion: 2`
 - **AND** the process exits with code 0
+
+#### Scenario: Different workspace default is not drift
+
+- **GIVEN** the change records `custom-workflow` version 1 and the workspace default is `@specd/schema-std`
+- **WHEN** `specd change status <name>` is run
+- **THEN** no `warnings:` section is rendered and `schemaWarnings` is empty
 
 ### Requirement: Change not found
 

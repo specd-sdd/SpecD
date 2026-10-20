@@ -12,7 +12,9 @@
     "core:change",
     "core:template-variables",
     "core:archive-repository-port",
-    "core:composition-resolver"
+    "core:composition-resolver",
+    "core:resolve-change-schema",
+    "core:workflow-topology"
   ],
   "implementation": [
     {

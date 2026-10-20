@@ -99,7 +99,23 @@
 
 - **GIVEN** the `workflow` section in `schema.yaml`
 - **WHEN** querying supported change workflow steps
-- **THEN** steps `drafting`, `designing`, `ready`, `implementing`, `verifying`, `done`, `pending-signoff`, `signed-off`, and `archiving` are present with explicit valid transitions
+- **THEN** declarative rows `designing`, `ready`, `implementing`, `verifying`, and `archiving` are present
+- **AND** `pending-spec-approval`, `pending-signoff`, and `signed-off` are absent from `workflow[]`
+- **AND** approvals remain delivery-edge checks rather than parking-state rows
+- **AND** `done` remains a mandatory protocol-owned completed-delivery boundary distinct from `archivable`
+
+#### Scenario: Schema supports optional and disabled flags
+
+- **GIVEN** a workflow step declared in `schema.yaml`
+- **WHEN** declaring `optional: true` or `disabled: true`
+- **THEN** the schema parser parses and validates the flags according to domain rules
+
+#### Scenario: Signoff off skips the check but not done
+
+- **GIVEN** the standard schema and `approvals.signoff: false`
+- **WHEN** the lifecycle advances from verified delivery toward archive readiness
+- **THEN** it still enters `done`
+- **AND** `approval.signoff` skips on `done -> archivable`
 
 ### Requirement: Schema Package Distribution
 

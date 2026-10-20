@@ -17,5 +17,41 @@
       "file": "core:src/infrastructure/fs/path-confinement.ts",
       "symbols": ["resolveConfinedPath"]
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "FileReader supplies UTF-8 reads behind a hexagonal port, returning null only for missing files and optionally enforcing a base path.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:a5b2615bf9592696d8bc3e64862d794f04ef510caa700d5e91371abb02136397",
+          "lastModified": "2026-09-28T11:19:59.132Z"
+        },
+        "verify.md": {
+          "hash": "sha256:d60b7f8af081809dfef6153c04a95f6b3146398390e1abb0b20f04d1a219e321",
+          "lastModified": "2026-09-28T11:19:59.133Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# FileReader Port\n\n## Rules\n- TypeScript interface `FileReader`, not abstract class; single `read(absolutePath: string): Promise<string | null>`.\n- Read UTF-8 text. Missing path (`ENOENT`) returns `null`; every other filesystem error propagates.\n- Implementations resolve input before reading or traversal checks.\n- Optional constructor `basePath` constraint rejects escaped resolved paths with `PathTraversalError`.\n- Inside-root rule: relative path from resolved base is empty, or neither begins with `..` nor is absolute. Handle drive-letter case; never use string-prefix-plus-separator test.\n\n## Constraints\n- Port lives `application/ports/`; no `node:fs` or I/O dependency at port level.\n- Return type `string | null`, never `Buffer`; `null` exclusively means absent file.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:a5b2615bf9592696d8bc3e64862d794f04ef510caa700d5e91371abb02136397",
+          "lastModified": "2026-09-28T11:19:59.132Z"
+        },
+        "verify.md": {
+          "hash": "sha256:d60b7f8af081809dfef6153c04a95f6b3146398390e1abb0b20f04d1a219e321",
+          "lastModified": "2026-09-28T11:19:59.133Z"
+        }
+      }
+    }
+  }
 }

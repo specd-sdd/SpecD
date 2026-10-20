@@ -9,12 +9,12 @@ Metadata must be producible deterministically from spec content so that every pr
 ### Requirement: Input and output
 
 The use case takes a `specId` string (e.g. `'core/change'` or
-`'billing:invoices/create'`). It returns `{ metadata: SpecMetadata,
+`'billing:invoices/create'`) and an optional `schemaName` naming the schema that governs the spec in the caller's change context (see Requirement: Schema resolution). It returns `{ metadata: SpecMetadata,
 hasExtraction: boolean }`. `metadata` contains the extracted fields, content
 hashes, canonical `dependsOn`, and a `provenance` record capturing the exact
 artifact hashes/lastModified, `persistedStateHash`, schema identity, projection
 version, and projection fingerprint used to produce this result. `hasExtraction`
-indicates whether the active schema declares any `metadataExtraction` rules.
+indicates whether the extraction schema selected for this call declares any `metadataExtraction` rules.
 
 The returned `provenance` MUST reflect the exact loaded artifact set and lock
 snapshot used during this call — not a subsequently re-read state — so that
@@ -23,7 +23,15 @@ artifact content.
 
 ### Requirement: Schema resolution
 
-The use case obtains the active schema via `SchemaProvider.get()`. If the schema cannot be resolved, `get()` throws `SchemaNotFoundError` or `SchemaValidationError` — the use case does not catch these. If the resolved schema has no `metadataExtraction` declarations, the use case returns `{ metadata: {}, hasExtraction: false }` immediately — there is nothing to extract.
+The use case SHALL select the extraction schema in this order of precedence:
+
+1. **Explicit change context.** When the input supplies `schemaName`, the use case MUST obtain the schema through `SchemaProvider.get(schemaName)`. Callers acting inside a change (for example a spec created or modified by an unarchived change, or `ArchiveChange` materializing the specs it just published) MUST pass the change's sovereign schema name resolved through `ResolveChangeSchema`.
+2. **Persisted spec schema.** When no `schemaName` is supplied and the spec has persisted state (`spec-lock.json`) recording a schema identity, the use case MUST obtain the schema through `SchemaProvider.get(<persisted identity name>)`.
+3. **Project default.** Only when no `schemaName` is supplied and the spec has no persisted schema identity (a legacy lock-less spec used outside any change) the use case MUST use the project default schema (`SchemaProvider.get()`).
+
+The use case MUST NOT fall back from step 1 or step 2 to the project default when the named lookup fails. If the provider returns a schema whose canonical name differs from the requested name, the use case MUST throw `SchemaProviderIdentityMismatchError`. Lookup failures (`SchemaNotFoundError`, `SchemaValidationError`) propagate uncaught.
+
+If the selected schema has no `metadataExtraction` declarations, the use case returns `{ metadata: {}, hasExtraction: false }` immediately — there is nothing to extract.
 
 ### Requirement: Spec resolution
 
@@ -138,7 +146,7 @@ The final metadata object merges:
 - implementation projection from persisted repository semantics
 - fresh lock-owned optimization fields, per Requirement: Fresh lock-owned optimizations only
 - `contentHashes` from the hashing step
-- `provenance` — the exact artifact hashes/lastModified, `persistedStateHash` (or `null` for a lock-less spec), schema identity (resolved from persisted state or fallback `schema.canonicalSpecSchema()`), projection version, and projection fingerprint used during this generation attempt
+- `provenance` — the exact artifact hashes/lastModified, `persistedStateHash` (or `null` for a lock-less spec), schema identity (the explicit schema's `canonicalSpecSchema()` when `schemaName` is supplied; otherwise the persisted lock identity; otherwise the project default's `canonicalSpecSchema()`), which always describes the schema actually used for extraction, projection version, and projection fingerprint used during this generation attempt
 - `generatedBy: 'core'`
 
 The result is returned with `hasExtraction: true`.
@@ -185,3 +193,5 @@ The helper is the only use-case-specific composition entry for config-based boot
 - [`core:spec-optimization`](../spec-optimization/spec.md) — per-field
   optimization record and freshness reasons used to decide which optimized
   fields to project
+- [`core:resolve-change-schema`](../resolve-change-schema/spec.md) — callers inside a change supply the sovereign schema name it resolves
+- [`core:spec-lock`](../spec-lock/spec.md) — persisted spec schema identity used when no explicit schema is supplied

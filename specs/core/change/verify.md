@@ -243,18 +243,24 @@ Scenarios:
 
 ### Requirement: Signoff gate
 
-Scenarios:
-
 #### Scenario: Signoff cannot rely on stale verification
 
-- **GIVEN** signoff is enabled and verification evidence is stale
+- **GIVEN** signoff is enabled, `verifying` is enabled, and verification evidence is stale
 - **WHEN** `done → archivable` is evaluated
 - **THEN** the transition is blocked until verification is renewed and signoff is valid for current inputs
+
+#### Scenario: Signoff without verification when verifying is disabled
+
+- **GIVEN** signoff is enabled and the change schema disables `verifying`
+- **AND** sign-off is valid and no verification evidence exists
+- **WHEN** `done → archivable` is evaluated
+- **THEN** `approval.signoff` passes
+- **AND** the transition is not blocked for verification
 
 #### Scenario: Disabled signoff still preserves other archive checks
 
 - **WHEN** signoff gate is disabled
-- **THEN** approval check skips while verification, freshness, tasks, and archive checks still apply
+- **THEN** approval check skips while required verification, freshness, tasks, and archive checks still apply
 
 ### Requirement: Materialized approval and verification projections
 
@@ -299,6 +305,48 @@ Scenarios:
 - **WHEN** `StartVerification` is constructed through either supported factory
 - **THEN** its deps include the schema provider and reconciler used for operation-specific readiness checks
 - **AND** no fake transition context is required
+
+### Requirement: StartVerification sovereign schema resolution
+
+#### Scenario: Verification readiness ignores a different workspace default
+
+- **GIVEN** a change whose `schemaName` is `custom-workflow`
+- **AND** the workspace default defines different required artifacts, topology, or checks
+- **WHEN** `StartVerification` evaluates operation-specific readiness
+- **THEN** it calls `SchemaProvider.get('custom-workflow')`
+- **AND** constructs the check context exclusively from the custom schema
+
+#### Scenario: Schema resolution failure creates no attempt
+
+- **GIVEN** resolving the schema recorded on the change fails
+- **WHEN** `StartVerification` executes
+- **THEN** the error propagates
+- **AND** no active verification attempt is created
+
+### Requirement: Verification requirement follows workflow topology
+
+#### Scenario: Disabled verifying projects verification as not required
+
+- **GIVEN** a change in `done` whose schema disables `verifying`
+- **AND** no verification attempt or completed evidence exists
+- **WHEN** the real validity reconciler runs
+- **THEN** the verdict reports verification `not-required`
+- **AND** no `VERIFICATION_REQUIRED`, `VERIFICATION_IN_PROGRESS`, or `VERIFICATION_STALE` blocker is produced
+
+#### Scenario: Enabled verifying still requires evidence at done
+
+- **GIVEN** a change in `done` whose schema enables `verifying`
+- **AND** no completed verification evidence exists
+- **WHEN** the real validity reconciler runs
+- **THEN** the verdict reports verification `absent`
+- **AND** a `VERIFICATION_REQUIRED` blocker is produced
+
+#### Scenario: Reconciler resolves the schema through ResolveChangeSchema
+
+- **GIVEN** a schema provider that returns a schema whose canonical name differs from `change.schemaName`
+- **WHEN** the validity reconciler runs
+- **THEN** it fails with `SchemaProviderIdentityMismatchError`
+- **AND** no validity projection is persisted
 
 ### Requirement: Artifacts
 
@@ -560,30 +608,45 @@ Scenarios:
 
 ### Requirement: Schema version
 
-#### Scenario: Schema version mismatch warns
+#### Scenario: Different workspace default does not reject an existing change
 
-- **WHEN** a Change is loaded and the active schema's version differs from the `schemaVersion` initialized from the root schema properties
-- **THEN** specd emits a warning but the change remains fully usable
+- **GIVEN** a change records `schemaName: custom-workflow`
+- **AND** the workspace default is `schema-std`
+- **WHEN** the change is loaded or a change-scoped operation executes
+- **THEN** the operation requests `custom-workflow`
+- **AND** the workspace-default difference does not throw `SchemaProviderIdentityMismatchError`
+- **AND** no fallback replaces the recorded schema identity
 
-#### Scenario: Schema mismatch does not block archive
+#### Scenario: Provider identity mismatch throws SchemaProviderIdentityMismatchError
 
-- **WHEN** a Change with a schema version mismatch is in `archivable` state
-- **THEN** archiving proceeds normally — the mismatch warning is advisory only
+- **GIVEN** an operation requests the schema recorded on the change
+- **AND** the provider returns a schema whose identity differs from that requested name
+- **WHEN** the operation validates the resolved schema before using schema-derived behavior
+- **THEN** `SchemaProviderIdentityMismatchError` is thrown
+- **AND** no topology, artifacts, checks, hooks, or validation rules from that schema are used
 
-#### Scenario: Schema name mismatch throws SchemaMismatchError
+#### Scenario: Schema version mismatch emits an advisory warning
 
-- **GIVEN** a change was created with schema name `schema-std`
-- **AND** the active system schema is `custom-schema`
-- **WHEN** the change is loaded or a use case is executed
-- **THEN** `SchemaMismatchError` is thrown
+- **GIVEN** a change records schema version 1
+- **AND** the resolved schema has the same name and version 2
+- **WHEN** `ResolveChangeSchema` performs the named sovereign lookup
+- **THEN** the result's `warnings` contains a typed advisory naming both versions
+- **AND** no other component (repository, manifest loader) emits a version warning against the workspace default
+- **AND** the change remains fully usable
 
-#### Scenario: Schema version mismatch emits warning
+#### Scenario: Workspace default version is irrelevant to advisory detection
 
-- **GIVEN** a change was created with schema version 1
-- **AND** the active system schema version is 2
-- **WHEN** the change is loaded
-- **THEN** a warning is emitted mentioning both versions
-- **AND** the change remains usable
+- **GIVEN** the workspace default has a different version
+- **AND** the named sovereign lookup returns the exact recorded name and version
+- **WHEN** `ResolveChangeSchema` runs
+- **THEN** no version advisory is emitted because of the workspace default
+
+#### Scenario: Schema version mismatch does not block archive
+
+- **GIVEN** a change with a same-name schema version mismatch is archivable
+- **WHEN** archive preflight resolves the recorded schema
+- **THEN** archiving may proceed normally
+- **AND** the version warning remains advisory
 
 ### Requirement: Drafting and discarding
 
@@ -701,6 +764,14 @@ Scenarios:
 - **WHEN** artifact sync reconciles the artifact map
 - **THEN** an `artifacts-synced` event is appended describing the added and removed files and artifact types
 
+#### Scenario: Custom-schema change is never synced from the workspace default
+
+- **GIVEN** a change whose `schemaName` is `custom-workflow` with artifact types `a` and `b`
+- **AND** a workspace default schema with different artifact types
+- **WHEN** the change is loaded and saved
+- **THEN** its artifact map is synced only against `custom-workflow` artifact types
+- **AND** no `artifacts-synced` event adds or removes artifacts because of the workspace default
+
 ### Requirement: Lifecycle interpretation authority
 
 #### Scenario: Dependency-aware lifecycle interpretation is external to Change
@@ -734,3 +805,20 @@ Scenarios:
 - **WHEN** only its task content changes
 - **THEN** approval and verification fingerprints remain unchanged
 - **AND** live task completion can still block transition or archive
+
+### Requirement: Sovereign schema for validity fingerprints
+
+#### Scenario: Fingerprint artifact selection ignores a different workspace default
+
+- **GIVEN** a change whose `schemaName` is `custom-workflow`
+- **AND** the custom schema and workspace default declare different artifact sets or `hasTasks` flags
+- **WHEN** artifact, approval, or complete verification fingerprints are collected
+- **THEN** `ValidityFingerprintService` calls `SchemaProvider.get('custom-workflow')`
+- **AND** hashes and exclusions are derived exclusively from the custom schema
+
+#### Scenario: Sovereign schema failure produces no cross-schema evidence
+
+- **GIVEN** resolving the schema recorded on the change fails
+- **WHEN** validity fingerprint collection runs during reconciliation or evidence capture
+- **THEN** the failure propagates according to the caller's fingerprint failure contract
+- **AND** no approval, verification, sign-off, archive, or reconciliation evidence is produced from the workspace default

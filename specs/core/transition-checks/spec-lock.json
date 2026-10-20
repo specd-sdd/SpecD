@@ -6,6 +6,7 @@
   "dependsOn": [
     "core:change",
     "core:workflow-model",
+    "core:workflow-topology",
     "core:schema-format",
     "default:_global/architecture",
     "core:check-registry"
@@ -13,54 +14,23 @@
   "implementation": [
     {
       "file": "core:src/domain/services/transition-checks.ts",
-      "symbols": [
-        "Check",
-        "CheckResult",
-        "CheckExecutionContext",
-        "CustomCheckDefinition",
-        "CheckBindingSpec",
-        "CheckBinding",
-        "applyBindingSpecs",
-        "pass",
-        "skip",
-        "fail"
-      ]
+      "symbols": ["CheckApplicability", "classifyAlong", "resolveEffectiveBindings"]
+    },
+    {
+      "file": "core:src/domain/checks/workflow-tasks-empty.ts",
+      "symbols": ["workflowTasksEmpty"]
     },
     {
       "file": "core:src/domain/services/check-bindings.ts",
-      "symbols": ["TRANSITION_BINDING_SPECS", "ARCHIVE_BINDING_SPECS", "DOMAIN_CHECKS"]
-    },
-    {
-      "file": "core:src/domain/checks/impl-links-in-scope.ts",
-      "symbols": ["runImplLinksInScope", "implLinksInScope"]
-    },
-    {
-      "file": "core:src/domain/checks/spec-overlap.ts",
-      "symbols": ["runSpecOverlap", "specOverlap"]
-    },
-    {
-      "file": "core:src/application/checks/impl-links-in-scope.ts",
-      "symbols": ["createImplLinksInScope"]
-    },
-    {
-      "file": "core:src/application/checks/spec-overlap.ts",
-      "symbols": ["createSpecOverlap"]
-    },
-    {
-      "file": "core:src/domain/errors/check-predicate-failed-error.ts",
-      "symbols": ["CheckPredicateFailedError"]
+      "symbols": ["TRANSITION_BINDING_SPECS"]
     },
     {
       "file": "core:src/application/services/execute-matching-predicates.ts",
-      "symbols": ["executeMatchingPredicates"]
+      "symbols": ["executeChecksByLegalTargets"]
     },
     {
-      "file": "core:src/application/use-cases/transition-change.ts",
-      "symbols": ["TransitionChange"]
-    },
-    {
-      "file": "core:src/application/use-cases/get-status.ts",
-      "symbols": ["GetStatus"]
+      "file": "core:src/domain/checks/protocol-edge.ts",
+      "symbols": ["run"]
     }
   ],
   "optimizations": {

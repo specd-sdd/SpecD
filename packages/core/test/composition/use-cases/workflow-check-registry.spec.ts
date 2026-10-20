@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { resolveWorkflowCheckRegistry } from '../../../src/composition/use-cases/workflow-check-registry.js'
 import { resolveGetStatusDeps } from '../../../src/composition/use-cases/get-status.js'
 import { type CompositionResolver } from '../../../src/composition/composition-resolver.js'
+import { ResolveChangeSchema } from '../../../src/application/services/resolve-change-schema.js'
+import { CheckRegistry } from '../../../src/domain/services/check-registry.js'
 import { Change } from '../../../src/domain/entities/change.js'
 import { type ChangeValidityVerdict } from '../../../src/domain/services/change-validity.js'
 import { type CheckExecutionContext } from '../../../src/domain/services/transition-checks.js'
@@ -37,15 +39,17 @@ function makeChange(name: string, specIds: readonly string[]): Change {
 
 function makeResolver(changes: Change[]): CompositionResolver {
   const repo = makeChangeRepository(changes)
+  const schemaProvider = makeSchemaProvider(makeSchema())
   return {
     getChangeRepository: () => repo,
-    getSchemaProvider: () => makeSchemaProvider(makeSchema()),
+    getSchemaProvider: () => schemaProvider,
     getListWorkspaces: () => makeListWorkspaces(),
     getArtifactParserRegistry: () => makeNoopParsers(),
     getExtractorTransforms: () => new Map(),
     getSpecWorkspaceRoutes: () => [],
     getRunStepHooks: () => makeRunStepHooks(),
     getContentHasher: () => ({ hash: () => 'sha256:test' }),
+    getResolveChangeSchema: () => new ResolveChangeSchema(schemaProvider),
   } as unknown as CompositionResolver
 }
 
@@ -138,6 +142,7 @@ describe('resolveWorkflowCheckRegistry', () => {
         { scope: 'transition', from: 'implementing', to: '*', along: 'forward' },
         { scope: 'transition', from: '*', to: 'verifying', along: '*' },
         { scope: 'operation', operation: 'verification-start' },
+        { scope: 'step-skip', step: 'implementing' },
       ])
       expect(registry.archiveBindings.some((binding) => binding.check.id === id)).toBe(true)
     }
@@ -270,6 +275,7 @@ describe('resolveWorkflowCheckRegistry', () => {
       registry: {
         checks: {
           bindings: () => [rogueBinding, legitCustomBinding],
+          withExecutableBuiltins: () => undefined,
         },
       },
     })
@@ -286,5 +292,45 @@ describe('resolveWorkflowCheckRegistry', () => {
     const custom = registry.transitionBindings.find((b) => b.check.id === '@security.audit')
     expect(custom).toBeDefined()
     expect(custom!.check.label).toBe('Legitimate Security Audit')
+  })
+
+  it('includes plugin step-skip default bindings in the transition base table', () => {
+    const checks = new CheckRegistry()
+    checks.register(
+      'qa',
+      {
+        id: 'freeze',
+        label: 'Freezing',
+        execute: async () => ({ id: '@qa.freeze', label: 'x', kind: 'predicate', outcome: 'pass' }),
+      },
+      [{ scope: 'step-skip', step: 'implementing', skippable: false }],
+    )
+    const resolver = makeResolver([])
+    Object.assign(resolver, { registry: { checks } })
+
+    const registry = resolveWorkflowCheckRegistry(resolver)
+
+    const binding = registry.transitionBindings.find((b) => b.check.id === '@qa.freeze')
+    expect(binding?.applicability).toEqual([{ scope: 'step-skip', step: 'implementing' }])
+  })
+  it('exposes a registry whose built-ins are the executable instances', () => {
+    const checks = new CheckRegistry()
+    const stub = checks.get('impl.linksInScope')
+    const resolver = makeResolver([])
+    Object.assign(resolver, { registry: { checks } })
+
+    const registry = resolveWorkflowCheckRegistry(resolver)
+
+    const executable = registry.checkRegistry?.get('impl.linksInScope')
+    expect(executable).toBe(registry.checks['impl.linksInScope'])
+    expect(executable).not.toBe(stub)
+    expect(registry.checkRegistry?.getGovernance('impl.linksInScope')).toEqual(
+      checks.getGovernance('impl.linksInScope'),
+    )
+  })
+
+  it('returns no executable registry when the composition has none', () => {
+    const registry = resolveWorkflowCheckRegistry(makeResolver([]))
+    expect(registry.checkRegistry).toBeUndefined()
   })
 })

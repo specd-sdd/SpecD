@@ -28,36 +28,36 @@
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Defines instruction, shell, and external hooks, lifecycle phases, failure semantics, and unresolved execution constraints.",
+      "value": "Defines instruction, shell, and external hooks, binding-driven execution, skip controls, ordering, templating, and resilient failures.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:70671a102914d6308e20e0ba36be48b0709469100291cee6cb2c1ca482cd8173",
-          "lastModified": "2026-09-28T11:19:59.153Z"
+          "hash": "sha256:50cb73b990f243013f8666a582b84b6dea8320de79b5c3cffabac3cc5f25b600",
+          "lastModified": "2026-10-01T14:53:49.965Z"
         },
         "verify.md": {
-          "hash": "sha256:fd1d18b6f03a1862ef89439b662ea0ba3551b706ff8409992701301952aec2f9",
-          "lastModified": "2026-09-28T11:19:59.154Z"
+          "hash": "sha256:db698f51a93d2cea702870fc554021e6fcb81ae5e3c95a26d92a2d99d3c72230",
+          "lastModified": "2026-10-01T14:53:49.966Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# Hook Execution Model\n\n## Rules\n- Hook entry: `id` + exactly one `instruction:`, `run:`, or `external: { type, config }`; otherwise `SchemaValidationError`. Every workflow step supports all forms.\n- `instruction:`: passive query-time text, consumed only by `GetHookInstructions(step, phase, hookId?)`; never process, side effect, predicate, effect, runtime execution, or `CompileContext` content.\n- `run:`: shell command executed only by `HookRunner`; returns exit code/stdout/stderr; never agent context.\n- `external:`: explicit dispatch to registered runner accepting `external.type`; no accepting runner MUST fail clearly. `HookRunner` remains shell-only.\n- External hooks use same lifecycle semantics as shell hooks: pre failure fail-fast; post failure reported without rollback.\n- `TransitionChange` and `ArchiveChange` auto-execute matching `run:` effects after predicates pass. Binding supplies slot/failure policy; check id does not.\n- `TransitionChange`: match effects by same `from`/`to`/`along`; execute `phase = before-persist` effects (`hook.post` and `hook.pre`); `onFailure = abort`; hook checks own `RunStepHooks` dependency.\n- `ArchiveChange`: execute operation-`archive` effects with `phase = before-persist` before commit and `phase = after-persist` after commit. Defaults: `hook.pre` abort/before-persist; `hook.post` collect/after-persist.\n\n## Constraints\n- `instruction:` never executes and MUST NOT enter transition predicates/effects.\n- `run:` never enters agent context. All workflow steps may contain both `instruction:` and `run:`.\n- Pre hooks: always fail-fast, `onFailure = abort`.\n- Transition `source.post`: forward-only, `phase = before-persist`, `onFailure = abort`.\n- Archive post hooks: fail-soft, `phase = after-persist`, `onFailure = collect`.\n- Schema hooks precede project hooks within phase.\n- Unresolved source conflict preserved:\n  - `HEAD`: `TransitionChange` and `ArchiveChange` MUST select effects by binding `phase`/`onFailure`, not check id; hook execute SHALL call `RunStepHooks`; use cases MUST NOT launch it by check id; `RunStepHooks` serves hook checks + CLI; `HookRunner` handles expansion and shell escaping; `--skip-hooks` skips effects only.\n  - Incoming: `TransitionChange` and `ArchiveChange` delegate hook execution to `RunStepHooks`; `RunStepHooks` serves all use cases + CLI; developer `run:` template expansion is verbatim, then `HookRunner` translates only unsupported quote syntax; callers do not shell-escape values.",
+      "value": "# Hook Execution Model\n\n## Rules\n- Hook entry: `id` plus exactly one `instruction:`, `run:`, or `external: { type, config }`; otherwise `SchemaValidationError`. Every workflow step supports all forms.\n- `instruction:`: passive query-time text consumed only by `GetHookInstructions(step, phase, hookId?)`; never process, side effect, predicate/effect, runtime execution, or `CompileContext` content.\n- `run:`: shell command executed by `HookRunner`; returns exit code/stdout/stderr; never agent context. `external:`: dispatched only to registered runner accepting `external.type`; missing runner fails clearly.\n- `TransitionChange`/`ArchiveChange` auto-execute matching executable effects after predicates. Binding supplies `phase`/`onFailure`; use cases never branch or launch by check id. Registered hook effects delegate collection, recording, execution to `RunStepHooks`.\n- Transition effects match `from`/`to`/`along`; executable `hook.pre` and forward-only source `hook.post` run `before-persist`, default abort. Archive `hook.pre` runs abort/`before-persist`; `hook.post` collect/`after-persist`.\n- Manual selectors: transition `source.pre|source.post|target.pre|target.post|all`; archive `pre|post|all`. `--skip-hooks` skips matching effects only; predicates remain. Manual skill flow must preserve `along` filter.\n- Executable hook `onFailure: abort|warn` (default abort). `abort` nonzero halts and yields `success:false`; `warn` captures real exit/stdout/stderr in `warnings`, emits telemetry, continues. Phase succeeds when all failures are warnings.\n- Post mutation failures never roll back committed state; abort still halts remaining post hooks, warn continues.\n- Ordering per phase: schema hooks declaration order, then project `schemaOverrides` declaration order.\n- `HookRunner` expands `{{change.name}}`, `{{change.path}}`, `{{project.root}}`; unknown paths unchanged; `{{change.workspace}}` unsupported. Substitute verbatim; author owns quoting; runner translates only host-unsupported quote syntax; callers never shell-escape/add quoting.\n\n## Constraints\n- `Change` entity never executes hooks; application layer owns execution.\n- `instruction:` never executes or enters predicates/effects; `run:` never enters agent context.\n- `RunStepHooks` is single engine for hook checks, lifecycle use cases, CLI.\n- Pre hooks fail fast for abort policy; transition source.post is forward-only abort/before-persist; archive post uses collect/after-persist.\n- `--skip-hooks` affects effects only.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:70671a102914d6308e20e0ba36be48b0709469100291cee6cb2c1ca482cd8173",
-          "lastModified": "2026-09-28T11:19:59.153Z"
+          "hash": "sha256:50cb73b990f243013f8666a582b84b6dea8320de79b5c3cffabac3cc5f25b600",
+          "lastModified": "2026-10-01T14:53:49.965Z"
         },
         "verify.md": {
-          "hash": "sha256:fd1d18b6f03a1862ef89439b662ea0ba3551b706ff8409992701301952aec2f9",
-          "lastModified": "2026-09-28T11:19:59.154Z"
+          "hash": "sha256:db698f51a93d2cea702870fc554021e6fcb81ae5e3c95a26d92a2d99d3c72230",
+          "lastModified": "2026-10-01T14:53:49.966Z"
         }
       }
     }

@@ -184,13 +184,27 @@
 - **AND** only the failing diff entry omits `diff`
 - **AND** warnings record the diff-generation failure separately from merge failures
 
-### Requirement: Schema name guard
+#### Scenario: Schema identity mismatch propagates instead of a partial result
 
-#### Scenario: Schema mismatch throws
+- **GIVEN** a schema provider that returns a schema whose canonical name differs from `change.schemaName`
+- **WHEN** `PreviewSpec.execute` runs
+- **THEN** it throws `SchemaProviderIdentityMismatchError`
+- **AND** it does not return a partial result with warnings
 
-- **GIVEN** a change with `schemaName: "schema-std"` and a schema whose `name()` is `"other-schema"`
+#### Scenario: Schema resolution failure propagates
+
+- **GIVEN** resolving the change's schema fails
+- **WHEN** `PreviewSpec.execute` runs
+- **THEN** the resolution error propagates
+
+### Requirement: Sovereign schema resolution
+
+#### Scenario: Resolves sovereign schema when workspace default differs
+
+- **GIVEN** a change with `schemaName: "custom-schema"` and a workspace default schema `"schema-std"`
 - **WHEN** `PreviewSpec.execute` is called
-- **THEN** the use case throws `SchemaMismatchError`
+- **THEN** it resolves `"custom-schema"` via `SchemaProvider.get("custom-schema")`
+- **AND** previews the spec without throwing `SchemaMismatchError`
 
 ### Requirement: Config-based factory delegates through resolvePreviewSpecDeps
 

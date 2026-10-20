@@ -11,13 +11,19 @@
 - **THEN** `buildSchema` throws `SchemaValidationError` because `reviewing` is not a valid Change lifecycle state
 - **AND** `TransitionChange` is never invoked with that name
 
+#### Scenario: Drain-state row rejected
+
+- **GIVEN** a schema with a `workflow` row `{ step: "pending-spec-approval" }` (or any other drain-only approval state)
+- **WHEN** the schema is built or resolved
+- **THEN** `buildSchema` throws `SchemaValidationError`
+- **AND** the drain state never occupies a pipeline slot
+
 #### Scenario: Omitted workflow row does not delete the protocol state
 
 - **GIVEN** a schema whose `workflow[]` lists `designing` and `ready` but not `implementing`
-- **AND** `VALID_TRANSITIONS` still allows `ready → implementing`
 - **WHEN** `workflowStep("implementing")` is resolved
 - **THEN** the result is null (no extras)
-- **AND** the hop remains protocol-legal
+- **AND** `implementing` remains enabled in the pipeline and `ready → implementing` remains legal
 
 ### Requirement: Step semantics
 
@@ -39,6 +45,142 @@
 - **GIVEN** at least one file is `drifted-pending-review`
 - **WHEN** workflow routing is evaluated after verification
 - **THEN** the change must return to `designing`
+
+### Requirement: Optional and disabled step declarations
+
+#### Scenario: Schema parses optional and disabled properties
+
+- **GIVEN** a schema workflow step declaring `optional: true` and `disabled: false`
+- **WHEN** the schema is built and resolved
+- **THEN** `workflowStep.optional` is `true`
+- **AND** `workflowStep.disabled` is `false`
+
+#### Scenario: Bedrock states cannot be disabled
+
+- **GIVEN** a schema attempting to set `optional: true` or `disabled: true` on `designing`, `done`, or `archivable`
+- **WHEN** `buildSchema` or schema resolution executes
+- **THEN** a `SchemaValidationError` is thrown
+
+#### Scenario: Done remains mandatory when signoff is disabled
+
+- **GIVEN** `approvals.signoff: false`
+- **WHEN** Core builds the active workflow
+- **THEN** `done` remains a mandatory state between delivery and `archivable`
+- **AND** `approval.signoff` skips on `done -> archivable`
+
+#### Scenario: Active approval anchors cannot be disabled
+
+- **GIVEN** `approvals.spec: true`
+- **AND** a schema declaring `ready: { disabled: true }`
+- **WHEN** the schema is built or resolved with the project approvals, including `specd schema validate`
+- **THEN** a `SchemaValidationError` is thrown at build/resolve time
+- **AND** the error is not deferred until the first topology query of a change
+
+#### Scenario: Disabling every configurable delivery step is valid
+
+- **GIVEN** `approvals.spec: false`
+- **AND** a schema declaring `ready`, `implementing`, and `verifying` as `disabled: true`
+- **WHEN** the schema is built and resolved
+- **THEN** no error is thrown
+- **AND** the active path is `designing → done → archivable`
+
+#### Scenario: Optional step with no effective skip checks is unconditional
+
+- **GIVEN** a workflow step declared `optional: true`
+- **AND** the registry and schema contribute no effective `step-skip` binding for that step
+- **WHEN** Core evaluates a shortcut across it
+- **THEN** the bypass is permitted
+
+#### Scenario: Skills cannot redefine optionality
+
+- **GIVEN** Core projects a shortcut across an optional step in `availableTransitions`
+- **WHEN** an agent skill selects its next hop
+- **THEN** it consumes the projection without adding an undeclared task or check condition
+
+### Requirement: Workflow step checks and skip-checks declarations
+
+#### Scenario: Schema builds step checks and skip-checks declarations
+
+- **GIVEN** a workflow step declaring valid `checks` and `skipChecks` with known IDs
+- **WHEN** `buildSchema` builds the schema
+- **THEN** `workflowStep.checks` contains the parsed transition check declarations
+- **AND** `workflowStep.skipChecks` contains the parsed skip check declarations
+
+#### Scenario: Referencing unknown check ID throws UnknownCheckError
+
+- **GIVEN** a workflow step declaring a check or skipCheck with ID `@unknown.check`
+- **WHEN** `buildSchema` executes
+- **THEN** `UnknownCheckError` is thrown identifying `@unknown.check`
+
+#### Scenario: Duplicate coordinate throws DuplicateCheckBindingError
+
+- **GIVEN** a workflow step declaring two checks with the same ID, scope, and direction
+- **WHEN** `buildSchema` executes
+- **THEN** `DuplicateCheckBindingError` is thrown
+
+#### Scenario: Unknown checks from state is rejected
+
+- **GIVEN** a workflow `checks[]` declaration whose `from` value is neither `*` nor a known lifecycle state
+- **WHEN** schema parsing and semantic validation execute
+- **THEN** a typed schema validation error identifies the invalid source state
+
+#### Scenario: Embedding locked check throws CheckEmbeddingForbiddenError
+
+- **GIVEN** a check registered with `allowSchemaEmbedding: false`
+- **WHEN** a schema declares this check in `checks` or `skipChecks` at a coordinate none of its code-defined bindings serves
+- **THEN** `CheckEmbeddingForbiddenError` is thrown
+
+#### Scenario: Declaring a check at its own code-defined coordinate is accepted
+
+- **GIVEN** a built-in or plugin check with `allowSchemaEmbedding: false` and a code-defined binding entering step `verifying` along `forward`
+- **WHEN** a schema declares the check in `verifying.checks` with `along: forward` and an allowed `config`
+- **THEN** schema validation succeeds for both the built-in and the plugin check
+
+#### Scenario: Later schema layer may change a schema-owned declaration
+
+- **GIVEN** a base schema declaring a Category C check on a step where no code-defined binding serves it
+- **WHEN** a later schema layer changes that declaration's `onFailure` or `skippable`
+- **THEN** `buildSchema` validates the merged declaration without `CheckBindingOverrideForbiddenError`
+
+#### Scenario: Overriding locked binding policy throws CheckBindingOverrideForbiddenError
+
+- **GIVEN** a code-defined binding registered with `allowBindingOverride: false`
+- **WHEN** a schema attempts to modify `onFailure` or `skippable`
+- **THEN** `CheckBindingOverrideForbiddenError` is thrown
+
+#### Scenario: Overriding locked configuration throws CheckConfigOverrideForbiddenError
+
+- **GIVEN** a check or binding registered with `allowConfigOverride: false`
+- **WHEN** a schema supplies a non-empty `config` object
+- **THEN** `CheckConfigOverrideForbiddenError` is thrown
+
+#### Scenario: Disabling locked check throws CheckDisableForbiddenError
+
+- **GIVEN** a check or binding registered with `allowDisable: false`
+- **WHEN** a schema declares `disabled: true`
+- **THEN** `CheckDisableForbiddenError` is thrown
+
+#### Scenario: Declaring skipChecks on disabled step throws SchemaValidationError
+
+- **GIVEN** a workflow step declared with `disabled: true` and a non-empty `skipChecks` array
+- **WHEN** `buildSchema` executes
+- **THEN** `SchemaValidationError` is thrown indicating skipChecks cannot be declared on disabled steps
+
+### Requirement: Sovereign change schema authority
+
+#### Scenario: Change preserves its recorded schema identity across project reconfigurations
+
+- **GIVEN** a change created under schema `custom-workflow@1.0.0`
+- **WHEN** the project `specd.yaml` config is updated to use `@specd/schema-std`
+- **THEN** the change's manifest continues to record schema name `custom-workflow` with version `1`
+- **AND** lifecycle and status operations resolve that schema by name via `SchemaProvider.get('custom-workflow')`
+- **AND** a resolved same-name schema with a different version produces a `SCHEMA_VERSION_DRIFT` advisory instead of a versioned lookup or an error
+
+#### Scenario: LazySchemaProvider caches schemas by reference
+
+- **GIVEN** a `LazySchemaProvider`
+- **WHEN** `get('custom-workflow')` is called multiple times
+- **THEN** the schema is resolved once and cached for subsequent requests
 
 ### Requirement: Requires-based gating
 
@@ -211,11 +353,19 @@
 
 #### Scenario: Step-to-step circular dependencies are impossible
 
-- **GIVEN** a schema where step A requires step B
+- **GIVEN** a schema where step A's `requires` lists step name `implementing` and no artifact with that ID exists
 - **WHEN** `buildSchema` validates the schema
-- **THEN** it throws `SchemaValidationError` because step gating only accepts artifact IDs
+- **THEN** it throws `SchemaValidationError` because `requires` only accepts declared artifact IDs
 
-### Requirement: Workflow array order is display order and progress axis
+### Requirement: Workflow array order is not significant
+
+#### Scenario: Noncanonical row order does not change the axis
+
+- **GIVEN** `workflow[]` rows declared as `verifying`, `implementing`, `ready`
+- **WHEN** the progress axis and the status display order are computed
+- **THEN** both use the canonical order `designing, ready, implementing, verifying, done`
+- **AND** no error is raised for the declared row order
+- **AND** the attempt `implementing → verifying` classifies as `forward`
 
 #### Scenario: Later step available before earlier step
 
@@ -250,6 +400,13 @@
 - **GIVEN** `workflow[]` omits `implementing`
 - **WHEN** the attempt is `verifying → implementing`
 - **THEN** `along` is `backward`
+
+#### Scenario: Disabled steps are excluded from progress axis
+
+- **GIVEN** `workflow[]` declares `verifying: { disabled: true }`
+- **WHEN** `resolveWorkflowPipeline` computes the progress axis
+- **THEN** `verifying` is excluded from the active axis
+- **AND** `ready -> done` classifies as `forward`
 
 ### Requirement: Two execution modes
 

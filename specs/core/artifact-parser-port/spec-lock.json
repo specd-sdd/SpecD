@@ -9,5 +9,41 @@
     "core:delta-format",
     "core:selector-model"
   ],
-  "implementation": []
+  "implementation": [],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Uniform parser port and extensible registry provide format-neutral AST, delta, serialization, outline, and selector metadata.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:2a86a157f7979f71b123609050e00b44de8c330071e6b7451508a54522300147",
+          "lastModified": "2026-08-25T15:37:19.259Z"
+        },
+        "verify.md": {
+          "hash": "sha256:416e355d6dfbe7c3a0e3c3ba156e8d91999c5c1103fe4ffcabd51a16f7a941ed",
+          "lastModified": "2026-08-25T15:37:19.260Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# ArtifactParser Port\n\n## Rules\n- `ArtifactParser`: `fileExtensions`, `parse(content)`, `apply(ast, delta)`, `serialize(ast)`, `renderSubtree(node)`, `nodeTypes()`, `outline(ast)`, `deltaInstructions()`, `parseDelta(content)`.\n- `ArtifactParserRegistry = ReadonlyMap<string, ArtifactParser>`; standard keys `markdown|json|yaml|plaintext`; composition additively merges external formats while preserving built-ins; unknown format fails clearly.\n- `parse` returns normalized `ArtifactAST { root }`. `apply` resolves every selector before mutation; missing/ambiguous selector throws `DeltaApplicationError`, preventing partial application; returns AST + warnings.\n- `serialize(parse(content))` must reparse to equivalent AST. Markdown preserves unaffected inline intent and source style markers where unambiguous; mixed styles serialize deterministically.\n- `renderSubtree` emits native subtree text. `nodeTypes` describes every addressable type with `type`, `identifiedBy`, `description`, and exact `isCollection|isSequence|isSequenceItem|isContainer|isLeaf` flags. Shared delta engine uses flags, never hardcoded type lists.\n- `outline` gives navigable addressable summary; compact defaults: markdown `section`, json `property|array-item`, yaml `pair`, plaintext `paragraph`; full detail available at use-case/command layer.\n- Root outline selector hints keyed by node type use placeholders only and avoid per-node duplication; omitted unless requested.\n- `deltaInstructions()` returns format-static text injected verbatim for delta artifacts.\n- `parseDelta` returns typed `DeltaEntry[]`; YAML normally implements, others may return empty. `no-op` mixed with another operation throws `SchemaValidationError`.\n- `ArtifactNode`: `type`, optional `label`, scalar `value`, `children`, `level`, `ordered`, adapter metadata. `DeltaEntry.op = added|modified|removed|no-op`; optional selector/position/rename/content/value/strategy/mergeKey; description allowed always and ignored during application.\n\n## Constraints\n- Port lives `application/ports/`; no parser-library dependency.\n- Domain services reference port only, never concrete parsers.\n- `Selector` and `DeltaPosition` are domain value objects.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:2a86a157f7979f71b123609050e00b44de8c330071e6b7451508a54522300147",
+          "lastModified": "2026-08-25T15:37:19.259Z"
+        },
+        "verify.md": {
+          "hash": "sha256:416e355d6dfbe7c3a0e3c3ba156e8d91999c5c1103fe4ffcabd51a16f7a941ed",
+          "lastModified": "2026-08-25T15:37:19.260Z"
+        }
+      }
+    }
+  }
 }

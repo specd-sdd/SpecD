@@ -9,9 +9,15 @@
     "core:persist-spec-metadata",
     "core:spec-metadata",
     "core:composition-resolver",
-    "default:_global/logging"
+    "default:_global/logging",
+    "core:resolve-change-schema"
   ],
-  "implementation": [],
+  "implementation": [
+    {
+      "file": "core:src/application/use-cases/materialize-spec-metadata.ts",
+      "symbols": ["MaterializeSpecMetadata"]
+    }
+  ],
   "optimizations": {
     "optimizedDescription": {
       "value": "MaterializeSpecMetadata: if-needed/force reuse-or-regenerate orchestration with bounded conflict retry.",

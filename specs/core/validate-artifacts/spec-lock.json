@@ -15,15 +15,13 @@
     "core:spec-id-format",
     "core:schema-format",
     "core:composition-resolver",
-    "core:transition-checks"
+    "core:transition-checks",
+    "core:resolve-change-schema"
   ],
   "implementation": [
     {
       "file": "core:src/application/use-cases/validate-artifacts.ts",
       "symbols": ["ValidateArtifacts"]
-    },
-    {
-      "file": "core:test/application/use-cases/validate-artifacts.spec.ts"
     }
   ],
   "optimizations": {

@@ -31,7 +31,6 @@ import {
 import { CorruptedManifestError } from '../../domain/errors/corrupted-manifest-error.js'
 import { ChangeAlreadyExistsError } from '../../application/errors/change-already-exists-error.js'
 import { ChangeNotFoundError } from '../../application/errors/change-not-found-error.js'
-import { SchemaMismatchError } from '../../application/errors/schema-mismatch-error.js'
 import {
   ChangeRepository,
   type ChangeRepositoryConfig as BaseChangeRepositoryConfig,
@@ -84,6 +83,13 @@ import {
 import { loadChangeFromManifest } from './manifest-change-loader.js'
 import { type ImplementationFileReadResult } from '../../application/ports/change-repository.js'
 
+/** Identity of the schema a change was created with, used to resolve its artifact types. */
+export interface ChangeSchemaRef {
+  readonly changeName: string
+  readonly schemaName: string
+  readonly schemaVersion: number
+}
+
 /**
  * Extended configuration for `FsChangeRepository`.
  */
@@ -92,8 +98,11 @@ export interface ChangeRepositoryConfig extends BaseChangeRepositoryConfig {
   readonly discardedPath: string
   /** Absolute project root used to confine implementation-file reads. */
   readonly projectRoot?: string
-  readonly activeSchema?: { name: string; version: number }
-  readonly resolveArtifactTypes?: () => Promise<readonly ArtifactType[]>
+  /**
+   * Resolves the artifact types of a change's own schema. Returns `null` when the
+   * schema cannot be resolved, in which case artifact sync is skipped.
+   */
+  readonly resolveArtifactTypes?: (ref: ChangeSchemaRef) => Promise<readonly ArtifactType[] | null>
   readonly resolveSpecExists?: (specId: string) => Promise<boolean>
   readonly artifactTypes?: readonly ArtifactType[]
 }
@@ -140,11 +149,13 @@ export class FsChangeRepository extends ChangeRepository {
   private readonly _discardedPath: string
   private readonly _locksPath: string
   private readonly _projectRoot: string
-  private readonly _activeSchema: { name: string; version: number } | undefined
-  private _artifactTypes: readonly ArtifactType[]
-  private readonly _resolveArtifactTypes: (() => Promise<readonly ArtifactType[]>) | undefined
+  private readonly _artifactTypes: readonly ArtifactType[]
+  private readonly _resolveArtifactTypes:
+    | ((ref: ChangeSchemaRef) => Promise<readonly ArtifactType[] | null>)
+    | undefined
+  private readonly _artifactTypesBySchema = new Map<string, readonly ArtifactType[] | null>()
   private readonly _resolveSpecExists: ((specId: string) => Promise<boolean>) | undefined
-  private _artifactTypesResolved: boolean
+  private readonly _artifactTypesFixed: boolean
   /** Change names currently inside `mutate` — allow save when drafting from active storage. */
   private readonly _activeMutationInProgress = new Set<string>()
   /** Change names currently inside `mutateDraft` — allow save/saveArtifact for that name. */
@@ -214,11 +225,10 @@ export class FsChangeRepository extends ChangeRepository {
       (path.basename(context.configPath) === '.specd'
         ? path.dirname(context.configPath)
         : context.configPath)
-    this._activeSchema = context.activeSchema
     this._resolveArtifactTypes = context.resolveArtifactTypes
     this._resolveSpecExists = context.resolveSpecExists
     this._artifactTypes = context.artifactTypes ?? []
-    this._artifactTypesResolved = context.artifactTypes !== undefined
+    this._artifactTypesFixed = context.artifactTypes !== undefined
 
     const fsCacheRoot = path.join(context.configPath, 'tmp', 'fs-cache')
     this._activeIndex = new FsChangeIndexCache<ActiveChangeListEntry>({
@@ -322,17 +332,26 @@ export class FsChangeRepository extends ChangeRepository {
   }
 
   /**
-   * Lazily resolves artifact types from the schema if not already provided
-   * at construction time.
+   * Resolves the artifact types of the change's own schema, cached per schema name and version.
    *
-   * @returns The resolved artifact types
+   * Statically provided artifact types win. Without a resolver the repository is
+   * uninitialized and reports no artifact types.
+   *
+   * @param ref - The change's recorded schema identity
+   * @returns Artifact types, or `null` when the change's schema cannot be resolved
    */
-  private async _ensureArtifactTypes(): Promise<readonly ArtifactType[]> {
-    if (!this._artifactTypesResolved && this._resolveArtifactTypes !== undefined) {
-      this._artifactTypes = await this._resolveArtifactTypes()
-      this._artifactTypesResolved = true
+  private async _artifactTypesFor(ref: ChangeSchemaRef): Promise<readonly ArtifactType[] | null> {
+    if (this._artifactTypesFixed || this._resolveArtifactTypes === undefined) {
+      return this._artifactTypes
     }
-    return this._artifactTypes
+    // Name alone is not an identity: two versions of one schema can differ in artifacts.
+    const key = `${ref.schemaName}@${ref.schemaVersion}`
+    if (this._artifactTypesBySchema.has(key)) {
+      return this._artifactTypesBySchema.get(key) ?? null
+    }
+    const resolved = await this._resolveArtifactTypes(ref)
+    this._artifactTypesBySchema.set(key, resolved)
+    return resolved
   }
 
   /**
@@ -663,9 +682,13 @@ export class FsChangeRepository extends ChangeRepository {
       throw new DraftedChangeReadOnlyError(change.name, 'save')
     }
 
-    const artifactTypes = await this._ensureArtifactTypes()
+    const artifactTypes = await this._artifactTypesFor({
+      changeName: change.name,
+      schemaName: change.schemaName,
+      schemaVersion: change.schemaVersion,
+    })
     const specExistence = await this._buildSpecExistenceMap(change.specIds)
-    if (artifactTypes.length > 0) {
+    if (artifactTypes !== null && artifactTypes.length > 0) {
       change.syncArtifacts(artifactTypes, specExistence)
     }
     change.touchUpdatedAt()
@@ -872,7 +895,12 @@ export class FsChangeRepository extends ChangeRepository {
     const dir = await this._resolveDir(change.name)
     if (dir === null) return
 
-    const artifactTypes = await this._ensureArtifactTypes()
+    const artifactTypes =
+      (await this._artifactTypesFor({
+        changeName: change.name,
+        schemaName: change.schemaName,
+        schemaVersion: change.schemaVersion,
+      })) ?? []
 
     for (const artifactType of artifactTypes) {
       if (artifactType.scope !== 'spec') continue
@@ -1335,23 +1363,17 @@ export class FsChangeRepository extends ChangeRepository {
     dir: string,
   ): Promise<{ change: Change; hasChangesToPersist: boolean }> {
     const artifactMap = new Map<string, ChangeArtifact>()
-    const artifactTypes = await this._ensureArtifactTypes()
+    const resolvedTypes = await this._artifactTypesFor({
+      changeName: manifest.name,
+      schemaName: manifest.schema.name,
+      schemaVersion: manifest.schema.version,
+    })
+    // `null` means the schema is unresolvable: skip sync and leave the artifact map unchanged.
+    const artifactTypes = resolvedTypes ?? []
     const artifactTypeMap = new Map(artifactTypes.map((t) => [t.id, t]))
     const specExistence = await this._buildSpecExistenceMap(manifest.specIds)
     let manifestNormalized = false
     let hasChangesToPersist = false
-
-    // Validate schema compatibility
-    if (this._activeSchema !== undefined) {
-      if (manifest.schema.name !== this._activeSchema.name) {
-        throw new SchemaMismatchError(manifest.name, manifest.schema.name, this._activeSchema.name)
-      }
-      if (manifest.schema.version !== this._activeSchema.version) {
-        Logger.warn(
-          `Change '${manifest.name}' was created with schema version ${manifest.schema.version} but the active schema version is ${this._activeSchema.version}.`,
-        )
-      }
-    }
 
     for (const raw of manifest.artifacts) {
       const artType = artifactTypeMap.get(raw.type)

@@ -10,14 +10,15 @@
 - **WHEN** `GetArtifactInstruction.execute` is called with `name: "nonexistent"`
 - **THEN** `ChangeNotFoundError` is thrown
 
-### Requirement: Schema name guard
+### Requirement: Sovereign schema resolution
 
-#### Scenario: Schema mismatch throws SchemaMismatchError
+#### Scenario: Resolves sovereign schema when workspace default differs
 
-- **GIVEN** a change created with schema `spec-driven`
-- **AND** `SchemaProvider.get()` returns a schema named `custom-schema`
+- **GIVEN** a change created with schema `custom-schema`
+- **AND** workspace default schema is `spec-driven`
 - **WHEN** `execute` is called
-- **THEN** `SchemaMismatchError` is thrown
+- **THEN** it resolves `custom-schema` via `SchemaProvider.get('custom-schema')`
+- **AND** `SchemaMismatchError` is not thrown
 
 ### Requirement: Artifact resolution
 

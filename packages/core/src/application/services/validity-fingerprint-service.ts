@@ -2,6 +2,7 @@ import { type ChangeRepository } from '../ports/change-repository.js'
 import { type BinaryContentHasher } from '../ports/binary-content-hasher.js'
 import { type ContentHasher } from '../ports/content-hasher.js'
 import { type SchemaProvider } from '../ports/schema-provider.js'
+import { ResolveChangeSchema } from './resolve-change-schema.js'
 import { type Change } from '../../domain/entities/change.js'
 import { type FingerprintInputFailure } from '../../domain/services/change-validity.js'
 import {
@@ -28,6 +29,7 @@ export interface ValidityFingerprintServiceDeps {
   readonly hasher: ContentHasher
   readonly binaryHasher: BinaryContentHasher
   readonly schemaProvider: SchemaProvider
+  readonly resolveChangeSchema?: ResolveChangeSchema
 }
 
 /**
@@ -38,6 +40,7 @@ export interface ValidityFingerprintServiceDeps {
  */
 export class ValidityFingerprintService {
   private readonly _deps: ValidityFingerprintServiceDeps
+  private readonly _resolveChangeSchema: ResolveChangeSchema
 
   /**
    * Creates a fingerprint service.
@@ -46,6 +49,8 @@ export class ValidityFingerprintService {
    */
   constructor(deps: ValidityFingerprintServiceDeps) {
     this._deps = deps
+    this._resolveChangeSchema =
+      deps.resolveChangeSchema ?? new ResolveChangeSchema(deps.schemaProvider)
   }
 
   /**
@@ -112,7 +117,11 @@ export class ValidityFingerprintService {
     readonly files: Readonly<Record<string, Sha256Digest>>
     readonly failures: readonly FingerprintInputFailure[]
   }> {
-    const schema = await this._deps.schemaProvider.get()
+    const { schema } = await this._resolveChangeSchema.execute({
+      changeName: change.name,
+      schemaName: change.schemaName,
+      schemaVersion: change.schemaVersion,
+    })
     const files: Record<string, Sha256Digest> = {}
     const failures: FingerprintInputFailure[] = []
     const types = [...schema.artifacts()].sort((left, right) => left.id.localeCompare(right.id))

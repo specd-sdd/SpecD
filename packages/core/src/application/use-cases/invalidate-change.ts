@@ -21,6 +21,8 @@ import {
 import { type ForceInvalidationRecovery } from '../errors/invalidate-requires-force-error.js'
 import { type ReconcileChangeValidity } from './reconcile-change-validity.js'
 import { type NextAction } from './get-status.js'
+import { evaluateLifecycle } from '../services/lifecycle-evaluation.js'
+import { type ChangeValidityVerdict } from '../../domain/services/change-validity.js'
 
 /** A single target identifying an artifact (and optionally a specific file within it). */
 export interface InvalidateTargetInput {
@@ -60,6 +62,8 @@ export interface InvalidateChangeResult {
   readonly nextAction: NextAction
 }
 
+import { ResolveChangeSchema } from '../services/resolve-change-schema.js'
+
 /**
  * Use case for manual, targeted invalidation of a change's artifacts.
  *
@@ -71,6 +75,8 @@ export class InvalidateChange {
   private readonly _actor: ActorResolver
   private readonly _schemaProvider: SchemaProvider
   private readonly _reconcile: ReconcileChangeValidity
+  private readonly _resolveChangeSchema: ResolveChangeSchema
+  private readonly _approvals: { readonly spec: boolean; readonly signoff: boolean }
 
   /**
    * Creates a new `InvalidateChange` use case.
@@ -79,17 +85,28 @@ export class InvalidateChange {
    * @param actor - Actor resolver for identity
    * @param schemaProvider - Schema provider for artifact type resolution
    * @param reconcile - Canonical reconciler that applies review, revocation, and recovery
+   * @param resolveChangeSchema - Shared change schema resolver
+   * @param approvals - Configured approval gates, used to route the post-invalidation next action
+   * @param approvals.spec - Whether spec approval is enabled
+   * @param approvals.signoff - Whether sign-off approval is enabled
    */
   constructor(
     changes: ChangeRepository,
     actor: ActorResolver,
     schemaProvider: SchemaProvider,
     reconcile: ReconcileChangeValidity,
+    resolveChangeSchema?: ResolveChangeSchema,
+    approvals: { readonly spec: boolean; readonly signoff: boolean } = {
+      spec: false,
+      signoff: false,
+    },
   ) {
     this._changes = changes
     this._actor = actor
     this._schemaProvider = schemaProvider
     this._reconcile = reconcile
+    this._resolveChangeSchema = resolveChangeSchema ?? new ResolveChangeSchema(schemaProvider)
+    this._approvals = approvals
   }
 
   /**
@@ -113,7 +130,11 @@ export class InvalidateChange {
       throw new InvalidInvalidateTargetError(targetErrors)
     }
 
-    const schema = await this._schemaProvider.get()
+    const { schema } = await this._resolveChangeSchema.execute({
+      changeName: change.name,
+      schemaName: change.schemaName,
+      schemaVersion: change.schemaVersion,
+    })
     const resolvedTargets =
       effectivePolicy.artifacts === 'none' || effectivePolicy.artifacts === 'global'
         ? []
@@ -160,25 +181,47 @@ export class InvalidateChange {
       projectionChanges: reconciled.projectionChanges,
       automaticReturn: reconciled.automaticReturn,
       blockers: reconciled.verdict.blockers,
-      nextAction: invalidationNextAction(reconciled.change, reconciled.automaticReturn),
+      nextAction: invalidationNextAction(
+        reconciled.change,
+        schema,
+        this._approvals,
+        reconciled.verdict,
+        reconciled.automaticReturn,
+      ),
     }
   }
 }
 
 /**
  * Projects canonical recovery without reconstructing invalidation policy in adapters.
+ * The command comes from lifecycle guidance for the recovered state under the change's
+ * schema, so a disabled `verifying` step never yields a verification command.
  *
  * @param change - Reconciled change
+ * @param schema - The change's sovereign schema
+ * @param approvals - Configured approval gates
+ * @param approvals.spec - Whether spec approval is enabled
+ * @param approvals.signoff - Whether sign-off approval is enabled
+ * @param verdict - Canonical validity verdict after reconciliation
  * @param recovery - Automatic lifecycle return, when one was committed
  * @returns Core-owned next action
  */
-function invalidationNextAction(change: Change, recovery: AutomaticRecovery | null): NextAction {
+function invalidationNextAction(
+  change: Change,
+  schema: Schema,
+  approvals: { readonly spec: boolean; readonly signoff: boolean },
+  verdict: ChangeValidityVerdict,
+  recovery: AutomaticRecovery | null,
+): NextAction {
   if (recovery !== null) {
+    const lifecycle = evaluateLifecycle(change, schema, {
+      approvals,
+      validity: verdict,
+      checksByTarget: {},
+    })
     return {
-      targetStep: recovery.to,
-      actionType: 'cognitive',
+      ...lifecycle.nextAction,
       reason: `Invalidation returned the change to ${recovery.to}`,
-      command: recovery.to === 'designing' ? '/specd-design' : '/specd-verify',
     }
   }
   return {

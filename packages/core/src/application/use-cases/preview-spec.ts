@@ -1,5 +1,4 @@
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
-import { SchemaMismatchError } from '../errors/schema-mismatch-error.js'
 import { SpecNotInChangeError } from '../errors/spec-not-in-change-error.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
 import { DiffGenerationError, type DiffGenerator } from '../ports/diff-generator.js'
@@ -51,6 +50,8 @@ export interface PreviewSpecResult {
   readonly warnings: readonly string[]
 }
 
+import { ResolveChangeSchema } from '../services/resolve-change-schema.js'
+
 /**
  * Applies a change's delta artifacts to the base spec content and returns
  * the merged result per artifact file, without mutating anything.
@@ -64,6 +65,7 @@ export class PreviewSpec {
   private readonly _specs: ReadonlyMap<string, SpecRepository>
   private readonly _schemaProvider: SchemaProvider
   private readonly _parsers: ArtifactParserRegistry
+  private readonly _resolveChangeSchema: ResolveChangeSchema
 
   /**
    * Creates a new `PreviewSpec` use case instance.
@@ -73,6 +75,7 @@ export class PreviewSpec {
    * @param schemaProvider - Provider for the fully-resolved schema
    * @param parsers - Registry of artifact format parsers
    * @param diffGenerator - Unified diff generator for merged preview entries
+   * @param resolveChangeSchema - Shared change schema resolver
    */
   constructor(
     changes: ChangeRepository,
@@ -80,12 +83,14 @@ export class PreviewSpec {
     schemaProvider: SchemaProvider,
     parsers: ArtifactParserRegistry,
     diffGenerator: DiffGenerator,
+    resolveChangeSchema?: ResolveChangeSchema,
   ) {
     this._changes = changes
     this._diffGenerator = diffGenerator
     this._specs = specs
     this._schemaProvider = schemaProvider
     this._parsers = parsers
+    this._resolveChangeSchema = resolveChangeSchema ?? new ResolveChangeSchema(schemaProvider)
   }
 
   /**
@@ -94,17 +99,17 @@ export class PreviewSpec {
    * @param input - Preview parameters
    * @returns The preview result with per-file entries and warnings
    * @throws {ChangeNotFoundError} If no change with the given name exists
-   * @throws {SchemaMismatchError} If the change's schema differs from the active schema
    * @throws {SpecNotInChangeError} If the specId is not in the change's specIds
    */
   async execute(input: PreviewSpecInput): Promise<PreviewSpecResult> {
     const change = await this._changes.get(input.name)
     if (change === null) throw new ChangeNotFoundError(input.name)
 
-    const schema = await this._schemaProvider.get()
-    if (schema.name() !== change.schemaName) {
-      throw new SchemaMismatchError(change.name, change.schemaName, schema.name())
-    }
+    const { schema } = await this._resolveChangeSchema.execute({
+      changeName: change.name,
+      schemaName: change.schemaName,
+      schemaVersion: change.schemaVersion,
+    })
 
     if (!change.specIds.includes(input.specId)) {
       throw new SpecNotInChangeError(input.specId, change.name)

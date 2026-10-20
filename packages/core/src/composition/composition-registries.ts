@@ -72,10 +72,14 @@ export interface PluginCheckRegistration {
   readonly defaultBindings?: readonly PluginCheckDefaultBinding[]
   /** Optional default configuration */
   readonly defaultConfig?: Readonly<Record<string, unknown>>
+  /** Whether workflow schemas may declare this check outside its own bindings (default: false when defaultBindings given, else true) */
+  readonly allowSchemaEmbedding?: boolean
   /** Whether workflow schema can override config (default: true) */
   readonly allowConfigOverride?: boolean
   /** Whether workflow schema can override bindings (default: false when defaultBindings given, else true) */
   readonly allowBindingOverride?: boolean
+  /** Whether workflow schema can disable the check (default: true) */
+  readonly allowDisable?: boolean
   /** Alternative options bundle */
   readonly options?: PluginCheckRegistrationOptions
 }
@@ -221,12 +225,16 @@ export function createCompositionRegistryView(
   ])
   for (const reg of [...(base.checks ?? []), ...(extra?.checks ?? [])]) {
     const defaultConfig = reg.defaultConfig ?? reg.options?.defaultConfig
+    const allowSchemaEmbedding = reg.allowSchemaEmbedding ?? reg.options?.allowSchemaEmbedding
     const allowConfigOverride = reg.allowConfigOverride ?? reg.options?.allowConfigOverride
     const allowBindingOverride = reg.allowBindingOverride ?? reg.options?.allowBindingOverride
+    const allowDisable = reg.allowDisable ?? reg.options?.allowDisable
     const opts: PluginCheckRegistrationOptions = {
       ...(defaultConfig !== undefined ? { defaultConfig } : {}),
+      ...(allowSchemaEmbedding !== undefined ? { allowSchemaEmbedding } : {}),
       ...(allowConfigOverride !== undefined ? { allowConfigOverride } : {}),
       ...(allowBindingOverride !== undefined ? { allowBindingOverride } : {}),
+      ...(allowDisable !== undefined ? { allowDisable } : {}),
     }
     checkRegistry.register(reg.pluginName, reg.check, reg.defaultBindings, opts)
   }

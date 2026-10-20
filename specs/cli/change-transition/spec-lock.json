@@ -9,12 +9,20 @@
     "core:transition-change",
     "core:hook-execution-model",
     "core:get-status",
-    "core:transition-checks"
+    "core:transition-checks",
+    "core:lifecycle-engine"
   ],
   "implementation": [
     {
       "file": "cli:src/commands/change/transition.ts",
       "symbols": ["registerChangeTransition"]
+    },
+    {
+      "file": "cli:test/commands/change/transition.spec.ts"
+    },
+    {
+      "file": "cli:src/commands/change/_check-progress-presenter.ts",
+      "symbols": ["createCheckProgressPresenter"]
     }
   ],
   "optimizations": {

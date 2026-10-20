@@ -152,3 +152,37 @@ Scenarios:
 - `actor: ActorResolver`
 - `schemaProvider: SchemaProvider`
 - **AND** the factory delegates to canonical `createInvalidateChange(deps)`
+
+### Requirement: Sovereign schema resolution
+
+#### Scenario: Invalidation targets come from the change schema
+
+- **GIVEN** a change whose `schemaName` is `custom-workflow`
+- **AND** its schema and the workspace default define different artifact DAG targets
+- **WHEN** `InvalidateChange` computes focused, downstream, or global targets
+- **THEN** it calls `SchemaProvider.get('custom-workflow')`
+- **AND** selects targets exclusively from the custom schema DAG
+
+#### Scenario: Schema resolution failure precedes persistence
+
+- **GIVEN** resolving the schema recorded on the change fails
+- **WHEN** invalidation is requested
+- **THEN** the error propagates
+- **AND** no invalidation event or artifact state change is persisted
+
+### Requirement: Next action follows lifecycle guidance
+
+#### Scenario: Recovery with verifying disabled never recommends verification
+
+- **GIVEN** a change whose schema disables `verifying`
+- **AND** an invalidation commits an automatic recovery to `done`
+- **WHEN** `InvalidateChange` returns its `nextAction`
+- **THEN** the command comes from lifecycle guidance for `done`
+- **AND** it is neither `/specd-verify` nor `specd changes verification start`
+
+#### Scenario: Recovery with verifying enabled still routes to verification
+
+- **GIVEN** a change whose schema enables `verifying`
+- **AND** an invalidation commits an automatic recovery to `done`
+- **WHEN** `InvalidateChange` returns its `nextAction`
+- **THEN** the command is `/specd-verify`

@@ -32,3 +32,4 @@ export {
   type ReconciledOperation,
   type ReconciledOperationBlockedInput,
 } from './reconciled-operation-blocked-error.js'
+export { SchemaProviderIdentityMismatchError } from './schema-provider-identity-mismatch-error.js'

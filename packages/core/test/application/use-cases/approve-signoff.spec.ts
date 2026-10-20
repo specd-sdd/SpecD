@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from 'vitest'
+import { ResolveChangeSchema } from '../../../src/application/services/resolve-change-schema.js'
 import { ApproveSignoff } from '../../../src/application/use-cases/approve-signoff.js'
 import { ChangeNotFoundError } from '../../../src/application/errors/change-not-found-error.js'
 import { ApprovalGateDisabledError } from '../../../src/application/errors/approval-gate-disabled-error.js'
-import { SchemaMismatchError } from '../../../src/application/errors/schema-mismatch-error.js'
 import { VerificationNotFoundError } from '../../../src/application/errors/verification-not-found-error.js'
 import { VerificationInProgressError } from '../../../src/application/errors/verification-in-progress-error.js'
 import { VerificationStaleError } from '../../../src/application/errors/verification-stale-error.js'
@@ -16,11 +16,14 @@ import { ReconcileChangeValidity } from '../../../src/application/use-cases/reco
 import { type RefreshImplementationTracking } from '../../../src/application/use-cases/refresh-implementation-tracking.js'
 import { type ActorResolver } from '../../../src/application/ports/actor-resolver.js'
 import { NodeBinaryContentHasher } from '../../../src/infrastructure/node/binary-content-hasher.js'
+import { SchemaProviderIdentityMismatchError } from '../../../src/application/errors/schema-provider-identity-mismatch-error.js'
+import { type SchemaProvider } from '../../../src/application/ports/schema-provider.js'
 import {
   makeChangeRepository,
   makeActorResolver,
   makeSchemaProvider,
   makeSchema,
+  makeWorkflowStep,
   makeContentHasher,
   makeChange,
   testActor,
@@ -48,6 +51,7 @@ function buildApproveSignoff(
   repo: ReturnType<typeof makeChangeRepository>,
   options?: {
     schema?: ReturnType<typeof makeSchema>
+    schemaProvider?: SchemaProvider
     approvals?: { readonly spec: boolean; readonly signoff: boolean }
     fingerprint?: ValidityFingerprintService
     actor?: ActorResolver
@@ -56,7 +60,7 @@ function buildApproveSignoff(
   const schema = options?.schema ?? makeSchema()
   const approvals = options?.approvals ?? { spec: false, signoff: true }
   const actor = options?.actor ?? makeActorResolver()
-  const schemaProvider = makeSchemaProvider(schema)
+  const schemaProvider = options?.schemaProvider ?? makeSchemaProvider(schema)
   const fingerprint =
     options?.fingerprint ??
     new ValidityFingerprintService({
@@ -68,7 +72,7 @@ function buildApproveSignoff(
   const refresh = { execute: async () => undefined } as unknown as RefreshImplementationTracking
   const reconcile = new ReconcileChangeValidity({
     changes: repo,
-    schemaProvider,
+    resolveChangeSchema: new ResolveChangeSchema(schemaProvider),
     actor,
     refreshImplementationTracking: refresh,
     fingerprint,
@@ -170,6 +174,49 @@ describe('ApproveSignoff', () => {
     expect(identity).toHaveBeenCalledTimes(1)
     expect(signed.signoff?.decision.by).toBe(decorated)
     expect(event?.type === 'signed-off' ? event.by : undefined).toBe(decorated)
+  })
+
+  it('fails closed on a provider identity mismatch instead of using the default schema', async () => {
+    const change = withCurrentVerification(makeDoneChange('mismatch', 'schema-a'))
+    const repo = makeChangeRepository([change])
+    const schemaProvider: SchemaProvider = {
+      get: vi
+        .fn()
+        .mockImplementation(async (ref?: string) =>
+          makeSchema({ name: ref === 'schema-a' ? 'schema-b' : 'default-schema' }),
+        ),
+    }
+    const useCase = buildApproveSignoff(repo, { schemaProvider })
+
+    await expect(useCase.execute({ name: change.name, reason: 'ship it' })).rejects.toBeInstanceOf(
+      SchemaProviderIdentityMismatchError,
+    )
+  })
+
+  describe('disabled verifying', () => {
+    const disabledVerifying = makeSchema([], [makeWorkflowStep('verifying', { disabled: true })])
+
+    it('records sign-off without any verification evidence', async () => {
+      const change = makeDoneWithoutVerification('no-verification-needed')
+      const uc = buildApproveSignoff(makeChangeRepository([change]), {
+        schema: disabledVerifying,
+      })
+
+      const signed = await uc.execute({ name: change.name, reason: 'ship it' })
+
+      expect(signed.signoff?.status).toBe('valid')
+      expect(signed.signoff?.verificationId).toBeNull()
+    })
+
+    it('does not raise verification errors for active-only evidence', async () => {
+      const change = makeDoneWithoutVerification('active-ignored')
+      change.startVerification(emptyFingerprint, testActor)
+      const uc = buildApproveSignoff(makeChangeRepository([change]), {
+        schema: disabledVerifying,
+      })
+
+      await expect(uc.execute({ name: change.name, reason: 'ship' })).resolves.toBeDefined()
+    })
   })
 
   describe('verification eligibility errors', () => {
@@ -455,20 +502,25 @@ describe('ApproveSignoff', () => {
     })
   })
 
-  describe('given the active schema differs from the change schema', () => {
-    it('throws SchemaMismatchError before mutate', async () => {
+  describe('given the change schema is resolved by sovereign reference', () => {
+    it('resolves schema by change.schemaName and succeeds', async () => {
       const change = makePendingSignoffChange('my-change', 'schema-a')
       const repo = makeChangeRepository([change])
-      const mutateSpy = vi.spyOn(repo, 'mutate')
-      const uc = buildApproveSignoff(repo, { schema: makeSchema({ name: 'schema-b' }) })
-
-      await expect(
-        uc.execute({
-          name: 'my-change',
-          reason: 'ok',
+      const schemaA = makeSchema({ name: 'schema-a' })
+      const schemaProvider: SchemaProvider = {
+        get: vi.fn().mockImplementation(async (ref?: string) => {
+          if (ref === 'schema-a') return schemaA
+          return makeSchema({ name: 'fallback' })
         }),
-      ).rejects.toThrow(SchemaMismatchError)
-      expect(mutateSpy).not.toHaveBeenCalled()
+      }
+      const uc = buildApproveSignoff(repo, { schemaProvider })
+
+      const result = await uc.execute({
+        name: 'my-change',
+        reason: 'ok',
+      })
+      expect(result.name).toBe('my-change')
+      expect(schemaProvider.get).toHaveBeenCalledWith('schema-a')
     })
   })
 

@@ -111,6 +111,16 @@ The config-based `createInvalidateChange(config, options?)` form MUST derive `In
 
 The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
 
+### Requirement: Sovereign schema resolution
+
+`InvalidateChange` MUST resolve the schema through `ResolveChangeSchema` after loading the target change. Artifact targets, global targets, and downstream propagation MUST be derived from that sovereign schema's artifact DAG.
+
+The use case MUST NOT consult the workspace default schema for a change-scoped invalidation, even when the default differs from the schema recorded on the change. Schema resolution errors MUST propagate before invalidation is persisted.
+
+### Requirement: Next action follows lifecycle guidance
+
+The `nextAction` returned after an invalidation that triggers an automatic recovery MUST be derived from lifecycle guidance (`evaluateLifecycle`) for the recovered state under the change's sovereign schema, not from a hard-coded command per recovery target. When the schema disables `verifying`, the command MUST NOT be `/specd-verify` or `specd changes verification start`.
+
 ## Constraints
 
 - `InvalidateChange` does not perform filesystem drift detection.
@@ -125,3 +135,4 @@ The helper is the only use-case-specific composition entry for config-based boot
 - [`core:config`](../config/spec.md)
 - [`default:_global/architecture`](../../_global/architecture/spec.md)
 - [`core:composition-resolver`](../composition-resolver/spec.md)
+- [core:resolve-change-schema](../resolve-change-schema/spec.md) — named sovereign lookup, provider identity validation, and same-name version advisory

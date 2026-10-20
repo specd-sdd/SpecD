@@ -13,6 +13,7 @@ import { type PreviewSpec } from '../../application/use-cases/preview-spec.js'
 import { type GetSpecMetadata } from '../../application/use-cases/get-spec-metadata.js'
 import { type SpecdConfig } from '../../application/specd-config.js'
 import { type ExtractorTransformRegistry } from '../../domain/services/content-extraction.js'
+import { type ResolveChangeSchema } from '../../application/services/resolve-change-schema.js'
 import {
   createCompositionResolver,
   type CompositionResolver,
@@ -37,6 +38,7 @@ export interface CompileContextDeps {
   readonly extractorTransforms: ExtractorTransformRegistry
   readonly workspaceRoutes: readonly SpecWorkspaceRoute[]
   readonly defaultConfig: CompileContextConfig
+  readonly resolveChangeSchema?: ResolveChangeSchema
 }
 
 /**
@@ -58,11 +60,13 @@ export function resolveCompileContextDeps(resolver: CompositionResolver): Compil
       specs: resolver.getSpecRepositories(),
       schemaProvider: resolver.getSchemaProvider(),
       parsers: resolver.getArtifactParserRegistry(),
+      resolveChangeSchema: resolver.getResolveChangeSchema(),
     }),
     getMetadata: createGetSpecMetadata(resolveGetSpecMetadataDeps(resolver)),
     extractorTransforms: resolver.getExtractorTransforms(),
     workspaceRoutes: resolver.getSpecWorkspaceRoutes(),
     defaultConfig: resolver.getCompileContextConfig(),
+    resolveChangeSchema: resolver.getResolveChangeSchema(),
   }
 }
 
@@ -126,6 +130,7 @@ function createCompileContextFromNormalized(
       extractorTransforms,
       workspaceRoutes,
       defaultConfig,
+      resolveChangeSchema,
     } = input.deps
     return new CompileContext(
       changes,
@@ -139,6 +144,7 @@ function createCompileContextFromNormalized(
       extractorTransforms,
       workspaceRoutes,
       defaultConfig,
+      resolveChangeSchema,
     )
   }
 

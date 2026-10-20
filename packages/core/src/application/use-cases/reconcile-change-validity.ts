@@ -1,5 +1,8 @@
 import { type ChangeRepository } from '../ports/change-repository.js'
-import { type SchemaProvider } from '../ports/schema-provider.js'
+import { type ResolveChangeSchema } from '../services/resolve-change-schema.js'
+import { type Schema } from '../../domain/value-objects/schema.js'
+import { type ChangeState } from '../../domain/value-objects/change-state.js'
+import { isWorkflowStepEnabled } from '../../domain/services/workflow-topology.js'
 import { type ActorResolver } from '../ports/actor-resolver.js'
 import { type RefreshImplementationTracking } from './refresh-implementation-tracking.js'
 import { type ValidityFingerprintService } from '../services/validity-fingerprint-service.js'
@@ -67,7 +70,7 @@ export interface ReconcileChangeValidityResult {
 /** Dependencies for the canonical validity reconciler. */
 export interface ReconcileChangeValidityDeps {
   readonly changes: ChangeRepository
-  readonly schemaProvider: SchemaProvider
+  readonly resolveChangeSchema: ResolveChangeSchema
   readonly actor: ActorResolver
   readonly refreshImplementationTracking: RefreshImplementationTracking
   readonly fingerprint: ValidityFingerprintService
@@ -200,7 +203,11 @@ export class ReconcileChangeValidity {
     intent: ReconciliationIntent,
     actor: ActorIdentity,
   ): Promise<AppliedReconciliation> {
-    const schema = await this._deps.schemaProvider.get()
+    const { schema } = await this._deps.resolveChangeSchema.execute({
+      changeName: change.name,
+      schemaName: change.schemaName,
+      schemaVersion: change.schemaVersion,
+    })
     const taskArtifacts = new Set(
       schema.artifacts().flatMap((artifact) => (artifact.hasTasks ? [artifact.id] : [])),
     )
@@ -215,7 +222,7 @@ export class ReconcileChangeValidity {
           }
     const policy = intent.type === 'manual-invalidation' ? intent.policy : change.invalidationPolicy
     const direct = collectReviewTargets(change, collected.fingerprint, taskArtifacts)
-    const verificationIsRequired = verificationRequired(change)
+    const verificationIsRequired = verificationRequired(change, schema)
     const facts: ChangeValidityFacts = {
       currentFingerprint: collected.fingerprint,
       currentSpecApprovalFingerprint: approvalFingerprint,
@@ -268,21 +275,26 @@ export class ReconcileChangeValidity {
   }
 }
 
+/** States at or beyond the verification boundary. */
+const VERIFICATION_STATES: ReadonlySet<ChangeState> = new Set<ChangeState>([
+  'verifying',
+  'done',
+  'archivable',
+  'archiving',
+  'pending-signoff',
+  'signed-off',
+])
+
 /**
- * Verification required.
+ * Whether verification evidence is required: the change schema enables `verifying`
+ * and the change is at or beyond the verification boundary.
  *
- * @param change - change
- * @returns verification required result
+ * @param change - Change under reconciliation
+ * @param schema - The change's own sovereign schema
+ * @returns True when verification evidence is required
  */
-function verificationRequired(change: Change): boolean {
-  return (
-    change.state === 'verifying' ||
-    change.state === 'done' ||
-    change.state === 'archivable' ||
-    change.state === 'archiving' ||
-    change.state === 'pending-signoff' ||
-    change.state === 'signed-off'
-  )
+function verificationRequired(change: Change, schema: Schema): boolean {
+  return isWorkflowStepEnabled('verifying', schema) && VERIFICATION_STATES.has(change.state)
 }
 
 /**

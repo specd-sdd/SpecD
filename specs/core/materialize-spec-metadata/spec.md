@@ -12,6 +12,7 @@ Every consumer that needs the normalized metadata projection should be able to r
 
 - `specId` — the canonical spec identity to materialize metadata for
 - `policy` — optional, `'if-needed'` (default) or `'force'`
+- `schemaName` — optional name of the schema governing the spec in the caller's change context. When present it MUST be forwarded unchanged to `GenerateSpecMetadata`, and the same schema selection (see [`core:generate-metadata`](../generate-metadata/spec.md) Requirement: Schema resolution) MUST be used for the freshness comparison of step 4 and the source re-read of step 6. Callers acting inside a change (including `ArchiveChange` after publication) MUST pass the change's sovereign schema name resolved through `ResolveChangeSchema`; callers outside a change MUST omit it.
 
 It MUST return a `MaterializeSpecMetadataResult`:
 
@@ -20,6 +21,8 @@ It MUST return a `MaterializeSpecMetadataResult`:
 - `source` — `'persisted'` when reused unchanged, `'generated'` when produced during this call
 - `regenerated` — `true` when generation occurred during this call
 - `warnings` — structured `SpecMetadataGenerationWarning` entries, if any
+
+`MaterializeSpecMetadata` MUST NOT select a schema itself; it SHALL NOT substitute the project default for a supplied `schemaName`.
 
 ### Requirement: if-needed reuses fresh metadata and self-heals everything else
 
@@ -105,3 +108,4 @@ The config-based `createMaterializeSpecMetadata(config, options?)` form MUST cre
 - [`core:spec-metadata`](../spec-metadata/spec.md) — the metadata document shape and freshness/provenance fields being compared
 - [`core:composition-resolver`](../composition-resolver/spec.md) — shared resolver used by the config-based factory
 - [`default:_global/logging`](../../../_global/logging/spec.md) — logging conventions for the cache-write-failed warning
+- [`core:resolve-change-schema`](../resolve-change-schema/spec.md) — change-bound callers supply the sovereign schema name it resolves

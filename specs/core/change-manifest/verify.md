@@ -121,26 +121,33 @@ Scenarios:
 
 ### Requirement: Schema version
 
-#### Scenario: Schema unchanged
+#### Scenario: Loading never compares the version with the workspace default
 
-- **WHEN** a change is loaded and its manifest schema matches the active schema name and version
-- **THEN** no warning is emitted
+- **GIVEN** a manifest recording `schema-std` version 1
+- **AND** the workspace default is `schema-std` version 2
+- **WHEN** the change is loaded
+- **THEN** loading emits no schema-version warning
+- **AND** the change is hydrated with version 1
 
-#### Scenario: Schema version bumped
+#### Scenario: Same-name version drift is reported only by ResolveChangeSchema
 
-- **WHEN** a change is loaded and the active schema has a higher version than recorded in the manifest
-- **THEN** specd emits a warning indicating the schema has changed since the change was created and the user should review whether the change artifacts are still compatible
+- **GIVEN** a manifest recording `custom-workflow` version 1
+- **AND** the sovereign named lookup returns `custom-workflow` version 2
+- **WHEN** a change-bound operation resolves the change's schema
+- **THEN** `ResolveChangeSchema` returns a typed advisory naming versions 1 and 2
+- **AND** the change repository emits no separate version warning
 
-#### Scenario: Schema name changed
+#### Scenario: Schema name differs from workspace default
 
-- **WHEN** a change is loaded and the active schema name differs from the one recorded in the manifest
-- **THEN** loading fails with `SchemaMismatchError`
+- **WHEN** a change is loaded and the workspace default schema name differs from the one recorded in the manifest
+- **THEN** loading succeeds
+- **AND** the change domain entity is hydrated with its recorded schema identity
 
 #### Scenario: Archiving with schema version mismatch remains allowed
 
-- **WHEN** archive is attempted on a change with a schema version mismatch
-- **THEN** the mismatch warning is surfaced
-- **AND** archiving is not blocked solely because of that version mismatch
+- **WHEN** archive is attempted on a change whose recorded version differs from the resolved same-name schema version
+- **THEN** archive is not blocked by the mismatch
+- **AND** the advisory comes from `ResolveChangeSchema`
 
 ### Requirement: Fingerprint serialization
 

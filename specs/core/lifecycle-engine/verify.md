@@ -126,6 +126,54 @@
 - **AND** `nextAction` recommends `/specd-verify`
 - **AND** `nextAction.targetStep` is `verifying`
 
+#### Scenario: Passing skip checks recommend bypassing optional implementing
+
+- **GIVEN** a change in `ready`
+- **AND** `implementing` is optional
+- **AND** its effective `step-skip` predicates pass
+- **WHEN** `evaluateLifecycle` runs
+- **THEN** `availableTransitions` contains both `implementing` and the legal shortcut target
+- **AND** `nextAction.targetStep` is the shortcut target
+
+#### Scenario: Failed skip check recommends entering optional implementing
+
+- **GIVEN** a change in `ready`
+- **AND** `implementing` is optional
+- **AND** one effective `step-skip` predicate fails
+- **WHEN** `evaluateLifecycle` runs
+- **THEN** the shortcut target is absent from `availableTransitions`
+- **AND** `nextAction.targetStep` is `implementing`
+
+#### Scenario: checksByTarget contains the complete failed shortcut evidence
+
+- **GIVEN** a legal shortcut whose normal predicates pass and whose bypassed-step predicate fails
+- **WHEN** `evaluateLifecycle` projects the candidate
+- **THEN** `checksByTarget` includes both the normal and `step-skip` results
+- **AND** the shortcut is absent from `availableTransitions`
+
+#### Scenario: Empty skip-check set recommends unconditional bypass
+
+- **GIVEN** a change whose immediate next step is optional
+- **AND** that step has no effective `step-skip` bindings
+- **WHEN** `evaluateLifecycle` runs
+- **THEN** Core recommends the first later available target
+- **AND** entering the optional step remains an explicit available alternative
+
+#### Scenario: Consecutive optional steps use the furthest passing shortcut
+
+- **GIVEN** two consecutive optional steps after the current state
+- **AND** every effective skip predicate for both steps passes
+- **WHEN** `evaluateLifecycle` runs
+- **THEN** `nextAction.targetStep` is the first later mandatory available step
+
+#### Scenario: Disabled verifying recommends done
+
+- **GIVEN** a change in `implementing` with complete tasks
+- **AND** a schema where `verifying` is `disabled: true`
+- **WHEN** `evaluateLifecycle` runs
+- **THEN** `availableTransitions` includes `done`
+- **AND** `nextAction.targetStep` is `done`
+
 #### Scenario: designing with ready available targets ready
 
 - **GIVEN** a change in `designing` with all required design artifacts complete
@@ -156,6 +204,20 @@
 - **WHEN** `evaluateLifecycle` runs
 - **THEN** `nextAction.targetStep` is `archiving`
 - **AND** `nextAction.command` is `/specd-archive`
+
+#### Scenario: Non-recommended available target remains explicit alternative
+
+- **GIVEN** `nextAction` recommends a forward lifecycle target
+- **AND** `designing` is also present in `availableTransitions`
+- **WHEN** lifecycle guidance is projected
+- **THEN** the recommendation remains unchanged
+- **AND** the advertised redesign target remains selectable by an explicit skill invocation
+
+#### Scenario: availableSteps follow canonical order regardless of row order
+
+- **GIVEN** a schema whose `workflow` rows are declared as `verifying`, `implementing`, `ready`
+- **WHEN** `evaluateLifecycleVerdict` projects `availableSteps`
+- **THEN** the steps appear as `ready`, `implementing`, `verifying`
 
 ### Requirement: Archiving escape transitions in lifecycle verdict
 
@@ -237,12 +299,41 @@
 - **THEN** `nextAction.targetStep` is `implementing`
 - **AND** `nextAction.command` is `/specd-implement`
 
+#### Scenario: Disabled verifying routes command forward to archive
+
+- **GIVEN** a change in `implementing` with all tasks complete
+- **AND** a schema where `verifying` is `disabled: true`
+- **WHEN** `evaluateLifecycle` runs
+- **THEN** `nextAction.command` resolves to `/specd-archive`
+- **AND** it does not loop infinitely on `/specd-implement`
+
 #### Scenario: Historical overlap command comes from guidance
 
 - **GIVEN** a change history containing unhandled `spec-overlap-conflict` invalidation
 - **WHEN** `evaluateLifecycle` runs
 - **THEN** `nextAction.command` is `/specd-design`
 - **AND** `evaluateLifecycleVerdict` did not embed that command string
+
+#### Scenario: Blocked done with verifying disabled never routes to verify
+
+- **GIVEN** a change in `done` whose schema disables `verifying`
+- **AND** the signoff gate is on and sign-off is missing
+- **WHEN** `evaluateLifecycle` runs with the real validity verdict (not an injected `verification: 'absent'` fixture)
+- **THEN** `nextAction.command` is the sign-off command
+- **AND** `nextAction.command` is never `/specd-verify` or `specd changes verification start`
+
+#### Scenario: Guidance verification boundary follows topology
+
+- **GIVEN** a schema whose `workflow[]` rows are declared in noncanonical order and disable `verifying`
+- **WHEN** guidance resolves commands for `implementing`, `done`, and `archivable`
+- **THEN** no command routes to `/specd-verify` and each command is derived from the active pipeline rather than a fixed state list
+
+#### Scenario: Blocked done with verifying disabled routes to the real blocker
+
+- **GIVEN** a change in `done` whose schema disables `verifying`
+- **AND** the real reconciler (no injected verification verdict) with the sign-off gate on and no sign-off recorded
+- **WHEN** `evaluateLifecycle` projects `nextAction`
+- **THEN** `nextAction.command` is the sign-off approval command, not `/specd-verify` and not a fallback `/specd-archive`
 
 ### Requirement: Next artifact topological order
 

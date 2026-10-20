@@ -1,6 +1,6 @@
 import path from 'node:path'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
-import { SchemaMismatchError } from '../errors/schema-mismatch-error.js'
+import { SchemaProviderIdentityMismatchError } from '../errors/schema-provider-identity-mismatch-error.js'
 import { ParserNotRegisteredError } from '../errors/parser-not-registered-error.js'
 import { ReadOnlyWorkspaceError } from '../../domain/errors/read-only-workspace-error.js'
 import { InvalidStateTransitionError } from '../../domain/errors/invalid-state-transition-error.js'
@@ -10,6 +10,7 @@ import { type ArchiveRepository } from '../ports/archive-repository.js'
 import { type ActorResolver } from '../ports/actor-resolver.js'
 import { type ArtifactParserRegistry } from '../ports/artifact-parser.js'
 import { type SchemaProvider } from '../ports/schema-provider.js'
+import { ResolveChangeSchema } from '../services/resolve-change-schema.js'
 import { type ContentHasher } from '../ports/content-hasher.js'
 import { type ReconcileChangeValidity } from './reconcile-change-validity.js'
 import {
@@ -206,6 +207,7 @@ export class ArchiveChange {
   private readonly _archiveBindings: readonly CheckBinding[]
   private readonly _hasher: ContentHasher | undefined
   private readonly _reconcile: ReconcileChangeValidity
+  private readonly _resolveChangeSchema: ResolveChangeSchema
 
   /**
    * Creates a new `ArchiveChange` use case instance.
@@ -224,6 +226,7 @@ export class ArchiveChange {
    * @param batchSnapshot - Batch canonical snapshot adapter for commit rollback
    * @param hasher - Content hasher for lock-less disk `dependsOn` extraction
    * @param reconcile - Required canonical validity reconciler used before and after hooks
+   * @param resolveChangeSchema - Shared change schema resolver
    */
   constructor(
     changes: ChangeRepository,
@@ -240,6 +243,7 @@ export class ArchiveChange {
     batchSnapshot: ArchiveBatchSnapshotPort = createNoopArchiveBatchSnapshot(),
     hasher: ContentHasher | undefined,
     reconcile: ReconcileChangeValidity,
+    resolveChangeSchema?: ResolveChangeSchema,
   ) {
     this._changes = changes
     this._listWorkspaces = listWorkspaces
@@ -258,6 +262,7 @@ export class ArchiveChange {
       throw new InvalidCompositionFactoryArgumentsError('ArchiveChange', 'reconcile is required')
     }
     this._reconcile = reconcile
+    this._resolveChangeSchema = resolveChangeSchema ?? new ResolveChangeSchema(schemaProvider)
   }
 
   /**
@@ -279,7 +284,11 @@ export class ArchiveChange {
     const loadedChange = await this._changes.get(input.name)
     if (loadedChange === null) throw new ChangeNotFoundError(input.name)
 
-    const schema = await this._schemaProvider.get()
+    const { schema } = await this._resolveChangeSchema.execute({
+      changeName: loadedChange.name,
+      schemaName: loadedChange.schemaName,
+      schemaVersion: loadedChange.schemaVersion,
+    })
 
     let change = loadedChange
     let validity: ChangeValidityVerdict | undefined
@@ -593,7 +602,11 @@ export class ArchiveChange {
         if (publishedState === undefined) continue
 
         Logger.debug('ArchiveChange force materialization started', { change: change.name, specId })
-        await this._materializeMetadata.execute({ specId, policy: 'force' })
+        await this._materializeMetadata.execute({
+          specId,
+          policy: 'force',
+          schemaName: schema.name(),
+        })
         Logger.debug('ArchiveChange force materialization completed', {
           change: change.name,
           specId,
@@ -1392,16 +1405,6 @@ function toPortableRelativePath(rootDir: string, absolutePath: string): string |
 }
 
 /**
- * Maps a failed archive predicate onto the historical typed errors.
- *
- * @param check - Failed check
- * @param change - Change being archived
- * @param schema - Active schema
- * @param overlapEntries - Overlap entries involving this change
- * @param workspaceMap - Workspace ownership map for readOnly errors
- * @throws Typed archive errors matching prior ArchiveChange behavior
- */
-/**
  * Whether a post-hook verdict still blocks archive.
  *
  * Artifact review, non-current verification, and required approval or sign-off
@@ -1466,7 +1469,7 @@ function throwMappedArchiveFailure(
 ): never {
   switch (check.id) {
     case 'schema.nameMatch':
-      throw new SchemaMismatchError(change.name, change.schemaName, schema.name())
+      throw new SchemaProviderIdentityMismatchError(change.name, change.schemaName, schema.name())
     case 'archive.archivable':
       change.assertArchivable()
       throw new ArchiveImplementationStateError([], check.message ?? 'Change is not archivable')

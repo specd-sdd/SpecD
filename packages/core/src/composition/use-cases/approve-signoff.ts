@@ -7,6 +7,7 @@ import { type ReconcileChangeValidity } from '../../application/use-cases/reconc
 import { type RefreshImplementationTracking } from '../../application/use-cases/refresh-implementation-tracking.js'
 import { type ValidityFingerprintService } from '../../application/services/validity-fingerprint-service.js'
 import { ApproveSignoff } from '../../application/use-cases/approve-signoff.js'
+import { type ResolveChangeSchema } from '../../application/services/resolve-change-schema.js'
 import { type SpecdConfig } from '../../application/specd-config.js'
 import {
   createCompositionResolver,
@@ -35,6 +36,8 @@ export interface ApproveSignoffDeps {
   readonly fingerprint: ValidityFingerprintService
   /** Implementation tracking refresh. */
   readonly refreshImplementationTracking: RefreshImplementationTracking
+  /** Shared change schema resolver. */
+  readonly resolveChangeSchema?: ResolveChangeSchema
 }
 
 /**
@@ -53,6 +56,7 @@ export function resolveApproveSignoffDeps(resolver: CompositionResolver): Approv
     reconcile: resolver.getReconcileChangeValidity(),
     fingerprint: resolver.getValidityFingerprintService(),
     refreshImplementationTracking: resolver.getRefreshImplementationTracking(),
+    resolveChangeSchema: resolver.getResolveChangeSchema(),
   }
 }
 
@@ -112,6 +116,7 @@ function createApproveSignoffFromNormalized(
       reconcile,
       fingerprint,
       refreshImplementationTracking,
+      resolveChangeSchema,
     } = input.deps
     return new ApproveSignoff(
       changes,
@@ -121,6 +126,7 @@ function createApproveSignoffFromNormalized(
       reconcile,
       fingerprint,
       refreshImplementationTracking,
+      resolveChangeSchema,
     )
   }
 

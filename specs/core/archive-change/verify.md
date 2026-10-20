@@ -43,13 +43,14 @@
 - **WHEN** execute is called with only a name
 - **THEN** hooks are not skipped and overlap is not allowed by default.
 
-### Requirement: Schema name guard
+### Requirement: Sovereign schema resolution
 
-#### Scenario: Mismatched schema throws error
+#### Scenario: Resolves sovereign schema when workspace default differs
 
-- **GIVEN** a change with schema A and project with schema B
+- **GIVEN** an archivable change with schema A and project with schema B
 - **WHEN** archive is called
-- **THEN** the use case must throw `SchemaMismatchError`.
+- **THEN** it resolves schema A via `SchemaProvider.get(A)`
+- **AND** proceeds without throwing `SchemaMismatchError`
 
 ### Requirement: Archivable guard
 
@@ -125,6 +126,21 @@
 - **WHEN** archive refreshes, reconciles, and passes live predicates
 - **THEN** it constructs the plan and snapshots only afterward
 - **AND** the new link is included in the publication plan and spec-lock sidecar
+
+#### Scenario: Archive without verification when verifying is disabled
+
+- **GIVEN** a change in `archivable` whose schema disables `verifying`
+- **AND** no verification attempt or completed evidence exists
+- **WHEN** `ArchiveChange.execute` runs with the real reconciler
+- **THEN** the `verification.current` archive predicate does not fail
+- **AND** the post-hook validity re-check does not block archive
+- **AND** archive succeeds when every other check passes
+
+#### Scenario: Archive still requires verification when verifying is enabled
+
+- **GIVEN** a change in `archivable` whose schema enables `verifying` and has no completed verification
+- **WHEN** `ArchiveChange.execute` runs
+- **THEN** archive fails for missing verification
 
 ### Requirement: ReadOnly workspace guard
 
@@ -435,6 +451,27 @@
 - **WHEN** `ArchiveChange` regenerates metadata for an archived spec
 - **THEN** it delegates generation and guarded cache persistence to `MaterializeSpecMetadata.execute({ specId, policy: 'force' })`
 - **AND** it does not call `GenerateSpecMetadata` directly or write `metadata.json` itself
+
+#### Scenario: Post-archive metadata is materialized with the change schema
+
+- **GIVEN** a change recorded with schema `custom-workflow` whose `metadataExtraction` differs from the workspace default
+- **WHEN** the change is archived
+- **THEN** `MaterializeSpecMetadata.execute` is called with `{ specId, policy: 'force', schemaName: 'custom-workflow' }` for each modified spec
+- **AND** the generated metadata reflects `custom-workflow` extraction rules, not the workspace default
+
+#### Scenario: Archive without verification when verifying is disabled uses the real reconciler
+
+- **GIVEN** a change in `archivable` whose schema disables `verifying` and that has no verification attempt or evidence
+- **AND** `ArchiveChange` is wired with the real validity reconciler
+- **WHEN** the change is archived
+- **THEN** no verification blocker is raised and archive succeeds
+
+#### Scenario: Archive still requires verification when verifying is enabled with the real reconciler
+
+- **GIVEN** a change in `archivable` whose schema enables `verifying` and whose completed verification is stale
+- **AND** `ArchiveChange` is wired with the real validity reconciler
+- **WHEN** archive is attempted
+- **THEN** archive is rejected with a verification blocker and nothing is published
 
 ### Requirement: Result shape
 

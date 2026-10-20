@@ -20,23 +20,36 @@
 
 #### Scenario: List all registered checks
 
-- **GIVEN** a CheckRegistry containing 15 built-ins and 2 registered plugin checks
+- **GIVEN** a CheckRegistry containing the 16 built-in checks and 2 registered plugin checks
 - **WHEN** calling `registry.list()`
-- **THEN** it returns an array of exactly 17 Check instances
+- **THEN** it returns an array of exactly 18 Check instances
 
 ### Requirement: Immutability of built-in checks
 
 #### Scenario: Built-in checks injected at construction
 
 - **GIVEN** a CheckRegistry constructed with the standard built-in check definitions
-- **WHEN** inspecting `registry.get('protocol.edge')` and `registry.get('workflow.requires')`
-- **THEN** both checks are present with their immutable built-in configurations
+- **WHEN** inspecting `registry.get('protocol.edge')`, `registry.get('workflow.requires')`, and `registry.get('workflow.tasksEmpty')`
+- **THEN** all checks are present with their immutable built-in configurations
 
-#### Scenario: Reject external registration using unprefixed built-in name
+#### Scenario: External registrations are always namespaced and never shadow built-ins
 
 - **GIVEN** a CheckRegistry instance
-- **WHEN** an external caller attempts to register a check without plugin namespacing or attempting to override a built-in
-- **THEN** the registration is rejected and throws `InvalidPluginNameError`
+- **WHEN** a plugin named `protocol` registers a check with id `edge`
+- **THEN** the check is registered as `@protocol.edge`
+- **AND** `registry.get('protocol.edge')` still returns the immutable built-in check
+
+#### Scenario: Invalid plugin name is rejected
+
+- **GIVEN** a CheckRegistry instance
+- **WHEN** a plugin registers with a name that is empty or contains whitespace, dots, symbols, or path traversal
+- **THEN** the registration throws `InvalidPluginNameError`
+
+#### Scenario: Plugin namespace accepts the documented grammar
+
+- **GIVEN** plugin names matching `^[a-zA-Z0-9_-]+$`
+- **WHEN** registering checks under names containing uppercase letters, a leading digit, or an underscore
+- **THEN** each valid namespace is accepted
 
 ### Requirement: Canonical namespacing and plugin registration
 
@@ -78,8 +91,8 @@
 #### Scenario: Register valid check binding coordinates
 
 - **GIVEN** a registered check `'@security.scan'`
-- **WHEN** registering default bindings for `{ scope: 'transition', to: 'ready', along: 'forward' }`
-- **THEN** the binding is successfully recorded and accessible via `registry.bindings()`
+- **WHEN** registering default bindings for `{ scope: 'transition', to: 'ready', along: 'forward' }` and `{ scope: 'step-skip', step: 'implementing' }`
+- **THEN** both bindings are successfully recorded and accessible via `registry.bindings()`
 
 #### Scenario: Reject duplicate binding on identical coordinate
 
@@ -87,25 +100,79 @@
 - **WHEN** attempting to register a second binding for the exact same coordinate `{ scope: 'transition', to: 'ready', along: 'forward' }`
 - **THEN** it throws `DuplicateCheckBindingError`
 
+#### Scenario: Reject duplicate step-skip binding on identical coordinate
+
+- **GIVEN** a check registered with a binding for `{ scope: 'step-skip', step: 'implementing' }`
+- **WHEN** attempting to register another binding for the exact same `{ scope: 'step-skip', step: 'implementing' }`
+- **THEN** it throws `DuplicateCheckBindingError`
+
 ### Requirement: Two-tier governance and confinement locks
 
-#### Scenario: Check-level allowBindingOverride false enforces confinement
+#### Scenario: allowSchemaEmbedding false forbids new coordinates
 
-- **GIVEN** a check registered with `allowBindingOverride: false` and default binding to `ready`
-- **WHEN** validating a schema that attempts to bind this check to step `implementing`
+- **GIVEN** a plugin check registered with `allowSchemaEmbedding: false` and a default binding entering `ready`
+- **WHEN** validating a schema that declares this check on step `implementing`
 - **THEN** schema validation throws `CheckEmbeddingForbiddenError`
+
+#### Scenario: Embedding defaults follow default bindings
+
+- **GIVEN** a plugin check registered with `defaultBindings` and no `allowSchemaEmbedding`
+- **AND** another plugin check registered without `defaultBindings` and no `allowSchemaEmbedding`
+- **WHEN** their governance is inspected
+- **THEN** the first has `allowSchemaEmbedding: false`
+- **AND** the second has `allowSchemaEmbedding: true`
+
+#### Scenario: Declaring a locked built-in at its own coordinate is not embedding
+
+- **GIVEN** the built-in check `impl.filesResolved` with its code-defined binding entering `verifying`
+- **AND** a variant of a built-in check with `allowSchemaEmbedding: false` declared on the step of its own code-defined coordinate
+- **WHEN** a schema declares the check on that coordinate with only an allowed `config`
+- **THEN** schema validation succeeds
+- **AND** no `CheckEmbeddingForbiddenError` is thrown, exactly as for a plugin check at its own coordinate
+
+#### Scenario: allowSchemaEmbedding does not lock policy at own coordinates
+
+- **GIVEN** a plugin check registered with `allowSchemaEmbedding: false` and a default binding entering `ready` whose `allowBindingOverride` is `true`
+- **WHEN** a schema redeclares that check on step `ready` changing `onFailure`
+- **THEN** schema validation accepts the policy change
 
 #### Scenario: Coordinate allowBindingOverride false locks policy overrides
 
-- **GIVEN** a check binding coordinate defined with `allowBindingOverride: false`
+- **GIVEN** a code-defined binding coordinate with `allowBindingOverride: false`
 - **WHEN** a schema attempts to override `onFailure: 'collect'` on that coordinate
 - **THEN** schema validation throws `CheckBindingOverrideForbiddenError`
+
+#### Scenario: allowBindingOverride does not restrict placement
+
+- **GIVEN** a plugin check with `allowSchemaEmbedding: true` whose default binding entering `ready` has `allowBindingOverride: false`
+- **WHEN** a schema declares the check on step `implementing`
+- **THEN** schema validation succeeds
+
+#### Scenario: Schema-owned binding may be changed by a later schema layer
+
+- **GIVEN** a base schema that embeds `impl.linksInScope` on step `done` (a coordinate no code-defined binding serves) with `onFailure: 'abort'`
+- **AND** an extending layer or `schemaOverrides` that redeclares it on `done` with `onFailure: 'collect'` and `skippable: false`
+- **WHEN** the layers are merged and the schema is built
+- **THEN** schema validation succeeds and the merged declaration carries `onFailure: 'collect'` and `skippable: false`
+- **AND** no `CheckBindingOverrideForbiddenError` is thrown
+
+#### Scenario: Schema-owned binding still honors check-level locks
+
+- **GIVEN** a plugin check with `allowConfigOverride: false` embedded by a base schema at a new coordinate
+- **WHEN** a later schema layer adds `config` to that declaration
+- **THEN** schema validation throws `CheckConfigOverrideForbiddenError`
 
 #### Scenario: Locked config rejects schema config override
 
 - **GIVEN** a check registered with `allowConfigOverride: false` and `defaultConfig: { rule: 'strict' }`
 - **WHEN** a schema provides `config: { rule: 'permissive' }` for this check
 - **THEN** schema validation throws `CheckConfigOverrideForbiddenError`
+
+#### Scenario: Omitted binding allowConfigOverride inherits the check-level lock
+
+- **GIVEN** a plugin check registered with `allowConfigOverride: false` whose default binding omits `allowConfigOverride`
+- **WHEN** the binding is constructed
+- **THEN** the binding's effective `allowConfigOverride` is `false`
 
 #### Scenario: Locked check-level allowDisable rejects schema disablement
 
@@ -115,22 +182,22 @@
 
 #### Scenario: Locked binding-level allowDisable rejects schema disablement
 
-- **GIVEN** an existing check binding coordinate configured with `allowDisable: false`
+- **GIVEN** an existing code-defined binding coordinate configured with `allowDisable: false`
 - **WHEN** a schema declares `disabled: true` for this check on that coordinate
 - **THEN** schema validation throws `CheckDisableForbiddenError`
 
 #### Scenario: Schema cannot relax existing binding allowDisable lock
 
-- **GIVEN** a check binding coordinate configured with `allowDisable: false`
-- **WHEN** a schema declares a check binding on that step attempting to disable it
-- **THEN** the existing binding's allowDisable lock takes precedence and throws `CheckDisableForbiddenError`
+- **GIVEN** a code-defined binding coordinate configured with `allowDisable: false`
+- **WHEN** any schema layer declares a binding on that step attempting to disable it
+- **THEN** the code-defined lock takes precedence and throws `CheckDisableForbiddenError`
 
 #### Scenario: Schema layer mergers preserve step checks without erasing governance locks
 
-- **GIVEN** a base schema defining step checks with governance protections
+- **GIVEN** a base schema defining step checks and skipChecks with governance protections
 - **WHEN** an extending schema layer is merged via `mergeSchemaLayers`
-- **THEN** `step.checks` collections are safely combined without clobbering existing checks
-- **AND** any attempt to redeclare an identical check coordinate with relaxed governance is prevented
+- **THEN** `step.checks` and `step.skipChecks` collections are safely combined without clobbering existing checks
+- **AND** any attempt to relax a code-set lock through a redeclaration is rejected
 
 #### Scenario: Permitted check disablement cleanly omits check from execution
 
@@ -141,28 +208,58 @@
 
 #### Scenario: Category A built-in checks initialize with locked governance
 
-- **GIVEN** a CheckRegistry initialized with default built-in checks
-- **WHEN** inspecting governance for Category A checks (`protocol.edge`, `verification.current`, `archive.archivable`, `schema.nameMatch`, `hook.pre`, `hook.post`)
-- **THEN** all report `allowBindingOverride: false` and `allowDisable: false`
+- **WHEN** inspecting Category A built-in checks in CheckRegistry
+- **THEN** all declare `allowSchemaEmbedding: false`, `allowBindingOverride: false`, `allowDisable: false`, and `skippable: false`
 
-#### Scenario: Category B built-in checks initialize with locked governance
+#### Scenario: Category B built-in checks include workflow.tasksEmpty with native attribute governance
 
-- **GIVEN** a CheckRegistry initialized with default built-in checks
-- **WHEN** inspecting governance for Category B checks (`workflow.requires`, `workflow.taskCompletion`, `approval.spec`, `approval.signoff`)
-- **THEN** all report `allowBindingOverride: false` and `allowDisable: false`
+- **WHEN** inspecting `workflow.tasksEmpty` in CheckRegistry
+- **THEN** it declares `allowSchemaEmbedding: false`, `allowBindingOverride: false`, `allowDisable: false`, and `skippable: false` under `scope: 'step-skip'` for `step: 'implementing'`
 
-#### Scenario: Category C built-in checks initialize with open governance
+#### Scenario: Category C built-in checks allow embedding
 
-- **GIVEN** a CheckRegistry initialized with default built-in checks
-- **WHEN** inspecting governance for Category C checks (`impl.linksInScope`, `spec.overlap`, `deps.consistent`, `impl.filesResolved`, `workspace.readOnly`)
-- **THEN** all report `allowBindingOverride: true` and `allowDisable: true`
+- **WHEN** inspecting `impl.linksInScope`, `impl.filesResolved`, `spec.overlap`, `deps.consistent`, and `workspace.readOnly`
+- **THEN** each declares `allowSchemaEmbedding: true`, `allowBindingOverride: true`, and `allowDisable: true`
+
+#### Scenario: Composition forwards plugin governance
+
+- **GIVEN** a plugin check registered through kernel composition with `allowDisable: false` and `allowSchemaEmbedding: false`
+- **WHEN** a schema declares `disabled: true` for that check on any step, or declares it at a coordinate its default bindings do not serve
+- **THEN** schema validation throws `CheckDisableForbiddenError` or `CheckEmbeddingForbiddenError` respectively
+
+#### Scenario: Plugin step-skip default bindings are evaluated
+
+- **GIVEN** a plugin check registered through kernel composition with a default binding `{ scope: 'step-skip', step: 'implementing' }`
+- **AND** `implementing` is optional
+- **WHEN** a transition bypasses `implementing`
+- **THEN** the plugin check runs as a `step-skip` predicate
+- **AND** its failure rejects the shortcut end to end
+
+#### Scenario: Composition registry exposes executable instances
+
+- **GIVEN** the `CheckRegistry` built by kernel composition
+- **WHEN** `registry.get('impl.linksInScope')` is executed for a change whose implementation links fall outside its scope
+- **THEN** the check returns `fail`, because the registry holds the application implementation and not a domain stub
+
+#### Scenario: Schema-embedded Category C check surfaces its real result
+
+- **GIVEN** a schema embedding `impl.linksInScope` on step `done`, where no code-defined binding serves that coordinate
+- **AND** a change with out-of-scope implementation links
+- **WHEN** `TransitionChange` attempts `verifying → done`
+- **THEN** the synthesized binding evaluates the real check and the transition fails with `CheckPredicateFailedError` for `impl.linksInScope`
 
 ### Requirement: Cascading configuration hierarchy
 
 #### Scenario: Cascade merges check default, binding config, and step config
 
-- **GIVEN** a check with check-level `defaultConfig: { timeout: 1000, level: 'info' }`
-- **AND** a binding with `config: { timeout: 2000 }`
+- **GIVEN** a check with check-level `defaultConfig: { timeout: 1000, level: 'info', tags: ['a'] }`
+- **AND** a binding with `config: { timeout: 2000, tags: ['b'] }`
 - **AND** a schema step declaration with `config: { level: 'debug', extra: true }`
-- **WHEN** the orchestrator builds `CheckExecutionContext.config` for this check invocation
-- **THEN** the effective config is `{ timeout: 2000, level: 'debug', extra: true }`
+- **WHEN** `resolveEffectiveBindings` resolves the binding and the predicate runner executes it
+- **THEN** `ctx.config` is exactly `{ timeout: 2000, level: 'debug', extra: true, tags: ['a', 'b'] }`
+
+#### Scenario: Runner does not merge configuration again
+
+- **GIVEN** a resolved binding carrying an effective configuration
+- **WHEN** the predicate runner executes it
+- **THEN** the check receives that configuration unchanged and no array entry is duplicated

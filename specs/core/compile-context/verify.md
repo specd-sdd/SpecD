@@ -377,13 +377,13 @@
 - **THEN** it does not invoke `ImplementationDetector`
 - **AND** it does not merge detected files before assembling context
 
-### Requirement: Schema name guard
+### Requirement: Sovereign schema resolution
 
-#### Scenario: Schema mismatch throws before context compilation
+#### Scenario: Resolves sovereign schema when workspace default differs
 
-- **GIVEN** the change was created under a different schema name
+- **GIVEN** the change was created under a different schema name than the workspace default
 - **WHEN** `CompileContext.execute` is called
-- **THEN** it throws `SchemaMismatchError` before collecting context
+- **THEN** it resolves the change's schema via `SchemaProvider.get(change.schemaName)` without throwing `SchemaMismatchError`
 
 ### Requirement: Workspace resolution for spec IDs
 
@@ -526,3 +526,17 @@
 - **WHEN** `resolveCompileContextDeps(resolver)` runs
 - **THEN** the resolved deps include `getMetadata: GetSpecMetadata`
 - **AND** it is used instead of direct `SpecRepository.metadata()` freshness checks
+
+### Requirement: Change schema applies to change specs only
+
+#### Scenario: Metadata for a change spec is materialized with the change schema
+
+- **GIVEN** a change recorded with schema `custom-workflow` whose `specIds` include `default:auth/login`
+- **WHEN** `CompileContext.execute` materializes metadata for `default:auth/login`
+- **THEN** `GetSpecMetadata` receives `schemaName: 'custom-workflow'`
+
+#### Scenario: Metadata for a spec outside the change omits schemaName
+
+- **GIVEN** the same change and a dependency spec `default:auth/shared` that is not in `specIds`
+- **WHEN** `CompileContext.execute` materializes metadata for `default:auth/shared`
+- **THEN** `GetSpecMetadata` receives no `schemaName`

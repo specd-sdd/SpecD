@@ -1,3 +1,4 @@
+import { type ApprovalGates } from '../../domain/services/workflow-topology.js'
 import { type SchemaRegistry } from '../../application/ports/schema-registry.js'
 import { type ResolveSchema } from '../../application/use-cases/resolve-schema.js'
 import { ValidateSchema } from '../../application/use-cases/validate-schema.js'
@@ -20,6 +21,8 @@ export interface ValidateSchemaDeps {
   readonly schemaRef: string
   /** Shared resolve-schema use case. */
   readonly resolveSchema: ResolveSchema
+  /** Optional approval gates used to validate workflow anchors. */
+  readonly approvals?: ApprovalGates
 }
 
 /**
@@ -33,6 +36,7 @@ export function resolveValidateSchemaDeps(resolver: CompositionResolver): Valida
     schemas: resolver.getSchemaRegistry(),
     schemaRef: resolver.config.schemaRef,
     resolveSchema: resolver.getResolveSchema(),
+    approvals: resolver.config.approvals,
   }
 }
 
@@ -89,6 +93,7 @@ function createValidateSchemaFromNormalized(
       input.deps.schemaRef,
       buildSchema,
       input.deps.resolveSchema,
+      input.deps.approvals,
     )
   }
   const resolver = createCompositionResolver(input.config, input.options)

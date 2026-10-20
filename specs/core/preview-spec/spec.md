@@ -137,11 +137,11 @@ If delta application fails for an artifact file (e.g. selector resolution failur
 
 If diff generation fails through the dedicated `DiffGenerationError`, `PreviewSpec` MUST also avoid throwing. It treats that case as a warning-producing partial result rather than as a failed preview.
 
-The preview MUST always succeed — partial results are acceptable, total failure is not.
+Once the change and its sovereign schema are resolved, the preview MUST always succeed for content-level failures — partial results are acceptable, total failure is not. This guarantee does not cover preconditions: change lookup failures, sovereign schema resolution failures, and `SchemaProviderIdentityMismatchError` MUST propagate as errors, because no trustworthy artifact model exists to preview against.
 
-### Requirement: Schema name guard
+### Requirement: Sovereign schema resolution
 
-After obtaining the schema from `SchemaProvider`, `PreviewSpec` MUST compare `schema.name()` with `change.schemaName`. If they differ, it MUST throw `SchemaMismatchError`.
+`PreviewSpec` MUST obtain the change's sovereign schema through `ResolveChangeSchema`. The change's recorded schema is the sovereign authority defining artifact parser registry lookups, delta formats, and templates. A different workspace default MUST remain irrelevant; provider identity mismatch MUST propagate as `SchemaProviderIdentityMismatchError`.
 
 ### Requirement: Config-based factory delegates through resolvePreviewSpecDeps
 
@@ -173,3 +173,4 @@ The helper is the only use-case-specific composition entry for config-based boot
 - [`core:file-reader-port`](../file-reader-port/spec.md) — preview-oriented workflows consume preview content as read-only text
 - [`core:composition-resolver`](../composition-resolver/spec.md) — config-based factory wiring resolves `PreviewSpec` dependencies through shared composition
 - [`core:diff-generator`](../diff-generator/spec.md) — unified diff generation is delegated to this internal capability
+- [core:resolve-change-schema](../resolve-change-schema/spec.md) — named sovereign lookup, provider identity validation, and same-name version advisory

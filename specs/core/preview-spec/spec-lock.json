@@ -9,16 +9,13 @@
     "core:change-layout",
     "core:file-reader-port",
     "core:composition-resolver",
-    "core:diff-generator"
+    "core:diff-generator",
+    "core:resolve-change-schema"
   ],
   "implementation": [
     {
       "file": "core:src/application/use-cases/preview-spec.ts",
       "symbols": ["PreviewSpec"]
-    },
-    {
-      "file": "core:src/composition/use-cases/preview-spec.ts",
-      "symbols": ["resolvePreviewSpecDeps", "createPreviewSpec"]
     }
   ]
 }
