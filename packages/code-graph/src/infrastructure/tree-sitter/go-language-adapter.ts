@@ -12,6 +12,11 @@ import { type SymbolNode, createSymbolNode } from '../../domain/value-objects/sy
 import { type Relation, createRelation } from '../../domain/value-objects/relation.js'
 import { SymbolKind } from '../../domain/value-objects/symbol-kind.js'
 import { RelationType } from '../../domain/value-objects/relation-type.js'
+import {
+  type ImportDiagnostic,
+  type PackageResolutionFacet,
+  type SymbolReferenceSyntaxFacet,
+} from '../../domain/value-objects/language-adapter-facets.js'
 import { findManifestField } from './find-manifest-field.js'
 import { splitWorkspaceIdentity } from '../../domain/services/split-workspace-identity.js'
 import {
@@ -262,6 +267,49 @@ function goPackageSurface(filePath: string): string {
  * Extracts functions, methods, structs, interfaces, type aliases, vars, and consts.
  */
 export class GoLanguageAdapter implements LanguageAdapter {
+  private readonly packageResolutionFacet: PackageResolutionFacet = {
+    identity: (codeRoot, repoRoot) => this.getPackageIdentity(codeRoot, repoRoot),
+    prepare: (context) => {
+      // Builds the per-run directory index of indexed Go files once, after every workspace has
+      // been analyzed or hydrated, so entry lookups never depend on resolution order.
+      goPackageFiles(context.session, '', '')
+    },
+    matchSpecifier: (specifier, knownPackages) =>
+      this.resolvePackageFromSpecifier(specifier, [...knownPackages]),
+    entrySurface: (request) => {
+      // The import path minus the module prefix is the package directory inside the workspace.
+      const relativeDir =
+        request.specifier === request.packageName
+          ? ''
+          : request.specifier.slice(request.packageName.length + 1)
+      return goPackageFiles(request.session, request.workspace, relativeDir).map((filePath) => ({
+        filePath,
+        surface: goPackageSurface(filePath),
+      }))
+    },
+  }
+
+  /**
+   * Package identity, specifier matching, directory preparation, and the package entry surface.
+   * @returns The facet this adapter provides.
+   */
+  get packageResolution(): PackageResolutionFacet {
+    return this.packageResolutionFacet
+  }
+
+  private readonly symbolReferenceSyntaxFacet: SymbolReferenceSyntaxFacet = {
+    parse: (text) => this.parseSymbolReference(text),
+    render: (symbol, ownerPath) => this.renderSymbolReference(symbol, ownerPath),
+  }
+
+  /**
+   * Member reference syntax.
+   * @returns The facet this adapter provides.
+   */
+  get symbolReferenceSyntax(): SymbolReferenceSyntaxFacet {
+    return this.symbolReferenceSyntaxFacet
+  }
+
   /**
    * Declares deterministic Go reference semantics.
    * @returns Supported reference capabilities.
@@ -303,7 +351,7 @@ export class GoLanguageAdapter implements LanguageAdapter {
    * @param text - Human reference text.
    * @returns One owner-then-member candidate, or none.
    */
-  parseSymbolReference(text: string): ParsedSymbolReference {
+  private parseSymbolReference(text: string): ParsedSymbolReference {
     return parseDottedMemberReference(text)
   }
 
@@ -313,7 +361,7 @@ export class GoLanguageAdapter implements LanguageAdapter {
    * @param ownerPath - Owner simple names.
    * @returns Generic dotted spelling.
    */
-  renderSymbolReference(
+  private renderSymbolReference(
     symbol: LogicalSymbol,
     ownerPath: readonly string[],
   ): { readonly generic: string } {
@@ -661,8 +709,8 @@ export class GoLanguageAdapter implements LanguageAdapter {
   resolveImports(analysis: FileAnalysis, context: ImportResolutionContext): ResolvedImports {
     const importMap = new Map<string, string>()
     const fileImports: string[] = []
-    const knownPackages = [...context.packageToWorkspace.keys()]
-    const { session, qualifiedNames, packageToWorkspace } = context
+    const diagnostics: ImportDiagnostic[] = []
+    const { qualifiedNames } = context
 
     for (const imp of analysis.imports) {
       // Blank and side-effect imports bind no name but still depend on the package.
@@ -679,20 +727,21 @@ export class GoLanguageAdapter implements LanguageAdapter {
         continue
       }
 
-      // A Go import names a package directory, not a symbol. It resolves to the non-test files
-      // of that directory inside the workspace whose `go.mod` module owns the specifier.
-      const pkgName = this.resolvePackageFromSpecifier(imp.specifier, knownPackages)
-      if (pkgName) {
-        const workspace = packageToWorkspace.get(pkgName)
-        if (workspace !== undefined) {
-          const relativeDir =
-            imp.specifier === pkgName ? '' : imp.specifier.slice(pkgName.length + 1)
-          fileImports.push(...goPackageFiles(session, workspace, relativeDir))
-        }
+      // A Go import names a package directory, not a symbol. It depends on the non-test files of
+      // that directory inside the workspace whose `go.mod` module owns the specifier.
+      const entries = context.packageEntryFiles(imp.specifier)
+      if (entries.status === 'unresolved') {
+        diagnostics.push({
+          filePath: analysis.filePath,
+          specifier: imp.specifier,
+          reason: entries.reason,
+        })
+        continue
       }
+      for (const entry of entries.entries) fileImports.push(entry.filePath)
     }
 
-    return { importMap, fileImports: [...new Set(fileImports)] }
+    return { importMap, fileImports: [...new Set(fileImports)], steps: [], diagnostics }
   }
 
   /**
@@ -1459,7 +1508,10 @@ export class GoLanguageAdapter implements LanguageAdapter {
    * @param knownPackages - Known module paths from `go.mod`.
    * @returns The matching module path, or undefined.
    */
-  resolvePackageFromSpecifier(specifier: string, knownPackages: string[]): string | undefined {
+  private resolvePackageFromSpecifier(
+    specifier: string,
+    knownPackages: string[],
+  ): string | undefined {
     let best: string | undefined
     for (const pkg of knownPackages) {
       if (specifier === pkg || specifier.startsWith(pkg + '/')) {
@@ -1486,7 +1538,7 @@ export class GoLanguageAdapter implements LanguageAdapter {
    * @param repoRoot - Optional repository root to bound the search.
    * @returns The module path from the nearest `go.mod`, or undefined.
    */
-  getPackageIdentity(codeRoot: string, repoRoot?: string): string | undefined {
+  private getPackageIdentity(codeRoot: string, repoRoot?: string): string | undefined {
     return findManifestField(
       codeRoot,
       'go.mod',

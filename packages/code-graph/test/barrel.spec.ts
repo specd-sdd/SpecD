@@ -240,6 +240,7 @@ describe('@specd/code-graph barrel', () => {
       'IndexedResourceKind',
       'InvalidGraphSelectorError',
       'InvalidGraphStoreConfigurationError',
+      'InvalidLanguageAdapterError',
       'InvalidRelationTypeError',
       'InvalidSymbolKindError',
       'MemberAccessor',

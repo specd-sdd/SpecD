@@ -83,7 +83,29 @@ export { type GraphStatistics } from './domain/value-objects/graph-statistics.js
 export {
   type LanguageAdapter,
   type AdapterDeclarationPolicy,
+  type AdapterAnalyzeContext,
+  type ImportResolutionContext,
+  type RelationBuildContext,
+  type ResolvedImports,
 } from './domain/value-objects/language-adapter.js'
+export {
+  type PackageWorkspace,
+  type PackagePreparationContext,
+  type PackageEntryRequest,
+  type PackageEntry,
+  type PackageResolutionFacet,
+  type RelativeImportResolutionFacet,
+  type QualifiedNameResolutionFacet,
+  type SymbolReferenceSyntaxFacet,
+  type ReExportLinkContext,
+  type ReExportLinkResult,
+  type ReExportLinkingFacet,
+  type ImportUnresolvedReason,
+  type ImportDiagnostic,
+  type PackageEntryResolution,
+  type PackageExportRequest,
+  type PackageExportResolution,
+} from './domain/value-objects/language-adapter-facets.js'
 export { type ImportDeclaration } from './domain/value-objects/import-declaration.js'
 export { ImportDeclarationKind } from './domain/value-objects/import-declaration-kind.js'
 export { type SourceLocation } from './domain/value-objects/source-location.js'
@@ -147,6 +169,7 @@ export {
   type IndexCoverageDiagnosticReason,
   type IndexCoverageDiagnostic,
   type IndexRunCoverageSummary,
+  type ImportDiagnosticSummary,
 } from './domain/value-objects/index-result.js'
 
 // Traversal types
@@ -248,6 +271,7 @@ export type {
 export { SpecdCodeGraphError } from './domain/errors/specd-code-graph-error.js'
 export { InvalidSymbolKindError } from './domain/errors/invalid-symbol-kind-error.js'
 export { InvalidRelationTypeError } from './domain/errors/invalid-relation-type-error.js'
+export { InvalidLanguageAdapterError } from './domain/errors/invalid-language-adapter-error.js'
 export { InvalidGraphSelectorError } from './domain/errors/invalid-graph-selector-error.js'
 export { DuplicateSymbolIdError } from './domain/errors/duplicate-symbol-id-error.js'
 export { GraphBusyError } from './domain/errors/graph-busy-error.js'

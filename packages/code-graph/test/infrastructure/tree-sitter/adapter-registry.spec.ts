@@ -4,6 +4,7 @@ import { TypeScriptLanguageAdapter } from '../../../src/infrastructure/tree-sitt
 import { PythonLanguageAdapter } from '../../../src/infrastructure/tree-sitter/python-language-adapter.js'
 import { type LanguageAdapter } from '../../../src/domain/value-objects/language-adapter.js'
 import { SymbolKind } from '../../../src/domain/value-objects/symbol-kind.js'
+import { InvalidLanguageAdapterError } from '../../../src/domain/errors/invalid-language-adapter-error.js'
 
 function pseudoAdapter(overrides: Partial<LanguageAdapter> = {}): LanguageAdapter {
   return {
@@ -17,7 +18,7 @@ function pseudoAdapter(overrides: Partial<LanguageAdapter> = {}): LanguageAdapte
       bindingFacts: [],
       callFacts: [],
     }),
-    resolveImports: () => ({ importMap: new Map(), fileImports: [] }),
+    resolveImports: () => ({ importMap: new Map(), fileImports: [], steps: [], diagnostics: [] }),
     buildRelations: () => [],
     ...overrides,
   }
@@ -103,7 +104,7 @@ describe('AdapterRegistry', () => {
     expect(() => registry.register(adapter)).toThrow(/callableContainerKinds/)
   })
 
-  it('given two adapters registered for one language, when queried, then the later registration wins', () => {
+  it('given two adapters registered for one language, when queried, then the later registration wins and the earlier one is no longer listed', () => {
     const registry = new AdapterRegistry()
     const first = pseudoAdapter()
     const second = pseudoAdapter()
@@ -112,5 +113,130 @@ describe('AdapterRegistry', () => {
     registry.register(second)
 
     expect(registry.getAdapter('pseudo')).toBe(second)
+    expect(registry.getAdapterForFile('a.ps')).toBe(second)
+    expect(registry.getAdapters()).toEqual([second])
+  })
+
+  it('given a replacement that declares only one of several languages, when queried, then the earlier adapter keeps the others', () => {
+    const registry = new AdapterRegistry()
+    const typescript = new TypeScriptLanguageAdapter()
+    const custom = pseudoAdapter({
+      languages: () => ['typescript'],
+      extensions: () => ({ '.ts': 'typescript' }),
+    })
+
+    registry.register(typescript)
+    registry.register(custom)
+
+    expect(registry.getAdapter('typescript')).toBe(custom)
+    expect(registry.getAdapterForFile('a.ts')).toBe(custom)
+    expect(registry.getAdapter('tsx')).toBe(typescript)
+    expect(registry.getAdapter('javascript')).toBe(typescript)
+    expect(registry.getAdapters()).toEqual(expect.arrayContaining([typescript, custom]))
+    expect(registry.getAdapters()).toHaveLength(2)
+  })
+
+  it('given the same adapter instance, when registered twice, then registration is idempotent', () => {
+    const registry = new AdapterRegistry()
+    const adapter = pseudoAdapter()
+
+    registry.register(adapter)
+    registry.register(adapter)
+
+    expect(registry.getAdapters()).toEqual([adapter])
+  })
+})
+
+describe('AdapterRegistry validation', () => {
+  /**
+   * Registers an adapter and returns the thrown error.
+   * @param registry - Registry under test.
+   * @param adapter - Adapter to register.
+   * @returns The thrown error.
+   */
+  function failure(registry: AdapterRegistry, adapter: unknown): InvalidLanguageAdapterError {
+    try {
+      registry.register(adapter as LanguageAdapter)
+    } catch (error) {
+      expect(error).toBeInstanceOf(InvalidLanguageAdapterError)
+      return error as InvalidLanguageAdapterError
+    }
+    throw new Error('expected registration to fail')
+  }
+
+  it('given an adapter without analyzeFile, when registered, then it fails naming the member and leaves the registry unchanged', () => {
+    const registry = new AdapterRegistry()
+    const adapter = { ...pseudoAdapter(), analyzeFile: undefined }
+
+    const error = failure(registry, adapter)
+
+    expect(error.code).toBe('INVALID_LANGUAGE_ADAPTER')
+    expect(error.message).toContain('missing required member "analyzeFile"')
+    expect(error.message).toContain('[pseudo]')
+    expect(registry.getAdapters()).toEqual([])
+    expect(registry.getAdapter('pseudo')).toBeUndefined()
+  })
+
+  it('given an adapter declaring no language, when registered, then it fails', () => {
+    const registry = new AdapterRegistry()
+
+    const error = failure(registry, pseudoAdapter({ languages: () => [] }))
+
+    expect(error.message).toContain('languages() returned no language')
+  })
+
+  it('given an extension for an undeclared language, when registered, then it fails', () => {
+    const registry = new AdapterRegistry()
+
+    const error = failure(registry, pseudoAdapter({ extensions: () => ({ '.rs': 'rust' }) }))
+
+    expect(error.message).toContain('extension ".rs" maps to undeclared language "rust"')
+  })
+
+  it('given a facet that is not an object, when registered, then it fails', () => {
+    const registry = new AdapterRegistry()
+
+    const error = failure(registry, { ...pseudoAdapter(), symbolReferenceSyntax: 'nope' })
+
+    expect(error.message).toContain('facet "symbolReferenceSyntax" must be an object')
+    expect(registry.getAdapters()).toEqual([])
+  })
+
+  it('given a facet missing a member, when registered, then it fails naming the member', () => {
+    const registry = new AdapterRegistry()
+    const packageResolution = {
+      identity: () => undefined,
+      prepare: () => undefined,
+      matchSpecifier: () => undefined,
+    }
+
+    const error = failure(registry, { ...pseudoAdapter(), packageResolution })
+
+    expect(error.message).toContain('facet "packageResolution" is missing member "entrySurface"')
+  })
+
+  it('given an adapter with only the required core, when registered, then it succeeds', () => {
+    const registry = new AdapterRegistry()
+    const adapter = pseudoAdapter()
+
+    registry.register(adapter)
+
+    expect(registry.getAdapter('pseudo')).toBe(adapter)
+  })
+
+  it('given an adapter with a complete facet, when registered, then it succeeds', () => {
+    const registry = new AdapterRegistry()
+    const adapter = pseudoAdapter({
+      packageResolution: {
+        identity: () => undefined,
+        prepare: () => undefined,
+        matchSpecifier: () => undefined,
+        entrySurface: () => [],
+      },
+    })
+
+    registry.register(adapter)
+
+    expect(registry.getAdapter('pseudo')).toBe(adapter)
   })
 })

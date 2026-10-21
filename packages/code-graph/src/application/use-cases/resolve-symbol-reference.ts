@@ -1106,8 +1106,11 @@ function parseAnchoredReference(
       : anchored === undefined
         ? undefined
         : registry?.getAdapterForFile(anchored)
-  if (adapter?.parseSymbolReference !== undefined)
-    return adapter.parseSymbolReference(request.requested)
+  if (adapter !== undefined) {
+    // An adapter without the `symbolReferenceSyntax` facet cannot prove human spellings;
+    // no other adapter's syntax is used.
+    return adapter.symbolReferenceSyntax?.parse(request.requested) ?? { candidates: [] }
+  }
   if (registry !== undefined && request.language !== undefined) return { candidates: [] }
   return parseDottedMemberReference(request.requested)
 }

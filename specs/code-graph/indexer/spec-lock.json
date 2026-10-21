@@ -17,62 +17,27 @@
   ],
   "implementation": [
     {
-      "file": "code-graph:src/application/use-cases/in-memory-index-session.ts",
-      "symbols": ["InMemoryIndexSession"]
-    },
-    {
-      "file": "code-graph:src/domain/errors/duplicate-declaration-mapping-error.ts",
-      "symbols": ["DuplicateDeclarationMappingError"]
-    },
-    {
-      "file": "code-graph:src/application/services/project-spec-coverage.ts",
-      "symbols": ["projectSpecCoverage"]
-    },
-    {
-      "file": "code-graph:test/application/use-cases/symbol-index.spec.ts"
-    },
-    {
-      "file": "code-graph:test/application/services/project-spec-coverage.spec.ts"
+      "file": "code-graph:src/application/services/package-import-resolver.ts",
+      "symbols": ["PackageImportResolver"]
     },
     {
       "file": "code-graph:src/application/use-cases/index-code-graph.ts",
       "symbols": ["IndexCodeGraph"]
     },
     {
-      "file": "code-graph:test/application/use-cases/index-project-graph-integration.spec.ts"
+      "file": "code-graph:src/application/use-cases/in-memory-index-session.ts",
+      "symbols": ["InMemoryIndexSession"]
     },
     {
-      "file": "code-graph:src/infrastructure/tree-sitter/reference-fact-helpers.ts",
-      "symbols": ["buildLogicalDeclarationFacts"]
+      "file": "code-graph:src/domain/value-objects/index-session.ts",
+      "symbols": ["IndexSession"]
     },
     {
-      "file": "code-graph:test/infrastructure/tree-sitter/reference-fact-helpers.spec.ts"
-    },
-    {
-      "file": "code-graph:test/application/use-cases/workspace-indexing.spec.ts"
-    },
-    {
-      "file": "code-graph:src/domain/services/replaces-whole-graph.ts"
+      "file": "code-graph:src/domain/services/scoped-binding-environment.ts"
     },
     {
       "file": "code-graph:src/domain/value-objects/index-result.ts",
-      "symbols": ["IndexResult"]
-    },
-    {
-      "file": "code-graph:src/application/use-cases/_shared/compute-graph-fingerprint.ts",
-      "symbols": ["detectFingerprintMismatch"]
-    },
-    {
-      "file": "code-graph:src/application/use-cases/index-project-graph.ts"
-    },
-    {
-      "file": "code-graph:src/domain/value-objects/index-options.ts"
-    },
-    {
-      "file": "code-graph:src/domain/value-objects/index-session.ts"
-    },
-    {
-      "file": "code-graph:test/application/use-cases/index-project-graph.spec.ts"
+      "symbols": ["ImportDiagnosticSummary"]
     }
   ],
   "optimizations": {

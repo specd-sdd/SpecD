@@ -17,14 +17,20 @@ import { type ImportDeclaration } from '../../../src/domain/value-objects/import
 import { type FileAnalysis } from '../../../src/domain/value-objects/file-analysis.js'
 import { InMemoryIndexSession } from '../../../src/application/use-cases/in-memory-index-session.js'
 import { parseLogicalSymbol } from '../../../src/domain/value-objects/symbol-reference.js'
+import {
+  type PackageResolutionFacet,
+  type RelativeImportResolutionFacet,
+  type SymbolReferenceSyntaxFacet,
+} from '../../../src/domain/value-objects/language-adapter-facets.js'
+import { createImportResolutionContext } from '../../helpers/import-resolution-context.js'
 
 interface TestAdapter {
   languages(): string[]
   extensions(): Record<string, string>
   resolutionManifests(): readonly string[]
-  getPackageIdentity(codeRoot: string, repoRoot?: string): string | undefined
-  resolvePackageFromSpecifier(specifier: string, knownPackages: string[]): string | undefined
-  resolveRelativeImportPath(fromFile: string, specifier: string): string | string[]
+  readonly packageResolution: PackageResolutionFacet
+  readonly relativeImportResolution: RelativeImportResolutionFacet
+  readonly symbolReferenceSyntax: SymbolReferenceSyntaxFacet
   extractSymbols(filePath: string, content: string): SymbolNode[]
   extractImportedNames(filePath: string, content: string): ImportDeclaration[]
   extractBindingFacts(
@@ -161,7 +167,7 @@ adapter.extractRelations = (
     filePath,
     analysis: draft,
   })
-  const resolvedImports = { importMap, fileImports: [] }
+  const resolvedImports = { importMap, fileImports: [], steps: [], diagnostics: [] }
   return baseAdapter.buildRelations(analysis, {
     session,
     resolvedImports,
@@ -442,6 +448,8 @@ class User(Base):
         resolvedImports: {
           importMap: new Map([['Persistable', parentSymbol.id]]),
           fileImports: ['ws:contracts.py'],
+          steps: [],
+          diagnostics: [],
         },
       })
 
@@ -580,24 +588,36 @@ HandlerFn: TypeAlias = Callable[[Event], Result]
 
   describe('resolvePackageFromSpecifier', () => {
     it('normalizes hyphens and underscores', () => {
-      const result = adapter.resolvePackageFromSpecifier('acme_auth.models', ['acme-auth'])
+      const result = adapter.packageResolution.matchSpecifier(
+        'acme_auth.models',
+        ['acme-auth'],
+        new InMemoryIndexSession(),
+      )
       expect(result).toBe('acme-auth')
     })
 
     it('matches exact top-level module', () => {
-      const result = adapter.resolvePackageFromSpecifier('requests', ['requests'])
+      const result = adapter.packageResolution.matchSpecifier(
+        'requests',
+        ['requests'],
+        new InMemoryIndexSession(),
+      )
       expect(result).toBe('requests')
     })
 
     it('returns undefined for unknown module', () => {
-      const result = adapter.resolvePackageFromSpecifier('numpy', ['pandas'])
+      const result = adapter.packageResolution.matchSpecifier(
+        'numpy',
+        ['pandas'],
+        new InMemoryIndexSession(),
+      )
       expect(result).toBeUndefined()
     })
   })
 
   describe('resolveRelativeImportPath', () => {
     it('returns candidates for dot-prefixed relative import', () => {
-      const result = adapter.resolveRelativeImportPath('core:src/models/user.py', '.base')
+      const result = adapter.relativeImportResolution.resolve('core:src/models/user.py', '.base')
       expect(result).toEqual([
         'core:src/models/base.py',
         'core:src/models/base/__init__.py',
@@ -607,7 +627,7 @@ HandlerFn: TypeAlias = Callable[[Event], Result]
     })
 
     it('returns candidates for parent import with double dot', () => {
-      const result = adapter.resolveRelativeImportPath('core:src/models/user.py', '..utils')
+      const result = adapter.relativeImportResolution.resolve('core:src/models/user.py', '..utils')
       expect(result).toEqual([
         'core:src/utils.py',
         'core:src/utils/__init__.py',
@@ -635,12 +655,12 @@ HandlerFn: TypeAlias = Callable[[Event], Result]
     it('reads name from pyproject.toml', () => {
       tempDir = mkdtempSync(join(tmpdir(), 'py-pkg-'))
       writeFileSync(join(tempDir, 'pyproject.toml'), '[project]\nname = "acme-auth"\n')
-      expect(adapter.getPackageIdentity(tempDir)).toBe('acme-auth')
+      expect(adapter.packageResolution.identity(tempDir)).toBe('acme-auth')
     })
 
     it('returns undefined when no pyproject.toml', () => {
       tempDir = mkdtempSync(join(tmpdir(), 'py-pkg-'))
-      expect(adapter.getPackageIdentity(tempDir)).toBeUndefined()
+      expect(adapter.packageResolution.identity(tempDir)).toBeUndefined()
     })
 
     it('given poetry name before project name, when identity is read, then project name wins', () => {
@@ -649,13 +669,13 @@ HandlerFn: TypeAlias = Callable[[Event], Result]
         join(tempDir, 'pyproject.toml'),
         '[tool.poetry]\nname = "poetry-name"\n\n[project]\nname = "project-name"\n',
       )
-      expect(adapter.getPackageIdentity(tempDir)).toBe('project-name')
+      expect(adapter.packageResolution.identity(tempDir)).toBe('project-name')
     })
 
     it('given a single-quoted project name, when identity is read, then that name is returned', () => {
       tempDir = mkdtempSync(join(tmpdir(), 'py-pkg-'))
       writeFileSync(join(tempDir, 'pyproject.toml'), "[project]\nname = 'quoted-name'\n")
-      expect(adapter.getPackageIdentity(tempDir)).toBe('quoted-name')
+      expect(adapter.packageResolution.identity(tempDir)).toBe('quoted-name')
     })
 
     it('given a nearer file without project name, when a parent has one, then the parent name is returned', () => {
@@ -664,12 +684,12 @@ HandlerFn: TypeAlias = Callable[[Event], Result]
       const nested = join(tempDir, 'pkg')
       mkdirSync(nested)
       writeFileSync(join(nested, 'pyproject.toml'), '[tool.poetry]\nname = "poetry-name"\n')
-      expect(adapter.getPackageIdentity(nested, tempDir)).toBe('project-name')
+      expect(adapter.packageResolution.identity(nested, tempDir)).toBe('project-name')
     })
     it('given a poetry-only manifest and no parent project name, when identity is read, then the result is undefined', () => {
       tempDir = mkdtempSync(join(tmpdir(), 'py-pkg-'))
       writeFileSync(join(tempDir, 'pyproject.toml'), '[tool.poetry]\nname = "poetry-name"\n')
-      expect(adapter.getPackageIdentity(tempDir, tempDir)).toBeUndefined()
+      expect(adapter.packageResolution.identity(tempDir, tempDir)).toBeUndefined()
     })
 
     it('walks up to find pyproject.toml above codeRoot', () => {
@@ -677,13 +697,13 @@ HandlerFn: TypeAlias = Callable[[Event], Result]
       writeFileSync(join(tempDir, 'pyproject.toml'), '[project]\nname = "acme-auth"\n')
       const subDir = join(tempDir, 'src')
       mkdirSync(subDir)
-      expect(adapter.getPackageIdentity(subDir, tempDir)).toBe('acme-auth')
+      expect(adapter.packageResolution.identity(subDir, tempDir)).toBe('acme-auth')
     })
   })
 })
 describe('PythonLanguageAdapter drive-letter paths', () => {
   it('keeps a drive letter in the resolved import path', () => {
-    const resolved = baseAdapter.resolveRelativeImportPath('C:/repo/src/a.py', '.b')
+    const resolved = baseAdapter.relativeImportResolution.resolve('C:/repo/src/a.py', '.b')
     expect(String(resolved)).toContain('C:/repo/src')
   })
 })
@@ -1164,11 +1184,17 @@ describe('Python nested imports, submodule imports and shadowing', () => {
       })
       if (filePath === main) analysis = registered
     }
-    const resolvedImports = baseAdapter.resolveImports(analysis!, {
-      session,
-      qualifiedNames: new Map(),
-      packageToWorkspace: new Map(),
-    })
+    const resolvedImports = baseAdapter.resolveImports(
+      analysis!,
+      createImportResolutionContext(
+        {
+          session,
+          qualifiedNames: new Map(),
+          packageToWorkspace: new Map(),
+        },
+        baseAdapter,
+      ),
+    )
     return {
       relations: baseAdapter.buildRelations(analysis!, { session, resolvedImports }),
       fileImports: resolvedImports.fileImports,
@@ -1285,7 +1311,12 @@ describe('Python imported base expression ranges', () => {
     return baseAdapter
       .buildRelations(analysis!, {
         session,
-        resolvedImports: { importMap: importMap(session), fileImports: [] },
+        resolvedImports: {
+          importMap: importMap(session),
+          fileImports: [],
+          steps: [],
+          diagnostics: [],
+        },
       })
       .filter((relation) => relation.metadata?.['importProvenance'] !== undefined)
       .map((relation) => ({

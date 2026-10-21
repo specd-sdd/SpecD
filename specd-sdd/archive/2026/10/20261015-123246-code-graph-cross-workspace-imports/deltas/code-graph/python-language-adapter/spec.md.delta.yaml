@@ -1,0 +1,28 @@
+- op: modified
+  description: Package imports resolve through the package resolution facet
+  selector:
+    type: section
+    matches: 'Requirement: Imports and package resolution'
+  content: |
+    The adapter SHALL extract `import`, `from ... import ...`, aliases, relative imports, and literal `importlib.import_module()` and `__import__()` dependencies. Variable or computed dynamic import arguments SHALL be dropped. For `import package.module`, the locally accessible binding and original qualified module SHALL both be retained.
+
+    Relative resolution SHALL honor leading-dot parent traversal and deterministic module/package candidates including module files, package `__init__.py`, stub files, and common `src/` layouts when known indexed paths prove them, through the `relativeImportResolution` facet. Namespace-package selection or other ambiguous layouts SHALL remain unresolved unless indexed context selects one route.
+
+    The adapter SHALL provide the `packageResolution` facet. `identity` SHALL read the project name from the nearest bounded `pyproject.toml`. `matchSpecifier` SHALL compare the first dotted segment of an absolute import with known package identities using underscore/hyphen normalization. `prepare` MAY be a no-op: the project name comes from the `identity` result and the code root from the workspace, so nothing more is read. When a module has both a source file and a stub (`mod.py` and `mod.pyi`, or `__init__.py` and `__init__.pyi`), only the source file is an entry. `entrySurface` SHALL perform no filesystem read and use only the package map and the indexed file set:
+
+    - `import pkg.sub.mod` and `from pkg.sub.mod import X` request the module file `pkg/sub/mod.py`, the stub `pkg/sub/mod.pyi`, or the package `pkg/sub/mod/__init__.py` (and `.pyi`), searched under the package's code root and its `src/` directory.
+    - `import pkg` and `from pkg import X` request the package `pkg/__init__.py` (and `.pyi`) under the same roots.
+
+    A non-relative absolute import SHALL resolve through the shared package import helpers. A name imported with `from pkg import X` resolves to the module-level declaration `X` published by the entry file's module surface. When `X` is not published by the entry file but `pkg/X.py`, `pkg/X.pyi`, or `pkg/X/__init__.py` exists, the import is a submodule import: it adds a file dependency on that file and creates no binding. Names that the entry file only re-imports stay local aliases and are not public routes (see "Public surface and stub behavior"), so such an import stays unresolved. The adapter MUST NOT search symbols by name in the target workspace.
+
+    Resolved package imports SHALL return an `import:package` step, and unresolved ones SHALL return a diagnostic with the reason reported by the helper.
+
+- op: modified
+  description: Resolution manifests unchanged, now backing the facet
+  selector:
+    type: section
+    matches: 'Requirement: Resolution manifests'
+  content: |
+    `resolutionManifests()` SHALL return exactly `['pyproject.toml']`.
+
+    The adapter MUST NOT declare `setup.cfg`, `setup.py`, or any other basename. The package identity MUST come from `[project].name` in the nearest bounded `pyproject.toml`, and MUST NOT come from a `name` key in another table of that file.

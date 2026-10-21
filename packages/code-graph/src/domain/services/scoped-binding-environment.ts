@@ -25,6 +25,15 @@ export interface SymbolLookup {
   findByName(name: string, filePrefix?: string): readonly SymbolNode[]
 
   /**
+   * Finds one symbol by its exact id, in any workspace.
+   *
+   * Needed to resolve a name that an import binds to a declaration in another workspace.
+   * @param symbolId - Symbol id to find.
+   * @returns The symbol, or undefined when it is not indexed.
+   */
+  findById?(symbolId: string): SymbolNode | undefined
+
+  /**
    * Finds all symbols declared in one workspace-prefixed file.
    * @param filePath - File path to inspect.
    * @returns Symbols declared in the file.
@@ -143,11 +152,34 @@ export function buildScopedBindingEnvironment(
     ...importFacts,
   ])
   const symbolsById = new Map(input.analysis.symbols.map((symbol) => [symbol.id, symbol]))
+  // A name that an import binds to a resolved declaration means that declaration, wherever it
+  // lives; it must not be replaced by a same-name symbol of the importing workspace.
+  const importedTargetsByScope = new Map(
+    importFacts.flatMap((fact) =>
+      fact.targetSymbolId === undefined
+        ? []
+        : [[`${fact.scopeId}\0${fact.name}`, fact.targetSymbolId] as const],
+    ),
+  )
+  // The import visible to a fact is the nearest one up the scope chain, unless a nearer scope
+  // declares the same name itself.
+  const importedTargets: ImportedTargets = (name, scopeId) => {
+    let current = scopesById.get(scopeId)
+    while (current !== undefined) {
+      const found = importedTargetsByScope.get(`${current.id}\0${name}`)
+      if (found !== undefined) return found
+      // A non-import binding of the same name in a nearer scope shadows the import.
+      if (factsByScopeAndName.get(current.id)?.has(name) === true) return undefined
+      current = current.parentId === undefined ? undefined : scopesById.get(current.parentId)
+    }
+    return undefined
+  }
 
   return {
     lookup: (name, scopeId) =>
       lookupBindingFacts(name, scopeId ?? rootScopeId, scopesById, factsByScopeAndName),
-    resolveTargetSymbol: (fact) => resolveBindingTarget(fact, input.symbolLookup, symbolsById),
+    resolveTargetSymbol: (fact) =>
+      resolveBindingTarget(fact, input.symbolLookup, symbolsById, importedTargets),
     resolveReceiver: (call) =>
       resolveReceiverFacts(
         call,
@@ -156,6 +188,7 @@ export function buildScopedBindingEnvironment(
         factsByScopeAndName,
         input.symbolLookup,
         symbolsById,
+        importedTargets,
       ),
   }
 }
@@ -351,21 +384,35 @@ function scopeIdOrRoot(scopeId: string | undefined, rootScopeId: string): string
   return scopeId ?? rootScopeId
 }
 
+/** Finds the declaration id that an import binds a name to, visible from a scope. */
+type ImportedTargets = (name: string, scopeId: string) => string | undefined
+
 /**
  * Resolves one binding fact to a deterministic target symbol.
  * @param fact - Binding fact to resolve.
  * @param symbolLookup - In-memory symbol lookup.
  * @param localSymbolsById - Local symbols indexed by id.
+ * @param importedTargets - Declaration id that an import-bound name resolves to in a scope.
  * @returns Target symbol, or undefined when unresolved/ambiguous.
  */
 function resolveBindingTarget(
   fact: BindingFact,
   symbolLookup: SymbolLookup,
   localSymbolsById: ReadonlyMap<string, SymbolNode>,
+  importedTargets: ImportedTargets,
 ): SymbolNode | undefined {
   if (fact.targetSymbolId !== undefined) {
     const local = localSymbolsById.get(fact.targetSymbolId)
     if (local !== undefined) return local
+    // An import fact names its declaration by id; it may live in another workspace.
+    const declared = symbolLookup.findById?.(fact.targetSymbolId)
+    if (declared !== undefined) return declared
+  } else if (fact.targetFilePath === undefined && fact.targetName !== undefined) {
+    const importedId = importedTargets(fact.targetName, fact.scopeId)
+    if (importedId !== undefined) {
+      const imported = localSymbolsById.get(importedId) ?? symbolLookup.findById?.(importedId)
+      if (imported !== undefined) return imported
+    }
   }
 
   if (fact.targetName === undefined) return undefined
@@ -434,6 +481,7 @@ function findSameFileDeclarations(
  * @param factsByScopeAndName - Grouped binding facts.
  * @param symbolLookup - In-memory symbol lookup.
  * @param localSymbolsById - Local symbols indexed by id.
+ * @param importedTargets - Declaration id that an import-bound name resolves to in a scope.
  * @returns Deterministic receiver facts with resolvable targets.
  */
 function resolveReceiverFacts(
@@ -443,11 +491,14 @@ function resolveReceiverFacts(
   factsByScopeAndName: ReadonlyMap<string, ReadonlyMap<string, readonly BindingFact[]>>,
   symbolLookup: SymbolLookup,
   localSymbolsById: ReadonlyMap<string, SymbolNode>,
+  importedTargets: ImportedTargets,
 ): readonly BindingFact[] {
   if (call.receiverName === undefined) return []
   const facts = lookupBindingFacts(call.receiverName, scopeId, scopesById, factsByScopeAndName)
   if (facts.length === 0) return []
-  return facts.filter((fact) => resolveBindingTarget(fact, symbolLookup, localSymbolsById))
+  return facts.filter((fact) =>
+    resolveBindingTarget(fact, symbolLookup, localSymbolsById, importedTargets),
+  )
 }
 
 /**

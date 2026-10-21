@@ -76,6 +76,59 @@
 - **THEN** deterministic forms retain their accessible and original names
 - **AND** the computed form is dropped without executing Python
 
+#### Scenario: Module import resolves to the module declaration
+
+- **GIVEN** workspace `auth` has project name `acme-auth` and indexes `src/acme_auth/models.py` declaring `User`
+- **AND** workspace `app` contains `from acme_auth.models import User`
+- **WHEN** imports are resolved
+- **THEN** the entry file is `auth:src/acme_auth/models.py`
+- **AND** the local binding of `User` targets that declaration
+- **AND** an `import:package` step is returned
+
+#### Scenario: Hyphen and underscore normalize
+
+- **GIVEN** project name `acme-auth` and the import `import acme_auth.models`
+- **WHEN** the specifier is matched
+- **THEN** the package is `acme-auth`
+
+#### Scenario: Package import uses init
+
+- **GIVEN** `from acme_auth import make_client` and `acme_auth/__init__.py` declares `make_client`
+- **WHEN** imports are resolved
+- **THEN** the entry file is `acme_auth/__init__.py` and the name resolves
+
+#### Scenario: Submodule import is a module dependency
+
+- **GIVEN** `from acme_auth import models` and `__init__.py` does not publish `models` while `models.py` exists
+- **WHEN** imports are resolved
+- **THEN** the file depends on `models.py`
+- **AND** no binding is created for `models`
+
+#### Scenario: Source wins over its stub
+
+- **GIVEN** `acme_auth/models.py` and `acme_auth/models.pyi` are both indexed
+- **WHEN** `entrySurface` runs for `acme_auth.models`
+- **THEN** only `models.py` is returned
+
+#### Scenario: Re-imported alias is not a public route
+
+- **GIVEN** `__init__.py` contains `from .models import User` and `User` is imported elsewhere with `from acme_auth import User`
+- **WHEN** imports are resolved
+- **THEN** the import stays unresolved with reason `not-exported`
+- **AND** no symbol search is performed
+
+#### Scenario: Unknown project is not guessed
+
+- **GIVEN** `import requests` and no workspace declares `requests`
+- **WHEN** imports are resolved
+- **THEN** nothing is persisted and the import is counted in `importDiagnostics.externalPackageImports`, not reported as a failure
+
+#### Scenario: Name found elsewhere in the project is not used
+
+- **GIVEN** the imported name exists once in the target project outside the entry file
+- **WHEN** imports are resolved
+- **THEN** the import stays unresolved
+
 ### Requirement: Resolution manifests
 
 #### Scenario: Python declares only pyproject.toml
@@ -89,6 +142,12 @@
 - **GIVEN** `[tool.poetry]` declares `name = "poetry-name"` before `[project]` declares `name = "project-name"`
 - **WHEN** the Python adapter reads package identity from that file
 - **THEN** the result is `project-name`
+
+#### Scenario: Entry surface performs no filesystem read
+
+- **GIVEN** a run with several Python workspaces whose `pyproject.toml` files are deleted after `identity` ran
+- **WHEN** `entrySurface` is called
+- **THEN** it still returns the entry files from the package map and the indexed file set
 
 ### Requirement: Scoped bindings, calls, annotations, and construction
 

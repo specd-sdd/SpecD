@@ -16,6 +16,12 @@ import {
 import { type Relation, createRelation } from '../../domain/value-objects/relation.js'
 import { SymbolKind } from '../../domain/value-objects/symbol-kind.js'
 import { RelationType } from '../../domain/value-objects/relation-type.js'
+import {
+  type ImportDiagnostic,
+  type PackageResolutionFacet,
+  type RelativeImportResolutionFacet,
+  type SymbolReferenceSyntaxFacet,
+} from '../../domain/value-objects/language-adapter-facets.js'
 import { findManifestField } from './find-manifest-field.js'
 import { splitWorkspaceIdentity } from '../../domain/services/split-workspace-identity.js'
 import {
@@ -39,6 +45,7 @@ import {
   MemberKind,
   type MemberSemantics,
   SymbolSpace,
+  type ResolutionStep,
   createLocalBinding,
   createPublicBinding,
   type AdapterCapabilities,
@@ -363,6 +370,85 @@ interface PythonParserState {
  * Extracts functions, classes, methods, and module-level assignments.
  */
 export class PythonLanguageAdapter implements LanguageAdapter {
+  private readonly packageResolutionFacet: PackageResolutionFacet = {
+    identity: (codeRoot, repoRoot) => this.getPackageIdentity(codeRoot, repoRoot),
+    // Python package facts come from the package map and the indexed file set, so there is
+    // nothing to read per workspace.
+    prepare: () => undefined,
+    matchSpecifier: (specifier, knownPackages) =>
+      this.resolvePackageFromSpecifier(specifier, [...knownPackages]),
+    entrySurface: (request) => {
+      const [topLevel, ...rest] = request.specifier.split('.')
+      if (topLevel === undefined || topLevel === '') return []
+      const modulePath = rest.join('/')
+      const candidates: string[] = []
+      // The package directory sits at the code root or under `src/`.
+      for (const root of [
+        `${request.workspace}:src/${topLevel}`,
+        `${request.workspace}:${topLevel}`,
+      ]) {
+        if (rest.length === 0) {
+          candidates.push(`${root}/__init__.py`, `${root}/__init__.pyi`)
+        } else {
+          candidates.push(
+            `${root}/${modulePath}.py`,
+            `${root}/${modulePath}.pyi`,
+            `${root}/${modulePath}/__init__.py`,
+            `${root}/${modulePath}/__init__.pyi`,
+          )
+        }
+      }
+      const indexed = candidates.filter(
+        (candidate) => request.session.getFileId(candidate) !== undefined,
+      )
+      return (
+        indexed
+          // A stub next to its source describes the same module; the source is the entry.
+          .filter(
+            (candidate) => !candidate.endsWith('.pyi') || !indexed.includes(candidate.slice(0, -1)),
+          )
+          // The public surface of a module is its path without extension or `__init__`.
+          .map((filePath) => ({
+            filePath,
+            surface: filePath.replace(/(?:\/__init__)?\.pyi?$/, ''),
+          }))
+      )
+    },
+  }
+
+  /**
+   * Package identity, specifier matching, and the package entry surface.
+   * @returns The facet this adapter provides.
+   */
+  get packageResolution(): PackageResolutionFacet {
+    return this.packageResolutionFacet
+  }
+
+  private readonly relativeImportResolutionFacet: RelativeImportResolutionFacet = {
+    resolve: (fromFile, specifier) => this.resolveRelativeImportPath(fromFile, specifier),
+  }
+
+  /**
+   * Relative module specifier to candidate files.
+   * @returns The facet this adapter provides.
+   */
+  get relativeImportResolution(): RelativeImportResolutionFacet {
+    return this.relativeImportResolutionFacet
+  }
+
+  private readonly symbolReferenceSyntaxFacet: SymbolReferenceSyntaxFacet = {
+    parse: (text) => this.parseSymbolReference(text),
+    render: (symbol, ownerPath) => this.renderSymbolReference(symbol, ownerPath),
+  }
+
+  /**
+   * Member reference syntax.
+   * @returns The facet this adapter provides.
+   */
+  get symbolReferenceSyntax(): SymbolReferenceSyntaxFacet {
+    return this.symbolReferenceSyntaxFacet
+  }
+
   /**
    * Declares deterministic Python reference semantics.
    * @returns Supported reference capabilities.
@@ -392,24 +478,6 @@ export class PythonLanguageAdapter implements LanguageAdapter {
     }
   }
   /**
-   * Resolves a qualified name to a file path.
-   * @param _qualifiedName - Qualified name.
-   * @param _codeRoot - Code root.
-   * @param _repoRoot - Repo root.
-   * @returns The resolved file path, or undefined.
-   */
-  resolveQualifiedNameToPath(
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    _qualifiedName: string,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    _codeRoot: string,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    _repoRoot?: string,
-  ): string | undefined {
-    return undefined
-  }
-
-  /**
    * Returns the language identifiers this adapter handles.
    * @returns An array containing 'python'.
    */
@@ -422,7 +490,7 @@ export class PythonLanguageAdapter implements LanguageAdapter {
    * @param text - Human reference text.
    * @returns One owner-then-member candidate, or none.
    */
-  parseSymbolReference(text: string): ParsedSymbolReference {
+  private parseSymbolReference(text: string): ParsedSymbolReference {
     return parseDottedMemberReference(text)
   }
 
@@ -432,7 +500,7 @@ export class PythonLanguageAdapter implements LanguageAdapter {
    * @param ownerPath - Owner simple names.
    * @returns Generic dotted spelling.
    */
-  renderSymbolReference(
+  private renderSymbolReference(
     symbol: LogicalSymbol,
     ownerPath: readonly string[],
   ): { readonly generic: string } {
@@ -838,14 +906,26 @@ export class PythonLanguageAdapter implements LanguageAdapter {
   resolveImports(analysis: FileAnalysis, context: ImportResolutionContext): ResolvedImports {
     const importMap = new Map<string, string>()
     const fileImports: string[] = []
-    const knownPackages = [...context.packageToWorkspace.keys()]
-    const { session, qualifiedNames, packageToWorkspace, codeRoot, repoRoot } = context
+    const steps: ResolutionStep[] = []
+    const diagnostics: ImportDiagnostic[] = []
+    const { session, qualifiedNames } = context
 
     for (const imp of analysis.imports) {
       if (isFileOnlyImport(imp)) {
-        const resolved = this.resolveFileImport(imp, analysis.filePath, session, codeRoot, repoRoot)
-        if (resolved !== undefined) {
-          fileImports.push(resolved)
+        if (imp.isRelative) {
+          const resolved = this.resolveFileImport(imp, analysis.filePath, session)
+          if (resolved !== undefined) fileImports.push(resolved)
+        } else {
+          const entries = context.packageEntryFiles(imp.specifier)
+          if (entries.status === 'resolved') {
+            for (const entry of entries.entries) fileImports.push(entry.filePath)
+          } else {
+            diagnostics.push({
+              filePath: analysis.filePath,
+              specifier: imp.specifier,
+              reason: entries.reason,
+            })
+          }
         }
         continue
       }
@@ -881,29 +961,56 @@ export class PythonLanguageAdapter implements LanguageAdapter {
           continue
         }
 
-        const pkgName = this.resolvePackageFromSpecifier(imp.specifier, knownPackages)
-        if (pkgName) {
-          const wsPrefix = packageToWorkspace.get(pkgName)
-          if (wsPrefix !== undefined) {
-            const candidates = session.findSymbolsByName(imp.originalName, wsPrefix + ':')
-            if (candidates.length === 1) {
-              importMap.set(imp.localName, candidates[0]!.id)
-              fileImports.push(candidates[0]!.filePath)
-            }
+        if (imp.kind === ImportDeclarationKind.Namespace) {
+          // `import pkg.module` depends on the module file; it binds the module, not a symbol.
+          const entries = context.packageEntryFiles(imp.specifier)
+          if (entries.status === 'resolved') {
+            for (const entry of entries.entries) fileImports.push(entry.filePath)
+          } else {
+            diagnostics.push({
+              filePath: analysis.filePath,
+              specifier: imp.specifier,
+              reason: entries.reason,
+            })
           }
+          continue
         }
-
-        if (this.resolveQualifiedNameToPath && codeRoot) {
-          const resolvedPath = this.resolveQualifiedNameToPath(imp.specifier, codeRoot, repoRoot)
-          if (resolvedPath) {
-            fileImports.push(resolvedPath)
-            continue
-          }
+        // `from pkg.module import name` resolves only to a name the module publishes.
+        const localBinding = analysis.referenceFacts?.localBindings.find(
+          (binding) => binding.scopeId === 'module' && binding.localName === imp.localName,
+        )
+        const result = context.resolvePackageExport({
+          specifier: imp.specifier,
+          exportedName: imp.originalName,
+          spaces: [SymbolSpace.Value, SymbolSpace.Type],
+          fromFile: analysis.filePath,
+          localBindingId: localBinding?.id ?? '',
+        })
+        if (result.status === 'resolved') {
+          importMap.set(imp.localName, result.targetSymbolId)
+          fileImports.push(result.entryFile)
+          if (localBinding !== undefined) steps.push(result.step)
+          continue
         }
+        // `from pkg import module` names a submodule, which is a dependency on its file.
+        const submodule =
+          result.reason === 'not-exported'
+            ? context.packageEntryFiles(`${imp.specifier}.${imp.originalName}`)
+            : undefined
+        if (submodule?.status === 'resolved') {
+          for (const entry of submodule.entries) fileImports.push(entry.filePath)
+          continue
+        }
+        diagnostics.push({
+          filePath: analysis.filePath,
+          specifier: imp.specifier,
+          exportedName: imp.originalName,
+          reason: result.reason,
+        })
       }
     }
 
-    return { importMap, fileImports: [...new Set(fileImports)] }
+    return { importMap, fileImports: [...new Set(fileImports)], steps, diagnostics }
   }
 
   /**
@@ -911,25 +1018,17 @@ export class PythonLanguageAdapter implements LanguageAdapter {
    * @param imp - Import declaration.
    * @param filePath - Path of the file.
    * @param session - Index session.
-   * @param codeRoot - Code root.
-   * @param repoRoot - Repo root.
    * @returns Resolved path, or undefined.
    */
   private resolveFileImport(
     imp: ImportDeclaration,
     filePath: string,
     session: IndexSession,
-    codeRoot?: string,
-    repoRoot?: string,
   ): string | undefined {
     if (imp.isRelative) {
       const resolved = this.resolveRelativeImportPath(filePath, imp.specifier)
       const candidates = Array.isArray(resolved) ? resolved : [resolved]
       return candidates.find((candidatePath) => session.findSymbolsByFile(candidatePath).length > 0)
-    }
-
-    if (!imp.isRelative && codeRoot) {
-      return this.resolveQualifiedNameToPath?.(imp.specifier, codeRoot, repoRoot)
     }
 
     return undefined
@@ -1839,7 +1938,7 @@ export class PythonLanguageAdapter implements LanguageAdapter {
    * @param specifier - The dot-prefixed module name.
    * @returns The resolved file path.
    */
-  resolveRelativeImportPath(fromFile: string, specifier: string): string | string[] {
+  private resolveRelativeImportPath(fromFile: string, specifier: string): string | string[] {
     // Separate workspace prefix (e.g. "core:src/models/user.py" → "core:", "src/models/user.py")
     const identity = splitWorkspaceIdentity(fromFile)
     const wsPrefix = identity === null ? '' : `${identity.workspace}:`
@@ -1883,7 +1982,10 @@ export class PythonLanguageAdapter implements LanguageAdapter {
    * @param knownPackages - Known package names from `pyproject.toml`.
    * @returns The matching package name, or undefined.
    */
-  resolvePackageFromSpecifier(specifier: string, knownPackages: string[]): string | undefined {
+  private resolvePackageFromSpecifier(
+    specifier: string,
+    knownPackages: string[],
+  ): string | undefined {
     if (!specifier) return undefined
     const topLevel = specifier.split('.')[0]
     if (!topLevel) return undefined
@@ -1906,7 +2008,7 @@ export class PythonLanguageAdapter implements LanguageAdapter {
    * @param repoRoot - Optional repository root to bound the search.
    * @returns The project name from the nearest `pyproject.toml`, or undefined.
    */
-  getPackageIdentity(codeRoot: string, repoRoot?: string): string | undefined {
+  private getPackageIdentity(codeRoot: string, repoRoot?: string): string | undefined {
     return findManifestField(codeRoot, 'pyproject.toml', readPythonProjectName, repoRoot)
   }
 }

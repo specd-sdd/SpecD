@@ -67,6 +67,14 @@ An owner-qualified reference SHALL resolve the owner path first and the member s
 
 A public binding matches on public surface, exported name, and symbol space. File path alone MUST NOT select it. The binding's logical target MAY live in another workspace.
 
+### Requirement: Package import bindings
+
+A local binding created by a package-specifier import SHALL resolve as a statically proven scoped import (precedence rule 5) when its target is persisted. The target MAY live in another workspace. The resolver SHALL report the ordered provenance path from the local binding through the `import:package` step to the public binding and the logical target.
+
+A package import that is not persisted as resolved SHALL leave its local binding without a target, and the resolver SHALL report the reference as unresolved. It MUST NOT search the graph for a same-name symbol in the package's workspace, and a unique same-name symbol SHALL NOT resolve the request.
+
+The resolver MUST NOT depend on a language to follow an `import:package` step; the step is part of the shared provenance vocabulary.
+
 ### Requirement: Resolution outcomes
 
 Every result SHALL have exactly one status:

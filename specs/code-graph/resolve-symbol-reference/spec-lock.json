@@ -11,32 +11,11 @@
   ],
   "implementation": [
     {
-      "file": "code-graph:src/domain/value-objects/symbol-reference.ts",
-      "symbols": ["ResolvedSymbolTarget", "ResolveSymbolReferenceInput", "SymbolResolutionResult"]
+      "file": "code-graph:src/application/use-cases/resolve-symbol-reference.ts"
     },
     {
-      "file": "code-graph:src/application/use-cases/resolve-symbol-reference.ts",
-      "symbols": ["ResolveSymbolReference"]
-    },
-    {
-      "file": "code-graph:test/application/use-cases/resolve-symbol-reference.spec.ts"
-    },
-    {
-      "file": "code-graph:src/application/services/resolve-graph-selector.ts",
-      "symbols": [
-        "ResolvedGraphSymbolSelector",
-        "resolveSymbolSelector",
-        "promoteToLogicalTarget",
-        "ResolvedGraphDeclarationSelector",
-        "ResolveSelectorOptions"
-      ]
-    },
-    {
-      "file": "code-graph:src/domain/services/exact-lane-query.ts",
-      "symbols": ["qualifiedLookupText", "isExactLaneQuery"]
-    },
-    {
-      "file": "code-graph:test/application/services/resolve-graph-selector.spec.ts"
+      "file": "code-graph:src/application/services/package-import-resolver.ts",
+      "symbols": ["PackageImportResolver"]
     }
   ],
   "optimizations": {

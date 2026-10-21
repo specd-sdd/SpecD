@@ -20,19 +20,22 @@ import {
 import { type ImportDeclaration } from '../../../src/domain/value-objects/import-declaration.js'
 import { InMemoryIndexSession } from '../../../src/application/use-cases/in-memory-index-session.js'
 import { parseLogicalSymbol } from '../../../src/domain/value-objects/symbol-reference.js'
+import { createImportResolutionContext } from '../../helpers/import-resolution-context.js'
+import {
+  type PackageResolutionFacet,
+  type QualifiedNameResolutionFacet,
+  type RelativeImportResolutionFacet,
+  type SymbolReferenceSyntaxFacet,
+} from '../../../src/domain/value-objects/language-adapter-facets.js'
 
 interface TestAdapter {
   languages(): string[]
   extensions(): Record<string, string>
   resolutionManifests(): readonly string[]
-  getPackageIdentity(codeRoot: string, repoRoot?: string): string | undefined
-  resolvePackageFromSpecifier(specifier: string, knownPackages: string[]): string | undefined
-  buildQualifiedName(namespace: string, symbolName: string): string
-  resolveQualifiedNameToPath(
-    qualifiedName: string,
-    codeRoot: string,
-    repoRoot?: string,
-  ): string | undefined
+  readonly packageResolution: PackageResolutionFacet
+  readonly relativeImportResolution: RelativeImportResolutionFacet
+  readonly qualifiedNameResolution: QualifiedNameResolutionFacet
+  readonly symbolReferenceSyntax: SymbolReferenceSyntaxFacet
   extractSymbols(filePath: string, content: string): SymbolNode[]
   extractNamespace(content: string): string | undefined
   extractImportedNames(filePath: string, content: string): ImportDeclaration[]
@@ -217,14 +220,22 @@ adapter.extractRelations = (
     filePath,
     analysis: draft,
   })
-  const resolved = baseAdapter.resolveImports(analysis, {
-    session,
-    qualifiedNames: new Map(),
-    packageToWorkspace: new Map(),
-  })
+  const resolved = baseAdapter.resolveImports(
+    analysis,
+    createImportResolutionContext(
+      {
+        session,
+        qualifiedNames: new Map(),
+        packageToWorkspace: new Map(),
+      },
+      baseAdapter,
+    ),
+  )
   const resolvedImports = {
     importMap: new Map([...resolved.importMap, ...importMap]),
     fileImports: resolved.fileImports,
+    steps: [],
+    diagnostics: [],
   }
   const adapterRelations = baseAdapter.buildRelations(analysis, {
     session,
@@ -630,11 +641,11 @@ class ArticlesController {
 
   describe('buildQualifiedName', () => {
     it('builds qualified name from namespace and symbol', () => {
-      expect(adapter.buildQualifiedName('App\\Models', 'User')).toBe('App\\Models\\User')
+      expect(adapter.qualifiedNameResolution.build('App\\Models', 'User')).toBe('App\\Models\\User')
     })
 
     it('works with single-level namespace', () => {
-      expect(adapter.buildQualifiedName('App', 'Config')).toBe('App\\Config')
+      expect(adapter.qualifiedNameResolution.build('App', 'Config')).toBe('App\\Config')
     })
   })
 
@@ -654,12 +665,12 @@ class ArticlesController {
     it('reads name from composer.json', () => {
       tempDir = mkdtempSync(join(tmpdir(), 'php-pkg-'))
       writeFileSync(join(tempDir, 'composer.json'), JSON.stringify({ name: 'acme/auth' }))
-      expect(adapter.getPackageIdentity(tempDir)).toBe('acme/auth')
+      expect(adapter.packageResolution.identity(tempDir)).toBe('acme/auth')
     })
 
     it('returns undefined when no composer.json', () => {
       tempDir = mkdtempSync(join(tmpdir(), 'php-pkg-'))
-      expect(adapter.getPackageIdentity(tempDir)).toBeUndefined()
+      expect(adapter.packageResolution.identity(tempDir)).toBeUndefined()
     })
 
     it('walks up to find composer.json above codeRoot', () => {
@@ -667,25 +678,68 @@ class ArticlesController {
       writeFileSync(join(tempDir, 'composer.json'), JSON.stringify({ name: 'acme/auth' }))
       const subDir = join(tempDir, 'src')
       mkdirSync(subDir)
-      expect(adapter.getPackageIdentity(subDir, tempDir)).toBe('acme/auth')
+      expect(adapter.packageResolution.identity(subDir, tempDir)).toBe('acme/auth')
     })
   })
 
   describe('resolveQualifiedNameToPath', () => {
     let tempDir: string
 
+    /**
+     * Prepares the PSR-4 metadata of one workspace in a fresh session.
+     * @param codeRoot - Workspace code root.
+     * @returns The prepared session.
+     */
+    function prepared(codeRoot: string, indexed: readonly string[] = []): InMemoryIndexSession {
+      const session = new InMemoryIndexSession()
+      for (const filePath of indexed) {
+        session.registerFile({
+          filePath,
+          projectRelativePath: filePath.slice('w:'.length),
+          language: 'php',
+          contentHash: 'x',
+          workspace: 'w',
+        })
+      }
+      adapter.packageResolution.prepare({
+        session,
+        workspaces: [{ name: 'w', codeRoot }],
+        repoRoot: codeRoot,
+      })
+      return session
+    }
+
     afterEach(() => {
       if (tempDir) rmSync(tempDir, { recursive: true, force: true })
     })
 
-    it('resolves qualified name to absolute path via PSR-4', () => {
+    it('resolves qualified name to the indexed workspace-prefixed file id via PSR-4', () => {
       tempDir = mkdtempSync(join(tmpdir(), 'php-psr4-'))
       writeFileSync(
         join(tempDir, 'composer.json'),
         JSON.stringify({ autoload: { 'psr-4': { 'App\\': 'src/' } } }),
       )
-      const result = adapter.resolveQualifiedNameToPath('App\\Models\\User', tempDir)
-      expect(result).toBe(join(tempDir, 'src', 'Models', 'User.php'))
+      const result = adapter.qualifiedNameResolution.resolveToPath(
+        'App\\Models\\User',
+        tempDir,
+        prepared(tempDir, ['w:src/Models/User.php']),
+      )
+      expect(result).toBe('w:src/Models/User.php')
+    })
+
+    it('never returns a file that is not indexed', () => {
+      tempDir = mkdtempSync(join(tmpdir(), 'php-psr4-'))
+      writeFileSync(
+        join(tempDir, 'composer.json'),
+        JSON.stringify({ autoload: { 'psr-4': { 'App\\': 'src/' } } }),
+      )
+      expect(
+        adapter.qualifiedNameResolution.resolveToPath(
+          'App\\Models\\User',
+          tempDir,
+          prepared(tempDir),
+        ),
+      ).toBeUndefined()
     })
 
     it('longest prefix wins', () => {
@@ -696,8 +750,14 @@ class ArticlesController {
           autoload: { 'psr-4': { 'App\\': 'src/', 'App\\Models\\': 'src/models/' } },
         }),
       )
-      const result = adapter.resolveQualifiedNameToPath('App\\Models\\User', tempDir)
-      expect(result).toBe(join(tempDir, 'src', 'models', 'User.php'))
+      const target = 'w:src/models/User.php'
+      const session = prepared(tempDir, ['w:src/Models/User.php', target])
+      const result = adapter.qualifiedNameResolution.resolveToPath(
+        'App\\Models\\User',
+        tempDir,
+        session,
+      )
+      expect(result).toBe(target)
     })
 
     it('returns undefined when no matching prefix', () => {
@@ -706,25 +766,52 @@ class ArticlesController {
         join(tempDir, 'composer.json'),
         JSON.stringify({ autoload: { 'psr-4': { 'App\\': 'src/' } } }),
       )
-      expect(adapter.resolveQualifiedNameToPath('Vendor\\Lib\\Foo', tempDir)).toBeUndefined()
+      expect(
+        adapter.qualifiedNameResolution.resolveToPath(
+          'Vendor\\Lib\\Foo',
+          tempDir,
+          prepared(tempDir),
+        ),
+      ).toBeUndefined()
     })
 
     it('returns undefined when no composer.json', () => {
       tempDir = mkdtempSync(join(tmpdir(), 'php-psr4-'))
-      expect(adapter.resolveQualifiedNameToPath('App\\Models\\User', tempDir)).toBeUndefined()
+      expect(
+        adapter.qualifiedNameResolution.resolveToPath(
+          'App\\Models\\User',
+          tempDir,
+          prepared(tempDir),
+        ),
+      ).toBeUndefined()
     })
 
-    it('caches PSR-4 map across calls', () => {
+    it('reads only prepared data, so a deleted composer.json does not change the result', () => {
       tempDir = mkdtempSync(join(tmpdir(), 'php-psr4-'))
       writeFileSync(
         join(tempDir, 'composer.json'),
         JSON.stringify({ autoload: { 'psr-4': { 'App\\': 'src/' } } }),
       )
-      const freshAdapter = new PhpLanguageAdapter()
-      const r1 = freshAdapter.resolveQualifiedNameToPath('App\\Models\\User', tempDir)
-      const r2 = freshAdapter.resolveQualifiedNameToPath('App\\Http\\Controller', tempDir)
-      expect(r1).toBe(join(tempDir, 'src', 'Models', 'User.php'))
-      expect(r2).toBe(join(tempDir, 'src', 'Http', 'Controller.php'))
+      const session = prepared(tempDir, ['w:src/Http/Controller.php'])
+      rmSync(join(tempDir, 'composer.json'))
+      const result = adapter.qualifiedNameResolution.resolveToPath(
+        'App\\Http\\Controller',
+        tempDir,
+        session,
+      )
+      expect(result).toBe('w:src/Http/Controller.php')
+    })
+
+    it('returns undefined for a workspace that was never prepared', () => {
+      tempDir = mkdtempSync(join(tmpdir(), 'php-psr4-'))
+      writeFileSync(
+        join(tempDir, 'composer.json'),
+        JSON.stringify({ autoload: { 'psr-4': { 'App\\': 'src/' } } }),
+      )
+      const session = new InMemoryIndexSession()
+      expect(
+        adapter.qualifiedNameResolution.resolveToPath('App\\Models\\User', tempDir, session),
+      ).toBeUndefined()
     })
   })
 
@@ -1348,11 +1435,11 @@ class ArticlesController {
 
 describe('PhpLanguageAdapter member spelling', () => {
   it('parses :: and dotted spellings to the same segments', () => {
-    expect(baseAdapter.parseSymbolReference('ArchiveChange::execute')).toEqual(
-      baseAdapter.parseSymbolReference('ArchiveChange.execute'),
+    expect(baseAdapter.symbolReferenceSyntax.parse('ArchiveChange::execute')).toEqual(
+      baseAdapter.symbolReferenceSyntax.parse('ArchiveChange.execute'),
     )
     expect(
-      baseAdapter.parseSymbolReference('ArchiveChange::execute').candidates[0]?.segments,
+      baseAdapter.symbolReferenceSyntax.parse('ArchiveChange::execute').candidates[0]?.segments,
     ).toEqual([
       { name: 'ArchiveChange', role: 'type' },
       { name: 'execute', role: 'member' },
@@ -1367,7 +1454,7 @@ describe('PhpLanguageAdapter member spelling', () => {
 
 describe('PhpLanguageAdapter drive-letter paths', () => {
   it('keeps a drive letter in the resolved import path', () => {
-    const resolved = baseAdapter.resolveRelativeImportPath('C:/repo/src/a.php', './b.php')
+    const resolved = baseAdapter.relativeImportResolution.resolve('C:/repo/src/a.php', './b.php')
     expect(resolved).toBe('C:/repo/src/b.php')
   })
 })
@@ -1588,11 +1675,17 @@ $top = new C();
         { session, workspaceName: 'ws' },
       )
       const analysis = session.registerAnalysis({ filePath: 'ws:src/main.php', analysis: draft })
-      const resolved = baseAdapter.resolveImports(analysis, {
-        session,
-        qualifiedNames: new Map(),
-        packageToWorkspace: new Map(),
-      })
+      const resolved = baseAdapter.resolveImports(
+        analysis,
+        createImportResolutionContext(
+          {
+            session,
+            qualifiedNames: new Map(),
+            packageToWorkspace: new Map(),
+          },
+          baseAdapter,
+        ),
+      )
 
       expect(resolved.importMap.size).toBe(0)
       expect(resolved.fileImports).toEqual([])
@@ -1630,6 +1723,8 @@ $top = new C();
         resolvedImports: {
           importMap: new Map([['Base', parentSymbol.id]]),
           fileImports: ['ws:src/Base.php'],
+          steps: [],
+          diagnostics: [],
         },
       })
 
@@ -1694,13 +1789,19 @@ $top = new C();
       registerPhp(session, target)
       // Pass 2 must rely on session-prepared metadata only: remove the manifest from disk.
       rmSync(join(root, 'composer.json'))
-      const resolved = baseAdapter.resolveImports(analysis, {
-        session,
-        qualifiedNames: new Map(),
-        packageToWorkspace: new Map(),
-        codeRoot: root,
-        repoRoot: root,
-      })
+      const resolved = baseAdapter.resolveImports(
+        analysis,
+        createImportResolutionContext(
+          {
+            session,
+            qualifiedNames: new Map(),
+            packageToWorkspace: new Map(),
+            codeRoot: root,
+            repoRoot: root,
+          },
+          baseAdapter,
+        ),
+      )
       return { resolved: resolved.fileImports, target }
     }
 
@@ -1736,13 +1837,19 @@ $top = new C();
       const analysis = session.registerAnalysis({ filePath, analysis: draft })
       registerPhp(session, join(root, 'src', 'Models', 'User.php'))
 
-      const resolved = baseAdapter.resolveImports(analysis, {
-        session,
-        qualifiedNames: new Map(),
-        packageToWorkspace: new Map(),
-        codeRoot: root,
-        repoRoot: root,
-      })
+      const resolved = baseAdapter.resolveImports(
+        analysis,
+        createImportResolutionContext(
+          {
+            session,
+            qualifiedNames: new Map(),
+            packageToWorkspace: new Map(),
+            codeRoot: root,
+            repoRoot: root,
+          },
+          baseAdapter,
+        ),
+      )
 
       expect(resolved.fileImports).toEqual([])
     })
@@ -1916,13 +2023,19 @@ describe('PhpLanguageAdapter calls, PSR-4 arrays and written hierarchy spelling'
         workspace: 'ws',
       })
 
-      const resolved = baseAdapter.resolveImports(analysis, {
-        session,
-        qualifiedNames: new Map(),
-        packageToWorkspace: new Map(),
-        codeRoot: root,
-        repoRoot: root,
-      })
+      const resolved = baseAdapter.resolveImports(
+        analysis,
+        createImportResolutionContext(
+          {
+            session,
+            qualifiedNames: new Map(),
+            packageToWorkspace: new Map(),
+            codeRoot: root,
+            repoRoot: root,
+          },
+          baseAdapter,
+        ),
+      )
 
       expect(resolved.fileImports).toEqual([target])
     })
@@ -1953,11 +2066,17 @@ describe('PhpLanguageAdapter calls, PSR-4 arrays and written hierarchy spelling'
       baseAdapter
         .buildRelations(analysis, {
           session,
-          resolvedImports: baseAdapter.resolveImports(analysis, {
-            session,
-            qualifiedNames: session.getQualifiedNames(),
-            packageToWorkspace: new Map(),
-          }),
+          resolvedImports: baseAdapter.resolveImports(
+            analysis,
+            createImportResolutionContext(
+              {
+                session,
+                qualifiedNames: session.getQualifiedNames(),
+                packageToWorkspace: new Map(),
+              },
+              baseAdapter,
+            ),
+          ),
         })
         .filter((relation: Relation) => relation.type === RelationType.Extends)
         .map((relation: Relation) => relation.target)
@@ -2017,7 +2136,12 @@ describe('PHP imported clause-name ranges', () => {
     return baseAdapter
       .buildRelations(analysis!, {
         session,
-        resolvedImports: { importMap: importMap(session), fileImports: [] },
+        resolvedImports: {
+          importMap: importMap(session),
+          fileImports: [],
+          steps: [],
+          diagnostics: [],
+        },
       })
       .filter((relation) => relation.metadata?.['importProvenance'] !== undefined)
       .map((relation) => ({

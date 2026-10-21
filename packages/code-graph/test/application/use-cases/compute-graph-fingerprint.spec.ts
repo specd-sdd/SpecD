@@ -17,6 +17,10 @@ import { CODE_GRAPH_VERSION } from '../../../src/index.js'
 import { type LanguageAdapter } from '../../../src/domain/value-objects/language-adapter.js'
 import { type FileAnalysisDraft } from '../../../src/domain/value-objects/file-analysis.js'
 import { type Relation } from '../../../src/domain/value-objects/relation.js'
+import { TypeScriptLanguageAdapter } from '../../../src/infrastructure/tree-sitter/typescript-language-adapter.js'
+import { PythonLanguageAdapter } from '../../../src/infrastructure/tree-sitter/python-language-adapter.js'
+import { GoLanguageAdapter } from '../../../src/infrastructure/tree-sitter/go-language-adapter.js'
+import { PhpLanguageAdapter } from '../../../src/infrastructure/tree-sitter/php-language-adapter.js'
 
 const packageRoot = join(dirname(fileURLToPath(import.meta.url)), '../../..')
 
@@ -47,7 +51,7 @@ function stubAdapter(manifests: readonly string[]): LanguageAdapter {
     analyzeFile: (): FileAnalysisDraft => {
       throw new Error('unused')
     },
-    resolveImports: () => ({ importMap: new Map(), fileImports: [] }),
+    resolveImports: () => ({ importMap: new Map(), fileImports: [], steps: [], diagnostics: [] }),
     buildRelations: (): Relation[] => [],
   }
 }
@@ -277,6 +281,36 @@ describe('Fingerprint logic', () => {
     )
     expect(after).not.toBe(before)
   })
+
+  it.each([
+    ['package.json', new TypeScriptLanguageAdapter()],
+    ['pyproject.toml', new PythonLanguageAdapter()],
+    ['go.mod', new GoLanguageAdapter()],
+    ['composer.json', new PhpLanguageAdapter()],
+  ] as const)(
+    'given the built-in adapter that reads %s, when that manifest changes, then the fingerprint changes',
+    (basename, adapter) => {
+      const root = '/repo'
+      const codeRoot = '/repo/packages/core'
+      const manifest = `${codeRoot}/${basename}`
+      const workspace = { ...mockWorkspace, codeRoot }
+      const graphConfig = { ...mockGraphConfig, projectRoot: root }
+      const fingerprint = (text: string): string =>
+        computeWorkspaceFingerprint(
+          codeGraphVersion,
+          root,
+          workspace,
+          [workspace],
+          graphConfig,
+          [adapter],
+          root,
+          filesSource({ [manifest]: text }),
+        )
+
+      expect(adapter.resolutionManifests()).toContain(basename)
+      expect(fingerprint('before')).not.toBe(fingerprint('after'))
+    },
+  )
 
   it('given LF and CRLF of the same package.json, when hashed, then digests match without sha256 prefix', () => {
     const root = '/repo'

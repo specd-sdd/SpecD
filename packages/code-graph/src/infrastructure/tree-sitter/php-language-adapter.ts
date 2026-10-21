@@ -1,4 +1,14 @@
 import path from 'node:path'
+import {
+  type ImportDiagnostic,
+  type PackageEntry,
+  type PackageEntryRequest,
+  type PackagePreparationContext,
+  type PackageResolutionFacet,
+  type RelativeImportResolutionFacet,
+  type QualifiedNameResolutionFacet,
+  type SymbolReferenceSyntaxFacet,
+} from '../../domain/value-objects/language-adapter-facets.js'
 import { parse } from '@ast-grep/napi'
 import { type SgNode } from '@ast-grep/napi'
 import {
@@ -111,10 +121,22 @@ interface PhpParserState {
   readonly scopes: readonly PhpScopeInfo[]
 }
 
+/** Session state key holding the Composer package that owns each workspace. */
+const PHP_PACKAGE_OWNERS_KEY = 'php-package-owners'
+
+/** One workspace and the Composer package whose autoload prefixes it owns. */
+interface PhpPackageOwner {
+  readonly workspace: string
+  readonly codeRoot: string
+  readonly packageName: string
+}
+
 /** Immutable Composer metadata prepared once per workspace in an indexing session. */
 interface PhpResolutionSessionState {
   readonly kind: 'php-resolution-metadata'
   readonly psr4ByCodeRoot: ReadonlyMap<string, readonly (readonly [string, string])[]>
+  /** Workspace name by code root, for building workspace-prefixed file ids. */
+  readonly workspaceByCodeRoot?: ReadonlyMap<string, string>
 }
 
 /**
@@ -440,6 +462,61 @@ function getCakePackageKind(packageName: string): 'model' | 'controller' | 'comp
  * Extracts functions, classes, methods, interfaces, enums, traits, and constants.
  */
 export class PhpLanguageAdapter implements LanguageAdapter {
+  private readonly packageResolutionFacet: PackageResolutionFacet = {
+    identity: (codeRoot, repoRoot) => this.getPackageIdentity(codeRoot, repoRoot),
+    prepare: (context) => this.preparePackages(context),
+    matchSpecifier: (specifier, knownPackages, session) =>
+      this.matchQualifiedNameToPackage(specifier, knownPackages, session),
+    entrySurface: (request) => this.qualifiedNameEntries(request),
+  }
+
+  /**
+   * Package identity, autoload preparation, qualified-name matching, and the package entry surface.
+   * @returns The facet this adapter provides.
+   */
+  get packageResolution(): PackageResolutionFacet {
+    return this.packageResolutionFacet
+  }
+
+  private readonly relativeImportResolutionFacet: RelativeImportResolutionFacet = {
+    resolve: (fromFile, specifier) => this.resolveRelativeImportPath(fromFile, specifier),
+  }
+
+  /**
+   * Relative module specifier to candidate files.
+   * @returns The facet this adapter provides.
+   */
+  get relativeImportResolution(): RelativeImportResolutionFacet {
+    return this.relativeImportResolutionFacet
+  }
+
+  private readonly qualifiedNameResolutionFacet: QualifiedNameResolutionFacet = {
+    build: (namespace, symbolName) => this.buildQualifiedName(namespace, symbolName),
+    resolveToPath: (qualifiedName, codeRoot, session) =>
+      this.resolveQualifiedNameFromSession(qualifiedName, codeRoot, session),
+  }
+
+  /**
+   * Qualified-name construction and qualified-name to file mapping.
+   * @returns The facet this adapter provides.
+   */
+  get qualifiedNameResolution(): QualifiedNameResolutionFacet {
+    return this.qualifiedNameResolutionFacet
+  }
+
+  private readonly symbolReferenceSyntaxFacet: SymbolReferenceSyntaxFacet = {
+    parse: (text) => this.parseSymbolReference(text),
+    render: (symbol, ownerPath) => this.renderSymbolReference(symbol, ownerPath),
+  }
+
+  /**
+   * Member reference syntax.
+   * @returns The facet this adapter provides.
+   */
+  get symbolReferenceSyntax(): SymbolReferenceSyntaxFacet {
+    return this.symbolReferenceSyntaxFacet
+  }
+
   /**
    * Declares deterministic PHP reference semantics.
    * @returns Supported reference capabilities.
@@ -474,7 +551,10 @@ export class PhpLanguageAdapter implements LanguageAdapter {
    * @param knownPackages - Known package names.
    * @returns Package identity, or undefined.
    */
-  resolvePackageFromSpecifier(specifier: string, knownPackages: string[]): string | undefined {
+  private resolvePackageFromSpecifier(
+    specifier: string,
+    knownPackages: string[],
+  ): string | undefined {
     // PHP resolves imports using fully qualified class names (FQN) rather than package-specifiers.
     // Therefore, package-specifier resolution is not used and always returns undefined.
     if (!specifier || knownPackages.length === 0) {
@@ -496,7 +576,7 @@ export class PhpLanguageAdapter implements LanguageAdapter {
    * @param text - Human reference text.
    * @returns One owner-then-member candidate, or none.
    */
-  parseSymbolReference(text: string): ParsedSymbolReference {
+  private parseSymbolReference(text: string): ParsedSymbolReference {
     return parseDottedMemberReference(text)
   }
 
@@ -506,7 +586,7 @@ export class PhpLanguageAdapter implements LanguageAdapter {
    * @param ownerPath - Owner simple names.
    * @returns Generic dotted spelling and native `::` spelling.
    */
-  renderSymbolReference(
+  private renderSymbolReference(
     symbol: LogicalSymbol,
     ownerPath: readonly string[],
   ): { readonly generic: string; readonly native: string } {
@@ -854,6 +934,7 @@ export class PhpLanguageAdapter implements LanguageAdapter {
   resolveImports(analysis: FileAnalysis, context: ImportResolutionContext): ResolvedImports {
     const importMap = new Map<string, string>()
     const fileImports: string[] = []
+    const diagnostics: ImportDiagnostic[] = []
     const { session, qualifiedNames, codeRoot } = context
 
     for (const imp of analysis.imports) {
@@ -889,21 +970,32 @@ export class PhpLanguageAdapter implements LanguageAdapter {
           continue
         }
 
-        if (codeRoot) {
-          const resolvedPath = this.resolveQualifiedNameFromSession(
-            imp.specifier,
-            codeRoot,
-            session,
-          )
-          if (resolvedPath) {
-            fileImports.push(resolvedPath)
-            continue
-          }
+        // No class with this exact qualified name is indexed: the owning package's PSR-4
+        // prefix still proves which file the import depends on.
+        const entries = context.packageEntryFiles(imp.specifier)
+        if (entries.status === 'resolved') {
+          for (const entry of entries.entries) fileImports.push(entry.filePath)
+          continue
         }
+        // A workspace without a Composer `name` has no package identity, but its own PSR-4 map
+        // still proves the file. Only an indexed file is ever a dependency.
+        const ownFile =
+          codeRoot === undefined
+            ? undefined
+            : this.resolveQualifiedNameFromSession(imp.specifier, codeRoot, session)
+        if (ownFile !== undefined) {
+          fileImports.push(ownFile)
+          continue
+        }
+        diagnostics.push({
+          filePath: analysis.filePath,
+          specifier: imp.specifier,
+          reason: entries.reason,
+        })
       }
     }
 
-    return { importMap, fileImports: [...new Set(fileImports)] }
+    return { importMap, fileImports: [...new Set(fileImports)], steps: [], diagnostics }
   }
 
   /**
@@ -2006,7 +2098,7 @@ export class PhpLanguageAdapter implements LanguageAdapter {
    * @param symbolName - Symbol name string.
    * @returns Qualified name.
    */
-  buildQualifiedName(namespace: string, symbolName: string): string {
+  private buildQualifiedName(namespace: string, symbolName: string): string {
     return `${namespace}\\${symbolName}`
   }
 
@@ -2024,7 +2116,7 @@ export class PhpLanguageAdapter implements LanguageAdapter {
    * @param repoRoot - Repo root path.
    * @returns Package name, or undefined.
    */
-  getPackageIdentity(codeRoot: string, repoRoot?: string): string | undefined {
+  private getPackageIdentity(codeRoot: string, repoRoot?: string): string | undefined {
     return findManifestField(
       codeRoot,
       'composer.json',
@@ -2034,6 +2126,92 @@ export class PhpLanguageAdapter implements LanguageAdapter {
       },
       repoRoot,
     )
+  }
+
+  /**
+   * Prepares the Composer autoload prefixes and package owner of every workspace, once per run.
+   * Workspaces that were only hydrated in an incremental run are included.
+   * @param context - Session, workspaces, and repository root.
+   */
+  private preparePackages(context: PackagePreparationContext): void {
+    const key = 'php-resolution-metadata'
+    const existing = context.session.getAdapterState<PhpResolutionSessionState>(key)
+    const psr4ByCodeRoot = new Map(existing?.psr4ByCodeRoot ?? [])
+    const workspaceByCodeRoot = new Map(existing?.workspaceByCodeRoot ?? [])
+    const owners: PhpPackageOwner[] = []
+    for (const workspace of context.workspaces) {
+      workspaceByCodeRoot.set(workspace.codeRoot, workspace.name)
+      if (!psr4ByCodeRoot.has(workspace.codeRoot)) {
+        psr4ByCodeRoot.set(
+          workspace.codeRoot,
+          this.buildPsr4Map(workspace.codeRoot, context.repoRoot),
+        )
+      }
+      const packageName = this.getPackageIdentity(workspace.codeRoot, context.repoRoot)
+      if (packageName !== undefined) {
+        owners.push({ workspace: workspace.name, codeRoot: workspace.codeRoot, packageName })
+      }
+    }
+    context.session.setAdapterState<PhpResolutionSessionState>(key, {
+      kind: 'php-resolution-metadata',
+      psr4ByCodeRoot,
+      workspaceByCodeRoot,
+    })
+    context.session.setAdapterState<readonly PhpPackageOwner[]>(PHP_PACKAGE_OWNERS_KEY, owners)
+  }
+
+  /**
+   * Finds the known Composer package whose autoload prefix is the longest match of a qualified name.
+   * @param qualifiedName - Fully qualified PHP name as written in a `use` import.
+   * @param knownPackages - Known package identities.
+   * @param session - Session holding the prepared autoload prefixes.
+   * @returns The owning package identity, or `undefined` when no prefix matches.
+   */
+  private matchQualifiedNameToPackage(
+    qualifiedName: string,
+    knownPackages: readonly string[],
+    session: IndexSession,
+  ): string | undefined {
+    const owners = session.getAdapterState<readonly PhpPackageOwner[]>(PHP_PACKAGE_OWNERS_KEY)
+    const metadata = session.getAdapterState<PhpResolutionSessionState>('php-resolution-metadata')
+    if (owners === undefined || metadata === undefined) return undefined
+    const name = qualifiedName.replace(/^\\/, '')
+    let best: { readonly length: number; readonly packageName: string } | undefined
+    for (const owner of owners) {
+      if (!knownPackages.includes(owner.packageName)) continue
+      for (const [prefix] of metadata.psr4ByCodeRoot.get(owner.codeRoot) ?? []) {
+        if (name.startsWith(prefix) && (best === undefined || prefix.length > best.length)) {
+          best = { length: prefix.length, packageName: owner.packageName }
+        }
+      }
+    }
+    return best?.packageName
+  }
+
+  /**
+   * Maps a qualified name to the class files its owning package publishes through PSR-4.
+   * @param request - Qualified name, matched package, owning workspace, and session.
+   * @returns Workspace-prefixed candidate files in longest-prefix order.
+   */
+  private qualifiedNameEntries(request: PackageEntryRequest): readonly PackageEntry[] {
+    const owners =
+      request.session.getAdapterState<readonly PhpPackageOwner[]>(PHP_PACKAGE_OWNERS_KEY)
+    const metadata =
+      request.session.getAdapterState<PhpResolutionSessionState>('php-resolution-metadata')
+    const owner = owners?.find(
+      (item) => item.workspace === request.workspace && item.packageName === request.packageName,
+    )
+    if (owner === undefined || metadata === undefined) return []
+    const map = metadata.psr4ByCodeRoot.get(owner.codeRoot) ?? []
+    const name = request.specifier.replace(/^\\/, '')
+    const entries: PackageEntry[] = []
+    for (const absolute of this.resolveQualifiedNameCandidates(name, map)) {
+      const relative = path.relative(owner.codeRoot, absolute).split(path.sep).join('/')
+      if (relative.startsWith('..')) continue
+      const filePath = `${owner.workspace}:${relative}`
+      entries.push({ filePath, surface: filePath })
+    }
+    return entries
   }
 
   /**
@@ -2051,6 +2229,9 @@ export class PhpLanguageAdapter implements LanguageAdapter {
     context.session.setAdapterState<PhpResolutionSessionState>(key, {
       kind: 'php-resolution-metadata',
       psr4ByCodeRoot,
+      ...(existing?.workspaceByCodeRoot === undefined
+        ? {}
+        : { workspaceByCodeRoot: existing.workspaceByCodeRoot }),
     })
   }
 
@@ -2090,6 +2271,7 @@ export class PhpLanguageAdapter implements LanguageAdapter {
 
   /**
    * Resolves one qualified name only from session-prepared PSR-4 entries.
+   * Only an indexed file is returned, as its indexed file id.
    * @param qualifiedName - PHP qualified name.
    * @param codeRoot - Workspace root whose metadata was prepared.
    * @param session - Current indexing session.
@@ -2103,11 +2285,15 @@ export class PhpLanguageAdapter implements LanguageAdapter {
     const metadata = session.getAdapterState<PhpResolutionSessionState>('php-resolution-metadata')
     const map = metadata?.psr4ByCodeRoot.get(codeRoot)
     if (map === undefined) return undefined
-    const candidates = this.resolveQualifiedNameCandidates(qualifiedName, map)
-    // With several directories for one prefix, only an indexed file proves the target.
-    return candidates.length <= 1
-      ? candidates[0]
-      : candidates.find((candidate) => session.getFileId(candidate) !== undefined)
+    const workspace = metadata?.workspaceByCodeRoot?.get(codeRoot)
+    // Only an indexed file proves the target. Indexed ids carry the workspace prefix.
+    for (const absolute of this.resolveQualifiedNameCandidates(qualifiedName, map)) {
+      const relative = path.relative(codeRoot, absolute).split(path.sep).join('/')
+      const ids = workspace === undefined ? [absolute] : [`${workspace}:${relative}`, absolute]
+      const indexed = ids.find((id) => session.getFileId(id) !== undefined)
+      if (indexed !== undefined) return indexed
+    }
+    return undefined
   }
 
   /**
@@ -2141,21 +2327,6 @@ export class PhpLanguageAdapter implements LanguageAdapter {
       }
     }
     return candidates
-  }
-
-  /**
-   * Resolves a qualified name to a file path.
-   * @param qualifiedName - PHP qualified name.
-   * @param codeRoot - Workspace root path.
-   * @param repoRoot - Repo root path.
-   * @returns Resolved file path, or undefined.
-   */
-  resolveQualifiedNameToPath(
-    qualifiedName: string,
-    codeRoot: string,
-    repoRoot?: string,
-  ): string | undefined {
-    return this.resolveQualifiedNameWithMap(qualifiedName, this.buildPsr4Map(codeRoot, repoRoot))
   }
 
   /**
@@ -2610,7 +2781,7 @@ export class PhpLanguageAdapter implements LanguageAdapter {
    * @param specifier - Relative specifier.
    * @returns Candidates array or string path.
    */
-  resolveRelativeImportPath(fromFile: string, specifier: string): string | string[] {
+  private resolveRelativeImportPath(fromFile: string, specifier: string): string | string[] {
     const identity = splitWorkspaceIdentity(fromFile)
     const wsPrefix = identity === null ? '' : `${identity.workspace}:`
     const relFile = identity === null ? fromFile : identity.relativePath

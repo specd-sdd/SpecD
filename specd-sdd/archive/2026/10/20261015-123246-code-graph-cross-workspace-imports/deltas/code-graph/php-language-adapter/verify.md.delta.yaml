@@ -1,0 +1,45 @@
+- op: added
+  description: PHP package import scenarios
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Namespaces, use aliases, and Composer resolution'
+  content: |
+    #### Scenario: Unindexed qualified name records the PSR-4 file dependency
+
+    - **GIVEN** workspace `billing` has `composer.json` PSR-4 `Acme\\Billing\\` mapped to `src/` and indexes `src/Invoice.php`
+    - **AND** workspace `app` contains `use Acme\Billing\Invoice;` and no class with that exact qualified name is registered
+    - **WHEN** imports are resolved
+    - **THEN** the file imports `billing:src/Invoice.php`
+    - **AND** no symbol target and no `import:package` step is produced
+
+    #### Scenario: Longest prefix across workspaces wins
+
+    - **GIVEN** `Acme\\` maps to workspace `shared` and `Acme\\Billing\\` maps to workspace `billing`
+    - **WHEN** `Acme\Billing\Invoice` is resolved
+    - **THEN** the owning workspace is `billing`
+
+    #### Scenario: Exact qualified name identity wins
+
+    - **GIVEN** a class declared with the qualified name `Acme\Billing\Invoice` in any workspace
+    - **WHEN** `use Acme\Billing\Invoice;` is resolved
+    - **THEN** the import targets that class through the exact qualified-name map
+
+    #### Scenario: Same short class name in another workspace is not used
+
+    - **GIVEN** workspace `legacy` declares a class `Invoice` in a different namespace
+    - **WHEN** `use Acme\Billing\Invoice;` is resolved
+    - **THEN** the import never targets `legacy`'s `Invoice`
+
+    #### Scenario: Qualified name with no matching prefix stays unresolved
+
+    - **GIVEN** `use Vendor\Lib\Foo;` and no workspace maps `Vendor\\Lib\\`
+    - **WHEN** imports are resolved
+    - **THEN** nothing is persisted and the import is counted in `importDiagnostics.externalPackageImports`, not reported as a failure
+
+    #### Scenario: Pass 2 performs no filesystem read
+
+    - **GIVEN** a run with several PHP workspaces whose `composer.json` files are deleted after `prepare` ran
+    - **WHEN** Pass 2 resolves `use` imports and `resolveToPath` is called
+    - **THEN** resolution still succeeds from the prepared PSR-4 maps
+    - **AND** an unindexed file is never targeted

@@ -11,12 +11,7 @@
   "implementation": [
     {
       "file": "code-graph:src/infrastructure/tree-sitter/python-language-adapter.ts",
-      "symbols": [
-        "PythonLanguageAdapter",
-        "collectClassInfo",
-        "buildRelations",
-        "headerHasParseError"
-      ]
+      "symbols": ["PythonLanguageAdapter"]
     }
   ],
   "optimizations": {

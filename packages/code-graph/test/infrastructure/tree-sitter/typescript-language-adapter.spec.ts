@@ -18,14 +18,22 @@ import { type FileAnalysis } from '../../../src/domain/value-objects/file-analys
 import { type ImportDeclaration } from '../../../src/domain/value-objects/import-declaration.js'
 import { InMemoryIndexSession } from '../../../src/application/use-cases/in-memory-index-session.js'
 import { parseLogicalSymbol } from '../../../src/domain/value-objects/symbol-reference.js'
+import { createImportResolutionContext } from '../../helpers/import-resolution-context.js'
+import {
+  type PackageResolutionFacet,
+  type ReExportLinkingFacet,
+  type RelativeImportResolutionFacet,
+  type SymbolReferenceSyntaxFacet,
+} from '../../../src/domain/value-objects/language-adapter-facets.js'
 
 interface TestAdapter {
   languages(): string[]
   extensions(): Record<string, string>
   resolutionManifests(): readonly string[]
-  getPackageIdentity(codeRoot: string, repoRoot?: string): string | undefined
-  resolvePackageFromSpecifier(specifier: string, knownPackages: string[]): string | undefined
-  resolveRelativeImportPath(fromFile: string, specifier: string): string | string[]
+  readonly packageResolution: PackageResolutionFacet
+  readonly relativeImportResolution: RelativeImportResolutionFacet
+  readonly symbolReferenceSyntax: SymbolReferenceSyntaxFacet
+  readonly reExportLinking: ReExportLinkingFacet
   extractSymbols(filePath: string, content: string): SymbolNode[]
   extractImportedNames(filePath: string, content: string): ImportDeclaration[]
   extractBindingFacts(
@@ -162,7 +170,7 @@ adapter.extractRelations = (
     filePath,
     analysis: draft,
   })
-  const resolvedImports = { importMap, fileImports: [] }
+  const resolvedImports = { importMap, fileImports: [], steps: [], diagnostics: [] }
   return baseAdapter.buildRelations(analysis, {
     session,
     resolvedImports,
@@ -333,11 +341,17 @@ class Service {
     }
 
     const consumer = session.getAnalysis('workspace:src/consumer.ts')!
-    const resolved = baseAdapter.resolveImports(consumer, {
-      session,
-      qualifiedNames: new Map(),
-      packageToWorkspace: new Map(),
-    })
+    const resolved = baseAdapter.resolveImports(
+      consumer,
+      createImportResolutionContext(
+        {
+          session,
+          qualifiedNames: new Map(),
+          packageToWorkspace: new Map(),
+        },
+        baseAdapter,
+      ),
+    )
     expect(resolved.importMap.get('PublicService')).toBe(
       session.findSymbolsByFile('workspace:src/service.ts')[0]?.id,
     )
@@ -783,6 +797,8 @@ const rows = [${records}, { recordId: 1000, run: () => true }];`
         resolvedImports: {
           importMap: new Map([['BaseService', parentSymbol.id]]),
           fileImports: ['ws:src/base.ts'],
+          steps: [],
+          diagnostics: [],
         },
       })
 
@@ -1006,37 +1022,49 @@ const rows = [${records}, { recordId: 1000, run: () => true }];`
 
   describe('resolvePackageFromSpecifier', () => {
     it('resolves scoped package', () => {
-      const result = adapter.resolvePackageFromSpecifier('@specd/core', [
+      const result = adapter.packageResolution.matchSpecifier(
         '@specd/core',
-        '@specd/cli',
-      ])
+        ['@specd/core', '@specd/cli'],
+        new InMemoryIndexSession(),
+      )
       expect(result).toBe('@specd/core')
     })
 
     it('resolves bare package', () => {
-      const result = adapter.resolvePackageFromSpecifier('lodash/fp', ['lodash'])
+      const result = adapter.packageResolution.matchSpecifier(
+        'lodash/fp',
+        ['lodash'],
+        new InMemoryIndexSession(),
+      )
       expect(result).toBe('lodash')
     })
 
     it('returns undefined for unknown package', () => {
-      const result = adapter.resolvePackageFromSpecifier('express', ['@specd/core'])
+      const result = adapter.packageResolution.matchSpecifier(
+        'express',
+        ['@specd/core'],
+        new InMemoryIndexSession(),
+      )
       expect(result).toBeUndefined()
     })
   })
 
   describe('resolveRelativeImportPath', () => {
     it('resolves .js to .ts', () => {
-      const result = adapter.resolveRelativeImportPath('core:src/commands/create.ts', '../utils.js')
+      const result = adapter.relativeImportResolution.resolve(
+        'core:src/commands/create.ts',
+        '../utils.js',
+      )
       expect(result).toBe('core:src/utils.ts')
     })
 
     it('returns candidates for extensionless specifier', () => {
-      const result = adapter.resolveRelativeImportPath('core:src/index.ts', './helpers/cli')
+      const result = adapter.relativeImportResolution.resolve('core:src/index.ts', './helpers/cli')
       expect(result).toEqual(['core:src/helpers/cli.ts', 'core:src/helpers/cli/index.ts'])
     })
 
     it('resolves ./ specifier', () => {
-      const result = adapter.resolveRelativeImportPath('core:src/index.ts', './utils.js')
+      const result = adapter.relativeImportResolution.resolve('core:src/index.ts', './utils.js')
       expect(result).toBe('core:src/utils.ts')
     })
   })
@@ -1057,12 +1085,12 @@ const rows = [${records}, { recordId: 1000, run: () => true }];`
     it('reads name from package.json', () => {
       tempDir = mkdtempSync(join(tmpdir(), 'ts-pkg-'))
       writeFileSync(join(tempDir, 'package.json'), JSON.stringify({ name: '@specd/core' }))
-      expect(adapter.getPackageIdentity(tempDir)).toBe('@specd/core')
+      expect(adapter.packageResolution.identity(tempDir)).toBe('@specd/core')
     })
 
     it('returns undefined when no package.json', () => {
       tempDir = mkdtempSync(join(tmpdir(), 'ts-pkg-'))
-      expect(adapter.getPackageIdentity(tempDir)).toBeUndefined()
+      expect(adapter.packageResolution.identity(tempDir)).toBeUndefined()
     })
 
     it('walks up to find package.json above codeRoot', () => {
@@ -1070,7 +1098,7 @@ const rows = [${records}, { recordId: 1000, run: () => true }];`
       writeFileSync(join(tempDir, 'package.json'), JSON.stringify({ name: '@acme/lib' }))
       const subDir = join(tempDir, 'src')
       mkdirSync(subDir)
-      expect(adapter.getPackageIdentity(subDir, tempDir)).toBe('@acme/lib')
+      expect(adapter.packageResolution.identity(subDir, tempDir)).toBe('@acme/lib')
     })
 
     it('does not walk above repoRoot boundary', () => {
@@ -1081,7 +1109,7 @@ const rows = [${records}, { recordId: 1000, run: () => true }];`
       mkdirSync(innerDir, { recursive: true })
       // package.json above repoRoot — should NOT be found
       writeFileSync(join(tempDir, 'package.json'), JSON.stringify({ name: 'outside' }))
-      expect(adapter.getPackageIdentity(innerDir, repoRoot)).toBeUndefined()
+      expect(adapter.packageResolution.identity(innerDir, repoRoot)).toBeUndefined()
     })
   })
 })
@@ -1116,7 +1144,7 @@ describe('TypeScriptLanguageAdapter member references and re-exports', () => {
   }
 
   it('parses EditChange.execute as owner then member and ignores dynamic or canonical text', () => {
-    expect(baseAdapter.parseSymbolReference('EditChange.execute')).toEqual({
+    expect(baseAdapter.symbolReferenceSyntax.parse('EditChange.execute')).toEqual({
       candidates: [
         {
           segments: [
@@ -1126,9 +1154,9 @@ describe('TypeScriptLanguageAdapter member references and re-exports', () => {
         },
       ],
     })
-    expect(baseAdapter.parseSymbolReference('obj[name]').candidates).toEqual([])
-    expect(baseAdapter.parseSymbolReference('EditChange.execute()').candidates).toEqual([])
-    const canonical = baseAdapter.parseSymbolReference(
+    expect(baseAdapter.symbolReferenceSyntax.parse('obj[name]').candidates).toEqual([])
+    expect(baseAdapter.symbolReferenceSyntax.parse('EditChange.execute()').candidates).toEqual([])
+    const canonical = baseAdapter.symbolReferenceSyntax.parse(
       'logical|2|4:core|7:src/a.ts|7:execute|5:value|0:|6:method|8:instance|0:|0:',
     )
     expect(canonical.candidates).toEqual([])
@@ -1136,13 +1164,13 @@ describe('TypeScriptLanguageAdapter member references and re-exports', () => {
     expect(baseAdapter.resolutionManifests()).toEqual(['package.json'])
   })
 
-  it('given conditional package exports and no main, when a re-export names the package, then no entry is selected', () => {
+  it('given only platform-specific conditions and no main, when a re-export names the package, then no entry is selected', () => {
     tempDir = mkdtempSync(join(tmpdir(), 'ts-conditional-exports-'))
     writeFileSync(
       join(tempDir, 'package.json'),
       JSON.stringify({
         name: '@specd/code-graph',
-        exports: { '.': { import: './dist/public.js', require: './dist/public.cjs' } },
+        exports: { '.': { require: './dist/public.cjs', node: './dist/public.node.js' } },
       }),
     )
     const session = analyzedSession([
@@ -1159,10 +1187,10 @@ describe('TypeScriptLanguageAdapter member references and re-exports', () => {
       },
     ])
 
-    const linked = baseAdapter.linkReExports(
-      session,
-      new Map([['@specd/code-graph', 'code-graph']]),
-    )
+    const linked = baseAdapter.reExportLinking.link({
+      session: session,
+      packageToWorkspace: new Map([['@specd/code-graph', 'code-graph']]),
+    })
 
     expect(
       linked.publicBindings.some(
@@ -1170,6 +1198,45 @@ describe('TypeScriptLanguageAdapter member references and re-exports', () => {
           item.surface === 'sdk:src/index.ts' && item.exportedName === 'runIsolatedGraphIndex',
       ),
     ).toBe(false)
+  })
+
+  it('given import and types conditions, when a re-export names the package, then the runtime source is bound', () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'ts-import-condition-'))
+    writeFileSync(
+      join(tempDir, 'package.json'),
+      JSON.stringify({
+        name: '@specd/code-graph',
+        exports: {
+          '.': { import: './dist/public.js', types: './dist/public.d.ts' },
+          './internal': { import: './dist/index.js' },
+        },
+      }),
+    )
+    const session = analyzedSession([
+      {
+        path: 'code-graph:src/public.ts',
+        workspace: 'code-graph',
+        codeRoot: tempDir,
+        content: 'export function runIsolatedGraphIndex(): void {}\n',
+      },
+      {
+        path: 'sdk:src/index.ts',
+        workspace: 'sdk',
+        content: "export { runIsolatedGraphIndex } from '@specd/code-graph'\n",
+      },
+    ])
+
+    const linked = baseAdapter.reExportLinking.link({
+      session,
+      packageToWorkspace: new Map([['@specd/code-graph', 'code-graph']]),
+    })
+
+    expect(
+      linked.publicBindings.some(
+        (item) =>
+          item.surface === 'sdk:src/index.ts' && item.exportedName === 'runIsolatedGraphIndex',
+      ),
+    ).toBe(true)
   })
 
   it('binds a package root re-export to the published source file', () => {
@@ -1200,10 +1267,10 @@ describe('TypeScriptLanguageAdapter member references and re-exports', () => {
         content: "export { runIsolatedGraphIndex } from '@specd/code-graph'\n",
       },
     ])
-    const linked = baseAdapter.linkReExports(
-      session,
-      new Map([['@specd/code-graph', 'code-graph']]),
-    )
+    const linked = baseAdapter.reExportLinking.link({
+      session: session,
+      packageToWorkspace: new Map([['@specd/code-graph', 'code-graph']]),
+    })
     const binding = linked.publicBindings.find(
       (item) =>
         item.surface === 'sdk:src/index.ts' && item.exportedName === 'runIsolatedGraphIndex',
@@ -1245,10 +1312,10 @@ describe('TypeScriptLanguageAdapter member references and re-exports', () => {
         content: "export { internalOnly } from '@specd/code-graph/internal'\n",
       },
     ])
-    const linked = baseAdapter.linkReExports(
-      session,
-      new Map([['@specd/code-graph', 'code-graph']]),
-    )
+    const linked = baseAdapter.reExportLinking.link({
+      session: session,
+      packageToWorkspace: new Map([['@specd/code-graph', 'code-graph']]),
+    })
     const published = session
       .getPublicBindings()
       .find(
@@ -1278,7 +1345,10 @@ describe('TypeScriptLanguageAdapter member references and re-exports', () => {
         content: "export { run } from './public.js'\n",
       },
     ])
-    const linked = baseAdapter.linkReExports(session, new Map())
+    const linked = baseAdapter.reExportLinking.link({
+      session: session,
+      packageToWorkspace: new Map(),
+    })
     const published = session
       .getPublicBindings()
       .find((item) => item.surface === 'code-graph:src/public.ts')
@@ -1318,8 +1388,10 @@ describe('TypeScriptLanguageAdapter member references and re-exports', () => {
       },
     ])
     expect(
-      baseAdapter.linkReExports(twoCandidates, new Map([['@specd/code-graph', 'code-graph']]))
-        .publicBindings,
+      baseAdapter.reExportLinking.link({
+        session: twoCandidates,
+        packageToWorkspace: new Map([['@specd/code-graph', 'code-graph']]),
+      }).publicBindings,
     ).toEqual([])
 
     const missing = analyzedSession([
@@ -1336,8 +1408,10 @@ describe('TypeScriptLanguageAdapter member references and re-exports', () => {
       },
     ])
     expect(
-      baseAdapter.linkReExports(missing, new Map([['@specd/code-graph', 'code-graph']]))
-        .publicBindings,
+      baseAdapter.reExportLinking.link({
+        session: missing,
+        packageToWorkspace: new Map([['@specd/code-graph', 'code-graph']]),
+      }).publicBindings,
     ).toEqual([])
 
     const unknown = analyzedSession([
@@ -1347,7 +1421,10 @@ describe('TypeScriptLanguageAdapter member references and re-exports', () => {
         content: "export { run } from '@specd/unknown'\n",
       },
     ])
-    expect(baseAdapter.linkReExports(unknown, new Map()).publicBindings).toEqual([])
+    expect(
+      baseAdapter.reExportLinking.link({ session: unknown, packageToWorkspace: new Map() })
+        .publicBindings,
+    ).toEqual([])
   })
 
   it('stores the alias exported name and skips default on a star re-export', () => {
@@ -1363,7 +1440,10 @@ describe('TypeScriptLanguageAdapter member references and re-exports', () => {
         content: "export { Alpha as Beta } from './ignored.js'\n",
       },
     ])
-    const alias = baseAdapter.linkReExports(session, new Map())
+    const alias = baseAdapter.reExportLinking.link({
+      session: session,
+      packageToWorkspace: new Map(),
+    })
     expect(alias.publicBindings).toEqual([])
 
     const relative = analyzedSession([
@@ -1383,7 +1463,10 @@ describe('TypeScriptLanguageAdapter member references and re-exports', () => {
         content: "export * from './public.js'\n",
       },
     ])
-    const linked = baseAdapter.linkReExports(relative, new Map())
+    const linked = baseAdapter.reExportLinking.link({
+      session: relative,
+      packageToWorkspace: new Map(),
+    })
     const alpha = relative
       .getPublicBindings()
       .find((item) => item.surface === 'code-graph:src/public.ts' && item.exportedName === 'Alpha')
@@ -1547,7 +1630,7 @@ describe('TypeScriptLanguageAdapter member references and re-exports', () => {
 
 describe('TypeScriptLanguageAdapter drive-letter paths', () => {
   it('keeps a drive letter in the resolved import path', () => {
-    const resolved = baseAdapter.resolveRelativeImportPath('C:/repo/src/a.ts', './b')
+    const resolved = baseAdapter.relativeImportResolution.resolve('C:/repo/src/a.ts', './b')
     expect(resolved).toContain('C:/repo/src/b.ts')
   })
 })
@@ -1937,11 +2020,17 @@ describe('TypeScript import forms, qualified heritage, namespaces, jsx and shado
       })
       if (filePath === main) analysis = registered
     }
-    const resolvedImports = baseAdapter.resolveImports(analysis!, {
-      session,
-      qualifiedNames: new Map(),
-      packageToWorkspace: new Map(),
-    })
+    const resolvedImports = baseAdapter.resolveImports(
+      analysis!,
+      createImportResolutionContext(
+        {
+          session,
+          qualifiedNames: new Map(),
+          packageToWorkspace: new Map(),
+        },
+        baseAdapter,
+      ),
+    )
     return {
       relations: baseAdapter.buildRelations(analysis!, { session, resolvedImports }),
       fileImports: resolvedImports.fileImports,
@@ -2097,7 +2186,12 @@ describe('TypeScript imported heritage clause ranges', () => {
     return baseAdapter
       .buildRelations(analysis!, {
         session,
-        resolvedImports: { importMap: importMap(session), fileImports: [] },
+        resolvedImports: {
+          importMap: importMap(session),
+          fileImports: [],
+          steps: [],
+          diagnostics: [],
+        },
       })
       .filter((relation) => relation.metadata?.['importProvenance'] !== undefined)
       .map((relation) => ({
@@ -2278,5 +2372,24 @@ describe('TypeScript identity layers through the real adapter', () => {
     expect(same).toHaveLength(2)
     expect(new Set(same.map((symbol) => symbol.id)).size).toBe(2)
     expect(same.every((symbol) => logicalByName.get(symbol.id) === undefined)).toBe(true)
+  })
+})
+
+describe('TypeScript type-only imports', () => {
+  it('Given type-only syntax, when imports are extracted, then only those names are marked type-only', () => {
+    const imports = adapter.extractImportedNames(
+      'ws:src/a.ts',
+      [
+        "import type { A } from 'pkg'",
+        "import { type B, C } from 'pkg'",
+        "import { D } from 'pkg'",
+        '',
+      ].join('\n'),
+    )
+
+    const typeOnly = Object.fromEntries(
+      imports.map((item) => [item.localName, item.typeOnly === true]),
+    )
+    expect(typeOnly).toEqual({ A: true, B: true, C: false, D: false })
   })
 })

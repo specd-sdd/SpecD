@@ -30,13 +30,19 @@ Each symbol SHALL use its complete parser construct range and exact declared-nam
 
 Logical declarations SHALL use the indexed Go package as their public surface. Package-level identifiers beginning with an uppercase Unicode letter SHALL produce public bindings; lowercase package declarations SHALL remain non-exported. Public identity MUST remain package-qualified even when several files contribute declarations to the same package.
 
-The adapter SHALL extract single, grouped, aliased, dot, and blank imports. Blank imports SHALL create dependency evidence without a local symbol binding. Dot imports SHALL remain a distinct namespace-import form and MUST NOT cause unqualified names to bind unless a unique indexed target is proven. Import specifiers SHALL resolve by longest known `go.mod` module prefix.
+The adapter SHALL extract single, grouped, aliased, dot, and blank imports. Blank imports SHALL create dependency evidence without a local symbol binding. Dot imports SHALL remain a distinct namespace-import form and MUST NOT cause unqualified names to bind unless a unique indexed target is proven.
+
+The adapter SHALL provide the `packageResolution` facet. `identity` SHALL read the `module` path from the nearest bounded `go.mod`. `matchSpecifier` SHALL resolve an import path by the longest known module-path prefix. `prepare` SHALL only build the directory index of indexed `.go` files per workspace; it reads no manifest. `entrySurface` SHALL use only the package map and that index: the import path minus the module prefix is a directory under the module's code root, and the entries are the indexed non-test `.go` files directly inside it, each with the package surface of that directory as `surface`. A path equal to the module path addresses the package at the module root. Files ending in `_test.go` are never entries.
+
+A Go import resolves to a package, not to a symbol. The adapter SHALL obtain the package files through the shared helper `packageEntryFiles` and add every entry file to the file-level dependencies of the importing file. An import that cannot be resolved yields no dependency and a diagnostic with the reason reported by the helper.
+
+Resolving a qualified selector such as `pkg.Name` to a symbol across packages is not supported and remains unsupported coverage; the adapter MUST NOT guess it and MUST NOT search symbols by name in the target workspace.
 
 ### Requirement: Resolution manifests
 
 `resolutionManifests()` SHALL return exactly `['go.mod']`.
 
-The adapter MUST NOT declare `go.work` or any other basename. Package identity continues to come from the `module` path in `go.mod`.
+The adapter MUST NOT declare `go.work` or any other basename. The package identity comes from the `module` path in `go.mod`.
 
 ### Requirement: Go logical identity and declaring owners
 

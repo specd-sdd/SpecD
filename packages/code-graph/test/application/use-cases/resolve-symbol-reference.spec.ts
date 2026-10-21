@@ -21,6 +21,7 @@ import { InMemoryGraphStore } from '../../helpers/in-memory-graph-store.js'
 import { AdapterRegistry } from '../../../src/infrastructure/tree-sitter/adapter-registry.js'
 import { PhpLanguageAdapter } from '../../../src/infrastructure/tree-sitter/php-language-adapter.js'
 import { TypeScriptLanguageAdapter } from '../../../src/infrastructure/tree-sitter/typescript-language-adapter.js'
+import { type LanguageAdapter } from '../../../src/domain/value-objects/language-adapter.js'
 import {
   FreshnessState,
   IndexedResourceKind,
@@ -899,7 +900,7 @@ describe('ResolveSymbolReference', () => {
       ],
     })
     const php = new PhpLanguageAdapter()
-    const phpParse = vi.spyOn(php, 'parseSymbolReference')
+    const phpParse = vi.spyOn(php.symbolReferenceSyntax, 'parse')
     const registry = new AdapterRegistry()
     registry.register(php)
     const resolver = new ResolveSymbolReference(store, async () => freshHealth, undefined, registry)
@@ -925,6 +926,53 @@ describe('ResolveSymbolReference', () => {
     expect(native.target?.id).toBe(member.id)
     expect(elsewhere.status).toBe('unresolved')
     expect(phpParse).not.toHaveBeenCalled()
+  })
+
+  it('never borrows the syntax of another adapter when the anchored adapter has no symbolReferenceSyntax facet', async () => {
+    const owner = symbol('EditChange', 'src/edit.pseudo')
+    const member = createLogicalSymbol({
+      workspace: 'core',
+      surface: 'src/edit.pseudo',
+      name: 'execute',
+      space: SymbolSpace.Value,
+      ownerId: owner.id,
+      memberSemantics: { kind: MemberKind.Method, dispatch: MemberDispatch.Instance },
+    })
+    const store = await makeStore({
+      symbols: [owner, member],
+      declarations: [{ logicalSymbolId: member.id, filePath: 'core:src/edit.pseudo' }],
+    })
+    const typescript = new TypeScriptLanguageAdapter()
+    const tsParse = vi.spyOn(typescript.symbolReferenceSyntax, 'parse')
+    const coreOnly: LanguageAdapter = {
+      languages: () => ['pseudo'],
+      extensions: () => ({ '.pseudo': 'pseudo' }),
+      resolutionManifests: () => [],
+      analyzeFile: () => ({
+        language: 'pseudo',
+        symbols: [],
+        imports: [],
+        bindingFacts: [],
+        callFacts: [],
+      }),
+      resolveImports: () => ({ importMap: new Map(), fileImports: [], steps: [], diagnostics: [] }),
+      buildRelations: () => [],
+    }
+    const registry = new AdapterRegistry()
+    registry.register(typescript)
+    registry.register(coreOnly)
+    const resolver = new ResolveSymbolReference(store, async () => freshHealth, undefined, registry)
+
+    const result = await resolver.execute({
+      workspace: 'core',
+      requested: 'EditChange.execute',
+      filePath: 'core:src/edit.pseudo',
+    })
+
+    // The exact qualified name still resolves; the facet-less adapter must not borrow another
+    // adapter's syntax to parse the spelling.
+    expect(result.status).toBe('resolved')
+    expect(tsParse).not.toHaveBeenCalled()
   })
 
   it('returns every equal qualified name and does not borrow a missing member', async () => {
@@ -968,8 +1016,8 @@ describe('ResolveSymbolReference', () => {
   it('uses the PHP adapter for syntax that is not a single qualified spelling', async () => {
     const php = new PhpLanguageAdapter()
     const typescript = new TypeScriptLanguageAdapter()
-    const phpParse = vi.spyOn(php, 'parseSymbolReference')
-    const tsParse = vi.spyOn(typescript, 'parseSymbolReference')
+    const phpParse = vi.spyOn(php.symbolReferenceSyntax, 'parse')
+    const tsParse = vi.spyOn(typescript.symbolReferenceSyntax, 'parse')
     const registry = new AdapterRegistry()
     registry.register(typescript)
     registry.register(php)

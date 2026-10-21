@@ -34,6 +34,8 @@ export {
   type IndexCoverageDiagnosticReason,
   type IndexCoverageDiagnostic,
   type IndexRunCoverageSummary,
+  type ImportDiagnosticSummary,
+  IMPORT_DIAGNOSTIC_SAMPLE_LIMIT,
 } from './index-result.js'
 export {
   type LanguageAdapter,
@@ -42,6 +44,24 @@ export {
   type RelationBuildContext,
   type ResolvedImports,
 } from './language-adapter.js'
+export {
+  type PackageWorkspace,
+  type PackagePreparationContext,
+  type PackageEntryRequest,
+  type PackageEntry,
+  type PackageResolutionFacet,
+  type RelativeImportResolutionFacet,
+  type QualifiedNameResolutionFacet,
+  type SymbolReferenceSyntaxFacet,
+  type ReExportLinkContext,
+  type ReExportLinkResult,
+  type ReExportLinkingFacet,
+  type ImportUnresolvedReason,
+  type ImportDiagnostic,
+  type PackageEntryResolution,
+  type PackageExportRequest,
+  type PackageExportResolution,
+} from './language-adapter-facets.js'
 
 export { type ImportDeclaration } from './import-declaration.js'
 export { ImportDeclarationKind } from './import-declaration-kind.js'

@@ -58,6 +58,14 @@ When adding an adapter, maintainers must:
    nesting, multiline and same-line ranges, comments/strings, unresolved imports,
    imported hierarchy, and Pass 2 I/O isolation, declaring unsupported cases explicitly.
 
+An adapter is a required core plus optional **facets**: groups of resolution services
+(package resolution, relative imports, qualified names, symbol-reference syntax, and
+re-export linking) that an adapter exposes only when it supports them. The indexer reads
+every language-specific resolution fact from those facets, so a new language needs only a
+new adapter. The facet members, their I/O rules, how a package import resolves across
+workspaces, registration validation, and a step-by-step checklist are in
+[Language adapters](./language-adapters.md).
+
 Code Graph owns semantic symbol identity and resolution. A `LogicalSymbol` groups the
 declaration occurrences that the source language defines as one target while retaining
 their existing location-backed `SymbolNode` identities. Its canonical identity uses
@@ -319,6 +327,31 @@ namespaces), only those declarations stay physical-only. Their owner identity is
 retained without declarations, so members keep a resolvable `ownerId` and a computed
 `qualifiedName`. `IndexResult.logicalDiagnostics` lists every
 `UNGROUPED_LOGICAL_COLLISION` and `CONFLICTING_DECLARATION_GROUP`.
+
+### Package imports across workspaces
+
+An import written as a package specifier resolves only through what the target package
+publishes. The adapter's `packageResolution` facet names the package and lists its entry
+files (for TypeScript, `package.json` `exports` or `main`, with `dist` mapped to the
+indexed `src`; for Python, the module or `__init__` under the project name; for Go, the
+package directory of the module path; for PHP, the PSR-4 class file). The indexer then
+reads the public bindings of those entries and resolves the imported name. A name no
+entry publishes stays unresolved even when a unique symbol with that name exists in the
+target workspace, and test files are never entries.
+
+A resolved import persists the binding target, an `import:package` resolution step, and a
+file-level `IMPORTS` relation to the entry file. Downstream `USES_TYPE`, `CALLS`, and
+`CONSTRUCTS` relations then resolve through the binding exactly as they do for a relative
+import, so `graph impact` and hotspots see dependents in other workspaces. Changing a
+target workspace re-resolves the files that import from it in the next incremental run.
+
+An unresolved package import creates no relation, binding target, or step.
+`IndexResult.importDiagnostics` reports why, with the number of failures (`total`), an exact
+count per reason (`no-entry-surface`, `not-exported`, `ambiguous`), and a
+bounded sample per reason. An import of a package that no workspace declares (an npm
+dependency, for example) is not a failure: it is counted only in `externalPackageImports`. An adapter without the package resolution
+facet is listed once in `adaptersWithoutPackageResolution` and is never counted as a failure.
+Diagnostics are never persisted and never affect the graph fingerprint.
 
 ### Imported hierarchy evidence
 

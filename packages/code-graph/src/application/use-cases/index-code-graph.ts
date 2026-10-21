@@ -24,6 +24,8 @@ import { type Relation, createRelation } from '../../domain/value-objects/relati
 import { RelationType } from '../../domain/value-objects/relation-type.js'
 import { type IndexOptions } from '../../domain/value-objects/index-options.js'
 import {
+  IMPORT_DIAGNOSTIC_SAMPLE_LIMIT,
+  type ImportDiagnosticSummary,
   type IndexResult,
   type IndexError,
   type IndexRunCoverageSummary,
@@ -34,7 +36,16 @@ import {
   emptyResolutionManifestSource,
   type ResolutionManifestSource,
 } from '../ports/resolution-manifest-source.js'
-import { type ResolvedImports } from '../../domain/value-objects/language-adapter.js'
+import {
+  type LanguageAdapter,
+  type ResolvedImports,
+} from '../../domain/value-objects/language-adapter.js'
+import {
+  type ImportDiagnostic,
+  type ImportUnresolvedReason,
+  type PackageWorkspace,
+} from '../../domain/value-objects/language-adapter-facets.js'
+import { PackageImportResolver } from '../services/package-import-resolver.js'
 import { mapWithConcurrency } from '../../domain/services/map-with-concurrency.js'
 import {
   type IndexCoverage,
@@ -870,26 +881,83 @@ export class IndexCodeGraph {
 
       // Build package-name → workspace-name map for cross-workspace import resolution.
       const packageToWorkspace = new Map<string, string>()
+      const disabledPackageResolution = new Set<LanguageAdapter>()
       for (const ws of options.workspaces) {
         for (const adapter of adapters) {
-          if (adapter.getPackageIdentity) {
-            const identity = adapter.getPackageIdentity(ws.codeRoot)
-            if (identity) {
-              const existingWs = packageToWorkspace.get(identity)
-              if (existingWs && existingWs !== ws.name) {
-                errors.push({
-                  filePath: `${ws.name}:<manifest>`,
-                  message: `Package identity collision: "${identity}" already mapped to workspace "${existingWs}"`,
-                })
-              } else {
-                packageToWorkspace.set(identity, ws.name)
-              }
-            }
+          if (adapter.packageResolution === undefined) continue
+          if (disabledPackageResolution.has(adapter)) continue
+          let identity: string | undefined
+          try {
+            identity = adapter.packageResolution.identity(ws.codeRoot, options.projectRoot)
+          } catch (err) {
+            errors.push({
+              filePath: `${ws.name}:<manifest>`,
+              message: `Package identity failed for adapter "${adapter.languages().join(',')}": ${String(err)}`,
+            })
+            // The adapter is treated as without package resolution for the rest of the run.
+            disabledPackageResolution.add(adapter)
+            continue
           }
+          if (identity === undefined) continue
+          const existingWs = packageToWorkspace.get(identity)
+          if (existingWs && existingWs !== ws.name) {
+            errors.push({
+              filePath: `${ws.name}:<manifest>`,
+              message: `Package identity collision: "${identity}" already mapped to workspace "${existingWs}", claimed again by workspace "${ws.name}"`,
+            })
+          } else {
+            packageToWorkspace.set(identity, ws.name)
+          }
+          // The first adapter that claims the workspace wins; later adapters are not asked.
+          break
         }
       }
 
+      const packageWorkspaces: readonly PackageWorkspace[] = options.workspaces.map((ws) => ({
+        name: ws.name,
+        codeRoot: ws.codeRoot,
+      }))
+      const packageImportResolver = new PackageImportResolver({
+        session,
+        packageToWorkspace,
+        disabledPackageResolution,
+      })
+      const importDiagnosticCounts = new Map<ImportUnresolvedReason, number>()
+      const importDiagnosticSamples: ImportDiagnostic[] = []
+      const sampledPerReason = new Map<ImportUnresolvedReason, number>()
+      let externalPackageImports = 0
+      const recordImportDiagnostic = (diagnostic: ImportDiagnostic): void => {
+        // A package that no workspace declares is an external dependency, not a failure.
+        if (diagnostic.reason === 'package-unknown') {
+          externalPackageImports++
+          return
+        }
+        // A disabled or absent facet is reported through `adaptersWithoutPackageResolution`.
+        if (diagnostic.reason === 'facet-absent') return
+        importDiagnosticCounts.set(
+          diagnostic.reason,
+          (importDiagnosticCounts.get(diagnostic.reason) ?? 0) + 1,
+        )
+        const sampled = sampledPerReason.get(diagnostic.reason) ?? 0
+        if (sampled < IMPORT_DIAGNOSTIC_SAMPLE_LIMIT) {
+          sampledPerReason.set(diagnostic.reason, sampled + 1)
+          importDiagnosticSamples.push(diagnostic)
+        }
+      }
+      // An adapter without the package resolution facet gets no cross-workspace package
+      // resolution; list it once per run. It is not an unresolved import.
+      const adaptersWithoutPackageResolution = adapters
+        .filter((adapter) => adapter.packageResolution === undefined)
+        .map((adapter) => adapter.languages().join(','))
+      const listDisabledAdapters = (): readonly string[] => [
+        ...new Set([
+          ...adaptersWithoutPackageResolution,
+          ...[...disabledPackageResolution].map((adapter) => adapter.languages().join(',')),
+        ]),
+      ]
+
       const fileLanguages = new Map(existingFiles.map((file) => [file.path, file.language]))
+      const fileCategories = new Map(existingFiles.map((file) => [file.path, file.category]))
       const pass1ChunkFiles: string[] = []
       const pass2ChunkFiles: string[] = []
       let stagedFileCount = 0
@@ -990,12 +1058,28 @@ export class IndexCodeGraph {
 
             const finalDraft = draft
 
+            const wsConfig = options.graphConfig.workspaces?.get(wsName)
+            const effectiveTestPatterns = [
+              ...(options.graphConfig.testPaths ?? DEFAULT_GRAPH_TEST_PATHS),
+              ...(wsConfig?.testPaths ?? []),
+            ]
+            const effectiveIgnorePatterns = [
+              ...(options.graphConfig.ignorePaths ?? DEFAULT_GRAPH_IGNORE_PATHS),
+              ...(wsConfig?.ignorePaths ?? []),
+            ]
+            const category = classifyFileCategory(
+              relPath,
+              effectiveTestPatterns,
+              effectiveIgnorePatterns,
+            )
+
             session.registerFile({
               filePath: prefixedPath,
               projectRelativePath: projectRelativePaths.get(prefixedPath) ?? '',
               language,
               contentHash: hash,
               workspace: wsName,
+              category,
             })
 
             session.registerAnalysis({
@@ -1021,21 +1105,6 @@ export class IndexCodeGraph {
                 finalDraft.referenceFacts === undefined ? 'reference-facts-unavailable' : undefined,
               capabilities: enabledCapabilities,
             })
-
-            const wsConfig = options.graphConfig.workspaces?.get(wsName)
-            const effectiveTestPatterns = [
-              ...(options.graphConfig.testPaths ?? DEFAULT_GRAPH_TEST_PATHS),
-              ...(wsConfig?.testPaths ?? []),
-            ]
-            const effectiveIgnorePatterns = [
-              ...(options.graphConfig.ignorePaths ?? DEFAULT_GRAPH_IGNORE_PATHS),
-              ...(wsConfig?.ignorePaths ?? []),
-            ]
-            const category = classifyFileCategory(
-              relPath,
-              effectiveTestPatterns,
-              effectiveIgnorePatterns,
-            )
 
             chunkFiles.push(
               createFileNode({
@@ -1109,6 +1178,9 @@ export class IndexCodeGraph {
             language: fileLanguages.get(prefixedPath) ?? 'unknown',
             contentHash: existingArtifactHashes.get(prefixedPath) ?? '',
             workspace: workspaceIdentityName(prefixedPath),
+            ...(fileCategories.get(prefixedPath) !== undefined
+              ? { category: fileCategories.get(prefixedPath)! }
+              : {}),
           })
           session.registerAnalysis({
             filePath: prefixedPath,
@@ -1131,10 +1203,51 @@ export class IndexCodeGraph {
       const pass2Start = performance.now()
       progress(50, 'Resolving imports')
 
+      // Between the passes: prepare package facts for every workspace, then link re-exports,
+      // so that entry surfaces have final public bindings before any import is resolved.
+      const reexportStart = performance.now()
+      let reexportCount = 0
+      for (const adapter of adapters) {
+        if (adapter.packageResolution === undefined) continue
+        if (disabledPackageResolution.has(adapter)) continue
+        try {
+          adapter.packageResolution.prepare({
+            session,
+            workspaces: packageWorkspaces,
+            repoRoot: options.projectRoot,
+          })
+        } catch (err) {
+          errors.push({
+            filePath: `${adapter.languages().join(',')}:<packageResolution>`,
+            message: String(err),
+          })
+          disabledPackageResolution.add(adapter)
+        }
+      }
+      for (const adapter of adapters) {
+        if (adapter.reExportLinking === undefined) continue
+        if (disabledPackageResolution.has(adapter)) continue
+        try {
+          const linked = adapter.reExportLinking.link({ session, packageToWorkspace })
+          session.addReferenceFacts(linked)
+          reexportCount += linked.publicBindings.length + linked.steps.length
+        } catch (err) {
+          errors.push({
+            filePath: `${adapter.languages().join(',')}:<reExportLinking>`,
+            message: String(err),
+          })
+          // An adapter that only links re-exports has no package resolution to disable.
+          if (adapter.packageResolution !== undefined) disabledPackageResolution.add(adapter)
+        }
+      }
+      phaseMetrics.reexports.durationMs += performance.now() - reexportStart
+      phaseMetrics.reexports.count = reexportCount
+
       const ownershipIndex = this.buildMethodOwnershipIndex(session)
       const symbolLookup: SymbolLookup = {
         findByName: (name, filePrefix) => session.findSymbolsByName(name, filePrefix),
         findByFile: (filePath) => session.findSymbolsByFile(filePath),
+        findById: (symbolId) => session.findSymbolById(symbolId),
       }
 
       // ── Pass 2: Resolve imports + extract relations (50-80%) ──
@@ -1167,14 +1280,22 @@ export class IndexCodeGraph {
             const analysis = session.getAnalysis(prefixedPath)
             if (!analysis) continue
 
+            const packageHelpers = packageImportResolver.forAdapter(adapter)
             const resolvedImports = adapter.resolveImports(analysis, {
               session,
               qualifiedNames: session.getQualifiedNames(),
               packageToWorkspace,
+              workspaces: packageWorkspaces,
+              packageEntryFiles: packageHelpers.packageEntryFiles,
+              resolvePackageExport: packageHelpers.resolvePackageExport,
               ...(ws?.codeRoot !== undefined ? { codeRoot: ws.codeRoot } : {}),
               repoRoot: options.projectRoot,
             })
             resolvedImportsMap.set(prefixedPath, resolvedImports)
+            if (resolvedImports.steps.length > 0) {
+              session.addReferenceFacts({ publicBindings: [], steps: resolvedImports.steps })
+            }
+            for (const diagnostic of resolvedImports.diagnostics) recordImportDiagnostic(diagnostic)
             for (const [localName, symbolId] of resolvedImports.importMap) {
               importedSymbolByLocalName.set(`${prefixedPath}\0${localName}`, symbolId)
             }
@@ -1552,16 +1673,6 @@ export class IndexCodeGraph {
           logicalIdByDeclarationSymbolId.set(declaration.symbolId, logicalId)
         }
       }
-      const reexportStart = performance.now()
-      let reexportCount = 0
-      for (const adapter of this.registry.getAdapters()) {
-        const linked = adapter.linkReExports?.(session, packageToWorkspace)
-        if (linked === undefined) continue
-        session.addReferenceFacts(linked)
-        reexportCount += linked.publicBindings.length + linked.steps.length
-      }
-      phaseMetrics.reexports.durationMs += performance.now() - reexportStart
-      phaseMetrics.reexports.count = reexportCount
       const coverageResolver = new ResolveSymbolReference(
         asGraphStore(new SessionReferenceStore(session)),
         () => Promise.resolve({ fresh: true, complete: true, reasonCodes: [] }),
@@ -1835,6 +1946,13 @@ export class IndexCodeGraph {
         coverage: summarizeCoverage(referenceFacts.coverage),
         coverageDiagnostics: coverageProjection.diagnostics,
         logicalDiagnostics: session.getLogicalDiagnostics(),
+        importDiagnostics: {
+          total: [...importDiagnosticCounts.values()].reduce((sum, count) => sum + count, 0),
+          byReason: Object.fromEntries(importDiagnosticCounts),
+          samples: importDiagnosticSamples,
+          externalPackageImports,
+          adaptersWithoutPackageResolution: listDisabledAdapters(),
+        } satisfies ImportDiagnosticSummary,
       }
     } finally {
       rmSync(stageDir, { recursive: true, force: true })

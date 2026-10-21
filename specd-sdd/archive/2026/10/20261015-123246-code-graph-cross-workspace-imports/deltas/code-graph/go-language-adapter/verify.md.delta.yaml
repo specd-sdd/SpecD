@@ -1,0 +1,45 @@
+- op: added
+  description: Go package import scenarios
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Package identity, exports, and imports'
+  content: |
+    #### Scenario: Import path resolves to the package directory
+
+    - **GIVEN** workspace `auth` has `go.mod` module `github.com/acme/auth` and indexes `models/user.go` declaring exported `User`
+    - **AND** workspace `app` imports `github.com/acme/auth/models`
+    - **WHEN** imports are resolved
+    - **THEN** the entry is the Go package of `auth:models`
+    - **AND** the file depends on the indexed non-test files of that package
+
+    #### Scenario: Qualified selector across packages stays unresolved
+
+    - **GIVEN** `app` calls `models.User{}` after importing that package
+    - **WHEN** relations are built
+    - **THEN** no symbol-level relation is produced for the selector
+    - **AND** the file-level dependency on the package files remains
+
+    #### Scenario: Test files are not entries
+
+    - **GIVEN** the package directory contains `user_test.go`
+    - **WHEN** `entrySurface` runs
+    - **THEN** `user_test.go` is not in the entry
+
+    #### Scenario: Module root import
+
+    - **GIVEN** an import path equal to the module path
+    - **WHEN** `entrySurface` runs
+    - **THEN** the entry is the package at the module root
+
+    #### Scenario: Longest module prefix wins
+
+    - **GIVEN** known modules `github.com/acme/auth` and `github.com/acme/auth/v2`
+    - **WHEN** the path `github.com/acme/auth/v2/models` is matched
+    - **THEN** the package is `github.com/acme/auth/v2`
+
+    #### Scenario: Unknown module is not guessed
+
+    - **GIVEN** an import path that no workspace module prefixes
+    - **WHEN** imports are resolved
+    - **THEN** nothing is persisted and the import is counted in `importDiagnostics.externalPackageImports`, not reported as a failure

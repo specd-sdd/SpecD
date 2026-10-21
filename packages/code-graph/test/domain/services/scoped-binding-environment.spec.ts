@@ -609,4 +609,59 @@ describe('scoped binding environment', () => {
     expect(resolved[0]!.targetSymbolId).toBe(targetService.id)
     expect(resolved[0]!.relationType).toBe(RelationType.Constructs)
   })
+
+  it('does not resolve a name through an import when a nearer scope declares it', () => {
+    const imported = createSymbolNode({
+      name: 'Helper',
+      kind: SymbolKind.Class,
+      filePath: 'other:src/helper.ts',
+      line: 1,
+      column: 0,
+    })
+    const local = createSymbolNode({
+      name: 'Helper',
+      kind: SymbolKind.Class,
+      filePath,
+      line: 20,
+      column: 0,
+    })
+    const func = createSymbolNode({
+      name: 'run',
+      kind: SymbolKind.Function,
+      filePath,
+      line: 10,
+      column: 0,
+      endLine: 30,
+      endColumn: 1,
+    })
+    const symbols = [local, func]
+    const symbolLookup: SymbolLookup = {
+      ...lookup(symbols),
+      findById: (id) => [imported, ...symbols].find((symbol) => symbol.id === id),
+    }
+    const shadow = fact('Helper', 'Helper', func.id)
+    const outer = fact('Other', 'Helper', filePath)
+    const environment = buildScopedBindingEnvironment({
+      analysis: mockAnalysis({
+        symbols,
+        facts: [shadow, outer],
+        imports: [
+          {
+            localName: 'Helper',
+            originalName: 'Helper',
+            specifier: '@x/other',
+            kind: ImportDeclarationKind.Named,
+            isReExport: false,
+            filePath,
+            line: 1,
+          } as never,
+        ],
+      }),
+      importMap: new Map([['Helper', imported.id]]),
+      symbolLookup,
+    })
+
+    expect(environment.resolveTargetSymbol(shadow)?.id).toBe(local.id)
+    expect(environment.resolveTargetSymbol(outer)?.id).toBe(imported.id)
+  })
 })

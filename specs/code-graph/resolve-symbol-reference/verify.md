@@ -261,3 +261,25 @@
 - **GIVEN** equivalent SQLite and supported alternative-backend contents
 - **WHEN** the same references are resolved
 - **THEN** statuses, reason codes, candidates, and provenance ordering match
+
+### Requirement: Package import bindings
+
+#### Scenario: Cross-workspace import resolves with provenance
+
+- **GIVEN** a local binding in `sdk` for `SymbolNode` with an `import:package` step to the public binding of `code-graph:src/public.ts`
+- **WHEN** the reference is resolved from that `sdk` file
+- **THEN** the target is the logical `SymbolNode` declared in `code-graph`
+- **AND** the path lists the local binding, the `import:package` step, the public binding, and the logical target
+
+#### Scenario: Unresolved package import does not guess
+
+- **GIVEN** a local binding with no target for a name that exists once in the package's workspace
+- **WHEN** the reference is resolved
+- **THEN** the outcome is unresolved
+- **AND** the same-name symbol is not chosen
+
+#### Scenario: Step is language-independent
+
+- **GIVEN** `import:package` steps from TypeScript, Python, Go, and PHP files
+- **WHEN** each reference is resolved
+- **THEN** the resolver follows each step without a language branch

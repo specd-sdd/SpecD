@@ -1,6 +1,7 @@
 export { SpecdCodeGraphError } from './specd-code-graph-error.js'
 export { InvalidSymbolKindError } from './invalid-symbol-kind-error.js'
 export { InvalidRelationTypeError } from './invalid-relation-type-error.js'
+export { InvalidLanguageAdapterError } from './invalid-language-adapter-error.js'
 export { InvalidGraphSelectorError } from './invalid-graph-selector-error.js'
 export { DuplicateSymbolIdError } from './duplicate-symbol-id-error.js'
 export { DuplicateDeclarationMappingError } from './duplicate-declaration-mapping-error.js'

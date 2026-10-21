@@ -54,6 +54,240 @@
 - **WHEN** the default TypeScript adapter reports resolution manifests
 - **THEN** the result is exactly `['package.json']`
 
+#### Scenario: Adapter is a required core plus declared facets
+
+- **GIVEN** the built-in TypeScript adapter
+- **WHEN** its members are inspected
+- **THEN** `languages`, `extensions`, `resolutionManifests`, `analyzeFile`, `resolveImports`, and `buildRelations` are present
+- **AND** it exposes `packageResolution`, `relativeImportResolution`, `symbolReferenceSyntax`, and `reExportLinking` as facet objects, and no `qualifiedNameResolution` because TypeScript has no qualified-name addressing
+- **AND** the `LanguageAdapter` interface declares none of the former loose methods `getPackageIdentity`, `resolvePackageFromSpecifier`, `resolveRelativeImportPath`, `buildQualifiedName`, `resolveQualifiedNameToPath`, `parseSymbolReference`, `renderSymbolReference`, or `linkReExports`, which a type-level test checks
+
+#### Scenario: Capability flags and facets are separate declarations
+
+- **GIVEN** an adapter that sets `capabilities().hierarchy` to true and provides no `packageResolution`
+- **WHEN** the indexer reads its declarations
+- **THEN** hierarchy resolution is supported
+- **AND** package resolution is treated as absent
+
+### Requirement: Adapter facet model
+
+#### Scenario: Facet presence is the declaration
+
+- **GIVEN** an adapter that exposes `packageResolution`
+- **WHEN** the indexer needs package identities
+- **THEN** it uses that facet
+- **AND** it does not test whether individual methods exist
+
+#### Scenario: Absent facet disables the behaviour without error
+
+- **GIVEN** an adapter that does not expose `packageResolution`
+- **WHEN** the indexer builds the package map and resolves a package-specifier import in that adapter's language
+- **THEN** no identity is contributed and the import stays unresolved
+- **AND** no error is raised and no heuristic replaces the facet
+- **AND** the run result lists the adapter in `importDiagnostics.adaptersWithoutPackageResolution`
+- **AND** that listing is not counted in `importDiagnostics.total`
+
+#### Scenario: Partial facet is rejected
+
+- **GIVEN** an adapter whose `packageResolution` facet lacks `entrySurface`
+- **WHEN** it is registered
+- **THEN** registration fails with `INVALID_LANGUAGE_ADAPTER`
+
+#### Scenario: Facet that throws does not stop the run
+
+- **GIVEN** a present facet whose per-file resolution throws for one file
+- **WHEN** the indexer resolves that file's imports
+- **THEN** the error is recorded for that file
+- **AND** other files are still indexed
+
+#### Scenario: Facet that throws in identity, prepare, or link does not stop the run
+
+- **GIVEN** an adapter whose `identity`, `prepare`, or `link` throws
+- **WHEN** the indexer executes the run
+- **THEN** the error is recorded as an indexing error
+- **AND** the adapter is treated as if it did not provide `packageResolution` for the rest of the run and is listed in `importDiagnostics.adaptersWithoutPackageResolution`
+- **AND** other adapters and workspaces are still indexed
+
+#### Scenario: New language needs no indexer change
+
+- **GIVEN** a test adapter for a made-up language with its own manifest, extension, and package layout, providing the core and `packageResolution`
+- **AND** two workspaces, one of which imports a name exported by the other through the made-up package specifier
+- **WHEN** both workspaces are indexed with the unmodified indexer
+- **THEN** the import resolves to the exported symbol in the other workspace
+- **AND** the indexer, session, resolver, and stores needed no change
+
+### Requirement: Package resolution facet
+
+#### Scenario: Prepare runs once before import resolution
+
+- **GIVEN** a run with several workspaces and a present `packageResolution` facet
+- **WHEN** the indexer executes the run
+- **THEN** `prepare` is called exactly once, after every workspace is analyzed and before any import is resolved
+- **AND** it receives every configured workspace name and code root, including workspaces that were only hydrated in an incremental run
+
+#### Scenario: Entry surface performs no I/O
+
+- **GIVEN** `prepare` has stored the manifest facts
+- **WHEN** `entrySurface` is called several times during Pass 2
+- **THEN** no filesystem read happens
+- **AND** the result depends only on the request and the prepared data
+
+#### Scenario: Entry surface returns ordered workspace-prefixed files
+
+- **GIVEN** `@specd/code-graph` exports `.` to `./dist/public.js`
+- **WHEN** `entrySurface` is called for `@specd/code-graph`
+- **THEN** it returns an entry whose `filePath` is `code-graph:src/public.ts`
+
+#### Scenario: Entry surface never searches symbols by name
+
+- **GIVEN** a package whose manifest publishes no entry for the specifier
+- **AND** a workspace symbol with the imported name exists
+- **WHEN** `entrySurface` is called
+- **THEN** it returns an empty array
+
+#### Scenario: Test files are not entries
+
+- **GIVEN** a facet whose `entrySurface` returns a file classified as a test
+- **WHEN** the shared helper filters the entries
+- **THEN** the test file is not returned to the adapter
+
+#### Scenario: Match specifier is pure
+
+- **GIVEN** known packages, a specifier, and a prepared session
+- **WHEN** `matchSpecifier` is called repeatedly
+- **THEN** the result is the same and no I/O happens
+- **AND** it depends only on its arguments and on the data `prepare` stored in the session
+
+#### Scenario: Facet manifests are declared
+
+- **GIVEN** the facet reads `go.mod`
+- **WHEN** the adapter reports `resolutionManifests()`
+- **THEN** the result includes `go.mod`
+
+### Requirement: Relative import resolution facet
+
+#### Scenario: Relative specifier yields candidates without choosing
+
+- **GIVEN** `./utils` imported from a TypeScript file
+- **WHEN** `relativeImportResolution.resolve` is called
+- **THEN** it returns the extension and index-file candidates
+- **AND** it does not choose among them
+
+#### Scenario: Language without relative imports omits the facet
+
+- **GIVEN** the Go adapter
+- **WHEN** its members are inspected
+- **THEN** it exposes no `relativeImportResolution`
+
+### Requirement: Qualified-name resolution facet
+
+#### Scenario: Build produces the canonical qualified name
+
+- **WHEN** the PHP adapter's `qualifiedNameResolution.build` is called with namespace `App\Models` and name `User`
+- **THEN** it returns `App\Models\User`
+
+#### Scenario: Resolve to path uses prepared metadata
+
+- **GIVEN** PSR-4 metadata was prepared for the code root and the `composer.json` file was deleted afterwards
+- **WHEN** `resolveToPath` is called with the session
+- **THEN** it still maps the qualified name to its class file
+- **AND** it performs no filesystem access
+
+#### Scenario: Language without qualified-name addressing omits the facet
+
+- **GIVEN** the Go adapter
+- **WHEN** its members are inspected
+- **THEN** it exposes no `qualifiedNameResolution`
+
+### Requirement: Symbol reference syntax facet
+
+#### Scenario: Parse and render live in one facet
+
+- **GIVEN** an adapter that provides `symbolReferenceSyntax`
+- **WHEN** a consumer parses `EditChange.execute` and renders the resulting member
+- **THEN** both operations come from that facet
+
+#### Scenario: Missing facet leaves a human reference unresolved
+
+- **GIVEN** an adapter that does not provide `symbolReferenceSyntax`
+- **WHEN** a human-written reference for its language is requested
+- **THEN** the reference is unresolved
+- **AND** no other adapter's syntax is used
+
+### Requirement: Re-export linking facet
+
+#### Scenario: Linking runs before import resolution
+
+- **GIVEN** a package entry that re-exports a name through a barrel chain
+- **WHEN** the indexer runs
+- **THEN** every present `reExportLinking` facet has completed before the first import is resolved in Pass 2
+
+#### Scenario: Linking performs no I/O
+
+- **WHEN** `link` runs
+- **THEN** it reads no file from disk
+
+#### Scenario: Adapter without the facet contributes no re-export bindings
+
+- **GIVEN** an adapter that does not provide `reExportLinking`
+- **WHEN** the indexer links re-exports
+- **THEN** nothing is linked for that adapter and no error is raised
+
+### Requirement: Package import resolution context
+
+#### Scenario: Named export resolves through the entry surface
+
+- **GIVEN** `sdk` imports `SymbolNode` from `@specd/code-graph`
+- **AND** the entry surface of that package is `code-graph:src/public.ts`, which publishes `SymbolNode` through a barrel chain
+- **WHEN** the adapter calls `resolvePackageExport`
+- **THEN** the result is resolved with the logical id of `SymbolNode` declared in `code-graph`
+- **AND** it carries the entry file and the public binding id used
+
+#### Scenario: Unique internal symbol is not chosen
+
+- **GIVEN** `SymbolNode` is exported only by an internal file that is not part of the entry surface
+- **WHEN** the adapter calls `resolvePackageExport`
+- **THEN** the result is unresolved with reason `not-exported`
+
+#### Scenario: Same-name symbol in a test file is not chosen
+
+- **GIVEN** a test file in the target workspace declares a symbol with the imported name
+- **AND** the entry surface does not export that name
+- **WHEN** the adapter calls `resolvePackageExport`
+- **THEN** the result is unresolved with reason `not-exported`
+
+#### Scenario: Conflicting entry files are ambiguous
+
+- **GIVEN** two entry files export the same name with different logical targets
+- **WHEN** the adapter calls `resolvePackageExport`
+- **THEN** the result is unresolved with reason `ambiguous`
+
+#### Scenario: Unknown package reports a reason
+
+- **GIVEN** the specifier matches no known package
+- **WHEN** the adapter calls `packageEntryFiles`
+- **THEN** the helper result is unresolved with reason `package-unknown`, which the indexer counts only in `externalPackageImports`
+
+#### Scenario: Absent facet reports a reason
+
+- **GIVEN** the importing adapter does not provide `packageResolution`
+- **WHEN** a package import is resolved
+- **THEN** the result is unresolved with reason `facet-absent`
+
+#### Scenario: Resolved import carries an import:package step
+
+- **GIVEN** a package import resolved to a public binding
+- **WHEN** the adapter returns `ResolvedImports`
+- **THEN** it includes a step of kind `import:package` from the importing local binding id to the public binding id
+- **AND** the indexer persists the step
+
+#### Scenario: Unresolved import diagnostics are not persisted
+
+- **GIVEN** a package import that stayed unresolved
+- **WHEN** the run is persisted
+- **THEN** no relation, binding target, or step is stored for it
+- **AND** the diagnostic with its reason is available only as non-persisted output
+
 ### Requirement: Full-file analysis contract
 
 #### Scenario: Adapter emits all deterministic facts in one pass
@@ -362,49 +596,95 @@
 - **THEN** `getAdapterForFile('main.rs')` returns that adapter
 - **AND** `getLanguageForFile('main.rs')` returns `'rust'`
 
+#### Scenario: Missing core member is rejected
+
+- **GIVEN** an adapter without `analyzeFile`
+- **WHEN** it is registered
+- **THEN** registration fails with a `SpecdError` whose code is `INVALID_LANGUAGE_ADAPTER`
+- **AND** the message names the missing member
+- **AND** the registry is unchanged
+
+#### Scenario: Facet that is not an object of functions is rejected
+
+- **GIVEN** an adapter whose `symbolReferenceSyntax` is a string
+- **WHEN** it is registered
+- **THEN** registration fails with `INVALID_LANGUAGE_ADAPTER`
+
+#### Scenario: Extension for an undeclared language is rejected
+
+- **GIVEN** an adapter whose `extensions()` maps `.rs` to `rust` but whose `languages()` does not include `rust`
+- **WHEN** it is registered
+- **THEN** registration fails with `INVALID_LANGUAGE_ADAPTER`
+
+#### Scenario: Later registration replaces the adapter for a language
+
+- **GIVEN** an adapter registered for `python` and `.py`
+- **WHEN** a second adapter that also declares `python` and `.py` is registered
+- **THEN** `getAdapter('python')` and `getAdapterForFile('main.py')` return the second adapter
+- **AND** the first adapter is no longer returned by `getAdapters()`
+
+#### Scenario: Replacement is per language
+
+- **GIVEN** an adapter registered for `typescript`, `tsx`, `javascript`, and `jsx`
+- **WHEN** a second adapter that declares only `typescript` and `.ts` is registered
+- **THEN** `typescript` and `.ts` resolve to the second adapter
+- **AND** `tsx`, `javascript`, and `jsx` still resolve to the first adapter, which `getAdapters()` still returns
+
+#### Scenario: Registering the same instance twice changes nothing
+
+- **GIVEN** an adapter that is already registered
+- **WHEN** the same instance is registered again
+- **THEN** the registry is unchanged and `getAdapters()` lists it once
+
+#### Scenario: Adapter without optional facets registers
+
+- **GIVEN** an adapter that implements only the required core
+- **WHEN** it is registered
+- **THEN** registration succeeds
+
 ### Requirement: Package identity extraction
 
 #### Scenario: TypeScript adapter reads package.json
 
 - **GIVEN** a directory containing `package.json` with `{"name": "@specd/core"}`
-- **WHEN** `getPackageIdentity(codeRoot)` is called on the TypeScript adapter
+- **WHEN** `packageResolution.identity(codeRoot)` is called on the TypeScript adapter
 - **THEN** it returns `'@specd/core'`
 
 #### Scenario: No manifest returns undefined
 
 - **GIVEN** a directory with no `package.json`
-- **WHEN** `getPackageIdentity(codeRoot)` is called on the TypeScript adapter
+- **WHEN** `packageResolution.identity(codeRoot)` is called on the TypeScript adapter
 - **THEN** it returns `undefined`
 
 #### Scenario: Go adapter reads go.mod
 
 - **GIVEN** a directory containing `go.mod` with `module github.com/acme/auth`
-- **WHEN** `getPackageIdentity(codeRoot)` is called on the Go adapter
+- **WHEN** `packageResolution.identity(codeRoot)` is called on the Go adapter
 - **THEN** it returns `'github.com/acme/auth'`
 
 #### Scenario: Python adapter reads pyproject.toml
 
 - **GIVEN** a directory containing `pyproject.toml` with `[project]` and `name = "acme-auth"`
-- **WHEN** `getPackageIdentity(codeRoot)` is called on the Python adapter
+- **WHEN** `packageResolution.identity(codeRoot)` is called on the Python adapter
 - **THEN** it returns `'acme-auth'`
 
 #### Scenario: PHP adapter reads composer.json
 
 - **GIVEN** a directory containing `composer.json` with `{"name": "acme/auth"}`
-- **WHEN** `getPackageIdentity(codeRoot)` is called on the PHP adapter
+- **WHEN** `packageResolution.identity(codeRoot)` is called on the PHP adapter
 - **THEN** it returns `'acme/auth'`
 
-#### Scenario: Adapter without getPackageIdentity
+#### Scenario: Adapter without the package resolution facet
 
-- **GIVEN** an adapter that does not implement `getPackageIdentity`
-- **WHEN** the indexer queries it for a workspace's package identity
-- **THEN** it returns `undefined` and cross-workspace resolution is skipped for that language
+- **GIVEN** an adapter that does not expose `packageResolution`
+- **WHEN** the indexer builds the package map for a workspace
+- **THEN** the adapter contributes no identity and cross-workspace resolution is skipped for that language
 
 #### Scenario: Manifest found above codeRoot
 
 - **GIVEN** a codeRoot at `/project/packages/core/src` with no `package.json`
 - **AND** `/project/packages/core/package.json` exists with `name: '@specd/core'`
-- **WHEN** `getPackageIdentity('/project/packages/core/src', '/project')` is called
+- **WHEN** `packageResolution.identity('/project/packages/core/src', '/project')` is called
 - **THEN** it returns `'@specd/core'`
 
 #### Scenario: Search bounded by repoRoot
@@ -412,7 +692,7 @@
 - **GIVEN** a codeRoot at `/project/packages/core`
 - **AND** `repoRoot` is `/project`
 - **AND** `/package.json` exists above the repo root
-- **WHEN** `getPackageIdentity` is called
+- **WHEN** `packageResolution.identity` is called
 - **THEN** it does not read `/package.json` — search stops at `/project`
 
 #### Scenario: Declared manifests are the files package identity reads
@@ -446,43 +726,43 @@
 #### Scenario: TypeScript scoped package specifier
 
 - **GIVEN** known packages `['@specd/core', '@specd/cli']`
-- **WHEN** `resolvePackageFromSpecifier('@specd/core', knownPackages)` is called on the TypeScript adapter
+- **WHEN** `packageResolution.matchSpecifier('@specd/core', knownPackages)` is called on the TypeScript adapter
 - **THEN** it returns `'@specd/core'`
 
 #### Scenario: TypeScript bare package specifier
 
 - **GIVEN** known packages `['lodash']`
-- **WHEN** `resolvePackageFromSpecifier('lodash/fp', knownPackages)` is called on the TypeScript adapter
+- **WHEN** `packageResolution.matchSpecifier('lodash/fp', knownPackages)` is called on the TypeScript adapter
 - **THEN** it returns `'lodash'`
 
 #### Scenario: Go module specifier resolved by longest prefix
 
 - **GIVEN** known packages `['github.com/acme/auth']`
-- **WHEN** `resolvePackageFromSpecifier('github.com/acme/auth/models', knownPackages)` is called on the Go adapter
+- **WHEN** `packageResolution.matchSpecifier('github.com/acme/auth/models', knownPackages)` is called on the Go adapter
 - **THEN** it returns `'github.com/acme/auth'`
 
 #### Scenario: Python package specifier with hyphen normalization
 
 - **GIVEN** known packages `['acme-auth']`
-- **WHEN** `resolvePackageFromSpecifier('acme_auth.models', knownPackages)` is called on the Python adapter
+- **WHEN** `packageResolution.matchSpecifier('acme_auth.models', knownPackages)` is called on the Python adapter
 - **THEN** it returns `'acme-auth'`
 
 #### Scenario: Unknown specifier returns undefined
 
 - **GIVEN** known packages `['@specd/core']`
-- **WHEN** `resolvePackageFromSpecifier('express', knownPackages)` is called
+- **WHEN** `packageResolution.matchSpecifier('express', knownPackages)` is called
 - **THEN** it returns `undefined`
 
 #### Scenario: PSR-4 resolves qualified name to file path
 
 - **GIVEN** a `codeRoot` containing `composer.json` with `autoload.psr-4: { "App\\": "src/" }`
-- **WHEN** `resolveQualifiedNameToPath('App\\Models\\User', codeRoot)` is called on the PHP adapter
+- **WHEN** `qualifiedNameResolution.resolveToPath('App\\Models\\User', codeRoot)` is called on the PHP adapter
 - **THEN** it returns the absolute path `{codeRoot}/src/Models/User.php`
 
 #### Scenario: Qualified name with no matching prefix returns undefined
 
 - **GIVEN** `composer.json` with `autoload.psr-4: { "App\\": "src/" }`
-- **WHEN** `resolveQualifiedNameToPath('Vendor\\Lib\\Foo', codeRoot)` is called
+- **WHEN** `qualifiedNameResolution.resolveToPath('Vendor\\Lib\\Foo', codeRoot)` is called
 - **THEN** it returns `undefined`
 
 #### Scenario: Session lookups drive PHP import resolution
@@ -496,10 +776,17 @@
 #### Scenario: Pass 2 uses precomputed package metadata instead of filesystem probes
 
 - **GIVEN** the PHP adapter needs PSR-4 metadata to resolve a qualified import during Pass 2
-- **AND** that metadata was already prepared as compact per-file or run-scoped adapter state
+- **AND** that metadata was already prepared by `packageResolution.prepare` or as compact run-scoped adapter state
 - **WHEN** `resolveImports()` runs
 - **THEN** the adapter resolves the import from that retained metadata and shared session lookups
 - **AND** it does not probe the filesystem for each import candidate
+
+#### Scenario: Package-specifier import never searches symbols by name
+
+- **GIVEN** a non-relative import of a name from a package in another workspace
+- **WHEN** the adapter resolves it
+- **THEN** it uses `packageEntryFiles` and `resolvePackageExport`
+- **AND** it does not call a name search over the target workspace
 
 ### Requirement: Tree-sitter query patterns
 
@@ -522,6 +809,12 @@
 - **GIVEN** a custom adapter omits hierarchy capability
 - **WHEN** hierarchy resolution is requested
 - **THEN** coverage is unsupported and no generic guess is emitted
+
+#### Scenario: Facet does not satisfy a capability flag
+
+- **GIVEN** an adapter provides `reExportLinking` but emits no hierarchy provenance
+- **WHEN** capabilities are recorded
+- **THEN** it cannot advertise hierarchy support because of that facet
 
 ### Requirement: Built-in adapter specialization
 
@@ -586,25 +879,25 @@
 #### Scenario: Dotted member text becomes a structured selector
 
 - **GIVEN** the anchored file is TypeScript
-- **WHEN** the adapter parses `EditChange.execute`
+- **WHEN** `symbolReferenceSyntax.parse` is called with `EditChange.execute`
 - **THEN** the result is one owner-then-member selector
 - **AND** the shared domain did not split the string on `.`
 
 #### Scenario: Ambiguous syntax stays unresolved
 
-- **WHEN** the adapter parses a dynamic or ambiguous member expression
+- **WHEN** the facet parses a dynamic or ambiguous member expression
 - **THEN** it returns no guessed candidate
 
 #### Scenario: Native and generic spellings round-trip
 
 - **GIVEN** one logical member
-- **WHEN** the adapter renders the generic spelling and the language-native spelling
+- **WHEN** the facet renders the generic spelling and the language-native spelling
 - **THEN** both parse back to that same structured member
 
 #### Scenario: PHP native spelling is not a TypeScript path
 
 - **GIVEN** the anchored file is PHP
-- **WHEN** the adapter parses `ArchiveChange::execute`
+- **WHEN** the PHP facet parses `ArchiveChange::execute`
 - **THEN** the selector is the same member as the generic `ArchiveChange.execute` spelling
 - **AND** the TypeScript adapter is not used
 
@@ -681,6 +974,13 @@
 - **THEN** the candidate is `code-graph:src/public.ts`
 - **AND** `sdk:src/@specd/code-graph.ts` is not a candidate
 
+#### Scenario: Re-export and ordinary imports share the entry surface
+
+- **GIVEN** `@specd/code-graph` is the target of both a re-export and an ordinary import
+- **WHEN** each is resolved
+- **THEN** both use the same `packageResolution.entrySurface` result
+- **AND** neither targets a file classified as a test
+
 ### Requirement: Hierarchy evidence consistency
 
 #### Scenario: Supported hierarchy emits relations and resolver provenance
@@ -736,3 +1036,15 @@
 - **WHEN** the conformance suite runs
 - **THEN** the adapter fails the common caller-containment scenarios
 - **AND** it is not accepted as conformant
+
+### Requirement: Adding a language adapter
+
+#### Scenario: Guide steps are complete
+
+- **WHEN** a developer follows the seven steps of the guide for a new language
+- **THEN** the adapter indexes and resolves package imports with no change outside the adapter and its registration
+
+#### Scenario: Docs page states the same rules
+
+- **WHEN** `docs/code-graph/language-adapters.md` is compared with this spec
+- **THEN** it states the same required core, facets, members, invariants, and steps without referring the reader to the spec

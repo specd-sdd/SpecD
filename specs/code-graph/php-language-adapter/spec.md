@@ -44,15 +44,19 @@ Same-name methods declared by different owners MUST remain distinct, including c
 
 The adapter SHALL extract namespace declarations and supported class-like `use X as Y` imports. A `use` alias SHALL create a namespace-scoped local binding to its canonical qualified target; it SHALL NOT create a public export or hierarchy edge by itself.
 
-Package identity SHALL come from the nearest bounded Composer `name`. Qualified names SHALL resolve through precomputed Composer PSR-4 mappings using the longest matching prefix and shared indexed-file lookups. Repeated Pass 2 resolution SHALL use cached compact metadata rather than per-candidate filesystem scans.
+The adapter SHALL provide the `packageResolution` and `qualifiedNameResolution` facets. `identity` SHALL read the Composer `name` from the nearest bounded `composer.json`. `prepare` SHALL read each workspace's `composer.json` once per run (`identity` reads the same manifest separately) and store its package name, code root, and PSR-4 prefix map as compact immutable data. `matchSpecifier` SHALL resolve a qualified name to the package whose PSR-4 prefix is the longest match among the prepared maps of all workspaces. `entrySurface` SHALL map the qualified name through that prefix to the single class file under the owning package's mapped directory, using the shared indexed-file lookups.
+
+A `use` import SHALL first resolve through the exact fully qualified name map: a qualified name is the language's symbol identity, so an exact match in any workspace is the target. When the map has no exact match, the import SHALL call the shared `packageEntryFiles` helper and record the PSR-4 class file of the imported qualified name, in the workspace that owns the longest prefix, as a file dependency. The adapter publishes no public bindings, so it MUST NOT resolve a symbol target through `resolvePackageExport`. A short class name MUST NOT be matched across workspaces without the qualified name. Repeated Pass 2 resolution SHALL use the prepared compact metadata and perform no filesystem read. `qualifiedNameResolution.resolveToPath(qualifiedName, codeRoot, session)` SHALL read the PSR-4 map prepared in the session, not the filesystem, and MUST NOT fall back to an absolute-path lookup of an unindexed file.
 
 Composer classmap/files, runtime autoloader mutation, and ambiguous case-sensitive filesystem alternatives SHALL remain unsupported until explicitly modeled.
+
+Unresolved imports SHALL return a diagnostic with the reason reported by the helper. The adapter returns no `import:package` step, because its symbol targets come from the exact qualified-name map rather than from public bindings.
 
 ### Requirement: Resolution manifests
 
 `resolutionManifests()` SHALL return exactly `['composer.json']`.
 
-That basename covers both the Composer package `name` and the PSR-4 map the adapter reads. The adapter MUST NOT declare any other resolution manifest.
+That basename covers both the Composer package `name` and the PSR-4 map the adapter reads in `packageResolution.prepare`. The adapter MUST NOT declare any other resolution manifest.
 
 ### Requirement: Static and framework dependency facts
 

@@ -40,6 +40,13 @@ const INDEX_RESULT: IndexResult = {
   },
   coverageDiagnostics: [],
   logicalDiagnostics: [],
+  importDiagnostics: {
+    total: 0,
+    byReason: {},
+    samples: [],
+    externalPackageImports: 0,
+    adaptersWithoutPackageResolution: [],
+  },
 }
 
 function makeProvider(): CodeGraphHostPort {

@@ -1,5 +1,6 @@
 import type { IndexCoverageStatus } from './index-session.js'
 import type { LogicalDeclarationDiagnostic } from './symbol-reference.js'
+import type { ImportDiagnostic, ImportUnresolvedReason } from './language-adapter-facets.js'
 
 /**
  * Describes an error encountered while indexing a specific file.
@@ -63,6 +64,35 @@ export interface IndexRunCoverageSummary {
 }
 
 /**
+ * Non-persisted summary of package imports that stayed unresolved during one run.
+ *
+ * The full list can be as large as the number of imports in the corpus, so the run keeps
+ * exact counts per reason and a bounded sample per reason.
+ */
+export interface ImportDiagnosticSummary {
+  /** Number of unresolved package imports recorded by the run, excluding external ones. */
+  readonly total: number
+  /** Exact count per unresolved reason; reasons that never occurred are omitted. */
+  readonly byReason: Readonly<Partial<Record<ImportUnresolvedReason, number>>>
+  /** At most {@link IMPORT_DIAGNOSTIC_SAMPLE_LIMIT} diagnostics per reason, in discovery order. */
+  readonly samples: readonly ImportDiagnostic[]
+  /**
+   * Imports of packages that no workspace declares. They are external dependencies, not
+   * failures, so they are counted here and excluded from `total`, `byReason`, and `samples`.
+   */
+  readonly externalPackageImports: number
+  /**
+   * Language identifiers of each registered adapter that does not provide the package resolution
+   * facet, one entry per adapter. A listing is not an unresolved import and is never counted in
+   * `total`, `byReason`, or `samples`.
+   */
+  readonly adaptersWithoutPackageResolution: readonly string[]
+}
+
+/** Maximum number of sampled import diagnostics kept per reason. */
+export const IMPORT_DIAGNOSTIC_SAMPLE_LIMIT = 20
+
+/**
  * Summary of an indexing operation including counts and errors.
  */
 export interface IndexResult {
@@ -85,4 +115,6 @@ export interface IndexResult {
   readonly coverageDiagnostics: readonly IndexCoverageDiagnostic[]
   /** Logical-identity collisions whose declarations were kept physical-only. */
   readonly logicalDiagnostics: readonly LogicalDeclarationDiagnostic[]
+  /** Unresolved package imports of this run. Never persisted and never part of the fingerprint. */
+  readonly importDiagnostics: ImportDiagnosticSummary
 }

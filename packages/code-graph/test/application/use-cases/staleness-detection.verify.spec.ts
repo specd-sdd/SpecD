@@ -46,7 +46,7 @@ function stubAdapter(manifests: readonly string[]): LanguageAdapter {
     analyzeFile: (): FileAnalysisDraft => {
       throw new Error('unused')
     },
-    resolveImports: () => ({ importMap: new Map(), fileImports: [] }),
+    resolveImports: () => ({ importMap: new Map(), fileImports: [], steps: [], diagnostics: [] }),
     buildRelations: (): Relation[] => [],
   }
 }

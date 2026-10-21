@@ -1017,7 +1017,7 @@ describe('CodeGraphProvider', () => {
     )
     const custom = new PhpLanguageAdapter()
     const analyze = vi.spyOn(custom, 'analyzeFile')
-    const parse = vi.spyOn(custom, 'parseSymbolReference')
+    const parse = vi.spyOn(custom.symbolReferenceSyntax, 'parse')
     const provider = await createCodeGraphProvider({
       storagePath: tempDir,
       projectRoot: tempDir,
@@ -1065,7 +1065,10 @@ describe('CodeGraphProvider', () => {
         language: 'php',
       })
       expect(parse).toHaveBeenCalledWith('ArchiveChange::execute()')
-      expect(parse.mock.instances.every((instance) => instance === custom)).toBe(true)
+      // The spy wraps the custom adapter's own facet, so every call went through that adapter.
+      expect(
+        parse.mock.instances.every((instance) => instance === custom.symbolReferenceSyntax),
+      ).toBe(true)
     } finally {
       await provider.close()
     }

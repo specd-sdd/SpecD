@@ -18,4 +18,9 @@ export interface ImportDeclaration {
   readonly kind?: ImportDeclarationKind | undefined
   /** Source range of the import syntax, when the adapter records it. */
   readonly range?: SourceRange | undefined
+  /**
+   * True when the language marks the import as type-only (for example TypeScript `import type`
+   * or `import { type X }`), so the name can only address the type space.
+   */
+  readonly typeOnly?: boolean | undefined
 }

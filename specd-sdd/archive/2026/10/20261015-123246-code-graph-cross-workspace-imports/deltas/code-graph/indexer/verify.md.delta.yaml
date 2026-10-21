@@ -1,0 +1,214 @@
+- op: added
+  description: Phase ordering scenarios
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Two-pass extraction with in-memory index'
+  content: |
+    #### Scenario: Preparation and linking precede Pass 2
+
+    - **GIVEN** a run with several workspaces and adapters providing `packageResolution` and `reExportLinking`
+    - **WHEN** the indexer executes
+    - **THEN** the package map is built before Pass 1
+    - **AND** `prepare` is called once and re-export linking completes before the first `resolveImports` call
+
+    #### Scenario: Hydrated workspaces are prepared
+
+    - **GIVEN** an incremental run where only one workspace changed
+    - **WHEN** `prepare` is called
+    - **THEN** it receives every workspace, including the unchanged ones
+
+- op: added
+  description: Package map and resolution scenarios
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Cross-workspace package resolution'
+  content: |
+    #### Scenario: Identity collision is reported
+
+    - **GIVEN** two workspaces whose manifests declare the same package identity
+    - **WHEN** the package map is built
+    - **THEN** an error names both workspaces
+
+    #### Scenario: Resolved package import persists binding, step, and IMPORTS
+
+    - **GIVEN** `sdk` imports `SymbolNode` from `@specd/code-graph`
+    - **WHEN** the run is committed
+    - **THEN** the local binding has the target logical id
+    - **AND** an `import:package` step exists from that binding to the public binding
+    - **AND** an `IMPORTS` relation exists from the `sdk` file to the entry file
+
+    #### Scenario: Unresolved import persists nothing
+
+    - **GIVEN** a package import whose name the entry surface does not publish
+    - **WHEN** the run is committed
+    - **THEN** no binding target, step, or relation is stored
+    - **AND** the reason `not-exported` appears only in non-persisted output
+
+    #### Scenario: Unique name is not enough
+
+    - **GIVEN** the imported name exists exactly once in the target workspace but not on its entry surface
+    - **WHEN** the import is resolved
+    - **THEN** it stays unresolved
+
+    #### Scenario: Test files are not entries
+
+    - **GIVEN** an entry candidate classified as a test
+    - **WHEN** the helper filters entries
+    - **THEN** the candidate is discarded
+
+    #### Scenario: Adapters disagree on a name
+
+    - **GIVEN** two entries publish the same name with different logical targets
+    - **WHEN** the helper resolves the name
+    - **THEN** the reason is `ambiguous` and nothing is persisted
+
+    #### Scenario: Identity is searched within the project
+
+    - **GIVEN** a workspace whose own directory has no package manifest and whose parent above the project root has one
+    - **WHEN** the package map is built
+    - **THEN** `identity` is called with the project root as the repository root
+    - **AND** the manifest above the project root is not read
+
+    #### Scenario: External packages are counted, not reported as failures
+
+    - **GIVEN** files that import `zod` and `node:fs`, which no workspace declares
+    - **WHEN** the run completes
+    - **THEN** `importDiagnostics.externalPackageImports` counts those imports
+    - **AND** they are not part of `total`, `byReason`, or `samples`
+
+    #### Scenario: Diagnostics summary is bounded
+
+    - **GIVEN** more than 20 imports that fail with the same reason
+    - **WHEN** the run completes
+    - **THEN** `byReason` holds the exact count for that reason
+    - **AND** `samples` holds at most 20 diagnostics for it
+
+    #### Scenario: Helper reports its reasons
+
+    - **GIVEN** an adapter without `packageResolution`, an unknown package, and a facet returning no indexed entry
+    - **WHEN** each import is resolved
+    - **THEN** the reasons are `facet-absent`, `package-unknown`, and `no-entry-surface` respectively
+
+- op: added
+  description: Import-bound names resolve to their declaration
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Scoped binding environment resolution'
+  content: |
+    #### Scenario: Type imported from another workspace produces USES_TYPE
+
+    - **GIVEN** a function in workspace `app` whose parameter type is imported from workspace `graph`
+    - **AND** the import resolved to a declaration in `graph`
+    - **WHEN** Pass 2 resolves relations
+    - **THEN** a `USES_TYPE` relation links the function to that declaration in `graph`
+
+    #### Scenario: Import wins over a same-name local symbol
+
+    - **GIVEN** workspace `app` declares an unrelated symbol named `Node`
+    - **AND** a file in `app` imports a `Node` from workspace `graph` and uses it as a parameter type
+    - **WHEN** Pass 2 resolves relations
+    - **THEN** the `USES_TYPE` relation targets the `Node` of `graph`
+    - **AND** no relation targets the local `Node`
+
+    #### Scenario: Unimported name keeps the workspace lookup
+
+    - **GIVEN** a parameter type name that no import binds and one symbol of that name in the workspace
+    - **WHEN** Pass 2 resolves relations
+    - **THEN** the relation targets that symbol as before
+
+- op: added
+  description: Facet-driven independence scenarios
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Facet-driven language independence
+
+    #### Scenario: Stub language resolves package imports without indexer change
+
+    - **GIVEN** a stub adapter for a made-up language `zig2` with extension `.z2`, manifest `zig2.pkg`, and a `packageResolution` facet
+    - **AND** workspace `lib` exports `Widget` and workspace `app` imports it through the made-up package specifier
+    - **WHEN** both workspaces are indexed using the unmodified indexer
+    - **THEN** the import resolves, with binding, step, and `IMPORTS`
+    - **AND** the indexer source contains no reference to `zig2`, `.z2`, or `zig2.pkg`
+
+    #### Scenario: Indexer source has no language branches for resolution
+
+    - **WHEN** the indexer sources are searched for language identifiers, extensions, and manifest names of the built-in adapters
+    - **THEN** none appears in package-import resolution code
+
+    #### Scenario: Absent facet is skipped with a diagnostic
+
+    - **GIVEN** an adapter that provides only the required core
+    - **WHEN** the run executes
+    - **THEN** its files are indexed normally
+    - **AND** no package map entry or package import resolution exists for it
+    - **AND** the adapter is listed in `importDiagnostics.adaptersWithoutPackageResolution`
+    - **AND** the listing is not counted in `total`, `byReason`, or `samples`
+
+    #### Scenario: A throwing identity does not stop the run
+
+    - **GIVEN** an adapter whose `identity` throws for one workspace
+    - **WHEN** the package map is built
+    - **THEN** the error is recorded as an indexing error
+    - **AND** the adapter is treated as without `packageResolution` for the rest of the run and is listed in `adaptersWithoutPackageResolution`
+    - **AND** the other workspaces and adapters are still indexed
+
+    #### Scenario: The first adapter to return an identity wins
+
+    - **GIVEN** two registered adapters that would both return an identity for one workspace
+    - **WHEN** the package map is built
+    - **THEN** the first adapter's identity is used
+    - **AND** the second adapter is not asked for that workspace
+
+- op: added
+  description: Closure scenarios
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Package import incremental closure
+
+    #### Scenario: Entry change re-resolves importers in other workspaces
+
+    - **GIVEN** `sdk` imports `SymbolNode` from `@specd/code-graph` and the graph is current
+    - **WHEN** `code-graph:src/public.ts` stops exporting `SymbolNode` and an incremental run follows
+    - **THEN** the importing `sdk` file is re-extracted
+    - **AND** its binding target, step, and `IMPORTS` edge are removed
+
+    #### Scenario: Barrel chain change reaches importers
+
+    - **GIVEN** the name is published through `public.ts` → `index.ts` → `domain/index.ts`
+    - **WHEN** `domain/index.ts` changes what it publishes
+    - **THEN** importers of the package are re-resolved
+
+    #### Scenario: Manifest change reaches importers
+
+    - **GIVEN** the `exports` field of the target package changes
+    - **WHEN** the next run computes the fingerprint
+    - **THEN** the run is a full rebuild or re-resolves every importer, and equals a clean rebuild
+
+    #### Scenario: Newly resolvable import is reconsidered
+
+    - **GIVEN** a package import is unresolved because the target workspace is not configured
+    - **WHEN** the workspace is added and the run is incremental
+    - **THEN** the import resolves and equals a clean rebuild
+
+    #### Scenario: Closure does not scan every file
+
+    - **GIVEN** an incremental run that changes one entry file and adds no code file
+    - **WHEN** the closure for that entry is computed
+    - **THEN** the importers are found from persisted steps and hydrated bindings only
+    - **AND** unrelated files are not read
+
+    #### Scenario: Added files still re-extract files with possibly unresolved imports
+
+    - **GIVEN** a run that adds a new code file
+    - **WHEN** the closure is computed
+    - **THEN** existing code files that may hold previously unresolved imports are re-extracted
+    - **AND** an import whose target workspace file just appeared resolves and equals a clean rebuild

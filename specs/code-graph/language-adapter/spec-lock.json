@@ -6,43 +6,25 @@
   "dependsOn": ["code-graph:symbol-model"],
   "implementation": [
     {
-      "file": "code-graph:src/domain/value-objects/call-fact.ts",
-      "symbols": ["CallFact"]
+      "file": "code-graph:src/domain/value-objects/language-adapter-facets.ts"
     },
     {
       "file": "code-graph:src/domain/value-objects/language-adapter.ts",
-      "symbols": ["AdapterDeclarationPolicy", "LanguageAdapter"]
+      "symbols": ["LanguageAdapter", "ImportResolutionContext", "ResolvedImports"]
     },
     {
-      "file": "code-graph:src/infrastructure/tree-sitter/reference-fact-helpers.ts",
-      "symbols": [
-        "AdapterSyntaxCandidate",
-        "findContainingCallableSymbol",
-        "createImportedHierarchyMetadata"
-      ]
-    },
-    {
-      "file": "code-graph:src/domain/services/scoped-binding-environment.ts",
-      "symbols": ["resolveDependencyFacts", "buildScopedBindingEnvironment"]
+      "file": "code-graph:src/domain/errors/invalid-language-adapter-error.ts",
+      "symbols": ["InvalidLanguageAdapterError"]
     },
     {
       "file": "code-graph:src/infrastructure/tree-sitter/adapter-registry.ts",
       "symbols": ["AdapterRegistry"]
     },
     {
-      "file": "code-graph:test/infrastructure/tree-sitter/language-adapter-conformance.spec.ts"
-    },
-    {
-      "file": "code-graph:src/application/use-cases/in-memory-index-session.ts"
-    },
-    {
-      "file": "code-graph:src/domain/value-objects/file-analysis.ts"
-    },
-    {
       "file": "code-graph:src/domain/value-objects/import-declaration.ts"
     },
     {
-      "file": "code-graph:test/infrastructure/tree-sitter/adapter-registry.spec.ts"
+      "file": "code-graph:src/domain/value-objects/index-result.ts"
     }
   ],
   "optimizations": {

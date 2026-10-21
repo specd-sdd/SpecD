@@ -19,6 +19,7 @@ import { createRelation } from '../../../src/domain/value-objects/relation.js'
 import { RelationType } from '../../../src/domain/value-objects/relation-type.js'
 import { InMemoryGraphStore } from '../../helpers/in-memory-graph-store.js'
 import { makeMockSpecRepository } from '../../helpers/make-mock-spec-repository.js'
+import { createImportResolutionContext } from '../../helpers/import-resolution-context.js'
 
 // Passthrough spies: pass-2 purity is asserted by counting reads performed after preparation.
 vi.mock('node:fs', async (importOriginal) => {
@@ -1056,12 +1057,15 @@ describe('LanguageAdapter Conformance Suite', () => {
         for (const spy of reads) vi.mocked(spy).mockClear()
 
         for (const analysis of analyses) {
-          const resolved = adapter.resolveImports(analysis, {
-            session,
-            qualifiedNames: new Map(),
-            packageToWorkspace: new Map(),
-            codeRoot: project,
-          })
+          const resolved = adapter.resolveImports(
+            analysis,
+            createImportResolutionContext({
+              session,
+              qualifiedNames: new Map(),
+              packageToWorkspace: new Map(),
+              codeRoot: project,
+            }),
+          )
           adapter.buildRelations(analysis, { session, resolvedImports: resolved })
         }
 
@@ -1113,11 +1117,14 @@ describe('LanguageAdapter Conformance Suite', () => {
           workspaceName: 'ws',
         })
         const analysis = session.registerAnalysis({ filePath: fixture.fileName, analysis: draft })
-        const resolved = adapter.resolveImports(analysis, {
-          session,
-          qualifiedNames: new Map(),
-          packageToWorkspace: new Map(),
-        })
+        const resolved = adapter.resolveImports(
+          analysis,
+          createImportResolutionContext({
+            session,
+            qualifiedNames: new Map(),
+            packageToWorkspace: new Map(),
+          }),
+        )
         expect(resolved.importMap.size).toBe(0)
         expect(resolved.fileImports).toEqual([])
       })
@@ -1174,7 +1181,12 @@ describe('LanguageAdapter Conformance Suite', () => {
             ],
           }
         },
-        resolveImports: () => ({ importMap: new Map(), fileImports: [] }),
+        resolveImports: () => ({
+          importMap: new Map(),
+          fileImports: [],
+          steps: [],
+          diagnostics: [],
+        }),
         buildRelations: () => [],
       }
 

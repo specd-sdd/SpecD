@@ -17,13 +17,18 @@ import { type ImportDeclaration } from '../../../src/domain/value-objects/import
 import { InMemoryIndexSession } from '../../../src/application/use-cases/in-memory-index-session.js'
 import { parseLogicalSymbol } from '../../../src/domain/value-objects/symbol-reference.js'
 import { type FileAnalysis } from '../../../src/domain/value-objects/file-analysis.js'
+import { createImportResolutionContext } from '../../helpers/import-resolution-context.js'
+import {
+  type PackageResolutionFacet,
+  type SymbolReferenceSyntaxFacet,
+} from '../../../src/domain/value-objects/language-adapter-facets.js'
 
 interface TestAdapter {
   languages(): string[]
   extensions(): Record<string, string>
   resolutionManifests(): readonly string[]
-  getPackageIdentity(codeRoot: string, repoRoot?: string): string | undefined
-  resolvePackageFromSpecifier(specifier: string, knownPackages: string[]): string | undefined
+  readonly packageResolution: PackageResolutionFacet
+  readonly symbolReferenceSyntax: SymbolReferenceSyntaxFacet
   extractSymbols(filePath: string, content: string): SymbolNode[]
   extractImportedNames(filePath: string, content: string): ImportDeclaration[]
   extractBindingFacts(
@@ -160,7 +165,7 @@ adapter.extractRelations = (
     filePath,
     analysis: draft,
   })
-  const resolvedImports = { importMap, fileImports: [] }
+  const resolvedImports = { importMap, fileImports: [], steps: [], diagnostics: [] }
   return baseAdapter.buildRelations(analysis, {
     session,
     resolvedImports,
@@ -532,28 +537,42 @@ type HandlerFn func(event Event) Result`
   describe('resolvePackageFromSpecifier', () => {
     it('resolves by longest prefix match', () => {
       const known = ['github.com/acme/auth', 'github.com/acme/billing']
-      expect(adapter.resolvePackageFromSpecifier('github.com/acme/auth/models', known)).toBe(
-        'github.com/acme/auth',
-      )
+      expect(
+        adapter.packageResolution.matchSpecifier(
+          'github.com/acme/auth/models',
+          known,
+          new InMemoryIndexSession(),
+        ),
+      ).toBe('github.com/acme/auth')
     })
 
     it('resolves exact match', () => {
       const known = ['github.com/acme/auth']
-      expect(adapter.resolvePackageFromSpecifier('github.com/acme/auth', known)).toBe(
-        'github.com/acme/auth',
-      )
+      expect(
+        adapter.packageResolution.matchSpecifier(
+          'github.com/acme/auth',
+          known,
+          new InMemoryIndexSession(),
+        ),
+      ).toBe('github.com/acme/auth')
     })
 
     it('returns undefined for unknown module', () => {
       const known = ['github.com/acme/auth']
-      expect(adapter.resolvePackageFromSpecifier('fmt', known)).toBeUndefined()
+      expect(
+        adapter.packageResolution.matchSpecifier('fmt', known, new InMemoryIndexSession()),
+      ).toBeUndefined()
     })
 
     it('picks longest match when multiple prefixes overlap', () => {
       const known = ['github.com/acme', 'github.com/acme/auth']
-      expect(adapter.resolvePackageFromSpecifier('github.com/acme/auth/models', known)).toBe(
-        'github.com/acme/auth',
-      )
+      expect(
+        adapter.packageResolution.matchSpecifier(
+          'github.com/acme/auth/models',
+          known,
+          new InMemoryIndexSession(),
+        ),
+      ).toBe('github.com/acme/auth')
     })
   })
 
@@ -574,12 +593,12 @@ type HandlerFn func(event Event) Result`
     it('reads module from go.mod', () => {
       tempDir = mkdtempSync(join(tmpdir(), 'go-pkg-'))
       writeFileSync(join(tempDir, 'go.mod'), 'module github.com/acme/auth\n\ngo 1.21\n')
-      expect(adapter.getPackageIdentity(tempDir)).toBe('github.com/acme/auth')
+      expect(adapter.packageResolution.identity(tempDir)).toBe('github.com/acme/auth')
     })
 
     it('returns undefined when no go.mod', () => {
       tempDir = mkdtempSync(join(tmpdir(), 'go-pkg-'))
-      expect(adapter.getPackageIdentity(tempDir)).toBeUndefined()
+      expect(adapter.packageResolution.identity(tempDir)).toBeUndefined()
     })
 
     it('sets a method parentId from the receiver and omits it on a top-level function', () => {
@@ -609,7 +628,7 @@ type HandlerFn func(event Event) Result`
       writeFileSync(join(tempDir, 'go.mod'), 'module github.com/acme/auth\n\ngo 1.21\n')
       const subDir = join(tempDir, 'cmd', 'server')
       mkdirSync(subDir, { recursive: true })
-      expect(adapter.getPackageIdentity(subDir, tempDir)).toBe('github.com/acme/auth')
+      expect(adapter.packageResolution.identity(subDir, tempDir)).toBe('github.com/acme/auth')
     })
   })
 
@@ -710,7 +729,7 @@ func run() {
       }
       const relations = baseAdapter.buildRelations(analysis, {
         session,
-        resolvedImports: { importMap: new Map(), fileImports: [] },
+        resolvedImports: { importMap: new Map(), fileImports: [], steps: [], diagnostics: [] },
       })
 
       const importRel = relations.find((r) => r.type === RelationType.Imports)
@@ -786,11 +805,17 @@ func run() {
         callFacts: draft.callFacts,
       }
 
-      const resolved = baseAdapter.resolveImports(analysis, {
-        session,
-        qualifiedNames: new Map(),
-        packageToWorkspace: new Map([['example.com/app', 'ws']]),
-      })
+      const resolved = baseAdapter.resolveImports(
+        analysis,
+        createImportResolutionContext(
+          {
+            session,
+            qualifiedNames: new Map(),
+            packageToWorkspace: new Map([['example.com/app', 'ws']]),
+          },
+          baseAdapter,
+        ),
+      )
 
       expect(resolved.fileImports).toEqual(['ws:pkg/utils/helper.go'])
       expect(resolved.importMap.size).toBe(0)
@@ -823,11 +848,17 @@ func run() {
         callFacts: draft.callFacts,
       }
 
-      const resolved = baseAdapter.resolveImports(analysis, {
-        session,
-        qualifiedNames: new Map(),
-        packageToWorkspace: new Map([['example.com/app', 'ws']]),
-      })
+      const resolved = baseAdapter.resolveImports(
+        analysis,
+        createImportResolutionContext(
+          {
+            session,
+            qualifiedNames: new Map(),
+            packageToWorkspace: new Map([['example.com/app', 'ws']]),
+          },
+          baseAdapter,
+        ),
+      )
 
       expect(resolved.fileImports).toEqual([])
     })
@@ -1111,11 +1142,17 @@ describe('Go embedded interfaces, blank imports and shadowing', () => {
       })
       if (filePath === main) analysis = registered
     }
-    const resolvedImports = baseAdapter.resolveImports(analysis!, {
-      session,
-      qualifiedNames: new Map(),
-      packageToWorkspace,
-    })
+    const resolvedImports = baseAdapter.resolveImports(
+      analysis!,
+      createImportResolutionContext(
+        {
+          session,
+          qualifiedNames: new Map(),
+          packageToWorkspace,
+        },
+        baseAdapter,
+      ),
+    )
     return {
       relations: baseAdapter.buildRelations(analysis!, { session, resolvedImports }),
       fileImports: resolvedImports.fileImports,

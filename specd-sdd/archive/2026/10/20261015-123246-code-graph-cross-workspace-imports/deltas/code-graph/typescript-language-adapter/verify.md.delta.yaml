@@ -1,0 +1,156 @@
+- op: added
+  description: Package import scenarios for TypeScript
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Imports, exports, and public bindings'
+  content: |
+    #### Scenario: Named package import resolves through the entry surface
+
+    - **GIVEN** `sdk` imports `{ SymbolNode }` from `@specd/code-graph`
+    - **AND** the package publishes `.` as a condition object with `import: ./dist/public.js` and `types: ./dist/public.d.ts`
+    - **WHEN** imports are resolved
+    - **THEN** the entry file is the indexed `code-graph:src/public.ts`
+    - **AND** the local binding of `SymbolNode` targets the logical id that entry publishes through its barrel chain
+    - **AND** an `import:package` step links the local binding to the public binding
+
+    #### Scenario: Type-only package import looks up only the type space
+
+    - **GIVEN** `import type { SymbolNode } from '@specd/code-graph'`
+    - **WHEN** imports are resolved
+    - **THEN** the name is looked up only in the type space of the entry surface
+    - **AND** a value-space export of the same name is not considered
+
+    #### Scenario: Namespace package import depends on the entry file
+
+    - **GIVEN** `import * as graph from '@specd/code-graph'`
+    - **WHEN** imports are resolved
+    - **THEN** the file imports the entry file `code-graph:src/public.ts`
+    - **AND** member accesses on `graph` resolve only through names that entry publishes
+
+    #### Scenario: Name published only by an internal file stays unresolved
+
+    - **GIVEN** `import { InternalThing } from '@specd/code-graph'` and `InternalThing` is declared only in a file that `src/public.ts` does not export
+    - **WHEN** imports are resolved
+    - **THEN** no binding target, step, or relation exists
+    - **AND** the diagnostic reason is `not-exported`
+
+    #### Scenario: Same-name symbol in a test file is never chosen
+
+    - **GIVEN** `code-graph:test/helpers/make-node.ts` declares `SymbolNode` and the entry surface publishes a different `SymbolNode`
+    - **WHEN** imports are resolved
+    - **THEN** the import targets the symbol the entry surface publishes
+    - **AND** the test helper is not a candidate
+
+    #### Scenario: Re-export is a file dependency
+
+    - **GIVEN** `src/public.ts` contains `export { SymbolNode } from './domain/index.js'`
+    - **WHEN** imports are resolved for `src/public.ts`
+    - **THEN** the file imports `src/domain/index.ts`
+
+    #### Scenario: Changing a re-exported module re-links the barrel
+
+    - **GIVEN** a barrel chain `public.ts` → `domain/index.ts` → `symbol-node.ts` and an importer in another workspace
+    - **WHEN** `domain/index.ts` stops publishing the name and an incremental run follows
+    - **THEN** the barrel and the importer are re-resolved
+    - **AND** the result equals a clean rebuild
+
+    #### Scenario: Type-only syntax is marked on the import
+
+    - **GIVEN** `import type { A }`, `import { type B, C }`, and `import { D }`
+    - **WHEN** imports are extracted
+    - **THEN** `A` and `B` are type-only and `C` and `D` are not
+
+    #### Scenario: Linking completes before package imports resolve
+
+    - **GIVEN** `public.ts` re-exports `SymbolNode` through `index.ts` and `domain/index.ts`
+    - **WHEN** a package import of `SymbolNode` is resolved in Pass 2
+    - **THEN** it sees the final public binding of `public.ts`
+
+- op: modified
+  description: Entry surface scenarios for package.json
+  selector:
+    type: section
+    matches: 'Requirement: Package and build-context boundary'
+  content: |
+    #### Scenario: Unsupported project selection is not guessed
+
+    - **GIVEN** resolution depends on `tsconfig` paths, `imports`, or a condition other than `import`, `default`, and `types`
+    - **WHEN** no consumed build context selects a route
+    - **THEN** `buildContext` is false
+    - **AND** the result remains unsupported, unresolved, or ambiguous
+
+    #### Scenario: Bare specifier uses exports root or main
+
+    - **GIVEN** a package with `exports["."]`, and another with only `main`
+    - **WHEN** `entrySurface` runs for each bare specifier
+    - **THEN** the first uses `exports["."]` and the second uses `main`
+
+    #### Scenario: main is ignored when exports is defined
+
+    - **GIVEN** a package with `main` and an `exports` object without `"."`
+    - **WHEN** `entrySurface` runs for the bare specifier
+    - **THEN** it returns no candidates
+
+    #### Scenario: Default package import binds the single default declaration
+
+    - **GIVEN** `import Client from '@acme/auth'` and the entry file has one default export declaration
+    - **WHEN** imports are resolved
+    - **THEN** the file depends on the entry files
+    - **AND** `Client` binds to that declaration
+
+    #### Scenario: Namespace package import
+
+    - **GIVEN** `import * as auth from '@acme/auth'`
+    - **WHEN** imports are resolved
+    - **THEN** the file depends on the entry files
+    - **AND** no declaration is bound to `auth`
+
+    #### Scenario: Type-only import looks up only the type space
+
+    - **GIVEN** `import type { User } from '@acme/auth'` and the entry publishes `User` only as a value
+    - **WHEN** imports are resolved
+    - **THEN** the import stays unresolved
+
+    #### Scenario: JavaScript-source package resolves
+
+    - **GIVEN** a workspace that publishes `./src/index.js` and indexes that JavaScript file
+    - **WHEN** `entrySurface` runs for the bare specifier
+    - **THEN** it returns `<workspace>:src/index.js`
+
+    #### Scenario: Subpath uses its own export entry
+
+    - **GIVEN** `exports["./internal"]` is `./dist/index.js`
+    - **WHEN** `entrySurface` runs for `@specd/code-graph/internal`
+    - **THEN** it returns the indexed source of `dist/index.js`
+
+    #### Scenario: Unlisted subpath yields no entry
+
+    - **GIVEN** a package that defines `exports` without `./secret`
+    - **WHEN** `entrySurface` runs for `pkg/secret`
+    - **THEN** it returns no candidates
+
+    #### Scenario: dist maps to the indexed source
+
+    - **GIVEN** the target is `./dist/public.js` and the workspace indexes `src/public.ts`
+    - **WHEN** `entrySurface` runs
+    - **THEN** it returns `code-graph:src/public.ts`
+    - **AND** it does not return a same-named file in another workspace
+
+    #### Scenario: Different runtime alternatives are ambiguous
+
+    - **GIVEN** `import` and `default` conditions lead to different indexed sources that both export a name differently
+    - **WHEN** the shared resolver reads both
+    - **THEN** the name is ambiguous and unresolved
+
+    #### Scenario: Prepare reads package.json once per workspace
+
+    - **GIVEN** a run with several workspaces, some hydrated from the store
+    - **WHEN** `prepare` runs
+    - **THEN** each configured workspace `package.json` is read once
+    - **AND** `entrySurface` performs no filesystem read afterwards
+
+    #### Scenario: Manifest is declared
+
+    - **WHEN** the adapter reports `resolutionManifests()`
+    - **THEN** the result is exactly `['package.json']`

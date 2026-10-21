@@ -3,8 +3,11 @@ import { type SpecNode } from '../../domain/value-objects/spec-node.js'
 import { type DocumentNode } from '../../domain/value-objects/document-node.js'
 import { type Relation } from '../../domain/value-objects/relation.js'
 import { type FileAnalysis } from '../../domain/value-objects/file-analysis.js'
+import { type FileCategory } from '../../domain/value-objects/file-node.js'
 import {
   type DeclarationOccurrence,
+  DeclarationOccurrenceForm,
+  type SymbolSpace,
   type HierarchyFact,
   type HierarchyImportProvenance,
   type LocalBinding,
@@ -25,6 +28,17 @@ import { RelationType } from '../../domain/value-objects/relation-type.js'
 import { DuplicateDeclarationMappingError } from '../../domain/errors/duplicate-declaration-mapping-error.js'
 
 /**
+ * Builds the lookup key of one public route.
+ * @param surface - Public surface id.
+ * @param exportedName - Exported spelling.
+ * @param space - Symbol space of the export.
+ * @returns A collision-free key.
+ */
+function publicRouteKey(surface: string, exportedName: string, space: SymbolSpace): string {
+  return `${surface}\u0000${exportedName}\u0000${space}`
+}
+
+/**
  * Concrete in-memory implementation of the IndexSession interface.
  * Coordinates lookup structures, file-level analyses, and deduplicated relations.
  */
@@ -38,9 +52,11 @@ export class InMemoryIndexSession implements IndexSession {
       language: string
       contentHash: string
       workspace: string
+      category: FileCategory
     }
   >()
   private readonly filePathsSet = new Set<string>()
+  private readonly publicBindingsByRoute = new Map<string, Map<string, PublicBinding>>()
   private readonly analyses = new Map<string, FileAnalysis>()
   private readonly declarationsByLogicalId = new Map<string, DeclarationOccurrence[]>()
   private readonly logicalSymbolsById = new Map<string, LogicalSymbol>()
@@ -87,9 +103,79 @@ export class InMemoryIndexSession implements IndexSession {
       language: input.language,
       contentHash: input.contentHash,
       workspace: input.workspace,
+      category: input.category ?? 'source',
     })
     this.filePathsSet.add(input.filePath)
     return fileId
+  }
+
+  /**
+   * Finds one registered symbol by its exact id, in any workspace.
+   * @param symbolId - Symbol id.
+   * @returns The symbol, or `undefined` when it is not registered.
+   */
+  findSymbolById(symbolId: string): SymbolNode | undefined {
+    return this.symbolsById.get(symbolId)
+  }
+
+  /**
+   * Stores a public binding and keeps the per-route lookup in step with it.
+   * @param binding - Binding to store; a binding with the same id replaces the previous one.
+   */
+  private putPublicBinding(binding: PublicBinding): void {
+    const previous = this.publicBindingsById.get(binding.id)
+    if (previous !== undefined) {
+      this.publicBindingsByRoute
+        .get(publicRouteKey(previous.surface, previous.exportedName, previous.space))
+        ?.delete(binding.id)
+    }
+    this.publicBindingsById.set(binding.id, binding)
+    const key = publicRouteKey(binding.surface, binding.exportedName, binding.space)
+    const routes = this.publicBindingsByRoute.get(key) ?? new Map<string, PublicBinding>()
+    routes.set(binding.id, binding)
+    this.publicBindingsByRoute.set(key, routes)
+  }
+
+  /**
+   * Returns the public bindings stored under one surface for an exported name and symbol space.
+   * @param surface - Public surface id.
+   * @param exportedName - Exported spelling.
+   * @param space - Symbol space of the export.
+   * @returns Matching bindings in deterministic identity order.
+   */
+  findPublicBindings(
+    surface: string,
+    exportedName: string,
+    space: SymbolSpace,
+  ): readonly PublicBinding[] {
+    const routes = this.publicBindingsByRoute.get(publicRouteKey(surface, exportedName, space))
+    if (routes === undefined) return []
+    return [...routes.values()].sort((left, right) => left.id.localeCompare(right.id))
+  }
+
+  /**
+   * Returns the category of a registered file.
+   * @param filePath - Workspace-prefixed file path.
+   * @returns The file category, or `undefined` when the file is not registered.
+   */
+  getFileCategory(filePath: string): FileCategory | undefined {
+    return this.files.get(filePath)?.category
+  }
+
+  /**
+   * Returns the primary declaration symbol id of a logical symbol.
+   * @param logicalId - Logical symbol id.
+   * @returns The lowest definition symbol id, else the lowest symbol id, else `undefined`.
+   */
+  getPrimaryDeclarationSymbolId(logicalId: string): string | undefined {
+    const declarations = this.declarationsByLogicalId.get(logicalId)
+    if (declarations === undefined || declarations.length === 0) return undefined
+    const lowest = (items: readonly DeclarationOccurrence[]): string | undefined =>
+      items.map((item) => item.symbolId).sort()[0]
+    const definitions = declarations.filter(
+      (declaration) => declaration.occurrenceForm === DeclarationOccurrenceForm.Definition,
+    )
+    return lowest(definitions) ?? lowest(declarations)
   }
 
   /**
@@ -100,6 +186,7 @@ export class InMemoryIndexSession implements IndexSession {
    * @param file.language - Persisted language id.
    * @param file.contentHash - Indexed content hash.
    * @param file.workspace - Owning workspace.
+   * @param file.category - Persisted file category; defaults to `'source'`.
    * @param symbols - Persisted symbols owned by the file.
    */
   hydratePersistedFile(
@@ -109,6 +196,7 @@ export class InMemoryIndexSession implements IndexSession {
       readonly language: string
       readonly contentHash: string
       readonly workspace: string
+      readonly category?: FileCategory
     },
     symbols: readonly SymbolNode[],
   ): void {
@@ -118,6 +206,7 @@ export class InMemoryIndexSession implements IndexSession {
       language: file.language,
       contentHash: file.contentHash,
       workspace: file.workspace,
+      ...(file.category !== undefined ? { category: file.category } : {}),
     })
     this.symbolsByFile.set(file.path, [...symbols])
     for (const symbol of symbols) {
@@ -142,7 +231,7 @@ export class InMemoryIndexSession implements IndexSession {
       }
       this.declarationsByLogicalId.set(item.logicalSymbolId, declarations)
     }
-    for (const binding of facts.publicBindings) this.publicBindingsById.set(binding.id, binding)
+    for (const binding of facts.publicBindings) this.putPublicBinding(binding)
     for (const binding of facts.localBindings) this.localBindingsById.set(binding.id, binding)
     for (const step of facts.steps) {
       this.resolutionStepsByKey.set(JSON.stringify([step.fromId, step.toId, step.kind]), step)
@@ -194,7 +283,7 @@ export class InMemoryIndexSession implements IndexSession {
       )
     }
     for (const binding of input.analysis.referenceFacts?.publicBindings ?? []) {
-      this.publicBindingsById.set(binding.id, binding)
+      this.putPublicBinding(binding)
     }
     for (const binding of input.analysis.referenceFacts?.localBindings ?? []) {
       this.localBindingsById.set(binding.id, binding)
@@ -227,7 +316,8 @@ export class InMemoryIndexSession implements IndexSession {
     }
 
     // Populate qualified name mappings if a namespace exists
-    if (input.analysis.namespace) {
+    // Symbols of test files are never an import target.
+    if (input.analysis.namespace && fileInfo.category !== 'test') {
       for (const symbol of input.analysis.symbols) {
         const separator = input.analysis.namespaceSeparator ?? '.'
         const qualifiedName = `${input.analysis.namespace}${separator}${symbol.name}`
@@ -338,7 +428,7 @@ export class InMemoryIndexSession implements IndexSession {
     readonly publicBindings: readonly PublicBinding[]
     readonly steps: readonly ResolutionStep[]
   }): void {
-    for (const binding of facts.publicBindings) this.publicBindingsById.set(binding.id, binding)
+    for (const binding of facts.publicBindings) this.putPublicBinding(binding)
     for (const step of facts.steps) {
       this.resolutionStepsByKey.set(JSON.stringify([step.fromId, step.toId, step.kind]), step)
     }

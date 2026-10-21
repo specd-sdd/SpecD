@@ -23,6 +23,13 @@ import {
 import { type Relation, createRelation } from '../../domain/value-objects/relation.js'
 import { SymbolKind } from '../../domain/value-objects/symbol-kind.js'
 import { RelationType } from '../../domain/value-objects/relation-type.js'
+import {
+  type ImportDiagnostic,
+  type PackageResolutionFacet,
+  type RelativeImportResolutionFacet,
+  type SymbolReferenceSyntaxFacet,
+  type ReExportLinkingFacet,
+} from '../../domain/value-objects/language-adapter-facets.js'
 import { findManifestField } from './find-manifest-field.js'
 import { splitWorkspaceIdentity } from '../../domain/services/split-workspace-identity.js'
 import {
@@ -614,6 +621,77 @@ interface TypeScriptParserState {
  * Uses tree-sitter via ast-grep to extract symbols and relations from source code.
  */
 export class TypeScriptLanguageAdapter implements LanguageAdapter {
+  private readonly packageResolutionFacet: PackageResolutionFacet = {
+    identity: (codeRoot, repoRoot) => this.getPackageIdentity(codeRoot, repoRoot),
+    prepare: (context) => {
+      // Every workspace is prepared, including workspaces that were only hydrated in an
+      // incremental run, so entry surfaces never depend on which files were analyzed.
+      const roots = sessionScopedState(
+        context.session,
+        WORKSPACE_CODE_ROOTS_KEY,
+        () => new Map<string, string>(),
+      )
+      for (const workspace of context.workspaces) {
+        roots.set(workspace.name, workspace.codeRoot)
+        prepareWorkspaceManifest(context.session, workspace.codeRoot)
+      }
+    },
+    matchSpecifier: (specifier, knownPackages) =>
+      this.resolvePackageFromSpecifier(specifier, [...knownPackages]),
+    entrySurface: (request) =>
+      this.entryCandidatePaths(
+        request.specifier,
+        request.packageName,
+        request.workspace,
+        request.session,
+      ).map((filePath) => ({ filePath, surface: filePath })),
+  }
+
+  /**
+   * Package identity, specifier matching, manifest preparation, and the published entry surface.
+   * @returns The facet this adapter provides.
+   */
+  get packageResolution(): PackageResolutionFacet {
+    return this.packageResolutionFacet
+  }
+
+  private readonly relativeImportResolutionFacet: RelativeImportResolutionFacet = {
+    resolve: (fromFile, specifier) => this.resolveRelativeImportPath(fromFile, specifier),
+  }
+
+  /**
+   * Relative module specifier to candidate files.
+   * @returns The facet this adapter provides.
+   */
+  get relativeImportResolution(): RelativeImportResolutionFacet {
+    return this.relativeImportResolutionFacet
+  }
+
+  private readonly symbolReferenceSyntaxFacet: SymbolReferenceSyntaxFacet = {
+    parse: (text) => this.parseSymbolReference(text),
+    render: (symbol, ownerPath) => this.renderSymbolReference(symbol, ownerPath),
+  }
+
+  /**
+   * Dotted member reference syntax.
+   * @returns The facet this adapter provides.
+   */
+  get symbolReferenceSyntax(): SymbolReferenceSyntaxFacet {
+    return this.symbolReferenceSyntaxFacet
+  }
+
+  private readonly reExportLinkingFacet: ReExportLinkingFacet = {
+    link: (context) => this.linkReExports(context.session, context.packageToWorkspace),
+  }
+
+  /**
+   * Named and star re-export linking.
+   * @returns The facet this adapter provides.
+   */
+  get reExportLinking(): ReExportLinkingFacet {
+    return this.reExportLinkingFacet
+  }
+
   /**
    * Declares deterministic TypeScript and JavaScript reference semantics.
    * @returns Supported reference capabilities.
@@ -643,24 +721,6 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
     }
   }
   /**
-   * Resolves a qualified name to a path.
-   * @param _qualifiedName - Qualified name.
-   * @param _codeRoot - Code root.
-   * @param _repoRoot - Repo root.
-   * @returns Resolved path, or undefined.
-   */
-  resolveQualifiedNameToPath(
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    _qualifiedName: string,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    _codeRoot: string,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    _repoRoot?: string,
-  ): string | undefined {
-    return undefined
-  }
-
-  /**
    * Returns the language identifiers this adapter handles.
    * @returns An array of supported language strings.
    */
@@ -673,7 +733,7 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
    * @param text - Human reference text.
    * @returns One owner-then-member candidate, or none for dynamic text and canonical ids.
    */
-  parseSymbolReference(text: string): ParsedSymbolReference {
+  private parseSymbolReference(text: string): ParsedSymbolReference {
     return parseDottedMemberReference(text)
   }
 
@@ -683,7 +743,7 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
    * @param ownerPath - Owner simple names.
    * @returns Generic and identical native spelling.
    */
-  renderSymbolReference(
+  private renderSymbolReference(
     symbol: LogicalSymbol,
     ownerPath: readonly string[],
   ): { readonly generic: string; readonly native: string } {
@@ -1312,14 +1372,17 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
   resolveImports(analysis: FileAnalysis, context: ImportResolutionContext): ResolvedImports {
     const importMap = new Map<string, string>()
     const fileImports: string[] = []
-    const knownPackages = [...context.packageToWorkspace.keys()]
-    const { session, qualifiedNames, packageToWorkspace, codeRoot, repoRoot } = context
+    const steps: ResolutionStep[] = []
+    const diagnostics: ImportDiagnostic[] = []
+    const { session, qualifiedNames } = context
 
     for (const imp of analysis.imports) {
       if (isFileOnlyImport(imp)) {
-        const resolved = this.resolveFileImport(imp, analysis.filePath, session, codeRoot, repoRoot)
-        if (resolved !== undefined) {
-          fileImports.push(resolved)
+        if (imp.isRelative) {
+          const resolved = this.resolveFileImport(imp, analysis.filePath, session)
+          if (resolved !== undefined) fileImports.push(resolved)
+        } else {
+          this.resolvePackageFileImport(imp, analysis.filePath, context, fileImports, diagnostics)
         }
         continue
       }
@@ -1361,29 +1424,133 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
           continue
         }
 
-        const pkgName = this.resolvePackageFromSpecifier(imp.specifier, knownPackages)
-        if (pkgName) {
-          const wsPrefix = packageToWorkspace.get(pkgName)
-          if (wsPrefix !== undefined) {
-            const candidates = session.findSymbolsByName(imp.originalName, wsPrefix + ':')
-            if (candidates.length === 1) {
-              importMap.set(imp.localName, candidates[0]!.id)
-              fileImports.push(candidates[0]!.filePath)
-            }
-          }
-        }
+        this.resolvePackageImport(
+          imp,
+          analysis,
+          context,
+          importMap,
+          fileImports,
+          steps,
+          diagnostics,
+        )
+      }
+    }
 
-        if (this.resolveQualifiedNameToPath && codeRoot) {
-          const resolvedPath = this.resolveQualifiedNameToPath(imp.specifier, codeRoot, repoRoot)
-          if (resolvedPath) {
-            fileImports.push(resolvedPath)
-            continue
-          }
+    // A re-export is a file dependency: when the source module changes, the barrel that
+    // republishes it must be re-linked, which the incremental closure learns from this edge.
+    const state = analysis.parserState as TypeScriptParserState | undefined
+    for (const reExport of state?.kind === 'typescript' ? state.reExports : []) {
+      if (reExport.specifier.startsWith('.')) {
+        const indexed = this.relativeCandidates(analysis.filePath, reExport.specifier).filter(
+          (candidate) => session.getFileId(candidate) !== undefined,
+        )
+        if (indexed.length === 1) fileImports.push(indexed[0]!)
+      } else {
+        const entries = context.packageEntryFiles(reExport.specifier)
+        if (entries.status === 'resolved') {
+          for (const entry of entries.entries) fileImports.push(entry.filePath)
         }
       }
     }
 
-    return { importMap, fileImports: [...new Set(fileImports)] }
+    return { importMap, fileImports: [...new Set(fileImports)], steps, diagnostics }
+  }
+
+  /**
+   * Records the file dependency of a side-effect, dynamic, or `require` package import.
+   * @param imp - Import declaration with a non-relative specifier.
+   * @param filePath - Importing file id.
+   * @param context - Import resolution context.
+   * @param fileImports - Receives the entry files the import depends on.
+   * @param diagnostics - Receives the reason when the package cannot be resolved.
+   */
+  private resolvePackageFileImport(
+    imp: ImportDeclaration,
+    filePath: string,
+    context: ImportResolutionContext,
+    fileImports: string[],
+    diagnostics: ImportDiagnostic[],
+  ): void {
+    const entries = context.packageEntryFiles(imp.specifier)
+    if (entries.status === 'unresolved') {
+      diagnostics.push({ filePath, specifier: imp.specifier, reason: entries.reason })
+      return
+    }
+    for (const entry of entries.entries) fileImports.push(entry.filePath)
+  }
+
+  /**
+   * Resolves one named, default, or namespace import of a package through its entry surface.
+   *
+   * A named import resolves only to a name that an entry file publishes; the imported name is
+   * never searched among the target workspace's symbols.
+   * @param imp - Import declaration with a non-relative specifier.
+   * @param analysis - Analysis of the importing file.
+   * @param context - Import resolution context.
+   * @param importMap - Receives the local name to declaration mapping.
+   * @param fileImports - Receives the entry files the import depends on.
+   * @param steps - Receives the `import:package` provenance step.
+   * @param diagnostics - Receives the reason when the import stays unresolved.
+   */
+  private resolvePackageImport(
+    imp: ImportDeclaration,
+    analysis: FileAnalysis,
+    context: ImportResolutionContext,
+    importMap: Map<string, string>,
+    fileImports: string[],
+    steps: ResolutionStep[],
+    diagnostics: ImportDiagnostic[],
+  ): void {
+    if (
+      imp.kind === ImportDeclarationKind.Namespace ||
+      imp.kind === ImportDeclarationKind.Default
+    ) {
+      const entries = context.packageEntryFiles(imp.specifier)
+      if (entries.status === 'unresolved') {
+        diagnostics.push({
+          filePath: analysis.filePath,
+          specifier: imp.specifier,
+          reason: entries.reason,
+        })
+        return
+      }
+      for (const entry of entries.entries) fileImports.push(entry.filePath)
+      if (imp.kind === ImportDeclarationKind.Default) {
+        // Bind only when the entry files declare exactly one default export.
+        const targets = new Set<string>()
+        for (const entry of entries.entries) {
+          const target = this.findDefaultExportDeclaration(context.session, entry.filePath)
+          if (target !== undefined) targets.add(target)
+        }
+        const [only] = [...targets]
+        if (targets.size === 1 && only !== undefined) importMap.set(imp.localName, only)
+      }
+      return
+    }
+    // A local binding is created for every import in `analyzeFile`. Without it the import can
+    // still resolve, but no provenance step can be linked to it.
+    const localBinding = analysis.referenceFacts?.localBindings.find(
+      (binding) => binding.scopeId === 'module' && binding.localName === imp.localName,
+    )
+    const result = context.resolvePackageExport({
+      specifier: imp.specifier,
+      exportedName: imp.originalName,
+      spaces: imp.typeOnly === true ? [SymbolSpace.Type] : [SymbolSpace.Value, SymbolSpace.Type],
+      fromFile: analysis.filePath,
+      localBindingId: localBinding?.id ?? '',
+    })
+    if (result.status === 'unresolved') {
+      diagnostics.push({
+        filePath: analysis.filePath,
+        specifier: imp.specifier,
+        exportedName: imp.originalName,
+        reason: result.reason,
+      })
+      return
+    }
+    importMap.set(imp.localName, result.targetSymbolId)
+    fileImports.push(result.entryFile)
+    if (localBinding !== undefined) steps.push(result.step)
   }
 
   /**
@@ -1488,25 +1655,17 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
    * @param imp - Import declaration.
    * @param filePath - Path of the file.
    * @param session - Index session.
-   * @param codeRoot - Code root.
-   * @param repoRoot - Repo root.
    * @returns Resolved path, or undefined.
    */
   private resolveFileImport(
     imp: ImportDeclaration,
     filePath: string,
     session: IndexSession,
-    codeRoot?: string,
-    repoRoot?: string,
   ): string | undefined {
     if (imp.isRelative) {
       const resolved = this.resolveRelativeImportPath(filePath, imp.specifier)
       const candidates = Array.isArray(resolved) ? resolved : [resolved]
       return candidates.find((candidatePath) => session.findSymbolsByFile(candidatePath).length > 0)
-    }
-
-    if (!imp.isRelative && codeRoot) {
-      return this.resolveQualifiedNameToPath?.(imp.specifier, codeRoot, repoRoot)
     }
 
     return undefined
@@ -1993,6 +2152,7 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
       if (!sourceNode) continue
       const specifier = sourceNode.text().replace(/['"]/g, '')
       const isRelative = specifier.startsWith('.')
+      const statementTypeOnly = /^import\s+type\b/.test(child.text())
       let hasClause = false
 
       for (const importChild of child.children()) {
@@ -2006,12 +2166,14 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
                   const nameNode = spec.field('name')
                   const aliasNode = spec.field('alias')
                   if (nameNode) {
+                    const typeOnly = statementTypeOnly || /^type\s/.test(spec.text())
                     addImport({
                       originalName: nameNode.text(),
                       localName: aliasNode ? aliasNode.text() : nameNode.text(),
                       specifier,
                       isRelative,
                       kind: ImportDeclarationKind.Named,
+                      ...(typeOnly ? { typeOnly: true } : {}),
                     })
                   }
                 }
@@ -2673,7 +2835,7 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
    * @param packageToWorkspace - Package name to workspace name.
    * @returns Bindings and steps added by this linking pass.
    */
-  linkReExports(
+  private linkReExports(
     session: IndexSession,
     packageToWorkspace: ReadonlyMap<string, string>,
   ): {
@@ -2802,7 +2964,10 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
     const candidates = specifier.startsWith('.')
       ? this.relativeCandidates(fromFile, specifier)
       : this.packageEntryCandidates(specifier, packageToWorkspace, session)
-    const indexed = candidates.filter((candidate) => session.getFileId(candidate) !== undefined)
+    const indexed = candidates.filter(
+      (candidate) =>
+        session.getFileId(candidate) !== undefined && session.getFileCategory(candidate) !== 'test',
+    )
     return indexed.length === 1 ? indexed[0] : undefined
   }
 
@@ -2832,16 +2997,34 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
     const packageName = this.resolvePackageFromSpecifier(specifier, [...packageToWorkspace.keys()])
     if (packageName === undefined) return []
     const workspace = packageToWorkspace.get(packageName)
-    const codeRoot =
-      workspace === undefined
-        ? undefined
-        : sessionScopedState(
-            session,
-            WORKSPACE_CODE_ROOTS_KEY,
-            () => new Map<string, string>(),
-          ).get(workspace)
-    if (workspace === undefined || codeRoot === undefined) return []
-    // Manifests were prepared during file analysis; this pass performs no filesystem reads.
+    if (workspace === undefined) return []
+    return this.entryCandidatePaths(specifier, packageName, workspace, session)
+  }
+
+  /**
+   * Maps a package specifier to the indexed source files its manifest publishes.
+   *
+   * Reads only manifests already prepared on the session; it performs no filesystem access.
+   * Runtime targets (`import`/`default` conditions, plain strings, `main`) are used first; the
+   * `types` targets are used only when no runtime target maps to an indexed source file.
+   * @param specifier - Full specifier as written, including any subpath.
+   * @param packageName - Package identity the specifier was matched to.
+   * @param workspace - Workspace that owns the package.
+   * @param session - Session holding the prepared manifests and the indexed files.
+   * @returns Indexed source file ids in manifest order, without duplicates. Empty when nothing is published.
+   */
+  private entryCandidatePaths(
+    specifier: string,
+    packageName: string,
+    workspace: string,
+    session: IndexSession,
+  ): readonly string[] {
+    const codeRoot = sessionScopedState(
+      session,
+      WORKSPACE_CODE_ROOTS_KEY,
+      () => new Map<string, string>(),
+    ).get(workspace)
+    if (codeRoot === undefined) return []
     const manifest = sessionScopedState(
       session,
       PACKAGE_MANIFESTS_KEY,
@@ -2849,16 +3032,16 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
     ).get(codeRoot)
     if (manifest === undefined || manifest === null) return []
     const subpath = specifier === packageName ? '.' : `./${specifier.slice(packageName.length + 1)}`
-    const published =
-      subpath === '.'
-        ? (publishedTarget(manifest.exports) ?? manifest.main)
-        : publishedTarget(
-            manifest.exports !== null && typeof manifest.exports === 'object'
-              ? (manifest.exports as Record<string, unknown>)[subpath]
-              : undefined,
-          )
-    if (published === undefined) return []
-    return sourceCandidates(workspace, published)
+    const targets = publishedTargets(manifest, subpath)
+    const indexed = (paths: readonly string[]): string[] => [
+      ...new Set(
+        paths
+          .flatMap((published) => sourceCandidates(workspace, published))
+          .filter((candidate) => session.getFileId(candidate) !== undefined),
+      ),
+    ]
+    const runtime = indexed(targets.runtime)
+    return runtime.length > 0 ? runtime : indexed(targets.types)
   }
 
   /**
@@ -2867,7 +3050,7 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
    * @param specifier - Relative module specifier.
    * @returns One resolved file id, or several candidates when the extension is absent.
    */
-  resolveRelativeImportPath(fromFile: string, specifier: string): string | string[] {
+  private resolveRelativeImportPath(fromFile: string, specifier: string): string | string[] {
     const identity = splitWorkspaceIdentity(fromFile)
     const wsPrefix = identity === null ? '' : `${identity.workspace}:`
     const relFile = identity === null ? fromFile : identity.relativePath
@@ -2910,7 +3093,10 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
    * @param knownPackages - Known package identities.
    * @returns The matching package name, or undefined.
    */
-  resolvePackageFromSpecifier(specifier: string, knownPackages: string[]): string | undefined {
+  private resolvePackageFromSpecifier(
+    specifier: string,
+    knownPackages: string[],
+  ): string | undefined {
     const pkgName = specifier.startsWith('@')
       ? specifier.split('/').slice(0, 2).join('/')
       : specifier.split('/')[0]!
@@ -2932,7 +3118,7 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
    * @param repoRoot - Optional repository root to bound the search.
    * @returns The `name` field from the nearest `package.json`, or undefined.
    */
-  getPackageIdentity(codeRoot: string, repoRoot?: string): string | undefined {
+  private getPackageIdentity(codeRoot: string, repoRoot?: string): string | undefined {
     return findManifestField(
       codeRoot,
       'package.json',
@@ -2945,37 +3131,102 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
   }
 }
 
+/** Published targets of one package entry, split by how a consumer reaches them. */
+interface PublishedTargets {
+  /** Runtime targets (`import` and `default` conditions, plain strings, `main`). */
+  readonly runtime: readonly string[]
+  /** Type-declaration targets (`types` condition), used only when no runtime target is indexed. */
+  readonly types: readonly string[]
+}
+
 /**
- * Reads the published relative path from an exports target.
+ * Collects the targets named by one `exports` value.
  *
- * A plain string path, or a subpath map whose `.` entry is a plain string path, is read.
- * Conditional exports (`import`, `require`, `default`, and other conditions) depend on the
- * consumer's platform and resolution conditions, which this adapter cannot prove, so they
- * remain unsupported and select nothing.
- * @param raw - String target or subpath map.
- * @returns The published relative path, or undefined when the target is not a plain string path.
+ * Plain strings and arrays are read as is. Condition objects are read through their `import`
+ * then `default` alternatives, with `types` kept apart. Every other condition (`require`,
+ * `node`, `browser`, ...) depends on the consumer's platform, which this adapter cannot prove,
+ * so it selects nothing.
+ * @param node - Value of an `exports` entry.
+ * @param runtime - Receives runtime targets.
+ * @param types - Receives type-declaration targets.
+ * @param underTypes - True when `node` was reached through a `types` condition.
  */
-function publishedTarget(raw: unknown): string | undefined {
-  if (typeof raw === 'string') return raw
-  if (raw === null || typeof raw !== 'object') return undefined
-  const record = raw as Record<string, unknown>
-  return typeof record['.'] === 'string' ? record['.'] : undefined
+function collectPublishedTargets(
+  node: unknown,
+  runtime: string[],
+  types: string[],
+  underTypes: boolean,
+): void {
+  if (typeof node === 'string') {
+    ;(underTypes ? types : runtime).push(node)
+    return
+  }
+  if (Array.isArray(node)) {
+    for (const item of node) collectPublishedTargets(item, runtime, types, underTypes)
+    return
+  }
+  if (node === null || typeof node !== 'object') return
+  const record = node as Record<string, unknown>
+  collectPublishedTargets(record['import'], runtime, types, underTypes)
+  collectPublishedTargets(record['default'], runtime, types, underTypes)
+  collectPublishedTargets(record['types'], runtime, types, true)
+}
+
+/**
+ * Reads the targets a package manifest publishes for one subpath.
+ *
+ * With `exports` defined, only the subpaths it lists are published. Without `exports`, the
+ * package root is published through `main`. `main` is never a fallback when `exports` is
+ * defined, even if `exports` offers no usable target.
+ * @param manifest - Prepared package manifest.
+ * @param subpath - `.` for the package root, otherwise `./<subpath>`.
+ * @returns The published runtime and type targets, empty when nothing is published.
+ */
+function publishedTargets(manifest: PackageEntryManifest, subpath: string): PublishedTargets {
+  const runtime: string[] = []
+  const types: string[] = []
+  const field = manifest.exports
+  if (field !== undefined && field !== null) {
+    let entry: unknown
+    if (typeof field === 'string' || Array.isArray(field)) {
+      entry = subpath === '.' ? field : undefined
+    } else if (typeof field === 'object') {
+      const record = field as Record<string, unknown>
+      const isSubpathMap = Object.keys(record).some((key) => key.startsWith('.'))
+      entry = isSubpathMap ? record[subpath] : subpath === '.' ? record : undefined
+    }
+    collectPublishedTargets(entry, runtime, types, false)
+  }
+  const hasExports = field !== undefined && field !== null
+  if (!hasExports && subpath === '.' && manifest.main !== undefined) {
+    runtime.push(manifest.main)
+  }
+  return { runtime, types }
 }
 
 /**
  * Maps a published package path onto indexed source file ids.
  * @param workspace - Workspace that owns the package.
  * @param published - Relative path from package exports or main.
- * @returns Candidate source file ids. The caller keeps a candidate only when exactly one is indexed.
+ * @returns Candidate source file ids. The caller keeps the candidates that are indexed files.
  */
 function sourceCandidates(workspace: string, published: string): readonly string[] {
   let relative = published.replace(/^\.\//, '')
+  relative = relative.replace(/\.d\.(?:ts|mts|cts)$/, '')
   relative = relative.replace(/\.(?:js|jsx|mjs|cjs)$/, '')
   if (relative.startsWith('dist/')) relative = `src/${relative.slice('dist/'.length)}`
   relative = relative.replace(/\.(?:ts|tsx)$/, '')
+  // TypeScript sources first, then JavaScript sources for packages written in JavaScript.
   return [
     `${workspace}:${relative}.ts`,
     `${workspace}:${relative}.tsx`,
     `${workspace}:${relative}/index.ts`,
+    `${workspace}:${relative}/index.tsx`,
+    `${workspace}:${relative}.js`,
+    `${workspace}:${relative}.jsx`,
+    `${workspace}:${relative}.mjs`,
+    `${workspace}:${relative}.cjs`,
+    `${workspace}:${relative}/index.js`,
+    `${workspace}:${relative}/index.jsx`,
   ]
 }

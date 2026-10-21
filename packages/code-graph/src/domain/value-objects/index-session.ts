@@ -3,6 +3,7 @@ import { type SpecNode } from './spec-node.js'
 import { type DocumentNode } from './document-node.js'
 import { type Relation } from './relation.js'
 import { type FileAnalysis, type FileAnalysisDraft } from './file-analysis.js'
+import { type FileCategory } from './file-node.js'
 import {
   type DeclarationOccurrence,
   type LocalBinding,
@@ -10,6 +11,7 @@ import {
   type LogicalSymbol,
   type PublicBinding,
   type ResolutionStep,
+  type SymbolSpace,
 } from './symbol-reference.js'
 
 /** The evidence state recorded for every source target considered by an index run. */
@@ -47,6 +49,8 @@ export interface RegisterFileInput {
   readonly language: string
   readonly contentHash: string
   readonly workspace: string
+  /** File category; defaults to `'source'` when omitted. */
+  readonly category?: FileCategory
 }
 
 /**
@@ -96,6 +100,13 @@ export interface IndexSession {
    * Finds all symbols matching a simple name, optionally filtered by file path prefix.
    */
   findSymbolsByName(name: string, filePrefix?: string): readonly SymbolNode[]
+
+  /**
+   * Finds one registered symbol by its exact id, in any workspace.
+   * @param symbolId - Symbol id.
+   * @returns The symbol, or `undefined` when it is not registered.
+   */
+  findSymbolById(symbolId: string): SymbolNode | undefined
 
   /**
    * Finds a symbol's ID by its qualified name.
@@ -164,6 +175,34 @@ export interface IndexSession {
 
   /** Returns lexical bindings recorded for this session. */
   getLocalBindings(): readonly LocalBinding[]
+
+  /**
+   * Returns the public bindings stored under one surface for an exported name and symbol space.
+   * @param surface - Public surface id.
+   * @param exportedName - Exported spelling.
+   * @param space - Symbol space of the export.
+   * @returns Matching bindings in deterministic identity order, empty when none.
+   */
+  findPublicBindings(
+    surface: string,
+    exportedName: string,
+    space: SymbolSpace,
+  ): readonly PublicBinding[]
+
+  /**
+   * Returns the category of a registered file.
+   * @param filePath - Workspace-prefixed file path.
+   * @returns The file category (`'source'` when none was recorded), or `undefined` when the file is not registered.
+   */
+  getFileCategory(filePath: string): FileCategory | undefined
+
+  /**
+   * Returns the primary declaration symbol id of a logical symbol: the lowest symbol id
+   * among definition occurrences, falling back to the lowest symbol id of any occurrence.
+   * @param logicalId - Logical symbol id.
+   * @returns The symbol id, or `undefined` when the logical symbol has no declaration.
+   */
+  getPrimaryDeclarationSymbolId(logicalId: string): string | undefined
 
   /** Returns resolution steps recorded for this session. */
   getResolutionSteps(): readonly ResolutionStep[]

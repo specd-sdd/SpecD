@@ -1,0 +1,340 @@
+- op: modified
+  description: Replace the loose optional methods with the required core plus declared facets
+  selector:
+    type: section
+    matches: 'Requirement: LanguageAdapter interface'
+  content: |
+    `LanguageAdapter` SHALL be an interface (not an abstract class, since adapters are stateless and have no shared state to inherit). It consists of a **required core** and **optional facets**.
+
+    The required core is:
+
+    - **`languages(): string[]`** — returns the language identifiers this adapter handles (e.g. `['typescript', 'tsx', 'javascript', 'jsx']`)
+    - **`extensions(): Record<string, string>`** — returns the file extension to language ID mapping (e.g. `{ '.ts': 'typescript', '.tsx': 'tsx' }`). The adapter registry uses this to resolve files to adapters — no hardcoded extension map.
+    - **`resolutionManifests(): readonly string[]`** — returns the exact basenames of the manifests this adapter reads for package identity or import resolution. The method is required, synchronous, and MUST NOT perform I/O. An adapter that reads no resolution manifest MUST return an empty array. Values MUST be exact filenames, not globs or directory paths.
+    - **`analyzeFile(filePath: string, content: string, context: AdapterAnalyzeContext): FileAnalysisDraft`** — parses the file content once and returns the complete compact analysis required by indexing for that file, including symbols, imports, deterministic binding facts, deterministic call facts, namespace data when relevant, and optional compact parser-specific state.
+    - **`resolveImports(analysis: FileAnalysis, context: ImportResolutionContext): ResolvedImports`** — resolves the file's previously extracted import declarations, qualified names, aliases, and deterministic file targets using the shared session lookups instead of re-reading or re-parsing file content. `ResolvedImports` carries the import map, the file-level imports, the resolution steps that explain each cross-file import, and the diagnostics for imports that stayed unresolved.
+    - **`buildRelations(analysis: FileAnalysis, context: RelationBuildContext): readonly Relation[]`** — builds deterministic graph relations for the file from the stored analysis facts and resolved import information. For code-file dependencies, adapters SHOULD emit concrete relations (`CALLS`, `CONSTRUCTS`, `USES_TYPE`, hierarchy relations) when targets are resolvable. File-level `IMPORTS` relations are derived by the indexer from the resolved imports returned by `resolveImports()`; an adapter MAY emit `IMPORTS` only for loader-style dependencies that only the adapter can prove; `DEPENDS_ON` remains reserved for spec-level dependency edges.
+
+    The optional facets are readonly properties of the adapter. A facet is declared by being present; the facets are:
+
+    - **`packageResolution`** — package identity, specifier matching, and the package entry surface (see "Package resolution facet").
+    - **`relativeImportResolution`** — relative module specifier to candidate files (see "Relative import resolution facet").
+    - **`qualifiedNameResolution`** — qualified-name construction and qualified-name to file mapping (see "Qualified-name resolution facet").
+    - **`symbolReferenceSyntax`** — parse and render of human and native symbol references (see "Symbol reference syntax facet").
+    - **`reExportLinking`** — linking of re-export routes into public bindings (see "Re-export linking facet").
+
+    The existing `capabilities()` and `declarationPolicy()` declarations are separate from facets. `capabilities()` states which semantic categories the adapter can prove (see "Resolver capability declaration"); facets state which resolution services the adapter provides. A facet MUST NOT be used to declare a semantic capability, and a capability flag MUST NOT be used to declare a facet.
+
+    All adapter and facet methods MUST be synchronous and deterministic with respect to the provided arguments and shared session context. They receive content as a string during analysis, not a file path to read, and they MUST NOT perform side effects outside the indexing session. Adapters MAY read and update compact run-scoped adapter cache state only through the `IndexSession` API exposed by the provided contexts. The only methods allowed to perform I/O are the ones this spec names explicitly as such.
+
+    The default TypeScript adapter MUST return `['package.json']` from `resolutionManifests()`.
+
+- op: added
+  description: Define what a facet is and the rules every facet follows
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: LanguageAdapter interface'
+  content: |
+    ### Requirement: Adapter facet model
+
+    A **facet** is a cohesive group of resolution services that an adapter provides only when it supports them. It is an object exposed as an optional readonly property of the adapter. All members of a facet are required: a facet MUST NOT contain optional members. An adapter that cannot provide every member of a facet MUST NOT expose that facet.
+
+    Presence of a facet is the adapter's declaration that it supports the capability behind it. The indexer, the resolver, and other consumers MUST decide what to do from the presence of the facet property and MUST NOT probe for individual methods. A consumer MUST NOT branch on a language identifier, a file extension, or a manifest name to compensate for an absent facet.
+
+    When a facet is absent:
+
+    - the behaviour that depends on it SHALL NOT run for that adapter;
+    - no error SHALL be raised and no heuristic fallback SHALL replace it;
+    - the affected items SHALL stay unresolved, and the run result SHALL list the adapter in `importDiagnostics.adaptersWithoutPackageResolution` when the missing facet is `packageResolution`. That listing is not a resolution failure and is never counted in `importDiagnostics.total`.
+
+    A facet that is present but throws while being used SHALL NOT stop the run. A failure inside per-file resolution is recorded for that file by the indexer's error isolation. A failure inside `identity`, `prepare`, or `link` is recorded as an indexing error, and the adapter is treated as if it did not provide `packageResolution` for the rest of the run, including the other workspaces; such an adapter is also listed in `importDiagnostics.adaptersWithoutPackageResolution`.
+
+    Facets are part of the public adapter contract. Each facet's members, argument and result types, purity, and I/O allowance are fixed by this spec. A new facet is added by a change to this spec; consumers MUST NOT rely on an adapter-specific extension.
+
+    Adding a new language SHALL require only a new adapter that implements the required core and any facets it supports. It MUST NOT require a change to the indexer, the index session, the resolver, or the graph stores.
+
+- op: added
+  description: Package resolution facet contract
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Adapter facet model'
+  content: |
+    ### Requirement: Package resolution facet
+
+    The `packageResolution` facet SHALL let the indexer connect a package specifier used in one workspace to the files that the target workspace's package publishes. It has these members:
+
+    - **`identity(codeRoot: string, repoRoot?: string): string | undefined`** — searches at and above `codeRoot`, bounded by `repoRoot`, for the language's package manifest and returns the package identity, or `undefined` when none is found. This method MAY perform I/O. It is called once per workspace before Pass 1 completes.
+    - **`prepare(context: PackagePreparationContext): void`** — prepares, for every workspace, the data that `matchSpecifier` and `entrySurface` need and stores it as compact immutable data in the run-scoped session. It MAY read manifests (I/O is allowed here and in `identity`). It MAY do nothing when the adapter derives everything from the package map, the matched package, the owning workspace, and the indexed file set; such an adapter still provides the member. A manifest may be read by both `identity` and `prepare`. `PackagePreparationContext` carries the `IndexSession`, the list of workspaces (`name` and `codeRoot`), and the repository root. The indexer calls it once per run, after all workspaces have been analyzed and before any import is resolved, and it MUST NOT be called again during Pass 2.
+    - **`matchSpecifier(specifier: string, knownPackages: readonly string[], session: IndexSession): string | undefined`** — returns which known package identity a non-relative specifier refers to, using the language's matching rules (for example the longest known prefix). It depends only on its arguments and on the data `prepare` stored in the session, performs no I/O, and has no side effects. Languages whose specifiers are not named after the package (for example PHP, where a qualified name belongs to the package whose autoload prefix matches it) read the prepared data through `session`.
+    - **`entrySurface(request: PackageEntryRequest): readonly PackageEntry[]`** — returns the ordered candidate entries through which the matched package publishes the requested specifier. A `PackageEntry` has a workspace-prefixed `filePath` and the public `surface` id under which that file's exports are stored (for most languages the file itself; for Go, the package). `PackageEntryRequest` carries the full specifier (including any subpath), the matched package identity, the target workspace name, and the `IndexSession`. It reads only the data stored by `prepare`; it MUST NOT perform I/O. It returns an empty array when the package publishes nothing for that specifier. The indexer discards entries whose file is not an indexed file.
+
+    The facet MUST derive entry files only from the language's package manifest and layout rules. It MUST NOT search symbols by name. The shared helper discards entries classified as tests, so a test file is never a package entry whether or not the facet returned it.
+
+    Every manifest basename the facet reads MUST appear in `resolutionManifests()`, and `resolutionManifests()` MUST NOT name a file the adapter does not read for package identity or import resolution.
+
+    Each adapter reads its language's manifest as follows:
+
+    | Language   | Manifest file    | Identity field   |
+    | ---------- | ---------------- | ---------------- |
+    | TypeScript | `package.json`   | `name`           |
+    | Python     | `pyproject.toml` | `[project].name` |
+    | Go         | `go.mod`         | `module`         |
+    | PHP        | `composer.json`  | `name`           |
+
+    The `repoRoot` parameter is resolved by the CLI/MCP layer using the VCS adapter (`VcsAdapter.rootDir()`), making it VCS-agnostic (git, hg, svn). When it is not provided, the manifest search walks up to the filesystem root.
+
+    An adapter that does not provide this facet contributes no package identities, and package-specifier imports from and to its workspaces stay unresolved.
+
+- op: added
+  description: Relative import resolution facet contract
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Package resolution facet'
+  content: |
+    ### Requirement: Relative import resolution facet
+
+    The `relativeImportResolution` facet SHALL map a relative module specifier to candidate files using the language's extension and index-file conventions. It has one member:
+
+    - **`resolve(fromFile: string, specifier: string): string | readonly string[]`** — returns one candidate file id or several, relative to the importing file. It is pure and MUST NOT perform I/O. It does not choose among candidates; the caller keeps only candidates that are indexed files.
+
+    An adapter whose language has no relative imports MUST NOT provide this facet.
+
+- op: added
+  description: Qualified-name resolution facet contract
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Relative import resolution facet'
+  content: |
+    ### Requirement: Qualified-name resolution facet
+
+    The `qualifiedNameResolution` facet SHALL support languages whose imports and loaders are addressed by namespace-qualified names. It has these members:
+
+    - **`build(namespace: string, symbolName: string): string`** — builds the language's canonical qualified name. It is pure.
+    - **`resolveToPath(qualifiedName: string, codeRoot: string, session: IndexSession): string | undefined`** — maps a qualified name to a source file path using only metadata already prepared in the run-scoped session. It MUST NOT read the filesystem, and it is synchronous and deterministic.
+
+    Metadata such as PSR-4 maps MUST come from compact state prepared during analysis or by the `packageResolution.prepare` step. An adapter that has no qualified-name addressing MUST NOT provide this facet.
+
+- op: added
+  description: Symbol reference syntax facet contract
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Qualified-name resolution facet'
+  content: |
+    ### Requirement: Symbol reference syntax facet
+
+    The `symbolReferenceSyntax` facet SHALL let a consumer accept and display human-written symbol references in the adapter's language. It has these members:
+
+    - **`parse(text: string): ParsedSymbolReference`** — parses supported human and native member-reference syntax into structured owner-then-member selectors. It returns zero, one, or many explicit candidates. Dynamic or ambiguous syntax stays unresolved. It is pure.
+    - **`render(symbol: LogicalSymbol, ownerPath: readonly string[]): { generic: string; native?: string }`** — renders a generic spelling and an optional language-native spelling from a structured logical member. `ownerPath` lists the owner names from the root to the immediate owner. It is pure.
+
+    A consumer needing human-reference parsing for a language whose adapter does not provide this facet SHALL treat the reference as unresolved.
+
+- op: added
+  description: Re-export linking facet contract
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Symbol reference syntax facet'
+  content: |
+    ### Requirement: Re-export linking facet
+
+    The `reExportLinking` facet SHALL turn re-export routes found during analysis into public bindings and resolution steps. It has one member:
+
+    - **`link(context: ReExportLinkContext): ReExportLinkResult`** — receives the `IndexSession`, the package map, and the prepared manifest facts, and returns the public bindings and resolution steps to add. It MUST NOT perform I/O.
+
+    The indexer SHALL run every present `reExportLinking` facet after all workspaces have completed Pass 1 and before any import is resolved in Pass 2. Import resolution MUST therefore see the final public bindings of every entry surface, including bindings reached through barrel chains and other workspaces. Linking MUST depend only on facts available after Pass 1 and the prepared manifest facts.
+
+- op: added
+  description: Context the indexer gives adapters to resolve package imports
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Re-export linking facet'
+  content: |
+    ### Requirement: Package import resolution context
+
+    `ImportResolutionContext` SHALL expose the data and the shared helpers an adapter needs to resolve non-relative imports without implementing the lookup itself:
+
+    - the list of workspaces (`name` and `codeRoot`) and the `packageName → workspaceName` map;
+    - **`packageEntryFiles(specifier: string): PackageEntryResolution`** — uses the importing adapter's `packageResolution` facet to match the specifier to a known package, obtain its `entrySurface`, and return the entries whose file is indexed;
+    - **`resolvePackageExport(request: PackageExportRequest): PackageExportResolution`** — for an exported name and the symbol spaces to consider, reads the public bindings stored under the surfaces of the entries that `packageEntryFiles` returned and resolves the name to a logical target. The adapter passes every space the import could address (for example `value` and `type` for a plain named import, `type` only for a type-only import).
+
+    `resolvePackageExport` SHALL resolve a name only when every binding found in every requested space and every entry leads to the same logical target. When nothing exports the name, or the bindings lead to different targets, the result is unresolved with a reason. The reasons are: `facet-absent`, `package-unknown`, `no-entry-surface`, `not-exported`, and `ambiguous`. The result for a resolved name carries the target logical id, the entry file, and the public binding id used.
+
+    An adapter SHALL resolve a package-specifier import by calling these helpers. It MUST NOT search symbols by name in the target workspace, and it MUST NOT choose the first or a unique same-name symbol. The helpers are implemented generically by the indexer and contain no language-specific logic.
+
+    `ResolvedImports` SHALL include a `steps` entry of kind `import:package` for each resolved package import, from the importing file's local binding id to the public binding id, and a diagnostics entry with the reason for each package import that stayed unresolved. The indexer SHALL persist the steps and SHALL NOT persist the diagnostics. The indexer does not treat `package-unknown` as a failure: an import of a package that no workspace declares is an external dependency and is only counted.
+
+- op: modified
+  description: Package identity is now part of the package resolution facet
+  selector:
+    type: section
+    matches: 'Requirement: Package identity extraction'
+  content: |
+    Package identity SHALL be provided by `packageResolution.identity`, defined in "Package resolution facet". An adapter that does not provide the facet has no package identity, and cross-workspace resolution for its workspaces stays unresolved.
+
+    The indexer calls `identity` for each workspace's `codeRoot` to build a `packageName → workspaceName` map. This enables cross-workspace import resolution without coupling the indexer to any language's package system.
+
+    For Python, the identity field is the `name` key inside the `[project]` table only. A `name` key in any other table, including `[tool.poetry]`, MUST NOT be used. Double-quoted and single-quoted TOML strings MUST both match. When `[project].name` is absent, that file MUST NOT yield an identity and the search MUST continue to the next manifest on the walk.
+
+    `identity` and `prepare` perform I/O (they read manifest files from disk). `resolutionManifests()` MUST NOT perform that I/O.
+
+- op: modified
+  description: Import specifier resolution goes through facets and the shared context
+  selector:
+    type: section
+    matches: 'Requirement: Import specifier resolution'
+  content: |
+    Import and qualified-name resolution often need project-wide file and symbol existence checks.
+
+    Adapters SHALL resolve imports and dynamic file targets through the shared `IndexSession` indexes and the helpers exposed by `ImportResolutionContext` rather than by scanning all symbols or re-reading the filesystem during Pass 2.
+
+    - `packageResolution.matchSpecifier` and `packageResolution.entrySurface` resolve a package specifier to entry files; the context helpers resolve the exported name.
+    - `qualifiedNameResolution.resolveToPath` resolves qualified names (like PHP namespaces) to source file paths when the language supports deterministic mapping.
+    - `relativeImportResolution.resolve` produces the candidate files of a relative specifier.
+    - `resolveImports` combines raw import declarations, the facets above, and parser-specific deterministic rules into resolved import targets.
+
+    Any metadata needed during Pass 2 (for example PSR-4 maps or package `exports`) MUST come from compact state prepared by `packageResolution.prepare` or during analysis. Pass 2 MUST NOT probe the filesystem for per-import existence checks.
+
+    The PHP adapter in particular MUST use the shared session's common file and symbol lookups for CakePHP, CodeIgniter, and namespace-driven resolution so dynamic path resolution does not regress into O(N) scans of all workspace symbols.
+
+- op: modified
+  description: Re-export bindings use the re-export linking facet and the shared entry surface
+  selector:
+    type: section
+    matches: 'Requirement: Re-export public bindings'
+  content: |
+    The adapter SHALL resolve each re-export specifier through its `reExportLinking` facet and emit the public bindings and resolution steps that are stored.
+
+    A relative specifier SHALL resolve to a source file in the importing workspace through `relativeImportResolution`. A non-relative package specifier SHALL resolve through `packageResolution` using the same entry surface that ordinary package imports use. For TypeScript, `package.json` `name` plus `exports` or `main`, including `.js` to the indexed source extension, is that map. `@specd/code-graph` MUST resolve through `exports["."]` to the indexed source of `dist/public.js`. `@specd/code-graph/internal` MUST resolve through the `./internal` export to the indexed source of `dist/index.js`.
+
+    The emitted binding SHALL use the re-exporting file as `surface` and the logical id already published by the entry file as `targetId`, including when that id belongs to another workspace. The adapter MUST NOT choose the first symbol of that name anywhere in the target workspace. A specifier that does not resolve to exactly one indexed entry file MUST NOT produce a guessed binding.
+
+    The indexer SHALL persist those facts. It MUST NOT read `package.json`, `exports`, `main`, or a TypeScript re-export route, and it MUST NOT copy bindings itself.
+
+- op: modified
+  description: Human reference parse and render is the symbol reference syntax facet
+  selector:
+    type: section
+    matches: 'Requirement: Human reference parse and render'
+  content: |
+    The `symbolReferenceSyntax` facet SHALL parse supported human and native member-reference syntax into structured owner-then-member selectors, and SHALL render a generic spelling plus an optional language-native spelling from a structured logical member. Parsing MUST return zero, one, or many explicit candidates. Dynamic or ambiguous syntax MUST stay unresolved.
+
+    Canonical and already-structured requests MUST NOT be parsed as human text. The adapter MUST NOT split a reference on `.` inside the shared domain. `resolutionManifests()` MUST remain the adapter-sourced fingerprint input and MUST NOT perform I/O.
+
+- op: modified
+  description: Registration validates the adapter shape
+  selector:
+    type: section
+    matches: 'Requirement: Adapter registry'
+  content: |
+    An `AdapterRegistry` SHALL map language identifiers to `LanguageAdapter` instances. It provides:
+
+    - **`register(adapter: LanguageAdapter): void`** — validates the adapter, then registers it for all languages it declares and all file extensions from `adapter.extensions()`
+    - **`getAdapter(languageId: string): LanguageAdapter | undefined`** — returns the adapter for a language, or `undefined` if none registered
+    - **`getAdapterForFile(filePath: string): LanguageAdapter | undefined`** — resolves extension → language → adapter using the dynamically built extension map
+    - **`getLanguageForFile(filePath: string): string | undefined`** — resolves extension → language identifier (e.g. `'typescript'`, `'python'`), or `undefined` if no adapter handles the extension
+    - **`getAdapters(): LanguageAdapter[]`** — returns all unique registered adapters
+
+    The extension-to-language map is built dynamically from registered adapters — there is no hardcoded extension list in the registry. Adding a new language requires only registering a new adapter.
+
+    Adapters SHALL be registered via `register()`. Built-in adapters (such as TypeScript, Python, Go, and PHP) are registered into the registry through composition providers.
+
+    `LanguageAdapter` is public API and adapters may be written outside this repository, so `register()` SHALL validate the adapter before changing any registry state. Registration MUST fail with a `SpecdError` carrying the code `INVALID_LANGUAGE_ADAPTER`, and MUST leave the registry unchanged, when:
+
+    - a required core member is missing or is not a function;
+    - `languages()` returns no identifier, or `extensions()` maps an extension to a language the adapter does not declare;
+    - a facet property is present but is not an object providing every member of that facet as a function.
+
+    The error message SHALL name the offending adapter language, the failed rule, and the missing or invalid member.
+
+    Registering an adapter for a language that is already registered SHALL replace the adapter previously registered for that language: the later registration wins, so a third-party adapter can substitute a built-in one. Replacement is per language. The extension mappings the new adapter declares overwrite earlier mappings of the same extension. An earlier adapter keeps every language the new adapter does not declare, and an adapter that no longer serves any language SHALL NOT be returned by `getAdapters()`, so no consumer consults it. Registering the same adapter instance again changes nothing.
+
+- op: modified
+  description: Resolver capability declaration disambiguation from facets
+  selector:
+    type: section
+    matches: 'Requirement: Resolver capability declaration'
+  content: |
+    Every adapter SHALL declare the semantic categories it can deterministically prove: declarations, members, public/local bindings, hierarchy, and build-context selection. A capability flag MUST be true only when the adapter emits enough shared facts and ordered provenance for the generic resolver to prove that category. A graph relation emitted only for impact traversal does not by itself satisfy the corresponding resolver capability.
+
+    Capability flags describe what the adapter can prove. They are distinct from facets, which describe the resolution services the adapter provides (see "Adapter facet model").
+
+    Missing capability support SHALL be recorded as unsupported coverage rather than guessed by the generic resolver. Emitted facts SHALL use the shared logical-symbol, binding, symbol-space, member-form, source-range, hierarchy, provenance-step, and coverage vocabulary. Adapter-specific syntax MUST NOT leak into generic resolver branches.
+
+- op: added
+  description: Authoring guide for new adapters
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Adding a language adapter
+
+    A new language adapter SHALL be added by completing these steps, in order, without changing the indexer, the index session, the resolver, or the graph stores:
+
+    1. Implement the required core: `languages`, `extensions`, `resolutionManifests`, `analyzeFile`, `resolveImports`, `buildRelations`.
+    2. Declare `capabilities()` and `declarationPolicy()` truthfully for the semantic categories the adapter can prove.
+    3. Provide each facet the language supports, with every member of the facet. Skip a facet when the language has no equivalent concept; do not provide a partial facet.
+    4. List every manifest the facets read in `resolutionManifests()`, and nothing else.
+    5. Register the adapter. Fix every `INVALID_LANGUAGE_ADAPTER` error before continuing.
+    6. Pass the cross-language semantic conformance suite and the facet scenarios in this spec's verification.
+    7. Write the adapter's specific spec and add it to the list of built-in adapter specs when it is built in.
+
+    The same guide, restated for readers without access to the specs, SHALL be published in `docs/code-graph/language-adapters.md`. The spec and the page MUST state the same rules.
+
+- op: modified
+  description: Constraints reflect facets
+  selector:
+    type: section
+    matches: 'Constraints'
+  content: |
+    - LanguageAdapter is an interface, not an abstract class — adapters are stateless
+    - The adapter contract is a required core plus optional facets; a facet is declared by being present and has no optional members
+    - Consumers decide from facet presence, never from probing individual methods, language identifiers, extensions, or manifest names
+    - `analyzeFile`, `resolveImports`, and `buildRelations` are synchronous and deterministic
+    - `analyzeFile` receives content, not file handles, and emits a complete `FileAnalysisDraft`
+    - Per-file parser state and run-scoped adapter cache state MUST remain compact plain data
+    - `resolutionManifests()` MUST NOT perform I/O
+    - Facet methods may read manifests only in `packageResolution.identity` and `packageResolution.prepare`, and Pass 2 import resolution must not probe the filesystem per candidate. Adapters may keep populating run-scoped session state from manifests while analyzing files, as they did before facets existed
+    - Resolution methods (`matchSpecifier`, `entrySurface`, `resolveToPath`, `resolveImports`) are synchronous and deterministic
+    - `qualifiedNameResolution.resolveToPath` SHOULD read parsed autoloader/manifest metadata prepared per codeRoot or session to avoid repeated disk reads during a single indexing run
+    - The indexer MUST NOT contain language-specific resolution logic — all of it is delegated to adapters through facets
+    - Adding a language MUST NOT require a change to the indexer
+    - Unrecognized file extensions are silently skipped
+    - Unresolvable call targets are silently dropped
+    - Dynamic loader calls with non-literal arguments are silently dropped
+    - Unresolvable dynamic loader targets are silently dropped for file dependency modeling
+    - require/include expressions with non-literal or dynamic path arguments are silently dropped
+    - Loader API support is registry-based and extensible (no hardcoded single-loader assumptions)
+    - Tree-sitter query patterns are internal — not part of the public API
+    - The TypeScript adapter is always registered by default
+    - Hierarchy relations are emitted only when their targets can be resolved deterministically
+    - Scoped binding facts and call facts MUST NOT perform fuzzy or runtime inference
+    - No dependency on @specd/core

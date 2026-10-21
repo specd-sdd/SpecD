@@ -146,10 +146,12 @@ The indexer MUST NOT retain parser ASTs, parse trees, or equivalent heavyweight 
 Extraction proceeds in two passes over the discovered files, using a shared in-memory `IndexSession` rather than repeated adapter extraction or graph-store lookups during analysis:
 
 - **Pass 1 (Analyze files, per workspace)** — For each workspace, for each file in chunks: read content, derive a complete `FileAnalysis` through the language adapter, register the file analysis in the shared `IndexSession`, and emit `DEFINES` and `EXPORTS` relations from the registered symbols. The session owns common in-memory lookups for files, symbols, qualified names, and parser-emitted facts. No store queries are needed during extraction.
+- **Before Pass 1** — The indexer builds the `packageName → workspaceName` map from the `packageResolution` facets. Package identity comes from manifests only and needs no analysis.
+- **Between the passes** — After every workspace has completed Pass 1 and unchanged workspaces have been hydrated, the indexer (1) calls `packageResolution.prepare` once per adapter so the data for all workspaces is stored in the session, and (2) runs every present `reExportLinking` facet so public bindings are final. No import is resolved before these steps finish.
 - **Pass 2 (Resolve imports + scoped bindings + relations, all workspaces)** — For each analyzed file, resolve imports and cross-file targets from the facts stored in the `IndexSession`, then derive `IMPORTS`, `CALLS`, `CONSTRUCTS`, `USES_TYPE`, hierarchy, and other deterministic relations from the stored facts without re-parsing the file. Shared scoped resolution owns cross-language receiver, type-reference, constructor, and call-candidate lookup against the session indexes.
 - **Specs (per workspace)** — For each workspace: iterate through specs provided by the `SpecRepository`.
 
-This two-pass approach ensures all symbols exist in the shared session before import, binding, call, and hierarchy resolution, while avoiding store queries and repeated file analysis during indexing.
+This approach ensures all symbols and final public bindings exist in the shared session before import, binding, call, and hierarchy resolution, while avoiding store queries and repeated file analysis during indexing.
 
 - **Bulk commit** — After all passes complete, commit one bulk write session so the indexed generation is persisted atomically.
 - **Search index rebuild** — The commit rebuilds the semantic and content search indexes once before the store reports ready.
@@ -184,6 +186,8 @@ The scoped binding environment builder SHALL be shared code-graph logic, not ada
 - free call, member call, static call, and constructor call candidates
 
 The indexer SHALL use the environment to resolve `CALLS`, `CONSTRUCTS`, `USES_TYPE`, `IMPORTS`, `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES` only when the target can be selected deterministically. It MUST NOT query the store during analysis and MUST NOT add language-specific resolution rules to `IndexCodeGraph`.
+
+A name that an import binds to a resolved declaration SHALL resolve to that declaration, in whichever workspace it is declared. The environment MUST resolve it through the session lookup of that declaration by id, and MUST NOT replace it with a same-name symbol of the importing workspace. A same-name search within the importing workspace is only allowed for a name that no import binds.
 
 The indexer SHALL drop any resolved symbol-to-symbol dependency relation whose source symbol id equals its target symbol id before staging relations for persistence.
 
@@ -224,11 +228,28 @@ The indexer SHALL log the execution time of each major internal phase (e.g., Fil
 
 ### Requirement: Cross-workspace package resolution
 
-Before later resolution passes, the indexer SHALL build a `packageName → workspaceName` map by calling `adapter.getPackageIdentity(codeRoot)` for each workspace. The indexer iterates over registered adapters and the first one to return a non-`undefined` identity wins. Each adapter reads its own manifest. The indexer MUST NOT parse `package.json`, `exports`, `main`, `go.mod`, `pyproject.toml`, or `composer.json` itself.
+Before Pass 1, the indexer SHALL build a `packageName → workspaceName` map by calling `packageResolution.identity(codeRoot, repoRoot)` for each workspace on each registered adapter that provides the facet, where `repoRoot` is the project root of the run, so that the manifest search never walks above the project. The first adapter to return a non-`undefined` identity for a workspace wins, and later adapters are not asked for that workspace. A failure inside `identity` SHALL be recorded as an indexing error and that adapter SHALL be treated as not providing `packageResolution` for the rest of the run; it MUST NOT stop the run. Each adapter reads its own manifest. The indexer MUST NOT parse `package.json`, `exports`, `main`, `go.mod`, `pyproject.toml`, or `composer.json` itself, and MUST NOT branch on a language identifier, file extension, or manifest name. A package identity claimed by two workspaces SHALL be reported as an error naming both workspaces.
 
-Public re-export bindings, including bindings whose target is another workspace, SHALL be the facts the adapter emits after resolving the specifier to an entry file. The indexer MUST NOT extract a package specifier and then select the first symbol of that name in the target workspace.
+The indexer SHALL then call `packageResolution.prepare` once per adapter with every workspace of the run, including workspaces that were only hydrated in an incremental run, so entry surfaces are available for all packages.
+
+The indexer SHALL implement `packageEntryFiles` and `resolvePackageExport` of `ImportResolutionContext` generically, using only the importing adapter's `packageResolution` facet and the session's public bindings:
+
+1. match the specifier to a known package with `matchSpecifier`;
+2. obtain the entries with `entrySurface` and keep those whose file is indexed and not classified as a test (a test file is never a package entry);
+3. read the public bindings stored under each entry's surface for the requested name and symbol space;
+4. resolve the name only when every entry that publishes it leads to the same logical target, and otherwise report `ambiguous` or `not-exported`.
+
+The helper reports `facet-absent` when the importing adapter does not provide `packageResolution`, `package-unknown` when no known package matches, and `no-entry-surface` when the facet returns no indexed entry. It MUST NOT search symbols by name, and it MUST NOT select a candidate because its name is unique.
+
+Public re-export bindings, including bindings whose target is another workspace, SHALL be the facts the adapter emits through `reExportLinking` after resolving the specifier to an entry file. The indexer MUST NOT extract a package specifier and then select the first symbol of that name in the target workspace.
 
 The map SHALL work for workspaces in one repo and for workspaces configured from separate repos, because identity comes from the adapter reading each workspace manifest.
+
+A resolved import SHALL set the local binding target, persist the returned `import:package` step, and add the file-level `IMPORTS` relation to the entry file. An unresolved import SHALL leave nothing persisted. Its reason SHALL be reported as a non-persisted diagnostic in the indexing output, and SHALL NOT be written to the graph store.
+
+An import of a package that no workspace declares (reason `package-unknown`) is an external dependency, not a resolution failure. The run SHALL only count such imports, in `IndexResult.importDiagnostics.externalPackageImports`, and SHALL NOT include them in the failure total, the per-reason counts, or the samples.
+
+`IndexResult.importDiagnostics` SHALL be a summary with `total` (the number of unresolved package imports excluding external ones), `byReason` (the exact count per reason, omitting reasons that never occurred), `samples` (at most 20 diagnostics per reason, in discovery order), `externalPackageImports`, and `adaptersWithoutPackageResolution` (the language identifiers of each registered adapter that does not provide the facet or whose package resolution was disabled by a facet failure, one entry per adapter). An adapter without the facet is listed once per run; it is not a resolution failure and is never counted in `total`, `byReason`, or `samples`. In an incremental run the counts and samples cover only the files reprocessed in that run. The full list is not kept because it can be as large as the number of imports in the corpus.
 
 ### Requirement: Error isolation
 
@@ -326,6 +347,22 @@ The affected closure SHALL reconsider every consumer whose semantic result can c
 
 Equivalence tests SHALL compare normalized semantic state after each identity-sensitive mutation rather than relying only on file or relation counts.
 
+### Requirement: Facet-driven language independence
+
+The indexer SHALL obtain every language-specific resolution fact from the facets that registered adapters provide. It MUST NOT branch on language identifiers, file extensions, or manifest names, and MUST NOT assume how a language maps a specifier to files.
+
+Before using a facet, the indexer SHALL check that the adapter provides it. An adapter that does not provide a facet SHALL be skipped for the behaviour that facet enables, with no error and no heuristic fallback, and the run result SHALL list the adapter in `importDiagnostics.adaptersWithoutPackageResolution` when the absent facet is `packageResolution`.
+
+Registering a new adapter SHALL be enough for the indexer to index its language and, when the adapter provides `packageResolution`, to resolve package imports to and from workspaces of that language. No indexer change SHALL be required.
+
+### Requirement: Package import incremental closure
+
+Resolved package imports are persisted as `import:package` resolution steps from the importing local binding to the entry public binding. The incremental closure SHALL use those steps in reverse, so that when a target workspace changes the files that import from it are re-resolved: a change to an entry file, to any file reached through its re-export chain, to a package manifest declared in `resolutionManifests()` that alters its identity or entry surface, or to the set of workspaces SHALL re-extract the importing files in other workspaces.
+
+A previously unresolved package import SHALL be reconsidered when its target becomes resolvable, including when the target workspace is newly added. The resulting graph SHALL equal a clean rebuild of the same final source.
+
+To find the importers of a changed entry, the closure SHALL read only persisted steps, hydrated public bindings, and manifest facts prepared for the run. It MUST NOT scan every file to find them. A run that adds new code files still re-extracts the existing code files that may contain previously unresolved imports (the addition-only fallback); that is how an import becomes resolvable when its target appears, and it is not a scan to find importers of a changed entry.
+
 ## Constraints
 
 - The `GraphStore` must be opened before calling the use case — the indexer does not manage store lifecycle
@@ -341,6 +378,10 @@ Equivalence tests SHALL compare normalized semantic state after each identity-se
 - `IndexCodeGraph` MUST NOT contain language-specific binding or call-resolution rules
 - Unresolved scoped binding facts MUST NOT produce persisted graph relations
 - Resolved self-relations where the source symbol id equals the target symbol id MUST NOT be persisted
+- The indexer MUST NOT contain language-specific resolution logic; it consumes adapter facets
+- A new language MUST NOT require an indexer change
+- Package-import diagnostics are never persisted
+- Pass 2 import resolution performs no filesystem I/O
 
 ## Examples
 

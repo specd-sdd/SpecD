@@ -2,13 +2,19 @@ import { type Relation } from './relation.js'
 import { type IndexSession } from './index-session.js'
 import { type FileAnalysisDraft, type FileAnalysis } from './file-analysis.js'
 import { type SymbolKind } from './symbol-kind.js'
+import { type AdapterCapabilities, type ResolutionStep } from './symbol-reference.js'
 import {
-  type AdapterCapabilities,
-  type LogicalSymbol,
-  type ParsedSymbolReference,
-  type PublicBinding,
-  type ResolutionStep,
-} from './symbol-reference.js'
+  type ImportDiagnostic,
+  type PackageEntryResolution,
+  type PackageExportRequest,
+  type PackageExportResolution,
+  type PackageResolutionFacet,
+  type PackageWorkspace,
+  type QualifiedNameResolutionFacet,
+  type ReExportLinkingFacet,
+  type RelativeImportResolutionFacet,
+  type SymbolReferenceSyntaxFacet,
+} from './language-adapter-facets.js'
 
 /**
  * Pure declaration classification, caller containment, and parser-authority policy for a language adapter.
@@ -43,8 +49,20 @@ export interface ImportResolutionContext {
   readonly session: IndexSession
   readonly qualifiedNames: ReadonlyMap<string, string>
   readonly packageToWorkspace: ReadonlyMap<string, string>
+  /** Every workspace of the run, with its code root. */
+  readonly workspaces: readonly PackageWorkspace[]
   readonly codeRoot?: string
   readonly repoRoot?: string
+  /**
+   * Matches a non-relative specifier to a known package through the importing adapter's
+   * `packageResolution` facet and returns the indexed, non-test entries it publishes.
+   */
+  readonly packageEntryFiles: (specifier: string) => PackageEntryResolution
+  /**
+   * Resolves an exported name through the public bindings of the package entries. Never
+   * searches symbols by name.
+   */
+  readonly resolvePackageExport: (request: PackageExportRequest) => PackageExportResolution
 }
 
 /**
@@ -53,6 +71,10 @@ export interface ImportResolutionContext {
 export interface ResolvedImports {
   readonly importMap: ReadonlyMap<string, string>
   readonly fileImports: readonly string[]
+  /** Resolution steps that explain each cross-file import (`import:package`). */
+  readonly steps: readonly ResolutionStep[]
+  /** Non-persisted records of package imports that stayed unresolved. */
+  readonly diagnostics: readonly ImportDiagnostic[]
 }
 
 /**
@@ -68,6 +90,12 @@ export interface RelationBuildContext {
 /**
  * Adapter for extracting symbols, relations, and imports from source files of a specific language.
  * All methods are synchronous and pure — they receive content as a string, not file handles.
+ *
+ * An adapter is a required core (`languages`, `extensions`, `resolutionManifests`,
+ * `analyzeFile`, `resolveImports`, `buildRelations`) plus optional facets. A facet is a
+ * cohesive group of resolution services; exposing it is the adapter's declaration that it
+ * supports every member of the group. Consumers decide from the presence of the facet and
+ * never probe individual methods, language identifiers, extensions, or manifest names.
  */
 export interface LanguageAdapter {
   /** Declares the semantic reference features this adapter can prove without guessing. */
@@ -117,95 +145,18 @@ export interface LanguageAdapter {
    */
   buildRelations(analysis: FileAnalysis, context: RelationBuildContext): Relation[]
 
-  /**
-   * Returns the package identity for a workspace root by reading the
-   * language's package manifest (e.g. `package.json`, `go.mod`).
-   * Searches at and above `codeRoot`, bounded by `repoRoot`.
-   * Unlike extraction methods, this performs I/O.
-   * @param codeRoot - Absolute path to the workspace's code root directory.
-   * @param repoRoot - Optional repository root to bound the search.
-   * @returns The package name, or undefined if no manifest is found.
-   */
-  getPackageIdentity?(codeRoot: string, repoRoot?: string): string | undefined
+  /** Package identity, specifier matching, and published entry surface. */
+  readonly packageResolution?: PackageResolutionFacet
 
-  /**
-   * Given a non-relative import specifier, returns which of the known
-   * packages it refers to. Language-specific matching rules apply.
-   * @param specifier - The raw import specifier (e.g. `@specd/core`, `github.com/acme/auth/models`).
-   * @param knownPackages - The list of known package identities.
-   * @returns The matching package name, or undefined.
-   */
-  resolvePackageFromSpecifier?(specifier: string, knownPackages: string[]): string | undefined
+  /** Relative module specifier to candidate files. */
+  readonly relativeImportResolution?: RelativeImportResolutionFacet
 
-  /**
-   * Resolves a relative import specifier to one or more candidate file paths.
-   * Applies language-specific extension mapping and path traversal rules.
-   * Returns multiple candidates when the specifier is ambiguous (e.g. could
-   * be a file or a directory with an index file). The indexer tries each
-   * candidate in order against the symbol index.
-   * @param fromFile - The importing file path (workspace-prefixed).
-   * @param specifier - The relative import specifier.
-   * @returns The resolved file path(s), most likely candidate first.
-   */
-  resolveRelativeImportPath?(fromFile: string, specifier: string): string | string[]
+  /** Qualified-name construction and qualified-name to file mapping. */
+  readonly qualifiedNameResolution?: QualifiedNameResolutionFacet
 
-  /**
-   * Builds a fully qualified name from a namespace and symbol name.
-   * Used by languages where imports resolve via qualified names (e.g. PHP).
-   * @param namespace - The namespace string.
-   * @param symbolName - The symbol name.
-   * @returns The qualified name string.
-   */
-  buildQualifiedName?(namespace: string, symbolName: string): string
+  /** Parse and render of human symbol references. */
+  readonly symbolReferenceSyntax?: SymbolReferenceSyntaxFacet
 
-  /**
-   * Resolves a fully qualified class/type name to an absolute file path
-   * by reading the language's autoloader configuration (e.g. composer.json PSR-4).
-   * Complements the in-memory qualified name map: handles classes not present
-   * in the indexed codebase. Performs I/O. SHOULD cache the parsed map per codeRoot.
-   * @param qualifiedName - Fully qualified name (e.g. `App\Models\User`)
-   * @param codeRoot - Absolute path to the workspace's code root.
-   * @param repoRoot - Optional repo root to bound the manifest search.
-   * @returns Absolute file path, or undefined if unresolvable.
-   */
-  resolveQualifiedNameToPath?(
-    qualifiedName: string,
-    codeRoot: string,
-    repoRoot?: string,
-  ): string | undefined
-
-  /**
-   * Parses human reference text this adapter can prove.
-   * Pure: no I/O and no canonical-id decoding.
-   * @param text - Human reference text.
-   * @returns Zero or more structured candidates.
-   */
-  parseSymbolReference?(text: string): ParsedSymbolReference
-
-  /**
-   * Renders a logical symbol as generic and, when different, native text.
-   * Pure: walks the supplied owner names and does not query a store.
-   * @param symbol - Logical symbol to render.
-   * @param ownerPath - Owner simple names from the root to the immediate owner.
-   * @returns Generic dotted spelling and an optional native spelling.
-   */
-  renderSymbolReference?(
-    symbol: LogicalSymbol,
-    ownerPath: readonly string[],
-  ): { readonly generic: string; readonly native?: string }
-
-  /**
-   * Emits public bindings for re-exports this adapter can prove.
-   * May read package manifests. Does not guess a symbol by name order.
-   * @param session - Index session containing declarations and same-file bindings.
-   * @param packageToWorkspace - Package name to workspace name.
-   * @returns Bindings and provenance to merge into the session.
-   */
-  linkReExports?(
-    session: IndexSession,
-    packageToWorkspace: ReadonlyMap<string, string>,
-  ): {
-    readonly publicBindings: readonly PublicBinding[]
-    readonly steps: readonly ResolutionStep[]
-  }
+  /** Linking of re-export routes into public bindings. */
+  readonly reExportLinking?: ReExportLinkingFacet
 }
