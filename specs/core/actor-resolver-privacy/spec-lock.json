@@ -4,5 +4,41 @@
     "version": 1
   },
   "dependsOn": ["core:actor-resolver-port", "core:config"],
-  "implementation": []
+  "implementation": [],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Privacy decorator hashes, masks, or anonymizes identity while excluded actors remain verbatim.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:e5299306eb7606261450683ba28637d03be7ac55dba86d3455da0b3e5caf9c96",
+          "lastModified": "2026-08-25T15:37:19.253Z"
+        },
+        "verify.md": {
+          "hash": "sha256:d1dfb11cf8fd659665ea22e791adee2f594bb1b56b0e346f2b1ae7a004b3bf79",
+          "lastModified": "2026-08-25T15:37:19.253Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Actor Resolver Privacy\n## Rules\n- Modes: hash HMAC SHA-256 email with secret salt, deterministic; mask; anonymous static Anonymous.\n- Mask name first char plus stars, one-char name stars. Local email first/last plus stars, one-char repeats, <=2 fully mask. Domain first char plus TLD; drop subdomains.\n- Active privacy removes providerId and non-whitelisted metadata.\n- excludeActors matches name/email case-insensitively; return raw identity, providerId, metadata verbatim; exclusion wins.\n## Constraints\n- Same email/salt creates same hash.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:e5299306eb7606261450683ba28637d03be7ac55dba86d3455da0b3e5caf9c96",
+          "lastModified": "2026-08-25T15:37:19.253Z"
+        },
+        "verify.md": {
+          "hash": "sha256:d1dfb11cf8fd659665ea22e791adee2f594bb1b56b0e346f2b1ae7a004b3bf79",
+          "lastModified": "2026-08-25T15:37:19.253Z"
+        }
+      }
+    }
+  }
 }

@@ -44,11 +44,15 @@ import { ArchiveDependencyMismatchError } from '../../domain/errors/archive-depe
 import { ArchiveImplementationStateError } from '../../domain/errors/archive-implementation-state-error.js'
 import { runDepsConsistent } from '../../domain/services/evaluate-transition-predicates.js'
 import {
+  resolveEffectiveBindings,
   type CheckBinding,
   type CheckProgressEvent,
   type CheckResult,
   type OnCheckProgress,
 } from '../../domain/services/transition-checks.js'
+import { type CheckRegistry } from '../../domain/services/check-registry.js'
+import { CheckPredicateFailedError } from '../../domain/errors/check-predicate-failed-error.js'
+import { validateSkipChecks } from '../services/validate-skip-checks.js'
 import { throwHookFailed } from '../checks/hook-failed.js'
 import {
   buildCheckExecutionContext,
@@ -82,19 +86,14 @@ export interface ArchiveChangeInput {
    */
   readonly skipHookPhases?: ReadonlySet<ArchiveHookPhaseSelector>
   /**
-   * When `true`, skips the overlap check and permits archiving even when
-   * other active changes target the same specs.
+   * Canonical ids of archive checks to bypass (for example `spec.overlap` or
+   * `impl.linksInScope`). Validated against the resolved archive bindings before any
+   * predicate, hook, or write runs. Delivery mechanisms (CLI flags) translate their
+   * own aliases into check ids; the use case accepts no ad-hoc bypass booleans.
    *
-   * Defaults to `false`.
+   * Defaults to empty.
    */
-  readonly allowOverlap?: boolean
-  /**
-   * When `true`, allows archive-time sidecar maintenance to update specs
-   * outside the active change scope.
-   *
-   * Defaults to `false`.
-   */
-  readonly allowOutOfScope?: boolean
+  readonly skipChecks?: readonly string[]
 }
 
 /** Callback for receiving archive check progress events. */
@@ -208,6 +207,7 @@ export class ArchiveChange {
   private readonly _hasher: ContentHasher | undefined
   private readonly _reconcile: ReconcileChangeValidity
   private readonly _resolveChangeSchema: ResolveChangeSchema
+  private readonly _checkRegistry?: CheckRegistry
 
   /**
    * Creates a new `ArchiveChange` use case instance.
@@ -227,6 +227,7 @@ export class ArchiveChange {
    * @param hasher - Content hasher for lock-less disk `dependsOn` extraction
    * @param reconcile - Required canonical validity reconciler used before and after hooks
    * @param resolveChangeSchema - Shared change schema resolver
+   * @param checkRegistry - Optional check registry used to resolve effective archive bindings and to validate `skipChecks`
    */
   constructor(
     changes: ChangeRepository,
@@ -244,6 +245,7 @@ export class ArchiveChange {
     hasher: ContentHasher | undefined,
     reconcile: ReconcileChangeValidity,
     resolveChangeSchema?: ResolveChangeSchema,
+    checkRegistry?: CheckRegistry,
   ) {
     this._changes = changes
     this._listWorkspaces = listWorkspaces
@@ -263,6 +265,9 @@ export class ArchiveChange {
     }
     this._reconcile = reconcile
     this._resolveChangeSchema = resolveChangeSchema ?? new ResolveChangeSchema(schemaProvider)
+    if (checkRegistry !== undefined) {
+      this._checkRegistry = checkRegistry
+    }
   }
 
   /**
@@ -275,6 +280,9 @@ export class ArchiveChange {
    * @throws {ChangeNotFoundError} If no change with the given name exists
    * @throws {SchemaNotFoundError} If the schema reference cannot be resolved
    * @throws {InvalidStateTransitionError} If the change is not in `archivable` or `archiving` state
+   * @throws {UnknownCheckError} If `skipChecks` names an id that is neither bound to archive nor registered
+   * @throws {CheckNotSkippableError} If `skipChecks` names a non-skippable binding or a hook check
+   * @throws {CheckPredicateFailedError} If a plugin or schema-embedded archive check fails
    * @throws {HookFailedError} If a pre-archive `run:` hook exits with a non-zero code
    */
   async execute(
@@ -313,31 +321,41 @@ export class ArchiveChange {
     const onCheckProgress: OnCheckProgress | undefined =
       onProgress === undefined ? undefined : (event) => onProgress(event)
 
-    const effectiveSkipChecks: string[] = []
-    if (input.allowOverlap === true) {
-      effectiveSkipChecks.push('spec.overlap')
-    }
-    if (input.allowOutOfScope === true) {
-      effectiveSkipChecks.push('impl.linksInScope')
-    }
+    // The injected bindings are the base table: resolve the schema's `archiveChecks`
+    // and governance once per run, then validate every requested bypass against them
+    // before any predicate, hook, or write runs.
+    const effectiveBindings = resolveEffectiveBindings({
+      baseBindings: this._archiveBindings,
+      schema,
+      operation: 'archive',
+      ...(this._checkRegistry !== undefined ? { registry: this._checkRegistry } : {}),
+    })
+    const skipChecks = validateSkipChecks({
+      skipChecks: input.skipChecks ?? [],
+      effectiveBindings,
+      ...(this._checkRegistry !== undefined ? { checkRegistry: this._checkRegistry } : {}),
+    })
+    const overlapBypassed =
+      skipChecks.includes('spec.overlap') &&
+      effectiveBindings.some((binding) => binding.check.id === 'spec.overlap')
 
     const archivePredicates = await executeMatchingPredicates(
-      this._archiveBindings,
+      effectiveBindings,
       buildCheckExecutionContext({
         change,
         schema,
         attempt: archiveAttempt,
         approvals: { spec: false, signoff: false },
-        skipChecks: effectiveSkipChecks,
+        skipChecks,
         ...(validity !== undefined ? { validity } : {}),
         ...(onCheckProgress !== undefined ? { onCheckProgress } : {}),
       }),
-      { failFastOn: 'schema.nameMatch', skipChecks: effectiveSkipChecks },
+      { failFastOn: 'schema.nameMatch', skipChecks },
     )
     const failedPredicates = archivePredicates.checks.filter((check) => check.outcome === 'fail')
     const needsOverlapScan =
       failedPredicates.some((check) => check.id === 'spec.overlap') ||
-      (failedPredicates.length === 0 && input.allowOverlap === true)
+      (failedPredicates.length === 0 && overlapBypassed)
     let others: Change[] = []
     let relevantOverlap: readonly OverlapEntry[] = []
     if (needsOverlapScan) {
@@ -347,9 +365,16 @@ export class ArchiveChange {
     }
     const invalidatedChanges: InvalidatedChangesEntry[] = []
     for (const check of failedPredicates) {
-      throwMappedArchiveFailure(check, change, schema, relevantOverlap, workspaceMap)
+      throwMappedArchiveFailure(
+        check,
+        change,
+        schema,
+        relevantOverlap,
+        workspaceMap,
+        effectiveBindings,
+      )
     }
-    if (input.allowOverlap === true && relevantOverlap.length > 0) {
+    if (overlapBypassed && relevantOverlap.length > 0) {
       invalidatedChanges.push(
         ...(await this._invalidateOverlappingChanges(change, others, relevantOverlap)),
       )
@@ -364,11 +389,7 @@ export class ArchiveChange {
 
     // --- before-persist effects (binding phase; not check id) ---
     const skip = input.skipHookPhases ?? new Set<ArchiveHookPhaseSelector>()
-    for (const binding of matchingEffects(
-      this._archiveBindings,
-      archiveAttempt,
-      'before-persist',
-    )) {
+    for (const binding of matchingEffects(effectiveBindings, archiveAttempt, 'before-persist')) {
       Logger.debug('ArchiveChange before-persist effects started', {
         change: change.name,
         checkId: binding.check.id,
@@ -379,8 +400,6 @@ export class ArchiveChange {
         schema,
         attempt: archiveAttempt,
         approvals: { spec: false, signoff: false },
-        allowOverlap: input.allowOverlap === true,
-        allowOutOfScope: input.allowOutOfScope === true,
         skipHookPhases: [...skip],
         ...(onCheckProgress !== undefined ? { onCheckProgress } : {}),
       })
@@ -415,17 +434,17 @@ export class ArchiveChange {
       throw new InvalidStateTransitionError(change.state, 'archiving')
     }
     const rerun = await executeMatchingPredicates(
-      this._archiveBindings,
+      effectiveBindings,
       buildCheckExecutionContext({
         change,
         schema,
         attempt: archiveAttempt,
         approvals: { spec: false, signoff: false },
-        skipChecks: effectiveSkipChecks,
+        skipChecks,
         validity,
         ...(onCheckProgress !== undefined ? { onCheckProgress } : {}),
       }),
-      { failFastOn: 'schema.nameMatch', skipChecks: effectiveSkipChecks },
+      { failFastOn: 'schema.nameMatch', skipChecks },
     )
     const rerunFailed = rerun.checks.filter((check) => check.outcome === 'fail')
     if (rerunFailed.length > 0) {
@@ -434,7 +453,14 @@ export class ArchiveChange {
         rerunOverlap = (await this._loadArchiveOverlap(change)).relevantOverlap
       }
       for (const check of rerunFailed) {
-        throwMappedArchiveFailure(check, change, schema, rerunOverlap, workspaceMap)
+        throwMappedArchiveFailure(
+          check,
+          change,
+          schema,
+          rerunOverlap,
+          workspaceMap,
+          effectiveBindings,
+        )
       }
     }
 
@@ -621,7 +647,7 @@ export class ArchiveChange {
     // --- after-persist effects (binding phase; not check id) ---
 
     const postHookFailures: string[] = []
-    for (const binding of matchingEffects(this._archiveBindings, archiveAttempt, 'after-persist')) {
+    for (const binding of matchingEffects(effectiveBindings, archiveAttempt, 'after-persist')) {
       Logger.debug('ArchiveChange after-persist effects started', {
         change: change.name,
         checkId: binding.check.id,
@@ -631,8 +657,6 @@ export class ArchiveChange {
         schema,
         attempt: archiveAttempt,
         approvals: { spec: false, signoff: false },
-        allowOverlap: input.allowOverlap === true,
-        allowOutOfScope: input.allowOutOfScope === true,
         skipHookPhases: [...skip],
         ...(onCheckProgress !== undefined ? { onCheckProgress } : {}),
       })
@@ -1457,8 +1481,10 @@ function overlapReviewTargets(change: Change, specIds: readonly string[]): Artif
  * @param schema - schema
  * @param overlapEntries - overlap entries
  * @param workspaceMap - workspace map
+ * @param bindings - effective archive bindings (source of the resolved `skippable`)
  * @throws {InvalidStateTransitionError} When archive checks reject the change
  * @throws {ArchiveImplementationStateError} When verification evidence is not current
+ * @throws {CheckPredicateFailedError} When a plugin or schema-embedded check fails
  */
 function throwMappedArchiveFailure(
   check: CheckResult,
@@ -1466,6 +1492,7 @@ function throwMappedArchiveFailure(
   schema: Schema,
   overlapEntries: readonly OverlapEntry[],
   workspaceMap: ReadonlyMap<string, ProjectWorkspace>,
+  bindings: readonly CheckBinding[],
 ): never {
   switch (check.id) {
     case 'schema.nameMatch':
@@ -1474,7 +1501,9 @@ function throwMappedArchiveFailure(
       change.assertArchivable()
       throw new ArchiveImplementationStateError([], check.message ?? 'Change is not archivable')
     case 'spec.overlap':
-      throw new SpecOverlapError(overlapEntries)
+      throw new SpecOverlapError(overlapEntries, {
+        skippable: bindings.find((b) => b.check.id === 'spec.overlap')?.skippable === true,
+      })
     case 'workspace.readOnly': {
       const readOnlySpecs: Array<{ specId: string; workspace: string }> = []
       for (const specId of change.specIds) {
@@ -1553,9 +1582,16 @@ function throwMappedArchiveFailure(
         check.message ?? 'Verification evidence is not current',
       )
     default:
-      throw new ArchiveImplementationStateError(
-        [],
-        check.message ?? `Archive predicate '${check.id}' failed`,
+      // Plugin and schema-embedded checks have no dedicated archive error: report them
+      // like transitions do, carrying the resolved skippability so hosts can offer a bypass.
+      throw new CheckPredicateFailedError(
+        check.id,
+        check.label,
+        check.code ?? 'CHECK_FAILED',
+        check.message ?? `Check '${check.id}' failed`,
+        check.command,
+        check.details,
+        bindings.find((b) => b.check.id === check.id)?.skippable === true,
       )
   }
 }

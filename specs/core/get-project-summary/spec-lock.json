@@ -39,36 +39,36 @@
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "GetProjectSummary entrega conteos baratos del proyecto y enriquecimientos opcionales de changes o salud de specs.",
+      "value": "Return cheap project counts, optional change task details, and optional spec health without mutation.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:da5e8d115ea84818b321be68fcb45788419743a6812719ba0b75ffb9c2980a02",
-          "lastModified": "2026-07-26T11:52:20.566Z"
+          "hash": "sha256:9bbdd43a83c07abfbe030fe82c97196b8a1579d51e9e2c3c8e1b72f146191519",
+          "lastModified": "2026-10-06T08:24:27.593Z"
         },
         "verify.md": {
-          "hash": "sha256:eb00add16d3c464cad3e4e753e79de94189d5c2fe13849597ae3c04ef7fa3ef8",
-          "lastModified": "2026-07-26T11:52:20.576Z"
+          "hash": "sha256:abc22e7475a9b8e391e13755fee28c5f91e09d14df26b47d5e73a12d575654bb",
+          "lastModified": "2026-10-06T08:24:27.594Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# Get Project Summary\n\n## Rules\n\n- execute(input?) always returns active/draft/discarded/archived counts, ordered workspace→spec counts and workspace count. Default flags omit active, drafts, specsHealth keys.\n- Input includeChanges/includeSpecsHealth default false. Count path: ChangeRepository count/countDrafts/countDiscarded, ArchiveRepository count or meta.total, ListWorkspaces then each specRepo.count; independent I/O parallel.\n- includeChanges true: list active/drafts, load each change, CountTasks.execute({ change }); entries name/state/tasks { incomplete, total }, including empty arrays. Discarded/archived count only.\n- includeSpecsHealth true returns project GetSpecsHealth.execute({}).\n- Constructor gets repos/use cases, no direct config/fs. createGetProjectSummary(config, options?) → resolveGetProjectSummaryDeps(resolver) → canonical factory; createKernel exposes kernel.project.getProjectSummary.\n- Preserve schema-driven change and canonical metadata-path spec repository bootstrap.\n\n## Constraints\n\n- Default path no lists/details/tasks, metadata, graph/context or artifacts.\n- Enrich only enabled; never mutate config/repos/changes.",
+      "value": "# GetProjectSummary\n## Rules\n- Always count active/draft/discarded/archived and specs by workspace in parallel.\n- `includeChanges` loads active/drafts and task summaries; `includeSpecsHealth` delegates health use case.\n- Factory uses canonical resolver deps and kernel exposure.\n## Constraints\n- Default path omits lists, tasks, metadata, graph/context.\n- Read-only.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:da5e8d115ea84818b321be68fcb45788419743a6812719ba0b75ffb9c2980a02",
-          "lastModified": "2026-07-26T11:52:20.566Z"
+          "hash": "sha256:9bbdd43a83c07abfbe030fe82c97196b8a1579d51e9e2c3c8e1b72f146191519",
+          "lastModified": "2026-10-06T08:24:27.593Z"
         },
         "verify.md": {
-          "hash": "sha256:eb00add16d3c464cad3e4e753e79de94189d5c2fe13849597ae3c04ef7fa3ef8",
-          "lastModified": "2026-07-26T11:52:20.576Z"
+          "hash": "sha256:abc22e7475a9b8e391e13755fee28c5f91e09d14df26b47d5e73a12d575654bb",
+          "lastModified": "2026-10-06T08:24:27.594Z"
         }
       }
     }

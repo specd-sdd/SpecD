@@ -33,36 +33,36 @@
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Centralizes schema-bound lifecycle transitions, reconciliation, checks, approvals, hooks, verification evidence, and atomic persistence.",
+      "value": "Central lifecycle transition authority: reconcile, authorize schema edges, run effects, persist atomically.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:d73516b7bdeb57288d29a0a30cba24e9809aefffa153f699b5d07877fb5e22bb",
-          "lastModified": "2026-09-28T06:29:51.397Z"
+          "hash": "sha256:2d59fb64b7b02a568cc5eea6fbb5c6943c5273cb37fbe2c74076cefad68f8fc0",
+          "lastModified": "2026-10-20T14:34:09.505Z"
         },
         "verify.md": {
-          "hash": "sha256:7f75e9d7f7ad4ddb3681bb860f8eed967f333ea84d8ec5c24050dc5cf46e7265",
-          "lastModified": "2026-09-28T06:29:51.398Z"
+          "hash": "sha256:992323b812e6db82260ea44d73735c091e18fb44159555b07a52ca39b80e2f26",
+          "lastModified": "2026-10-20T14:34:09.506Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# TransitionChange\n\n## Rules\n- `execute({ name, to, skipHookPhases?, refreshImplementationTrackingBefore?, allowOutOfScope? }, onProgress?)`; `to: ChangeState|\"next\"`. Skip selectors affect effects only. `allowOutOfScope` may skip `impl.linksInScope`, never `impl.filesResolved`.\n- Constructor receives changes, actor, schemaProvider, refreshImplementationTracking, approvals, application transitionBindings; no LifecycleEngine, ImplementationDetector, RunStepHooks, CountTasks. Config factory delegates dependency resolution through `resolveTransitionChangeDeps`.\n- Missing change throws `ChangeNotFoundError`. Active change refreshes implementation tracking before evaluation unless explicitly false; never duplicate detector or merge logic.\n- `next` resolves happy-path forward hop, never status recommendation; unavailable states throw `HappyPathNextUnavailableError`.\n- Spec approval and signoff are validity checks, not pending hops. Missing, stale, revoked, or legacy-unprovable evidence fails with structured approval guidance. Historic pending states allow only documented drain target or designing; non-drain failure precedence is `approval-required`.\n- After mutation-capable pre-hooks and before authorization, run canonical reconciliation on fresh artifact, implementation, approval, verification facts. Committed recovery survives failed requested transition and is reported with reconciled state, blockers, reasons, next action. Forward transitions block on non-task drift or pending review.\n- Evaluate matching transitionBindings via `evaluateLifecycle`; predicates fail-fast, effects run only after predicates pass. No parallel green-check logic.\n- `workflow.requires` maps failed predicate to `incomplete-artifact` with artifactId, effective status, optional first blocking parent; emit `requires-check`. Missing workflow row skips workflow checks only; unresolved schema throws.\n- `requiresTaskCompletion` artifacts require `hasTasks` and taskCompletionCheck or `missing-task-capability`; count once through predicate. Absent count after capability means no qualifying content. Incomplete tasks emit failure event and throw `incomplete-tasks`.\n- Every forward transition sourced at implementing and every real transition targeting verifying refreshes tracking and runs blocking `impl.filesResolved` plus `impl.linksInScope`; matching stable ID executes once. Mutation-capable hooks require fresh rerun before persistence. Transition never captures verification baseline.\n- `verifying→done` requires completed successful current verification via `verification.current`; shared fingerprint evaluator, no mutating completion or baseline replacement. Missing, stale, changed, legacy-unknown, unfinished, or unresolvable evidence blocks. Explicit not-required verdict alone skips. Fingerprint mismatch stays verifying and recommends in-place verification.\n- Verification start and completion may occur from any active state. Movement preserves unchanged completed evidence. No restart flag or `verifying→verifying`; new start replaces active attempt.\n- Forward source post hook then target pre hook execute before persistence through matching before-persist effects; generic check progress, abort on failure. No source post for backward, redesign, recovery. Skip phases never skip predicates.\n- Persist through `ChangeRepository.mutate(name, fn)` on fresh instance. Inside mutation apply reconciliation-dependent actions, tracking activation when entering implementing, then `change.transition(target, actor)`.\n- `verifying→implementing` is implementation-only retry and preserves unchanged validated artifacts; behavior or plan change routes designing.\n- Explicit designing from any non-drafting state delegates reopening and validity changes to reconciler; review breadth follows policy, not unconditional all-file reopening. designing to designing is neutral no-op.\n- `archiving→archivable` is recovery: no archive effects, source post, requires, or task checks.\n- Backward hop preserves unchanged verification; post-signoff return invalidates signoff as appropriate, not unrelated spec approval.\n- Return `{ change }`; progress bus: requires-check, task-completion-failed, generic check-start/progress/done, transitioned. Shared runner typed errors propagate with no partial state.\n\n## Constraints\n- Entity owns legal state edges; use case resolves target and checks then delegates.\n- Structured invalid reasons: incomplete-artifact, incomplete-tasks, missing-task-capability, invalid-transition, approval-required, gate-not-required.\n- Safe task regex failure or nested quantifier is non-match, never throw.\n- Enter-ready and forward exit-implementing checks share ArchiveChange runners; redesign skips implementation exit checks.\n- Schema missing throws; absent workflow target never suppresses protocol or other predicates.\n- Composition injects application create* checks, not domain stubs.",
+      "value": "# TransitionChange\n## Rules\n- Resolve change schema, refresh tracking, reconcile validity before authorization.\n- Resolve legal target/`next`; evaluate canonical transition bindings and predicates.\n- Run selected hooks/checks before atomic `ChangeRepository.mutate`; persist transition with actor.\n- Verification attempts/evidence and approvals are validity gates, not inferred hops.\n## Constraints\n- Entity owns edges; use case never invents them.\n- Skip hooks never skips predicates.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:d73516b7bdeb57288d29a0a30cba24e9809aefffa153f699b5d07877fb5e22bb",
-          "lastModified": "2026-09-28T06:29:51.397Z"
+          "hash": "sha256:2d59fb64b7b02a568cc5eea6fbb5c6943c5273cb37fbe2c74076cefad68f8fc0",
+          "lastModified": "2026-10-20T14:34:09.505Z"
         },
         "verify.md": {
-          "hash": "sha256:7f75e9d7f7ad4ddb3681bb860f8eed967f333ea84d8ec5c24050dc5cf46e7265",
-          "lastModified": "2026-09-28T06:29:51.398Z"
+          "hash": "sha256:992323b812e6db82260ea44d73735c091e18fb44159555b07a52ca39b80e2f26",
+          "lastModified": "2026-10-20T14:34:09.506Z"
         }
       }
     }

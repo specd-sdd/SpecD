@@ -3,6 +3,7 @@ import * as path from 'node:path'
 import {
   type ArchiveHookPhaseSelector,
   type CheckProgressEvent,
+  CheckPredicateFailedError,
   SpecOverlapError,
 } from '@specd/sdk'
 import { resolveCliContext } from '../../helpers/cli-context.js'
@@ -27,15 +28,20 @@ function writeStructuredRecord(format: Exclude<OutputFormat, 'text'>, record: un
  * Builds an archive progress callback for the generic check bus.
  *
  * @param format - CLI output format
+ * @param skipChecks - Check ids bypassed with `--skip-checks`, rendered as skipped by that flag
  * @returns Progress sink
  */
-function makeArchiveProgressRenderer(format: OutputFormat): {
+function makeArchiveProgressRenderer(
+  format: OutputFormat,
+  skipChecks: ReadonlySet<string>,
+): {
   onProgress: (event: CheckProgressEvent) => void
 } {
   const checkPresenter = createCheckProgressPresenter({
     format,
     streamName: 'change-archive',
     stream: format === 'text' ? process.stderr : process.stdout,
+    skipChecks,
   })
   return {
     onProgress: (event) => {
@@ -57,11 +63,14 @@ export function registerChangeArchive(parent: Command): void {
       'Move an archivable change to the archive (or retry from archiving after a failed commit).',
     )
     .option('--skip-hooks <phases>', 'skip archive hook phases (pre,post,all)')
-    .option('--allow-overlap', 'permit archiving despite spec overlap with other active changes')
     .option(
-      '--allow-out-of-scope',
-      'permit archiving when implementation links resolve outside the change scope (impl.linksInScope)',
+      '--skip-checks <ids>',
+      'comma-separated check identifiers to bypass, repeatable (e.g. spec.overlap,impl.linksInScope)',
+      (value: string, previous: string[]) => [...previous, value],
+      [] as string[],
     )
+    .option('--allow-overlap', 'alias of --skip-checks spec.overlap')
+    .option('--allow-out-of-scope', 'alias of --skip-checks impl.linksInScope')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
     .addHelpText(
@@ -81,6 +90,7 @@ JSON/TOON output schema:
           format: string
           config?: string
           skipHooks?: string
+          skipChecks?: string[]
           allowOverlap?: true
           allowOutOfScope?: true
         },
@@ -91,16 +101,32 @@ JSON/TOON output schema:
               ? parseCommaSeparatedValues(opts.skipHooks, VALID_ARCHIVE_HOOK_PHASES, '--skip-hooks')
               : new Set<ArchiveHookPhaseSelector>()
 
+          // The use case accepts only `skipChecks`; the aliases are translated here.
+          const skipChecks = new Set<string>()
+          for (const entry of opts.skipChecks ?? []) {
+            for (const id of entry
+              .split(',')
+              .map((candidate) => candidate.trim())
+              .filter(Boolean)) {
+              skipChecks.add(id)
+            }
+          }
+          if (opts.allowOutOfScope === true) {
+            skipChecks.add('impl.linksInScope')
+          }
+          if (opts.allowOverlap === true) {
+            skipChecks.add('spec.overlap')
+          }
+
           const { config, kernel } = await resolveCliContext({ configPath: opts.config })
           const fmt = parseFormat(opts.format)
-          const progressRenderer = makeArchiveProgressRenderer(fmt)
+          const progressRenderer = makeArchiveProgressRenderer(fmt, skipChecks)
 
           const result = await kernel.changes.archive.execute(
             {
               name,
               skipHookPhases,
-              ...(opts.allowOverlap === true ? { allowOverlap: true } : {}),
-              ...(opts.allowOutOfScope === true ? { allowOutOfScope: true } : {}),
+              ...(skipChecks.size > 0 ? { skipChecks: [...skipChecks] } : {}),
             },
             progressRenderer.onProgress,
           )
@@ -136,7 +162,7 @@ JSON/TOON output schema:
             })
           }
         } catch (err) {
-          if (err instanceof SpecOverlapError) {
+          if (err instanceof SpecOverlapError && opts.format === 'text') {
             const specList = err.entries
               .map(
                 (e) =>
@@ -147,9 +173,23 @@ JSON/TOON output schema:
               )
               .join('\n')
             process.stderr.write(
-              `error: cannot archive — spec overlap detected:\n${specList}\n\n` +
-                'Use --allow-overlap to proceed despite overlap.\n',
+              `error: cannot archive — spec overlap detected:\n${specList}\n` +
+                (err.skippable
+                  ? '\nUse --skip-checks spec.overlap to proceed despite overlap.\n'
+                  : ''),
             )
+            process.exit(1)
+          }
+          if (err instanceof CheckPredicateFailedError && opts.format === 'text') {
+            const lines = [
+              `error: ${err.message}`,
+              `  check:   ${err.label} (${err.checkId})`,
+              ...(err.command ? [`  command: ${err.command}`] : []),
+              ...(err.skippable === true
+                ? [`  bypass:  Retry with --skip-checks ${err.checkId} if an exception is granted`]
+                : []),
+            ]
+            process.stderr.write(`${lines.join('\n')}\n`)
             process.exit(1)
           }
           handleError(err, opts.format)

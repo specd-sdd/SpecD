@@ -219,6 +219,40 @@ Scenarios:
 - **THEN** the result includes check rows with `id`, `kind`, and `outcome`
 - **AND** `effect` rows are not required for `allowed`
 
+#### Scenario: Archive predicates come from the effective archive bindings
+
+- **GIVEN** a change in `archivable` and a schema declaring `archiveChecks: [{ id: spec.overlap, disabled: true }]`
+- **AND** another active change overlaps its specs
+- **WHEN** `GetStatus` projects blockers
+- **THEN** no `OVERLAP_CONFLICT` blocker is produced because the check is not evaluated
+
+#### Scenario: Schema-hardened overlap carries no bypass flag
+
+- **GIVEN** a change in `archivable` and a schema declaring `archiveChecks: [{ id: spec.overlap, skippable: false }]`
+- **AND** another active change overlaps its specs
+- **WHEN** `GetStatus` projects blockers
+- **THEN** `OVERLAP_CONFLICT` is present without `bypassFlag`
+- **AND** `nextAction.reason` does not suggest a bypass
+
+#### Scenario: Locked archive check carries no bypass flag
+
+- **GIVEN** a change in `archivable` that contains a spec from a `readOnly` workspace
+- **WHEN** `GetStatus` projects blockers
+- **THEN** the `workspace.readOnly` blocker has no `bypassFlag`
+
+#### Scenario: Plugin archive check follows its resolved skippability
+
+- **GIVEN** a plugin check bound to `scope: 'archive'` that fails for an `archivable` change
+- **WHEN** its resolved binding is skippable
+- **THEN** the blocker carries `bypassFlag: '--skip-checks @plugin.check'`
+- **AND** when it is not skippable the blocker carries no `bypassFlag`
+
+#### Scenario: Archive predicates run without user bypass
+
+- **GIVEN** a change in `archivable` with a skippable failing archive check
+- **WHEN** `GetStatus` evaluates it
+- **THEN** the check is evaluated with an empty `skipChecks` and its failure is reported
+
 ### Requirement: Shared transition candidate evaluation
 
 #### Scenario: Passing bypass predicates advertise the shortcut
@@ -489,5 +523,6 @@ Scenarios:
 - `refreshImplementationTracking: RefreshImplementationTracking`
 - `transitionBindings` from the workflow check registry
 - `archiveBindings` from the workflow check registry
+- `checkRegistry` from the workflow check registry
 - **AND** it does not resolve `lifecycle` or `LifecycleEngine`
 - **AND** the factory delegates to canonical `createGetStatus(deps)`

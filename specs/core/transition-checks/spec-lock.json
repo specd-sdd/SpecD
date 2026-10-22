@@ -9,62 +9,48 @@
     "core:workflow-topology",
     "core:schema-format",
     "default:_global/architecture",
-    "core:check-registry"
+    "core:check-registry",
+    "core:archive-change",
+    "core:get-status"
   ],
   "implementation": [
     {
       "file": "core:src/domain/services/transition-checks.ts",
-      "symbols": ["CheckApplicability", "classifyAlong", "resolveEffectiveBindings"]
-    },
-    {
-      "file": "core:src/domain/checks/workflow-tasks-empty.ts",
-      "symbols": ["workflowTasksEmpty"]
-    },
-    {
-      "file": "core:src/domain/services/check-bindings.ts",
-      "symbols": ["TRANSITION_BINDING_SPECS"]
-    },
-    {
-      "file": "core:src/application/services/execute-matching-predicates.ts",
-      "symbols": ["executeChecksByLegalTargets"]
-    },
-    {
-      "file": "core:src/domain/checks/protocol-edge.ts",
-      "symbols": ["run"]
+      "symbols": ["resolveEffectiveBindings", "ResolveEffectiveBindingsInput"]
     }
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Shared registry and reconciler make transitions, archive, status, recovery, approvals, verification, effects, and progress use one validity model.",
+      "value": "Shared binding registry evaluates transitions and archive once, reconciles validity, and makes lifecycle projections authoritative.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:e9fd037dec4b603b3f46332b5a7ba2b27aa8327a646fbbaacd1f5441169b2d2c",
-          "lastModified": "2026-09-28T06:29:51.930Z"
+          "hash": "sha256:dcd099b89db6617e0a0a183c78e8a87e733492b0177ec1f2a9ef12378ccb9900",
+          "lastModified": "2026-10-20T14:34:09.484Z"
         },
         "verify.md": {
-          "hash": "sha256:7d6cb3dc83a3b9897b217d5ee68f4856a70375f4a61f89dc63c36bb2abe4ce3b",
-          "lastModified": "2026-09-28T06:29:51.931Z"
+          "hash": "sha256:3c83c2e6275910cea24821460e03baf1bf70065ed94dac9f5e6095b7e810474d",
+          "lastModified": "2026-10-20T14:34:09.485Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# Transition Checks\n\n## Rules\n### Check ABI and registry\n- Stable IDs include `protocol.edge`, `workflow.requires`, `workflow.taskCompletion`, `deps.consistent`, `workspace.readOnly`, `impl.filesResolved`, `impl.linksInScope`, `verification.current`, `approval.spec`, `approval.signoff`, `schema.nameMatch`, `archive.archivable`, `spec.overlap`, `hook.pre`, `hook.post`; never `archive.publication`.\n- Each `Check`: stable string `id`, short gerund `label`, explicit `kind: predicate|effect`, `execute(ctx): Promise<CheckResult>`. Result: id/label/kind/outcome `pass|fail|skip`, failure code/message, optional details. `instruction:` hooks are not checks.\n- Application checks extend `WorkflowCheck` with pass/fail/skip helpers; named `create<Name>(deps)` takes only ports used by that check. Optional domain `run(facts)` is pure, never production I/O.\n- No `PredicateSnapshots`, `needs`, `emptyPredicateSnapshots`, `gatherPredicateSnapshots`, or global fact gathering. One module pair per check. Runtime IDs remain plugin-safe strings.\n- `CheckExecutionContext`: change, schema, transition attempt or archive operation, baked approval config, `skipHookPhases`, `allowOverlap`, `allowOutOfScope`, optional pure DAG status, `onCheckProgress`, per-evaluation `passMemo`. Task check memoizes `CountTasks` only in `passMemo`.\n- Registry alone owns binding applicability `from`/`to`/`along` or operation. Effects also declare `phase: before-persist|after-persist`, `onFailure: abort|collect`, selector identity. No check-owned applicability or check-ID timing switches.\n\n### Direction and evaluation\n- `along`: `forward|backward|redesign|recovery|any`; recovery is only `archiving→archivable`, never backward. Redesign targets `designing`.\n- Progress axis uses known states from `schema.workflow[]`, splicing omitted `ready, implementing, verifying, done, archivable, archiving` by `AXIS_FALLBACK` relative order. Unknown strings occupy no slot; omission never removes protocol state. `drafting`/`designing` absent from fallback.\n- Transition: classify requested pair; never rewrite target for approvals. `TransitionChange` fail-fast on failed `protocol.edge`; `GetStatus` collects it with all matching predicates. Execute each matching predicate once; allowed iff none fail. Then run matching effects by slot around persistence.\n- Archive is operation, not fake edge; never bind `approval.signoff`.\n- Predicates determine projected allowance. Effects never affect status allowance; `--skip-hooks` skips effects only.\n- Before-persist abort → `HookFailedError`, no persist. After-persist collect → record and continue. Same matcher selects predicates/effects.\n\n### Canonical validity and reconciliation\n- Pure shared evaluator consumes fresh change, schema, gates/policy, artifacts, confirmed implementation; independently reports artifact review, approvals, verification, task completion, state validity, blockers, affected inputs, reasons, recovery, next action.\n- Recovery priority: stale/revoked required spec approval → `designing`; else stale/revoked sign-off for later change → `done`; stale verification blocks applicable boundaries at `verifying` or later and renews in place; else artifact drift follows `invalidation.workflow`, with `preserve` retaining state. Never advance earlier state.\n- Unresolved non-task drift/review blocks applicable forward movement even with artifact policy `none`. Verification staleness does not block entry into `verifying`. Task presence, structure, completion evaluated live at configured boundaries and archive.\n- Sole application owner `ReconcileChangeValidity` acquires fresh files, evaluates verdict, materializes artifact/approval/verification changes, appends audit, selects recovery, persists atomically. Delegators: `GetStatus`, `ValidateArtifacts`, `ApproveSpec`, `ApproveSignoff`, `TransitionChange`, `ArchiveChange`, `EditChange`, `InvalidateChange`, `StartVerification`, `CompleteVerification`, `InvalidateVerification`.\n- Reconciler returns change, verdict, affected inputs, reasons, committed return; unchanged facts are idempotent. Reconcile again after hooks/mutations. Repository hydration, checks, CLI, skills never independently invalidate or recover.\n- Typed use case exposes `execute`, canonical/config factories, `resolveReconcileChangeValidityDeps`; config factory normalizes args and delegates. Every mutating path must inject reconciler; missing dependency fails typed configuration, never falls back to `Change.invalidate`.\n\n### Required bindings\n- `protocol.edge`: every transition; `workflow.requires`: requested target; task completion from `requiresTaskCompletion`.\n- `deps.consistent` and `workspace.readOnly`: enter `ready` and archive.\n- `impl.filesResolved`/`impl.linksInScope`: target `verifying`, forward exit `implementing`, archive; explicit verification start reuses them through operation context, never fake self-transition.\n- `verification.current`: `verifying→done`; requires completed successful current-fingerprint evidence. Active attempt cannot pass. Missing/unavailable/stale/legacy-unknown/mismatch/unresolved fails actionably; skip only canonical `not-required`, absent verdict fails closed. Label: `Checking verification freshness`.\n- `approval.spec`: forward exit `ready`; disabled skips, only valid materialized current approval passes. `approval.signoff`: exact `done→archivable`; requires current valid sign-off and verification. Approval commands record consent separately; no happy-path pending states.\n- Archive predicates include schema-name, archivable, overlap, shared workspace/dependency/implementation/validity/task/freshness checks. Publication remains private preflight.\n- A matching check ID executes once even if multiple bindings match. After file/link-mutating pre-effects, reacquire facts and rerun readiness/verification predicates before persist. Protocol rejects `verifying→verifying`; verification start/complete are operations.\n- `impl.linksInScope` alone is skippable via `--allow-out-of-scope`; attach `isSkippable`/`bypassFlag` only to that ID. `impl.filesResolved` never skippable.\n\n### Effects and diagnostics\n- Transition `hook.pre`: non-recovery, before-persist/abort. Transition `hook.post`: forward only, before-persist/abort. Archive pre: before-persist/abort; archive post: after-persist/collect; both use step `archiving`.\n- Hook checks own `RunStepHooks` dependency. Skip selection uses binding phase plus target/source or archive pre/post identity; transition pre/post share before-persist.\n- Fail messages explain actionable difference. Dependencies show extracted vs persisted per spec; overlap names peers/specs; readOnly names specs/workspaces. Implementation checks show count plus ≤3 labeled examples; full inventory only structured/dedicated listing.\n- Generic progress envelope around every executed check: `check-start {id,label}`, optional `check-progress`, `check-done {id,label,outcome,reason?}`. Hooks map runner output into same bus. Status never streams; structured rows/blockers retain label/checkId.\n- Canonical labels remain fixed per built-in ID; never `Executing:`.\n\n### Projections\n- `validTransitions`: protocol-legal targets. `availableTransitions`: predicate-allowed targets. `nextAction`: evaluation plus review blockers only.\n- Implementing with complete tasks and allowed verifying recommends `/specd-verify`. Failed spec/sign-off approval recommends respective `specd changes approve` command. Backward skill hops remain available but not default.\n- Historic parked approval states preserve approval-repair contract before protocol rejection. Production status/archive registry injects overlap detector; dependency-free default registry only isolated/non-production.\n\n## Constraints\n- No schema/task/platform result-array split; origin stays check metadata.\n- Dry-run evaluates predicates only; schema YAML cannot list check IDs.\n- Approval gates never route through pending states.\n- Effect timing, failure, skipping, applicability come only from bindings.\n- Adding checks/plugins cannot require lifecycle gather-logic changes.",
+      "value": "# Transition Checks\n\n## Rules\n- Stable check IDs: `protocol.edge`, workflow, deps/workspace, implementation, approval, schema/archive/overlap, verification, hooks. `Check.execute(ctx)` returns pass/fail/skip; effects and predicates distinct.\n- Registry binding alone selects `from/to/along` or archive operation, effect phase, failure policy, resolved config. No snapshot bag, ID timing switches, or duplicate gathering.\n- Candidate evaluation runs matching predicates once; `TransitionChange` fail-fast on `protocol.edge`, `GetStatus` collects all. Effects execute by binding slot: pre aborts, post collects.\n- Archive is operation, never fake edge; do not bind `approval.signoff`.\n- Single `ReconcileChangeValidity` owns fresh facts, verdict, review, approvals, verification, recovery, audit, atomic persistence. All mutators delegate; no direct `Change.invalidate` fallback.\n- Recovery priority: stale required spec approval → `designing`; stale signoff later state → `done`; stale verification renews in place; then artifact policy. Preserve review stays phase.\n- Required bindings govern protocol, artifacts/tasks, ready dependency/workspace, implementation exit/start, verification→done, approvals, archive predicates and effects.\n- Approval commands record consent; transitions never use pending approval hops. Verification start/complete use exact non-task artifact + implementation fingerprint.\n\n## Constraints\n- Result origin metadata, never split result DTO arrays.\n- Recovery not backward; dry run predicates only.\n- Schema YAML never lists check IDs.\n- New checks require no central snapshot/use-case gather edits.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:e9fd037dec4b603b3f46332b5a7ba2b27aa8327a646fbbaacd1f5441169b2d2c",
-          "lastModified": "2026-09-28T06:29:51.930Z"
+          "hash": "sha256:dcd099b89db6617e0a0a183c78e8a87e733492b0177ec1f2a9ef12378ccb9900",
+          "lastModified": "2026-10-20T14:34:09.484Z"
         },
         "verify.md": {
-          "hash": "sha256:7d6cb3dc83a3b9897b217d5ee68f4856a70375f4a61f89dc63c36bb2abe4ce3b",
-          "lastModified": "2026-09-28T06:29:51.931Z"
+          "hash": "sha256:3c83c2e6275910cea24821460e03baf1bf70065ed94dac9f5e6095b7e810474d",
+          "lastModified": "2026-10-20T14:34:09.485Z"
         }
       }
     }

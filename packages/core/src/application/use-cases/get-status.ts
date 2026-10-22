@@ -29,6 +29,7 @@ import {
 } from '../../domain/services/lifecycle-verdict.js'
 import { evaluateLifecycle } from '../services/lifecycle-evaluation.js'
 import {
+  resolveEffectiveBindings,
   type CheckBinding,
   type CheckResult,
   type TaskCompletionCounts,
@@ -260,6 +261,8 @@ export interface Blocker {
   readonly code: string
   /** Human-readable explanation of the blocker. */
   readonly message: string
+  /** Whether the blocker can be bypassed via a CLI flag or configuration. */
+  readonly isSkippable: boolean
   /** CLI flag that skips this blocker when the predicate is skippable. */
   readonly bypassFlag?: string
   /** Gerund label from the failed check when projected from a predicate. */
@@ -390,6 +393,7 @@ function schemaResolutionBlocker(error: Error | undefined): Blocker {
     return {
       code: 'SCHEMA_IDENTITY_MISMATCH',
       message: error.message,
+      isSkippable: false,
       details: { requestedName: error.expectedSchemaName, returnedName: error.actualSchemaName },
     }
   }
@@ -397,6 +401,7 @@ function schemaResolutionBlocker(error: Error | undefined): Blocker {
     code: 'SCHEMA_RESOLUTION_FAILED',
     message:
       'Schema resolution failed; lifecycle transitions are unavailable until the schema is restored.',
+    isSkippable: false,
   }
 }
 
@@ -645,9 +650,18 @@ export class GetStatus {
     })
     const checksByTargetMap = legalTargets.checksByTarget
     let archiveChecks: readonly CheckResult[] = []
+    // Archive predicates and their bypass policy come from the same resolved bindings
+    // `ArchiveChange` uses, so a hint always matches what archive accepts.
+    let effectiveArchiveBindings: readonly CheckBinding[] = this._archiveBindings
     if (change.state === 'archivable') {
+      effectiveArchiveBindings = resolveEffectiveBindings({
+        baseBindings: this._archiveBindings,
+        schema,
+        operation: 'archive',
+        ...(this._checkRegistry !== undefined ? { registry: this._checkRegistry } : {}),
+      })
       const archiveEvaluation = await executeMatchingPredicates(
-        this._archiveBindings,
+        effectiveArchiveBindings,
         buildCheckExecutionContext({
           change,
           schema,
@@ -664,6 +678,8 @@ export class GetStatus {
     const verdict = evaluateLifecycle(change, schema, {
       approvals: this._approvals,
       checksByTarget: checksByTargetMap,
+      bindingsByTarget: legalTargets.bindingsByTarget,
+      archiveBindings: effectiveArchiveBindings,
       ...(validity !== undefined ? { validity } : {}),
     })
     const artifactStatusByType = new Map(
@@ -706,6 +722,7 @@ export class GetStatus {
       verdict.checksByTarget,
       legalTargets.bindingsByTarget,
       archiveChecks,
+      effectiveArchiveBindings,
     )
     nextAction = this._nextActionAfterArchiveOverlap(verdict.nextAction, blockers)
     validTransitions = verdict.validTransitions
@@ -940,6 +957,7 @@ export class GetStatus {
    * @param checksByTarget - Predicate results per protocol-legal target
    * @param bindingsByTarget - Resolved bindings per target (derived policy)
    * @param archiveChecks - Archive-scope predicates when `state === 'archivable'`
+   * @param archiveBindings - Effective archive bindings (derived policy for archive checks)
    * @returns Deduplicated public blockers
    */
   private _mergeBlockers(
@@ -947,30 +965,56 @@ export class GetStatus {
     checksByTarget: Readonly<Partial<Record<ChangeState, readonly CheckResult[]>>>,
     bindingsByTarget: Readonly<Partial<Record<ChangeState, readonly CheckBinding[]>>>,
     archiveChecks: readonly CheckResult[] = [],
+    archiveBindings: readonly CheckBinding[] = this._archiveBindings,
   ): Blocker[] {
     // Skippability comes from the resolved bindings of the target the failure belongs to
     // (schema-composed), or from the archive bindings for archive checks.
-    const candidates: { check: CheckResult; bindings: readonly CheckBinding[] }[] = [
+    // Archive failures are judged only against the archive bindings: a check that is
+    // skippable on a transition may be locked or hardened on archive (and vice versa), so
+    // the two sources never share a skippability verdict.
+    const candidates: {
+      check: CheckResult
+      bindings: readonly CheckBinding[]
+      source: 'transition' | 'archive'
+    }[] = [
       ...Object.entries(checksByTarget).flatMap(([target, rows]) =>
         (rows ?? []).map((check) => ({
           check,
           bindings: bindingsByTarget[target as ChangeState] ?? this._transitionBindings,
+          source: 'transition' as const,
         })),
       ),
-      ...archiveChecks.map((check) => ({ check, bindings: this._archiveBindings })),
+      ...archiveChecks.map((check) => ({
+        check,
+        bindings: archiveBindings,
+        source: 'archive' as const,
+      })),
     ]
-    const skippableByCheckId = new Map<string, boolean>()
-    for (const { check, bindings } of candidates) {
+    const transitionSkippable = new Map<string, boolean>()
+    const archiveSkippable = new Map<string, boolean>()
+    if (archiveChecks.length > 0) {
+      for (const binding of archiveBindings) {
+        archiveSkippable.set(
+          binding.check.id,
+          (archiveSkippable.get(binding.check.id) ?? false) || binding.skippable === true,
+        )
+      }
+    }
+    for (const { check, bindings, source } of candidates) {
       if (check.outcome !== 'fail') continue
       const skippable = bindings.find((b) => b.check.id === check.id)?.skippable === true
-      skippableByCheckId.set(check.id, (skippableByCheckId.get(check.id) ?? false) || skippable)
+      const target = source === 'archive' ? archiveSkippable : transitionSkippable
+      target.set(check.id, (target.get(check.id) ?? false) || skippable)
     }
 
     const merged = new Map<string, Blocker>()
     for (const blocker of reviewBlockers) {
       // The lifecycle verdict pre-computes bypass hints; resolved bindings are authoritative.
       const resolved =
-        blocker.checkId !== undefined ? skippableByCheckId.get(blocker.checkId) : undefined
+        blocker.checkId !== undefined
+          ? (archiveSkippable.get(blocker.checkId) ?? transitionSkippable.get(blocker.checkId))
+          : undefined
+      const isSkippable = resolved ?? blocker.isSkippable ?? false
       const bypassFlag =
         resolved === undefined
           ? blocker.bypassFlag
@@ -980,25 +1024,27 @@ export class GetStatus {
       merged.set(`${blocker.code}:${blocker.message}`, {
         code: blocker.code,
         message: blocker.message,
+        isSkippable,
         ...(bypassFlag !== undefined ? { bypassFlag } : {}),
         ...(blocker.label !== undefined ? { label: blocker.label } : {}),
         ...(blocker.checkId !== undefined ? { checkId: blocker.checkId } : {}),
       })
     }
 
-    for (const { check } of candidates) {
+    for (const { check, source } of candidates) {
       if (check.outcome !== 'fail' || check.code === undefined) continue
       const message = check.message ?? `Check '${check.id}' failed`
       const key = `${check.code}:${message}`
       if (merged.has(key)) continue
+      const isSkippable =
+        (source === 'archive' ? archiveSkippable : transitionSkippable).get(check.id) === true
       merged.set(key, {
         code: check.code,
         message,
+        isSkippable,
         label: check.label,
         checkId: check.id,
-        ...(skippableByCheckId.get(check.id) === true
-          ? { bypassFlag: `--skip-checks ${check.id}` }
-          : {}),
+        ...(isSkippable ? { bypassFlag: `--skip-checks ${check.id}` } : {}),
       })
     }
 
@@ -1021,10 +1067,12 @@ export class GetStatus {
     if (overlap === undefined) {
       return nextAction
     }
-    const bypass = overlap.bypassFlag ?? '--skip-checks spec.overlap'
-    const reason = overlap.message.includes(bypass)
-      ? overlap.message
-      : `${overlap.message} Use ${bypass} to archive anyway.`
+    // Never invent a bypass: when the resolved binding is not skippable there is none to offer.
+    const bypass = overlap.bypassFlag
+    const reason =
+      bypass === undefined || overlap.message.includes(bypass)
+        ? overlap.message
+        : `${overlap.message} Use ${bypass} to archive anyway.`
     return {
       targetStep: 'archivable',
       actionType: 'mechanical',

@@ -67,7 +67,7 @@ For every condition that prevents a transition or marks an artifact as incomplet
 - `code`: A unique machine-readable identifier.
 - `message`: A human-readable description.
 - `isSkippable`: Boolean indicating if the blocker can be bypassed via a CLI flag or configuration.
-- `bypassFlag`: (Optional) The name of the flag that bypasses this blocker (e.g., `--skip-checks spec.overlap`). Projected bypass flags use the canonical `--skip-checks <checkId>` form; CLI aliases such as `--allow-overlap` and `--allow-out-of-scope` are accepted inputs, not projected values. `isSkippable` and `bypassFlag` SHALL come from the resolved binding of the failing check.
+- `bypassFlag`: (Optional) The name of the flag that bypasses this blocker (e.g., `--skip-checks spec.overlap`). Projected bypass flags use the canonical `--skip-checks <checkId>` form; CLI aliases such as `--allow-overlap` and `--allow-out-of-scope` are accepted inputs, not projected values. `isSkippable` and `bypassFlag` SHALL come from the resolved binding of the failing check (from `LifecycleVerdictInput.resolvedBindings` when supplied by the caller, or resolved from `schema` against the built-in binding specifications when omitted); when the resolved binding has `skippable: false`, `isSkippable` MUST be `false` and `bypassFlag` MUST be omitted.
 - `affectedArtifacts` (optional): Detail identifying the specific artifact IDs and files.
 
 If a blocker is skippable and the corresponding bypass is active in the verdict input, the function MUST omit that blocker from `blockers` (it MUST NOT remain as a transition blocker). `LifecycleDomainVerdict` has no `warnings` field; active bypass MUST NOT invent a warning channel.

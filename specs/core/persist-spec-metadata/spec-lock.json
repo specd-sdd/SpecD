@@ -9,5 +9,41 @@
     "default:_global/architecture",
     "core:composition-resolver"
   ],
-  "implementation": []
+  "implementation": [],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Guarded internal complete-metadata persistence validates projection then conditionally writes repository snapshot.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:fa34640902bf41bab8d5d1ed753ba369fb8caa4f88d7b079a3bf3994684cec55",
+          "lastModified": "2026-08-25T15:37:19.325Z"
+        },
+        "verify.md": {
+          "hash": "sha256:a86df46cf6a39cdf1957deef84bccd53957a63a0ac8ffae0780a90408515a1e7",
+          "lastModified": "2026-08-25T15:37:19.325Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Persist Spec Metadata\n## Rules\n- PersistSpecMetadata internal; only MaterializeSpecMetadata calls. Never Kernel/public Core/SDK/CLI/MCP export or general editor.\n- Accept complete SpecMetadata plus expectedRevision; null creates absent snapshot, value replaces exact observed revision. No patches.\n- Structurally validate before write; typed validation error and no write on failure.\n- Delegate SpecRepository.writeMetadataSnapshot(spec, metadata, { expectedRevision }); no I/O, serialization, conflict detection, retries, merge. Propagate typed conflict.\n- No dependency/optimization/projection authority. Explicit injected target-workspace SpecRepository.\n## Constraints\n- Never read artifacts/lock; complete replacement only; no CLI command.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:fa34640902bf41bab8d5d1ed753ba369fb8caa4f88d7b079a3bf3994684cec55",
+          "lastModified": "2026-08-25T15:37:19.325Z"
+        },
+        "verify.md": {
+          "hash": "sha256:a86df46cf6a39cdf1957deef84bccd53957a63a0ac8ffae0780a90408515a1e7",
+          "lastModified": "2026-08-25T15:37:19.325Z"
+        }
+      }
+    }
+  }
 }

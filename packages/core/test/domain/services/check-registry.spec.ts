@@ -497,3 +497,54 @@ describe('CheckRegistry', () => {
     ).toThrow(InvalidInputError)
   })
 })
+
+describe('CheckRegistry — archive bindings', () => {
+  const pluginCheck: CustomCheckDefinition = {
+    id: 'scan',
+    label: 'Scan',
+    execute: async () => ({ id: 'x', label: 'x', kind: 'predicate', outcome: 'pass' }),
+  }
+
+  it('includes the built-in archive bindings by default', () => {
+    const registry = new CheckRegistry()
+    const archiveIds = registry
+      .bindings()
+      .filter((b) => b.applicability.some((a) => a.scope === 'archive'))
+      .map((b) => b.check.id)
+    expect(archiveIds).toEqual(
+      expect.arrayContaining(['spec.overlap', 'workspace.readOnly', 'impl.linksInScope']),
+    )
+  })
+
+  it('exposes the archive exception on the registry bindings', () => {
+    const registry = new CheckRegistry()
+    for (const id of ['workspace.readOnly', 'deps.consistent', 'impl.filesResolved']) {
+      const archive = registry
+        .getBindings(id)
+        .find((b) => b.applicability.some((a) => a.scope === 'archive'))
+      expect(archive?.allowBindingOverride, id).toBe(false)
+      expect(archive?.allowConfigOverride, id).toBe(false)
+      expect(archive?.allowDisable, id).toBe(false)
+      const transition = registry
+        .getBindings(id)
+        .find((b) => b.applicability.some((a) => a.scope === 'transition'))
+      expect(transition?.allowDisable, id).toBe(true)
+      expect(registry.getGovernance(id)?.allowDisable, id).toBe(true)
+    }
+  })
+
+  it('registers a plugin archive binding after the built-in ones', () => {
+    const registry = new CheckRegistry()
+    registry.register('sec', pluginCheck, [{ scope: 'archive', skippable: true }])
+    const binding = registry.getBindings('@sec.scan')[0]
+    expect(binding?.applicability).toEqual([{ scope: 'archive' }])
+    expect(binding?.skippable).toBe(true)
+  })
+
+  it('rejects a second archive binding for the same plugin check', () => {
+    const registry = new CheckRegistry()
+    expect(() =>
+      registry.register('sec', pluginCheck, [{ scope: 'archive' }, { scope: 'archive' }]),
+    ).toThrow(DuplicateCheckBindingError)
+  })
+})

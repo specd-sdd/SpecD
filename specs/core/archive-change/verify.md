@@ -26,6 +26,13 @@
 - **AND** it does not receive `GenerateSpecMetadata` or `SaveSpecMetadata` directly
 - **AND** it does not receive `RunStepHooks`
 
+#### Scenario: ArchiveChange receives the CheckRegistry
+
+- **GIVEN** the archive workflow is composed for runtime use
+- **WHEN** `ArchiveChange` is instantiated
+- **THEN** the constructor receives the `CheckRegistry` handed in by composition
+- **AND** it is used to resolve effective archive bindings and to validate `skipChecks`
+
 ### Requirement: Archive bindings not RunStepHooks on the use case
 
 #### Scenario: ArchiveChange constructor does not take RunStepHooks
@@ -36,12 +43,60 @@
 - **AND** the constructor does not accept `RunStepHooks`
 - **AND** `ArchiveChangeDeps` does not include `runStepHooks`
 
+#### Scenario: Base bindings are never executed directly
+
+- **GIVEN** the injected `archiveBindings` contain `spec.overlap`
+- **AND** the change's schema declares `archiveChecks: [{ id: spec.overlap, disabled: true }]`
+- **WHEN** `ArchiveChange.execute` runs
+- **THEN** `spec.overlap` is not evaluated
+- **AND** the injected `archiveBindings` array is not mutated
+
 ### Requirement: Input
 
 #### Scenario: Default values for optional fields
 
 - **WHEN** execute is called with only a name
-- **THEN** hooks are not skipped and overlap is not allowed by default.
+- **THEN** hooks are not skipped and no archive check is bypassed by default.
+
+#### Scenario: skipChecks defaults to empty
+
+- **WHEN** execute is called with only a name
+- **THEN** no archive check is bypassed
+
+#### Scenario: Bypass booleans are not part of the input
+
+- **WHEN** the `ArchiveChangeInput` contract is inspected
+- **THEN** it exposes `skipChecks` and no `allowOverlap` or `allowOutOfScope` field
+- **AND** every bypass is expressed as a check id in `skipChecks`
+
+#### Scenario: Bypassing impl.linksInScope does not bypass impl.filesResolved
+
+- **GIVEN** archive would require sidecar updates outside the change scope and a tracked file is still `open`
+- **WHEN** `execute({ name, skipChecks: ['impl.linksInScope'] })` runs
+- **THEN** the archive still fails on `impl.filesResolved`
+
+#### Scenario: Check ids are case-sensitive
+
+- **WHEN** `execute({ name, skipChecks: ['Spec.Overlap'] })` runs
+- **THEN** `UnknownCheckError` is thrown naming `Spec.Overlap`
+
+#### Scenario: Empty skipChecks equals omitted
+
+- **WHEN** `execute({ name, skipChecks: [] })` runs
+- **THEN** it behaves exactly like an execute without `skipChecks`
+
+#### Scenario: Duplicate ids collapse
+
+- **WHEN** `execute({ name, skipChecks: ['spec.overlap', 'spec.overlap'] })` runs
+- **THEN** `spec.overlap` is bypassed once and no error is raised
+
+#### Scenario: Bypassing a check the schema disabled is a no-op
+
+- **GIVEN** the schema declares `archiveChecks: [{ id: spec.overlap, disabled: true }]`
+- **AND** `alpha` overlaps `beta`
+- **WHEN** `execute({ name: 'alpha', skipChecks: ['spec.overlap'] })` runs
+- **THEN** the id is accepted and has no effect
+- **AND** no peer is scanned and `invalidatedChanges` is empty
 
 ### Requirement: Sovereign schema resolution
 
@@ -51,6 +106,13 @@
 - **WHEN** archive is called
 - **THEN** it resolves schema A via `SchemaProvider.get(A)`
 - **AND** proceeds without throwing `SchemaMismatchError`
+
+#### Scenario: Peers are loaded for invalidation when spec.overlap is bypassed
+
+- **GIVEN** `alpha` overlaps `beta`
+- **WHEN** `execute({ name: 'alpha', skipChecks: ['spec.overlap'] })` runs
+- **THEN** peer changes are listed only after the archive predicates return
+- **AND** `beta` is invalidated through the reconciler
 
 ### Requirement: Archivable guard
 
@@ -179,13 +241,26 @@
 - **THEN** `workspace.readOnly` fails
 - **AND** `ArchiveChange` uses the same runner on operation `archive`
 
+#### Scenario: workspace.readOnly cannot be skipped on archive
+
+- **GIVEN** a change in `archivable` state containing a spec from a `readOnly` workspace
+- **WHEN** `execute({ name, skipChecks: ['workspace.readOnly'] })` runs
+- **THEN** `CheckNotSkippableError` is thrown naming `workspace.readOnly`
+- **AND** no hook runs and no file is written
+
+#### Scenario: A schema cannot disable workspace.readOnly on archive
+
+- **GIVEN** a schema declaring `archiveChecks: [{ id: workspace.readOnly, disabled: true }]`
+- **WHEN** the schema is built
+- **THEN** `CheckDisableForbiddenError` is thrown
+
 ### Requirement: Overlap guard
 
 #### Scenario: Archive blocked when other changes target same specs
 
 - **GIVEN** a change `alpha` in `archivable` state targeting `core:config`
 - **AND** another active change `beta` also targets `core:config`
-- **WHEN** `ArchiveChange.execute({ name: 'alpha' })` is called without `allowOverlap`
+- **WHEN** `ArchiveChange.execute({ name: 'alpha' })` is called without bypassing `spec.overlap`
 - **THEN** `SpecOverlapError` is thrown
 - **AND** the error message includes `core:config` and `beta`
 - **AND** no files are modified and no hooks are executed
@@ -194,7 +269,7 @@
 
 - **GIVEN** `alpha` in `archivable` targets `core:config` and `core:kernel`
 - **AND** active peers `beta` and `gamma` overlap those specs and each has workflow `redesign`
-- **WHEN** `ArchiveChange.execute({ name: 'alpha', allowOverlap: true })` succeeds
+- **WHEN** `ArchiveChange.execute({ name: 'alpha', skipChecks: ['spec.overlap'] })` succeeds
 - **THEN** each peer receives a `spec-overlap-conflict` invalidation through canonical reconciliation and returns to `designing` once
 - **AND** each audit message names `alpha` and its overlapping spec ID
 - **AND** `invalidatedChanges` contains `{ name: 'beta', specIds: ['core:config'] }` and `{ name: 'gamma', specIds: ['core:kernel'] }`
@@ -202,7 +277,7 @@
 #### Scenario: Archive overlap peer recovery is reconciler-owned and serialized
 
 - **GIVEN** `alpha` and active `beta` both target `core:config`
-- **WHEN** archive of `alpha` permits overlap
+- **WHEN** archive of `alpha` bypasses `spec.overlap`
 - **THEN** the `spec-overlap-conflict` intent for `beta` is processed inside one serialized `ChangeRepository.mutate('beta', fn)` reconciliation
 - **AND** artifact review, projection changes, audit event, and any gate-required return are committed atomically
 - **AND** `ArchiveChange` never calls `beta.invalidate` directly
@@ -210,15 +285,15 @@
 #### Scenario: Ungated preserve peer remains in its current phase
 
 - **GIVEN** an overlapping active peer in `implementing` with workflow `preserve` and no required stale spec consent
-- **WHEN** another change archives with `allowOverlap: true`
+- **WHEN** another change archives bypassing `spec.overlap`
 - **THEN** the peer remains in `implementing` with explicit overlap review and a forward-progress blocker
 - **AND** no unconditional return to `designing` is appended
 
-#### Scenario: No overlap with allowOverlap produces empty invalidatedChanges
+#### Scenario: No overlap with the bypass produces empty invalidatedChanges
 
 - **GIVEN** a change `alpha` in `archivable` state targeting `core:config`
 - **AND** no other active change targets `core:config`
-- **WHEN** `ArchiveChange.execute({ name: 'alpha', allowOverlap: true })` is called
+- **WHEN** `ArchiveChange.execute({ name: 'alpha', skipChecks: ['spec.overlap'] })` is called
 - **THEN** the archive proceeds normally
 - **AND** `result.invalidatedChanges` is an empty array
 
@@ -229,6 +304,57 @@
 - **WHEN** `ArchiveChange.execute({ name: 'alpha' })` is called
 - **THEN** `alpha` itself does not cause an overlap detection
 - **AND** the archive proceeds normally
+
+#### Scenario: Bypassing spec.overlap permits archive and invalidates peers
+
+- **GIVEN** `alpha` in `archivable` overlaps `beta` on `core:config`
+- **WHEN** `ArchiveChange.execute({ name: 'alpha', skipChecks: ['spec.overlap'] })` is called
+- **THEN** the archive proceeds
+- **AND** `beta` receives a `spec-overlap-conflict` invalidation through canonical reconciliation
+
+#### Scenario: Schema-disabled spec.overlap performs no scan and no invalidation
+
+- **GIVEN** the schema declares `archiveChecks: [{ id: spec.overlap, disabled: true }]`
+- **AND** `alpha` overlaps `beta`
+- **WHEN** `ArchiveChange.execute({ name: 'alpha' })` is called
+- **THEN** the archive proceeds without listing peer changes
+- **AND** `beta` is not invalidated
+
+#### Scenario: Non-skippable spec.overlap cannot be bypassed
+
+- **GIVEN** the schema declares `archiveChecks: [{ id: spec.overlap, skippable: false }]`
+- **AND** `alpha` overlaps `beta`
+- **WHEN** `ArchiveChange.execute({ name: 'alpha', skipChecks: ['spec.overlap'] })` is called
+- **THEN** `CheckNotSkippableError` is thrown before any check, hook, or write
+
+#### Scenario: Bypassing spec.overlap when nothing overlaps
+
+- **GIVEN** `alpha` in `archivable` has no overlapping active change
+- **WHEN** `ArchiveChange.execute({ name: 'alpha', skipChecks: ['spec.overlap'] })` is called
+- **THEN** the archive proceeds normally
+- **AND** `result.invalidatedChanges` is an empty array
+
+#### Scenario: Bypassing spec.overlap does not bypass other failing checks
+
+- **GIVEN** `alpha` overlaps `beta` and also contains a spec from a `readOnly` workspace
+- **WHEN** `execute({ name: 'alpha', skipChecks: ['spec.overlap'] })` runs
+- **THEN** `ReadOnlyWorkspaceError` is thrown
+- **AND** no peer is invalidated and no file is written
+
+#### Scenario: Retry from archiving applies the same bypass
+
+- **GIVEN** `alpha` is in `archiving` after a failed commit and overlaps `beta`
+- **WHEN** `execute({ name: 'alpha', skipChecks: ['spec.overlap'] })` runs
+- **THEN** the bypass is validated and applied exactly as from `archivable`
+
+#### Scenario: Overlap error names peers and carries no delivery-specific flag
+
+- **GIVEN** `alpha` overlaps `beta` on `core:config`
+- **WHEN** `ArchiveChange.execute({ name: 'alpha' })` is called without bypassing `spec.overlap`
+- **THEN** `SpecOverlapError` is thrown
+- **AND** its message names `core:config` and `beta`
+- **AND** its message contains no `--skip-checks` or `--allow-overlap` text
+- **AND** `skippable` reflects the resolved `spec.overlap` binding
 
 ### Requirement: Pre-archive hooks
 
@@ -484,7 +610,7 @@
 
 #### Scenario: Result includes invalidated changes after overlap
 
-- **GIVEN** `ArchiveChange.execute` was called with `allowOverlap: true`
+- **GIVEN** `ArchiveChange.execute` was called bypassing `spec.overlap`
 - **AND** two overlapping changes were invalidated
 - **WHEN** the result is returned
 - **THEN** `invalidatedChanges` has two entries with `name` and `specIds` for each invalidated change
@@ -787,6 +913,13 @@
 - **THEN** `impl.filesResolved` does not match
 - **AND** the transition is not failed for `IMPLEMENTATION_STATE`
 
+#### Scenario: impl.filesResolved cannot be skipped on archive
+
+- **GIVEN** a tracked implementation file in `open` state
+- **WHEN** `execute({ name, skipChecks: ['impl.filesResolved'] })` runs
+- **THEN** `CheckNotSkippableError` is thrown
+- **AND** `skipChecks: ['impl.linksInScope']` does not bypass the open file either
+
 ### Requirement: Implementation materialization into spec-lock
 
 #### Scenario: File-level and symbol-level links materialize into sidecar
@@ -828,21 +961,39 @@
 #### Scenario: Out-of-scope sidecar maintenance fails by default
 
 - **GIVEN** implementation integrity maintenance would require sidecar updates outside the archived spec scope
-- **WHEN** archive runs without override
+- **WHEN** archive runs without bypassing `impl.linksInScope`
 - **THEN** archive fails before applying those external updates
 
 #### Scenario: Explicit override allows out-of-scope sidecar updates
 
 - **GIVEN** the same out-of-scope sidecar maintenance situation
-- **WHEN** archive runs with `--allow-out-of-scope`
+- **WHEN** archive runs with `skipChecks: ['impl.linksInScope']`
 - **THEN** archive is allowed to proceed with those external sidecar updates
 
 #### Scenario: Same skippable flag on exit implementing
 
 - **GIVEN** `impl.linksInScope` would fail
-- **AND** `--allow-out-of-scope` is in scope for the attempt
+- **AND** `impl.linksInScope` is bypassed through `skipChecks` for the attempt
 - **WHEN** exit from `implementing` is evaluated
 - **THEN** the predicate skips with the same semantics as archive
+
+#### Scenario: skipChecks impl.linksInScope allows out-of-scope sidecar updates
+
+- **GIVEN** the same out-of-scope sidecar maintenance situation
+- **WHEN** archive runs with `skipChecks: ['impl.linksInScope']`
+- **THEN** archive is allowed to proceed with those external sidecar updates
+
+#### Scenario: Schema makes impl.linksInScope non-skippable
+
+- **GIVEN** the schema declares `archiveChecks: [{ id: impl.linksInScope, skippable: false }]`
+- **WHEN** archive runs with `skipChecks: ['impl.linksInScope']`
+- **THEN** `CheckNotSkippableError` is thrown
+
+#### Scenario: Schema disables impl.linksInScope
+
+- **GIVEN** the schema declares `archiveChecks: [{ id: impl.linksInScope, disabled: true }]`
+- **WHEN** archive runs
+- **THEN** the check is not evaluated and archive does not fail for out-of-scope updates
 
 ### Requirement: Typed errors for archive failures
 
@@ -884,6 +1035,41 @@
 - **WHEN** `ArchiveChange` aborts the batch
 - **THEN** `ArchiveBatchRestoreError` is thrown
 
+#### Scenario: Unregistered skip id throws UnknownCheckError
+
+- **WHEN** `ArchiveChange` is executed with `skipChecks: ['nope.check']`
+- **THEN** `UnknownCheckError` is thrown
+
+#### Scenario: Non-skippable skip id throws CheckNotSkippableError
+
+- **WHEN** `ArchiveChange` is executed with `skipChecks: ['workspace.readOnly']`
+- **THEN** `CheckNotSkippableError` is thrown
+
+#### Scenario: Plugin check failure throws CheckPredicateFailedError
+
+- **GIVEN** a plugin check `@security.code-scan` bound to archive that fails with code `SECURITY_FINDINGS`
+- **WHEN** `ArchiveChange.execute` runs
+- **THEN** `CheckPredicateFailedError` is thrown carrying the check id, label, code `SECURITY_FINDINGS`, message, command, and details
+- **AND** it is not an `ArchiveImplementationStateError`
+
+#### Scenario: Plugin failure carries the resolved skippability
+
+- **GIVEN** the same check with a resolved binding that is skippable, and again with one that is not
+- **WHEN** it fails on archive
+- **THEN** `CheckPredicateFailedError.skippable` is `true` in the first case and `false` in the second
+
+#### Scenario: Plugin failure without a code uses CHECK_FAILED
+
+- **GIVEN** a plugin check that fails without a code
+- **WHEN** `ArchiveChange.execute` runs
+- **THEN** the thrown `CheckPredicateFailedError` has code `CHECK_FAILED`
+
+#### Scenario: Built-in failures keep their dedicated errors
+
+- **GIVEN** `workspace.readOnly`, `deps.consistent`, `impl.filesResolved`, `spec.overlap`, or `verification.current` fails
+- **WHEN** `ArchiveChange.execute` runs
+- **THEN** the dedicated error for that check is thrown, not `CheckPredicateFailedError`
+
 ### Requirement: Archive checks share runners and wrap remaining preflight
 
 #### Scenario: deps.consistent throws ArchiveDependencyMismatchError
@@ -901,6 +1087,140 @@
 - **THEN** it fails with `ArchivePreflightError` or `ArchiveArtifactMissingError`
 - **AND** that failure is not a registered `archive.publication` check
 
+#### Scenario: Plugin archive check runs after the built-in predicates
+
+- **GIVEN** a plugin check `@security.code-scan` registered with a default binding `{ scope: 'archive' }`
+- **WHEN** `ArchiveChange.execute` runs
+- **THEN** it is evaluated after the built-in archive predicates, in registry order
+- **AND** a failure of that check blocks the archive before any hook or write
+
+#### Scenario: Schema embeds a registered check on archive
+
+- **GIVEN** `@security.code-scan` is registered without default bindings and allows schema embedding
+- **AND** the schema declares `archiveChecks: [{ id: '@security.code-scan' }]`
+- **WHEN** `ArchiveChange.execute` runs
+- **THEN** a synthesized, non-skippable binding for `scope: 'archive'` is evaluated with the real check instance
+
+#### Scenario: Schema without archiveChecks keeps the base behaviour
+
+- **GIVEN** a schema with no `archiveChecks` and no plugin archive bindings
+- **WHEN** the effective archive bindings are resolved
+- **THEN** they contain the same checks, in the same order and with the same policy, as the base `archiveBindings`
+- **AND** archive behaves exactly as before this capability
+
+#### Scenario: Several embedded checks are evaluated in declaration order
+
+- **GIVEN** the schema declares `archiveChecks` for `@a.lint` and then `@b.scan`, both embeddable
+- **WHEN** archive runs
+- **THEN** both are evaluated after the built-in and plugin default predicates, `@a.lint` first
+
+#### Scenario: A locked check redeclared without change is accepted
+
+- **GIVEN** the schema declares `archiveChecks: [{ id: workspace.readOnly, skippable: false }]`
+- **WHEN** archive runs
+- **THEN** the declaration is accepted as redeclaring the code-defined coordinate
+- **AND** the policy of `workspace.readOnly` is unchanged
+
+#### Scenario: Declaration for a check absent from the archive operation is inert when disabled
+
+- **GIVEN** the schema declares `archiveChecks: [{ id: '@qa.extended-lint', disabled: true }]` for a registered check with no archive binding
+- **WHEN** archive runs
+- **THEN** no binding exists for it and the archive is unaffected
+
+### Requirement: Effective archive bindings and skip validation
+
+#### Scenario: Bindings are resolved on every execute
+
+- **GIVEN** the same `ArchiveChange` instance archives two changes with different sovereign schemas
+- **WHEN** each `execute` runs
+- **THEN** each run evaluates the bindings resolved from its own schema
+- **AND** no resolution result is reused across runs
+
+#### Scenario: Unknown check id is rejected
+
+- **WHEN** `execute({ name, skipChecks: ['nope.check'] })` runs
+- **THEN** `UnknownCheckError` is thrown
+- **AND** no predicate is evaluated, no hook runs, no file is written, and the change stays `archivable`
+
+#### Scenario: Hook checks are not skippable through skipChecks
+
+- **WHEN** `execute({ name, skipChecks: ['hook.pre'] })` runs
+- **THEN** `CheckNotSkippableError` is thrown
+- **AND** its message points to `skipHookPhases`
+
+#### Scenario: Locked built-in check cannot be skipped
+
+- **WHEN** `execute({ name, skipChecks: ['verification.current'] })` runs
+- **THEN** `CheckNotSkippableError` is thrown naming `verification.current`
+
+#### Scenario: Skippable built-in check is bypassed and audited
+
+- **GIVEN** `impl.linksInScope` would fail
+- **WHEN** `execute({ name, skipChecks: ['impl.linksInScope'] })` runs
+- **THEN** that check reports `outcome: 'skip'` with the same bypass marker as on `TransitionChange`
+- **AND** the archive proceeds
+
+#### Scenario: Schema makes a plugin check skippable
+
+- **GIVEN** `@security.code-scan` bound to archive and the schema declares it `skippable: true`
+- **WHEN** `execute({ name, skipChecks: ['@security.code-scan'] })` runs
+- **THEN** the check is bypassed and the archive proceeds
+
+#### Scenario: Schema cannot relax a locked archive check
+
+- **GIVEN** a schema declaring `archiveChecks: [{ id: impl.filesResolved, skippable: true }]`
+- **WHEN** the schema is built
+- **THEN** `CheckBindingOverrideForbiddenError` is thrown before any archive is attempted
+
+#### Scenario: Skip validation completes before any publication write
+
+- **GIVEN** an invalid skip id
+- **WHEN** `ArchiveChange.execute` rejects the request
+- **THEN** no archive publication write happened and the change is still `archivable`
+- **AND** the only state written earlier is canonical validity reconciliation
+
+#### Scenario: State guard precedes skip validation
+
+- **GIVEN** a change in `designing`
+- **WHEN** `execute({ name, skipChecks: ['nope.check'] })` runs
+- **THEN** `InvalidStateTransitionError` is thrown, not `UnknownCheckError`
+
+#### Scenario: Schema resolution failure precedes skip validation
+
+- **GIVEN** the change's schema identity does not match the provider
+- **WHEN** `execute({ name, skipChecks: ['nope.check'] })` runs
+- **THEN** `SchemaProviderIdentityMismatchError` propagates first
+
+#### Scenario: Registered check without an archive binding is accepted
+
+- **WHEN** `execute({ name, skipChecks: ['approval.spec'] })` runs
+- **THEN** no error is raised because `approval.spec` is registered
+- **AND** the id has no effect on the archive
+
+#### Scenario: Check disabled by the schema is accepted
+
+- **GIVEN** the schema disables `impl.linksInScope` through `archiveChecks`
+- **WHEN** `execute({ name, skipChecks: ['impl.linksInScope'] })` runs
+- **THEN** no error is raised and the id has no effect
+
+#### Scenario: Bypassing one check does not bypass another
+
+- **GIVEN** both `spec.overlap` and `impl.linksInScope` would fail
+- **WHEN** `execute({ name, skipChecks: ['spec.overlap'] })` runs
+- **THEN** the `impl.linksInScope` failure still blocks the archive
+
+#### Scenario: Mixed valid and invalid ids reject the whole request
+
+- **WHEN** `execute({ name, skipChecks: ['spec.overlap', 'nope.check'] })` runs
+- **THEN** `UnknownCheckError` is thrown
+- **AND** `spec.overlap` has not been bypassed and nothing was executed
+
+#### Scenario: A passing check can still be bypassed
+
+- **GIVEN** `impl.linksInScope` would pass
+- **WHEN** `execute({ name, skipChecks: ['impl.linksInScope'] })` runs
+- **THEN** the archive proceeds and the bypass is recorded for that check
+
 ### Requirement: Config-based factory delegates through resolveArchiveChangeDeps
 
 #### Scenario: createArchiveChange config form derives ArchiveChangeDeps through resolveArchiveChangeDeps
@@ -909,6 +1229,7 @@
 - **THEN** it creates a composition resolver for that composition session
 - **AND** it derives `ArchiveChangeDeps` through `resolveArchiveChangeDeps(resolver)`
 - **AND** `resolveArchiveChangeDeps(resolver)` resolves `archiveBindings` from `resolveWorkflowCheckRegistry`
+- **AND** it resolves `checkRegistry` from the same registry
 - **AND** it resolves `materializeMetadata: MaterializeSpecMetadata`
 - **AND** it resolves `contentHasher: ContentHasher`
 - **AND** it does not resolve `runStepHooks` onto the use case

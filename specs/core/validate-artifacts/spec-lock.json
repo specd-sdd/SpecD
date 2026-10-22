@@ -26,36 +26,36 @@
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Artifact-validation chokepoint enforces schema, DAG, delta, metadata, validity reconciliation, and completion invariants.",
+      "value": "Validate artifacts against change schema, dependencies, deltas, metadata, hashes, and canonical validity reconciliation.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:a47a013672b29d93d131b8ae3e38e03e3a938333644246459f095a4efe44b29d",
-          "lastModified": "2026-09-28T11:19:59.196Z"
+          "hash": "sha256:dc85ae51f62f067a6248f72a5a36ec9ad630c7bc57f1371b6d371c3e74a59c54",
+          "lastModified": "2026-10-20T14:34:09.761Z"
         },
         "verify.md": {
-          "hash": "sha256:7a387c5b2a50374c4c3da2caec0f01c9c30838e38a74ee08fb328fbf06f13086",
-          "lastModified": "2026-09-28T11:19:59.198Z"
+          "hash": "sha256:32bfa965321a5cfa358ef33bddcd826627fcff855c1852376e7c0aa6ecc5b80b",
+          "lastModified": "2026-10-20T14:34:09.762Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# ValidateArtifacts\n## Rules\n- Constructor: `ChangeRepository`, `ListWorkspaces`, `SchemaProvider`, `ArtifactParserRegistry`, `ActorResolver`, `ContentHasher`, `ExtractorTransformRegistry`, `SpecWorkspaceRoute[]`; schema lazy/cached; workspace lookup via `ListWorkspaces`; DAG via module `evaluateLifecycleVerdict` with empty `checksByTarget`. Config factory uses `resolveValidateArtifactsDeps`; never resolves `lifecycle`/`LifecycleEngine`.\n- Throw `ChangeNotFoundError` for missing change, then require `schema.name() === change.schemaName`, else `SchemaMismatchError`, before validation. `specPath` required only for `scope: spec`; ignored for `scope: change`; change artifacts route by ID, never `change.specIds`.\n- Full pass requires every non-optional artifact non-`missing`; optional `skipped` resolves requirement. Single `artifactId` skips full-set check. Traverse artifact types in `topologicalOrder()`; spec files follow `change.specIds`. Evaluate DAG once, patch verdict after completion; no persist/re-evaluate. Dependencies require effective `complete`/`skipped`; failures name dependency/status and upstream parent blocker when available.\n- Canonical `complete`/`skipped` bypass structural reads, delta preview, and `markComplete`; review/drift states validate. Reconcile fresh non-task artifact/implementation inputs within same serialized mutation, independently comparing approval, verification, sign-off baselines; mark only affected projections stale, append audit, atomically recover mandatory gates. Never replay event order, broadly invalidate, or let new `validatedHash` erase detected drift. Revalidation does not restore semantic gates.\n- Shared validity evaluator owns baseline drift; central reconciler materializes it. Exclude `hasTasks: true` artifacts from automatic drift invalidation, consent/verification comparison, and downstream propagation, but retain structural validation, presence checks, task counting. Artifact policy controls reopening breadth; workflow policy lifecycle movement; unresolved non-task drift/review always blocks forward transitions.\n- Resolve expected file before `validatedHash`: existing concrete delta-capable base uses `deltas/<workspace>/<capability-path>/<filename>.delta.yaml`; new/absent concrete base uses `specs/<workspace>/<capability-path>/<filename>`; change artifact uses root basename. No fallback; reject mixed direct/delta new-spec representation unless each delta has concrete base. Required absence becomes canonical `missing` and reports expected path.\n- All-`no-op` delta skips delta validation, application, base load, structural validation; hash raw delta. Otherwise parse normalized delta AST; run `deltaValidations`; load/parse base; apply; map `DeltaApplicationError`; validate merged serialized AST; never mutate `SpecRepository`.\n- Validation-rule algorithm: select by selector-model fields or JSONPath `path`; zero matches failure when required, warning otherwise; enforce total/unique `count`; test `contentMatches` against `renderSubtree`; recursively evaluate `children`; collect all failures/warnings.\n- Cross-artifact rules require matching scope/spec and, when filtered, reference `artifactId`. Participant ready after expected file, local pass, parsed materialized output; rehydrate prior `complete` participants identically. Unavailable participant yields deferred non-failure warning. Resolve selectors, `keySelector`, extraction, capture, strip. `all-equal`; `subset [A,B]` means A ⊆ B; `superset [A,B]` means B ⊆ A; ordering ignore or relative-order strict.\n- Extract current-artifact partial metadata via `extractMetadata(..., artifactType.id)`; validate `permissiveSpecMetadataSchema`, not complete-write `strictSpecMetadataSchema`. Transform/context errors fail. Successful extracted `dependsOn` updates `change.specDependsOn`; mismatch with canonical `spec-lock.json` does not fail.\n- Success applies ordered `preHashCleanup`, universal whitespace normalization, SHA-256 of cleaned raw content, then `markComplete(key, hash)`. Return `{passed, failures, warnings, files}`; validation failures never throw. Persist completion, reconciliation, audit, and dependency updates via fresh `ChangeRepository.mutate`; preserve partial progress.\n## Constraints\n- Only `ValidateArtifacts` calls `Artifact.markComplete(hash)`.\n- Never write merged specs to `SpecRepository`; only `ArchiveChange`.\n- Repository hydration exposes physical facts only; no approval invalidation or lifecycle recovery.\n- `preHashCleanup` changes hash only, never disk.\n- Missing `deltaValidations[]`/`validations[]` skips that step.",
+      "value": "# ValidateArtifacts\n## Rules\n- Resolve change/schema; validate artifacts topologically. Required non-missing; optional `skipped` valid.\n- Apply/validate deltas, rules, cross-artifact checks; hash cleaned raw content then `markComplete`.\n- Reconcile fresh artifact/implementation validity atomically; persist progress/audit via `ChangeRepository.mutate`.\n## Constraints\n- Only `ValidateArtifacts` calls `Artifact.markComplete(hash)`.\n- Never write merged specs to `SpecRepository`.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:a47a013672b29d93d131b8ae3e38e03e3a938333644246459f095a4efe44b29d",
-          "lastModified": "2026-09-28T11:19:59.196Z"
+          "hash": "sha256:dc85ae51f62f067a6248f72a5a36ec9ad630c7bc57f1371b6d371c3e74a59c54",
+          "lastModified": "2026-10-20T14:34:09.761Z"
         },
         "verify.md": {
-          "hash": "sha256:7a387c5b2a50374c4c3da2caec0f01c9c30838e38a74ee08fb328fbf06f13086",
-          "lastModified": "2026-09-28T11:19:59.198Z"
+          "hash": "sha256:32bfa965321a5cfa358ef33bddcd826627fcff855c1852376e7c0aa6ecc5b80b",
+          "lastModified": "2026-10-20T14:34:09.762Z"
         }
       }
     }

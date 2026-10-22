@@ -90,6 +90,17 @@ Available transitions are **check-derived**: the same predicate evaluation used 
 - **Blockers**: A dedicated section listing explicit conditions preventing progress (e.g. `ARTIFACT_DRIFT`, `MISSING_ARTIFACT`).
 - **Next Action**: A direct recommendation of the next step to take, including the suggested command and rationale.
 
+A blocker whose resolved binding can be bypassed shows the flag `GetStatus` projected under it, and only then. The CLI never builds a bypass of its own, so a flag shown here is exactly what `specd changes archive` accepts:
+
+```text
+blockers:
+  ! OVERLAP_CONFLICT — Checking spec overlap: Specs overlap with other active changes: other-change (core:config)
+    bypass: --skip-checks spec.overlap
+  ! READ_ONLY_WORKSPACE — Checking workspace ownership: Contains specs from readOnly workspaces
+```
+
+`workspace.readOnly` shows no `bypass:` line because it can never be skipped on archive. JSON and TOON carry the same value as `bypassFlag` on each blocker.
+
 It also exposes both the aggregate state of each artifact and the state of each tracked file inside that artifact. Structured output includes an `artifactDag` array for structural analysis and a `review` block for identifying artifacts that require attention.
 
 Active status reconciles validity before it renders, including when `ifModifiedSince` matches, because the manifest timestamp cannot prove external files. That reconciliation may persist a recovery. Draft status stays read-only and may still use the timestamp shortcut. Text and structured output include a `validity` projection: spec approval, sign-off, verification freshness, the active attempt separately from completed evidence, committed `automaticReturn`, blockers, and a phase-aware next action. An empty implementation `files` map is observed empty evidence. `implementation: null` is legacy unknown evidence and does not authorize a required gate. Stale verification before `verifying` is context. At a verification, sign-off, or archive boundary it is a blocker whose repair stays in the current state. Text output does not print source bytes or full hashes.
@@ -591,9 +602,15 @@ Archive a completed change. Scope-`spec` artifacts are synced into the spec repo
 
 While archive runs, the change remains `archivable` through initial guards and pre-archive hooks. After hooks it refreshes tracking, reconciles validity, reruns guards, and only then builds the publication plan and full-batch preflight, detects orphan backups, and snapshots canonical inputs. It transitions to `archiving` immediately before canonical publication. On commit-phase failure, batch restore may return the change to `archivable` (retry) or leave it in `archiving` (use `specd changes transition` to `archivable` or `designing`). See [Change Lifecycle Guide](../guide/workflow.md#archiving).
 
-If other active changes target the same specs, the archive is blocked by default. Use `--allow-overlap` to proceed despite the overlap.
+Archive resolves its checks like a transition does: the built-in archive checks, the checks bound by hosts and plugins, and the schema's `archiveChecks`, under the registry governance locks. A check can be bypassed with `--skip-checks <ids>` only when its resolved binding is skippable. By default only `spec.overlap` and `impl.linksInScope` are skippable; `workspace.readOnly`, `impl.filesResolved`, `deps.consistent`, `verification.current`, and the schema, archivable, and task-completion checks can never be bypassed on archive. `specd changes status` shows a bypass flag only for blockers that can be skipped.
 
-If implementation links resolve to specs outside the change scope (`impl.linksInScope`), archive is blocked by default. Use `--allow-out-of-scope` only when that out-of-scope link set is intentional. The flag does not bypass unresolved tracked files (`impl.filesResolved`).
+If other active changes target the same specs, the archive is blocked by default. Use `--skip-checks spec.overlap` to proceed despite the overlap; the error output suggests that flag only when it would be accepted. Peers are invalidated through the reconciler, exactly as before.
+
+If implementation links resolve to specs outside the change scope (`impl.linksInScope`), archive is blocked by default. Use `--skip-checks impl.linksInScope` only when that out-of-scope link set is intentional. It does not bypass unresolved tracked files (`impl.filesResolved`).
+
+If a check registered by a host or plugin (or embedded by the schema) fails, the command exits `1` with the check id, label, message, and command. In `text` format it prints `bypass:  Retry with --skip-checks <id> if an exception is granted` only when that check's binding is skippable.
+
+An unregistered id fails with `UnknownCheckError`. A hook (`hook.pre`, `hook.post`) or a non-skippable check fails with `CheckNotSkippableError`; hook phases are skipped with `--skip-hooks`. Ids are matched exactly (case-sensitive), duplicates collapse, and every id is validated before any check, hook, or write runs.
 
 Tracked implementation files must be resolved or ignored before archive succeeds.
 
@@ -602,13 +619,14 @@ When archive checks and hooks run, `change archive` uses the generic check-progr
 - In `text` format, each check prints its gerund label, optional progress lines, and a pass/fail mark. Completed checks stay visible.
 - In `json` and `toon`, all machine-readable output is emitted on `stdout` as a newline-delimited stream of structured records with `stream: "change-archive"` (`check-start` / `check-progress` / `check-done`, then a terminal `complete` event whose `result` includes `result: "ok"`, `name`, `archivePath`, and `invalidatedChanges`). `stderr` is reserved for text-mode progress and non-structured process diagnostics.
 
-| Option                      | Description                                                                                                      |
-| --------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `--skip-hooks <phases>`     | Skip archive hook phases. Valid values: `pre`, `post`, `all`.                                                    |
-| `--allow-overlap`           | Permit archiving despite spec overlap with other active changes.                                                 |
-| `--allow-out-of-scope`      | Permit archiving when implementation links resolve outside the change scope. Does not bypass open tracked files. |
-| `--format text\|json\|toon` | Output format.                                                                                                   |
-| `--config <path>`           | Config file path.                                                                                                |
+| Option                      | Description                                                                                                     |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `--skip-hooks <phases>`     | Skip archive hook phases. Valid values: `pre`, `post`, `all`.                                                   |
+| `--skip-checks <ids>`       | Comma-separated check identifiers to bypass (repeatable), for example `spec.overlap,impl.linksInScope`.         |
+| `--allow-overlap`           | Alias of `--skip-checks spec.overlap`. Fails with `CheckNotSkippableError` if the schema made it non-skippable. |
+| `--allow-out-of-scope`      | Alias of `--skip-checks impl.linksInScope`. Does not bypass open tracked files.                                 |
+| `--format text\|json\|toon` | Output format.                                                                                                  |
+| `--config <path>`           | Config file path.                                                                                               |
 
 ### change run-hooks
 

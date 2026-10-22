@@ -14,7 +14,7 @@ import {
   type TransitionAlong,
 } from './transition-checks.js'
 import { InvalidInputError } from '../errors/invalid-input-error.js'
-import { DOMAIN_CHECKS, TRANSITION_BINDINGS } from './check-bindings.js'
+import { ARCHIVE_BINDINGS, DOMAIN_CHECKS, TRANSITION_BINDINGS } from './check-bindings.js'
 
 const PLUGIN_NAME_REGEX = /^[a-zA-Z0-9_-]+$/
 
@@ -78,7 +78,7 @@ export class CheckRegistry {
    */
   constructor(
     builtins: readonly Check[] = Object.values(DOMAIN_CHECKS),
-    defaultBindings: readonly CheckBinding[] = TRANSITION_BINDINGS,
+    defaultBindings: readonly CheckBinding[] = [...TRANSITION_BINDINGS, ...ARCHIVE_BINDINGS],
   ) {
     const nonEmbeddableBuiltins = new Set([
       // Category A: Protocol & State Invariants

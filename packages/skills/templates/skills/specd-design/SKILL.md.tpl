@@ -42,8 +42,9 @@ specd changes status <name> --format text
 Identify any high-visibility blockers from the **blockers:** section (e.g. `ARTIFACT_DRIFT`,
 `REVIEW_REQUIRED`) and inform the user. Follow the **next action:**
 command recommendation. `OVERLAP_CONFLICT` is archive-only (live overlap while
-`archivable`, `--allow-overlap`). Invalidation overlap is `review.reason:
-spec-overlap-conflict` → `/specd-design`, not `--allow-overlap`.
+`archivable`, bypassed with `--skip-checks spec.overlap`). Invalidation overlap is
+`review.reason: spec-overlap-conflict` → `/specd-design`, never bypassed with
+`--skip-checks spec.overlap` or `--allow-overlap`.
 
 Extract the `path:` field from the "lifecycle:" section.
 

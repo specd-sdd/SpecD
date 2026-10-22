@@ -61,6 +61,18 @@ We need an extensible domain model for verification checks, resilient failure po
 
 This decision is confirmed when custom checks register cleanly via `KernelBuilder`, governance locks reject invalid schema overrides with specialized domain errors, non-blocking hook warnings allow state progression, `--skip-checks` bypasses only audited skippable checks, and the CLI renders structured Repair Guides.
 
+## Addendum: the archive operation under the shared cascade
+
+`changes archive` originally ran a static table of archive bindings and exposed two ad-hoc flags (`--allow-overlap`, `--allow-out-of-scope`) that the use case mapped to `spec.overlap` and `impl.linksInScope`. That left the archive operation outside the cascade this ADR introduced: a schema could not declare, configure, or disable archive checks, and `changes status` advertised `--skip-checks <id>` hints that `changes archive` rejected.
+
+Decisions:
+
+1. **`archiveChecks` on the `archiving` workflow row** (valid only there), the third check surface beside `checks` and `skipChecks`. Entries accept `id`, `skippable`, `disabled`, and `config`; `onFailure` is rejected because archive predicate failures have no abort/collect distinction. Rejected: a top-level `archive:` block (breaks symmetry), `scope: archive` on `checks` (ambiguous with `from`/`along`).
+2. **`ArchiveChange` resolves its bindings through `resolveEffectiveBindings`** (`operation: 'archive'`) on every run, under the same governance locks, and validates the bypass list against the resolved bindings with the same rules as `TransitionChange` (`UnknownCheckError`, `CheckNotSkippableError`).
+3. **Aliases live in the host.** `ArchiveChangeInput` drops `allowOverlap` and `allowOutOfScope`; the use case accepts only `skipChecks`, like `TransitionChange`. The CLI translates `--allow-overlap` and `--allow-out-of-scope` into `spec.overlap` and `impl.linksInScope`. This is a breaking change for SDK callers.
+4. **Archive locks.** The set of skippable built-in archive checks does not grow: only `spec.overlap` and `impl.linksInScope`. On the archive rows, `workspace.readOnly` (a security boundary), `impl.filesResolved`, and `deps.consistent` become fully locked; their transition rows keep the Category C policy.
+5. **Status and errors follow the resolved bindings.** `changes status` computes archive bypass hints from the same resolved set, so a hint always matches what `changes archive` accepts; plugin or schema-embedded archive check failures throw `CheckPredicateFailedError` with the resolved `skippable`.
+
 ## More Information
 
 ### Guides & Specifications

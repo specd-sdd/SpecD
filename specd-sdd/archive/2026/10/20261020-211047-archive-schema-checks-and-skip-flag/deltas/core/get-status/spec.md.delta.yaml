@@ -1,0 +1,72 @@
+- op: modified
+  selector:
+    type: section
+    matches: ^Requirement:\ Execute\ matching\ predicates\ then\ project$
+  content: |
+    Before composing lifecycle guidance, `GetStatus` MUST, for each protocol-legal candidate target, select matching **predicates** from the effective bindings resolved for that candidate (`resolveEffectiveBindings`, including schema `checks` / `skipChecks` declarations) and call `check.execute(ctx)` (see [`core:transition-checks`](../transition-checks/spec.md)). GetStatus MUST collect **every** matching predicate for each hop (no `protocol.edge` fail-fast) so blockers and the repair guide show the full why.
+
+    When `change.state` is `archivable`, GetStatus MUST also execute the archive-scope predicates of the **effective archive bindings** (`resolveEffectiveBindings` with operation `archive`, including schema `archiveChecks`; not `hook.pre` / `hook.post` effects) without any user bypass (`skipChecks` empty). A check the schema disables on archive is not evaluated and produces no blocker. Live `spec.overlap` failure MAY then appear as public `OVERLAP_CONFLICT`, with `bypassFlag: '--skip-checks spec.overlap'` only when the resolved archive binding of `spec.overlap` is skippable. Invalidation-from-another-archive MUST NOT use that blocker (see review).
+
+    `CountTasks` MUST be memoized on the **current evaluation pass** so one `GetStatus.execute` counts once for all legal targets. The check MUST NOT cache counts on the Kernel-lived instance across executes.
+
+    `GetStatus` MUST NOT gather a global snapshot type for all checks. Each check obtains its own I/O through `create*` ports (`CountTasks` inside `workflow.taskCompletion`, extract inside `deps.consistent`, ownership inside `workspace.readOnly`, impl facts inside `impl.*`).
+
+    `evaluateLifecycle` MUST project `availableTransitions` / `nextAction` from those `CheckResult`s. Domain projection MUST remain I/O-free.
+
+    `GetStatus` MUST call `evaluateLifecycle` (domain verdict + application guidance) to obtain public `nextAction.command`. It MUST NOT read command strings from domain `nextHop`.
+
+    The status result MUST expose check-derived `availableTransitions` and `nextAction`. It MUST expose enough check rows (id, kind, outcome, code/message on fail) that a later dry-run UI does not need a second result type. `effect` rows MUST NOT be required for `allowed` on status.
+- op: modified
+  selector:
+    type: section
+    matches: ^Requirement:\ Constructor\ dependencies$
+  content: |
+    `GetStatus` SHALL receive the change repository, schema provider, approval-gate configuration, `RefreshImplementationTracking`, the central validity reconciler, the composed transition/archive checks needed for projection, and an optional `CheckRegistry` (used when resolving effective bindings for candidate transitions and for the archive operation). It imports pure lifecycle projection functions rather than injecting an alternative lifecycle engine or collecting one shared snapshot bag. All construction paths MUST supply the reconciler; absence MUST fail explicitly rather than enable a legacy invalidation fallback.
+
+    The config factory SHALL resolve these through the existing composition resolver and both established factory signatures. `GetStatus` MUST NOT construct filesystem adapters, invoke `ImplementationDetector` directly, or implement a second invalidation path.
+
+    Active resolution uses `get` and may reconcile; draft resolution uses `getDraft` and remains read-only. Discarded changes are out of scope.
+- op: modified
+  selector:
+    type: section
+    matches: ^Requirement:\ Identifies\ blockers$
+  content: |
+    `GetStatus` MUST identify explicit blockers that prevent lifecycle progression.
+
+    Blockers MUST be collected for:
+
+    - **Artifact Drift**: code `'ARTIFACT_DRIFT'` if `review.reason` is `'artifact-drift'`.
+    - **Review Required**: code `'REVIEW_REQUIRED'` if `review.reason` is `'artifact-review-required'`.
+    - **Incomplete artifacts**: code `'INCOMPLETE_ARTIFACT'` for each required artifact whose effective status is `missing` or `in-progress`. There is no separate `MISSING_ARTIFACT` code — absence and in-progress share `INCOMPLETE_ARTIFACT`.
+      Failed predicates for candidate hops MUST appear on public `blockers` with their check codes (`INCOMPLETE_ARTIFACT`, `APPROVAL_REQUIRED`, `INCOMPLETE_TASKS`, `DEPS_INCONSISTENT`, `READ_ONLY_WORKSPACE`, `IMPLEMENTATION_STATE`, `INVALID_TRANSITION`, archive codes when in scope including `OVERLAP_CONFLICT` **only** from archive predicates while `state === 'archivable'`). `review.reason === 'spec-overlap-conflict'` MUST NOT add `OVERLAP_CONFLICT` to `blockers`. `GetStatus` MUST NOT drop requires or approval failures from `blockers` while omitting those hops from `availableTransitions`.
+
+    A blocker projected from a failed predicate SHALL carry `isSkippable` and `bypassFlag: '--skip-checks <checkId>'` only when the resolved binding of that check for the evaluated candidate is skippable, including skippability declared by the schema. For code `IMPLEMENTATION_STATE`, only `impl.linksInScope` failures are skippable; open-file failures from `impl.filesResolved` MUST NOT advertise a bypass even though they share the same code.
+
+    Blockers projected from a failed check MUST include that check’s gerund `label` (and SHOULD include `checkId`) alongside `code` and `message`. Review-only blockers (`ARTIFACT_DRIFT`, `REVIEW_REQUIRED`) MAY omit `label`. Agents use `label` as a human hint for what the machine code means (for example `DEPS_INCONSISTENT` → `Checking spec dependencies`).
+
+    When `review.required` is true, `review` MUST include a human `message`. For `spec-overlap-conflict` the message MUST explain conflict with archived overlapping specs (not the kebab token alone). `nextAction.reason` SHOULD use that message.
+
+    When public `blockers` include `OVERLAP_CONFLICT`, `nextAction.command` MUST remain `/specd-archive` and `targetStep` MUST remain `archivable`. `nextAction.reason` MUST NOT be `Ready to archive`. It MUST name live overlap and, only when the resolved `spec.overlap` binding is skippable, the projected bypass flag (`--skip-checks spec.overlap`). Overlap is an archive operation predicate, not a hop, so `availableTransitions` MAY still list `archiving`.
+
+    `GetStatus` MAY assemble these blockers directly or obtain them from `evaluateLifecycle`, but the blocker set MUST be derived from the same authoritative evaluation used for effective statuses and `availableTransitions`.
+- op: modified
+  selector:
+    type: section
+    matches: ^Requirement:\ Config\-based\ factory\ delegates\ through\ resolveGetStatusDeps$
+  content: |
+    The config-based `createGetStatus(config, options?)` form MUST derive `GetStatusDeps` through `resolveGetStatusDeps(resolver)` and then delegate to canonical `createGetStatus(deps)`.
+
+    `resolveGetStatusDeps(resolver)` MUST resolve:
+
+    - `changes: ChangeRepository`
+    - `schemaProvider: SchemaProvider`
+    - `approvals: { readonly spec: boolean; readonly signoff: boolean }`
+    - `refreshImplementationTracking: RefreshImplementationTracking`
+    - composed workflow checks from `create*` (ports such as `CountTasks`, deps extract, workspace ownership live on those checks, not on a gather helper)
+    - `transitionBindings` from `resolveWorkflowCheckRegistry`
+    - `archiveBindings` from `resolveWorkflowCheckRegistry`
+    - `checkRegistry` from `resolveWorkflowCheckRegistry` (the executable registry, when the composition has one)
+
+    It MUST NOT resolve `lifecycle`, `LifecycleEngine`, or `evaluateLifecycle`. `GetStatus` imports `evaluateLifecycle` as a module function.
+
+    The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.

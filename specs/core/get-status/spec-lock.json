@@ -20,43 +20,40 @@
     {
       "file": "core:src/application/use-cases/get-status.ts",
       "symbols": ["GetStatus"]
-    },
-    {
-      "file": "core:test/application/use-cases/get-status.spec.ts"
     }
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Projects reconciled active lifecycle validity or read-only draft status with artifacts, checks, blockers, approvals, and next action.",
+      "value": "GetStatus reconciles active change validity then projects canonical artifacts, checks, review, evidence, tracking, and next action.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:b1eba8e23a5327ebb287bb3ea4380ac7028cffeee5fdd7c8475a812510ac84ff",
-          "lastModified": "2026-09-28T06:29:51.431Z"
+          "hash": "sha256:879a9d5e6cec1069aa67f8271fcab452fbb7c03d759fe7c43ed1a2a17e92a1b1",
+          "lastModified": "2026-10-20T14:34:09.865Z"
         },
         "verify.md": {
-          "hash": "sha256:182030997c349f9738f78df6a4e869cf07a330ba93b3364d927099500edb2abc",
-          "lastModified": "2026-09-28T06:34:40.310Z"
+          "hash": "sha256:56f167a9a7ff72365fa2b39671bffdc92e5c8d5fe3a3568fa649386436413ad5",
+          "lastModified": "2026-10-20T20:56:26.660Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# GetStatus\n\n## Rules\n- Input `name`; optional `refreshImplementationTracking` defaults true for active only; optional `ifModifiedSince` parsed by `Date.parse`.\n- Resolve `changes.get(name)`, then `getDraft(name)`; never discarded storage. Missing → `ChangeNotFoundError` code `CHANGE_NOT_FOUND`.\n- Active path resolves schema first. Failure yields read-only `SCHEMA_RESOLUTION_FAILED`, static `validTransitions`, empty available transitions/lifecycle blockers, normal approvals/changePath, `nextArtifact=null`, `schemaInfo=null`; no refresh/reconciliation/mutation. Other check or reconciliation failures propagate.\n- After schema success: optionally call `RefreshImplementationTracking.execute({ name })`; then single application reconciler atomically detects/persists validity effects and automatic return. Response uses committed aggregate. Repeated unchanged observation adds no duplicate events. No direct detector or alternative invalidation path.\n- Conditional short-circuit occurs only after active refresh/reconciliation. Valid timestamp >= reconciled `updatedAt` may return `unchanged:true`, empty artifacts/blockers, minimal review/action, plus reconciled change and dependencies. Draft may retain read-only revision optimization.\n- Draft path conforms `core:drafted-change-view`: `draftView`, no mutable `Change`; `projectArtifacts` only; never `evaluateLifecycle`/`evaluateLifecycleVerdict`; transitions/steps empty, `nextArtifact=null`, no mutating command.\n- Full active artifacts: exactly one entry per schema artifact; unattached → `missing`; derive recursive effective/display status via canonical evaluation. File `complete-with-drift` only canonical complete + drift; real states outrank drift display.\n- Task-capable artifact reuses `workflow.taskCompletion` check result by type for `{ complete, incomplete, total }`; omit for missing/empty content. `CountTasks` once per evaluation pass, never Kernel-lived cache or second painting call.\n- Execute every matching predicate for every protocol-legal target. At `archivable`, also all archive predicates with allow flags false; never hook effects. Checks own I/O; no global snapshot. `evaluateLifecycle` remains I/O-free and supplies public transitions/check rows/next action, never domain `nextHop` command.\n- Result exposes implementation files/states and file/symbol links; artifact/workflow policies; review/drift; spec approval/sign-off validity; completed verification evidence separately from active attempt; fingerprint input changes; automatic return; rich `ValidityStatusProjection`, never raw verdict.\n- Review and recovery derive from canonical verdict. Required stale spec consent returns to `designing`; stale sign-off alone returns later state to `done`; missing/stale verification blocks only verification-requiring boundaries. Preserve-mode review stays current but blocks forward progress; structural validation never renews consent/evidence.\n- Public blockers include review drift/review-required and every failed candidate predicate. `OVERLAP_CONFLICT` only live archive predicate at `archivable`, never overlap invalidation; command remains `/specd-archive`, reason names live overlap and `--allow-overlap`. `--allow-out-of-scope` only failed `impl.linksInScope`, never `impl.filesResolved`. Check blockers include gerund `label`, preferably `checkId`.\n- Constructor receives repository, schema provider, approval config, refresh primitive, central reconciler, composed transition/archive checks and bindings. `createGetStatus(config, options?)` delegates through `resolveGetStatusDeps(resolver)` then canonical factory; no `LifecycleEngine`, direct `ImplementationDetector`, filesystem wiring, or duplicate invalidation.\n- `changePath = ChangeRepository.changePath(change)`.\n\n## Constraints\n- Active status may persist only reconciler-selected validity effects after schema success; draft, archived, schema-unavailable paths read-only.\n- Artifact and linked implementation content may be read for fresh facts; ordinary projection avoids unrelated content reads.\n- Canonical verdict drives lifecycle, review, blockers, transitions, next action.\n- Schema failure degrades fail-closed; subsequent failures propagate.",
+      "value": "# GetStatus\n\n## Rules\n- Input `name`; optional active-only `refreshImplementationTracking=true`; optional `ifModifiedSince`.\n- Resolve active then draft; unknown throws `ChangeNotFoundError`. Draft projection read-only with no mutable lifecycle.\n- Active: resolve schema, optionally refresh tracking, run sole reconciler, return committed aggregate plus artifacts, checks, blockers, approvals, verification, fingerprints, lifecycle, `changePath`.\n- Schema failure returns read-only actionable `SCHEMA_RESOLUTION_FAILED`; after schema success propagate check/reconciliation failures.\n- Conditional unchanged response occurs only after refresh/reconciliation.\n- Run matching predicates for each legal candidate; archive predicates at `archivable`; never effects. Reuse task-check count.\n- Core projects every schema artifact with DAG effective/display state, review/recovery, tracking files/links. CLI consumers must not recompute.\n- Factory uses resolver and complete bootstrap dependencies.\n\n## Constraints\n- Only reconciler-selected validity effects may persist.\n- Archived/draft/schema-unavailable reads stay read-only.\n- `changePath` comes from `ChangeRepository.changePath(change)`.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:b1eba8e23a5327ebb287bb3ea4380ac7028cffeee5fdd7c8475a812510ac84ff",
-          "lastModified": "2026-09-28T06:29:51.431Z"
+          "hash": "sha256:879a9d5e6cec1069aa67f8271fcab452fbb7c03d759fe7c43ed1a2a17e92a1b1",
+          "lastModified": "2026-10-20T14:34:09.865Z"
         },
         "verify.md": {
-          "hash": "sha256:182030997c349f9738f78df6a4e869cf07a330ba93b3364d927099500edb2abc",
-          "lastModified": "2026-09-28T06:34:40.310Z"
+          "hash": "sha256:56f167a9a7ff72365fa2b39671bffdc92e5c8d5fe3a3568fa649386436413ad5",
+          "lastModified": "2026-10-20T20:56:26.660Z"
         }
       }
     }

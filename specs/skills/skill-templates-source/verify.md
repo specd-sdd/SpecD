@@ -316,13 +316,25 @@
 
 - **WHEN** `specd-design`, `specd-implement`, `specd-verify`, and `specd-new` templates are inspected
 - **THEN** they do not list `OVERLAP_CONFLICT` among typical status blockers
-- **AND** they do not teach `--allow-overlap` as the response to `review.reason: spec-overlap-conflict`
+- **AND** they do not teach `--skip-checks spec.overlap` (or `--allow-overlap`) as the response to `review.reason: spec-overlap-conflict`
 
 #### Scenario: Archive skill reserves OVERLAP_CONFLICT for live overlap
 
 - **WHEN** `specd-archive/SKILL.md.tpl` is inspected
 - **THEN** it MAY list `OVERLAP_CONFLICT` as a typical blocker
-- **AND** `--allow-overlap` is only for live archive overlap, not invalidation review
+- **AND** `--skip-checks spec.overlap` is only for live archive overlap, not invalidation review
+
+#### Scenario: Archive skill teaches the canonical check bypass
+
+- **WHEN** `specd-archive/SKILL.md.tpl` is inspected
+- **THEN** it teaches `--skip-checks <checkId>` as the canonical bypass, using the id shown by `specd changes status`
+- **AND** it presents `--allow-overlap` and `--allow-out-of-scope` only as aliases of `--skip-checks spec.overlap` and `--skip-checks impl.linksInScope`
+
+#### Scenario: Archive skill does not suggest bypassing a blocker without a flag
+
+- **WHEN** `specd-archive/SKILL.md.tpl` is inspected
+- **THEN** it tells the agent that a blocker whose status shows no bypass flag cannot be skipped
+- **AND** it names `workspace.readOnly`, `impl.filesResolved`, and `deps.consistent` as checks that are never bypassable on archive
 
 ### Requirement: Implementation tracking in verify and implement templates
 

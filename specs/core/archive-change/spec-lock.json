@@ -26,49 +26,59 @@
     "core:initialize-persisted-spec-state",
     "core:composition-resolver",
     "core:transition-checks",
-    "core:resolve-change-schema"
+    "core:resolve-change-schema",
+    "core:check-registry"
   ],
   "implementation": [
     {
       "file": "core:src/application/use-cases/archive-change.ts",
-      "symbols": ["ArchiveChange"]
+      "symbols": ["ArchiveChange", "ArchiveChangeInput"]
     },
     {
-      "file": "core:test/application/use-cases/archive-change.spec.ts"
+      "file": "core:src/application/services/validate-skip-checks.ts",
+      "symbols": ["validateSkipChecks"]
+    },
+    {
+      "file": "core:src/composition/use-cases/archive-change.ts",
+      "symbols": ["resolveArchiveChangeDeps", "ArchiveChangeDeps"]
+    },
+    {
+      "file": "core:src/domain/errors/spec-overlap-error.ts",
+      "symbols": ["SpecOverlapError"]
     }
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "ArchiveChange reconciles live validity, atomically publishes specs and locks, archives evidence, materializes metadata, and runs bound effects.",
+      "value": "ArchiveChange atomically preflights, publishes, archives, restores on commit failure, then reports nonfatal post-archive failures.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:9b616c9692435115de73f8579b62cddca88efedf609511c219708265fdc888a6",
-          "lastModified": "2026-09-28T06:29:51.478Z"
+          "hash": "sha256:ecc80e55931be72fab285d9be59171a7a5d855e093c6ea91bdca24140f853bfc",
+          "lastModified": "2026-10-20T14:34:09.918Z"
         },
         "verify.md": {
-          "hash": "sha256:4eda7fd6f83496d7ab5edee4c6856295f09b0d7e87ec24145520edb555d03a44",
-          "lastModified": "2026-09-28T06:29:51.479Z"
+          "hash": "sha256:908c81a8292d5648dd0747ad2a81dd988e6d98a751c670d979e8ee5cc9e6b7ce",
+          "lastModified": "2026-10-20T14:34:09.919Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# ArchiveChange\n\n## Rules\n### Construction and input\n- Inject `ChangeRepository`, `ListWorkspaces`, `ArchiveRepository`, `archiveBindings: readonly CheckBinding[]`, `ActorResolver`, `ArtifactParserRegistry`, `SchemaProvider`, mandatory reconciler, `MaterializeSpecMetadata`, `ExtractorTransformRegistry`, `SpecWorkspaceRoute[]`, project root, `ArchiveBatchSnapshotPort`, `ContentHasher`.\n- Never inject `RunStepHooks`, `HookRunner`, or `projectWorkflowHooks` into `ArchiveChange`; `createHookPre`/`createHookPost` own hook I/O through injected bindings. `resolveArchiveChangeDeps` gets bindings from `resolveWorkflowCheckRegistry`.\n- `execute`: `name`; optional `skipHookPhases: ReadonlySet<'pre'|'post'|'all'>`; `allowOverlap=false`; `allowOutOfScope=false`.\n\n### Guards and live validity\n- Load resolved cached schema, then evaluate operation-`archive` predicates in registry order: `schema.nameMatch` (fail-fast), `archive.archivable`, `spec.overlap`, shared `workspace.readOnly` and `deps.consistent`, shared `impl.filesResolved` and `impl.linksInScope`. Archive is operation, never fake lifecycle edge; never bind `approval.signoff`.\n- `change.assertArchivable()` accepts `archivable` or retry state `archiving`; otherwise `InvalidStateTransitionError` before hooks, snapshots, writes.\n- Host must not load peer changes before predicates return, except after failed overlap or for allowed-overlap reconciliation.\n- Before publication plan, after pre-hooks: refresh implementation tracking; run single application reconciler against fresh artifacts/implementation; rerun live predicates and task count. Accepted verdict and plan use same post-hook snapshot.\n- Reject absent/stale/revoked required approval; absent/legacy-unknown/stale verification; unresolved non-task drift/review; missing/unreadable/invalid/incomplete task artifact. Task files excluded from approval fingerprint but live-counted.\n- Mandatory reconciler recovery to `designing` or `done` is committed and returned as typed diagnostic with state, automatic return, blockers, next action; never undo recovery. Stale verification renews in place, not forced `verifying`.\n- ReadOnly check uses same enter-`ready` runner and lists affected specs/workspaces; no hooks or writes; remain `archivable`.\n- Overlap is archive-only. With `allowOverlap=false`, throw `SpecOverlapError`. With true, send `spec-overlap-conflict` intent to reconciler per peer; peer policy determines review/state atomically. Never broad `Change.invalidate`.\n\n### Effects and tracked inputs\n- Execute matching archive effects from binding table, never ID switches. Before-persist effects run in `archivable` unless pre/all skipped; abort failures throw `HookFailedError`. Skipping hooks never skips predicates.\n- Use tracked `ArtifactFile.filename` only. Never probe alternate `deltas/` or `specs/`; tracked direct spec file remains authoritative.\n- Resolve each spec workspace through `ListWorkspaces`; parser registry maps `markdown|json|yaml|plaintext`.\n\n### Full-batch preflight and commit\n- Before any canonical publication: resolve every input, apply deltas, prepare all artifact writes and complete `spec-lock.json`, run structural, extraction/dependency, sidecar, implementation, and other rejectable checks. Any failure aborts whole batch unchanged.\n- After preflight, snapshot every canonical spec into `<specDir>/.specd-archive-backup/`: existence, all existing canonical files including lock, manifest `{changeName,specDirExisted,existingFiles,createdFiles:[]}`. Exclude generated `.specd/metadata/.../metadata.json`.\n- Detect orphan backups first. Matching `changeName`: auto-restore, delete backup, abort with retry guidance. Foreign/unreadable manifest: abort untouched with repair guidance.\n- After snapshots, immediately before first `publish()`, serialized `ChangeRepository.mutate`: reload, `assertArchivable()`, transition to `archiving` if needed using actor.\n- Safety boundaries: whole-batch preflight atomicity; per-spec publication atomicity; batch snapshot/restore. Commit failure restores every spec in reverse publication order. New spec dir removed; existing files restored; created-only paths deleted; unrelated files untouched.\n- Full restore success: delete backups, append `archive-failed {commitStarted:true}`, mutate `archiving→archivable`. Partial restore: report `ArchiveBatchRestoreError`/repair guidance, remain `archiving`.\n\n### Merge and dependency sealing\n- For each present, non-`missing`/`skipped` spec artifact: output basename from schema. Delta file present → parse YAML, registry parser parses base (empty when absent), applies entries, serializes; rethrow `DeltaApplicationError`; missing parser → `ParserNotRegisteredError`. No delta file or `delta:false` → copy tracked primary file.\n- Markdown serialization preserves untouched inline/list style; mixed markers normalize deterministically to project lint conventions.\n- Sealed `dependsOn` precedence: `change.specDependsOn`; else existing lock; else existing canonical spec via `resolveInitialPersistedDependsOn()` without `explicitDependsOn`; else new-spec merge extraction or `[]`. Never use cached `metadata.json`.\n- Merge extraction checks sealed set through shared `runDepsConsistent`; it cannot replace existing lock or on-disk initial resolution. Mismatch → `ArchiveDependencyMismatchError`.\n- Build base `{kind:'existing',state}` or `{kind:'initial',schema:canonicalSpecSchema(),dependsOn}`; canonical schema fallback `compat→extends→name@version`. Apply shared `applyPersistedSpecStatePatch` with sealed dependencies, implementation, confirmed links. Preserve `optimizations` unchanged.\n- Publish artifacts plus full persisted state atomically through `SpecRepository.publish({ persistedState, expectedRevision })`; never separate `writePersistedState()`. `expectedRevision=null` without lock. Existing lock schema immutable; snapshot dependencies replace, never union.\n\n### Implementation integrity\n- Shared forward exit-`implementing` runner rejects tracked `open` files; `resolved`/`ignored` pass. Never run on redesign.\n- Materialize confirmed links: canonical `workspace:path`; file-level without symbols, symbol-level with symbols. Ignore excluded paths; discard unnormalizable paths and nonexistent target specs; reject path outside target spec workspace `codeRoot`.\n- Out-of-scope sidecar maintenance fails through skippable `impl.linksInScope`; only `allowOutOfScope` bypasses. It never bypasses `impl.filesResolved`.\n\n### Archive, evidence, metadata, result\n- Resolve actor before `ArchiveRepository.archive(change,{actor})`; failure triggers restore, no anonymous fallback. Repository constructs `ArchivedChange`; timestamped name derives from `change.createdAt`. Delete backups immediately after successful move.\n- Preserve `manifestVersion`, invalidation policy, approval/verification projections, algorithm-tagged artifact/implementation fingerprints, full append-only history. Legacy archived manifests remain read-only; unprovable active legacy verification/sign-off must be renewed.\n- Preflight extracts metadata from prepared content and compares extracted dependencies to sealed set. Post-archive, force `MaterializeSpecMetadata.execute({specId,policy:'force'})`; failures are non-fatal `staleMetadataSpecPaths`.\n- After-persist effects run unless post/all skipped; collect failures in declaration order, never rollback successful archive.\n- Maintain archive index `.specd-index-meta.json` total atomically; fs archive listing uses configured tmp fs-cache index.\n- Return `archivedChange`, absolute `archiveDirPath`, `postHookFailures`, `staleMetadataSpecPaths`, `invalidatedChanges[{name,specIds}]`.\n- Use typed `SpecdError` subclasses: `ChangeNotFoundError`, `SchemaMismatchError`, `ArchiveDependencyMismatchError`, `ArchiveArtifactMissingError`, `ArchiveImplementationStateError`, `ArchivePreflightError`, `ParserNotRegisteredError`, `ArchiveBatchRestoreError`, `ReadOnlyWorkspaceError`.\n- Emit structured debug logs across preparation, commit, recovery, completion with `change`, `specId`, `step`, `phase`; never full contents, stderr, secrets.\n\n## Constraints\n- Guards, pre-effects, reconciliation, complete preflight, snapshots occur before `archiving` and first publish.\n- Pre-effect failure: no transition, snapshot, or canonical write.\n- Commit failure restores batch; return to `archivable` only after complete restore.\n- Successful archive move is never rolled back for post-effects or metadata failure.\n- Never construct `ArchivedChange`, directly invoke `HookRunner`, or call broad `change.invalidate()`.\n- Config factory must use `resolveArchiveChangeDeps(resolver)` then canonical `createArchiveChange(deps)`; fallback `FsArchiveBatchSnapshot` instance is lazy and reused for entire operation.",
+      "value": "# ArchiveChange\n\n## Rules\n- Inject repositories, schema/parser/extractor registries, `archiveBindings`, reconciler, `MaterializeSpecMetadata`, actor, batch snapshot, hashing; never `RunStepHooks`/`HookRunner`.\n- `execute({ name, skipChecks })`: skip list defaults empty; only resolved skippable check IDs accepted. Aliases map to checks. Never bypass unrelated checks.\n- Accept only `archivable|archiving`; run archive predicates before hooks/snapshots: schema, archivable, overlap, workspace/deps, implementation, verification. Reconcile fresh facts after pre-effects; committed recovery remains persisted.\n- Use bindings for pre/post effects; skip phases never skips predicates. Pre failure aborts unchanged. Read-only or failed predicates: no hooks/writes.\n- Fully prepare merged artifacts, dependencies, persisted state, locks, implementation links, and all validations before canonical writes. Snapshot whole batch; transition `archivable→archiving` immediately before first publish.\n- Commit failure restores all snapshots; return `archivable` only after complete restore. Orphan matching backup restores then aborts; foreign/unreadable backup aborts.\n- Publish via `SpecRepository.publish({ persistedState, expectedRevision })`; preserve optimizations. Archive through `archiveRepository.archive(change,{ actor })`; metadata/post-effects failures are nonfatal results.\n- On bypassed `spec.overlap`, reconcile each peer with `spec-overlap-conflict`; never `change.invalidate()`.\n\n## Constraints\n- No hooks, snapshots, or writes before `change.assertArchivable()`.\n- Preflight and snapshots precede `archiving` and first publication.\n- Successful archive never rolls back for metadata/post-effect failure.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:9b616c9692435115de73f8579b62cddca88efedf609511c219708265fdc888a6",
-          "lastModified": "2026-09-28T06:29:51.478Z"
+          "hash": "sha256:ecc80e55931be72fab285d9be59171a7a5d855e093c6ea91bdca24140f853bfc",
+          "lastModified": "2026-10-20T14:34:09.918Z"
         },
         "verify.md": {
-          "hash": "sha256:4eda7fd6f83496d7ab5edee4c6856295f09b0d7e87ec24145520edb555d03a44",
-          "lastModified": "2026-09-28T06:29:51.479Z"
+          "hash": "sha256:908c81a8292d5648dd0747ad2a81dd988e6d98a751c670d979e8ee5cc9e6b7ce",
+          "lastModified": "2026-10-20T14:34:09.919Z"
         }
       }
     }

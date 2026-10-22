@@ -224,14 +224,36 @@ describe('workflow skill templates', () => {
       expect(typical?.[0] ?? '').not.toContain('OVERLAP_CONFLICT')
       expect(template).toContain('spec-overlap-conflict')
       expect(template).toContain('/specd-design')
-      expect(template).toContain('not `--allow-overlap`')
+      expect(template.replace(/\s+/g, ' ')).toContain(
+        'never bypassed with `--skip-checks spec.overlap` or `--allow-overlap`',
+      )
     }
 
     const archive = readTemplate('skills', 'specd-archive', 'SKILL.md.tpl')
     expect(archive.match(/\(e\.g\.[\s\S]*?\)/)?.[0] ?? '').toContain('OVERLAP_CONFLICT')
-    expect(archive).toContain('--allow-overlap')
+    expect(archive).toContain('--skip-checks spec.overlap')
     expect(archive).toContain('spec-overlap-conflict')
-    expect(archive).toContain('do not use `--allow-overlap`')
+    expect(archive.replace(/\s+/g, ' ')).toContain('never bypass it')
+  })
+
+  it('teaches the canonical check bypass on archive, with --allow-* only as aliases', () => {
+    const archive = readTemplate('skills', 'specd-archive', 'SKILL.md.tpl')
+    const flat = archive.replace(/\s+/g, ' ')
+    expect(flat).toContain('--skip-checks <checkId>')
+    expect(flat).toContain('--skip-checks impl.linksInScope')
+    expect(flat).toContain(
+      '`--allow-overlap` and `--allow-out-of-scope` exist only as aliases of `--skip-checks spec.overlap`',
+    )
+    expect(flat).not.toMatch(/archive[^.]*with `--allow-overlap`/)
+  })
+
+  it('names the archive checks that can never be bypassed and the missing-flag rule', () => {
+    const flat = readTemplate('skills', 'specd-archive', 'SKILL.md.tpl').replace(/\s+/g, ' ')
+    for (const id of ['workspace.readOnly', 'impl.filesResolved', 'deps.consistent']) {
+      expect(flat).toContain(id)
+    }
+    expect(flat).toContain('never bypassable on archive')
+    expect(flat).toContain('shows no `bypass:` flag')
   })
 
   it('teaches canonical reconciliation instead of hand-rolled invalidation', () => {

@@ -134,7 +134,8 @@ identify which ones are blocking progress (e.g. `ARTIFACT_DRIFT`,
 `REVIEW_REQUIRED`) and inform the user. Follow the `nextAction.command`
 recommendation. `OVERLAP_CONFLICT` is archive-only (live overlap while
 `archivable`). Invalidation overlap is `review.reason: spec-overlap-conflict` →
-`/specd-design`, not `--allow-overlap`.
+`/specd-design`, never bypassed with `--skip-checks spec.overlap` or
+`--allow-overlap`.
 
 If `review.required` is `true`, suggest `/specd-design <name>` regardless of
 the lifecycle state. Summarize `review.reason` and `review.affectedArtifacts`,

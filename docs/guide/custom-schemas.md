@@ -96,6 +96,30 @@ The four cases are distinct:
 
 “Effective” includes registry bindings supplied by Core or plugins, not only inline `skipChecks`. Skills never infer the route: they execute the `nextAction` selected by Core. Explicit entry into an optional step remains available even when Core recommends the shortcut.
 
+### Checks on the archive operation
+
+A workflow row has three independent check surfaces:
+
+| Field           | Evaluated when                                | Scope        |
+| --------------- | --------------------------------------------- | ------------ |
+| `checks`        | entering the step                             | `transition` |
+| `skipChecks`    | an optional step is bypassed                  | `step-skip`  |
+| `archiveChecks` | the change is archived (`archiving` row only) | `archive`    |
+
+`archiveChecks` lets a schema tune or embed checks of the archive operation. A schema can configure, disable, or change the `skippable` permission of `spec.overlap` and `impl.linksInScope`, and of checks bound to the archive operation by a host or plugin. It cannot relax `workspace.readOnly`, `impl.filesResolved`, `deps.consistent`, or the protocol checks (`schema.nameMatch`, `archive.archivable`, `workflow.taskCompletion`, `verification.current`, `hook.pre`, `hook.post`): they are locked on archive and the schema fails to build if it tries.
+
+```yaml
+workflow:
+  - step: archiving
+    archiveChecks:
+      - id: spec.overlap
+        skippable: false # this project never archives over live overlap
+      - id: '@security.code-scan'
+        skippable: true
+```
+
+`archiveChecks` accepts only `id`, `skippable`, `disabled`, and `config` (there is no `onFailure`). Full reference: [Archive operation checks](../schemas/schema-format.md#archive-operation-checks).
+
 ---
 
 ## 2. Composable Schema Plugins (`schemaPlugins`)

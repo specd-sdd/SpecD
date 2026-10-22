@@ -92,6 +92,12 @@ Example: `! DEPS_INCONSISTENT — Checking spec dependencies: Extracted dependsO
 
 JSON/TOON MUST serialize `label` (and `checkId` when present) on those blocker objects. Review-only blockers without a check `label` keep `! <CODE>: <message>`.
 
+### Requirement: Archive bypass hints come from resolved bindings
+
+When a blocker carries a `bypassFlag` supplied by `GetStatus`, the CLI MUST render it as provided — in text mode as an indented line `    bypass: <flag>` directly under the blocker line, and in JSON or TOON as the blocker's `bypassFlag` property. The CLI MUST NOT construct, add, or remove a bypass locally. `GetStatus` derives the flag from the resolved bindings (see [`core:transition-checks`](../../core/transition-checks/spec.md)), so a flag appears only for a skippable binding and always uses the `--skip-checks <checkId>` form. For archive blockers, that flag is accepted by `changes archive`; the same `    bypass: --skip-checks <checkId>` format also appears on skippable transition blockers (such as `impl.linksInScope`), where it is accepted by `changes transition`.
+
+When the resolved binding is not skippable (for example a locked built-in check such as `workspace.readOnly`, or `spec.overlap` made non-skippable by the schema), no `bypass:` line or `bypassFlag` is shown in text, JSON, or TOON output, and the next-action reason MUST NOT suggest one. When a bypass flag is shown, the next-action reason for an archive blocked by overlap reads `<message> Use --skip-checks spec.overlap to archive anyway.`, unless the message already contains the flag.
+
 ### Requirement: Schema version warning
 
 Schema version drift SHALL be reported only through the advisories `GetStatus` returns in `schemaWarnings`, which come from `ResolveChangeSchema` comparing the change's recorded schema version with the resolved same-name schema. A different workspace default schema is not drift and MUST NOT produce a warning.

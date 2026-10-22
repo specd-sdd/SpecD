@@ -5,8 +5,14 @@ import { type ArtifactStatus } from '../value-objects/artifact-status.js'
 import { type ChangeState } from '../value-objects/change-state.js'
 import { type Schema } from '../value-objects/schema.js'
 import { type ChangeValidityVerdict, type ValidityBlocker } from './change-validity.js'
-import { type CheckResult } from './transition-checks.js'
-import { boundFromStates } from './check-bindings.js'
+import {
+  checkMatches,
+  classifyAlong,
+  resolveEffectiveBindings,
+  type CheckBinding,
+  type CheckResult,
+} from './transition-checks.js'
+import { ARCHIVE_BINDINGS, boundFromStates, TRANSITION_BINDINGS } from './check-bindings.js'
 import {
   isWorkflowStepEnabled,
   isWorkflowTransitionLegal,
@@ -22,21 +28,11 @@ function isBypassFlagActive(bypassFlag: string | undefined, flags: ReadonlySet<s
   if (flags.has(bypassFlag) || flags.has(trimmed) || flags.has(`--${trimmed}`)) {
     return true
   }
-  if (bypassFlag === '--skip-checks spec.overlap') {
-    return (
-      flags.has('allow-overlap') ||
-      flags.has('--allow-overlap') ||
-      flags.has('spec.overlap') ||
-      flags.has('skip-checks spec.overlap')
-    )
-  }
-  if (bypassFlag === '--skip-checks impl.linksInScope') {
-    return (
-      flags.has('allow-out-of-scope') ||
-      flags.has('--allow-out-of-scope') ||
-      flags.has('impl.linksInScope') ||
-      flags.has('skip-checks impl.linksInScope')
-    )
+  if (bypassFlag.startsWith('--skip-checks ')) {
+    const checkId = bypassFlag.slice('--skip-checks '.length)
+    if (flags.has(checkId)) {
+      return true
+    }
   }
   return false
 }
@@ -74,8 +70,23 @@ export interface LifecycleVerdictInput {
    * fallback when a target has no injected predicate results.
    */
   readonly approvals?: { readonly spec: boolean; readonly signoff: boolean }
-  /** Bypass tokens such as `allow-overlap` that skip matching review blockers. */
+  /** Bypass tokens such as `spec.overlap` or `--skip-checks spec.overlap` that skip matching skippable blockers. */
   readonly bypassFlags?: readonly string[]
+  /**
+   * Optional resolved check bindings for the evaluated attempt or operation.
+   * When omitted, skippability is resolved from `schema` against the default bindings.
+   */
+  readonly resolvedBindings?: readonly CheckBinding[]
+  /**
+   * Optional resolved transition bindings per target state (e.g. from `evaluateLegalTargets`).
+   * Preserves plugin-registered and schema-embedded checks when `resolvedBindings` is omitted.
+   */
+  readonly bindingsByTarget?: Readonly<Partial<Record<ChangeState, readonly CheckBinding[]>>>
+  /**
+   * Optional resolved archive bindings (e.g. from `resolveEffectiveBindings` with `operation: 'archive'`).
+   * Preserves plugin-registered and schema-embedded archive checks when `resolvedBindings` is omitted.
+   */
+  readonly archiveBindings?: readonly CheckBinding[]
   /**
    * Already reconciled validity verdict.
    *
@@ -275,6 +286,17 @@ export function evaluateLifecycleVerdict(
     },
   )
 
+  const skippableByCheckId = buildSkippableByCheckId(
+    change,
+    schema,
+    approvals,
+    options.requestedTarget,
+    checksByTarget,
+    options.resolvedBindings,
+    options.bindingsByTarget,
+    options.archiveBindings,
+  )
+
   const hopBlockers =
     options.requestedTarget !== undefined
       ? requestedTargetBlockers(
@@ -286,10 +308,12 @@ export function evaluateLifecycleVerdict(
           reviewBlockers,
           checksByTarget[options.requestedTarget] ?? [],
           bypassFlags,
+          skippableByCheckId,
         )
       : blockersFromFailedChecks(
           Object.values(checksByTarget).flatMap((rows) => rows ?? []),
           bypassFlags,
+          skippableByCheckId,
         )
 
   const blockers = dedupeBlockers([
@@ -611,8 +635,13 @@ function requestedTargetBlockers(
   reviewBlockers: readonly LifecycleBlocker[],
   requestedChecks: readonly CheckResult[],
   bypassFlags: ReadonlySet<string>,
+  skippableByCheckId: ReadonlyMap<string, boolean>,
 ): LifecycleBlocker[] {
-  const blockers: LifecycleBlocker[] = blockersFromFailedChecks(requestedChecks, bypassFlags)
+  const blockers: LifecycleBlocker[] = blockersFromFailedChecks(
+    requestedChecks,
+    bypassFlags,
+    skippableByCheckId,
+  )
   if (
     (requestedTarget === 'pending-spec-approval' || requestedTarget === 'spec-approved') &&
     !approvals.spec
@@ -840,25 +869,107 @@ function nextArtifact(
   return null
 }
 
+function buildSkippableByCheckId(
+  change: Change,
+  schema: Schema,
+  approvals: { readonly spec: boolean; readonly signoff: boolean },
+  requestedTarget: ChangeState | undefined,
+  checksByTarget: Readonly<Partial<Record<ChangeState, readonly CheckResult[]>>>,
+  resolvedBindings?: readonly CheckBinding[],
+  bindingsByTarget?: Readonly<Partial<Record<ChangeState, readonly CheckBinding[]>>>,
+  archiveBindings?: readonly CheckBinding[],
+): ReadonlyMap<string, boolean> {
+  const skippableByCheckId = new Map<string, boolean>()
+  if (resolvedBindings !== undefined) {
+    for (const binding of resolvedBindings) {
+      const prev = skippableByCheckId.get(binding.check.id)
+      skippableByCheckId.set(binding.check.id, (prev ?? false) || binding.skippable === true)
+    }
+    return skippableByCheckId
+  }
+
+  const effectiveArchiveBindings =
+    archiveBindings ??
+    resolveEffectiveBindings({
+      baseBindings: ARCHIVE_BINDINGS,
+      schema,
+      operation: 'archive',
+    })
+  const archiveByCheckId = new Map<string, boolean>()
+  for (const binding of effectiveArchiveBindings) {
+    archiveByCheckId.set(binding.check.id, binding.skippable === true)
+  }
+
+  const targets: readonly ChangeState[] =
+    requestedTarget !== undefined
+      ? [requestedTarget]
+      : (Object.keys(checksByTarget) as ChangeState[])
+
+  const preferArchive = change.state === 'archivable' || requestedTarget === 'archiving'
+  if (preferArchive) {
+    for (const [id, skippable] of archiveByCheckId) {
+      skippableByCheckId.set(id, skippable)
+    }
+  }
+
+  for (const target of targets) {
+    const along = classifyAlong(change.state, target, schema, approvals)
+    const effectiveTransitionBindings =
+      bindingsByTarget?.[target] ??
+      resolveEffectiveBindings({
+        baseBindings: TRANSITION_BINDINGS,
+        schema,
+        targetStep: target,
+        from: change.state,
+        along,
+      })
+    for (const binding of effectiveTransitionBindings) {
+      const attempt = { scope: 'transition' as const, from: change.state, to: target, along }
+      const matchesTarget =
+        binding.exceptAlong?.includes(along) !== true &&
+        binding.applicability.some((row) => checkMatches(row, attempt))
+      if (!matchesTarget && skippableByCheckId.has(binding.check.id)) {
+        continue
+      }
+      if (preferArchive && archiveByCheckId.has(binding.check.id) && !matchesTarget) {
+        continue
+      }
+      const prev = skippableByCheckId.get(binding.check.id)
+      skippableByCheckId.set(
+        binding.check.id,
+        matchesTarget
+          ? (prev ?? false) || binding.skippable === true
+          : (prev ?? binding.skippable === true),
+      )
+    }
+  }
+
+  for (const [id, skippable] of archiveByCheckId) {
+    if (!skippableByCheckId.has(id)) {
+      skippableByCheckId.set(id, skippable)
+    }
+  }
+
+  return skippableByCheckId
+}
+
 function blockersFromFailedChecks(
   checks: readonly CheckResult[],
   bypassFlags: ReadonlySet<string>,
+  skippableByCheckId: ReadonlyMap<string, boolean>,
 ): LifecycleBlocker[] {
   return checks
     .filter((check) => check.outcome === 'fail' && check.code !== undefined)
     .flatMap((check) => {
       const code = check.code ?? 'INVALID_TRANSITION'
-      const linksInScopeSkippable =
-        code === 'IMPLEMENTATION_STATE' && check.id === 'impl.linksInScope'
-      const skippable = code === 'OVERLAP_CONFLICT' || linksInScopeSkippable
+      const skippable = skippableByCheckId.get(check.id) === true
       const blocker: LifecycleBlocker = {
         code,
         message: check.message ?? `Check '${check.id}' failed`,
         isSkippable: skippable,
         label: check.label,
         checkId: check.id,
-        ...(code === 'OVERLAP_CONFLICT' ? { bypassFlag: '--skip-checks spec.overlap' } : {}),
-        ...(linksInScopeSkippable ? { bypassFlag: '--skip-checks impl.linksInScope' } : {}),
+        ...(skippable ? { bypassFlag: `--skip-checks ${check.id}` } : {}),
       }
       if (skippable && isBypassFlagActive(blocker.bypassFlag, bypassFlags)) {
         return []

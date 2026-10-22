@@ -3,15 +3,51 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": ["core:transition-checks", "default:_global/architecture"],
+  "dependsOn": ["core:transition-checks", "default:_global/architecture", "core:schema-format"],
   "implementation": [
+    {
+      "file": "core:src/domain/services/check-bindings.ts",
+      "symbols": ["ARCHIVE_BINDING_SPECS"]
+    },
     {
       "file": "core:src/domain/services/check-registry.ts",
       "symbols": ["CheckRegistry"]
-    },
-    {
-      "file": "core:src/composition/composition-registries.ts",
-      "symbols": ["createCompositionRegistryView"]
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Extensible pure registry resolves immutable built-ins and namespaced plugin checks with locked binding governance.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:8262bf0e43d8082246428c202344f85fb7effaa10a9ae909b85149ee0be22e3f",
+          "lastModified": "2026-10-20T14:34:09.467Z"
+        },
+        "verify.md": {
+          "hash": "sha256:ecf96861ca102311ec4d52f046c89f071ebb82c5071f8dcbf56f9cc09bee8444",
+          "lastModified": "2026-10-20T14:34:09.468Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Check Registry\n\n## Rules\n- `CheckRegistry` catalogs canonical `Check` definitions and default `CheckBinding`; expose `get`, `has`, `list`, `bindings`.\n- Constructor installs immutable built-ins: protocol, workflow, dependency, workspace, implementation, approval, schema, archive, overlap, verification, hooks. No public built-in mutation/unregister.\n- `register(pluginName, check, defaultBindings?, options?)` requires `^[a-zA-Z0-9_-]+$`; canonical ID `@${pluginName}.${check.id}`; duplicate throws `DuplicateCheckError`.\n- `CustomCheckDefinition` becomes predicate `Check`; explicit non-predicate `kind` throws `InvalidCheckKindError`. Checks never run commands, subprocesses, or filesystem mutation.\n- Binding identity: transition `{checkId,scope:'transition',to,along}`; archive `{checkId,scope:'archive'}`; skip `{checkId,scope:'step-skip',step}`. Exact duplicate throws `DuplicateCheckBindingError`.\n- Governance separates placement, binding policy, config, disablement. Code-set false locks monotonic across schema layers; schema-owned bindings remain schema-editable under check-level locks.\n- Categories A/B forbid embedding, override, disable; Category C policy checks permit all. Composition forwards every plugin governance field/default binding. Executable application checks, never fixture matchers, serve runtime bindings.\n- Resolver deep-merges config: check default → binding → schema; objects merge, arrays concatenate, later scalars replace; runner receives immutable resolved config.\n\n## Constraints\n- Pure domain: no filesystem, subprocess, console.\n- Existing built-in resolution remains compatible.\n- Constructed checks/bindings immutable during workflow.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:8262bf0e43d8082246428c202344f85fb7effaa10a9ae909b85149ee0be22e3f",
+          "lastModified": "2026-10-20T14:34:09.467Z"
+        },
+        "verify.md": {
+          "hash": "sha256:ecf96861ca102311ec4d52f046c89f071ebb82c5071f8dcbf56f9cc09bee8444",
+          "lastModified": "2026-10-20T14:34:09.468Z"
+        }
+      }
+    }
+  }
 }

@@ -13,5 +13,41 @@
       "file": "core:src/infrastructure/fs/fs-validation-result-cache.ts",
       "symbols": ["FsValidationResultCache"]
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Workspace-bound ValidateSpecs cache port owns stamp/fingerprint freshness while hosts remain cache-opaque.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:860adb764485498935f7e9b8f6e5f52d03713a40eeace54c532500ba977ebce3",
+          "lastModified": "2026-08-25T15:37:19.360Z"
+        },
+        "verify.md": {
+          "hash": "sha256:9360f53951dac16616927f6fcfc3f9955565e52b841600d86771c89e642da090",
+          "lastModified": "2026-08-25T15:37:19.360Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Validation Result Cache Port\n## Rules\n- Abstract ValidationResultCache in application/ports; adapters implement behavior. One workspace identity per instance.\n- Constructor inject same-workspace SpecRepository; never method argument. Use contractual APIs only.\n- Persist all SpecValidationEntry fields: spec, passed, failures, warnings.\n- Bucket valid only matching schemaFingerprint, non-negative engineVersion, invalidation state; invalid means miss.\n- Store Spec artifact/persistedState/generatedMetadata stamps and cache-owned cacheFingerprint.\n- cacheFingerprint hashes sorted-key JSON: specFingerprint from SpecRepository.specFingerprint(spec), metadataContentHash raw metadata bytes hash or __absent__. No third fingerprint.\n- lookup: invalid bucket miss; supplied stamps avoids get; same stamps hard hit without hash; differing + same lazy fingerprint persists stamps then hit; else miss. List Meta/get stamps equivalent.\n- Only hit entry or miss results. Methods workspace, lookup(spec/schemaFingerprint/engineVersion/stamps?), upsert(entry/spec/schemaFingerprint/engineVersion). No cacheFingerprint, refreshStamps, repository args.\n- ValidateSpecs alone composes port; never hosts or FsSpecIndexCache.\n## Constraints\n- Export core ports barrel; runtime state; no schema evaluation.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:860adb764485498935f7e9b8f6e5f52d03713a40eeace54c532500ba977ebce3",
+          "lastModified": "2026-08-25T15:37:19.360Z"
+        },
+        "verify.md": {
+          "hash": "sha256:9360f53951dac16616927f6fcfc3f9955565e52b841600d86771c89e642da090",
+          "lastModified": "2026-08-25T15:37:19.360Z"
+        }
+      }
+    }
+  }
 }

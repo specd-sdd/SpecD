@@ -14,14 +14,10 @@ import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 import { HappyPathNextUnavailableError } from '../../domain/errors/happy-path-next-unavailable-error.js'
 import { InvalidStateTransitionError } from '../../domain/errors/invalid-state-transition-error.js'
 import { CheckPredicateFailedError } from '../../domain/errors/check-predicate-failed-error.js'
-import {
-  CheckNotSkippableError,
-  UnknownCheckError,
-} from '../../domain/errors/check-registry-errors.js'
 import { findBlockingParent, projectArtifacts } from '../../domain/services/lifecycle-verdict.js'
 import { evaluateLifecycle } from '../services/lifecycle-evaluation.js'
+import { validateSkipChecks } from '../services/validate-skip-checks.js'
 import {
-  isEffectCheck,
   resolveEffectiveBindings,
   type CheckBinding,
   type CheckProgressEvent,
@@ -290,26 +286,15 @@ export class TransitionChange {
     })
 
     // Core accepts only the uniform skipChecks contract. Legacy flags are adapter concerns.
-    const skipChecksList = [...(input.skipChecks ?? [])]
-
-    // Validate skipChecks against the resolved bindings for this attempt: policy
-    // (`skippable`) is whatever the schema-composed cascade produced.
-    for (const checkId of skipChecksList) {
-      const binding = effectiveBindings.find((b) => b.check.id === checkId)
-      const hasCheck = binding !== undefined || (this._checkRegistry?.has(checkId) ?? false)
-      if (!hasCheck) {
-        throw new UnknownCheckError(checkId)
-      }
-      if (binding && isEffectCheck(binding.check)) {
-        throw new CheckNotSkippableError(
-          checkId,
-          'Effect checks (hooks) are governed exclusively by skipHookPhases',
-        )
-      }
-      if (binding && !binding.skippable) {
-        throw new CheckNotSkippableError(checkId)
-      }
-    }
+    // Validate against the resolved bindings for this attempt: policy (`skippable`) is
+    // whatever the schema-composed cascade produced.
+    const skipChecksList = [
+      ...validateSkipChecks({
+        skipChecks: input.skipChecks ?? [],
+        effectiveBindings,
+        ...(this._checkRegistry !== undefined ? { checkRegistry: this._checkRegistry } : {}),
+      }),
+    ]
 
     const skip = input.skipHookPhases ?? new Set<HookPhaseSelector>()
     const skipHookPhases = [...skip]

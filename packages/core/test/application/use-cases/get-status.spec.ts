@@ -21,6 +21,7 @@ import {
   type Check,
   type CheckBinding,
 } from '../../../src/domain/services/transition-checks.js'
+import { CheckRegistry } from '../../../src/domain/services/check-registry.js'
 import { detectImplLinksInScope } from '../../../src/application/services/detect-impl-links-in-scope.js'
 import { createWorkflowCheckRegistry } from '../../../src/application/checks/workflow-check-registry.js'
 import { ReconcileChangeValidity } from '../../../src/application/use-cases/reconcile-change-validity.js'
@@ -78,6 +79,7 @@ function makeGetStatus(
       change: Change,
     ) => { blocked: boolean; message?: string } | Promise<{ blocked: boolean; message?: string }>
     reconcile?: ReconcileChangeValidity
+    checkRegistry?: CheckRegistry
   } = {},
 ) {
   const schema = opts.schema === undefined ? makeStdSchema() : opts.schema
@@ -109,6 +111,7 @@ function makeGetStatus(
     opts.transitionBindings ?? registry.transitionBindings,
     opts.archiveBindings ?? registry.archiveBindings,
     opts.reconcile ?? makeObservingReconcile(changes, undefined, refresh),
+    opts.checkRegistry,
   )
 }
 
@@ -345,6 +348,7 @@ describe('GetStatus', () => {
           code: 'SCHEMA_RESOLUTION_FAILED',
           message:
             'Schema resolution failed; lifecycle transitions are unavailable until the schema is restored.',
+          isSkippable: false,
         },
       ])
     })
@@ -411,6 +415,7 @@ describe('GetStatus', () => {
           code: 'SCHEMA_IDENTITY_MISMATCH',
           message:
             "Schema provider returned 'wrong-schema' for change 'identity-mismatch' when 'expected-schema' was requested.",
+          isSkippable: false,
           details: { requestedName: 'expected-schema', returnedName: 'wrong-schema' },
         },
       ])
@@ -836,7 +841,7 @@ describe('GetStatus', () => {
     expect(blocker?.label).toBe('Checking open implementation files')
   })
 
-  it('given failed impl.linksInScope, when GetStatus merges blockers, then bypassFlag is --allow-out-of-scope', async () => {
+  it('given failed impl.linksInScope, when GetStatus merges blockers, then bypassFlag is --skip-checks impl.linksInScope', async () => {
     const change = makeChange('impl-scope')
     change.transition('designing', testActor)
     change.transition('ready', testActor)
@@ -1705,5 +1710,189 @@ describe('GetStatus with verifying disabled and the real reconciler', () => {
       (check) => check.id === 'approval.signoff',
     )
     expect(signoffCheck?.outcome).toBe('pass')
+  })
+})
+
+describe('GetStatus — archive hints from the effective archive bindings', () => {
+  function archivable(name: string): Change {
+    const change = makeChange(name)
+    for (const state of [
+      'designing',
+      'ready',
+      'implementing',
+      'verifying',
+      'done',
+      'archivable',
+    ] as const) {
+      change.transition(state, testActor)
+    }
+    return change
+  }
+
+  function failing(id: string, code: string): Check {
+    return {
+      id,
+      label: id,
+      kind: 'predicate',
+      execute: async () => fail(id, code, `${id} failed`),
+    }
+  }
+
+  function binding(
+    id: string,
+    code: string,
+    opts: { skippable: boolean; locked?: boolean },
+  ): CheckBinding {
+    return {
+      check: failing(id, code),
+      applicability: [{ scope: 'archive' }],
+      skippable: opts.skippable,
+      allowBindingOverride: opts.locked !== true,
+      allowConfigOverride: opts.locked !== true,
+      allowDisable: opts.locked !== true,
+    }
+  }
+
+  function schemaWith(archiveChecks?: readonly Record<string, unknown>[]): Schema {
+    return makeSchema(
+      [makeArtifactType('proposal')],
+      [
+        makeWorkflowStep('archiving', {
+          ...(archiveChecks !== undefined ? { archiveChecks: archiveChecks as never } : {}),
+        }),
+      ],
+    )
+  }
+
+  function statusFor(
+    bindings: CheckBinding[],
+    archiveChecks?: readonly Record<string, unknown>[],
+    registry?: CheckRegistry,
+  ) {
+    const uc = makeGetStatus(makeChangeRepository([archivable('c')]), {
+      schema: schemaWith(archiveChecks),
+      archiveBindings: bindings,
+      ...(registry !== undefined ? { checkRegistry: registry } : {}),
+    })
+    return uc.execute({ name: 'c' })
+  }
+
+  it('keeps the canonical bypass flag for a skippable overlap', async () => {
+    const result = await statusFor([
+      binding('spec.overlap', 'OVERLAP_CONFLICT', { skippable: true }),
+    ])
+    const blocker = result.blockers.find((b) => b.code === 'OVERLAP_CONFLICT')
+    expect(blocker?.isSkippable).toBe(true)
+    expect(blocker?.bypassFlag).toBe('--skip-checks spec.overlap')
+    expect(result.nextAction.reason).toContain('--skip-checks spec.overlap')
+  })
+
+  it('produces no overlap blocker when the schema disables spec.overlap', async () => {
+    const result = await statusFor(
+      [binding('spec.overlap', 'OVERLAP_CONFLICT', { skippable: true })],
+      [{ id: 'spec.overlap', disabled: true }],
+    )
+    expect(result.blockers.some((b) => b.code === 'OVERLAP_CONFLICT')).toBe(false)
+  })
+
+  it('shows the overlap blocker without a flag or hint when the schema makes it non-skippable', async () => {
+    const result = await statusFor(
+      [binding('spec.overlap', 'OVERLAP_CONFLICT', { skippable: true })],
+      [{ id: 'spec.overlap', skippable: false }],
+    )
+    const blocker = result.blockers.find((b) => b.code === 'OVERLAP_CONFLICT')
+    expect(blocker).toBeDefined()
+    expect(blocker?.isSkippable).toBe(false)
+    expect(blocker?.bypassFlag).toBeUndefined()
+    expect(result.nextAction.reason).toBe('spec.overlap failed')
+    expect(result.nextAction.reason).not.toContain('--skip-checks')
+    expect(result.nextAction.reason).not.toContain('anyway')
+
+    const baseNonSkippable = await statusFor([
+      binding('spec.overlap', 'OVERLAP_CONFLICT', { skippable: false }),
+    ])
+    const baseBlocker = baseNonSkippable.blockers.find((b) => b.code === 'OVERLAP_CONFLICT')
+    expect(baseBlocker?.isSkippable).toBe(false)
+    expect(baseBlocker?.bypassFlag).toBeUndefined()
+    expect(baseNonSkippable.nextAction.reason).toBe('spec.overlap failed')
+    expect(baseNonSkippable.nextAction.reason).not.toContain('--skip-checks')
+  })
+
+  it('offers no bypass for a locked check even though the binding table says skippable', async () => {
+    const result = await statusFor([
+      binding('workspace.readOnly', 'READ_ONLY_WORKSPACE', { skippable: false, locked: true }),
+    ])
+    const blocker = result.blockers.find((b) => b.code === 'READ_ONLY_WORKSPACE')
+    expect(blocker).toBeDefined()
+    expect(blocker?.isSkippable).toBe(false)
+    expect(blocker?.bypassFlag).toBeUndefined()
+  })
+
+  it('follows the resolved skippability of a plugin archive check', async () => {
+    const skippable = await statusFor([
+      binding('@sec.scan', 'SECURITY_FINDINGS', { skippable: true }),
+    ])
+    const skippableBlocker = skippable.blockers.find((b) => b.code === 'SECURITY_FINDINGS')
+    expect(skippableBlocker?.isSkippable).toBe(true)
+    expect(skippableBlocker?.bypassFlag).toBe('--skip-checks @sec.scan')
+
+    const hardened = await statusFor(
+      [binding('@sec.scan', 'SECURITY_FINDINGS', { skippable: true })],
+      [{ id: '@sec.scan', skippable: false }],
+    )
+    const hardenedBlocker = hardened.blockers.find((b) => b.code === 'SECURITY_FINDINGS')
+    expect(hardenedBlocker?.isSkippable).toBe(false)
+    expect(hardenedBlocker?.bypassFlag).toBeUndefined()
+  })
+
+  it('projects isSkippable: false for non-predicate review blockers', async () => {
+    const change = makeChange('incomplete-requires')
+    change.transition('designing', testActor)
+    const schema = makeSchema(
+      [makeArtifactType('proposal')],
+      [makeWorkflowStep('ready', { requires: ['proposal'] })],
+    )
+    const uc = makeGetStatus(makeChangeRepository([change]), { schema })
+    const result = await uc.execute({ name: 'incomplete-requires' })
+    const blocker = result.blockers.find((b) => b.code === 'INCOMPLETE_ARTIFACT')
+    expect(blocker).toBeDefined()
+    expect(blocker?.isSkippable).toBe(false)
+    expect(blocker?.bypassFlag).toBeUndefined()
+  })
+
+  it('judges an archive failure by the archive binding even if the same check is skippable on a transition', async () => {
+    // impl.linksInScope is skippable on transitions out of implementing; the schema hardens it on archive.
+    const result = await statusFor(
+      [binding('impl.linksInScope', 'IMPLEMENTATION_STATE', { skippable: true })],
+      [{ id: 'impl.linksInScope', skippable: false }],
+    )
+    const blocker = result.blockers.find((b) => b.code === 'IMPLEMENTATION_STATE')
+    expect(blocker).toBeDefined()
+    expect(blocker?.bypassFlag).toBeUndefined()
+  })
+
+  it('gives each failing skippable archive check its own flag', async () => {
+    const result = await statusFor([
+      binding('spec.overlap', 'OVERLAP_CONFLICT', { skippable: true }),
+      binding('impl.linksInScope', 'IMPLEMENTATION_STATE', { skippable: true }),
+      binding('workspace.readOnly', 'READ_ONLY_WORKSPACE', { skippable: false, locked: true }),
+    ])
+    const flags = Object.fromEntries(result.blockers.map((b) => [b.code, b.bypassFlag]))
+    expect(flags.OVERLAP_CONFLICT).toBe('--skip-checks spec.overlap')
+    expect(flags.IMPLEMENTATION_STATE).toBe('--skip-checks impl.linksInScope')
+    expect(flags.READ_ONLY_WORKSPACE).toBeUndefined()
+  })
+
+  it('embeds a registered check declared by the schema and reports it without a flag', async () => {
+    const registry = new CheckRegistry()
+    registry.register('qa', {
+      id: 'lint',
+      label: 'Linting',
+      execute: async () => fail('@qa.lint', 'LINT_FAILED', 'lint failed'),
+    })
+    const result = await statusFor([], [{ id: '@qa.lint' }], registry)
+    const blocker = result.blockers.find((b) => b.code === 'LINT_FAILED')
+    expect(blocker).toBeDefined()
+    expect(blocker?.bypassFlag).toBeUndefined()
   })
 })

@@ -107,6 +107,7 @@ import { createWorkflowCheckRegistry } from '../../../src/application/checks/wor
 import { detectImplLinksInScope } from '../../../src/application/services/detect-impl-links-in-scope.js'
 import { detectSpecOverlap } from '../../../src/domain/services/detect-spec-overlap.js'
 import { type CheckBinding } from '../../../src/domain/services/transition-checks.js'
+import { type CheckRegistry } from '../../../src/domain/services/check-registry.js'
 import { type ExtractorTransformRegistry } from '../../../src/domain/services/extract-metadata.js'
 import { type SpecWorkspaceRoute } from '../../../src/application/use-cases/_shared/spec-reference-resolver.js'
 import { type ArchiveBatchSnapshotPort } from '../../../src/application/ports/archive-batch-snapshot.js'
@@ -1006,6 +1007,7 @@ export function newArchiveChange(
   batchSnapshot: ArchiveBatchSnapshotPort = createNoopArchiveBatchSnapshot(),
   archiveBindings?: readonly CheckBinding[],
   reconcile?: ReconcileChangeValidity,
+  checkRegistry?: CheckRegistry,
 ): ArchiveChange {
   return new ArchiveChange(
     changes,
@@ -1031,6 +1033,8 @@ export function newArchiveChange(
     batchSnapshot,
     makeContentHasher(),
     reconcile ?? makeObservingReconcile(changes),
+    undefined,
+    checkRegistry,
   )
 }
 

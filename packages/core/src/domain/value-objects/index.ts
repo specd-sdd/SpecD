@@ -73,6 +73,7 @@ export {
   type HookFailurePolicy,
   type WorkflowStep,
   type WorkflowStepCheckDeclaration,
+  type WorkflowStepArchiveCheckDeclaration,
 } from './workflow-step.js'
 export { HookResult } from './hook-result.js'
 export {

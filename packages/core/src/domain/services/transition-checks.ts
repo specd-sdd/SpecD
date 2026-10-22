@@ -553,6 +553,12 @@ export interface ResolveEffectiveBindingsInput {
   readonly along?: TransitionAlong | undefined
   /** Optional check registry for catalog lookups and governance default configs. */
   readonly registry?: CheckRegistry | undefined
+  /**
+   * Selects the archive operation (`scope: 'archive'`): the `archiveChecks` of the
+   * `archiving` step are overlaid on the base archive bindings. Mutually exclusive with
+   * `targetStep` and `bypassedSteps`.
+   */
+  readonly operation?: 'archive' | undefined
 }
 
 /**
@@ -565,6 +571,29 @@ function withoutEffectiveConfig(binding: CheckBinding): CheckBinding {
   const copy: { -readonly [K in keyof CheckBinding]: CheckBinding[K] } = { ...binding }
   delete copy.effectiveConfig
   return copy
+}
+
+/** Minimal shape shared by `checks`, `skipChecks`, and `archiveChecks` declarations. */
+interface OverlayDeclaration {
+  readonly id: string
+  readonly disabled?: boolean | undefined
+  readonly skippable?: boolean | undefined
+  readonly onFailure?: EffectOnFailure | undefined
+  readonly config?: Readonly<Record<string, unknown>> | undefined
+}
+
+/** One overlay pass: which declarations apply, to which rows, at which concrete coordinate. */
+interface OverlayPlan<D extends OverlayDeclaration> {
+  /** Declarations to apply. */
+  readonly declarations: readonly D[]
+  /** Whether a declaration applies to this attempt; defaults to always. */
+  readonly declMatches?: (decl: D) => boolean
+  /** Rows of a base binding that this plan overlays. */
+  readonly rowsOf: (binding: CheckBinding) => readonly CheckApplicability[]
+  /** Concrete applicability carried by overlaid clones and synthesized bindings. */
+  readonly concrete: CheckApplicability
+  /** Bypassed step this plan is concrete for (step-skip plans only). */
+  readonly step?: ChangeState
 }
 
 /** One schema overlay applied to a base binding at a single coordinate. */
@@ -586,7 +615,7 @@ interface BindingEdit {
 
 /**
  * Pure domain function that resolves effective check bindings by overlaying
- * schema-declared checks (`checks:` and `skipChecks:`) onto base bindings,
+ * schema-declared checks (`checks:`, `skipChecks:`, and `archiveChecks:`) onto base bindings,
  * synthesizing bindings for declarations no base row serves, and cascading
  * configuration via `deepMergeConfig`.
  *
@@ -594,17 +623,34 @@ interface BindingEdit {
  * concrete set of bindings for one attempt, executed unchanged by the predicate runner.
  * Each declaration applies only to the attempt it matches (`from`/`to`/`along`); the
  * base rows it overlays are replaced by one clone whose applicability is the concrete
- * attempt (transition) or the concrete bypassed step (step-skip). A base binding that
- * serves several coordinates keeps its non-overlaid rows in a remainder copy.
+ * attempt (transition), the concrete bypassed step (step-skip), or the archive coordinate
+ * (`operation: 'archive'`). A base binding that serves several coordinates keeps its
+ * non-overlaid rows in a remainder copy.
  *
  * @param input - Dynamic binding resolution inputs
  * @returns Fully composed effective check bindings
- * @throws {@link InvalidInputError} When `targetStep` is given without `from` and `along`
+ * @throws {@link InvalidInputError} When `targetStep` is given without `from` and `along`, or when
+ *   `operation: 'archive'` is combined with `targetStep` or `bypassedSteps`
  */
 export function resolveEffectiveBindings(
   input: ResolveEffectiveBindingsInput,
 ): readonly CheckBinding[] {
-  const { baseBindings, schema, targetStep, bypassedSteps = [], from, along, registry } = input
+  const {
+    baseBindings,
+    schema,
+    targetStep,
+    bypassedSteps = [],
+    from,
+    along,
+    registry,
+    operation,
+  } = input
+
+  if (operation === 'archive' && (targetStep !== undefined || bypassedSteps.length > 0)) {
+    throw new InvalidInputError(
+      "resolveEffectiveBindings: 'operation: archive' cannot be combined with 'targetStep' or 'bypassedSteps'",
+    )
+  }
 
   const editsByIndex = new Map<number, BindingEdit[]>()
   const synthesizedBindings: CheckBinding[] = []
@@ -626,28 +672,12 @@ export function resolveEffectiveBindings(
     editsByIndex.set(index, list)
   }
 
-  // 1. Overlay targetStep checks (scope: 'transition')
-  if (targetStep !== undefined) {
-    if (from === undefined || along === undefined) {
-      throw new InvalidInputError(
-        'resolveEffectiveBindings requires `from` and `along` when `targetStep` is given',
-      )
-    }
-    const attempt: CheckAttempt = { scope: 'transition', from, to: targetStep, along }
-    const concrete: CheckApplicability = { scope: 'transition', from, to: targetStep, along }
-    const targetStepDef = schema.workflowStep(targetStep)
-    for (const chk of targetStepDef?.checks ?? []) {
-      const declMatchesAttempt = checkMatches(
-        {
-          scope: 'transition',
-          from: chk.from ?? '*',
-          to: targetStep,
-          along: chk.along ?? 'forward',
-        },
-        attempt,
-      )
-      // A declaration for another from/along coordinate leaves base bindings untouched.
-      if (!declMatchesAttempt) continue
+  // Shared overlay: applies one plan's declarations to the base rows it serves, or
+  // synthesizes a binding for a registered check no base row serves.
+  const overlay = <D extends OverlayDeclaration>(plan: OverlayPlan<D>): void => {
+    for (const chk of plan.declarations) {
+      // A declaration for another coordinate leaves base bindings untouched.
+      if (plan.declMatches !== undefined && !plan.declMatches(chk)) continue
 
       let matchedAny = false
 
@@ -655,13 +685,15 @@ export function resolveEffectiveBindings(
         const b = baseBindings[i]!
         if (b.check.id !== chk.id) continue
 
-        const rows = b.applicability.filter(
-          (a) => a.scope === 'transition' && checkMatches(a, attempt),
-        )
-
+        const rows = plan.rowsOf(b)
         if (rows.length > 0) {
           matchedAny = true
-          recordEdit(i, { rows, applicability: [concrete], decl: chk })
+          recordEdit(i, {
+            rows,
+            applicability: [plan.concrete],
+            ...(plan.step !== undefined ? { step: plan.step } : {}),
+            decl: chk,
+          })
         }
       }
 
@@ -673,7 +705,7 @@ export function resolveEffectiveBindings(
           const onFailure = chk.onFailure ?? 'abort'
           synthesizedBindings.push({
             check,
-            applicability: [concrete],
+            applicability: [plan.concrete],
             skippable: chk.skippable ?? false,
             allowBindingOverride: governance?.allowBindingOverride ?? false,
             allowConfigOverride: governance?.allowConfigOverride ?? false,
@@ -686,46 +718,52 @@ export function resolveEffectiveBindings(
     }
   }
 
+  // 1. Overlay targetStep checks (scope: 'transition')
+  if (targetStep !== undefined) {
+    if (from === undefined || along === undefined) {
+      throw new InvalidInputError(
+        'resolveEffectiveBindings requires `from` and `along` when `targetStep` is given',
+      )
+    }
+    const attempt: CheckAttempt = { scope: 'transition', from, to: targetStep, along }
+    overlay({
+      declarations: schema.workflowStep(targetStep)?.checks ?? [],
+      declMatches: (chk) =>
+        checkMatches(
+          {
+            scope: 'transition',
+            from: chk.from ?? '*',
+            to: targetStep,
+            along: chk.along ?? 'forward',
+          },
+          attempt,
+        ),
+      rowsOf: (b) =>
+        b.applicability.filter((a) => a.scope === 'transition' && checkMatches(a, attempt)),
+      concrete: { scope: 'transition', from, to: targetStep, along },
+    })
+  }
+
   // 2. Overlay bypassedSteps checks (scope: 'step-skip'), one concrete clone per declared step
   for (const bypassedStep of bypassedSteps) {
-    const stepDef = schema.workflowStep(bypassedStep)
-    const concrete: CheckApplicability = { scope: 'step-skip', step: bypassedStep }
-    for (const chk of stepDef?.skipChecks ?? []) {
-      let matchedAny = false
-
-      for (let i = 0; i < baseBindings.length; i++) {
-        const b = baseBindings[i]!
-        if (b.check.id !== chk.id) continue
-
-        const rows = b.applicability.filter(
+    overlay({
+      declarations: schema.workflowStep(bypassedStep)?.skipChecks ?? [],
+      rowsOf: (b) =>
+        b.applicability.filter(
           (a) => a.scope === 'step-skip' && (a.step === '*' || a.step === bypassedStep),
-        )
+        ),
+      concrete: { scope: 'step-skip', step: bypassedStep },
+      step: bypassedStep,
+    })
+  }
 
-        if (rows.length > 0) {
-          matchedAny = true
-          recordEdit(i, { rows, applicability: [concrete], step: bypassedStep, decl: chk })
-        }
-      }
-
-      if (!matchedAny && chk.disabled !== true && registry) {
-        const check = registry.get(chk.id)
-        if (check) {
-          const governance = registry.getGovernance(chk.id)
-          const effectiveConfig = cascadeConfig(chk.id, undefined, chk.config)
-          const onFailure = chk.onFailure ?? 'abort'
-          synthesizedBindings.push({
-            check,
-            applicability: [concrete],
-            skippable: chk.skippable ?? false,
-            allowBindingOverride: governance?.allowBindingOverride ?? false,
-            allowConfigOverride: governance?.allowConfigOverride ?? false,
-            allowDisable: governance?.allowDisable ?? false,
-            onFailure,
-            ...(effectiveConfig !== undefined ? { effectiveConfig } : {}),
-          })
-        }
-      }
-    }
+  // 2b. Overlay archiveChecks of the `archiving` step (scope: 'archive')
+  if (operation === 'archive') {
+    overlay({
+      declarations: schema.workflowStep('archiving')?.archiveChecks ?? [],
+      rowsOf: (b) => b.applicability.filter((a) => a.scope === 'archive'),
+      concrete: { scope: 'archive' },
+    })
   }
 
   // 3. Assemble combined result, splitting bindings that were edited per coordinate

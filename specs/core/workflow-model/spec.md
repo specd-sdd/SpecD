@@ -10,7 +10,7 @@ The schema format defines the YAML structure of workflow step entries, but not w
 
 The Change entity defines a fixed set of lifecycle states (`drafting`, `designing`, `ready`, `implementing`, `verifying`, `done`, `archivable`, `archiving`). Drain-only approval states (`pending-spec-approval`, `spec-approved`, `pending-signoff`, `signed-off`) exist on `ChangeState` for historical recovery; they are not `workflow[]` extras and MUST NOT be introduced as schema steps. Protocol membership comes from `ChangeState`. Legal hops SHALL be computed by the `workflow-topology` module (see [`core:workflow-topology`](../workflow-topology/spec.md)), which uses the canonical pipeline for forward progression and admits `VALID_TRANSITIONS` edges only as backward, redesign, recovery, escape, or drain moves for their exact source state.
 
-The schema's `workflow[]` array SHALL treat `step` as a lookup key onto an existing state. A matching row SHALL attach only that state's extra configuration (`optional`, `disabled`, `requires`, `requiresTaskCompletion`, `hooks`, `checks`, `skipChecks`). A `workflow[]` entry MUST NOT introduce a new lifecycle state.
+The schema's `workflow[]` array SHALL treat `step` as a lookup key onto an existing state. A matching row SHALL attach only that state's extra configuration (`optional`, `disabled`, `requires`, `requiresTaskCompletion`, `hooks`, `checks`, `skipChecks`, `archiveChecks`). A `workflow[]` entry MUST NOT introduce a new lifecycle state.
 
 Omitting a known state from `workflow[]` MUST NOT remove that state from the protocol. When no row matches, `workflowStep(state)` SHALL be null: the state remains enabled in the pipeline, with no schema extras.
 
@@ -51,18 +51,21 @@ A workflow step declaration in `workflow[]` MAY declare:
 
 - `checks: WorkflowStepCheckDeclaration[]`: an array of predicate check declarations evaluated when transitioning into the step (`scope: 'transition'`). Each declaration MAY specify `id` (canonical check identifier), `along` (default: `'forward'`), `from` (default: `'*'`), `onFailure` (`'abort'` | `'collect'`, default: `'abort'`), `skippable` (boolean), `disabled` (boolean, default: `false`), and `config` (arbitrary JSON record).
 - `skipChecks: WorkflowStepSkipCheckDeclaration[]`: an array of predicate check declarations evaluated when the step is optional and bypassed during a transition (`scope: 'step-skip'`). Each declaration MAY specify `id`, `onFailure` (`'abort'` | `'collect'`, default: `'abort'`), `skippable` (boolean), `disabled` (boolean, default: `false`), and `config` (arbitrary JSON record).
+- `archiveChecks: WorkflowStepArchiveCheckDeclaration[]`: an array of predicate check declarations evaluated by the archive operation (`scope: 'archive'`). Valid only on the `archiving` step. Each declaration MAY specify `id`, `skippable` (boolean), `disabled` (boolean, default: `false`), and `config` (arbitrary JSON record). There is no `onFailure`: archive predicate failures have no abort/collect distinction, and a declaration that carries any other key is rejected by schema validation (see [`core:schema-format`](../schema-format/spec.md)).
 
 Validation rules enforced during schema construction:
 
-1. **Check Existence**: Every check `id` declared in `checks` or `skipChecks` MUST exist in the active `CheckRegistry`. Referencing an unregistered check SHALL throw `UnknownCheckError`.
-2. **Coordinate Uniqueness**: Duplicate check declarations for the exact same coordinate (`{id, scope: 'transition', to: step, along}` or `{id, scope: 'step-skip', step}`) SHALL throw `DuplicateCheckBindingError`.
+1. **Check Existence**: Every check `id` declared in `checks`, `skipChecks`, or `archiveChecks` MUST exist in the active `CheckRegistry`. Referencing an unregistered check SHALL throw `UnknownCheckError`.
+2. **Coordinate Uniqueness**: Duplicate check declarations for the exact same coordinate (`{id, scope: 'transition', to: step, along}`, `{id, scope: 'step-skip', step}`, or `{id, scope: 'archive'}`) SHALL throw `DuplicateCheckBindingError`.
 3. **Governance Locks**:
-   - Placement lock: A check with `allowSchemaEmbedding: false` CANNOT be declared in `checks` or `skipChecks` at a coordinate that none of its code-defined bindings serves (throws `CheckEmbeddingForbiddenError`). Declaring any check, built-in or plugin, at a coordinate one of its code-defined bindings already serves is always permitted, subject to the locks below. Coordinate matching for `checks` uses `to`, `along`, and `from`; for `skipChecks` it uses `step`.
+   - Placement lock: A check with `allowSchemaEmbedding: false` CANNOT be declared in `checks`, `skipChecks`, or `archiveChecks` at a coordinate that none of its code-defined bindings serves (throws `CheckEmbeddingForbiddenError`). Declaring any check, built-in or plugin, at a coordinate one of its code-defined bindings already serves is always permitted, subject to the locks below. Coordinate matching for `checks` uses `to`, `along`, and `from`; for `skipChecks` it uses `step`; for `archiveChecks` it is the `scope: 'archive'` coordinate of the check.
    - Policy lock: A matching code-defined binding with `allowBindingOverride: false` CANNOT have its `onFailure` or `skippable` modified (throws `CheckBindingOverrideForbiddenError`). Schema-owned declarations carry no policy lock.
    - Parameter lock: A check or code-defined binding with `allowConfigOverride: false` CANNOT declare `config` overrides (throws `CheckConfigOverrideForbiddenError`).
    - Disablement lock: A check or code-defined binding with `allowDisable: false` CANNOT declare `disabled: true` (throws `CheckDisableForbiddenError`).
    - Locks are evaluated against the merged declaration produced by schema layering, so a later schema layer MAY change a declaration that an earlier schema layer created, within the check-level locks (see [`core:check-registry`](../check-registry/spec.md)).
 4. **Step Status Compatibility**: `skipChecks` SHALL NOT be declared on steps that are declared `disabled: true`. Attempting to declare `skipChecks` on a disabled step SHALL throw `SchemaValidationError`.
+5. **Archive Step Only**: `archiveChecks` SHALL be declared only on the `archiving` step. Declaring it on any other step SHALL throw `SchemaValidationError` naming that step.
+6. **Archive Locks**: On the archive operation, `workspace.readOnly`, `impl.filesResolved`, and `deps.consistent` carry binding-level locks (`allowBindingOverride: false`, `allowConfigOverride: false`, `allowDisable: false`, `skippable: false`; see [`core:check-registry`](../check-registry/spec.md)), so an `archiveChecks` declaration that disables them (`disabled: true`), sets `skippable: true`, or configures them SHALL throw the corresponding governance error. A redundant `skippable: false` that repeats the code-defined value is accepted.
 
 ### Requirement: Sovereign change schema authority
 
@@ -191,4 +194,4 @@ A workflow step's `requires` array contains **artifact IDs** (e.g. `specs`, `tas
 - [`core:archive-change`](../archive-change/spec.md) — deterministic archiving step behavior
 - [`core:hook-execution-model`](../hook-execution-model/spec.md) — hook execution semantics
 - [`core:workflow-topology`](../workflow-topology/spec.md) — authoritative domain service computing workflow topology
-- [`core:check-registry`](../check-registry/spec.md) — governance locks applied to step `checks` and `skipChecks` declarations
+- [`core:check-registry`](../check-registry/spec.md) — governance locks applied to step `checks`, `skipChecks`, and `archiveChecks` declarations

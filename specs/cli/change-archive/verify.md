@@ -20,6 +20,64 @@
 - **WHEN** `specd change archive my-change` is run
 - **THEN** it is accepted as an alias of `specd changes archive my-change`
 
+#### Scenario: --skip-checks accepts a comma-separated list
+
+- **WHEN** the user runs `specd changes archive my-change --skip-checks spec.overlap,impl.linksInScope`
+- **THEN** `ArchiveChangeInput.skipChecks` contains both ids
+
+#### Scenario: --skip-checks is repeatable
+
+- **WHEN** the user runs `specd changes archive my-change --skip-checks spec.overlap --skip-checks '@security.code-scan'`
+- **THEN** `ArchiveChangeInput.skipChecks` contains both ids
+
+#### Scenario: --allow-overlap is translated to the spec.overlap id
+
+- **WHEN** the user runs `specd changes archive my-change --allow-overlap`
+- **THEN** the CLI calls the use case with `skipChecks` containing `spec.overlap`
+- **AND** it passes no other bypass field
+
+#### Scenario: --allow-out-of-scope is translated to the impl.linksInScope id
+
+- **WHEN** the user runs `specd changes archive my-change --allow-out-of-scope`
+- **THEN** the CLI calls the use case with `skipChecks` containing `impl.linksInScope`
+
+#### Scenario: The CLI does not validate skippability itself
+
+- **WHEN** the user runs `specd changes archive my-change --skip-checks workspace.readOnly`
+- **THEN** the CLI forwards the id and reports the use case's `CheckNotSkippableError`
+
+#### Scenario: Whitespace and empty entries are ignored
+
+- **WHEN** the user runs `specd changes archive my-change --skip-checks "spec.overlap, ,impl.linksInScope"`
+- **THEN** `skipChecks` contains exactly `spec.overlap` and `impl.linksInScope`
+
+#### Scenario: Duplicate ids across flag and alias collapse
+
+- **WHEN** the user runs `specd changes archive my-change --skip-checks spec.overlap --allow-overlap`
+- **THEN** `spec.overlap` is bypassed once and the command does not fail
+
+#### Scenario: Singular alias accepts the same flags
+
+- **WHEN** the user runs `specd change archive my-change --skip-checks spec.overlap`
+- **THEN** the command behaves exactly like `specd changes archive`
+
+#### Scenario: --skip-checks without a value is a usage error
+
+- **WHEN** the user runs `specd changes archive my-change --skip-checks`
+- **THEN** the command exits with code 1 and prints a usage error
+- **AND** nothing is archived
+
+#### Scenario: --skip-checks combines with --skip-hooks
+
+- **WHEN** the user runs `specd changes archive my-change --skip-hooks all --skip-checks spec.overlap`
+- **THEN** both are applied independently: hooks are skipped and the overlap bypass is validated
+
+#### Scenario: Help documents the flags
+
+- **WHEN** the user runs `specd changes archive --help`
+- **THEN** the output lists `--skip-checks <ids>`, `--allow-overlap`, and `--allow-out-of-scope`
+- **AND** the aliases are described as equivalent to the corresponding `--skip-checks` id
+
 ### Requirement: Prerequisites
 
 #### Scenario: Change not in archivable state
@@ -106,6 +164,73 @@
 - **THEN** the command exits with code 1
 - **AND** stderr contains an `error:` message
 
+#### Scenario: Unknown check id
+
+- **WHEN** the user runs `specd changes archive my-change --skip-checks nope.check`
+- **THEN** the command exits with code 1 and reports `UnknownCheckError`
+
+#### Scenario: Non-skippable check id
+
+- **WHEN** the user runs `specd changes archive my-change --skip-checks verification.current`
+- **THEN** the command exits with code 1 and reports `CheckNotSkippableError`
+
+#### Scenario: Hook check id
+
+- **WHEN** the user runs `specd changes archive my-change --skip-checks hook.pre`
+- **THEN** the command exits with code 1 and the message points to `--skip-hooks`
+
+#### Scenario: Overlap error suggests the canonical bypass
+
+- **GIVEN** archive is blocked by spec overlap and `spec.overlap` is skippable
+- **WHEN** the command fails
+- **THEN** stderr lists the overlapping specs and peers and ends with `Use --skip-checks spec.overlap to proceed despite overlap.`
+
+#### Scenario: No bypass suggestion when spec.overlap is not skippable
+
+- **GIVEN** the schema declares `spec.overlap` with `skippable: false`
+- **WHEN** archive is blocked by overlap
+- **THEN** the error message does not suggest `--skip-checks` or `--allow-overlap`
+
+#### Scenario: Skippable plugin check failure suggests the bypass
+
+- **GIVEN** `@security.code-scan` fails on archive and its resolved binding is skippable
+- **WHEN** the user runs `specd changes archive my-change` in text mode
+- **THEN** the command exits with code 1 and reports the check id, label, and message
+- **AND** it prints `bypass:  Retry with --skip-checks @security.code-scan if an exception is granted`
+
+#### Scenario: Non-skippable plugin check failure suggests no bypass
+
+- **GIVEN** the check fails and its resolved binding is not skippable
+- **WHEN** the user runs `specd changes archive my-change`
+- **THEN** the command exits with code 1 and prints no bypass suggestion
+
+#### Scenario: Plugin check failure in structured output
+
+- **WHEN** the same failure occurs with `--format json`
+- **THEN** the command emits the structured error record with the check's failure code and exit code 1
+
+#### Scenario: Check ids are case-sensitive
+
+- **WHEN** the user runs `specd changes archive my-change --skip-checks Spec.Overlap`
+- **THEN** the command exits with code 1 and reports `UnknownCheckError`
+
+#### Scenario: Structured error output
+
+- **WHEN** `--format json` is used and the bypass is rejected with `CheckNotSkippableError`
+- **THEN** the command emits the structured error record with the error code and exit code 1
+
+#### Scenario: Invalid state still fails with skip flags present
+
+- **GIVEN** the change is in `designing`
+- **WHEN** the user runs `specd changes archive my-change --skip-checks spec.overlap`
+- **THEN** the command exits with code 1 naming the current state
+
+#### Scenario: Alias for a non-skippable check fails
+
+- **GIVEN** the schema makes `impl.linksInScope` non-skippable
+- **WHEN** the user runs `specd changes archive my-change --allow-out-of-scope`
+- **THEN** the command exits with code 1 and reports `CheckNotSkippableError`
+
 ### Requirement: Output on success (extended)
 
 #### Scenario: Text output shows invalidated changes when overlap occurred
@@ -127,6 +252,13 @@
 - **GIVEN** `ArchiveChange` returns `invalidatedChanges` with one entry
 - **WHEN** `specd change archive <name> --allow-overlap --format json` succeeds
 - **THEN** the JSON output includes `invalidatedChanges` with the entry's `name` and `specIds`
+
+#### Scenario: --skip-checks spec.overlap reports invalidated peers
+
+- **GIVEN** archiving with `--skip-checks spec.overlap` invalidates `beta`
+- **WHEN** the command succeeds in text mode
+- **THEN** the output includes the `invalidated 1 overlapping change` section listing `beta` and its specs
+- **AND** `--format json` includes the same `invalidatedChanges` entries
 
 ### Requirement: JSON output on success
 

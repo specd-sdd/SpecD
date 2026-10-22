@@ -24,5 +24,41 @@
     {
       "file": "core:test/infrastructure/fs/spec-repository.spec.ts"
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Filesystem SpecRepository validates paths, atomically persists specs, metadata and locks, and owns FS index/meta/fingerprint behavior.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:85177fa30fcfa7288e1a2bd96152e955c6d0929284e12f507ca1d147b3ce4def",
+          "lastModified": "2026-09-28T11:19:59.145Z"
+        },
+        "verify.md": {
+          "hash": "sha256:a146ba93950a87362995e39b686d92ff4240823163a89261013d7e3f156fb0c3",
+          "lastModified": "2026-09-28T11:19:59.146Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# FS Spec Repository\n## Rules\n- FsSpecRepository validates config path/metadataPath only; both directories required. Factory forwards context/config unchanged.\n- FsSpecIndexCache owns list/count/reindex/invalidation under config tmp fs-cache; no direct index files. Capability path sort; invalidation/source-file mtime freshness, no TTL.\n- Index caches workspace/path/title/summary/meta stamps; title metadata else final path. Projection errors swallowed; list flags read cache only; Meta never hash.\n- get uses stats only for artifact, lock, metadata stamps.\n- read/writePersistedState share canonical stable atomic spec-lock serializer with publish; validate complete state, exact-byte hashes, expectedRevision conflicts; no invented defaults; readOnly rejects before I/O.\n- New publish needs artifacts. Rename EPERM/EBUSY/EACCES bounded retry; normalize line endings only temporary gitignore equality.\n- Metadata snapshots return missing/invalid/present, enforce revisions, may write readOnly workspace. artifactMeta reuses stat/hash path.\n- Persisted/generated meta optional hash, null absent. specFingerprint hashes filename-sorted artifacts + lock hash/absent sentinel; exclude metadata. No validation cache ownership.\n## Constraints\n- infrastructure/fs implementation of SpecRepository; never owns schema/patch/default selection.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:85177fa30fcfa7288e1a2bd96152e955c6d0929284e12f507ca1d147b3ce4def",
+          "lastModified": "2026-09-28T11:19:59.145Z"
+        },
+        "verify.md": {
+          "hash": "sha256:a146ba93950a87362995e39b686d92ff4240823163a89261013d7e3f156fb0c3",
+          "lastModified": "2026-09-28T11:19:59.146Z"
+        }
+      }
+    }
+  }
 }

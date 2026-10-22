@@ -230,6 +230,70 @@
 - **THEN** the blockers section includes `DEPS_INCONSISTENT` and `Checking spec dependencies`
 - **AND** JSON output includes `blockers[].label`
 
+### Requirement: Archive bypass hints come from resolved bindings
+
+#### Scenario: Skippable overlap blocker shows the canonical bypass
+
+- **GIVEN** a change in `archivable` blocked by `spec.overlap` with a skippable binding
+- **WHEN** the user runs `specd changes status my-change`
+- **THEN** the blocker renders a `    bypass: --skip-checks spec.overlap` line under the blocker in text mode
+- **AND** the next-action reason ends with `Use --skip-checks spec.overlap to archive anyway.` unless the message already contains the flag
+
+#### Scenario: The shown flag is accepted by changes archive
+
+- **GIVEN** status shows `--skip-checks spec.overlap` on an archive blocker
+- **WHEN** the user runs `specd changes archive my-change --skip-checks spec.overlap`
+- **THEN** the flag is accepted by `changes archive`, whereas the same `    bypass: --skip-checks <checkId>` format on a skippable transition blocker (such as `impl.linksInScope`) is accepted by `changes transition`
+
+#### Scenario: Locked check shows no bypass
+
+- **GIVEN** a change blocked by a `workspace.readOnly` failure on archive
+- **WHEN** the user runs `specd changes status my-change`
+- **THEN** the blocker carries no bypass flag in text, JSON, or TOON output
+
+#### Scenario: Schema-hardened overlap shows no bypass
+
+- **GIVEN** the schema declares `spec.overlap` with `skippable: false` and the change overlaps a peer
+- **WHEN** the user runs `specd changes status my-change`
+- **THEN** no bypass flag is shown
+- **AND** the next-action reason does not suggest one
+
+#### Scenario: The CLI never builds a bypass locally
+
+- **GIVEN** `GetStatus` supplies no `bypassFlag` for a blocker
+- **WHEN** the CLI renders it
+- **THEN** it does not add a flag
+
+#### Scenario: Several archive blockers each carry their own flag
+
+- **GIVEN** a change blocked by both `spec.overlap` and `impl.linksInScope`, both skippable
+- **WHEN** the user runs `specd changes status my-change`
+- **THEN** each blocker shows its own `--skip-checks <checkId>` flag
+
+#### Scenario: Plugin archive check follows its resolved skippability
+
+- **GIVEN** `@security.code-scan` fails on archive
+- **WHEN** its resolved binding is skippable
+- **THEN** the blocker shows `--skip-checks @security.code-scan`
+- **AND** when it is not skippable no flag is shown
+
+#### Scenario: Structured output includes the same hints
+
+- **WHEN** the user runs `specd changes status my-change --format json` or `toon`
+- **THEN** the blockers carry `bypassFlag` exactly when text output shows one
+
+#### Scenario: Disabled spec.overlap produces no overlap blocker
+
+- **GIVEN** the schema disables `spec.overlap` through `archiveChecks`
+- **WHEN** the change overlaps another active change
+- **THEN** status shows no overlap blocker and no bypass hint for it
+
+#### Scenario: A hardened archive blocker mixed with a skippable one
+
+- **GIVEN** `workspace.readOnly` and `spec.overlap` both fail
+- **WHEN** status is rendered
+- **THEN** only the `spec.overlap` blocker shows a bypass flag
+
 ### Requirement: Schema version warning
 
 #### Scenario: Schema mismatch

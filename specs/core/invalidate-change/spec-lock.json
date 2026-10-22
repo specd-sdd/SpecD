@@ -19,5 +19,41 @@
     {
       "file": "core:test/application/use-cases/invalidate-change.spec.ts"
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Invalidate change validity projections according to explicit reason/policy through canonical reconciliation semantics.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:ce14b6c4c513bcc9876ce5744733f01504b0c852cec3df9d2db92082a07da7c3",
+          "lastModified": "2026-10-20T14:34:10.184Z"
+        },
+        "verify.md": {
+          "hash": "sha256:576fa4c099f1670e4c2c75dc0f79af750f041298bac258111a3bfdbcaac17810",
+          "lastModified": "2026-10-20T14:34:10.185Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# InvalidateChange\n## Rules\n- Load change, resolve sovereign schema, and perform serialized mutation.\n- Withdraw affected approval/verification/signoff evidence, append audit reason, expose resulting change.\n- Respect configured invalidation policy and canonical recovery boundaries.\n## Constraints\n- Never fabricate fingerprints or bypass reconciler-owned validity rules.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:ce14b6c4c513bcc9876ce5744733f01504b0c852cec3df9d2db92082a07da7c3",
+          "lastModified": "2026-10-20T14:34:10.184Z"
+        },
+        "verify.md": {
+          "hash": "sha256:576fa4c099f1670e4c2c75dc0f79af750f041298bac258111a3bfdbcaac17810",
+          "lastModified": "2026-10-20T14:34:10.185Z"
+        }
+      }
+    }
+  }
 }

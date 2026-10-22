@@ -64,6 +64,35 @@ describe('createCompositionRegistryView', () => {
     expect(view.checks.getGovernance('@qb.audit')?.allowDisable).toBe(false)
     expect(view.checks.getGovernance('@qc.audit')?.allowDisable).toBe(true)
   })
+  it('exposes the archive bindings with the archive locks and accepts a plugin archive binding', () => {
+    const check = {
+      id: 'scan',
+      label: 'Scanning',
+      execute: async () => ({
+        id: '@sec.scan',
+        label: 'Scanning',
+        kind: 'predicate' as const,
+        outcome: 'pass' as const,
+      }),
+    }
+    const view = createCompositionRegistryView(createBuiltinCompositionRegistry(), {
+      checks: [
+        { pluginName: 'sec', check, defaultBindings: [{ scope: 'archive', skippable: true }] },
+      ],
+    })
+
+    for (const id of ['workspace.readOnly', 'deps.consistent', 'impl.filesResolved']) {
+      const archive = view.checks
+        .getBindings(id)
+        .find((binding) => binding.applicability.some((row) => row.scope === 'archive'))
+      expect(archive?.allowDisable, id).toBe(false)
+      expect(archive?.allowBindingOverride, id).toBe(false)
+    }
+    const plugin = view.checks.getBindings('@sec.scan')[0]
+    expect(plugin?.applicability).toEqual([{ scope: 'archive' }])
+    expect(plugin?.skippable).toBe(true)
+  })
+
   it('forwards plugin allowSchemaEmbedding into check governance and enforces it at build time', () => {
     const check = {
       id: 'gate',

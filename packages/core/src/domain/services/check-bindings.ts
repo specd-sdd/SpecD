@@ -147,6 +147,13 @@ export const TRANSITION_BINDING_SPECS: readonly CheckBindingSpec[] = [
 
 /**
  * Archive applicability in registry order. Publication is not a check.
+ *
+ * Archive exception to the Category C policy: `workspace.readOnly`, `deps.consistent`,
+ * and `impl.filesResolved` are fully locked on archive rows (no binding override, no
+ * configuration override, no disablement, not skippable). `workspace.readOnly` is a
+ * security boundary, and unresolved implementation or inconsistent dependencies would
+ * produce an invalid archive. Their transition rows keep the Category C policy. Only
+ * `spec.overlap`, `impl.linksInScope`, and plugin checks are tunable by a schema on archive.
  */
 export const ARCHIVE_BINDING_SPECS: readonly CheckBindingSpec[] = [
   {
@@ -173,25 +180,25 @@ export const ARCHIVE_BINDING_SPECS: readonly CheckBindingSpec[] = [
   },
   {
     id: 'workspace.readOnly',
-    allowBindingOverride: true,
-    allowConfigOverride: true,
-    allowDisable: true,
+    allowBindingOverride: false,
+    allowConfigOverride: false,
+    allowDisable: false,
     applicability: [{ scope: 'archive' }],
     skippable: false,
   },
   {
     id: 'deps.consistent',
-    allowBindingOverride: true,
-    allowConfigOverride: true,
-    allowDisable: true,
+    allowBindingOverride: false,
+    allowConfigOverride: false,
+    allowDisable: false,
     applicability: [{ scope: 'archive' }],
     skippable: false,
   },
   {
     id: 'impl.filesResolved',
-    allowBindingOverride: true,
-    allowConfigOverride: true,
-    allowDisable: true,
+    allowBindingOverride: false,
+    allowConfigOverride: false,
+    allowDisable: false,
     applicability: [{ scope: 'archive' }],
     skippable: false,
   },

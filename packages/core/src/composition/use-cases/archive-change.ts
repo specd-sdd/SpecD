@@ -7,6 +7,7 @@ import { type ChangeRepository } from '../../application/ports/change-repository
 import { type SpecRepository } from '../../application/ports/spec-repository.js'
 import { type SchemaProvider } from '../../application/ports/schema-provider.js'
 import { type ContentHasher } from '../../application/ports/content-hasher.js'
+import { type CheckRegistry } from '../../domain/services/check-registry.js'
 import { ArchiveChange } from '../../application/use-cases/archive-change.js'
 import { type ResolveChangeSchema } from '../../application/services/resolve-change-schema.js'
 import { type MaterializeSpecMetadata } from '../../application/use-cases/materialize-spec-metadata.js'
@@ -118,6 +119,8 @@ export interface ArchiveChangeDeps {
   readonly contentHasher: ContentHasher
   readonly reconcile: import('../../application/use-cases/reconcile-change-validity.js').ReconcileChangeValidity
   readonly resolveChangeSchema?: ResolveChangeSchema
+  /** Executable check registry used to resolve effective archive bindings and validate skips. */
+  readonly checkRegistry?: CheckRegistry
 }
 
 export function resolveArchiveChangeDeps(resolver: CompositionResolver): ArchiveChangeDeps {
@@ -151,6 +154,7 @@ export function resolveArchiveChangeDeps(resolver: CompositionResolver): Archive
     contentHasher: resolver.getContentHasher(),
     reconcile: resolver.getReconcileChangeValidity(),
     resolveChangeSchema: resolver.getResolveChangeSchema(),
+    ...(registry.checkRegistry !== undefined ? { checkRegistry: registry.checkRegistry } : {}),
   }
 }
 
@@ -192,6 +196,7 @@ function createArchiveChangeFromNormalized(
       contentHasher,
       reconcile,
       resolveChangeSchema,
+      checkRegistry,
     } = input.deps
 
     return new ArchiveChange(
@@ -210,6 +215,7 @@ function createArchiveChangeFromNormalized(
       contentHasher,
       reconcile,
       resolveChangeSchema,
+      checkRegistry,
     )
   }
 

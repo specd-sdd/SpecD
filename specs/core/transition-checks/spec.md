@@ -129,16 +129,27 @@ When evaluating a candidate transition (`from` -> `to`) or bypassed steps (`list
    - Declarations defining new bindings SHALL synthesize a `CheckBinding` with `scope: 'step-skip'` and `step: S`.
    - Step configuration SHALL be merged using `deepMergeConfig` and passed into `CheckExecutionContext.config`.
 3. **Single-pass config cascade**: The effective configuration for each binding SHALL be computed exactly once, in the order check default → binding default → step declaration, and carried on the resolved binding. Predicate execution SHALL pass that resolved record to `CheckExecutionContext.config` unchanged and MUST NOT merge any layer a second time. Merging the same layer twice (for example duplicating array entries) is a defect.
-4. **Coordinate isolation**: The `scope: 'transition'` coordinate of a step and the `scope: 'step-skip'` coordinate of the same step are independent bindings. `disabled: true` in `checks` SHALL remove the check only from that step's transition coordinate, and `disabled: true` in `skipChecks` SHALL remove it only from that step's step-skip coordinate. Disabling one coordinate MUST NOT remove, reconfigure, or otherwise affect the other.
+4. **Coordinate isolation**: The `scope: 'transition'` coordinate of a step and the `scope: 'step-skip'` coordinate of the same step are independent bindings. `disabled: true` in `checks` SHALL remove the check only from that step's transition coordinate, and `disabled: true` in `skipChecks` SHALL remove it only from that step's step-skip coordinate. `disabled: true` in `archiveChecks` SHALL remove it only from the `scope: 'archive'` coordinate. Disabling one coordinate MUST NOT remove, reconfigure, or otherwise affect another.
 5. **Applicability of step checks**: A check declared in `schema.workflowStep(to).checks` SHALL match a transition attempt only when its `from` (default `'*'`) and `along` (default `'forward'`) match the attempt. Step checks MUST NOT run on backward, redesign, or recovery entries unless their declaration explicitly selects that `along`. This applies equally when the declaration overlays a code-defined binding: the overlaid binding's applicability SHALL be narrowed to the declaration's `from` and `along`, and the rows of the code-defined binding that the declaration does not select SHALL keep their original policy and configuration.
 6. **Concrete step-skip coordinates**: When a code-defined `step-skip` binding with `step: '*'` serves a bypassed step that the schema declares in `skipChecks`, the resolved binding for that step SHALL carry the concrete `step` value. A binding resolved for one bypassed step MUST NOT match, or lend its configuration to, a different bypassed step.
-7. **Resolver is the single owner**: `resolveEffectiveBindings` SHALL be the only place that applies schema `checks` / `skipChecks` declarations (exclusion through `disabled`, `from` / `along` narrowing, `onFailure`, `skippable`, and configuration). Every declaration SHALL resolve either into a binding or into an exclusion. The predicate runner SHALL execute the resolved bindings as given: it MUST NOT re-filter declarations, re-merge configuration, or execute declarations that are not represented as resolved bindings.
+7. **Resolver is the single owner**: `resolveEffectiveBindings` SHALL be the only place that applies schema `checks` / `skipChecks` / `archiveChecks` declarations (exclusion through `disabled`, `from` / `along` narrowing, `onFailure`, `skippable`, and configuration). Every declaration SHALL resolve either into a binding or into an exclusion. The predicate runner SHALL execute the resolved bindings as given: it MUST NOT re-filter declarations, re-merge configuration, or execute declarations that are not represented as resolved bindings.
 8. **Executable instances**: A binding synthesized for a declaration SHALL reference the executable check instance from the registry handed in by composition (see [`core:check-registry`](../check-registry/spec.md)), so a schema-embedded built-in check evaluates real facts.
-9. **Derived policy comes from resolved bindings**: Every consumer that reports or enforces binding policy — failure mapping (`skippable` on `CheckPredicateFailedError`), `--skip-checks` validation, blocker `bypassFlag` projection, and `onFailure` handling — SHALL read it from the resolved bindings for the attempt being evaluated, never from the base binding table.
+9. **Derived policy comes from resolved bindings**: Every consumer that reports or enforces binding policy — failure mapping (`skippable` on `CheckPredicateFailedError`), `--skip-checks` validation (for transitions and for the archive operation), blocker `bypassFlag` projection, and `onFailure` handling — SHALL read it from the resolved bindings for the attempt being evaluated, never from the base binding table.
+10. **Archive operation bindings**: When the input selects operation `archive`, the resolver SHALL treat the `archiveChecks` of `schema.workflowStep('archiving')` as declarations over bindings with `scope: 'archive'`:
+    - Declarations with `disabled: true` SHALL exclude the matching check from the archive operation.
+    - Declarations naming a check that no base archive binding serves SHALL synthesize a `CheckBinding` with `scope: 'archive'`, `skippable` taken from the declaration (default `false`), the check's governance from the registry, and the default failure policy.
+    - `skippable` and `config` SHALL overlay the base binding at the archive coordinate, subject to the governance locks.
+    - `archiveChecks` have no `onFailure`; the base binding's failure policy SHALL be kept.
+    - Synthesized archive bindings SHALL be appended after the base bindings, in declaration order.
+    - Without a registry, a declaration that names a check no base archive row serves SHALL be dropped, because nothing can be synthesized; declarations that overlay base rows still apply.
+    - `operation: 'archive'` is mutually exclusive with `targetStep` and `bypassedSteps`; combining them SHALL throw `InvalidInputError`.
+    - The three overlays (`checks`, `skipChecks`, `archiveChecks`) SHALL share one parameterized implementation so cascade, governance, and coordinate-splitting behave identically.
 
 ### Requirement: Archive is an operation not an edge
 
 The archive use case SHALL evaluate checks bound to operation `archive`, not a fake lifecycle `from → to`. `approval.signoff` MUST NOT be bound to that operation.
+
+The archive operation SHALL resolve its bindings through `resolveEffectiveBindings` exactly as transitions do, so the schema's `archiveChecks`, the governance locks, and `--skip-checks` validation apply uniformly. The archive operation has no `from`, `to`, or `along`; its attempt is `{ scope: 'archive' }`.
 
 ### Requirement: Binding pipeline phase and failure policy
 
@@ -306,6 +317,8 @@ Canonical built-in labels (gerund):
 
 Happy-path `nextAction` from `done` / `archivable` SHALL remain archive or signoff-approve. Skill-aligned backward hops MUST appear in `availableTransitions` without becoming that default `nextAction`.
 
+For a change in `archivable`, blockers produced by archive predicates SHALL carry a `bypassFlag` (`--skip-checks <checkId>`) only when the resolved archive binding for that check is skippable. A blocker whose resolved binding is not skippable (for example a built-in locked check, or `spec.overlap` made non-skippable by the schema) SHALL carry no `bypassFlag`. The flag SHALL be exactly what `ArchiveChange` accepts.
+
 ### Requirement: No shared snapshot bag
 
 There SHALL be no ABI type that enumerates all check facts (`PredicateSnapshots` or a closed `needs` union). `GetStatus`, `TransitionChange`, `ArchiveChange`, `ValidateArtifacts`, and `GetArtifactInstruction` MUST NOT gather a global snapshot for all checks. Each check’s `execute` SHALL perform that check’s I/O through its own composed ports, then call that check’s domain `run` with those facts only.
@@ -337,3 +350,5 @@ Transition evaluation for historic parked approval states MUST preserve the appr
 - [`core:schema-format`](../schema-format/spec.md) — workflow step YAML shape
 - [`default:_global/architecture`](../../../_global/architecture/spec.md) — domain purity vs application I/O
 - [`core:check-registry`](../check-registry/spec.md) — dynamic check resolution, namespacing, and two-tier governance
+- [`core:archive-change`](../archive-change/spec.md) — archive operation binding resolution and `--skip-checks` validation
+- [`core:get-status`](../get-status/spec.md) — archive predicate evaluation and blocker `bypassFlag` projection in `archivable`

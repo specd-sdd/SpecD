@@ -17,5 +17,41 @@
       "file": "core:src/application/use-cases/preview-spec.ts",
       "symbols": ["PreviewSpec"]
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Preview merged change-spec artifacts and optional unified diffs without mutating source specs or change state.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:c0d69f4a05bdc0d21e7c8c184e33dc396ce254d6b99590b046cdab54c47e0d39",
+          "lastModified": "2026-10-20T14:34:09.824Z"
+        },
+        "verify.md": {
+          "hash": "sha256:49de8c41de78581e8390b4463b60159815facc60e313c613c375c17db6a2781b",
+          "lastModified": "2026-10-20T14:34:09.825Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# PreviewSpec\n## Rules\n- Require targeted change spec; resolve sovereign schema and discover files from `change.artifacts`.\n- Apply delta files to base artifacts; return each spec artifact as merged, no-op, or missing with warnings.\n- On requested diff, invoke `DiffGenerator` for merged files; preserve preview if diff fails.\n## Constraints\n- Read-only; never validate deltas or require complete state.\n- `spec.md` first, remaining files alphabetical.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:c0d69f4a05bdc0d21e7c8c184e33dc396ce254d6b99590b046cdab54c47e0d39",
+          "lastModified": "2026-10-20T14:34:09.824Z"
+        },
+        "verify.md": {
+          "hash": "sha256:49de8c41de78581e8390b4463b60159815facc60e313c613c375c17db6a2781b",
+          "lastModified": "2026-10-20T14:34:09.825Z"
+        }
+      }
+    }
+  }
 }

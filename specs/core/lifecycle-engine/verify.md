@@ -90,12 +90,19 @@
 - **THEN** it returns a blocker with code `ARTIFACT_DRIFT`
 - **AND** `affectedArtifacts` contains exactly the drifted filename and spec ID
 
+#### Scenario: Blocker skippability and bypass flag come from resolved bindings
+
+- **GIVEN** a failed `spec.overlap` check with code `OVERLAP_CONFLICT`
+- **AND** the resolved `spec.overlap` binding has `skippable: false` (via schema `archiveChecks` or `resolvedBindings`)
+- **WHEN** `evaluateLifecycleVerdict` projects `blockers`
+- **THEN** the `OVERLAP_CONFLICT` blocker has `isSkippable: false` and no `bypassFlag`
+
 ### Requirement: Available steps and domain next hop
 
 #### Scenario: Skip bypass allows transition despite blocker
 
 - **GIVEN** an `OVERLAP_CONFLICT` blocker that is skippable
-- **AND** the `--allow-overlap` bypass flag is provided
+- **AND** `spec.overlap` is bypassed through `skipChecks`
 - **WHEN** `evaluateLifecycleVerdict` is called
 - **THEN** `OVERLAP_CONFLICT` is absent from `blockers`
 - **AND** the verdict does not include a warning object for that overlap

@@ -15,65 +15,39 @@
     "core:transition-checks",
     "core:workflow-topology"
   ],
-  "implementation": [
-    {
-      "file": "core:src/application/use-cases/start-verification.ts",
-      "symbols": ["StartVerification"]
-    },
-    {
-      "file": "core:test/application/use-cases/start-verification.spec.ts"
-    },
-    {
-      "file": "core:src/application/services/validity-fingerprint-service.ts",
-      "symbols": ["ValidityFingerprintService"]
-    },
-    {
-      "file": "core:test/application/services/validity-fingerprint-service.spec.ts"
-    },
-    {
-      "file": "core:test/application/use-cases/invalidate-change.spec.ts"
-    },
-    {
-      "file": "core:src/domain/entities/change.ts",
-      "symbols": ["Change"]
-    },
-    {
-      "file": "core:src/application/use-cases/invalidate-verification.ts",
-      "symbols": ["InvalidateVerification"]
-    }
-  ],
+  "implementation": [],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Central aggregate owns change identity, lifecycle, artifacts, consent, verification, implementation tracking, history, and recovery.",
+      "value": "`Change` is immutable-identity aggregate for scoped specs, event-derived lifecycle, artifacts, approvals, verification, and implementation tracking.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:14d4bf7e09fd4190db06a3d1548853e4f3dc30862fd8e7b3988cc22955f80bdb",
-          "lastModified": "2026-10-06T10:29:45.981Z"
+          "hash": "sha256:be37730c0ffa66f35f21e3641184e4b7b42e418104a3311b87c63103a886c965",
+          "lastModified": "2026-10-20T14:34:10.307Z"
         },
         "verify.md": {
-          "hash": "sha256:f0ba72e267a75d52608337f6b21005990742247a4a14ea9c2179c505e99c63be",
-          "lastModified": "2026-10-06T10:29:45.982Z"
+          "hash": "sha256:0045dab21ed754c4f841b5598f076e13182077a9b57761f99957934d736736ef",
+          "lastModified": "2026-10-20T14:34:10.308Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# Change\n\n## Rules\n- Identity: immutable unique slug `name`, `createdAt`; reject whole-slug Windows devices `con|prn|aux|nul|com1..com9|lpt1..lpt9` case-insensitively. `ActorIdentity`: `name`, `email`, optional `provider`, `providerId`, `metadata`. `updatedAt >= createdAt`; omitted defaults to `createdAt`; `touchUpdatedAt(at = new Date())` advances it.\n- Scope: mutable empty-valid canonical `specIds`; validate workspace on creation. Derived plural `workspaces` via `parseSpecId()`, never persisted/primary/indexed. `specDependsOn` is `CompileContext` highest-priority source; scope replacement prunes removed keys. Canonical additions/removals stale spec consent with precise diffs; reorder/duplicates do not. Scope edit alone never forces redesign.\n- Lifecycle: `drafting → designing → ready → implementing ⇄ verifying → done → archivable → archiving`; `VALID_TRANSITIONS` authoritative. Legacy pending/approved states drain only. Gates `approvals.spec`/`approvals.signoff` default false; enabled gates retain `ready`/`done` until valid consent. Every state except `drafting` may return `designing`; application `designing → designing` neutral no-op; entity rejects real self-transition. `verifying → verifying` invalid.\n- Retry: `done|signed-off|archivable → implementing|verifying` preserves unchanged artifacts/spec approval, invalidates active signoff. `archiving` permits manual `archivable|designing`; central reconciliation alone may apply `archiving → done` for required signoff recovery.\n- `implementing → verifying` requires configured task completion. `verifying → implementing` only implementation repair; artifact/task revision returns `designing`. Lifecycle movement neither captures/completes nor invalidates verification.\n- Artifacts: files use `missing|in-progress|complete|skipped|pending-review|drifted-pending-review`; aggregate precedence drifted > pending > complete > skipped > missing > in-progress. Only optional artifacts may skip; `complete|skipped` satisfy dependencies. `markComplete` reserved for validation; `markSkipped` for skip use case.\n- Invalidation: structured `{artifacts: none|surgical|downstream|global, workflow: preserve|redesign}`; schema `ArtifactDag` expands downstream, excluding task artifacts from propagated drift review. `hasDrift` changes only for focused `artifact-drift`. Central reconciliation applies gate recovery: stale required spec consent → `designing`; stale required signoff → `done`; spec wins; never advance earlier state; idempotent.\n- Consent: spec approval in `ready` requires validated reviewed artifacts, no drift, exact sorted canonical `specIds` + non-task artifact fingerprint. Signoff in `done` requires current artifacts, implementation fingerprint, valid verification. Projections persist `valid|stale|revoked`, actor/reason/time/cause; legacy incomplete evidence remains unknown. Hash equality never heals invalidity.\n- Verification: explicit start from any active state refreshes tracking/resolution, checks files/links, captures non-task artifact + implementation baseline, appends `verification-attempt-started`; repeat supersedes active attempt, preserves history. Complete requires active attempt and exact fresh inputs, then records valid completion/event. Explicit invalidation requires reason. Operations never run tests or transition lifecycle.\n- Implementation tracking: persist `implementationTrackingStartedAt`, project-relative files `open|resolved|ignored|removed`, confirmed spec/file links with optional symbols, explicit-vs-container-only intent. Activation idempotent; `removed` persists until refresh finds file; historical implementing fact gates autodetection.\n- Fingerprints: deterministic complete-key maps. `text-v1` strips BOM, normalizes line endings/trailing horizontal whitespace/whitespace-only lines/final newline; no parsing, formatting, internal-whitespace, or symbol-range hashing. Binary byte-hash records algorithm. Missing/unreadable linked files fail. Task artifacts excluded from approval/verification fingerprints.\n- History append-only; state derives latest `transitioned`. Archive only from `archivable`; failure records step/message/`commitStarted`; successful restore returns `archivable`, failed restore stays `archiving`. Draft moves active storage without lifecycle change; drafted changes read-only except restore/discard; discard irreversible and force-required after historical implementation.\n- Entity owns facts; `evaluateLifecycleVerdict`/`projectArtifacts` own schema-DAG effective status, checks, blockers, hops, next action.\n\n## Constraints\n- History immutable; projection invalidity never self-heals. Artifact/file state and `hasDrift` authoritative; `validatedHash` baseline only.\n- No primary workspace. Approval gates opt-in. Archive sources only `archivable|archiving`.\n- Task completion derives schema `hasTasks`, task check, workflow requirements; task text is not approval evidence.\n- Change domain I/O-free; application supplies schema, checks, fingerprints, actor, reconciliation, persistence.",
+      "value": "# Change\n\n## Rules\n- Immutable `name`/`createdAt`; workspaces derive from `specIds`; reject Windows device names. Lifecycle derives append-only transition history.\n- Own artifacts/files, implementation tracking/links, approval and verification projections, fingerprints, schema identity, draft/discard/archive outcome history.\n- Supports designing self-entry, skill backward hops, archive recovery, verification loop; archive source only `archivable|archiving`.\n- Explicit file states and persisted drift; only validation marks complete, skip use case marks skipped; optional skipped satisfies dependencies.\n- Verification starts from active state with fresh tracking and sovereign schema, baseline non-task artifacts + implementation; completion requires exact fresh baseline. Attempts/audit immutable.\n- Approval gates default off; valid spec approval gates implementation, signoff gates archivable. Task content not approval evidence.\n- Artifact/scope invalidation emits focused evidence; central reconciler selects review/recovery by policy. No unconditional return on repository read.\n- `syncArtifacts` reconciles schema shape and audits changes. Draft is read-only; discard rules honor historical implementation.\n\n## Constraints\n- Aggregate stores facts, not DAG presentation.\n- Fingerprints use sovereign schema; task artifacts excluded from approval/verification evidence.\n- Archive uses shared checks, not normal edge.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:14d4bf7e09fd4190db06a3d1548853e4f3dc30862fd8e7b3988cc22955f80bdb",
-          "lastModified": "2026-10-06T10:29:45.981Z"
+          "hash": "sha256:be37730c0ffa66f35f21e3641184e4b7b42e418104a3311b87c63103a886c965",
+          "lastModified": "2026-10-20T14:34:10.307Z"
         },
         "verify.md": {
-          "hash": "sha256:f0ba72e267a75d52608337f6b21005990742247a4a14ea9c2179c505e99c63be",
-          "lastModified": "2026-10-06T10:29:45.982Z"
+          "hash": "sha256:0045dab21ed754c4f841b5598f076e13182077a9b57761f99957934d736736ef",
+          "lastModified": "2026-10-20T14:34:10.308Z"
         }
       }
     }

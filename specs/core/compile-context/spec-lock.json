@@ -32,36 +32,36 @@
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Compiles change-aware project/spec context with preview-first extraction, dependency traversal, fingerprints, and optimization preference.",
+      "value": "Compile fingerprinted project/spec context with merged previews, dependencies, and fresh optimized metadata.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:ff9c745588bddee9c490bccd0b7680de1e164f11e2a43a5462f5deb020671fed",
-          "lastModified": "2026-08-30T09:18:36.428Z"
+          "hash": "sha256:18d5b5480504e7967b1c5012c6a359cec2750338f9485e4960890385d0d9c1eb",
+          "lastModified": "2026-10-20T14:34:10.072Z"
         },
         "verify.md": {
-          "hash": "sha256:25f97a7d02b08ab1742885bfc45cfecb0bb2ee0a85125cfd0931cb60621beb7a",
-          "lastModified": "2026-08-30T09:18:36.428Z"
+          "hash": "sha256:0433df01b2aadb8690a1783e970e6545ffca2098508745e6cd4d6206ddbb8f68",
+          "lastModified": "2026-10-20T14:34:10.073Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# CompileContext\n\n## Rules\n- Constructor injects `ChangeRepository`, `ListWorkspaces`, `SchemaProvider`, `FileReader`, `ArtifactParserRegistry`, `ContentHasher`, `PreviewSpec`, `GetSpecMetadata`, yaml-derived `CompileContextConfig`. No `LifecycleEngine`, `ImplementationDetector`, or direct metadata-snapshot reads. Schema lazy/cached; config factory uses `resolveCompileContextDeps`.\n- `execute`: name, step; optional contextMode, llmOptimizedContext, includeChangeSpecs=false, followDeps=false, depth, sections, fingerprint. No config input. Shallow-merge only runtime contextMode/optimization over baked config. Caller refreshes implementation tracking. Schema name mismatch throws before collection.\n- Qualification: explicit workspace prefix routes by name; unqualified project pattern→default, workspace pattern→that workspace, metadata dependency→declaring workspace. Unknown workspace warns/skips.\n- Collection order: protected change.specIds seed only when includeChangeSpecs; always specDependsOn values; shared `resolveConfiguredContextSpecs` project include/exclude then active-workspace include/exclude; optional dependency traversal from all change.specIds. Traversal additions survive excludes, honor depth, check existence before registration, break repeated cycle edges silently. Optimized project context suppresses project patterns only, not workspace patterns.\n- Dependency tier: nonempty `change.specDependsOn[specId]` → self-healing `GetSpecMetadata` projection → schema dependsOn extraction with shared transforms/origin context. Preview used for change-scoped specs. Missing persisted traversal metadata warns; stale usable projection warns; unresolved discoveries silently skip.\n- Deduplicate stable order; source priority specIds > specDependsOn > dependsOnTraversal > includePattern.\n- Modes: list IDs only; summary title/description; full all; hybrid only directly seeded change.specIds full. Sections affect full only. Without sections, render all spec-scoped files, spec.md first then alphabetical, labeled filename.\n- Every collected change.specId uses merged `PreviewSpec` artifacts as primary title/description/content source in all non-list modes, including change-only specs. Extract through schema metadataExtraction, not Markdown heuristics. Fallback: preview extraction → canonical projection → base extraction. Usable rung suppresses stale/missing metadata warning. Preview failure never blocks. Lock optimizations never apply to change.specIds.\n- Other rendered specs use `GetSpecMetadata(policy: if-needed)`. Regeneration is not warning; forward actionable warnings such as metadata-cache-write-failed. No valid projection → missing-metadata + minimal output. Materialize only entries/modes needing metadata.\n- Result: contextFingerprint, changed|unchanged status, projectContext, specs, warnings; never lifecycle/readiness/blockers. Project instructions verbatim; files relative to specd.yaml; missing file warns/skips.\n- Fingerprint canonical emitted logical context, diagnostics, result-shaping inputs, merged delta content; excludes lifecycle state/availability. Match returns unchanged with empty projectContext/specs.\n- Optimization enabled: prefer nonempty optimizedContext; sections lacking either rules or constraints force context bypass; requested scenarios append when optimization active. optimizedDescription unaffected. Non-change specs with absent/drifted value warn missing-optimization/stale-optimization with `Launch specd-spec-context-optimizer agent to refresh`.\n- Factory `createCompileContext(config, options?)` resolves dependencies through `resolveCompileContextDeps(resolver)` then canonical deps factory; no inline fs wiring.\n\n## Constraints\n- Project context precedes specs; missing files/specs/workspaces warn and skip.\n- Steps 1–4 precede opt-in traversal; traversal discoveries survive excludes. One stable entry/spec.\n- File access only through repositories/FileReader. Sections affect full content only.\n- Artifact and hook instructions excluded; use dedicated use cases. Cycle safety mandatory.",
+      "value": "# CompileContext\n## Rules\n- Collect configured/change specs and optional dependencies; resolve sovereign schema.\n- Preview change specs; extract dependency metadata with fallback ladder; emit stable fingerprint.\n- Prefer fresh `optimizedContext`; missing/stale optimization warns; scenarios append on request.\n## Constraints\n- Read-only; no lifecycle/readiness logic.\n- Project context precedes specs; cycle-safe traversal.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:ff9c745588bddee9c490bccd0b7680de1e164f11e2a43a5462f5deb020671fed",
-          "lastModified": "2026-08-30T09:18:36.428Z"
+          "hash": "sha256:18d5b5480504e7967b1c5012c6a359cec2750338f9485e4960890385d0d9c1eb",
+          "lastModified": "2026-10-20T14:34:10.072Z"
         },
         "verify.md": {
-          "hash": "sha256:25f97a7d02b08ab1742885bfc45cfecb0bb2ee0a85125cfd0931cb60621beb7a",
-          "lastModified": "2026-08-30T09:18:36.428Z"
+          "hash": "sha256:0433df01b2aadb8690a1783e970e6545ffca2098508745e6cd4d6206ddbb8f68",
+          "lastModified": "2026-10-20T14:34:10.073Z"
         }
       }
     }

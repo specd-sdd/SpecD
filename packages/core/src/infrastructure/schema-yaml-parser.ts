@@ -5,6 +5,7 @@ import {
   type HookEntry,
   type WorkflowStepCheckDeclaration,
   type WorkflowStepSkipCheckDeclaration,
+  type WorkflowStepArchiveCheckDeclaration,
 } from '../domain/value-objects/workflow-step.js'
 import { SchemaValidationError } from '../domain/errors/schema-validation-error.js'
 
@@ -283,6 +284,15 @@ const WorkflowStepSkipCheckZodSchema = z.object({
   config: z.record(z.unknown()).optional(),
 })
 
+const WorkflowStepArchiveCheckZodSchema = z
+  .object({
+    id: z.string(),
+    skippable: z.boolean().optional(),
+    disabled: z.boolean().optional(),
+    config: z.record(z.unknown()).optional(),
+  })
+  .strict()
+
 const WorkflowStepZodSchema = z
   .object({
     step: z.string(),
@@ -298,6 +308,7 @@ const WorkflowStepZodSchema = z
       .optional(),
     checks: z.array(WorkflowStepCheckZodSchema).optional(),
     skipChecks: z.array(WorkflowStepSkipCheckZodSchema).optional(),
+    archiveChecks: z.array(WorkflowStepArchiveCheckZodSchema).optional(),
   })
   .transform(
     (ws): WorkflowStepRaw => ({
@@ -313,6 +324,9 @@ const WorkflowStepZodSchema = z
       ...(ws.checks !== undefined ? { checks: ws.checks as WorkflowStepCheckDeclaration[] } : {}),
       ...(ws.skipChecks !== undefined
         ? { skipChecks: ws.skipChecks as WorkflowStepSkipCheckDeclaration[] }
+        : {}),
+      ...(ws.archiveChecks !== undefined
+        ? { archiveChecks: ws.archiveChecks as WorkflowStepArchiveCheckDeclaration[] }
         : {}),
     }),
   )
@@ -432,6 +446,7 @@ export interface WorkflowStepRaw {
   }
   readonly checks?: readonly WorkflowStepCheckDeclaration[]
   readonly skipChecks?: readonly WorkflowStepSkipCheckDeclaration[]
+  readonly archiveChecks?: readonly WorkflowStepArchiveCheckDeclaration[]
 }
 
 /** Zod-inferred metadata extraction block. */

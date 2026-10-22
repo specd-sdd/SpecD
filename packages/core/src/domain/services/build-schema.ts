@@ -36,8 +36,9 @@ import {
   DuplicateCheckBindingError,
   UnknownCheckError,
 } from '../errors/check-registry-errors.js'
-import { CheckRegistry } from './check-registry.js'
-import { DOMAIN_CHECKS, TRANSITION_BINDINGS } from './check-bindings.js'
+import { CheckRegistry, type CheckGovernance } from './check-registry.js'
+import { type CheckBinding } from './transition-checks.js'
+import { ARCHIVE_BINDINGS, DOMAIN_CHECKS, TRANSITION_BINDINGS } from './check-bindings.js'
 
 // ---------------------------------------------------------------------------
 // Raw input types (plain interfaces, no Zod dependency)
@@ -641,6 +642,122 @@ function validateArtifactGraph(ref: string, artifacts: readonly ArtifactType[]):
 // Public API
 // ---------------------------------------------------------------------------
 
+/** Keys accepted on an `archiveChecks` declaration. */
+const ARCHIVE_CHECK_KEYS: ReadonlySet<string> = new Set(['id', 'skippable', 'disabled', 'config'])
+
+/**
+ * Validates the shape of one `archiveChecks` declaration. Zod covers a plain
+ * `schema.yaml`, but entries added by schema plugins or `schemaOverrides` reach
+ * `buildSchema` unchecked, so this is the authoritative check.
+ *
+ * @param ref - Schema reference for error messages
+ * @param index - Position of the declaration in the `archiveChecks` array
+ * @param chk - Raw declaration value
+ * @throws {SchemaValidationError} When the declaration is malformed
+ */
+function assertArchiveCheckShape(ref: string, index: number, chk: unknown): void {
+  const where = `workflow step 'archiving': archiveChecks[${index}]`
+  if (typeof chk !== 'object' || chk === null || Array.isArray(chk)) {
+    throw new SchemaValidationError(ref, `${where} must be an object`)
+  }
+  const record = chk as Record<string, unknown>
+  for (const key of Object.keys(record)) {
+    if (!ARCHIVE_CHECK_KEYS.has(key)) {
+      throw new SchemaValidationError(ref, `${where} has unsupported key '${key}'`)
+    }
+  }
+  if (typeof record.id !== 'string' || record.id.length === 0) {
+    throw new SchemaValidationError(ref, `${where} must have a string id`)
+  }
+  for (const flag of ['skippable', 'disabled'] as const) {
+    if (record[flag] !== undefined && typeof record[flag] !== 'boolean') {
+      throw new SchemaValidationError(ref, `${where} '${flag}' must be a boolean`)
+    }
+  }
+  if (
+    record.config !== undefined &&
+    (typeof record.config !== 'object' || record.config === null || Array.isArray(record.config))
+  ) {
+    throw new SchemaValidationError(ref, `${where} 'config' must be an object`)
+  }
+}
+
+/** Declaration fields the governance locks inspect (shared by all check surfaces). */
+interface GovernedDeclaration {
+  /** Canonical check identifier. */
+  readonly id: string
+  /** Failure policy, when the surface supports one. */
+  readonly onFailure?: 'abort' | 'collect' | undefined
+  /** Declared bypass permission. */
+  readonly skippable?: boolean | undefined
+  /** Declared disablement. */
+  readonly disabled?: boolean | undefined
+  /** Declared configuration override. */
+  readonly config?: Readonly<Record<string, unknown>> | undefined
+}
+
+/** Context one declaration is evaluated against by {@link assertDeclarationGovernance}. */
+interface DeclarationGovernanceArgs {
+  /** Declaration being validated. */
+  readonly chk: GovernedDeclaration
+  /** Workflow step that declares it. */
+  readonly stepName: string
+  /** Check-level governance, if registered. */
+  readonly governance: CheckGovernance | undefined
+  /** Code-defined binding serving the same coordinate, if any. */
+  readonly ownBinding: CheckBinding | undefined
+  /** Coordinate description used in policy-lock errors. */
+  readonly coordinate: string
+}
+
+/**
+ * Applies the governance locks to one schema check declaration: placement,
+ * policy (`onFailure` then `skippable`), disablement, and configuration.
+ * Binding-level locks protect only code-defined bindings at their own coordinate.
+ *
+ * @param args - Declaration and the governance context it is evaluated against
+ * @throws {CheckEmbeddingForbiddenError} When the check may not be placed at this coordinate
+ * @throws {CheckBindingOverrideForbiddenError} When `onFailure` or `skippable` is locked
+ * @throws {CheckDisableForbiddenError} When the check cannot be disabled
+ * @throws {CheckConfigOverrideForbiddenError} When configuration is locked
+ */
+function assertDeclarationGovernance(args: DeclarationGovernanceArgs): void {
+  const { chk, stepName, governance, ownBinding, coordinate } = args
+
+  // Placement lock: a check may only be declared by a schema at a coordinate
+  // one of its code-defined bindings serves, unless it allows schema embedding.
+  if (ownBinding === undefined && governance?.allowSchemaEmbedding === false) {
+    throw new CheckEmbeddingForbiddenError(chk.id, stepName)
+  }
+
+  if (
+    ownBinding?.allowBindingOverride === false &&
+    (chk.onFailure !== undefined || chk.skippable !== undefined)
+  ) {
+    if (chk.onFailure !== undefined && chk.onFailure !== ownBinding.onFailure) {
+      throw new CheckBindingOverrideForbiddenError(chk.id, 'onFailure', coordinate)
+    }
+    if (chk.skippable !== undefined && chk.skippable !== ownBinding.skippable) {
+      throw new CheckBindingOverrideForbiddenError(chk.id, 'skippable', coordinate)
+    }
+  }
+
+  if (chk.disabled === true) {
+    if (governance?.allowDisable === false || ownBinding?.allowDisable === false) {
+      throw new CheckDisableForbiddenError(chk.id, stepName)
+    }
+  }
+
+  if (chk.config !== undefined && Object.keys(chk.config).length > 0) {
+    if (governance?.allowConfigOverride === false) {
+      throw new CheckConfigOverrideForbiddenError(chk.id, `workflow step '${stepName}'`)
+    }
+    if (ownBinding && ownBinding.allowConfigOverride === false) {
+      throw new CheckConfigOverrideForbiddenError(chk.id, `workflow step '${stepName}'`)
+    }
+  }
+}
+
 /**
  * Constructs a fully-typed {@link Schema} from validated intermediate data
  * and pre-loaded template contents.
@@ -705,6 +822,7 @@ export function buildSchema(
     hooks: step.hooks ?? { pre: [], post: [] },
     ...(step.checks !== undefined ? { checks: step.checks } : {}),
     ...(step.skipChecks !== undefined ? { skipChecks: step.skipChecks } : {}),
+    ...(step.archiveChecks !== undefined ? { archiveChecks: step.archiveChecks } : {}),
   }))
 
   // Semantic validation: duplicate step names
@@ -745,6 +863,18 @@ export function buildSchema(
     }
     if (step.disabled === true && step.skipChecks !== undefined && step.skipChecks.length > 0) {
       throw new SchemaValidationError(ref, `disabled step '${step.step}' cannot declare skipChecks`)
+    }
+    if (step.archiveChecks !== undefined && step.step !== 'archiving') {
+      throw new SchemaValidationError(
+        ref,
+        `workflow step '${step.step}' cannot declare archiveChecks; archiveChecks is only valid on 'archiving'`,
+      )
+    }
+    if (step.archiveChecks !== undefined && !Array.isArray(step.archiveChecks)) {
+      throw new SchemaValidationError(
+        ref,
+        `workflow step '${step.step}': 'archiveChecks' must be an array`,
+      )
     }
   }
 
@@ -792,7 +922,8 @@ export function buildSchema(
 
   // Semantic validation: check declarations and governance locks
   const activeRegistry =
-    registry ?? new CheckRegistry(Object.values(DOMAIN_CHECKS), TRANSITION_BINDINGS)
+    registry ??
+    new CheckRegistry(Object.values(DOMAIN_CHECKS), [...TRANSITION_BINDINGS, ...ARCHIVE_BINDINGS])
 
   const checkCoordinateSet = new Set<string>()
   for (const step of workflow) {
@@ -836,50 +967,13 @@ export function buildSchema(
             ),
         )
 
-      // Placement lock: a check may only be declared by a schema at a coordinate
-      // one of its code-defined bindings serves, unless it allows schema embedding.
-      const isOwnCoordinate = matchingBinding !== undefined
-      if (!isOwnCoordinate && governance?.allowSchemaEmbedding === false) {
-        throw new CheckEmbeddingForbiddenError(chk.id, step.step)
-      }
-
-      // Binding-level locks protect only code-defined bindings at their own coordinate.
-      const ownBinding = isOwnCoordinate ? matchingBinding : undefined
-
-      if (
-        ownBinding?.allowBindingOverride === false &&
-        (chk.onFailure !== undefined || chk.skippable !== undefined)
-      ) {
-        if (chk.onFailure !== undefined && chk.onFailure !== ownBinding.onFailure) {
-          throw new CheckBindingOverrideForbiddenError(
-            chk.id,
-            'onFailure',
-            `scope: transition, to: ${step.step}, along: ${along}`,
-          )
-        }
-        if (chk.skippable !== undefined && chk.skippable !== ownBinding.skippable) {
-          throw new CheckBindingOverrideForbiddenError(
-            chk.id,
-            'skippable',
-            `scope: transition, to: ${step.step}, along: ${along}`,
-          )
-        }
-      }
-
-      if (chk.disabled === true) {
-        if (governance?.allowDisable === false || ownBinding?.allowDisable === false) {
-          throw new CheckDisableForbiddenError(chk.id, step.step)
-        }
-      }
-
-      if (chk.config !== undefined && Object.keys(chk.config).length > 0) {
-        if (governance?.allowConfigOverride === false) {
-          throw new CheckConfigOverrideForbiddenError(chk.id, `workflow step '${step.step}'`)
-        }
-        if (ownBinding && ownBinding.allowConfigOverride === false) {
-          throw new CheckConfigOverrideForbiddenError(chk.id, `workflow step '${step.step}'`)
-        }
-      }
+      assertDeclarationGovernance({
+        chk,
+        stepName: step.step,
+        governance,
+        ownBinding: matchingBinding,
+        coordinate: `scope: transition, to: ${step.step}, along: ${along}`,
+      })
     }
 
     for (const chk of step.skipChecks ?? []) {
@@ -906,48 +1000,38 @@ export function buildSchema(
             ),
         )
 
-      // Placement lock: see the transition checks loop.
-      const isOwnCoordinate = matchingBinding !== undefined
-      if (!isOwnCoordinate && governance?.allowSchemaEmbedding === false) {
-        throw new CheckEmbeddingForbiddenError(chk.id, step.step)
+      assertDeclarationGovernance({
+        chk,
+        stepName: step.step,
+        governance,
+        ownBinding: matchingBinding,
+        coordinate: `scope: step-skip, step: ${step.step}`,
+      })
+    }
+
+    for (const [index, chk] of (step.archiveChecks ?? []).entries()) {
+      assertArchiveCheckShape(ref, index, chk)
+      if (!activeRegistry.has(chk.id)) {
+        throw new UnknownCheckError(chk.id)
       }
 
-      const ownBinding = isOwnCoordinate ? matchingBinding : undefined
-
-      if (
-        ownBinding?.allowBindingOverride === false &&
-        (chk.onFailure !== undefined || chk.skippable !== undefined)
-      ) {
-        if (chk.onFailure !== undefined && chk.onFailure !== ownBinding.onFailure) {
-          throw new CheckBindingOverrideForbiddenError(
-            chk.id,
-            'onFailure',
-            `scope: step-skip, step: ${step.step}`,
-          )
-        }
-        if (chk.skippable !== undefined && chk.skippable !== ownBinding.skippable) {
-          throw new CheckBindingOverrideForbiddenError(
-            chk.id,
-            'skippable',
-            `scope: step-skip, step: ${step.step}`,
-          )
-        }
+      const coordKey = `${chk.id}::archive`
+      if (checkCoordinateSet.has(coordKey)) {
+        throw new DuplicateCheckBindingError(chk.id, 'scope: archive')
       }
+      checkCoordinateSet.add(coordKey)
 
-      if (chk.disabled === true) {
-        if (governance?.allowDisable === false || ownBinding?.allowDisable === false) {
-          throw new CheckDisableForbiddenError(chk.id, step.step)
-        }
-      }
+      const matchingBinding = activeRegistry
+        .bindings()
+        .find((b) => b.check.id === chk.id && b.applicability.some((a) => a.scope === 'archive'))
 
-      if (chk.config !== undefined && Object.keys(chk.config).length > 0) {
-        if (governance?.allowConfigOverride === false) {
-          throw new CheckConfigOverrideForbiddenError(chk.id, `workflow step '${step.step}'`)
-        }
-        if (ownBinding && ownBinding.allowConfigOverride === false) {
-          throw new CheckConfigOverrideForbiddenError(chk.id, `workflow step '${step.step}'`)
-        }
-      }
+      assertDeclarationGovernance({
+        chk,
+        stepName: step.step,
+        governance: activeRegistry.getGovernance(chk.id),
+        ownBinding: matchingBinding,
+        coordinate: 'scope: archive',
+      })
     }
   }
 

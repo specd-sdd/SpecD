@@ -49,11 +49,43 @@ describe('check-bindings governance', () => {
     }
   })
 
-  it('locks Category A/B and unlocks Category C', () => {
-    for (const spec of [...TRANSITION_BINDING_SPECS, ...ARCHIVE_BINDING_SPECS]) {
+  // Archive exception: these Category C checks are fully locked on archive rows only.
+  const archiveLocked = new Set(['workspace.readOnly', 'deps.consistent', 'impl.filesResolved'])
+
+  it('locks Category A/B and unlocks Category C on transition bindings', () => {
+    for (const spec of TRANSITION_BINDING_SPECS) {
       const expected = categoryC.has(spec.id)
       expect(spec.allowBindingOverride, spec.id).toBe(expected)
       expect(spec.allowDisable, spec.id).toBe(expected)
+    }
+  })
+
+  it('locks Category A/B and the archive exception, unlocks only spec.overlap and impl.linksInScope on archive', () => {
+    for (const spec of ARCHIVE_BINDING_SPECS) {
+      const expected = categoryC.has(spec.id) && !archiveLocked.has(spec.id)
+      expect(spec.allowBindingOverride, spec.id).toBe(expected)
+      expect(spec.allowDisable, spec.id).toBe(expected)
+    }
+  })
+
+  it('fully locks workspace.readOnly, deps.consistent and impl.filesResolved on archive rows', () => {
+    for (const id of archiveLocked) {
+      const spec = ARCHIVE_BINDING_SPECS.find((candidate) => candidate.id === id)
+      expect(spec?.allowBindingOverride, id).toBe(false)
+      expect(spec?.allowConfigOverride, id).toBe(false)
+      expect(spec?.allowDisable, id).toBe(false)
+      expect(spec?.skippable, id).toBe(false)
+    }
+  })
+
+  it('keeps the archive-locked checks unlocked on their transition rows', () => {
+    for (const id of archiveLocked) {
+      const rows = TRANSITION_BINDING_SPECS.filter((candidate) => candidate.id === id)
+      expect(rows.length, id).toBeGreaterThan(0)
+      for (const spec of rows) {
+        expect(spec.allowBindingOverride, id).toBe(true)
+        expect(spec.allowDisable, id).toBe(true)
+      }
     }
   })
 

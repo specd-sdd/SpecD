@@ -25,6 +25,12 @@
 - **THEN** the result is null (no extras)
 - **AND** `implementing` remains enabled in the pipeline and `ready → implementing` remains legal
 
+#### Scenario: A workflow row may attach archiveChecks
+
+- **GIVEN** a `workflow[]` row with `step: archiving` and `archiveChecks`
+- **WHEN** the schema is built
+- **THEN** the row attaches those declarations without introducing a new lifecycle state
+
 ### Requirement: Step semantics
 
 #### Scenario: implementation-failure returns to implementing
@@ -165,6 +171,72 @@
 - **GIVEN** a workflow step declared with `disabled: true` and a non-empty `skipChecks` array
 - **WHEN** `buildSchema` executes
 - **THEN** `SchemaValidationError` is thrown indicating skipChecks cannot be declared on disabled steps
+
+#### Scenario: archiveChecks on the archiving step
+
+- **GIVEN** `step: archiving` with `archiveChecks: [{ id: spec.overlap, skippable: false }]`
+- **WHEN** the schema is built
+- **THEN** the declaration applies at the `{ id: spec.overlap, scope: 'archive' }` coordinate
+
+#### Scenario: archiveChecks on another step is rejected
+
+- **GIVEN** `step: verifying` with `archiveChecks`
+- **WHEN** the schema is built
+- **THEN** `SchemaValidationError` is thrown naming `verifying`
+
+#### Scenario: archiveChecks with an unregistered id
+
+- **GIVEN** `archiveChecks: [{ id: '@nope.check' }]`
+- **WHEN** the schema is built
+- **THEN** `UnknownCheckError` is thrown
+
+#### Scenario: Duplicate archive coordinate
+
+- **GIVEN** `archiveChecks` listing `spec.overlap` twice
+- **WHEN** the schema is built
+- **THEN** `DuplicateCheckBindingError` is thrown
+
+#### Scenario: Archive locks are enforced for archiveChecks
+
+- **GIVEN** `archiveChecks` that disable `workspace.readOnly`, make `impl.filesResolved` skippable, or configure `deps.consistent`
+- **WHEN** the schema is built
+- **THEN** `CheckDisableForbiddenError`, `CheckBindingOverrideForbiddenError`, and `CheckConfigOverrideForbiddenError` are thrown respectively
+
+#### Scenario: Placement lock applies to archiveChecks
+
+- **GIVEN** a plugin check with `allowSchemaEmbedding: false` and no archive binding
+- **WHEN** `archiveChecks` declares it
+- **THEN** `CheckEmbeddingForbiddenError` is thrown
+
+#### Scenario: Same id in checks and archiveChecks of the archiving entry
+
+- **GIVEN** `step: archiving` declares `checks: [{ id: impl.linksInScope }]` and `archiveChecks: [{ id: impl.linksInScope }]`
+- **WHEN** the schema is built
+- **THEN** no duplicate error is raised because the coordinates are `{ scope: 'transition', to: archiving }` and `{ scope: 'archive' }`
+
+#### Scenario: Disabling one coordinate does not affect the other
+
+- **GIVEN** `impl.linksInScope` is declared in `checks` and in `archiveChecks`, with `disabled: true` only in `archiveChecks`
+- **WHEN** bindings are resolved for the transition and for the archive operation
+- **THEN** the transition coordinate remains and the archive coordinate is removed
+
+#### Scenario: Redundant declaration of a locked archive check is accepted
+
+- **GIVEN** `archiveChecks: [{ id: workspace.readOnly, skippable: false }]`
+- **WHEN** the schema is built
+- **THEN** no governance error is raised
+
+#### Scenario: Empty archiveChecks is valid
+
+- **GIVEN** `step: archiving` with `archiveChecks: []`
+- **WHEN** the schema is built
+- **THEN** it builds without error
+
+#### Scenario: Declarations for non-archive checks are unaffected
+
+- **GIVEN** a schema with only `checks` and `skipChecks`
+- **WHEN** it is built
+- **THEN** its validation outcome is identical to before `archiveChecks` existed
 
 ### Requirement: Sovereign change schema authority
 

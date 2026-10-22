@@ -13,5 +13,41 @@
     {
       "file": "core:src/composition/use-cases/get-draft.ts"
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Retrieve a named draft change read-only with its persisted schema-bound draft data.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:8b68e7d5b09e8c9b621e2d28cdd066fc0c64f680d637f6f648f3f03de87cb7d7",
+          "lastModified": "2026-08-25T15:37:19.291Z"
+        },
+        "verify.md": {
+          "hash": "sha256:ade81de4afecfac151a1425f3c22592ad4f7baf216d7b374a920caaaddf4ca83",
+          "lastModified": "2026-08-25T15:37:19.291Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# GetDraft\n## Rules\n- Load requested draft from `DraftRepository`; missing draft raises typed not-found error.\n- Return draft entity/data without lifecycle evaluation or mutation.\n- Factory resolves repository through canonical composition deps.\n## Constraints\n- Read-only.\n- Never resolve active changes or alter draft state.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:8b68e7d5b09e8c9b621e2d28cdd066fc0c64f680d637f6f648f3f03de87cb7d7",
+          "lastModified": "2026-08-25T15:37:19.291Z"
+        },
+        "verify.md": {
+          "hash": "sha256:ade81de4afecfac151a1425f3c22592ad4f7baf216d7b374a920caaaddf4ca83",
+          "lastModified": "2026-08-25T15:37:19.291Z"
+        }
+      }
+    }
+  }
 }

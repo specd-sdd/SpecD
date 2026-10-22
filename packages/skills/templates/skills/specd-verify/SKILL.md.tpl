@@ -23,7 +23,8 @@ Identify any high-visibility blockers from the **blockers:** section (e.g. `ARTI
 `REVIEW_REQUIRED`) and inform the user.
 
 `OVERLAP_CONFLICT` is archive-only. Invalidation overlap is `review.reason:
-spec-overlap-conflict` → `/specd-design`, not `--allow-overlap`.
+spec-overlap-conflict` → `/specd-design`, never bypassed with
+`--skip-checks spec.overlap` or `--allow-overlap`.
 
 If the only (or remaining) blocker is `IMPLEMENTATION_STATE` / open tracked files,
 **stay in this skill** — drain tracking (see `shared.md` — "Implementation tracking")

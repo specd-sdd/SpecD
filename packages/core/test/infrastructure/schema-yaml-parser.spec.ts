@@ -960,3 +960,83 @@ workflow:
     expect(() => parseSchemaYaml('#test', yaml)).toThrow(SchemaValidationError)
   })
 })
+
+describe('parseSchemaYaml — workflow archiveChecks', () => {
+  const withArchive = (block: string): string =>
+    minimal(`workflow:\n  - step: archiving\n    archiveChecks:\n${block}`)
+
+  it('parses archiveChecks with all supported attributes', () => {
+    const data = parseSchemaYaml(
+      '#test',
+      withArchive(
+        `      - id: spec.overlap\n        skippable: false\n      - id: '@security.code-scan'\n        disabled: false\n        config:\n          minSeverity: critical\n`,
+      ),
+    )
+    expect(data.workflow![0]!.archiveChecks).toEqual([
+      { id: 'spec.overlap', skippable: false },
+      { id: '@security.code-scan', disabled: false, config: { minSeverity: 'critical' } },
+    ])
+  })
+
+  it('keeps archiveChecks absent when not declared (including when checks is declared on archiving)', () => {
+    const data = parseSchemaYaml('#test', minimal('workflow:\n  - step: archiving\n'))
+    expect(data.workflow![0]!.archiveChecks).toBeUndefined()
+
+    const withChecksOnly = parseSchemaYaml(
+      '#test',
+      minimal('workflow:\n  - step: archiving\n    checks:\n      - id: impl.linksInScope\n'),
+    )
+    expect(withChecksOnly.workflow![0]!.checks).toEqual([{ id: 'impl.linksInScope' }])
+    expect(withChecksOnly.workflow![0]!.archiveChecks).toBeUndefined()
+  })
+
+  it('accepts an empty archiveChecks array', () => {
+    const data = parseSchemaYaml(
+      '#test',
+      minimal('workflow:\n  - step: archiving\n    archiveChecks: []\n'),
+    )
+    expect(data.workflow![0]!.archiveChecks).toEqual([])
+  })
+
+  it('rejects onFailure instead of stripping it', () => {
+    expect(() =>
+      parseSchemaYaml(
+        '#test',
+        withArchive('      - id: spec.overlap\n        onFailure: collect\n'),
+      ),
+    ).toThrow(SchemaValidationError)
+  })
+
+  it('rejects unknown keys', () => {
+    expect(() =>
+      parseSchemaYaml('#test', withArchive('      - id: spec.overlap\n        from: ready\n')),
+    ).toThrow(SchemaValidationError)
+  })
+
+  it('rejects wrongly typed fields and a missing id', () => {
+    expect(() =>
+      parseSchemaYaml('#test', withArchive('      - id: spec.overlap\n        skippable: "yes"\n')),
+    ).toThrow(SchemaValidationError)
+    expect(() =>
+      parseSchemaYaml('#test', withArchive('      - id: spec.overlap\n        disabled: 1\n')),
+    ).toThrow(SchemaValidationError)
+    expect(() =>
+      parseSchemaYaml('#test', withArchive('      - id: spec.overlap\n        config: [1]\n')),
+    ).toThrow(SchemaValidationError)
+    expect(() => parseSchemaYaml('#test', withArchive('      - skippable: true\n'))).toThrow(
+      SchemaValidationError,
+    )
+  })
+
+  it('still accepts checks, skipChecks, optional and disabled', () => {
+    const data = parseSchemaYaml(
+      '#test',
+      minimal(
+        'workflow:\n  - step: implementing\n    optional: true\n    disabled: false\n    checks:\n      - id: impl.linksInScope\n    skipChecks:\n      - id: workflow.tasksEmpty\n',
+      ),
+    )
+    expect(data.workflow![0]!.optional).toBe(true)
+    expect(data.workflow![0]!.checks).toHaveLength(1)
+    expect(data.workflow![0]!.skipChecks).toHaveLength(1)
+  })
+})

@@ -1109,3 +1109,230 @@ describe('resolveEffectiveBindings', () => {
     })
   })
 })
+
+describe('resolveEffectiveBindings — archive operation', () => {
+  const pass = async (): Promise<never> =>
+    ({ id: 'x', label: 'x', kind: 'predicate', outcome: 'pass' }) as never
+
+  function archivingSchema(archiveChecks?: readonly Record<string, unknown>[], extra = {}) {
+    return makeSchema(
+      [],
+      [
+        {
+          step: 'archiving',
+          requires: [],
+          requiresTaskCompletion: [],
+          hooks: { pre: [], post: [] },
+          ...(archiveChecks !== undefined ? { archiveChecks } : {}),
+          ...extra,
+        } as never,
+      ],
+    )
+  }
+
+  function resolveArchive(
+    schema = archivingSchema(),
+    registry: CheckRegistry | undefined = new CheckRegistry(),
+  ) {
+    return resolveEffectiveBindings({
+      baseBindings: ARCHIVE_BINDINGS,
+      schema,
+      operation: 'archive',
+      ...(registry !== undefined ? { registry } : {}),
+    })
+  }
+
+  it('returns the base archive bindings, in order, when the schema declares no archiveChecks', () => {
+    for (const schema of [makeSchema(), archivingSchema(), archivingSchema([])]) {
+      const effective = resolveArchive(schema)
+      expect(effective.map((b) => b.check.id)).toEqual(ARCHIVE_BINDINGS.map((b) => b.check.id))
+      expect(effective.map((b) => b.skippable)).toEqual(ARCHIVE_BINDINGS.map((b) => b.skippable))
+    }
+  })
+
+  it('removes a disabled check from the archive operation only', () => {
+    const effective = resolveArchive(archivingSchema([{ id: 'spec.overlap', disabled: true }]))
+    expect(effective.some((b) => b.check.id === 'spec.overlap')).toBe(false)
+    expect(effective.some((b) => b.check.id === 'impl.linksInScope')).toBe(true)
+
+    const registry = new CheckRegistry()
+    const transition = resolveEffectiveBindings({
+      baseBindings: TRANSITION_BINDINGS,
+      schema: archivingSchema([{ id: 'deps.consistent', disabled: true }]),
+      targetStep: 'ready',
+      from: 'designing',
+      along: 'forward',
+      registry,
+    })
+    expect(transition.some((b) => b.check.id === 'deps.consistent')).toBe(true)
+  })
+
+  it('overlays skippable and configuration on a base archive binding', () => {
+    const effective = resolveArchive(
+      archivingSchema([{ id: 'spec.overlap', skippable: false, config: { window: 2 } }]),
+    )
+    const overlap = effective.find((b) => b.check.id === 'spec.overlap')
+    expect(overlap?.skippable).toBe(false)
+    expect(overlap?.effectiveConfig).toEqual({ window: 2 })
+    expect(overlap?.applicability).toEqual([{ scope: 'archive' }])
+  })
+
+  it('keeps the base failure policy of effect bindings', () => {
+    const effective = resolveArchive(archivingSchema([{ id: 'spec.overlap' }]))
+    const hookPre = effective.find((b) => b.check.id === 'hook.pre')
+    expect(hookPre?.onFailure).toBe('abort')
+    const hookPost = effective.find((b) => b.check.id === 'hook.post')
+    expect(hookPost?.onFailure).toBe('collect')
+  })
+
+  it('synthesizes a non-skippable binding for an embedded registered check', () => {
+    const registry = new CheckRegistry()
+    registry.register('qa', { id: 'lint', label: 'Lint', execute: pass }, undefined, {
+      defaultConfig: { level: 'warn' },
+    })
+    const effective = resolveArchive(
+      archivingSchema([{ id: '@qa.lint', config: { level: 'error' } }]),
+      registry,
+    )
+    const lint = effective.find((b) => b.check.id === '@qa.lint')
+    expect(lint?.skippable).toBe(false)
+    expect(lint?.applicability).toEqual([{ scope: 'archive' }])
+    expect(lint?.effectiveConfig).toEqual({ level: 'error' })
+    expect(effective.at(-1)?.check.id).toBe('@qa.lint')
+  })
+
+  it('honours skippable true on an embedded check and orders embeds by declaration', () => {
+    const registry = new CheckRegistry()
+    registry.register('a', { id: 'lint', label: 'Lint', execute: pass }, undefined)
+    registry.register('b', { id: 'scan', label: 'Scan', execute: pass }, undefined)
+    const effective = resolveArchive(
+      archivingSchema([{ id: '@a.lint', skippable: true }, { id: '@b.scan' }]),
+      registry,
+    )
+    const tail = effective.slice(-2)
+    expect(tail.map((b) => b.check.id)).toEqual(['@a.lint', '@b.scan'])
+    expect(tail[0]?.skippable).toBe(true)
+  })
+
+  it('ignores a disabled declaration for a check with no archive binding', () => {
+    const registry = new CheckRegistry()
+    registry.register('qa', { id: 'lint', label: 'Lint', execute: pass }, undefined)
+    const effective = resolveArchive(
+      archivingSchema([{ id: '@qa.lint', disabled: true }]),
+      registry,
+    )
+    expect(effective.map((b) => b.check.id)).toEqual(ARCHIVE_BINDINGS.map((b) => b.check.id))
+  })
+
+  it('applies plugin default config under the declaration config exactly once', () => {
+    const registry = new CheckRegistry()
+    registry.register(
+      'sec',
+      { id: 'scan', label: 'Scan', execute: pass },
+      [{ scope: 'archive', config: { paths: ['a'] } }],
+      { defaultConfig: { paths: ['d'] }, allowConfigOverride: true },
+    )
+    const base = [
+      ...ARCHIVE_BINDINGS,
+      ...registry.bindings().filter((b) => b.check.id === '@sec.scan'),
+    ]
+    const effective = resolveEffectiveBindings({
+      baseBindings: base,
+      schema: archivingSchema([{ id: '@sec.scan', config: { paths: ['s'] } }]),
+      operation: 'archive',
+      registry,
+    })
+    expect(effective.find((b) => b.check.id === '@sec.scan')?.effectiveConfig).toEqual({
+      paths: ['d', 'a', 's'],
+    })
+  })
+
+  it('keeps a redundant declaration of a locked check at its code-defined policy', () => {
+    const effective = resolveArchive(
+      archivingSchema([{ id: 'workspace.readOnly', skippable: false }]),
+    )
+    const readOnly = effective.find((b) => b.check.id === 'workspace.readOnly')
+    expect(readOnly?.skippable).toBe(false)
+    expect(readOnly?.allowDisable).toBe(false)
+    expect(readOnly?.allowBindingOverride).toBe(false)
+  })
+
+  it('keeps checks and archiveChecks of the archiving entry as independent coordinates for the same check id', () => {
+    const schema = archivingSchema([{ id: 'impl.linksInScope', disabled: true }], {
+      checks: [{ id: 'impl.linksInScope', skippable: false }],
+    })
+    expect(resolveArchive(schema).some((b) => b.check.id === 'impl.linksInScope')).toBe(false)
+    const transition = resolveEffectiveBindings({
+      baseBindings: [
+        ...TRANSITION_BINDINGS,
+        {
+          check: {
+            id: 'impl.linksInScope',
+            label: 'Links in scope',
+            kind: 'predicate',
+            execute: pass,
+          },
+          applicability: [{ scope: 'transition', from: '*', to: 'archiving', along: '*' }],
+          onFailure: 'abort',
+          skippable: true,
+          allowBindingOverride: true,
+          allowConfigOverride: true,
+          allowDisable: true,
+        },
+      ],
+      schema,
+      targetStep: 'archiving',
+      from: 'archivable',
+      along: 'forward',
+      registry: new CheckRegistry(),
+    })
+    const transitionLinks = transition.find(
+      (b) =>
+        b.check.id === 'impl.linksInScope' &&
+        b.applicability.some((a) => a.scope === 'transition' && a.to === 'archiving'),
+    )
+    expect(transitionLinks).toBeDefined()
+    expect(transitionLinks?.skippable).toBe(false)
+  })
+
+  it('drops unserved declarations without error and applies base overlays when resolved without a registry', () => {
+    const schema = archivingSchema([
+      { id: 'spec.overlap', skippable: false },
+      { id: '@qa.lint', skippable: true },
+    ])
+    const effective = resolveArchive(schema, undefined)
+    expect(effective.find((b) => b.check.id === 'spec.overlap')?.skippable).toBe(false)
+    expect(effective.some((b) => b.check.id === '@qa.lint')).toBe(false)
+  })
+
+  it('rejects the archive operation combined with a transition or bypassed steps', () => {
+    expect(() =>
+      resolveEffectiveBindings({
+        baseBindings: ARCHIVE_BINDINGS,
+        schema: makeSchema(),
+        operation: 'archive',
+        targetStep: 'ready',
+        from: 'designing',
+        along: 'forward',
+      }),
+    ).toThrow(InvalidInputError)
+    expect(() =>
+      resolveEffectiveBindings({
+        baseBindings: ARCHIVE_BINDINGS,
+        schema: makeSchema(),
+        operation: 'archive',
+        bypassedSteps: ['implementing'],
+      }),
+    ).toThrow(InvalidInputError)
+  })
+
+  it('leaves transition and step-skip resolution untouched when operation is absent', () => {
+    const schema = archivingSchema([{ id: 'spec.overlap', disabled: true }])
+    const effective = resolveEffectiveBindings({
+      baseBindings: ARCHIVE_BINDINGS,
+      schema,
+      registry: new CheckRegistry(),
+    })
+    expect(effective.some((b) => b.check.id === 'spec.overlap')).toBe(true)
+  })
+})

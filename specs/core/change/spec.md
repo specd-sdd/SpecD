@@ -304,7 +304,7 @@ Event types:
 - `spec-change` — the change scope changed (for example, `specIds` were edited)
 - `artifact-drift` — one or more validated artifact files changed on disk
 - `artifact-review-required` — the change returned to `designing` because the artifacts must be revised even though no drifted file was detected
-- `spec-overlap-conflict` — the change was invalidated because an archived change with overlapping specs was archived with `allowOverlap: true`
+- `spec-overlap-conflict` — the change was invalidated because an archived change with overlapping specs was archived with `spec.overlap` bypassed
 
 `invalidated.message` is a clear human-readable explanation, not a one-word label. `invalidated.affectedArtifacts` is a structured list of the affected artifact types and file keys so callers can explain exactly what triggered the review:
 

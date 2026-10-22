@@ -22,36 +22,36 @@
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "GenerateSpecMetadata deterministically projects extracted metadata, canonical dependencies, hashes, provenance, and fresh persisted optimizations.",
+      "value": "Deterministically extract spec metadata, canonical dependencies, hashes, provenance, and fresh optimizations.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:629c565a8ec6b428348f9e7d41217917ae4facdb3353398f85e3e25aed3b28e0",
-          "lastModified": "2026-08-30T09:18:36.431Z"
+          "hash": "sha256:6e20423acbe98bf3f237fd50b23359a478da845be1d629f49e460101bd62fa53",
+          "lastModified": "2026-10-20T14:34:10.645Z"
         },
         "verify.md": {
-          "hash": "sha256:f002554cc9234da778046375bb6ddd36b976e9b4bf7d5716bef285ad86919035",
-          "lastModified": "2026-08-30T09:18:36.431Z"
+          "hash": "sha256:5001b447bd712c06430ebb3dc74263790cadaae42cb1e0ce2fca485a717243e0",
+          "lastModified": "2026-10-20T14:34:10.646Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# GenerateSpecMetadata\n\n## Rules\n- Input `specId` (`core/change`, `billing:invoices/create`); return `{ metadata: SpecMetadata, hasExtraction: boolean }`: extracted fields, hashes, canonical `dependsOn`, implementation, fresh optimizations, exact-call `provenance`.\n- Resolve schema `SchemaProvider.get()`; propagate `SchemaNotFoundError`/`SchemaValidationError`. No `metadataExtraction` → `{ metadata: {}, hasExtraction: false }`.\n- Parse with `parseSpecId()`; select workspace `SpecRepository`. Unknown workspace → `WorkspaceNotFoundError`; missing `get()` → `SpecNotFoundError`.\n- For schema artifacts with `scope: spec`: filename = final `output` segment; format `inferFormat()` or `plaintext`; parser `ArtifactParserRegistry`; content `SpecRepository.artifact()`. Skip absent parser/content.\n- Await `extractMetadata()` using schema declarations, ASTs keyed artifact ID, renderers, shared `ExtractorTransformRegistry`, caller-owned origin context. Results (`title`, `description`, `dependsOn`, `keywords`, `rules`, `constraints`, `scenarios`, `context`) already normalized; repository-backed transforms allowed, extraction engine never infers filesystem paths.\n- `dependsOn`: extracted candidate; call `readPersistedState(spec)` once. State exists → persisted value; non-empty differing extracted value → explicit failure. Absent → extracted or `[]`. Normalize only declared transforms; unnormalizable found values fail, never drop.\n- One persisted snapshot per generation for `dependsOn`, implementation, optimizations, `provenance.persistedStateHash`; hash `persistedStateMeta(spec, { includeHash: true })?.hash ?? null` or same snapshot `originalHash`; never removed `persistedStateHash(spec)`, never mix/reread snapshots.\n- Include each persisted `optimizedDescription`/`optimizedContext` only if fresh against same-call artifacts + schema; omit stale/absent. Never regenerate/invalidate/mutate.\n- SHA-256 `ContentHasher.hash()` each loaded artifact; `contentHashes` keyed resolved filename; exclude unloaded. Return extraction + canonical dependencies + implementation + fresh optimizations + hashes + `generatedBy: core` + provenance (artifact hashes/lastModified, persisted state hash/null, schema identity, projection version/fingerprint), `hasExtraction: true`.\n- Config `createGenerateSpecMetadata(config, options?)` calls `resolveGenerateSpecMetadataDeps(resolver)`, then canonical `createGenerateSpecMetadata(deps)`; resolver provides `listWorkspaces`, `schemaProvider`, `parsers`, `hasher`, `extractorTransforms`, `workspaceRoutes`; no inline fs-shaped wiring.\n\n## Constraints\n- Deterministic schema extraction; no LLM. `GenerateSpecMetadata` orchestrates; async `extractMetadata()` owns extraction.\n- Read-only: never disk/persisted writes or `SpecRepository.writeMetadataSnapshot()`/`writePersistedState()`; persistence belongs `MaterializeSpecMetadata` and internal `PersistSpecMetadata`.\n- Optimization freshness only same-call artifacts, schema, persisted snapshot.",
+      "value": "# GenerateSpecMetadata\n## Rules\n- Resolve schema/spec artifacts, parse and extract declared metadata/transforms.\n- Canonical dependencies come from persisted state when present; conflicting extraction fails.\n- Hash loaded content; include fresh persisted optimizations and same-snapshot provenance.\n## Constraints\n- Read-only; no metadata writes or LLM.\n- Deterministic extraction only.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:629c565a8ec6b428348f9e7d41217917ae4facdb3353398f85e3e25aed3b28e0",
-          "lastModified": "2026-08-30T09:18:36.431Z"
+          "hash": "sha256:6e20423acbe98bf3f237fd50b23359a478da845be1d629f49e460101bd62fa53",
+          "lastModified": "2026-10-20T14:34:10.645Z"
         },
         "verify.md": {
-          "hash": "sha256:f002554cc9234da778046375bb6ddd36b976e9b4bf7d5716bef285ad86919035",
-          "lastModified": "2026-08-30T09:18:36.431Z"
+          "hash": "sha256:5001b447bd712c06430ebb3dc74263790cadaae42cb1e0ce2fca485a717243e0",
+          "lastModified": "2026-10-20T14:34:10.646Z"
         }
       }
     }

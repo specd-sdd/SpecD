@@ -569,6 +569,10 @@ function applyWorkflowMutations(
 
     const existingIdx = result.findIndex((s) => s.step === entry.step)
 
+    if (entry.archiveChecks !== undefined && !Array.isArray(entry.archiveChecks)) {
+      throw err(layer, `${opName}.workflow[${entry.step}].archiveChecks: must be an array`)
+    }
+
     if (existingIdx === -1) {
       result = addToArray(
         result,
@@ -650,6 +654,22 @@ function applyWorkflowMutations(
           position,
           layer,
           `${opName}.workflow[${entry.step}].skipChecks`,
+        ),
+      }
+    }
+    if (entry.archiveChecks !== undefined) {
+      if (step.archiveChecks !== undefined && !Array.isArray(step.archiveChecks)) {
+        throw err(layer, `${opName}.workflow[${entry.step}].archiveChecks: must be an array`)
+      }
+      step = {
+        ...step,
+        archiveChecks: addToArray(
+          step.archiveChecks ?? [],
+          entry.archiveChecks,
+          'id',
+          position,
+          layer,
+          `${opName}.workflow[${entry.step}].archiveChecks`,
         ),
       }
     }
@@ -753,6 +773,7 @@ function applyMetadataMutations(
  * @param data - The current schema YAML data
  * @param layer - The layer containing operations to apply
  * @returns A new SchemaYamlData with the layer's operations applied
+ * @throws {@link SchemaValidationError} If any layer operation is invalid
  */
 function applyLayer(data: SchemaYamlData, layer: SchemaLayer): SchemaYamlData {
   let result = clone(data)
@@ -932,6 +953,11 @@ function applyLayer(data: SchemaYamlData, layer: SchemaLayer): SchemaYamlData {
       }
     }
     if (ops.set.workflow) {
+      for (const entry of ops.set.workflow) {
+        if (entry.archiveChecks !== undefined && !Array.isArray(entry.archiveChecks)) {
+          throw err(layer, `set.workflow[${entry.step ?? '?'}].archiveChecks: must be an array`)
+        }
+      }
       result = {
         ...result,
         workflow: setInArray(

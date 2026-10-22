@@ -89,8 +89,27 @@ export interface WorkflowStepSkipCheckDeclaration {
 }
 
 /**
+ * Declaration tuning a check of the archive operation in schema.yaml
+ * (`scope: 'archive'`). Valid only on the `archiving` workflow entry.
+ *
+ * There is deliberately no `onFailure`: archive predicate failures have no
+ * abort/collect distinction.
+ */
+export interface WorkflowStepArchiveCheckDeclaration {
+  /** Check identifier (must be registered in CheckRegistry). */
+  readonly id: string
+  /** Permission to bypass via `--skip-checks`, subject to governance locks. */
+  readonly skippable?: boolean
+  /** Whether this check is disabled for the archive operation, subject to governance locks. */
+  readonly disabled?: boolean
+  /** Step-specific configuration merged over check and binding defaults. */
+  readonly config?: Readonly<Record<string, unknown>>
+}
+
+/**
  * A lookup row in schema `workflow[]`. `step` names an existing `ChangeState`;
- * the row attaches extras (`requires`, `requiresTaskCompletion`, `hooks`, `checks`, `skipChecks`).
+ * the row attaches extras (`requires`, `requiresTaskCompletion`, `hooks`, `checks`, `skipChecks`,
+ * `archiveChecks`).
  * It does not define protocol membership or legal hops.
  */
 export interface WorkflowStep {
@@ -140,4 +159,10 @@ export interface WorkflowStep {
 
   /** Checks declared for skipping this workflow step (evaluated when bypassing this optional step). */
   readonly skipChecks?: readonly WorkflowStepSkipCheckDeclaration[]
+
+  /**
+   * Checks declared for the archive operation. Valid only on the `archiving` row;
+   * evaluated by `ArchiveChange` and `GetStatus` for `scope: 'archive'`.
+   */
+  readonly archiveChecks?: readonly WorkflowStepArchiveCheckDeclaration[]
 }

@@ -113,6 +113,40 @@ describe('resolveWorkflowCheckRegistry', () => {
     expect(result.outcome).toBe('pass')
   })
 
+  it('appends plugin archive bindings after the built-in ones and keeps archive locks', () => {
+    const checks = new CheckRegistry()
+    checks.register(
+      'sec',
+      {
+        id: 'scan',
+        label: 'Scanning',
+        execute: async () => ({
+          id: '@sec.scan',
+          label: 'Scanning',
+          kind: 'predicate',
+          outcome: 'pass',
+        }),
+      },
+      [{ scope: 'archive', skippable: true }],
+    )
+    const resolver = makeResolver([])
+    Object.assign(resolver, { registry: { checks } })
+
+    const registry = resolveWorkflowCheckRegistry(resolver)
+
+    const ids = registry.archiveBindings.map((binding) => binding.check.id)
+    expect(ids.at(-1)).toBe('@sec.scan')
+    expect(ids.indexOf('@sec.scan')).toBeGreaterThan(ids.indexOf('impl.linksInScope'))
+    expect(registry.archiveBindings.at(-1)?.skippable).toBe(true)
+    const readOnly = registry.checkRegistry
+      ?.getBindings('workspace.readOnly')
+      .find((binding) => binding.applicability.some((row) => row.scope === 'archive'))
+    expect(readOnly?.allowBindingOverride).toBe(false)
+    expect(registry.transitionBindings.some((binding) => binding.check.id === '@sec.scan')).toBe(
+      false,
+    )
+  })
+
   it('binds verification.current only on verifying to done and reuses it for archive', () => {
     const registry = resolveWorkflowCheckRegistry(makeResolver([]))
     const transitionRows = registry.transitionBindings.filter(

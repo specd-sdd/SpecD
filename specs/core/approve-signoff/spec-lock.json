@@ -17,5 +17,41 @@
       "file": "core:src/application/use-cases/approve-signoff.ts",
       "symbols": ["ApproveSignoff"]
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Record final signoff only when gate enabled and reconciled delivered change/evidence remain valid.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:48c05973409a04937da49b8b39550f4d3e5ae95f6d533b6169fe693a218a8e7a",
+          "lastModified": "2026-10-20T14:34:10.000Z"
+        },
+        "verify.md": {
+          "hash": "sha256:386050d9e3beb9238d5b9574760268009f43001a509828792684650bc59c6609",
+          "lastModified": "2026-10-20T14:34:10.001Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# ApproveSignoff\n## Rules\n- Gate-disabled fails before I/O; resolve change schema, actor, and canonical reconciliation.\n- Require eligible done state, valid spec approval and verification evidence when enabled.\n- Atomically persist signed-off projection/event with reviewed fingerprint; do not transition state.\n## Constraints\n- Reconciler owns invalidation/recovery.\n- Historic drain compatibility never changes happy path.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:48c05973409a04937da49b8b39550f4d3e5ae95f6d533b6169fe693a218a8e7a",
+          "lastModified": "2026-10-20T14:34:10.000Z"
+        },
+        "verify.md": {
+          "hash": "sha256:386050d9e3beb9238d5b9574760268009f43001a509828792684650bc59c6609",
+          "lastModified": "2026-10-20T14:34:10.001Z"
+        }
+      }
+    }
+  }
 }

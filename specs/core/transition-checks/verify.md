@@ -223,12 +223,99 @@
 - **WHEN** the check fails in `TransitionChange` and in `GetStatus`
 - **THEN** `CheckPredicateFailedError.skippable` is `true`, `--skip-checks <checkId>` is accepted, and the status blocker advertises `--skip-checks <checkId>`
 
+#### Scenario: archiveChecks disabled removes the check from the archive operation only
+
+- **GIVEN** `spec.overlap` base-bound to `archive` and the `archiving` entry declares `archiveChecks: [{ id: spec.overlap, disabled: true }]`
+- **WHEN** bindings are resolved with operation `archive`
+- **THEN** no `spec.overlap` binding is in the effective set
+- **AND** resolving a transition into any step is unaffected
+
+#### Scenario: archiveChecks skippable overlays the base binding
+
+- **GIVEN** `deps.consistent` is not skippable at the base and the entry declares `skippable: true`
+- **WHEN** bindings are resolved with operation `archive`
+- **THEN** the effective `deps.consistent` binding is skippable only where the lock permits
+- **AND** where `allowBindingOverride` is `false` the declaration was already rejected at build
+
+#### Scenario: Embedded plugin check synthesizes an archive binding
+
+- **GIVEN** a registered check no base archive binding serves and an `archiveChecks` entry naming it with `skippable: true`
+- **WHEN** bindings are resolved with operation `archive`
+- **THEN** a binding with `scope: 'archive'` and `skippable: true` is synthesized from the registry's real check instance
+
+#### Scenario: Synthesized archive binding defaults to non-skippable
+
+- **GIVEN** an `archiveChecks` entry without `skippable`
+- **WHEN** bindings are resolved
+- **THEN** the synthesized binding is not skippable
+
+#### Scenario: archiveChecks keep the base failure policy
+
+- **GIVEN** a base archive binding with its own failure policy
+- **WHEN** an `archiveChecks` entry overlays `config`
+- **THEN** the effective binding keeps the base `onFailure`
+
+#### Scenario: Config cascade applies once on archive
+
+- **GIVEN** check default config, binding config, and `archiveChecks[].config` with array values
+- **WHEN** bindings are resolved with operation `archive`
+- **THEN** the effective config is merged exactly once in order check default, binding, declaration
+
+#### Scenario: Declaration for an unserved check is dropped without a registry
+
+- **GIVEN** `archiveChecks` names a registered check no base archive binding serves
+- **WHEN** bindings are resolved with operation `archive` and no registry
+- **THEN** no binding is synthesized and no error is raised
+- **AND** declarations that overlay base archive bindings still apply
+
+#### Scenario: Archive operation cannot be combined with a transition
+
+- **WHEN** bindings are resolved with operation `archive` and also a `targetStep` or `bypassedSteps`
+- **THEN** `InvalidInputError` is thrown
+
+#### Scenario: Schema without archiveChecks leaves the base bindings unchanged
+
+- **GIVEN** no `archiving` entry or an entry without `archiveChecks`
+- **WHEN** bindings are resolved with operation `archive`
+- **THEN** the result equals the base bindings with only cascaded config applied
+
+#### Scenario: Disabling a check with no base archive binding is inert
+
+- **GIVEN** `archiveChecks: [{ id: '@qa.extended-lint', disabled: true }]` for a registered check with no archive binding
+- **WHEN** bindings are resolved with operation `archive`
+- **THEN** no binding is added and no error is raised
+
+#### Scenario: Synthesized archive bindings follow declaration order
+
+- **GIVEN** two embedded checks declared in the order `@a.lint`, `@b.scan`
+- **WHEN** bindings are resolved with operation `archive`
+- **THEN** both are appended after the base bindings, `@a.lint` first
+
+#### Scenario: archiveChecks and checks on the archiving entry are independent
+
+- **GIVEN** the `archiving` entry declares `checks: [{ id: deps.consistent }]` and `archiveChecks: [{ id: deps.consistent }]`
+- **WHEN** a transition into `archiving` and the archive operation are resolved
+- **THEN** each coordinate receives only its own declaration
+- **AND** no duplicate-binding error is raised
+
+#### Scenario: A redundant declaration keeps the base policy
+
+- **GIVEN** `archiveChecks: [{ id: workspace.readOnly, skippable: false }]`
+- **WHEN** bindings are resolved with operation `archive`
+- **THEN** the effective binding keeps `skippable: false` and its governance locks
+
 ### Requirement: Archive is an operation not an edge
 
 #### Scenario: Signoff is not an archive predicate
 
 - **WHEN** `ArchiveChange` evaluates operation `archive`
 - **THEN** `approval.signoff` is not in the attached predicate list
+
+#### Scenario: Archive resolves through the same resolver as transitions
+
+- **WHEN** `ArchiveChange` prepares its checks
+- **THEN** it calls `resolveEffectiveBindings` with operation `archive` and the registry
+- **AND** the attempt it evaluates is `{ scope: 'archive' }` with no `from`, `to`, or `along`
 
 ### Requirement: Binding pipeline phase and failure policy
 
@@ -423,6 +510,18 @@
 - **WHEN** `GetStatus` runs
 - **THEN** `availableTransitions` includes `implementing` and `verifying`
 - **AND** `nextAction` recommends archive or signoff-approve, not the implement skill
+
+#### Scenario: Archive blocker carries bypassFlag only for skippable bindings
+
+- **GIVEN** a change in `archivable` blocked by `spec.overlap` whose resolved binding is skippable
+- **WHEN** `GetStatus` projects blockers
+- **THEN** the blocker has `bypassFlag` `--skip-checks spec.overlap`
+
+#### Scenario: Locked or schema-hardened archive blocker has no bypassFlag
+
+- **GIVEN** a blocker from `workspace.readOnly`, or from `spec.overlap` with `skippable: false` in the schema
+- **WHEN** `GetStatus` projects blockers
+- **THEN** the blocker carries no `bypassFlag`
 
 ### Requirement: No shared snapshot bag
 

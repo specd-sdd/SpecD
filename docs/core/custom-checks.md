@@ -107,6 +107,7 @@ SpecD enforces two tiers of governance locks to ensure that project schemas cann
    - **Category A (Protocol & State Invariants)** (`protocol.edge`, `verification.current`, `archive.archivable`, `schema.nameMatch`, `hook.pre`, `hook.post`): Enforce `allowBindingOverride: false` and `allowDisable: false`. Attempting to embed or disable them in `schema.yaml` throws `CheckEmbeddingForbiddenError` or `CheckDisableForbiddenError`.
    - **Category B (Native Step Attributes)** (`workflow.requires`, `workflow.taskCompletion`, `approval.spec`, `approval.signoff`): Controlled natively via dedicated step/workspace schema attributes (`step.requires: []`, `requiresTaskCompletion`, `approvals`).
    - **Category C (Policy & Consistency Checks)** (`impl.linksInScope`, `spec.overlap`, `deps.consistent`, `impl.filesResolved`, `workspace.readOnly`): Enforce `allowBindingOverride: true` and `allowDisable: true`. Project schemas can bind them to workflow steps, configure them, or declaratively disable them (`disabled: true`).
+   - **Archive exception**: on the archive operation (`scope: 'archive'`) only, `workspace.readOnly`, `impl.filesResolved`, and `deps.consistent` are fully locked (`allowBindingOverride: false`, `allowConfigOverride: false`, `allowDisable: false`, not skippable). `workspace.readOnly` is a security boundary, and unresolved implementation or inconsistent dependencies would produce an invalid archive, so no schema declaration and no `--skip-checks` can relax them there. Their transition bindings keep the Category C policy. On archive, the only built-in checks a schema can configure, disable, or make skippable are `spec.overlap` and `impl.linksInScope`.
 
 ### 4.2 Declarative Disablement (`disabled: true`) vs. Runtime Bypass (`skippable` / `--skip-checks`)
 
@@ -222,6 +223,43 @@ workflow:
           onFailure: warn
 ```
 
+### Archive checks
+
+The archive operation is a third check surface: it has its own bindings (`{ scope: 'archive' }`), and a schema tunes them with `archiveChecks` on the `archiving` row (valid only there).
+
+A host registers a check that runs on every archive:
+
+```ts
+const kernel = await createKernelBuilder(config)
+  .registerCheck('security', securityScanCheck, [{ scope: 'archive', skippable: true }], {
+    allowBindingOverride: true,
+    allowConfigOverride: true,
+    allowDisable: true,
+    defaultConfig: { minSeverity: 'high' },
+  })
+  .build()
+```
+
+A schema can then tune it, or embed a registered check that has no archive binding:
+
+```yaml
+workflow:
+  - step: archiving
+    archiveChecks:
+      - id: '@security.code-scan' # registered by the host above
+        skippable: true
+        config:
+          minSeverity: critical # deep-merged over defaultConfig
+      - id: spec.overlap
+        skippable: false # never archive over a live overlap
+      - id: impl.linksInScope
+        disabled: true
+```
+
+`archiveChecks` entries accept only `id`, `skippable`, `disabled`, and `config`. `onFailure` is rejected: archive predicate failures have no abort/collect distinction. Governance on archive is the table in the [schema format reference](../schemas/schema-format.md#archive-operation-checks).
+
+When a plugin or schema-embedded archive check fails, `ArchiveChange` throws `CheckPredicateFailedError` (check id, label, failure code, message, command, details, and the resolved `skippable`), like a failing transition check. Built-in archive checks keep their dedicated errors.
+
 ---
 
 ## 7. CLI Bypass and Repair Guide
@@ -244,3 +282,12 @@ Users can bypass skippable checks directly:
 ```bash
 specd changes transition my-change verifying --skip-checks @security.code-scan
 ```
+
+The same flag works on archive. Each id is validated against the resolved archive bindings before anything runs:
+
+```bash
+specd changes archive my-change --skip-checks spec.overlap
+specd changes archive my-change --skip-checks @security.code-scan
+```
+
+An unregistered id fails with `UnknownCheckError`; a hook (`hook.pre`, `hook.post`) or a non-skippable binding fails with `CheckNotSkippableError`. `--allow-overlap` and `--allow-out-of-scope` remain as CLI aliases of `--skip-checks spec.overlap` and `--skip-checks impl.linksInScope`; the use case itself accepts only `skipChecks`.

@@ -56,7 +56,7 @@ Custom checks MUST strictly evaluate state invariants (predicates). Registration
 Each check binding MUST be uniquely identified by its lifecycle coordinate:
 
 - For transition bindings: `{ checkId, scope: 'transition', to, along }` where `to` is the target `ChangeState` and `along` is the classified transition direction.
-- For archive bindings: `{ checkId, scope: 'archive' }`.
+- For archive bindings: `{ checkId, scope: 'archive' }`. A schema `archiveChecks` declaration targets this coordinate; at most one declaration per check id is allowed in one `archiveChecks` array.
 - For step-skip bindings: `{ checkId, scope: 'step-skip', step }` where `step` is the intermediate `ChangeState` being bypassed.
 
 The registry MUST reject registration attempts containing duplicate bindings for the exact same coordinate with a `DuplicateCheckBindingError`.
@@ -85,7 +85,7 @@ The registry MUST support a governance model that separates **where** a schema m
    - **Immutability of `allowDisable` (No Relaxation)**: An existing binding or check definition with `allowDisable: false` CANNOT be relaxed or overridden by `schema.yaml`. Any attempt in `schema.yaml` to declare `disabled: true` on a check or coordinate where `allowDisable: false` is active MUST throw a `CheckDisableForbiddenError`.
 5. **Monotonic Governance Rule (Principle of Monotonic Governance Locks)**:
    - Every lock set by code (check registration or code-defined binding) operates under monotonic restriction: once `false`, it CANNOT be erased, relaxed, or overwritten by subsequent schema layers, redeclarations of the same binding, or AST mergers (`merge-schema-layers`).
-   - Schema layer mergers (`merge-schema-layers`) MUST preserve both `step.checks` and `step.skipChecks` collections using collision-safe array mutation, preventing accidental clobbering or erasure of governance locks across extended layers.
+   - Schema layer mergers (`merge-schema-layers`) MUST preserve the `step.checks`, `step.skipChecks`, and `step.archiveChecks` collections using collision-safe array mutation, preventing accidental clobbering or erasure of governance locks across extended layers.
    - Any attempt to downgrade or erase a code-set lock (`false` -> `true` or omitted) across layers or redeclarations MUST be strictly rejected, guaranteeing the principle of least privilege.
    - **Schema-owned bindings belong to the schema.** Because a schema-owned binding carries no code-defined binding locks, a later schema layer (`extends`, schema plugin, `schemaOverrides`) MAY change its `onFailure`, `skippable`, configuration, or `disabled` flag, or remove it, subject only to the check-level `allowConfigOverride` and `allowDisable` locks. Governance is validated against the merged declaration.
 6. **Built-in Checks Governance Categorization**:
@@ -93,13 +93,17 @@ The registry MUST support a governance model that separates **where** a schema m
      - **Category A (Protocol & State Invariants)** (`protocol.edge`, `verification.current`, `archive.archivable`, `schema.nameMatch`, `hook.pre`, `hook.post`): MUST have `allowSchemaEmbedding: false`, `allowBindingOverride: false`, and `allowDisable: false`.
      - **Category B (Native Step Attributes)** (`workflow.requires`, `workflow.taskCompletion`, `workflow.tasksEmpty`, `approval.spec`, `approval.signoff`): Governed natively via dedicated step and workspace schema configurations (`requires: []`, `requiresTaskCompletion`, `approvals`). MUST have `allowSchemaEmbedding: false`, `allowBindingOverride: false`, and `allowDisable: false` to prevent redundant or conflicting embedding in `step.checks: []`.
      - **Category C (Policy & Consistency Checks)** (`impl.linksInScope`, `spec.overlap`, `deps.consistent`, `impl.filesResolved`, `workspace.readOnly`): MUST have `allowSchemaEmbedding: true`, `allowBindingOverride: true`, and `allowDisable: true`, permitting project schemas to declare them on workflow steps, configure them, or disable them.
-   - Every built-in binding spec MUST declare `allowBindingOverride` and `allowDisable` explicitly with its category's values.
+     - **Archive exception**: on bindings with `scope: 'archive'` only, `workspace.readOnly`, `impl.filesResolved`, and `deps.consistent` MUST declare `allowBindingOverride: false`, `allowConfigOverride: false`, `allowDisable: false`, and `skippable: false`. `workspace.readOnly` is a security boundary and the other two are required for a valid archive, so no schema declaration and no `--skip-checks` may relax them there. Their check-level governance and their `transition` and `step-skip` bindings remain Category C. On archive, the only built-in checks a schema can configure, disable, or make skippable are `spec.overlap` and `impl.linksInScope`.
+   - Every built-in binding spec MUST declare `allowBindingOverride` and `allowDisable` explicitly with its category's values (applying the archive exception above).
 7. **Registration fidelity through composition**:
    - Kernel composition SHALL forward every governance field of a `PluginCheckRegistration` (`allowSchemaEmbedding`, `allowBindingOverride`, `allowConfigOverride`, `allowDisable`, `defaultConfig`) to the `CheckRegistry` unchanged.
    - Kernel composition SHALL forward every declared default binding of a plugin check, in all scopes (`transition`, `archive`, and `step-skip`), into the bindings the use cases evaluate. A plugin `step-skip` default binding SHALL be evaluated when its step is bypassed exactly like a built-in step-skip binding.
 8. **Executable check instances**:
    - The `CheckRegistry` that composition hands to use cases MUST catalog the executable application check instances (the `create*` factories that read real facts through ports) for every built-in check.
    - Domain matcher instances that evaluate fixed facts SHALL be used only for matcher tests and domain fixtures. A binding synthesized for a schema-embedded check MUST evaluate the same real implementation as that check's code-defined bindings, never a stub that cannot fail.
+9. **Archive declarations**:
+   - Schema `archiveChecks` declarations on the `archiving` workflow entry are governed by the same locks as `checks` and `skipChecks`: placement (`allowSchemaEmbedding`), policy (`allowBindingOverride`, for `skippable` only because `archiveChecks` has no `onFailure`), configuration (`allowConfigOverride`), and disablement (`allowDisable`), evaluated against the code-defined `scope: 'archive'` binding of the check when one exists.
+   - A declaration for a check that no code-defined archive binding serves is embedding and is governed by `allowSchemaEmbedding`. A plugin whose default bindings include `{ scope: 'archive' }` is therefore tunable by a schema at that coordinate without embedding.
 
 ### Requirement: Cascading configuration hierarchy
 
@@ -117,4 +121,5 @@ The resolved configuration MUST be passed into `CheckExecutionContext.config` as
 ## Spec Dependencies
 
 - [`core:transition-checks`](../transition-checks/spec.md) — Base check interfaces, `Check`, `CheckResult`, `CheckExecutionContext`, and built-in check specifications.
-- [`default:_global/architecture`](../../default/_global/architecture/spec.md) — Pure domain services and inversion of control.
+- [`default:_global/architecture`](../../_global/architecture/spec.md) — Pure domain services and inversion of control.
+- [`core:schema-format`](../schema-format/spec.md) — workflow row options (`checks`, `skipChecks`, `archiveChecks`) that the governance locks apply to

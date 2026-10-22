@@ -509,7 +509,7 @@ describe('evaluateLifecycle', () => {
     expect(verdict.nextAction.command).toBe('/specd-design')
   })
 
-  it('omits skippable OVERLAP_CONFLICT when bypassFlags include allow-overlap', () => {
+  it('does not treat CLI-only aliases allow-overlap or allow-out-of-scope as domain bypass flags', () => {
     const change = makeChange()
     const overlapFail: CheckResult = {
       id: 'spec.overlap',
@@ -520,25 +520,122 @@ describe('evaluateLifecycle', () => {
       message: 'overlap',
     }
     const schema = makeSchema()
-    const blocked = evaluate(change, schema, {
-      requestedTarget: 'designing',
-      checksByTarget: { designing: [overlapFail] },
-    })
-    expect(blocked.blockers.some((blocker) => blocker.code === 'OVERLAP_CONFLICT')).toBe(true)
 
-    const allowed = evaluate(change, schema, {
+    const withAlias = evaluate(change, schema, {
       requestedTarget: 'designing',
-      bypassFlags: ['allow-overlap'],
+      bypassFlags: [
+        'allow-overlap',
+        '--allow-overlap',
+        'allow-out-of-scope',
+        '--allow-out-of-scope',
+      ],
       checksByTarget: { designing: [overlapFail] },
     })
-    expect(allowed.blockers.some((blocker) => blocker.code === 'OVERLAP_CONFLICT')).toBe(false)
+    expect(withAlias.blockers.some((blocker) => blocker.code === 'OVERLAP_CONFLICT')).toBe(true)
+  })
 
-    const dashed = evaluate(change, schema, {
+  it('omits skippable OVERLAP_CONFLICT when the canonical spec.overlap bypass is supplied', () => {
+    const change = makeChange()
+    const overlapFail: CheckResult = {
+      id: 'spec.overlap',
+      label: 'Checking spec overlap',
+      kind: 'predicate',
+      outcome: 'fail',
+      code: 'OVERLAP_CONFLICT',
+      message: 'overlap',
+    }
+    const schema = makeSchema({ workflow: [makeWorkflowStep('designing')] })
+    const bypassed = evaluate(change, schema, {
       requestedTarget: 'designing',
-      bypassFlags: ['--allow-overlap'],
+      bypassFlags: ['spec.overlap'],
       checksByTarget: { designing: [overlapFail] },
     })
-    expect(dashed.blockers.some((blocker) => blocker.code === 'OVERLAP_CONFLICT')).toBe(false)
+    expect(bypassed.blockers.some((blocker) => blocker.code === 'OVERLAP_CONFLICT')).toBe(false)
+    expect('warnings' in bypassed).toBe(false)
+    expect(bypassed.availableSteps.find((step) => step.step === 'designing')?.isPermitted).toBe(
+      true,
+    )
+
+    const fullFlagBypassed = evaluate(change, schema, {
+      requestedTarget: 'designing',
+      bypassFlags: ['--skip-checks spec.overlap'],
+      checksByTarget: { designing: [overlapFail] },
+    })
+    expect(fullFlagBypassed.blockers.some((blocker) => blocker.code === 'OVERLAP_CONFLICT')).toBe(
+      false,
+    )
+    expect('warnings' in fullFlagBypassed).toBe(false)
+    expect(
+      fullFlagBypassed.availableSteps.find((step) => step.step === 'designing')?.isPermitted,
+    ).toBe(true)
+  })
+
+  it('projects non-skippable OVERLAP_CONFLICT without bypassFlag when schema sets skippable: false', () => {
+    const change = makeChange()
+    const overlapFail: CheckResult = {
+      id: 'spec.overlap',
+      label: 'Checking spec overlap',
+      kind: 'predicate',
+      outcome: 'fail',
+      code: 'OVERLAP_CONFLICT',
+      message: 'overlap',
+    }
+    const hardenedSchema = makeSchema({
+      workflow: [
+        makeWorkflowStep('designing'),
+        makeWorkflowStep('ready'),
+        makeWorkflowStep('archiving', {
+          archiveChecks: [{ id: 'spec.overlap', skippable: false }],
+        }),
+      ],
+    })
+    const verdict = evaluate(change, hardenedSchema, {
+      requestedTarget: 'designing',
+      bypassFlags: ['spec.overlap', '--skip-checks spec.overlap'],
+      checksByTarget: { designing: [overlapFail] },
+    })
+    const overlapBlocker = verdict.blockers.find((blocker) => blocker.code === 'OVERLAP_CONFLICT')
+    expect(overlapBlocker).toBeDefined()
+    expect(overlapBlocker?.isSkippable).toBe(false)
+    expect(overlapBlocker?.bypassFlag).toBeUndefined()
+  })
+
+  it('projects skippability for custom plugin checks from bindingsByTarget and archiveBindings', () => {
+    const change = makeChange()
+    const pluginCheckFail: CheckResult = {
+      id: '@sec.scan',
+      label: 'Scanning security',
+      kind: 'predicate',
+      outcome: 'fail',
+      code: 'SECURITY_FINDINGS',
+      message: 'findings detected',
+    }
+    const schema = makeSchema({
+      workflow: [makeWorkflowStep('designing'), makeWorkflowStep('ready')],
+    })
+    const verdict = evaluate(change, schema, {
+      checksByTarget: { ready: [pluginCheckFail] },
+      bindingsByTarget: {
+        ready: [
+          {
+            check: {
+              id: '@sec.scan',
+              label: 'Scanning security',
+              kind: 'predicate',
+              execute: async () => pluginCheckFail,
+            },
+            applicability: [{ scope: 'transition', from: '*', to: 'ready', along: '*' }],
+            skippable: true,
+            allowBindingOverride: true,
+            allowConfigOverride: true,
+          },
+        ],
+      },
+    })
+    const blocker = verdict.blockers.find((b) => b.code === 'SECURITY_FINDINGS')
+    expect(blocker).toBeDefined()
+    expect(blocker?.isSkippable).toBe(true)
+    expect(blocker?.bypassFlag).toBe('--skip-checks @sec.scan')
   })
 
   it('treats complete-with-drift as complete for lifecycle interpretation', () => {
@@ -849,7 +946,7 @@ describe('evaluateLifecycle', () => {
     expect(blocker?.checkId).toBe('impl.filesResolved')
   })
 
-  it('given failed impl.linksInScope, when blockers are projected, then bypassFlag is --allow-out-of-scope', () => {
+  it('given failed impl.linksInScope, when blockers are projected, then bypassFlag is --skip-checks impl.linksInScope', () => {
     const change = makeChange()
     change.transition('designing', testActor)
     change.transition('ready', testActor)

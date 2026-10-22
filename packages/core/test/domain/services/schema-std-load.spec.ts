@@ -50,6 +50,10 @@ describe('real @specd/schema-std through buildSchema', () => {
     ])
   })
 
+  it('declares no archiveChecks on the archiving row by default', () => {
+    expect(schema.workflowStep('archiving')?.archiveChecks).toBeUndefined()
+  })
+
   it('enables every standard delivery step', () => {
     for (const step of ['designing', 'ready', 'implementing', 'verifying', 'archiving'] as const) {
       expect(isWorkflowStepEnabled(step, schema)).toBe(true)

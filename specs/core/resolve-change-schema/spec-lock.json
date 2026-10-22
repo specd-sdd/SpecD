@@ -20,5 +20,41 @@
       "file": "core:src/composition/use-cases/resolve-change-schema.ts",
       "symbols": ["createResolveChangeSchema"]
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Resolve a change-recorded schema by exact name, warn on version drift, never consult default schema.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:2a53f9222e841f1c4783731ca3491e4bfd10139fcf5f76b418c3d84536195e48",
+          "lastModified": "2026-10-20T14:34:10.376Z"
+        },
+        "verify.md": {
+          "hash": "sha256:287a25249a936d2d9b57a3f8daa5d6a967b039083d18beb9f87fff99ec95ffdf",
+          "lastModified": "2026-10-20T14:34:10.376Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# ResolveChangeSchema\n## Rules\n- Lookup `SchemaProvider.get(schemaName)` from recorded change reference; return schema plus warnings.\n- Exact canonical-name mismatch throws `SchemaProviderIdentityMismatchError`.\n- Same-name version mismatch warns only; propagate other failures.\n- Shared boundary for change-schema consumers; factory resolves canonical deps.\n## Constraints\n- Never use workspace default, mutate change, or persist warnings.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:2a53f9222e841f1c4783731ca3491e4bfd10139fcf5f76b418c3d84536195e48",
+          "lastModified": "2026-10-20T14:34:10.376Z"
+        },
+        "verify.md": {
+          "hash": "sha256:287a25249a936d2d9b57a3f8daa5d6a967b039083d18beb9f87fff99ec95ffdf",
+          "lastModified": "2026-10-20T14:34:10.376Z"
+        }
+      }
+    }
+  }
 }

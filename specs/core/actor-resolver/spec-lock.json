@@ -9,5 +9,41 @@
       "file": "core:src/composition/actor-resolver.ts",
       "symbols": ["createVcsActorResolver", "createLazyVcsActorResolver"]
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Compose async VCS-backed ActorResolver with external providers, null fallback, and kernel privacy wrapping.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:e50056a0e8b785a8d19a7bdbfec30894a9588e8a5adf34ab99543694a7a7fafb",
+          "lastModified": "2026-08-25T15:37:19.254Z"
+        },
+        "verify.md": {
+          "hash": "sha256:29bb522853cce2fda61acc6941aec95e531870d8979be2e29765394cdbe79a75",
+          "lastModified": "2026-08-25T15:37:19.254Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# ActorResolver\n## Rules\n- `createVcsActorResolver` uses provided/active `VcsAdapter`; probes external providers registration order before built-ins.\n- No match or `NullVcsAdapter` returns `NullActorResolver`; `cwd` defaults `process.cwd()`.\n- Return `Promise<ActorResolver>`; kernel, not factory, applies `PrivacyActorResolver`.\n## Constraints\n- Async VCS detection; concrete resolver types remain internal.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:e50056a0e8b785a8d19a7bdbfec30894a9588e8a5adf34ab99543694a7a7fafb",
+          "lastModified": "2026-08-25T15:37:19.254Z"
+        },
+        "verify.md": {
+          "hash": "sha256:29bb522853cce2fda61acc6941aec95e531870d8979be2e29765394cdbe79a75",
+          "lastModified": "2026-08-25T15:37:19.254Z"
+        }
+      }
+    }
+  }
 }

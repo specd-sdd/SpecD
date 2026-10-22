@@ -3,8 +3,12 @@ import {
   mergeSchemaLayers,
   type SchemaLayer,
 } from '../../../src/domain/services/merge-schema-layers.js'
-import { type SchemaYamlData } from '../../../src/domain/services/build-schema.js'
+import { buildSchema, type SchemaYamlData } from '../../../src/domain/services/build-schema.js'
 import { SchemaValidationError } from '../../../src/domain/errors/schema-validation-error.js'
+import {
+  CheckBindingOverrideForbiddenError,
+  CheckDisableForbiddenError,
+} from '../../../src/domain/errors/check-registry-errors.js'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -450,5 +454,142 @@ describe('mergeSchemaLayers — workflow step checks', () => {
         }),
       ]),
     ).toThrow(SchemaValidationError)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Requirement: Archive operation checks (archiveChecks) across layers
+// ---------------------------------------------------------------------------
+
+describe('mergeSchemaLayers — archiveChecks', () => {
+  const archiving = (archiveChecks: unknown[]): Record<string, unknown> => ({
+    step: 'archiving',
+    requires: [],
+    requiresTaskCompletion: [],
+    hooks: { pre: [], post: [] },
+    archiveChecks,
+  })
+
+  it('adds archiveChecks to an archiving entry that has none', () => {
+    const b = base({
+      workflow: [
+        ...base().workflow!,
+        {
+          step: 'archiving',
+          requires: [],
+          requiresTaskCompletion: [],
+          hooks: { pre: [{ id: 'g', type: 'instruction', text: 'keep me' }], post: [] },
+        } as never,
+      ],
+    })
+    const result = mergeSchemaLayers(b, [
+      layer('override', {
+        append: { workflow: [{ step: 'archiving', archiveChecks: [{ id: 'spec.overlap' }] }] },
+      }),
+    ])
+    const entry = result.workflow!.find((w) => w.step === 'archiving')
+    expect(entry?.archiveChecks).toEqual([{ id: 'spec.overlap' }])
+    expect(entry?.hooks.pre).toHaveLength(1)
+  })
+
+  it('creates the archiving entry with archiveChecks when the base has none', () => {
+    const result = mergeSchemaLayers(base(), [
+      layer('override', {
+        append: { workflow: [archiving([{ id: 'impl.linksInScope', disabled: true }])] },
+      }),
+    ])
+    expect(result.workflow!.find((w) => w.step === 'archiving')?.archiveChecks).toEqual([
+      { id: 'impl.linksInScope', disabled: true },
+    ])
+  })
+
+  it('combines distinct ids from two layers', () => {
+    const b = base({
+      workflow: [...base().workflow!, archiving([{ id: 'spec.overlap' }]) as never],
+    })
+    const result = mergeSchemaLayers(b, [
+      layer('plugin', {
+        append: {
+          workflow: [{ step: 'archiving', archiveChecks: [{ id: '@security.code-scan' }] }],
+        },
+      }),
+    ])
+    expect(
+      result.workflow!.find((w) => w.step === 'archiving')?.archiveChecks?.map((c) => c.id),
+    ).toEqual(['spec.overlap', '@security.code-scan'])
+  })
+
+  it('rejects an id that a later layer introduces and an earlier layer already declared', () => {
+    const b = base({
+      workflow: [...base().workflow!, archiving([{ id: '@security.code-scan' }]) as never],
+    })
+    expect(() =>
+      mergeSchemaLayers(b, [
+        layer('override', {
+          append: {
+            workflow: [{ step: 'archiving', archiveChecks: [{ id: '@security.code-scan' }] }],
+          },
+        }),
+      ]),
+    ).toThrow(SchemaValidationError)
+  })
+
+  it('rejects non-array archiveChecks from a plugin or schemaOverrides layer with SchemaValidationError', () => {
+    expect(() =>
+      mergeSchemaLayers(base(), [
+        layer('plugin', {
+          append: {
+            workflow: [{ step: 'archiving', archiveChecks: { id: 'spec.overlap' } as never }],
+          },
+        }),
+      ]),
+    ).toThrow(SchemaValidationError)
+
+    const withArchiving = base({
+      workflow: [...base().workflow!, archiving([]) as never],
+    })
+    expect(() =>
+      mergeSchemaLayers(withArchiving, [
+        layer('override', {
+          append: {
+            workflow: [{ step: 'archiving', archiveChecks: 'spec.overlap' as never }],
+          },
+        }),
+      ]),
+    ).toThrow(SchemaValidationError)
+
+    expect(() =>
+      mergeSchemaLayers(withArchiving, [
+        layer('override', {
+          set: {
+            workflow: [{ step: 'archiving', archiveChecks: { id: 'spec.overlap' } as never }],
+          },
+        }),
+      ]),
+    ).toThrow(SchemaValidationError)
+  })
+
+  it('prevents schemaOverrides from relaxing a locked archive check when built', () => {
+    const mergedSkippable = mergeSchemaLayers(base(), [
+      layer('override', {
+        append: {
+          workflow: [archiving([{ id: 'impl.filesResolved', skippable: true }])],
+        },
+      }),
+    ])
+    expect(() => buildSchema('#test', mergedSkippable, new Map())).toThrow(
+      CheckBindingOverrideForbiddenError,
+    )
+
+    const mergedDisabled = mergeSchemaLayers(base(), [
+      layer('override', {
+        append: {
+          workflow: [archiving([{ id: 'workspace.readOnly', disabled: true }])],
+        },
+      }),
+    ])
+    expect(() => buildSchema('#test', mergedDisabled, new Map())).toThrow(
+      CheckDisableForbiddenError,
+    )
   })
 })

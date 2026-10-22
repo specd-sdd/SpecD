@@ -389,12 +389,35 @@ Supported metadata fields: `title`, `description`, `dependsOn`, `keywords` (sing
 
 ### Requirement: Workflow
 
-A `workflow` array SHALL attach configuration to existing Change lifecycle states. It MUST NOT define the set of states a change may occupy and MUST NOT add or remove protocol hops. Each entry must include:
+A `workflow` array SHALL attach configuration to existing Change lifecycle states. It MUST NOT define the set of states a change may occupy and MUST NOT add or remove protocol hops. Each entry accepts the options below; `step` is the only required one:
 
 - `step` (string, required) — lookup key naming an existing lifecycle state (e.g., `designing`, `implementing`)
+- `optional` (boolean, optional, default `false`) — marks the step as skippable in the topology
+- `disabled` (boolean, optional, default `false`) — removes the step from the active pipeline
 - `requires` (array of strings, optional) — IDs of artifacts that must be `complete` or `skipped` before the step is available
 - `requiresTaskCompletion` (array of strings, optional) — IDs of artifacts where all tasks MUST be complete before the step can be finished. **Invariant**: Every artifact ID listed here MUST have `hasTasks: true` declared in its artifact definition. `SchemaRegistry.resolve()` SHALL throw a `SchemaValidationError` if this invariant is violated.
 - `hooks` (object, optional) — `pre` and `post` hooks for the step
+- `checks` (array, optional) — check declarations for the transition into the step. Each declaration has `id` (string, required) and MAY have `from` (a lifecycle state or `*`, default `*`), `along` (`forward`, `backward`, `recovery`, `redesign`, or `*`, default `forward`), `onFailure` (`abort` | `collect`, default `abort`), `skippable` (boolean), `disabled` (boolean), and `config` (object)
+- `skipChecks` (array, optional) — check declarations evaluated when the step is bypassed. Each declaration has `id` (string, required) and MAY have `onFailure` (`abort` | `collect`), `skippable` (boolean), `disabled` (boolean), and `config` (object)
+- `archiveChecks` (array, optional) — check declarations for the archive operation. Valid only on the entry whose `step` is `archiving`; on any other entry `buildSchema` MUST throw `SchemaValidationError` naming that step. Each declaration has `id` (string, required) and MAY have `skippable` (boolean), `disabled` (boolean), and `config` (object). No other key is accepted: in particular `onFailure` is rejected, because archive predicate failures have no abort/collect distinction. A declaration with any other key MUST be rejected with `SchemaValidationError`; the parser MUST NOT silently strip it. `@specd/schema-std` declares no `archiveChecks` by default.
+
+`checks`, `skipChecks`, and `archiveChecks` are independent surfaces: `checks` applies when entering the step, `skipChecks` when bypassing it, and `archiveChecks` to the archive operation itself. Checks declared in the `archiving` entry's `checks` apply to entering `archiving`, never to the archive operation. `id` is a canonical check identifier, built-in (for example `spec.overlap`) or plugin (for example `@security.code-scan`). The entries of each of these arrays are identified by `id` for schema layering (`extends`, schema plugins, `schemaOverrides`); an `id` that a later layer introduces and an earlier layer already declared is rejected with `SchemaValidationError`, exactly as for `checks` and `skipChecks`. `archiveChecks` MUST be an array and each declaration MUST be an object with a string `id`; `skippable` and `disabled` MUST be booleans and `config` MUST be an object. An empty `archiveChecks` array is equivalent to omitting it. This requirement defines the options a schema may declare; how checks are registered, governed, and evaluated is defined by the workflow and check specs, not here.
+
+Example:
+
+```yaml
+workflow:
+  - step: archiving
+    archiveChecks:
+      - id: spec.overlap
+        skippable: false
+      - id: impl.linksInScope
+        disabled: true
+      - id: '@security.code-scan'
+        skippable: true
+        config:
+          minSeverity: critical
+```
 
 Declaration order is display order and the listed names on the `along` progress axis. Missing delivery states MUST be spliced by canonical fallback index (see [`core:transition-checks`](../transition-checks/spec.md)). It MUST NOT enforce sequential occupancy of adjacent entries. An omitted `step` MUST NOT delete that state from the domain machine. A `step` that is not a `ChangeState` MUST NOT occupy an axis slot. `buildSchema` MUST throw `SchemaValidationError` for such a `step`; the name MUST NOT reach hop evaluation.
 

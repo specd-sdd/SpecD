@@ -25,8 +25,10 @@ specd changes status <name> --format text
 Identify any high-visibility blockers from the **blockers:** section (e.g. `ARTIFACT_DRIFT`,
 `OVERLAP_CONFLICT`, `REVIEW_REQUIRED`) and inform the user. Follow the **next action:**
 command recommendation. `OVERLAP_CONFLICT` means live overlap with other active
-changes; archive with `--allow-overlap` only for that case. If `review.reason` is
-`spec-overlap-conflict`, run `/specd-design` — do not use `--allow-overlap`.
+changes; bypass it only for that case, with the flag status shows under the blocker
+(`--skip-checks spec.overlap`). A blocker whose status shows no `bypass:` flag
+cannot be skipped. If `review.reason` is `spec-overlap-conflict`, run
+`/specd-design` — never bypass it.
 
 Extract the `path:` field from the "lifecycle:" section.
 
@@ -164,7 +166,7 @@ resolved or ignored.
 - Tracked files in `open` state block archive — resolve or ignore them first
 - Links targeting files outside the spec's workspace `codeRoot` block archive
 - Links targeting specs outside the change scope block archive unless explicitly
-  overridden with `--allow-out-of-scope`
+  bypassed with `--skip-checks impl.linksInScope`
 
 ### 4b. Live preflight after hooks
 
@@ -214,16 +216,24 @@ changes target the same specs as this change. When this happens:
 2. Explain the risk.
 3. Ask the user whether to proceed or abort.
 
-If the user confirms, re-run the command with `--allow-overlap`:
+If the user confirms, re-run the command with the bypass shown by status
+(`--skip-checks <checkId>`):
 
 ```bash
-specd changes archive <name> --skip-hooks pre --allow-overlap --format toon
+specd changes archive <name> --skip-hooks pre --skip-checks spec.overlap --format toon
 ```
+
+Only checks that status shows a `bypass:` flag for can be skipped. `workspace.readOnly`,
+`impl.filesResolved`, `deps.consistent`, `verification.current`, and the schema,
+archivable, and task-completion checks are never bypassable on archive. If the
+failure shows no bypass, fix the cause instead of retrying. `--allow-overlap` and
+`--allow-out-of-scope` exist only as aliases of `--skip-checks spec.overlap` and
+`--skip-checks impl.linksInScope`.
 
 If the command fails because implementation sidecar maintenance would update specs outside the change scope, stop and surface the affected specs to the user. Only retry after explicit confirmation with:
 
 ```bash
-specd changes archive <name> --skip-hooks pre --allow-out-of-scope --format toon
+specd changes archive <name> --skip-hooks pre --skip-checks impl.linksInScope --format toon
 ```
 
 ### 6. Post-archive instructions

@@ -17,5 +17,41 @@
       "file": "core:src/application/use-cases/approve-spec.ts",
       "symbols": ["ApproveSpec"]
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Record human spec consent in ready after reconciled structural validity; never use approval transition states.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:6f847d3cb5a65d5cf343840c5d68424c388ee9f081c5f52363018defccbf4e32",
+          "lastModified": "2026-10-20T14:34:09.960Z"
+        },
+        "verify.md": {
+          "hash": "sha256:9a72c443bdd6d5779520685cd7955579d34e3eabcccf09d4f014f281c0b87242",
+          "lastModified": "2026-10-20T14:34:09.961Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# ApproveSpec\n## Rules\n- Gate-disabled fails before I/O; load change, resolve sovereign schema, resolve one actor.\n- Reconcile then require ready, valid non-task artifacts and scope-aware fingerprint.\n- Atomic mutation stores valid approval projection and `spec-approved` event; change stays ready.\n## Constraints\n- No approval when stale/revoked or outside ready.\n- Never independently infer invalidation/recovery.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:6f847d3cb5a65d5cf343840c5d68424c388ee9f081c5f52363018defccbf4e32",
+          "lastModified": "2026-10-20T14:34:09.960Z"
+        },
+        "verify.md": {
+          "hash": "sha256:9a72c443bdd6d5779520685cd7955579d34e3eabcccf09d4f014f281c0b87242",
+          "lastModified": "2026-10-20T14:34:09.961Z"
+        }
+      }
+    }
+  }
 }

@@ -1732,3 +1732,107 @@ describe('reconciled validity and next action', () => {
     ])
   })
 })
+
+describe('archive bypass hints come from resolved bindings', () => {
+  function archivable(
+    blockers: ReadonlyArray<Record<string, unknown>>,
+    reason = 'Ready to archive',
+  ): Record<string, unknown> {
+    return {
+      schemaWarnings: [],
+      change: makeMockChange({ name: 'my-change', state: 'archivable' }),
+      specDependsOn: {},
+      implementationTracking: { trackedFiles: [], links: [] },
+      artifactStatuses: [],
+      lifecycle: defaultLifecycle,
+      blockers,
+      nextAction: {
+        targetStep: 'archivable',
+        actionType: 'mechanical',
+        reason,
+        command: '/specd-archive',
+      },
+    }
+  }
+
+  async function run(
+    result: Record<string, unknown>,
+    format: 'text' | 'json' | 'toon',
+  ): Promise<string> {
+    const { kernel, stdout } = setup()
+    kernel.changes.status.execute.mockResolvedValue(result)
+    const program = makeProgram()
+    registerChangeStatus(program.command('change'))
+    await program.parseAsync(['node', 'specd', 'change', 'status', 'my-change', '--format', format])
+    return stdout()
+  }
+
+  const overlap = {
+    code: 'OVERLAP_CONFLICT',
+    message: 'Specs overlap with other active changes',
+    label: 'Checking spec overlap',
+    checkId: 'spec.overlap',
+    bypassFlag: '--skip-checks spec.overlap',
+  }
+  const scope = {
+    code: 'IMPLEMENTATION_STATE',
+    message: 'Links resolve outside scope',
+    label: 'Checking implementation links',
+    checkId: 'impl.linksInScope',
+    bypassFlag: '--skip-checks impl.linksInScope',
+  }
+  const readOnly = {
+    code: 'READ_ONLY_WORKSPACE',
+    message: 'Contains readOnly specs',
+    label: 'Checking workspace ownership',
+    checkId: 'workspace.readOnly',
+  }
+
+  it('renders the projected bypass flag under a skippable blocker in text', async () => {
+    const output = await run(archivable([overlap]), 'text')
+    expect(output).toContain('! OVERLAP_CONFLICT — Checking spec overlap: Specs overlap')
+    expect(output).toContain('    bypass: --skip-checks spec.overlap')
+  })
+
+  it('gives every skippable blocker its own flag and none to a locked one', async () => {
+    const output = await run(archivable([overlap, scope, readOnly]), 'text')
+    expect(output).toContain('    bypass: --skip-checks spec.overlap')
+    expect(output).toContain('    bypass: --skip-checks impl.linksInScope')
+    expect(output.match(/bypass:/g)).toHaveLength(2)
+    expect(output).toContain('READ_ONLY_WORKSPACE')
+  })
+
+  it('never builds a bypass when GetStatus supplies none', async () => {
+    const hardened = { ...overlap }
+    delete (hardened as { bypassFlag?: string }).bypassFlag
+    const output = await run(
+      archivable([hardened], 'Specs overlap with other active changes'),
+      'text',
+    )
+    expect(output).toContain('OVERLAP_CONFLICT')
+    expect(output).not.toContain('bypass:')
+    expect(output).not.toContain('--skip-checks')
+  })
+
+  it.each(['json', 'toon'] as const)('serializes the same hints in %s', async (format) => {
+    const hardened = { ...overlap, code: 'HARDENED_OVERLAP' }
+    delete (hardened as { bypassFlag?: string }).bypassFlag
+    const output = await run(archivable([overlap, readOnly, hardened]), format)
+    const parsed = format === 'json' ? JSON.parse(output) : decodeToon(output)
+    const blockersList = parsed.blockers as Array<{ code: string; bypassFlag?: string }>
+    const byCode = Object.fromEntries(blockersList.map((b) => [b.code, b.bypassFlag]))
+    expect(byCode.OVERLAP_CONFLICT).toBe('--skip-checks spec.overlap')
+    expect(byCode.READ_ONLY_WORKSPACE).toBeUndefined()
+    expect(byCode.HARDENED_OVERLAP).toBeUndefined()
+    if (format === 'json') {
+      const readOnlyRow = blockersList.find((b) => b.code === 'READ_ONLY_WORKSPACE')!
+      expect('bypassFlag' in readOnlyRow).toBe(false)
+    }
+  })
+
+  it('shows no overlap blocker when the schema disabled spec.overlap (none projected)', async () => {
+    const output = await run(archivable([]), 'text')
+    expect(output).not.toContain('OVERLAP_CONFLICT')
+    expect(output).not.toContain('bypass:')
+  })
+})

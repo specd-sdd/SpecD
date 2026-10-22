@@ -13,5 +13,41 @@
     {
       "file": "core:src/composition/use-cases/get-spec-outline.ts"
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Read and parse spec-scoped artifacts into parser-provided compact/full navigable outlines.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:7e4614c2273261e0d5b02f230f9c180a06500c9733ff1af0ac857b2b7d3293c3",
+          "lastModified": "2026-08-25T15:37:19.310Z"
+        },
+        "verify.md": {
+          "hash": "sha256:1ea32ad1e785fd3bd1c5436400eb785b8f7df1650ac4d0b85e495454b4c07c82",
+          "lastModified": "2026-08-25T15:37:19.310Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# GetSpecOutline\n## Rules\n- Resolve requested artifact IDs/filenames or all existing spec-scoped schema artifacts.\n- Read repository content, choose parser, parse AST, emit `outline`; optional parser selector hints.\n- Canonical factory resolves specs/schema/parsers deps.\n## Constraints\n- Read-only; hint placeholders never duplicate concrete node values.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:7e4614c2273261e0d5b02f230f9c180a06500c9733ff1af0ac857b2b7d3293c3",
+          "lastModified": "2026-08-25T15:37:19.310Z"
+        },
+        "verify.md": {
+          "hash": "sha256:1ea32ad1e785fd3bd1c5436400eb785b8f7df1650ac4d0b85e495454b4c07c82",
+          "lastModified": "2026-08-25T15:37:19.310Z"
+        }
+      }
+    }
+  }
 }

@@ -11,8 +11,16 @@
   ],
   "implementation": [
     {
-      "file": "core:src/domain/value-objects/artifact-type.ts",
-      "symbols": ["ArtifactType"]
+      "file": "core:src/domain/value-objects/workflow-step.ts",
+      "symbols": ["WorkflowStepArchiveCheckDeclaration", "WorkflowStep"]
+    },
+    {
+      "file": "core:src/infrastructure/schema-yaml-parser.ts",
+      "symbols": ["parseSchemaYaml"]
+    },
+    {
+      "file": "core:src/domain/services/merge-schema-layers.ts",
+      "symbols": ["mergeSchemaLayers"]
     }
   ],
   "optimizations": {

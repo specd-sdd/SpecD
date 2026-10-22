@@ -22,36 +22,36 @@
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Resolve expanded artifact instructions, templates, delta guidance, outlines, and DAG-selected next artifact read-only.",
+      "value": "Read expanded artifact guidance, templates, delta instructions, outlines, and next DAG artifact.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:cfdb9093b441351193ef17a359b933c566668164b7ff3af8cd38e2f2a960da35",
-          "lastModified": "2026-08-29T22:53:46.269Z"
+          "hash": "sha256:4b57c0f19a78ced1776c49c1e981599bc354ad8e4c64db52a1f08e5aa32ed898",
+          "lastModified": "2026-10-20T14:34:10.098Z"
         },
         "verify.md": {
-          "hash": "sha256:8de41f4d812e448432e4c6eba274604ea86d246ca5c16dfe3c80b3b0981ad3e0",
-          "lastModified": "2026-08-29T22:53:46.270Z"
+          "hash": "sha256:70ff9d7793a647b176e102c20f2f157c1aa75dc66c461ad1b1674ba6770480ca",
+          "lastModified": "2026-10-20T14:34:10.100Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# Get Artifact Instruction\n\n## Rules\n\n- Constructor: `ChangeRepository`, `ReadonlyMap<string, SpecRepository>`, `SchemaProvider`, `ArtifactParserRegistry`, `TemplateExpander`.\n- `execute(name, artifactId?)`: load change; absent => `ChangeNotFoundError`.\n- Resolve schema; `schema.name() !== change.schemaName` => `SchemaMismatchError`.\n- Omitted `artifactId`: `evaluateLifecycleVerdict` with empty `checksByTarget`; use topological `nextArtifact`; none => `ArtifactNotFoundError`.\n- Find schema artifact `id`; absent => `ArtifactNotFoundError`.\n- Expand via `TemplateExpander.expand()`: instruction, template, `deltaInstruction`, rule text.\n- Result: `artifactId`; `rulesPre`/`rulesPost` declaration-order instructions, `[]` absent; `instruction`/`template`, `null` absent; `delta`, `null` when `delta: false`.\n- Template: read declared path via `SchemaRegistry`; expand content.\n- `delta: true`: `formatInstructions = parsers.get(artifact.format).deltaInstructions()`; `domainInstructions = deltaInstruction ?? null`; `availableOutlines`: only `change.specIds` whose artifact file exists in `SpecRepository`.\n- Missing parser => `ParserNotRegisteredError`.\n- `createGetArtifactInstruction(config, options?)`: derive deps only through `resolveGetArtifactInstructionDeps(resolver)` then canonical `createGetArtifactInstruction(deps)`.\n- Helper resolves `changes`, `specs`, `schemaProvider`, `parsers`, `templateExpander`; never `lifecycle`/`LifecycleEngine`; no inline fs wiring.\n- Next-artifact/effective-status: `evaluateLifecycleVerdict` empty `checksByTarget`; never hop predicates, `availableTransitions`, global snapshot.\n\n## Constraints\n\n- Read-only: no change mutation or command execution.\n- `rules.pre`/`rules.post` augment, never replace instruction.\n- Missing delta artifact files silently skipped.\n- `availableOutlines` is `string[]` spec IDs only; no outline trees. Fetch on demand: `GetSpecOutline` / `specd specs outline <specPath> --artifact <artifactId>`.\n- Caller uses `rulesPre` + instruction + template + `rulesPost` for new artifacts; `rulesPre` + delta + `rulesPost` for deltas.",
+      "value": "# GetArtifactInstruction\n## Rules\n- Resolve change/schema; omitted artifact selects verdict `nextArtifact`.\n- Expand rules, instruction, template, and delta guidance; list existing change-spec outlines.\n- Factory resolves canonical deps through `resolveGetArtifactInstructionDeps`.\n## Constraints\n- Read-only; no commands/mutation.\n- Uses DAG verdict only, never lifecycle availability.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:cfdb9093b441351193ef17a359b933c566668164b7ff3af8cd38e2f2a960da35",
-          "lastModified": "2026-08-29T22:53:46.269Z"
+          "hash": "sha256:4b57c0f19a78ced1776c49c1e981599bc354ad8e4c64db52a1f08e5aa32ed898",
+          "lastModified": "2026-10-20T14:34:10.098Z"
         },
         "verify.md": {
-          "hash": "sha256:8de41f4d812e448432e4c6eba274604ea86d246ca5c16dfe3c80b3b0981ad3e0",
-          "lastModified": "2026-08-29T22:53:46.270Z"
+          "hash": "sha256:70ff9d7793a647b176e102c20f2f157c1aa75dc66c461ad1b1674ba6770480ca",
+          "lastModified": "2026-10-20T14:34:10.100Z"
         }
       }
     }

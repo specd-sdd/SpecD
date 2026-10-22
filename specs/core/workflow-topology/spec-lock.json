@@ -24,5 +24,41 @@
     {
       "file": "core:test/domain/services/workflow-topology.spec.ts"
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Pure canonical workflow graph: pipeline, legal hops, bypasses, enablement, and forward successors.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:b3bf79cc43a985070f38e22b670e32b296de7403baa0261abaa17b0a7a9b15f7",
+          "lastModified": "2026-10-20T14:34:09.688Z"
+        },
+        "verify.md": {
+          "hash": "sha256:df6fd1209600097c581635d1a87bd7332b8b8002913fd100fc4eacea511ea169",
+          "lastModified": "2026-10-20T14:34:09.688Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# WorkflowTopology\n## Rules\n- Export `resolveWorkflowPipeline`, `isWorkflowStepEnabled`, `listWorkflowTransitions`, `isWorkflowTransitionLegal`, `listBypassedWorkflowSteps`, `nextWorkflowStep`.\n- Canonical ordered pipeline; disabled omitted, optional retained; bedrock states never disabled/optional.\n- Forward next plus optional-only shortcuts; backward/drain edges only `VALID_TRANSITIONS`.\n- Disabled `verifying` removes verification evidence requirement.\n## Constraints\n- Pure deterministic domain service; zero I/O.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:b3bf79cc43a985070f38e22b670e32b296de7403baa0261abaa17b0a7a9b15f7",
+          "lastModified": "2026-10-20T14:34:09.688Z"
+        },
+        "verify.md": {
+          "hash": "sha256:df6fd1209600097c581635d1a87bd7332b8b8002913fd100fc4eacea511ea169",
+          "lastModified": "2026-10-20T14:34:09.688Z"
+        }
+      }
+    }
+  }
 }

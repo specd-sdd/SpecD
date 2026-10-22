@@ -46,36 +46,36 @@
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "CreateChange: unique named Change, actor+created event, schema resolve, optional overlap, scaffold via ChangeRepository.create.",
+      "value": "Create drafting change with sovereign schema, normalized specs, dependency seeds, scaffold, and overlap report.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:ac69280f43c876e95436af994dd3ed39bafa981116910b20b724a1119cfbf12c",
-          "lastModified": "2026-08-25T15:37:19.278Z"
+          "hash": "sha256:7460ec584ae23de450501868ad429861b44c5aa32bc6254d497d178c48eb19db",
+          "lastModified": "2026-10-06T10:29:46.043Z"
         },
         "verify.md": {
-          "hash": "sha256:4336aab73268a58e71123804ef223910233099a4d2a3dae50b77361c438a9f1d",
-          "lastModified": "2026-08-25T15:37:19.278Z"
+          "hash": "sha256:db376afe89629d17f5ef3a5e7ee9205d6d53257991c44deed401b1356e0e1984",
+          "lastModified": "2026-10-06T10:29:46.044Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# CreateChange\n\n## Rules\n- Input: `name` (kebab slug), optional `description`, `specIds`, optional `schemaName`+`schemaVersion` (both or neither), optional `invalidationPolicy` (`none|surgical|downstream|global`), optional `includeOverlapCheck`.\n- Both schema fields absent → `GetActiveSchema.execute()` → `name()`/`version()`. One only → validation error. Errors from GetActiveSchema propagate.\n- `includeOverlapCheck` + non-empty `specIds` → after persist/scaffold `DetectOverlap.execute({ name })`; success → `overlapReport`; throw → omit, creation still succeeds. Else no DetectOverlap.\n- Name exists → `ChangeAlreadyExistsError`. Actor via `ActorResolver` on `created` event.\n- History: exactly one `created` (`type`, `at`, `by`, `specIds`, `schemaName`, `schemaVersion`). `createdAt` same Date as event `at`.\n- Seed `specDependsOn`: `readPersistedDependsOn` → else `metadata.json.dependsOn` → else `[]`; skip non-existent specs.\n- Persist `ChangeRepository.create` → `scaffold(change, specExists)` via `ListWorkspaces`. Result: `{ change, changePath, overlapReport? }`.\n- Deps: ChangeRepository, ListWorkspaces, ActorResolver, GetActiveSchema, DetectOverlap. Config factory via `resolveCreateChangeDeps` only.\n\n## Constraints\n- No state transitions (starts drafting). Scaffold dirs only — no artifact file R/W. Same Date for createdAt + event.",
+      "value": "# CreateChange\n## Rules\n- Validate name/spec IDs; resolve active schema and actor; create drafting manifest/history.\n- Seed `specDependsOn` from persisted lock/metadata; scaffold artifact locations by schema.\n- Return change, path, optional overlap report.\n## Constraints\n- No lifecycle transition; scaffold does not write artifact content.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:ac69280f43c876e95436af994dd3ed39bafa981116910b20b724a1119cfbf12c",
-          "lastModified": "2026-08-25T15:37:19.278Z"
+          "hash": "sha256:7460ec584ae23de450501868ad429861b44c5aa32bc6254d497d178c48eb19db",
+          "lastModified": "2026-10-06T10:29:46.043Z"
         },
         "verify.md": {
-          "hash": "sha256:4336aab73268a58e71123804ef223910233099a4d2a3dae50b77361c438a9f1d",
-          "lastModified": "2026-08-25T15:37:19.278Z"
+          "hash": "sha256:db376afe89629d17f5ef3a5e7ee9205d6d53257991c44deed401b1356e0e1984",
+          "lastModified": "2026-10-06T10:29:46.044Z"
         }
       }
     }

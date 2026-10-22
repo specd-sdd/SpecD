@@ -222,9 +222,9 @@ Template contract tests MUST assert these ownership and drain rules exist in the
 
 ### Requirement: Overlap invalidation vs live archive overlap in templates
 
-`OVERLAP_CONFLICT` is a **live archive** blocker (`spec.overlap` while `archivable`, skippable with `--allow-overlap`). Skill templates for `specd-design`, `specd-implement`, `specd-verify`, and `specd-new` MUST NOT list `OVERLAP_CONFLICT` as a typical status blocker. Invalidation from another archive is `review.reason: spec-overlap-conflict` and routes to `/specd-design`; it MUST NOT be taught as `--allow-overlap`.
+`OVERLAP_CONFLICT` is a **live archive** blocker (`spec.overlap` while `archivable`, skippable with `--skip-checks spec.overlap`). Skill templates for `specd-design`, `specd-implement`, `specd-verify`, and `specd-new` MUST NOT list `OVERLAP_CONFLICT` as a typical status blocker. Invalidation from another archive is `review.reason: spec-overlap-conflict` and routes to `/specd-design`; it MUST NOT be taught as the `--skip-checks spec.overlap` bypass (or its `--allow-overlap` alias).
 
-`specd-archive` MAY list `OVERLAP_CONFLICT` as a typical blocker and MUST tell the agent that `--allow-overlap` applies only to that live overlap, not to `spec-overlap-conflict` review.
+`specd-archive` MAY list `OVERLAP_CONFLICT` as a typical blocker and MUST tell the agent that the bypass `--skip-checks <id>` shown by `specd changes status` (for overlap, `--skip-checks spec.overlap`) applies only to a live blocker, never to `spec-overlap-conflict` review, and that no bypass is offered for a blocker whose status shows none.
 
 ### Requirement: Fast-track workflow template
 

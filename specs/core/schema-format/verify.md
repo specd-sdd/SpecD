@@ -624,6 +624,97 @@
 - **THEN** it throws `SchemaValidationError`
 - **AND** the unknown name does not become an axis slot
 
+#### Scenario: archiveChecks accepted on the archiving entry
+
+- **GIVEN** a `workflow` entry `step: archiving` with `archiveChecks: [{ id: spec.overlap, skippable: false }]`
+- **WHEN** the schema is parsed
+- **THEN** the declaration is kept with its `id` and `skippable`
+
+#### Scenario: archiveChecks rejected on any other step
+
+- **GIVEN** a `workflow` entry `step: implementing` with `archiveChecks: [{ id: spec.overlap }]`
+- **WHEN** the schema is built
+- **THEN** `SchemaValidationError` is thrown naming `implementing`
+
+#### Scenario: onFailure is rejected in archiveChecks
+
+- **GIVEN** `archiveChecks: [{ id: spec.overlap, onFailure: collect }]`
+- **WHEN** the schema is parsed
+- **THEN** `SchemaValidationError` is thrown
+- **AND** the key is not silently stripped
+
+#### Scenario: Unknown keys are rejected in archiveChecks
+
+- **GIVEN** `archiveChecks: [{ id: spec.overlap, from: ready }]`
+- **WHEN** the schema is parsed
+- **THEN** `SchemaValidationError` is thrown
+
+#### Scenario: Declarations are identified by id when layering
+
+- **GIVEN** `schemaOverrides.append.workflow` adds an `archiving` entry with `archiveChecks: [{ id: '@security.code-scan', config: { minSeverity: medium } }]`
+- **AND** the base schema already declares `archiveChecks` for another id
+- **WHEN** the layers are merged
+- **THEN** both declarations are present
+
+#### Scenario: checks on the archiving entry do not become archiveChecks
+
+- **GIVEN** an `archiving` entry with `checks: [{ id: deps.consistent }]` and no `archiveChecks`
+- **WHEN** the schema is parsed
+- **THEN** `archiveChecks` is absent and the `checks` declaration stays a transition-into-`archiving` declaration
+
+#### Scenario: Standard schema declares no archiveChecks
+
+- **WHEN** `@specd/schema-std` is loaded
+- **THEN** its `archiving` entry has no `archiveChecks`
+
+#### Scenario: checks, skipChecks, optional and disabled are accepted workflow options
+
+- **GIVEN** an entry using `optional`, `disabled`, `checks` and `skipChecks` with their documented fields
+- **WHEN** the schema is parsed
+- **THEN** each option is accepted without error
+
+#### Scenario: archiveChecks must be an array
+
+- **GIVEN** `archiveChecks: { id: spec.overlap }`
+- **WHEN** the schema is parsed
+- **THEN** `SchemaValidationError` is thrown
+
+#### Scenario: Declaration without id is rejected
+
+- **GIVEN** `archiveChecks: [{ skippable: true }]`
+- **WHEN** the schema is parsed
+- **THEN** `SchemaValidationError` is thrown
+
+#### Scenario: Wrongly typed fields are rejected
+
+- **GIVEN** `archiveChecks: [{ id: spec.overlap, skippable: "yes" }]`, or `disabled: 1`, or `config: [1]`
+- **WHEN** the schema is parsed
+- **THEN** each declaration throws `SchemaValidationError`
+
+#### Scenario: Empty archiveChecks equals omitted
+
+- **GIVEN** an `archiving` entry with `archiveChecks: []`
+- **WHEN** the schema is built
+- **THEN** it behaves exactly like an entry without `archiveChecks`
+
+#### Scenario: Same id introduced by two layers is rejected
+
+- **GIVEN** the base schema declares `archiveChecks` for `@security.code-scan` and `schemaOverrides.append.workflow` declares it again
+- **WHEN** the layers are merged
+- **THEN** `SchemaValidationError` is thrown, as for `checks` and `skipChecks`
+
+#### Scenario: Override adds archiveChecks to an entry that has none
+
+- **GIVEN** the base `archiving` entry has no `archiveChecks`
+- **WHEN** `schemaOverrides.append.workflow` adds `archiveChecks` for `step: archiving`
+- **THEN** the merged entry contains them and keeps its hooks and other options
+
+#### Scenario: A plugin schema layer can declare archiveChecks
+
+- **GIVEN** a schema plugin that adds an `archiving` entry with `archiveChecks`
+- **WHEN** the plugin layer is applied
+- **THEN** the declarations are present in the final schema
+
 ### Requirement: Explicit external hook entries
 
 #### Scenario: External hook entry declares nested type and opaque config

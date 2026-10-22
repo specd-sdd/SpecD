@@ -692,14 +692,17 @@ selector:
 
 ### Step fields
 
-| Field                    | Type                  | Required | Description                                                                                           |
-| ------------------------ | --------------------- | -------- | ----------------------------------------------------------------------------------------------------- |
-| `step`                   | string                | yes      | Lookup key: existing lifecycle state name (`designing`, `implementing`, …).                           |
-| `optional`               | boolean               | no       | When `true`, the step is skippable in the topology if step-skip checks pass. Defaults to `false`.     |
-| `disabled`               | boolean               | no       | When `true`, the step is omitted from the active pipeline and cannot be entered. Defaults to `false`. |
-| `requires`               | array of artifact IDs | no       | Artifacts that must be `complete` (or `skipped`) before this step is available.                       |
-| `requiresTaskCompletion` | array of artifact IDs | no       | Artifacts whose `taskCompletionCheck` must pass before **this** step is entered.                      |
-| `hooks`                  | object                | no       | `pre` and/or `post` arrays of hook entries for this step's boundaries.                                |
+| Field                    | Type                  | Required | Description                                                                                                                                  |
+| ------------------------ | --------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `step`                   | string                | yes      | Lookup key: existing lifecycle state name (`designing`, `implementing`, …).                                                                  |
+| `optional`               | boolean               | no       | When `true`, the step is skippable in the topology if step-skip checks pass. Defaults to `false`.                                            |
+| `disabled`               | boolean               | no       | When `true`, the step is omitted from the active pipeline and cannot be entered. Defaults to `false`.                                        |
+| `requires`               | array of artifact IDs | no       | Artifacts that must be `complete` (or `skipped`) before this step is available.                                                              |
+| `requiresTaskCompletion` | array of artifact IDs | no       | Artifacts whose `taskCompletionCheck` must pass before **this** step is entered.                                                             |
+| `hooks`                  | object                | no       | `pre` and/or `post` arrays of hook entries for this step's boundaries.                                                                       |
+| `checks`                 | array                 | no       | Check declarations evaluated when entering this step (`id`, `from`, `along`, `onFailure`, `skippable`, `disabled`, `config`).                |
+| `skipChecks`             | array                 | no       | Check declarations evaluated when this optional step is bypassed (`id`, `onFailure`, `skippable`, `disabled`, `config`).                     |
+| `archiveChecks`          | array                 | no       | Check declarations for the archive operation. **Only valid on `step: archiving`** (`id`, `skippable`, `disabled`, `config`; no `onFailure`). |
 
 ### Workflow topology rules
 
@@ -716,6 +719,55 @@ The workflow-topology functions (`resolveWorkflowPipeline`, `listWorkflowTransit
    - Hooks for bypassed intermediate steps are strictly suppressed (only source post-hooks and target pre-hooks fire).
    - An optional step with an empty effective skip-check set is bypassable unconditionally. With one or more effective bindings, every binding must pass. The effective set includes registry bindings plus schema `skipChecks`.
    - Core recommends the furthest passing shortcut across consecutive optional steps, falls back to entering the closest optional step when a bypass predicate fails, and preserves explicit entry as an alternative. Skills consume this recommendation rather than selecting a route.
+
+### Archive operation checks
+
+`archiveChecks` tunes the checks that run when a change is archived (`specd changes archive`). It is the third check surface of a workflow row, independent of `checks` (evaluated when entering the step) and `skipChecks` (evaluated when bypassing an optional step). Checks declared in the `archiving` row's `checks` apply to entering `archiving`, never to the archive operation.
+
+```yaml
+workflow:
+  - step: archiving
+    archiveChecks:
+      # Tune a core check: never archive over a live overlap
+      - id: spec.overlap
+        skippable: false
+      # Disable a core check this project does not need
+      - id: impl.linksInScope
+        disabled: true
+      # Embed a check registered by a host or plugin, and configure it
+      - id: '@security.code-scan'
+        skippable: true
+        config:
+          minSeverity: critical # deep-merged over the plugin's defaultConfig
+```
+
+Each declaration accepts only `id` (required), `skippable`, `disabled`, and `config`. Any other key, including `onFailure`, is rejected with a schema validation error: archive predicate failures have no abort/collect distinction, so the field would do nothing. `archiveChecks` is valid only on the `archiving` row; on any other row the schema fails to build. The same project override works from `specd.yaml`:
+
+```yaml
+schemaOverrides:
+  append:
+    workflow:
+      - step: archiving
+        archiveChecks:
+          - id: '@security.code-scan'
+            config:
+              minSeverity: medium
+```
+
+Declaring the same `id` twice in one array, or in two schema layers, is an error. Declaring it in `checks` and in `archiveChecks` of the `archiving` row is allowed: they are different coordinates.
+
+What a schema can change on archive is governed by the check registry locks:
+
+| Check                                                                                                                | Skippable by default | Schema may disable | Schema may set `skippable` | Schema may set `config` |
+| -------------------------------------------------------------------------------------------------------------------- | -------------------- | ------------------ | -------------------------- | ----------------------- |
+| `spec.overlap`, `impl.linksInScope`                                                                                  | yes                  | yes                | yes                        | yes                     |
+| `workspace.readOnly`, `impl.filesResolved`, `deps.consistent`                                                        | no                   | **no**             | **no**                     | **no**                  |
+| `schema.nameMatch`, `archive.archivable`, `workflow.taskCompletion`, `verification.current`, `hook.pre`, `hook.post` | no                   | no                 | no                         | no                      |
+| Plugin check bound to `{ scope: 'archive' }`                                                                         | per its binding      | per its governance | per its governance         | per its governance      |
+
+`workspace.readOnly` is a security boundary, and unresolved implementation or inconsistent dependencies would produce an invalid archive, so those three checks cannot be relaxed on archive by any schema or flag. Repeating a locked check with its existing values (for example `skippable: false` on `workspace.readOnly`) is accepted. Declaring a check that no archive binding serves is _embedding_ and requires the check to allow schema embedding (`approval.spec`, for example, does not). Violations raise `CheckDisableForbiddenError`, `CheckBindingOverrideForbiddenError`, `CheckConfigOverrideForbiddenError`, or `CheckEmbeddingForbiddenError` when the schema is built. `@specd/schema-std` declares no `archiveChecks`.
+
+At archive time a check can be bypassed with `specd changes archive <name> --skip-checks <id>` only when its resolved binding is skippable. See the [CLI reference](../cli/cli-reference.md) and the [custom checks guide](../core/custom-checks.md).
 
 ### Hook entries
 

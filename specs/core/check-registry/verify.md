@@ -106,6 +106,18 @@
 - **WHEN** attempting to register another binding for the exact same `{ scope: 'step-skip', step: 'implementing' }`
 - **THEN** it throws `DuplicateCheckBindingError`
 
+#### Scenario: Duplicate archiveChecks declaration for one check
+
+- **GIVEN** a schema whose `archiveChecks` lists `spec.overlap` twice
+- **WHEN** the schema is built
+- **THEN** `DuplicateCheckBindingError` is thrown for coordinate `{ checkId: spec.overlap, scope: 'archive' }`
+
+#### Scenario: Archive and transition coordinates are independent
+
+- **GIVEN** `deps.consistent` is bound on `ready` transitions and on archive
+- **WHEN** a schema disables it in `archiveChecks`
+- **THEN** only the archive coordinate is affected
+
 ### Requirement: Two-tier governance and confinement locks
 
 #### Scenario: allowSchemaEmbedding false forbids new coordinates
@@ -247,6 +259,88 @@
 - **AND** a change with out-of-scope implementation links
 - **WHEN** `TransitionChange` attempts `verifying → done`
 - **THEN** the synthesized binding evaluates the real check and the transition fails with `CheckPredicateFailedError` for `impl.linksInScope`
+
+#### Scenario: Archive exception locks workspace.readOnly
+
+- **WHEN** a schema declares `archiveChecks: [{ id: workspace.readOnly, disabled: true }]`
+- **THEN** `CheckDisableForbiddenError` is thrown
+
+#### Scenario: Archive exception locks impl.filesResolved policy
+
+- **WHEN** a schema declares `archiveChecks: [{ id: impl.filesResolved, skippable: true }]`
+- **THEN** `CheckBindingOverrideForbiddenError` is thrown
+
+#### Scenario: Archive exception locks deps.consistent configuration
+
+- **WHEN** a schema declares `archiveChecks: [{ id: deps.consistent, config: { strict: true } }]`
+- **THEN** `CheckConfigOverrideForbiddenError` is thrown
+
+#### Scenario: The archive exception does not touch transition bindings
+
+- **WHEN** a schema disables `workspace.readOnly` on `checks` of the `ready` step
+- **THEN** it is accepted, because the transition binding keeps its Category C policy
+
+#### Scenario: spec.overlap and impl.linksInScope remain tunable on archive
+
+- **WHEN** a schema declares `archiveChecks` entries that disable `spec.overlap` and set `skippable: false` on `impl.linksInScope`
+- **THEN** the schema builds without error
+
+#### Scenario: Plugin archive binding is tunable without embedding
+
+- **GIVEN** a plugin check whose default bindings include `{ scope: 'archive' }` and `allowSchemaEmbedding: false`
+- **WHEN** a schema declares it in `archiveChecks` with a `config`
+- **THEN** the declaration is accepted as tuning of a code-defined coordinate
+
+#### Scenario: Plugin check without an archive binding cannot be embedded when locked
+
+- **GIVEN** a plugin check with default bindings only on transitions and `allowSchemaEmbedding: false`
+- **WHEN** a schema declares it in `archiveChecks`
+- **THEN** `CheckEmbeddingForbiddenError` is thrown
+
+#### Scenario: archiveChecks survive layer merging with locks intact
+
+- **GIVEN** a base schema and a `schemaOverrides` layer that both declare `archiveChecks`
+- **WHEN** the layers are merged
+- **THEN** entries are combined by `id` without clobbering either layer
+- **AND** a later layer cannot relax a lock set by code
+
+#### Scenario: Redeclaring a locked archive check without changing its policy is accepted
+
+- **WHEN** a schema declares `archiveChecks: [{ id: workspace.readOnly, skippable: false }]`
+- **THEN** the schema builds without error, because the value equals the code-defined policy
+
+#### Scenario: Category A and B archive checks reject disablement
+
+- **WHEN** a schema declares `archiveChecks` that set `disabled: true` on Category A archive checks (`schema.nameMatch`, `archive.archivable`, `verification.current`, `hook.pre`, `hook.post`) or Category B `workflow.taskCompletion`
+- **THEN** each declaration throws `CheckDisableForbiddenError`
+
+#### Scenario: Category A archive checks reject becoming skippable
+
+- **WHEN** a schema declares `archiveChecks: [{ id: schema.nameMatch, skippable: true }]`
+- **THEN** `CheckBindingOverrideForbiddenError` is thrown
+
+#### Scenario: A check with no archive binding cannot be embedded when locked
+
+- **WHEN** a schema declares `archiveChecks: [{ id: approval.spec }]`
+- **THEN** `CheckEmbeddingForbiddenError` is thrown
+
+#### Scenario: Plugin archive binding policy lock
+
+- **GIVEN** a plugin archive binding with `allowBindingOverride: false` and `skippable: false`
+- **WHEN** a schema declares it with `skippable: true`
+- **THEN** `CheckBindingOverrideForbiddenError` is thrown
+
+#### Scenario: Plugin configuration and disablement locks apply on archive
+
+- **GIVEN** a plugin check with `allowConfigOverride: false` and another with `allowDisable: false`, both bound to archive
+- **WHEN** a schema declares `config` on the first and `disabled: true` on the second
+- **THEN** `CheckConfigOverrideForbiddenError` and `CheckDisableForbiddenError` are thrown respectively
+
+#### Scenario: Plugin check tuned on archive merges config over its defaults
+
+- **GIVEN** a plugin check with `defaultConfig: { minSeverity: high }` bound to archive
+- **WHEN** a schema declares `config: { minSeverity: critical }`
+- **THEN** the effective configuration is `{ minSeverity: critical }`
 
 ### Requirement: Cascading configuration hierarchy
 

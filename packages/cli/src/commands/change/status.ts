@@ -267,6 +267,10 @@ JSON/TOON output schema:
                     ? `  ! ${b.code} — ${b.label}: ${b.message}`
                     : `  ! ${b.code}: ${b.message}`,
                 )
+                // Rendered exactly as GetStatus projected it; the CLI never builds a bypass.
+                if (b.bypassFlag !== undefined) {
+                  lines.push(`    bypass: ${b.bypassFlag}`)
+                }
               }
               lines.push('')
             }

@@ -14,5 +14,41 @@
     {
       "file": "core:src/composition/use-cases/validate-schema.ts"
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Validate project, raw, file, or reference schema via registry, extends resolution, and injected buildSchema.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:0999cb9317324216f3c60f9a81b4e53cb3f1acc327be79f07b59f44c4f53acdd",
+          "lastModified": "2026-08-25T15:37:19.359Z"
+        },
+        "verify.md": {
+          "hash": "sha256:6ffad5abe70096ff03f2e3f6c10bfd64b60ad4ab30e316bc1c400aa1f03760fd",
+          "lastModified": "2026-08-25T15:37:19.359Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# ValidateSchema\n## Rules\n- Project mode delegates full `ResolveSchema`; raw/file/ref load `resolveRaw`, cascade `extends`, build schema.\n- Return structured valid/errors/warnings for schema failures; unexpected bugs propagate.\n- File/ref successful extends emits resolution warning; factory uses resolver deps.\n## Constraints\n- Application use case; no infrastructure imports.\n- Never throws validation failures.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:0999cb9317324216f3c60f9a81b4e53cb3f1acc327be79f07b59f44c4f53acdd",
+          "lastModified": "2026-08-25T15:37:19.359Z"
+        },
+        "verify.md": {
+          "hash": "sha256:6ffad5abe70096ff03f2e3f6c10bfd64b60ad4ab30e316bc1c400aa1f03760fd",
+          "lastModified": "2026-08-25T15:37:19.359Z"
+        }
+      }
+    }
+  }
 }

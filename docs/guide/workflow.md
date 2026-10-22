@@ -249,6 +249,19 @@ The workflow-topology domain functions (`resolveWorkflowPipeline`, `isWorkflowSt
 
 Registry bindings and schema `skipChecks` are composed into the effective set. For example, `implementing` can be conditional because Core binds `workflow.tasksEmpty` even if the YAML row has no inline `skipChecks`. Passing the bypass policy changes only the recommendation: explicit entry into an optional step remains a legal alternative. Skills consume `nextAction.command` and `nextAction.targetStep`; they do not inspect tasks or choose a path independently.
 
+### Archive checks and bypass
+
+Archiving is an operation, not a lifecycle hop, and it resolves its checks through the same cascade as transitions: the built-in archive checks, the checks bound by hosts and plugins, and the schema's `archiveChecks` on the `archiving` row, all under the registry governance locks.
+
+Only checks whose resolved binding is skippable can be bypassed, with the generic flag:
+
+```bash
+specd changes archive <name> --skip-checks spec.overlap
+specd changes archive <name> --skip-checks spec.overlap,impl.linksInScope
+```
+
+By default only `spec.overlap` and `impl.linksInScope` are skippable. `workspace.readOnly`, `impl.filesResolved`, `deps.consistent`, `verification.current`, and the schema, archivable, and task-completion checks can never be bypassed on archive, and `specd changes status` shows a bypass flag only for blockers that can be skipped. `--allow-overlap` and `--allow-out-of-scope` are CLI aliases of the two skippable ids above.
+
 ### Shortcut transitions via `--next`
 
 When intermediate steps are skipped or disabled, changes do not need to pause in every intermediate state. The CLI supports shortcut transitions:

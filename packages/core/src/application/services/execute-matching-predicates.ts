@@ -50,10 +50,6 @@ export interface BuildCheckExecutionContextInput {
   readonly validity?: import('../../domain/services/change-validity.js').ChangeValidityVerdict
   readonly checkRegistry?: CheckRegistry
   readonly config?: Readonly<Record<string, unknown>>
-  /** @deprecated Kept for transition compatibility */
-  readonly allowOverlap?: boolean
-  /** @deprecated Kept for transition compatibility */
-  readonly allowOutOfScope?: boolean
 }
 
 /**

@@ -11,50 +11,53 @@
   ],
   "implementation": [
     {
-      "file": "skills:templates/skills/specd-compliance/SKILL.md.tpl"
+      "file": "skills:templates/skills/specd-archive/SKILL.md.tpl"
+    },
+    {
+      "file": "skills:templates/skills/specd-design/SKILL.md.tpl"
+    },
+    {
+      "file": "skills:templates/skills/specd-implement/SKILL.md.tpl"
+    },
+    {
+      "file": "skills:templates/skills/specd-new/SKILL.md.tpl"
     },
     {
       "file": "skills:templates/skills/specd-verify/SKILL.md.tpl"
-    },
-    {
-      "file": "skills:test/infrastructure/skill-repository.spec.ts"
-    },
-    {
-      "file": "skills:test/generated-skill-protocol.spec.ts"
     }
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Defines capability-aware, metadata-contract templates and runtime frontmatter rendering for all supported skill and agent installs.",
+      "value": "Defines capability-aware skill/agent template sources, metadata contracts, rendering, runtime frontmatter, and workflow command guidance.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:3a8aec1db4e5424b1d4a042a2efbde3a252c5f2316171cc1185d14820a170519",
-          "lastModified": "2026-08-27T16:46:08.182Z"
+          "hash": "sha256:facb5210141dcd95e5ade6461cc4bb689cf0304e76720c6fa77e6b830add65f1",
+          "lastModified": "2026-09-28T06:29:52.227Z"
         },
         "verify.md": {
-          "hash": "sha256:d20b87e8139b2d2f82c0ede65c5ad92592ebb31de1ef9efc1b7fcf5f7a92532c",
-          "lastModified": "2026-08-27T16:46:08.182Z"
+          "hash": "sha256:9e8ff0af31d39b9cca0802948692b3742799807f6a992ee395b09a38da36f4e3",
+          "lastModified": "2026-09-28T06:34:40.691Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# Skill templates source\n\n## Rules\n\n- Sources: `packages/skills/templates/skills/<skill-name>/SKILL.md.tpl`; agents: `packages/skills/templates/agents/<agent-name>/SPECD-AGENT.md.tpl`. Sources `.md.tpl`; installed outputs `.md`.\n- Every skill/agent dir: `skill.meta.json`/`specd-agent.meta.json`. Schema: `kind`, `supportedCapabilities`, `requiredCapabilities`, `requiredSharedTemplates`; `kind` matches `skills/` or `agents/`.\n- Layout: `templates/skills/`, `templates/agents/`, `templates/shared/`. No `specd-metadata/` skill template. `shared.meta.json` not canonical consumer source.\n- Rendering: deterministic, single-pass Handlebars; no arbitrary code/runtime scripting. Capabilities: `mcp` MCP branches; `agents` delegation branches; `frontmatter` injects `variables.frontmatter`.\n- Shared reference exactly `@{{sharedFolder}}/shared.md`; `sharedFolder` project-root-relative.\n- Graph impact: dependents=`--direction dependents` (`upstream` compatibility); dependencies=`--direction dependencies` (`downstream` compatibility); both=`--direction both`. Files: `specd graph impact --file <path1> <path2> ...`; never `--changes`; never call downstream dependents.\n- Graph search snippets opt-in: include `--snippet` only for previews; omit for identifiers/locations. `json`/`toon` omit `snippet` absent `--snippet`.\n- Frontmatter: canonical metadata + vendor contracts. Plugins pass structured `variables.frontmatter`, capabilities; never prebuilt YAML. `@specd/skills` injects only skill-local frontmatter-capable render; shared files never frontmatter. Emit target-recognized fields only.\n- Runtime field coverage: Codex `name`, `description`; Copilot `name`, `description`, `license`, `allowed-tools`, `user-invocable`, `disable-model-invocation`; Open Code `name`, `description`, `license`, `compatibility`, `metadata`.\n- Workflow templates: code/spec links mention `specd changes implementation add`; archive resolves/reviews tracked implementation. No status scans (`stale`, `missing`, `invalid`) or routine `specd spec generate-metadata`; present it only forced rebuild/cache-warm/repair/diagnostic.\n- Optimizer agents gate on `specd project status --format toon`: only act when top-level `llmOptimizedContext` == `true`; never `specd specs metadata` gate. Persist direct `cli:spec-optimizations` set options; never combine with `--input`; never generate metadata afterward.\n- Read surfaces: `specd specs show <spec-id>` raw authoring/review; `specd specs context <spec-id>` semantic/filter/dependency/optimized context; `specd specs metadata <spec-id>` self-healed projection diagnostics only. Archive may inspect `source`, `regenerated`, warnings; config still top-level `llmOptimizedContext`. Tests assert exact commands/fields.\n- `templates/skills/specd-fasttrack/`: `SKILL.md.tpl`, `skill.meta.json` (`kind: \"skill\"`, `requiredSharedTemplates` includes `shared.md`, all referenced capabilities), no static frontmatter, shared reference exact above. Rendered workflow immediately updates `.specd-exploration.md` after meaningful decision, scope/contract finding, edit, implementation link, test/debug, audit; preserve changed/why/affected files/symbols. Final consolidation summarizes, never replaces increments.\n\n## Constraints\n\n- No static frontmatter YAML. `.md.tpl` sources; every skill dir `skill.meta.json`.\n- `shared.meta.json` not canonical shared requirement source; installed markdown no absolute paths.\n- Templates may use install-time frontmatter insertion. Plugins declare capabilities/structured `variables.frontmatter`; never unsupported runtime fields. `@specd/skills` injects final skill-local frontmatter.\n- Graph terms use dependents/dependencies; `upstream`/`downstream` compatibility only; use `--file`, never `--changes`.",
+      "value": "# Skill templates source\n\n## Rules\n- Sources: `packages/skills/templates/skills/<skill-name>/SKILL.md.tpl`; agents: `templates/agents/<agent-name>/SPECD-AGENT.md.tpl`. Installed outputs remove `.tpl`.\n- Every directory owns `skill.meta.json` or `specd-agent.meta.json`: kind, supported/required capabilities, shared templates.\n- Deterministic single-pass Handlebars; capabilities choose MCP/agents/frontmatter behavior. Shared reference exactly `@{{sharedFolder}}/shared.md`.\n- Graph guidance: `--direction dependents|dependencies`; `--file` for file impact; snippets only explicit preview; no `--changes`.\n- Templates contain no static frontmatter. Plugins supply structured `variables.frontmatter`; skills inject target-supported runtime fields locally.\n- Workflow templates use implementation tracking links, metadata self-healing only for repair, in-place approvals, reconciled invalidation, correct overlap distinction and archive hook behavior.\n- Optimizers gate on top-level `llmOptimizedContext`; use persisted `specs optimizations set` direct fields, never metadata gate/input mixing/regeneration.\n- Fast-track records decisions continuously, then summarizes; uses governing context, confirmation, and dependents terminology.\n\n## Constraints\n- No static YAML frontmatter or absolute installed paths.\n- `.md.tpl` sources; every skill directory has metadata.\n- Runtime fields limited to target support.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:3a8aec1db4e5424b1d4a042a2efbde3a252c5f2316171cc1185d14820a170519",
-          "lastModified": "2026-08-27T16:46:08.182Z"
+          "hash": "sha256:facb5210141dcd95e5ade6461cc4bb689cf0304e76720c6fa77e6b830add65f1",
+          "lastModified": "2026-09-28T06:29:52.227Z"
         },
         "verify.md": {
-          "hash": "sha256:d20b87e8139b2d2f82c0ede65c5ad92592ebb31de1ef9efc1b7fcf5f7a92532c",
-          "lastModified": "2026-08-27T16:46:08.182Z"
+          "hash": "sha256:9e8ff0af31d39b9cca0802948692b3742799807f6a992ee395b09a38da36f4e3",
+          "lastModified": "2026-09-28T06:34:40.691Z"
         }
       }
     }

@@ -145,6 +145,12 @@
 - **THEN** its optional fields are limited to the documented override set (`contextMode`, `llmOptimizedContext`, `includeChangeSpecs`, `followDeps`, `depth`, `sections`, `fingerprint`) plus required per-call identifiers (`name`, `step`)
 - **AND** it does not declare `config` or approval gate fields
 
+#### Scenario: Archive and transition accept uniform check bypasses only
+
+- **WHEN** `ArchiveChangeInput` and `TransitionChangeInput` are inspected
+- **THEN** both list `skipHookPhases` and `skipChecks` among their per-call override fields
+- **AND** neither declares ad-hoc bypass booleans such as `allowOverlap` or `allowOutOfScope`
+
 ### Requirement: Kernel entries must match use case types
 
 #### Scenario: Kernel entry type matches use case class

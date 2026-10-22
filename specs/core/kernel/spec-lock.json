@@ -57,7 +57,6 @@
     "core:get-specs-health",
     "core:count-tasks",
     "core:check-registry",
-    "core:get-project-summary",
     "core:archive-repository-port",
     "core:get-draft",
     "core:get-discarded",
@@ -69,14 +68,10 @@
     "core:get-spec-outline",
     "core:validate-schema",
     "core:resolve-context-specs",
+    "core:get-project-summary",
     "core:actor-resolver"
   ],
-  "implementation": [
-    {
-      "file": "core:src/composition/kernel.ts",
-      "symbols": ["getProjectSummary"]
-    }
-  ],
+  "implementation": [],
   "optimizations": {
     "optimizedDescription": {
       "value": "Immutable Kernel facade wires grouped domain use cases; ConfigWriter separately owns configuration mutation.",

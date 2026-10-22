@@ -27,36 +27,36 @@
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Governed CLI lifecycle transitions with Core-resolved routing, validity recovery, hooks, progress, and repair diagnostics.",
+      "value": "CLI executes one Core-governed lifecycle hop with generic check-bus hook progress and canonical failure guidance.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:536aec77f7347e02c2ec4372763a1b8b4f67f2f9e72300c972aab522a567de9e",
-          "lastModified": "2026-09-28T06:29:51.815Z"
+          "hash": "sha256:ac780aeb73516d3a941276fe21cc565824c86b7060756bb252a0145644f66bc1",
+          "lastModified": "2026-10-20T14:34:09.625Z"
         },
         "verify.md": {
-          "hash": "sha256:8e1d86dbcdee0758375f3ed046172194f3495dd0f30d688bdddefa182b65eadf",
-          "lastModified": "2026-09-28T06:29:51.819Z"
+          "hash": "sha256:6888ca7a63e296d0244789fcf5c82d378a592b8ee0dfb9a50104dc506990bd75",
+          "lastModified": "2026-10-20T14:34:09.625Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# Change Transition\n## Rules\n- Commands: `specd changes transition <name> <step> ...` or `--next`; alias `specd change transition`. `<name>` required; `<step>` required unless mutually exclusive `--next`. Options: `--skip-hooks <source.pre,source.post,target.pre,target.post,all>`, `--allow-out-of-scope`, `--format text|json|toon`.\n- `--next` passes `to: 'next'`; Core resolves happy-path state. CLI never keeps routing table or uses `GetStatus.nextAction` as resolver. Core rejection from no-auto-hop states exits 1 with explanatory stderr `error:`.\n- Consume canonical `GetStatus`/`TransitionChange` validity results before `next` and after reconciled failure. Automatic recovery output shows actual state, invalidated evidence, reason, next action: stale required spec approval routes through `designing`/`ready`; stale sign-off alone to `done`; stale verification recommends in-place verification only at required boundary. Never retry, select alternate transition, expose attempt restart, accept `verifying → verifying`, or claim attempt completion. Entry to `verifying` reports readiness; exit to `done` reports `verification.current`.\n- Never call `RefreshImplementationTracking`/`ImplementationDetector`. Pre-transition and repair `GetStatus` use `refreshImplementationTracking: false`; `TransitionChange` retains default refresh.\n- No approval flags to `TransitionChange.execute`; kernel uses `config.approvals`. Never rewrite logical target for approval/sign-off; failed gates stay `ready`/`done`.\n- `--allow-out-of-scope` sets `allowOutOfScope: true` only for `impl.linksInScope`, never `impl.filesResolved`; omission leaves field unset. `--skip-hooks` maps to `skipHookPhases`; `all` delegates manual `change run-hooks`.\n- Default effects: source.post hooks → target.pre hooks → transition; fail-fast. Hook failure exits 2, stderr `error:`, no Repair Guide.\n- Pass `onProgress`. Text uses generic check bus: `check-start`, optional `check-progress`, `check-done`; hooks appear as `Running pre hooks`/`Running post hooks`; render `<label> (<id>)`, lines, then `✓ <label>` or `✗ <label>: <reason>`; never `Executing:`. Keep in-flight hook output visible even on failure. `change transition` never emits public `hook-progress`; `run-hooks` may retain its presenter.\n- JSON/TOON emit stdout NDJSON records, all `stream: \"change-transition\"`; terminal `event.type: \"complete\"`. Success result: `result`, `name`, `from`, `to`; failure: `result: \"failure\"`, `name`, `from`, `to`, `blockers`, `nextAction`.\n- Text success prints final confirmation stdout after stderr progress. Invalid transition, unsatisfied requires, incomplete tasks, or rejected `next`: exit 1, stderr `error:`; incomplete tasks name artifact.\n- Text repair-guide errors use canonical `GetStatus` transition-check blockers/nextAction on stderr: `! <CODE> — <label>: <message>` or unlabeled `! <CODE>: <message>` plus target/command/reason. Surface human-gate reason. Never recompute diagnostics in CLI.\n## Constraints\n- Help exposes logical target, never routing.\n- `HookFailedError` is not repair-guide error.\n- Text: progress stderr, confirmation stdout. JSON/TOON: structured stream stdout; stderr only non-structured diagnostics.",
+      "value": "# Change Transition\n## Rules\n- specd change transition name [step] [--next]: name plus exactly step/next; usage error exit 1 before TransitionChange. skip-checks plus legacy allow-out-of-scope=impl.linksInScope, allow-overlap=spec.overlap; pass skipChecks.\n- next passes to next; Core resolves enabled single hop. CLI never routing/optional shortcut; unavailable next exit 1 stderr error.\n- Use canonical GetStatus/TransitionChange reconciliation; report actual recovery. No retry/alternate target/attempt restart/verifying self hop/attempt claims. No direct tracking refresh; status refreshImplementationTracking false, transition default refresh.\n- No approval flags/target rewrite; kernel config gates; gates remain ready/done.\n- Default source.post then target.pre then transition, fail-fast. skip-hooks maps skipHookPhases; all requires manual change run-hooks.\n- onProgress generic check bus; hooks rendered Running pre/post hooks; text label/id plus progress and pass/fail/skip, never Executing. Recheck only when hooks ran.\n- JSON/TOON stdout NDJSON stream change-transition, terminal complete result. Text progress stderr, confirmation stdout. Hook failure exit 2 error, no Repair Guide.\n- Predicate failures use canonical Repair Guide, code/gerund/remediation/exact skippable bypass. Task/requires failures exit 1 and name blocking artifact.\n## Constraints\n- Help logical target only; Core projects blockers/action; HookFailedError not Repair Guide.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:536aec77f7347e02c2ec4372763a1b8b4f67f2f9e72300c972aab522a567de9e",
-          "lastModified": "2026-09-28T06:29:51.815Z"
+          "hash": "sha256:ac780aeb73516d3a941276fe21cc565824c86b7060756bb252a0145644f66bc1",
+          "lastModified": "2026-10-20T14:34:09.625Z"
         },
         "verify.md": {
-          "hash": "sha256:8e1d86dbcdee0758375f3ed046172194f3495dd0f30d688bdddefa182b65eadf",
-          "lastModified": "2026-09-28T06:29:51.819Z"
+          "hash": "sha256:6888ca7a63e296d0244789fcf5c82d378a592b8ee0dfb9a50104dc506990bd75",
+          "lastModified": "2026-10-20T14:34:09.625Z"
         }
       }
     }
