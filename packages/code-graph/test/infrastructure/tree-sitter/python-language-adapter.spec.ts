@@ -2,7 +2,11 @@ import { describe, it, expect, afterEach } from 'vitest'
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { PythonLanguageAdapter } from '../../../src/infrastructure/tree-sitter/python-language-adapter.js'
+import {
+  PythonLanguageAdapter,
+  normalizePythonDistName,
+  readPythonProjectName,
+} from '../../../src/infrastructure/tree-sitter/python-language-adapter.js'
 import { SymbolKind } from '../../../src/domain/value-objects/symbol-kind.js'
 import { RelationType } from '../../../src/domain/value-objects/relation-type.js'
 import { ImportDeclarationKind } from '../../../src/domain/value-objects/import-declaration-kind.js'
@@ -1355,5 +1359,168 @@ describe('Python imported base expression ranges', () => {
     )
 
     expect(edges.map((edge) => edge.range)).toEqual([at(3, line, 'A'), at(3, line, 'B')])
+  })
+
+  describe('Python package resolution hardening', () => {
+    let tempDir: string
+
+    afterEach(() => {
+      if (tempDir !== undefined) rmSync(tempDir, { recursive: true, force: true })
+    })
+
+    describe('normalizePythonDistName', () => {
+      it('lowercases letters and collapses runs of separators to a single hyphen', () => {
+        expect(normalizePythonDistName('Acme.Auth')).toBe('acme-auth')
+        expect(normalizePythonDistName('foo..__--bar')).toBe('foo-bar')
+        expect(normalizePythonDistName('Simple_Name')).toBe('simple-name')
+      })
+    })
+
+    it('Scenario: PEP 503 distribution name normalization', () => {
+      const session = new InMemoryIndexSession()
+      // Scenario: Dots and case normalize
+      expect(
+        baseAdapter.packageResolution.matchSpecifier('acme_auth.models', ['Acme.Auth'], session),
+      ).toBe('Acme.Auth')
+
+      // Scenario: Equal normalized names stay unresolved
+      expect(
+        baseAdapter.packageResolution.matchSpecifier(
+          'acme_auth.models',
+          ['acme-auth', 'acme_auth'],
+          session,
+        ),
+      ).toBeUndefined()
+    })
+
+    it('Scenario: Submodule without __init__.py resolves when unambiguous', () => {
+      const session = new InMemoryIndexSession()
+      session.registerFile({
+        filePath: 'auth:acme_auth/models.py',
+        projectRelativePath: 'acme_auth/models.py',
+        language: 'python',
+        contentHash: 'hash',
+        workspace: 'auth',
+      })
+      session.registerFile({
+        filePath: 'app:main.py',
+        projectRelativePath: 'main.py',
+        language: 'python',
+        contentHash: 'hash',
+        workspace: 'app',
+      })
+      const draft = baseAdapter.analyzeFile(
+        'app:main.py',
+        'from acme_auth import models\nx = models\n',
+        { session, workspaceName: 'app' },
+      )
+      const analysis: FileAnalysis = {
+        fileId: 2,
+        filePath: 'app:main.py',
+        projectRelativePath: 'main.py',
+        contentHash: 'hash',
+        workspace: 'app',
+        language: 'python',
+        symbols: draft.symbols,
+        imports: draft.imports,
+        bindingFacts: draft.bindingFacts,
+        callFacts: draft.callFacts,
+      }
+
+      const resolved = baseAdapter.resolveImports(
+        analysis,
+        createImportResolutionContext(
+          {
+            session,
+            packageToWorkspace: new Map([['acme_auth', 'auth']]),
+          },
+          baseAdapter,
+        ),
+      )
+
+      expect(resolved.fileImports).toEqual(['auth:acme_auth/models.py'])
+      expect(resolved.importMap.size).toBe(0)
+      expect(resolved.diagnostics).toEqual([])
+    })
+
+    it('Scenario: Multiple submodules with equal name are ambiguous', () => {
+      const session = new InMemoryIndexSession()
+      // Submodule indexed under codeRoot and under src/
+      session.registerFile({
+        filePath: 'auth:acme_auth/models.py',
+        projectRelativePath: 'acme_auth/models.py',
+        language: 'python',
+        contentHash: 'hash',
+        workspace: 'auth',
+      })
+      session.registerFile({
+        filePath: 'auth:src/acme_auth/models.py',
+        projectRelativePath: 'src/acme_auth/models.py',
+        language: 'python',
+        contentHash: 'hash',
+        workspace: 'auth',
+      })
+      session.registerFile({
+        filePath: 'app:main.py',
+        projectRelativePath: 'main.py',
+        language: 'python',
+        contentHash: 'hash',
+        workspace: 'app',
+      })
+      const draft = baseAdapter.analyzeFile(
+        'app:main.py',
+        'from acme_auth import models\nx = models\n',
+        { session, workspaceName: 'app' },
+      )
+      const analysis: FileAnalysis = {
+        fileId: 3,
+        filePath: 'app:main.py',
+        projectRelativePath: 'main.py',
+        contentHash: 'hash',
+        workspace: 'app',
+        language: 'python',
+        symbols: draft.symbols,
+        imports: draft.imports,
+        bindingFacts: draft.bindingFacts,
+        callFacts: draft.callFacts,
+      }
+
+      const resolved = baseAdapter.resolveImports(
+        analysis,
+        createImportResolutionContext(
+          {
+            session,
+            packageToWorkspace: new Map([['acme_auth', 'auth']]),
+          },
+          baseAdapter,
+        ),
+      )
+
+      expect(resolved.fileImports).toEqual([])
+      expect(resolved.diagnostics).toEqual([
+        expect.objectContaining({
+          filePath: 'app:main.py',
+          specifier: 'acme_auth',
+          exportedName: 'models',
+          reason: 'ambiguous',
+        }),
+      ])
+    })
+
+    it('Scenario: Package manifest located once in prepare and pyproject.toml without project name is skipped', () => {
+      tempDir = mkdtempSync(join(tmpdir(), 'py-prep-'))
+      writeFileSync(join(tempDir, 'pyproject.toml'), '[project]\nname = "parent-pkg"\n')
+      const subDir = join(tempDir, 'sub')
+      mkdirSync(subDir, { recursive: true })
+      writeFileSync(join(subDir, 'pyproject.toml'), '[tool.poetry]\nname = "sub-tool"\n')
+
+      const skippedMessages: string[] = []
+      const report = (msg: string) => skippedMessages.push(msg)
+
+      const identity = baseAdapter.packageResolution.identity(subDir, tempDir, report)
+      expect(identity).toBe('parent-pkg')
+      expect(skippedMessages).toHaveLength(1)
+      expect(skippedMessages[0]).toContain('Package manifest skipped (no identity):')
+    })
   })
 })

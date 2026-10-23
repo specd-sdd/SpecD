@@ -313,9 +313,13 @@ blocks the graph forever:
 ### Schema shape and recreation
 
 Opening storage checks the schema version before any DDL runs and the column shape of
-every ordinary table after it. A database whose tables lack columns the current DDL
-declares is `SCHEMA_INCOMPATIBLE`, exactly like an older version, and is recovered by
-`graph index --force` (recreate and rebuild). `recreate()` removes only the database
+every ordinary table after it. Storage uses schema version 16, which persists nullable
+`files.namespace` and `files.namespace_separator` columns so that files hydrated from the
+store contribute their qualified names during incremental indexing without needing
+re-analysis. An existing database at schema version 15 or earlier lacks these columns and
+opening it raises a `GraphStorageRecoveryRequiredError` with reason `'SCHEMA_INCOMPATIBLE'`,
+exactly like an older version. It is recovered by `graph index` (or `graph index --force`),
+which recreates storage and rebuilds the graph. `recreate()` removes only the database
 files (`code-graph.sqlite`, `-wal`, `-shm`), leaves `index.lock` alone, and rotates
 `storage.epoch`.
 
@@ -352,6 +356,15 @@ bounded sample per reason. An import of a package that no workspace declares (an
 dependency, for example) is not a failure: it is counted only in `externalPackageImports`. An adapter without the package resolution
 facet is listed once in `adaptersWithoutPackageResolution` and is never counted as a failure.
 Diagnostics are never persisted and never affect the graph fingerprint.
+
+On partial runs (`graph index --workspace <name>`), the indexer indexes only the requested
+workspace subset, but maps package identities and prepares manifests for all configured
+workspaces. This ensures that cross-workspace imports from the indexed workspace resolve
+identically to a full indexing run. Workspace accessibility is port-driven through
+`WorkspaceAccessibilitySource`. If any configured workspace is inaccessible (for example
+an external workspace whose repository has not been cloned locally, or when the accessibility probe fails),
+the probe failure is non-fatal: the workspace is skipped with a diagnostic in `IndexResult.errors`,
+its declared packages remain external (`package-unknown`), and the indexing run continues successfully without failing.
 
 ### Imported hierarchy evidence
 

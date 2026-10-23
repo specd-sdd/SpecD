@@ -4,6 +4,8 @@ import { dirname, join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { IndexCodeGraph } from '../../../src/application/use-cases/index-code-graph.js'
 import { emptyResolutionManifestSource } from '../../../src/application/ports/resolution-manifest-source.js'
+import { emptyRepositoryRootSource } from '../../../src/application/ports/repository-root-source.js'
+import { NodeWorkspaceAccessibilitySource } from '../../../src/infrastructure/fs/node-workspace-accessibility-source.js'
 import { AdapterRegistry } from '../../../src/infrastructure/tree-sitter/adapter-registry.js'
 import { PythonLanguageAdapter } from '../../../src/infrastructure/tree-sitter/python-language-adapter.js'
 import { GoLanguageAdapter } from '../../../src/infrastructure/tree-sitter/go-language-adapter.js'
@@ -63,7 +65,13 @@ describe('IndexCodeGraph package imports by language', () => {
     await store.open()
     const registry = new AdapterRegistry()
     registry.register(adapter)
-    const indexer = new IndexCodeGraph(store, registry, emptyResolutionManifestSource)
+    const indexer = new IndexCodeGraph(
+      store,
+      registry,
+      emptyResolutionManifestSource,
+      emptyRepositoryRootSource,
+      new NodeWorkspaceAccessibilitySource(),
+    )
     const result = await indexer.execute({
       projectRoot: tempDir,
       vcsRoot: tempDir,

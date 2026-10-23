@@ -17,27 +17,55 @@
   ],
   "implementation": [
     {
-      "file": "code-graph:src/application/services/package-import-resolver.ts",
-      "symbols": ["PackageImportResolver"]
+      "file": "code-graph:src/domain/value-objects/index-options.ts",
+      "symbols": ["IndexOptions"]
     },
     {
-      "file": "code-graph:src/application/use-cases/index-code-graph.ts",
-      "symbols": ["IndexCodeGraph"]
-    },
-    {
-      "file": "code-graph:src/application/use-cases/in-memory-index-session.ts",
-      "symbols": ["InMemoryIndexSession"]
+      "file": "code-graph:src/application/ports/repository-root-source.ts",
+      "symbols": ["RepositoryRootSource"]
     },
     {
       "file": "code-graph:src/domain/value-objects/index-session.ts",
       "symbols": ["IndexSession"]
     },
     {
-      "file": "code-graph:src/domain/services/scoped-binding-environment.ts"
+      "file": "code-graph:src/application/use-cases/in-memory-index-session.ts",
+      "symbols": ["InMemoryIndexSession"]
     },
     {
-      "file": "code-graph:src/domain/value-objects/index-result.ts",
-      "symbols": ["ImportDiagnosticSummary"]
+      "file": "code-graph:src/application/use-cases/index-code-graph.ts",
+      "symbols": ["IndexCodeGraph"]
+    },
+    {
+      "file": "code-graph:src/infrastructure/vcs/vcs-repository-root-source.ts",
+      "symbols": ["VcsRepositoryRootSource"]
+    },
+    {
+      "file": "code-graph:src/composition/create-code-graph-provider.ts",
+      "symbols": ["createCodeGraphProvider"]
+    },
+    {
+      "file": "code-graph:test/application/use-cases/index-code-graph-package-resolution.spec.ts"
+    },
+    {
+      "file": "code-graph:test/application/use-cases/index-code-graph-incremental.spec.ts"
+    },
+    {
+      "file": "code-graph:test/application/use-cases/package-resolution.spec.ts"
+    },
+    {
+      "file": "code-graph:src/application/ports/workspace-accessibility-source.ts",
+      "symbols": ["WorkspaceAccessibilitySource"]
+    },
+    {
+      "file": "code-graph:src/infrastructure/fs/node-workspace-accessibility-source.ts",
+      "symbols": ["NodeWorkspaceAccessibilitySource"]
+    },
+    {
+      "file": "code-graph:test/infrastructure/fs/node-workspace-accessibility-source.spec.ts"
+    },
+    {
+      "file": "code-graph:test/infrastructure/vcs/vcs-repository-root-source.spec.ts"
     }
   ],
   "optimizations": {

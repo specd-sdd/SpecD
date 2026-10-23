@@ -202,7 +202,7 @@ The SQLite schema SHALL persist the logical node kinds required by the abstract 
 - **`Document`** nodes for textual non-code resources
 - `Meta` records for store-level metadata
 
-The `File` table SHALL include columns for `path` (PK), `project_relative_path`, `language`, `content_hash`, `workspace`, `category`, and `content`.
+The `File` table SHALL include columns for `path` (PK), `project_relative_path`, `language`, `content_hash`, `workspace`, `category`, `content`, `namespace`, and `namespace_separator`. `namespace` and `namespace_separator` are nullable and are both null or both set.
 
 The `Document` table SHALL include columns for `path` (PK), `project_relative_path`, `content_hash`, `content`, and `workspace`.
 
@@ -358,7 +358,7 @@ abstract `GraphStore` contract.
 
 SQLite SHALL persist the logical-symbol, declaration, member-semantics, symbol-space, binding, provenance, coverage, construct-range, selection-range, and declaration-occurrence-form fields required by `GraphStore`. Structured lookup columns SHALL be indexed. Serialized canonical ids MUST NOT be parsed or substring-ranked to implement semantic lookup. Canonical ids remain unique external identities; backend-local integer row keys MAY be used for physical joins when provider-visible ids do not change.
 
-The reference schema version MUST be **15**. `SQLITE_SCHEMA_VERSION` MUST be 15 in the same revision as the DDL that persists declaration `occurrence_form`. `CREATE TABLE IF NOT EXISTS` does not alter an existing database, so a persisted version 14 database MUST reject ordinary reads with `GraphSchemaIncompatibleError` and recovery reason `SCHEMA_INCOMPATIBLE`; `graph index` SHALL recreate derived storage as version 15, rotate `storage.epoch`, and rebuild search indexes before readiness. Versions older than 14 and versions newer than 15 MUST also be rejected. The implementation MUST NOT mix rows from different schema versions or use an in-place `ALTER TABLE` migration.
+The reference schema version MUST be **16**. `SQLITE_SCHEMA_VERSION` MUST be 16 in the same revision as the DDL that persists the file `namespace` and `namespace_separator` columns. `CREATE TABLE IF NOT EXISTS` does not alter an existing database, so a persisted version 15 database MUST make ordinary store opening fail with the public `GraphStorageRecoveryRequiredError` and recovery reason `SCHEMA_INCOMPATIBLE`; the low-level `GraphSchemaIncompatibleError` MAY be retained as internal cause or diagnostic evidence but MUST NOT replace the public recovery wrapper. `graph index` SHALL recreate derived storage as version 16, rotate `storage.epoch`, and rebuild search indexes before readiness. Versions older than 15 and versions newer than 16 MUST also be rejected through the same public recovery contract. The implementation MUST NOT mix rows from different schema versions or use an in-place `ALTER TABLE` migration.
 
 In schema version 15:
 
@@ -366,6 +366,8 @@ In schema version 15:
 - `documents` SHALL persist `project_relative_path` and omit `config_relative_path`.
 - `symbols` SHALL persist `project_relative_path`.
 - `logical_declarations` SHALL persist the declaration `occurrence_form` used to distinguish signature, implementation, and other physical occurrence roles without changing logical identity. A physical-only declaration has no `logical_declarations` row and therefore persists no occurrence form; it remains navigable by physical symbol ID and range.
+
+In schema version 16, `files` SHALL additionally persist the nullable `namespace` and `namespace_separator` of the file analysis. Upserting a file writes both from the analysis; reading a file returns both so an unchanged file can be hydrated into a later run without re-analysis. Version 16 is introduced by this change; no separate version is created for these columns.
 
 `logical_symbols` SHALL keep `member_kind`, `member_dispatch`, `member_accessor`, `native_kind`, and `qualified_name`. `qualified_name` stores the generic dotted owner path and MUST have an equality index. `idx_logical_symbols_member_lookup` SHALL use the member-semantics columns. `id`, `workspace`, `surface`, `name`, `space`, and `owner_id` stay. Stored `id` text MUST use the versioned canonical encoding.
 
@@ -375,7 +377,7 @@ In schema version 15:
 
 SQLite SHALL maintain the substring-capable source-content index and bounded short-query fallback required by the abstract store. Reverse coverage and traversal batch reads SHALL use set-based predicates and deterministic ordering.
 
-Indexed-input observations, freshness latches, VCS evidence, and compact unchanged-file facts SHALL remain persisted. One indexing run SHALL use one transaction, set-based endpoint validation, bounded writes, one commit, and one semantic and content index rebuild. Inserts, selects, and the worker row shape MUST use the version 15 columns in the same revision.
+Indexed-input observations, freshness latches, VCS evidence, and compact unchanged-file facts SHALL remain persisted. One indexing run SHALL use one transaction, set-based endpoint validation, bounded writes, one commit, and one semantic and content index rebuild. Inserts, selects, and the worker row shape MUST use the version 16 columns in the same revision.
 
 ## Constraints
 

@@ -1,0 +1,15 @@
+- op: modified
+  description: Module directory is the package root; code root may be below go.mod; module path is unquoted
+  selector:
+    type: section
+    matches: 'Requirement: Package identity, exports, and imports'
+  content: |
+    Logical declarations SHALL use the indexed Go package as their public surface. Package-level identifiers beginning with an uppercase Unicode letter SHALL produce public bindings; lowercase package declarations SHALL remain non-exported. Public identity MUST remain package-qualified even when several files contribute declarations to the same package.
+
+    The adapter SHALL extract single, grouped, aliased, dot, and blank imports. Blank imports SHALL create dependency evidence without a local symbol binding. Dot imports SHALL remain a distinct namespace-import form and MUST NOT cause unqualified names to bind unless a unique indexed target is proven.
+
+    The adapter SHALL provide the `packageResolution` facet. `identity` SHALL read the `module` path from the nearest `go.mod` found by the package-root search defined in "Package resolution facet" of `code-graph:language-adapter`; the directory of that `go.mod` is the module directory. A `module` path written as a quoted string SHALL be returned without its quotes. `matchSpecifier` SHALL resolve an import path by the longest known module-path prefix. `prepare` SHALL build the directory index of indexed `.go` files per workspace and SHALL locate the module directory of every configured workspace with the same package-root search, once per run, storing only the location of the code root relative to the module directory. It reads no other manifest data. `entrySurface` SHALL use only the package map and that prepared data: the import path minus the module prefix is a directory under the module directory, expressed relative to the workspace code root, and the entries are the indexed non-test `.go` files directly inside it, each with the package surface of that directory as `surface`. A module directory above the code root is therefore supported, and a package directory that falls outside the code root yields no entries. A path equal to the module path addresses the package at the module directory. Files ending in `_test.go` are never entries.
+
+    A Go import resolves to a package, not to a symbol. The adapter SHALL obtain the package files through the shared helper `packageEntryFiles` and add every entry file to the file-level dependencies of the importing file. An import that cannot be resolved yields no dependency and a diagnostic with the reason reported by the helper.
+
+    Resolving a qualified selector such as `pkg.Name` to a symbol across packages is not supported and remains unsupported coverage; the adapter MUST NOT guess it and MUST NOT search symbols by name in the target workspace.

@@ -22,7 +22,7 @@ import {
   type RelativeImportResolutionFacet,
   type SymbolReferenceSyntaxFacet,
 } from '../../domain/value-objects/language-adapter-facets.js'
-import { findManifestField } from './find-manifest-field.js'
+import { findPackageManifest } from './find-manifest-field.js'
 import { splitWorkspaceIdentity } from '../../domain/services/split-workspace-identity.js'
 import {
   parseDottedMemberReference,
@@ -371,7 +371,7 @@ interface PythonParserState {
  */
 export class PythonLanguageAdapter implements LanguageAdapter {
   private readonly packageResolutionFacet: PackageResolutionFacet = {
-    identity: (codeRoot, repoRoot) => this.getPackageIdentity(codeRoot, repoRoot),
+    identity: (codeRoot, repoRoot, report) => this.getPackageIdentity(codeRoot, repoRoot, report),
     // Python package facts come from the package map and the indexed file set, so there is
     // nothing to read per workspace.
     prepare: () => undefined,
@@ -994,12 +994,23 @@ export class PythonLanguageAdapter implements LanguageAdapter {
         }
         // `from pkg import module` names a submodule, which is a dependency on its file.
         const submodule =
-          result.reason === 'not-exported'
+          result.reason === 'not-exported' || result.reason === 'no-entry-surface'
             ? context.packageEntryFiles(`${imp.specifier}.${imp.originalName}`)
             : undefined
         if (submodule?.status === 'resolved') {
-          for (const entry of submodule.entries) fileImports.push(entry.filePath)
-          continue
+          if (submodule.entries.length === 1) {
+            fileImports.push(submodule.entries[0]!.filePath)
+            continue
+          }
+          if (submodule.entries.length > 1) {
+            diagnostics.push({
+              filePath: analysis.filePath,
+              specifier: imp.specifier,
+              exportedName: imp.originalName,
+              reason: 'ambiguous',
+            })
+            continue
+          }
         }
         diagnostics.push({
           filePath: analysis.filePath,
@@ -1977,7 +1988,7 @@ export class PythonLanguageAdapter implements LanguageAdapter {
 
   /**
    * Resolves a Python import specifier to a known package.
-   * Normalizes hyphens and underscores for matching.
+   * Normalizes per PEP 503 and returns the package only when exactly one matches.
    * @param specifier - The import specifier (e.g. `acme_auth.models`).
    * @param knownPackages - Known package names from `pyproject.toml`.
    * @returns The matching package name, or undefined.
@@ -1989,8 +2000,11 @@ export class PythonLanguageAdapter implements LanguageAdapter {
     if (!specifier) return undefined
     const topLevel = specifier.split('.')[0]
     if (!topLevel) return undefined
-    const normalized = topLevel.replaceAll('_', '-')
-    return knownPackages.find((pkg) => pkg.replaceAll('_', '-') === normalized)
+    const normalized = normalizePythonDistName(topLevel)
+    const matches = [
+      ...new Set(knownPackages.filter((pkg) => normalizePythonDistName(pkg) === normalized)),
+    ]
+    return matches.length === 1 ? matches[0] : undefined
   }
 
   /**
@@ -2006,11 +2020,38 @@ export class PythonLanguageAdapter implements LanguageAdapter {
    * the given directory, bounded by the repository root.
    * @param codeRoot - Absolute path to the workspace's code root.
    * @param repoRoot - Optional repository root to bound the search.
+   * @param report - Optional callback to report skipped manifests.
    * @returns The project name from the nearest `pyproject.toml`, or undefined.
    */
-  private getPackageIdentity(codeRoot: string, repoRoot?: string): string | undefined {
-    return findManifestField(codeRoot, 'pyproject.toml', readPythonProjectName, repoRoot)
+  private getPackageIdentity(
+    codeRoot: string,
+    repoRoot?: string,
+    report?: (message: string) => void,
+  ): string | undefined {
+    const result = findPackageManifest<string>(
+      codeRoot,
+      'pyproject.toml',
+      (c) => {
+        const name = readPythonProjectName(c)
+        return name !== undefined ? { kind: 'match', value: name } : { kind: 'skip' }
+      },
+      repoRoot,
+    )
+    for (const skipped of result.skipped) {
+      report?.(`Package manifest skipped (no identity): ${skipped}`)
+    }
+    return result.match?.value
   }
+}
+
+/**
+ * Normalizes a Python distribution name per PEP 503:
+ * Letters are lowercased and every run of `-`, `_`, or `.` becomes a single `-`.
+ * @param value - Distribution name.
+ * @returns Normalized distribution name.
+ */
+export function normalizePythonDistName(value: string): string {
+  return value.toLowerCase().replace(/[-_.]+/g, '-')
 }
 
 /**
@@ -2018,7 +2059,7 @@ export class PythonLanguageAdapter implements LanguageAdapter {
  * @param content - UTF-8 manifest text.
  * @returns The project name, or undefined when `[project].name` is absent.
  */
-function readPythonProjectName(content: string): string | undefined {
+export function readPythonProjectName(content: string): string | undefined {
   let inProject = false
   for (const line of content.split(/\r?\n/)) {
     const header = /^\s*\[([^\]]+)\]\s*(?:#.*)?$/.exec(line)

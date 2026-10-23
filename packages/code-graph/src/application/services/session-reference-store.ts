@@ -11,7 +11,6 @@ import {
   IndexCoverageStatus,
 } from '../../domain/value-objects/index-session.js'
 import {
-  deriveQualifiedName,
   type LocalBinding,
   type LogicalSymbol,
   type PublicBinding,
@@ -53,22 +52,18 @@ export class SessionReferenceStore {
   }
 
   /**
-   * Finds logical symbols by stored or derived qualified spelling.
-   * @param qualifiedNames - Generic dotted spellings.
+   * Finds logical symbols by stored qualified spelling.
+   * @param qualifiedNames - Stored qualified spellings.
    * @returns Every equal logical symbol.
    */
   findLogicalSymbolsByQualifiedNames(
     qualifiedNames: readonly string[],
   ): Promise<readonly LogicalSymbol[]> {
     const names = new Set(qualifiedNames)
-    const symbols = this.session.getLogicalSymbols()
-    const byId = new Map(symbols.map((symbol) => [symbol.id, symbol]))
     return Promise.resolve(
-      symbols.flatMap((symbol) => {
-        const spelling = symbol.qualifiedName ?? deriveQualifiedName(symbol, byId)
-        if (spelling === undefined || !names.has(spelling)) return []
-        return [symbol.qualifiedName === spelling ? symbol : { ...symbol, qualifiedName: spelling }]
-      }),
+      this.session
+        .getLogicalSymbols()
+        .filter((symbol) => symbol.qualifiedName !== undefined && names.has(symbol.qualifiedName)),
     )
   }
 

@@ -2,7 +2,11 @@ import { describe, it, expect, afterEach } from 'vitest'
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { GoLanguageAdapter } from '../../../src/infrastructure/tree-sitter/go-language-adapter.js'
+import {
+  GO_MODULE_OFFSETS_KEY,
+  GoLanguageAdapter,
+  readGoModulePath,
+} from '../../../src/infrastructure/tree-sitter/go-language-adapter.js'
 import { SymbolKind } from '../../../src/domain/value-objects/symbol-kind.js'
 import { RelationType } from '../../../src/domain/value-objects/relation-type.js'
 import { ImportDeclarationKind } from '../../../src/domain/value-objects/import-declaration-kind.js'
@@ -805,6 +809,7 @@ func run() {
         callFacts: draft.callFacts,
       }
 
+      session.setAdapterState(GO_MODULE_OFFSETS_KEY, new Map([['ws', '']]))
       const resolved = baseAdapter.resolveImports(
         analysis,
         createImportResolutionContext(
@@ -848,6 +853,7 @@ func run() {
         callFacts: draft.callFacts,
       }
 
+      session.setAdapterState(GO_MODULE_OFFSETS_KEY, new Map([['ws', '']]))
       const resolved = baseAdapter.resolveImports(
         analysis,
         createImportResolutionContext(
@@ -1142,6 +1148,7 @@ describe('Go embedded interfaces, blank imports and shadowing', () => {
       })
       if (filePath === main) analysis = registered
     }
+    session.setAdapterState(GO_MODULE_OFFSETS_KEY, new Map([['ws', '']]))
     const resolvedImports = baseAdapter.resolveImports(
       analysis!,
       createImportResolutionContext(
@@ -1251,5 +1258,171 @@ describe('Go embedded interfaces, blank imports and shadowing', () => {
     )
 
     expect(relations.filter((relation) => relation.type === RelationType.Calls)).toHaveLength(1)
+  })
+
+  describe('Go package resolution hardening', () => {
+    let tempDir: string
+
+    afterEach(() => {
+      if (tempDir !== undefined) rmSync(tempDir, { recursive: true, force: true })
+    })
+
+    describe('readGoModulePath', () => {
+      it('unquotes double-quoted module paths', () => {
+        expect(readGoModulePath('module "example.com/mod"\n\ngo 1.21\n')).toBe('example.com/mod')
+      })
+
+      it('unquotes backtick-quoted module paths', () => {
+        expect(readGoModulePath('module `example.com/mod`\n\ngo 1.21\n')).toBe('example.com/mod')
+      })
+
+      it('reads unquoted module paths', () => {
+        expect(readGoModulePath('module example.com/mod\n\ngo 1.21\n')).toBe('example.com/mod')
+      })
+
+      it('returns undefined when no module directive exists', () => {
+        expect(readGoModulePath('package main\n')).toBeUndefined()
+      })
+    })
+
+    it('Scenario: Quoted module path is unquoted', () => {
+      tempDir = mkdtempSync(join(tmpdir(), 'go-mod-quotes-'))
+      writeFileSync(join(tempDir, 'go.mod'), 'module "example.com/mod"\n\ngo 1.21\n')
+      expect(baseAdapter.packageResolution.identity(tempDir)).toBe('example.com/mod')
+
+      writeFileSync(join(tempDir, 'go.mod'), 'module `example.com/mod`\n\ngo 1.21\n')
+      expect(baseAdapter.packageResolution.identity(tempDir)).toBe('example.com/mod')
+    })
+
+    it('Scenario: go.mod above the code root', () => {
+      tempDir = mkdtempSync(join(tmpdir(), 'go-above-root-'))
+      writeFileSync(join(tempDir, 'go.mod'), 'module example.com/mod\n\ngo 1.21\n')
+      const codeRoot = join(tempDir, 'internal')
+      mkdirSync(join(codeRoot, 'util'), { recursive: true })
+
+      const session = new InMemoryIndexSession()
+      session.registerFile({
+        filePath: 'ws:util/helper.go',
+        projectRelativePath: 'internal/util/helper.go',
+        language: 'go',
+        contentHash: 'hash',
+        workspace: 'ws',
+      })
+      session.registerFile({
+        filePath: 'ws:util/helper_test.go',
+        projectRelativePath: 'internal/util/helper_test.go',
+        language: 'go',
+        contentHash: 'hash',
+        workspace: 'ws',
+      })
+
+      baseAdapter.packageResolution.prepare?.({
+        session,
+        workspaces: [{ name: 'ws', codeRoot, repoRoot: tempDir }],
+        projectRoot: tempDir,
+      })
+
+      const surface = baseAdapter.packageResolution.entrySurface({
+        session,
+        workspace: 'ws',
+        packageName: 'example.com/mod',
+        specifier: 'example.com/mod/internal/util',
+      })
+
+      expect(surface).toEqual([
+        {
+          filePath: 'ws:util/helper.go',
+          surface: 'ws:util',
+        },
+      ])
+    })
+
+    it('Scenario: Package directory outside the code root yields no entries', () => {
+      tempDir = mkdtempSync(join(tmpdir(), 'go-outside-root-'))
+      writeFileSync(join(tempDir, 'go.mod'), 'module example.com/mod\n\ngo 1.21\n')
+      const codeRoot = join(tempDir, 'internal')
+      mkdirSync(codeRoot, { recursive: true })
+
+      const session = new InMemoryIndexSession()
+      session.registerFile({
+        filePath: 'ws:util/helper.go',
+        projectRelativePath: 'internal/util/helper.go',
+        language: 'go',
+        contentHash: 'hash',
+        workspace: 'ws',
+      })
+
+      baseAdapter.packageResolution.prepare?.({
+        session,
+        workspaces: [{ name: 'ws', codeRoot, repoRoot: tempDir }],
+        projectRoot: tempDir,
+      })
+
+      // Path outside internal (e.g. cmd/tool)
+      const outsideSurface = baseAdapter.packageResolution.entrySurface({
+        session,
+        workspace: 'ws',
+        packageName: 'example.com/mod',
+        specifier: 'example.com/mod/cmd/tool',
+      })
+      expect(outsideSurface).toEqual([])
+
+      // Path equal to the module root itself (which is above codeRoot)
+      const rootSurface = baseAdapter.packageResolution.entrySurface({
+        session,
+        workspace: 'ws',
+        packageName: 'example.com/mod',
+        specifier: 'example.com/mod',
+      })
+      expect(rootSurface).toEqual([])
+    })
+
+    it('Scenario: Module directory is located once in prepare', () => {
+      tempDir = mkdtempSync(join(tmpdir(), 'go-prepare-once-'))
+      const ws1Dir = join(tempDir, 'ws1')
+      const ws2Dir = join(tempDir, 'ws2')
+      mkdirSync(ws1Dir, { recursive: true })
+      mkdirSync(ws2Dir, { recursive: true })
+      const mod1File = join(ws1Dir, 'go.mod')
+      const mod2File = join(ws2Dir, 'go.mod')
+      writeFileSync(mod1File, 'module example.com/ws1\n')
+      writeFileSync(mod2File, 'module example.com/ws2\n')
+
+      const session = new InMemoryIndexSession()
+      session.registerFile({
+        filePath: 'ws1:pkg/a.go',
+        projectRelativePath: 'ws1/pkg/a.go',
+        language: 'go',
+        contentHash: 'h1',
+        workspace: 'ws1',
+      })
+
+      baseAdapter.packageResolution.prepare?.({
+        session,
+        workspaces: [
+          { name: 'ws1', codeRoot: ws1Dir },
+          { name: 'ws2', codeRoot: ws2Dir },
+        ],
+        projectRoot: tempDir,
+      })
+
+      // Delete the manifests on disk to prove entrySurface performs no filesystem I/O
+      rmSync(mod1File)
+      rmSync(mod2File)
+
+      const entries = baseAdapter.packageResolution.entrySurface({
+        session,
+        workspace: 'ws1',
+        packageName: 'example.com/ws1',
+        specifier: 'example.com/ws1/pkg',
+      })
+
+      expect(entries).toEqual([
+        {
+          filePath: 'ws1:pkg/a.go',
+          surface: 'ws1:pkg',
+        },
+      ])
+    })
   })
 })

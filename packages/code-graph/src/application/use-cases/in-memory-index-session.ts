@@ -72,6 +72,8 @@ export class InMemoryIndexSession implements IndexSession {
   private readonly symbolsByFile = new Map<string, SymbolNode[]>()
   private readonly symbolsByName = new Map<string, SymbolNode[]>()
   private readonly qualifiedNameSymbolMap = new Map<string, string>()
+  private readonly testQualifiedNameSymbolMap = new Map<string, string>()
+  private mergedQualifiedNameSymbolMap: Map<string, string> | undefined = undefined
 
   // Spec and document lookups
   private readonly specs = new Map<string, SpecNode>()
@@ -187,6 +189,8 @@ export class InMemoryIndexSession implements IndexSession {
    * @param file.contentHash - Indexed content hash.
    * @param file.workspace - Owning workspace.
    * @param file.category - Persisted file category; defaults to `'source'`.
+   * @param file.namespace - Optional enclosing namespace.
+   * @param file.namespaceSeparator - Optional namespace separator.
    * @param symbols - Persisted symbols owned by the file.
    */
   hydratePersistedFile(
@@ -196,7 +200,9 @@ export class InMemoryIndexSession implements IndexSession {
       readonly language: string
       readonly contentHash: string
       readonly workspace: string
-      readonly category?: FileCategory
+      readonly category?: FileCategory | undefined
+      readonly namespace?: string | undefined
+      readonly namespaceSeparator?: string | undefined
     },
     symbols: readonly SymbolNode[],
   ): void {
@@ -214,6 +220,17 @@ export class InMemoryIndexSession implements IndexSession {
       const named = this.symbolsByName.get(symbol.name) ?? []
       named.push(symbol)
       this.symbolsByName.set(symbol.name, named)
+    }
+
+    if (file.namespace) {
+      const targetMap =
+        file.category === 'test' ? this.testQualifiedNameSymbolMap : this.qualifiedNameSymbolMap
+      const separator = file.namespaceSeparator ?? '.'
+      for (const symbol of symbols) {
+        const qualifiedName = `${file.namespace}${separator}${symbol.name}`
+        targetMap.set(qualifiedName, symbol.id)
+      }
+      this.mergedQualifiedNameSymbolMap = undefined
     }
   }
 
@@ -316,13 +333,15 @@ export class InMemoryIndexSession implements IndexSession {
     }
 
     // Populate qualified name mappings if a namespace exists
-    // Symbols of test files are never an import target.
-    if (input.analysis.namespace && fileInfo.category !== 'test') {
+    if (input.analysis.namespace) {
+      const targetMap =
+        fileInfo.category === 'test' ? this.testQualifiedNameSymbolMap : this.qualifiedNameSymbolMap
+      const separator = input.analysis.namespaceSeparator ?? '.'
       for (const symbol of input.analysis.symbols) {
-        const separator = input.analysis.namespaceSeparator ?? '.'
         const qualifiedName = `${input.analysis.namespace}${separator}${symbol.name}`
-        this.qualifiedNameSymbolMap.set(qualifiedName, symbol.id)
+        targetMap.set(qualifiedName, symbol.id)
       }
+      this.mergedQualifiedNameSymbolMap = undefined
     }
 
     return fileAnalysis
@@ -486,9 +505,20 @@ export class InMemoryIndexSession implements IndexSession {
   /**
    * Finds a symbol's ID by its qualified name.
    * @param qualifiedName - The qualified name of the symbol.
+   * @param options - Options; when `includeTests` is true, test symbols are also searched.
+   * @param options.includeTests - When true, test symbols are also searched.
    * @returns The symbol ID, or undefined if not found.
    */
-  findSymbolByQualifiedName(qualifiedName: string): string | undefined {
+  findSymbolByQualifiedName(
+    qualifiedName: string,
+    options?: { readonly includeTests?: boolean },
+  ): string | undefined {
+    if (options?.includeTests) {
+      return (
+        this.qualifiedNameSymbolMap.get(qualifiedName) ??
+        this.testQualifiedNameSymbolMap.get(qualifiedName)
+      )
+    }
     return this.qualifiedNameSymbolMap.get(qualifiedName)
   }
 
@@ -644,9 +674,24 @@ export class InMemoryIndexSession implements IndexSession {
 
   /**
    * Retrieves the qualified name mapping.
+   * @param options - Options; when `includeTests` is true, returns production and test symbols.
+   * @param options.includeTests - When true, returns production and test symbols.
    * @returns Readonly map of qualified name to symbol ID.
    */
-  getQualifiedNames(): ReadonlyMap<string, string> {
+  getQualifiedNames(options?: { readonly includeTests?: boolean }): ReadonlyMap<string, string> {
+    if (options?.includeTests) {
+      if (this.mergedQualifiedNameSymbolMap === undefined) {
+        const merged = new Map<string, string>()
+        for (const [name, id] of this.testQualifiedNameSymbolMap) {
+          merged.set(name, id)
+        }
+        for (const [name, id] of this.qualifiedNameSymbolMap) {
+          merged.set(name, id)
+        }
+        this.mergedQualifiedNameSymbolMap = merged
+      }
+      return this.mergedQualifiedNameSymbolMap
+    }
     return this.qualifiedNameSymbolMap
   }
 }

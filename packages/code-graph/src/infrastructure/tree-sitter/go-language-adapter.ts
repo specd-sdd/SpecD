@@ -1,3 +1,4 @@
+import { relative } from 'node:path'
 import { parse } from '@ast-grep/napi'
 import { type SgNode } from '@ast-grep/napi'
 import {
@@ -17,7 +18,7 @@ import {
   type PackageResolutionFacet,
   type SymbolReferenceSyntaxFacet,
 } from '../../domain/value-objects/language-adapter-facets.js'
-import { findManifestField } from './find-manifest-field.js'
+import { canonical, findPackageManifest } from './find-manifest-field.js'
 import { splitWorkspaceIdentity } from '../../domain/services/split-workspace-identity.js'
 import {
   parseDottedMemberReference,
@@ -200,6 +201,20 @@ interface GoTypeInfo {
 /** Session state key for the directory index of indexed Go files. */
 const GO_PACKAGE_DIRECTORIES_KEY = 'go:package-directories'
 
+/** Session state key for workspace-to-module directory offsets. */
+export const GO_MODULE_OFFSETS_KEY = 'go:module-offsets'
+
+/**
+ * Extracts the module path from a `go.mod` file content.
+ * Matches `module <path>` where `<path>` may be unquoted, double-quoted, or backtick-quoted.
+ * @param content - Text content of `go.mod`.
+ * @returns Unquoted module path, or undefined if not found.
+ */
+export function readGoModulePath(content: string): string | undefined {
+  const match = content.match(/^module\s+(?:"([^"]+)"|`([^`]+)`|(\S+))/m)
+  return match?.[1] ?? match?.[2] ?? match?.[3]
+}
+
 /**
  * Lists the non-test Go files that make up one package directory of a workspace.
  * The directory index is built once per run from the files already registered in the session.
@@ -268,24 +283,61 @@ function goPackageSurface(filePath: string): string {
  */
 export class GoLanguageAdapter implements LanguageAdapter {
   private readonly packageResolutionFacet: PackageResolutionFacet = {
-    identity: (codeRoot, repoRoot) => this.getPackageIdentity(codeRoot, repoRoot),
+    identity: (codeRoot, repoRoot, report) => this.getPackageIdentity(codeRoot, repoRoot, report),
     prepare: (context) => {
       // Builds the per-run directory index of indexed Go files once, after every workspace has
       // been analyzed or hydrated, so entry lookups never depend on resolution order.
       goPackageFiles(context.session, '', '')
+      const offsets = new Map<string, string | undefined>()
+      for (const workspace of context.workspaces) {
+        const result = findPackageManifest<string>(
+          workspace.codeRoot,
+          'go.mod',
+          (c) => {
+            const mod = readGoModulePath(c)
+            return mod !== undefined ? { kind: 'match', value: mod } : { kind: 'skip' }
+          },
+          workspace.repoRoot,
+        )
+        const offset =
+          result.match === undefined
+            ? undefined
+            : relative(
+                canonical(result.match.packageRoot),
+                canonical(workspace.codeRoot),
+              ).replaceAll('\\', '/')
+        offsets.set(workspace.name, offset)
+      }
+      context.session.setAdapterState(GO_MODULE_OFFSETS_KEY, offsets)
     },
     matchSpecifier: (specifier, knownPackages) =>
       this.resolvePackageFromSpecifier(specifier, [...knownPackages]),
     entrySurface: (request) => {
-      // The import path minus the module prefix is the package directory inside the workspace.
-      const relativeDir =
+      const moduleRelativeDir =
         request.specifier === request.packageName
           ? ''
           : request.specifier.slice(request.packageName.length + 1)
-      return goPackageFiles(request.session, request.workspace, relativeDir).map((filePath) => ({
-        filePath,
-        surface: goPackageSurface(filePath),
-      }))
+      const offsets =
+        request.session.getAdapterState<Map<string, string | undefined>>(GO_MODULE_OFFSETS_KEY)
+      if (offsets === undefined) return []
+      const offset = offsets.get(request.workspace)
+      if (offset === undefined) return []
+      let codeRootRelativeDir: string
+      if (offset === '') {
+        codeRootRelativeDir = moduleRelativeDir
+      } else if (moduleRelativeDir === offset) {
+        codeRootRelativeDir = ''
+      } else if (moduleRelativeDir.startsWith(offset + '/')) {
+        codeRootRelativeDir = moduleRelativeDir.slice(offset.length + 1)
+      } else {
+        return []
+      }
+      return goPackageFiles(request.session, request.workspace, codeRootRelativeDir).map(
+        (filePath) => ({
+          filePath,
+          surface: goPackageSurface(filePath),
+        }),
+      )
     },
   }
 
@@ -1536,17 +1588,26 @@ export class GoLanguageAdapter implements LanguageAdapter {
    * the given directory, bounded by the repository root.
    * @param codeRoot - Absolute path to the workspace's code root.
    * @param repoRoot - Optional repository root to bound the search.
+   * @param report - Optional callback to report skipped manifests.
    * @returns The module path from the nearest `go.mod`, or undefined.
    */
-  private getPackageIdentity(codeRoot: string, repoRoot?: string): string | undefined {
-    return findManifestField(
+  private getPackageIdentity(
+    codeRoot: string,
+    repoRoot?: string,
+    report?: (message: string) => void,
+  ): string | undefined {
+    const result = findPackageManifest<string>(
       codeRoot,
       'go.mod',
       (content) => {
-        const match = content.match(/^module\s+(\S+)/m)
-        return match?.[1]
+        const mod = readGoModulePath(content)
+        return mod !== undefined ? { kind: 'match', value: mod } : { kind: 'skip' }
       },
       repoRoot,
     )
+    for (const skipped of result.skipped) {
+      report?.(`Package manifest skipped (no identity): ${skipped}`)
+    }
+    return result.match?.value
   }
 }

@@ -22,7 +22,10 @@ import { SymbolKind } from '../../domain/value-objects/symbol-kind.js'
 import { type SpecNode, createSpecNode } from '../../domain/value-objects/spec-node.js'
 import { type Relation, createRelation } from '../../domain/value-objects/relation.js'
 import { RelationType } from '../../domain/value-objects/relation-type.js'
-import { type IndexOptions } from '../../domain/value-objects/index-options.js'
+import {
+  type IndexOptions,
+  type ProjectWorkspace,
+} from '../../domain/value-objects/index-options.js'
 import {
   IMPORT_DIAGNOSTIC_SAMPLE_LIMIT,
   type ImportDiagnosticSummary,
@@ -32,10 +35,9 @@ import {
   type WorkspaceIndexBreakdown,
 } from '../../domain/value-objects/index-result.js'
 import { type AdapterRegistryPort } from '../../domain/ports/adapter-registry-port.js'
-import {
-  emptyResolutionManifestSource,
-  type ResolutionManifestSource,
-} from '../ports/resolution-manifest-source.js'
+import { type ResolutionManifestSource } from '../ports/resolution-manifest-source.js'
+import { type RepositoryRootSource } from '../ports/repository-root-source.js'
+import { type WorkspaceAccessibilitySource } from '../ports/workspace-accessibility-source.js'
 import {
   type LanguageAdapter,
   type ResolvedImports,
@@ -456,11 +458,15 @@ export class IndexCodeGraph {
    * @param store - The graph store to persist indexed data into.
    * @param registry - The adapter registry for resolving language adapters.
    * @param manifestSource - Port that reads resolution-manifest existence and text.
+   * @param repositoryRoots - Port that resolves repository roots for workspaces.
+   * @param workspaceAccessibility - Port that checks workspace code root accessibility.
    */
   constructor(
     private readonly store: GraphStore,
     private readonly registry: AdapterRegistryPort,
-    private readonly manifestSource: ResolutionManifestSource = emptyResolutionManifestSource,
+    private readonly manifestSource: ResolutionManifestSource,
+    private readonly repositoryRoots: RepositoryRootSource,
+    private readonly workspaceAccessibility: WorkspaceAccessibilitySource,
   ) {}
 
   /**
@@ -805,8 +811,10 @@ export class IndexCodeGraph {
       // Native stores enforce relation endpoint integrity, so an import whose target did not
       // exist at the previous generation cannot be recovered from persisted relations alone.
       // Reconsider every existing code file only when additions may satisfy such imports.
-      const additionCandidates =
-        newFiles.length === 0 ? [] : existingFiles.map((existing) => existing.path)
+      const addsCode = newFiles.some(
+        (p) => this.registry.getAdapterForFile(relativeIdentityPath(p)) !== undefined,
+      )
+      const additionCandidates = addsCode ? existingFiles.map((existing) => existing.path) : []
       const affectedClosure =
         persistedReferenceFacts === undefined
           ? new Set<string>()
@@ -880,43 +888,117 @@ export class IndexCodeGraph {
       }
 
       // Build package-name → workspace-name map for cross-workspace import resolution.
+      const configured = options.configuredWorkspaces ?? options.workspaces
+      const probeResults = await Promise.all(
+        configured.map(async (ws) => {
+          try {
+            const isAccessible = await this.workspaceAccessibility.isAccessibleDirectory(
+              ws.codeRoot,
+            )
+            return { ws, isAccessible }
+          } catch {
+            return { ws, isAccessible: false }
+          }
+        }),
+      )
+      const accessible: ProjectWorkspace[] = []
+      for (const { ws, isAccessible } of probeResults) {
+        if (isAccessible) {
+          accessible.push(ws)
+        } else {
+          errors.push({
+            filePath: `${ws.name}:<manifest>`,
+            message: `Workspace "${ws.name}" skipped for package resolution: code root "${ws.codeRoot}" is not accessible`,
+          })
+        }
+      }
+
+      const repoRootByCodeRoot = new Map<string, string>()
+      const repoRootPromises = new Map<string, Promise<string | undefined>>()
+      for (const ws of accessible) {
+        if (!repoRootPromises.has(ws.codeRoot)) {
+          repoRootPromises.set(
+            ws.codeRoot,
+            Promise.resolve()
+              .then(() => this.repositoryRoots.resolve(ws.codeRoot))
+              .catch(() => undefined),
+          )
+        }
+      }
+      await Promise.all(
+        [...repoRootPromises.entries()].map(async ([codeRoot, promise]) => {
+          const root = await promise
+          if (root !== undefined) {
+            repoRootByCodeRoot.set(codeRoot, root)
+          }
+        }),
+      )
+
+      const packageWorkspaces: readonly PackageWorkspace[] = accessible.map((ws) => {
+        const root = repoRootByCodeRoot.get(ws.codeRoot)
+        return {
+          name: ws.name,
+          codeRoot: ws.codeRoot,
+          ...(root !== undefined ? { repoRoot: root } : {}),
+        }
+      })
+
       const packageToWorkspace = new Map<string, string>()
+      const claims = new Map<string, Set<string>>()
+      const claimsByAdapter = new Map<string, Set<LanguageAdapter>>()
       const disabledPackageResolution = new Set<LanguageAdapter>()
-      for (const ws of options.workspaces) {
+      const purgeDisabledAdapterClaims = (failedAdapter: LanguageAdapter): void => {
+        disabledPackageResolution.add(failedAdapter)
+        for (const [id, claimingAdapters] of claimsByAdapter) {
+          const hasActive = [...claimingAdapters].some(
+            (claiming) => !disabledPackageResolution.has(claiming),
+          )
+          if (!hasActive) {
+            packageToWorkspace.delete(id)
+          }
+        }
+      }
+      for (const ws of accessible) {
+        const wsRepoRoot = repoRootByCodeRoot.get(ws.codeRoot)
         for (const adapter of adapters) {
           if (adapter.packageResolution === undefined) continue
           if (disabledPackageResolution.has(adapter)) continue
           let identity: string | undefined
           try {
-            identity = adapter.packageResolution.identity(ws.codeRoot, options.projectRoot)
+            identity = adapter.packageResolution.identity(ws.codeRoot, wsRepoRoot, (message) => {
+              errors.push({ filePath: `${ws.name}:<manifest>`, message })
+            })
           } catch (err) {
             errors.push({
               filePath: `${ws.name}:<manifest>`,
               message: `Package identity failed for adapter "${adapter.languages().join(',')}": ${String(err)}`,
             })
-            // The adapter is treated as without package resolution for the rest of the run.
-            disabledPackageResolution.add(adapter)
+            purgeDisabledAdapterClaims(adapter)
             continue
           }
           if (identity === undefined) continue
-          const existingWs = packageToWorkspace.get(identity)
-          if (existingWs && existingWs !== ws.name) {
-            errors.push({
-              filePath: `${ws.name}:<manifest>`,
-              message: `Package identity collision: "${identity}" already mapped to workspace "${existingWs}", claimed again by workspace "${ws.name}"`,
-            })
+          const adapterSet = claimsByAdapter.get(identity) ?? new Set<LanguageAdapter>()
+          adapterSet.add(adapter)
+          claimsByAdapter.set(identity, adapterSet)
+
+          const existingClaims = claims.get(identity)
+          if (existingClaims !== undefined) {
+            if (!existingClaims.has(ws.name)) {
+              existingClaims.add(ws.name)
+              packageToWorkspace.delete(identity)
+              const sorted = [...existingClaims].sort().join(', ')
+              errors.push({
+                filePath: `${ws.name}:<manifest>`,
+                message: `Package identity collision: "${identity}" is claimed by workspaces ${sorted}`,
+              })
+            }
           } else {
+            claims.set(identity, new Set([ws.name]))
             packageToWorkspace.set(identity, ws.name)
           }
-          // The first adapter that claims the workspace wins; later adapters are not asked.
-          break
         }
       }
 
-      const packageWorkspaces: readonly PackageWorkspace[] = options.workspaces.map((ws) => ({
-        name: ws.name,
-        codeRoot: ws.codeRoot,
-      }))
       const packageImportResolver = new PackageImportResolver({
         session,
         packageToWorkspace,
@@ -946,15 +1028,20 @@ export class IndexCodeGraph {
       }
       // An adapter without the package resolution facet gets no cross-workspace package
       // resolution; list it once per run. It is not an unresolved import.
-      const adaptersWithoutPackageResolution = adapters
-        .filter((adapter) => adapter.packageResolution === undefined)
-        .map((adapter) => adapter.languages().join(','))
-      const listDisabledAdapters = (): readonly string[] => [
-        ...new Set([
-          ...adaptersWithoutPackageResolution,
-          ...[...disabledPackageResolution].map((adapter) => adapter.languages().join(',')),
-        ]),
-      ]
+      const listDisabledAdapters = (): readonly string[] => {
+        const disabledInstances = new Set<LanguageAdapter>([
+          ...adapters.filter((adapter) => adapter.packageResolution === undefined),
+          ...disabledPackageResolution,
+        ])
+        const names = new Set<string>()
+        for (const adapter of disabledInstances) {
+          const langs = adapter.languages()
+          if (langs.length > 0 && langs[0] !== undefined) {
+            names.add(langs[0])
+          }
+        }
+        return [...names].sort()
+      }
 
       const fileLanguages = new Map(existingFiles.map((file) => [file.path, file.language]))
       const fileCategories = new Map(existingFiles.map((file) => [file.path, file.category]))
@@ -1048,12 +1135,14 @@ export class IndexCodeGraph {
             const hash = fileHashes.get(prefixedPath) ?? computeContentHash(content)
             const wsName = workspaceIdentityName(prefixedPath)
             const ws = options.workspaces.find((w) => w.name === wsName)
+            const wsRepoRoot =
+              ws?.codeRoot !== undefined ? repoRootByCodeRoot.get(ws.codeRoot) : undefined
 
             const draft = adapter.analyzeFile(prefixedPath, content, {
               session,
               workspaceName: wsName,
               ...(ws?.codeRoot !== undefined ? { codeRoot: ws.codeRoot } : {}),
-              repoRoot: options.projectRoot,
+              ...(wsRepoRoot !== undefined ? { repoRoot: wsRepoRoot } : {}),
             })
 
             const finalDraft = draft
@@ -1115,10 +1204,13 @@ export class IndexCodeGraph {
                 workspace: wsName,
                 category,
                 content,
+                namespace: finalDraft.namespace,
+                namespaceSeparator: finalDraft.namespaceSeparator,
               }),
             )
             indexedResourceKinds.set(prefixedPath, IndexedResourceKind.File)
             fileLanguages.set(prefixedPath, language)
+            fileCategories.set(prefixedPath, category)
             const fileProjRel = projectRelativePaths.get(prefixedPath) ?? ''
             const symbolsWithProjRel = finalDraft.symbols.map((sym) =>
               sym.projectRelativePath === fileProjRel
@@ -1214,21 +1306,25 @@ export class IndexCodeGraph {
           adapter.packageResolution.prepare({
             session,
             workspaces: packageWorkspaces,
-            repoRoot: options.projectRoot,
+            projectRoot: options.projectRoot,
           })
         } catch (err) {
           errors.push({
             filePath: `${adapter.languages().join(',')}:<packageResolution>`,
             message: String(err),
           })
-          disabledPackageResolution.add(adapter)
+          purgeDisabledAdapterClaims(adapter)
         }
       }
       for (const adapter of adapters) {
         if (adapter.reExportLinking === undefined) continue
-        if (disabledPackageResolution.has(adapter)) continue
         try {
-          const linked = adapter.reExportLinking.link({ session, packageToWorkspace })
+          const linked = adapter.reExportLinking.link({
+            session,
+            packageToWorkspace: disabledPackageResolution.has(adapter)
+              ? new Map()
+              : packageToWorkspace,
+          })
           session.addReferenceFacts(linked)
           reexportCount += linked.publicBindings.length + linked.steps.length
         } catch (err) {
@@ -1237,7 +1333,7 @@ export class IndexCodeGraph {
             message: String(err),
           })
           // An adapter that only links re-exports has no package resolution to disable.
-          if (adapter.packageResolution !== undefined) disabledPackageResolution.add(adapter)
+          if (adapter.packageResolution !== undefined) purgeDisabledAdapterClaims(adapter)
         }
       }
       phaseMetrics.reexports.durationMs += performance.now() - reexportStart
@@ -1276,6 +1372,8 @@ export class IndexCodeGraph {
 
             const wsName = workspaceIdentityName(prefixedPath)
             const ws = options.workspaces.find((w) => w.name === wsName)
+            const wsRepoRoot =
+              ws?.codeRoot !== undefined ? repoRootByCodeRoot.get(ws.codeRoot) : undefined
 
             const analysis = session.getAnalysis(prefixedPath)
             if (!analysis) continue
@@ -1283,13 +1381,15 @@ export class IndexCodeGraph {
             const packageHelpers = packageImportResolver.forAdapter(adapter)
             const resolvedImports = adapter.resolveImports(analysis, {
               session,
-              qualifiedNames: session.getQualifiedNames(),
+              qualifiedNames: session.getQualifiedNames({
+                includeTests: fileCategories.get(prefixedPath) === 'test',
+              }),
               packageToWorkspace,
               workspaces: packageWorkspaces,
               packageEntryFiles: packageHelpers.packageEntryFiles,
               resolvePackageExport: packageHelpers.resolvePackageExport,
               ...(ws?.codeRoot !== undefined ? { codeRoot: ws.codeRoot } : {}),
-              repoRoot: options.projectRoot,
+              ...(wsRepoRoot !== undefined ? { repoRoot: wsRepoRoot } : {}),
             })
             resolvedImportsMap.set(prefixedPath, resolvedImports)
             if (resolvedImports.steps.length > 0) {
@@ -1323,6 +1423,8 @@ export class IndexCodeGraph {
 
             const wsName = workspaceIdentityName(prefixedPath)
             const ws = options.workspaces.find((w) => w.name === wsName)
+            const wsRepoRoot =
+              ws?.codeRoot !== undefined ? repoRootByCodeRoot.get(ws.codeRoot) : undefined
 
             const analysis = session.getAnalysis(prefixedPath)
             if (!analysis) continue
@@ -1348,7 +1450,7 @@ export class IndexCodeGraph {
               session,
               resolvedImports,
               ...(ws?.codeRoot !== undefined ? { codeRoot: ws.codeRoot } : {}),
-              repoRoot: options.projectRoot,
+              ...(wsRepoRoot !== undefined ? { repoRoot: wsRepoRoot } : {}),
             })
             phaseMetrics.adapterRelations.durationMs += performance.now() - adapterRelationsStart
             phaseMetrics.adapterRelations.count += relations.length

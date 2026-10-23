@@ -158,4 +158,63 @@ describe('FileNode', () => {
     })
     expect(node.projectRelativePath).toBe('../../packages/core/src/index.ts')
   })
+
+  it('File namespace is optional and paired', () => {
+    // When omitted, both are undefined
+    const nodeWithout = createFileNode({
+      path: 'core:src/index.ts',
+      language: 'typescript',
+      contentHash: 'sha256:hash',
+      workspace: 'core',
+    })
+    expect(nodeWithout.namespace).toBeUndefined()
+    expect(nodeWithout.namespaceSeparator).toBeUndefined()
+    expect('namespace' in nodeWithout).toBe(false)
+    expect('namespaceSeparator' in nodeWithout).toBe(false)
+
+    // When namespace is set without separator, separator defaults to '.'
+    const nodeWithNamespaceOnly = createFileNode({
+      path: 'core:src/index.ts',
+      language: 'php',
+      contentHash: 'sha256:hash',
+      workspace: 'core',
+      namespace: 'App\\Services',
+    })
+    expect(nodeWithNamespaceOnly.namespace).toBe('App\\Services')
+    expect(nodeWithNamespaceOnly.namespaceSeparator).toBe('.')
+
+    // When namespace and separator are both set
+    const nodeWithBoth = createFileNode({
+      path: 'core:src/index.ts',
+      language: 'php',
+      contentHash: 'sha256:hash',
+      workspace: 'core',
+      namespace: 'App\\Services',
+      namespaceSeparator: '\\',
+    })
+    expect(nodeWithBoth.namespace).toBe('App\\Services')
+    expect(nodeWithBoth.namespaceSeparator).toBe('\\')
+
+    // When separator is set but namespace is undefined, separator is not set
+    const nodeSeparatorOnly = createFileNode({
+      path: 'core:src/index.ts',
+      language: 'typescript',
+      contentHash: 'sha256:hash',
+      workspace: 'core',
+      namespaceSeparator: '.',
+    })
+    expect(nodeSeparatorOnly.namespace).toBeUndefined()
+    expect(nodeSeparatorOnly.namespaceSeparator).toBeUndefined()
+    expect('namespaceSeparator' in nodeSeparatorOnly).toBe(false)
+
+    // Namespace is not part of file equality (path identity)
+    const nodeOtherNs = createFileNode({
+      path: 'core:src/index.ts',
+      language: 'typescript',
+      contentHash: 'sha256:hash',
+      workspace: 'core',
+      namespace: 'Other',
+    })
+    expect(nodeWithout.path).toBe(nodeOtherNs.path)
+  })
 })

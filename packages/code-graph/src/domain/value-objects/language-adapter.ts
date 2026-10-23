@@ -39,6 +39,7 @@ export interface AdapterAnalyzeContext {
   readonly session: IndexSession
   readonly workspaceName: string
   readonly codeRoot?: string
+  /** Repository root of the workspace code root being processed; absent when no VCS is detected. */
   readonly repoRoot?: string
 }
 
@@ -52,6 +53,7 @@ export interface ImportResolutionContext {
   /** Every workspace of the run, with its code root. */
   readonly workspaces: readonly PackageWorkspace[]
   readonly codeRoot?: string
+  /** Repository root of the workspace code root being processed; absent when no VCS is detected. */
   readonly repoRoot?: string
   /**
    * Matches a non-relative specifier to a known package through the importing adapter's
@@ -84,6 +86,7 @@ export interface RelationBuildContext {
   readonly session: IndexSession
   readonly resolvedImports: ResolvedImports
   readonly codeRoot?: string
+  /** Repository root of the workspace code root being processed; absent when no VCS is detected. */
   readonly repoRoot?: string
 }
 

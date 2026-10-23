@@ -12,36 +12,36 @@
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "One graph indexes many workspaces with canonical identities, project-relative lookup, specs, and cross-workspace resolution.",
+      "value": "One graph indexes many workspaces with canonical identities, repository-backed specs, and exact cross-workspace package resolution.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:1e964e9c113be8acdbb34b0bc4420e53494a8e01f64af29e53aea2ce17c74c1d",
-          "lastModified": "2026-10-13T14:47:14.856Z"
+          "hash": "sha256:df5386842892907cbaaab8d5ac113ddce7f5c47b45f7959bdfca4b1ee6316615",
+          "lastModified": "2026-10-21T09:25:01.274Z"
         },
         "verify.md": {
-          "hash": "sha256:a947c0acdbc72173577102730b1f09080741d2d233d836af49bfa58159062c1b",
-          "lastModified": "2026-10-13T14:47:14.856Z"
+          "hash": "sha256:aa44df19b4ed1c419dc018a022e6001e23694f0df142f27eac9227eb5f247467",
+          "lastModified": "2026-10-21T10:16:44.877Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# Workspace Integration\n\n## Rules\n- Workspace File/Document identity: `{workspaceName}:{relativeToCodeRoot}`; project-global outside all roots: `root:{projectRelativePath}`. Workspace ownership wins; never duplicate physical file as `root:`.\n- `path` is canonical identity for symbols, IDs, relations. Store forward-slash `projectRelativePath` relative to active-config project root, no leading `./`, allowing `..`; denormalize onto symbols for lookup/navigation.\n- Drive strings matching `^[A-Za-z]:[/\\\\]` or `^[A-Za-z]:$` are paths, never workspace prefixes. Applies across filtering, hotspots, storage queries, package surfaces, CLI display.\n- `SymbolNode.id = {filePath}:{kind}:{name}:{line}:{column}`.\n- `SpecNode.workspace` stores workspace; spec IDs remain `{workspace}:{specPath}`, respecting configured prefix.\n- Discovery starts at absolute workspace `codeRoot`; `discoverFiles` returns root-relative paths and remains workspace-agnostic; indexer prefixes identity and derives project-relative path.\n- Unprefixed CLI/tool file selectors may exact-match `projectRelativePath`; canonical identity remains authoritative.\n- Specs come exclusively from workspace `SpecRepository`: list identities, persisted-state hash, artifact content (`spec.md` first then alphabetical; no metadata/locks), metadata defaults, persisted dependencies and implementation. No CLI precompute/filesystem fallback.\n- Pass 2 sees all workspace symbols. Relative import stays workspace; package import uses adapter-derived package→workspace map; PHP qualified names resolve globally.\n- Cross-workspace identity is structured workspace/module-package/public-surface/symbol-space. Apply language case, visibility, supported config. Never infer target from global same-name match.\n- Workspace roots/package identities/project references/autoload mappings/deterministic resolution inputs affect derivation fingerprint.\n- Exact file selectors normalize canonical, project-relative, and absolute spellings to one file. Wildcards retain pattern semantics.\n- `IndexOptions`: project root, `ProjectWorkspace[]`, project graph config, optional progress/chunk/ref, explicit `vcsRoot: string|null`. Graph config carries global includes/excludes and per-workspace allowed/excluded paths/`respectGitignore`.\n- Indexer obtains repository from `ProjectWorkspace`; removed `WorkspaceIndexTarget.specs` callback.\n- `IndexResult.workspaces` reports per-workspace discovered/indexed/skipped/removed files and discovered/indexed specs.\n- `respectGitignore` default true: with supplied VCS root, load root+nested files relative to location; gitignore exclusions absolute. Null root means no probing. False means only explicit exclusion rules.\n\n## Constraints\n- Runtime dependency on `@specd/core`.\n- One project graph store.\n- Discovery workspace-agnostic; indexer owns identities/project-relative paths.\n- Spec access only through `SpecRepository`.\n- Identity metadata migrations such as `configRelativePath`→`projectRelativePath` require full rebuild.",
+      "value": "# Workspace Integration\n\n## Rules\n- File/Document identity: `{workspaceName}:{relativeToCodeRoot}`; project-global outside workspace roots: `root:{projectRelativePath}`. Workspace ownership wins; never duplicate physical file as `root:`.\n- `path` is canonical identity for symbols, IDs, relations. Store forward-slash `projectRelativePath` relative to active-config project root, no leading `./`, allowing `..`; denormalize onto symbols for lookup/navigation.\n- Strings matching `^[A-Za-z]:[/\\\\]` or `^[A-Za-z]:$` are drive paths, never workspace prefixes. Applies to exclusion, hotspots, SQLite filters, package surfaces, CLI display.\n- `SymbolNode.id = {filePath}:{kind}:{name}:{line}:{column}`.\n- `SpecNode.workspace` stores workspace; spec IDs remain `{workspace}:{specPath}`, respecting configured prefix.\n- Discover from absolute workspace `codeRoot`; `discoverFiles` returns root-relative paths and remains workspace-agnostic; indexer prefixes identity and derives project-relative path.\n- Exact file selectors normalize canonical, project-relative, absolute spellings to one file. Wildcards retain pattern semantics.\n- Specs come only from workspace `SpecRepository`: `list()`, `persistedStateHash()`, artifacts via `artifact()` (`spec.md` first, remaining alphabetical; exclude metadata/locks), `metadata()` defaults, `readPersistedDependsOn()`, `readPersistedImplementation()`. No CLI precompute or filesystem fallback.\n- Pass 2 starts after symbols and public bindings for all workspaces are final. Relative imports stay workspace-local.\n- Package imports use adapter `packageResolution` facts mapping package→workspace and resolve names only through target package published entry surfaces/public bindings; never search target workspace symbols. Resolved named import records binding target, resolution step, entry-file `IMPORTS`; unnamed import records entry-file `IMPORTS`. Downstream `USES_TYPE`, `CALLS`, `CONSTRUCTS` use binding.\n- Unresolved package imports create no relation/binding/step; diagnostics remain non-persisted. Undeclared packages count external only.\n- Tests are never package entries; import qualified-name lookup cannot target test symbols.\n- Qualified symbol identities resolve globally by exact qualified name; file-qualified identities resolve through importing adapter `qualifiedNameResolution` and `packageResolution`.\n- Cross-workspace identity is structured workspace/module-package/public-surface/symbol-space. Apply language case, visibility, supported config. Never infer from global or workspace same-name uniqueness.\n- Workspace roots, package identity, `exports`/`main`, module paths, project references, autoload mappings, and adapter `resolutionManifests()` affect derivation fingerprint.\n- `IndexOptions`: project root, `ProjectWorkspace[]`, `ProjectGraphConfig`, optional progress/chunk/ref, explicit `vcsRoot: string|null`. Graph config carries global includes/excludes and per-workspace allowed/excluded paths/`respectGitignore`. Removed `WorkspaceIndexTarget.specs`.\n- `IndexResult.workspaces` reports per-workspace discovered/indexed/skipped/removed files and discovered/indexed specs.\n- `respectGitignore` defaults true: non-null `vcsRoot` loads root+nested files relative to location; gitignore exclusions have priority. Null root forbids VCS probing. False applies only explicit exclusions.\n\n## Constraints\n- Runtime dependency on `@specd/core`.\n- One project graph store.\n- Discovery workspace-agnostic; indexer owns identities/project-relative paths.\n- Spec access only through `SpecRepository`.\n- Identity metadata changes require full rebuild.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:1e964e9c113be8acdbb34b0bc4420e53494a8e01f64af29e53aea2ce17c74c1d",
-          "lastModified": "2026-10-13T14:47:14.856Z"
+          "hash": "sha256:df5386842892907cbaaab8d5ac113ddce7f5c47b45f7959bdfca4b1ee6316615",
+          "lastModified": "2026-10-21T09:25:01.274Z"
         },
         "verify.md": {
-          "hash": "sha256:a947c0acdbc72173577102730b1f09080741d2d233d836af49bfa58159062c1b",
-          "lastModified": "2026-10-13T14:47:14.856Z"
+          "hash": "sha256:aa44df19b4ed1c419dc018a022e6001e23694f0df142f27eac9227eb5f247467",
+          "lastModified": "2026-10-21T10:16:44.877Z"
         }
       }
     }

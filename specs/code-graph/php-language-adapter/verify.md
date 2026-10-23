@@ -137,6 +137,64 @@
 - **THEN** resolution still succeeds from the prepared PSR-4 maps
 - **AND** an unindexed file is never targeted
 
+#### Scenario: Prepare parses composer.json once
+
+- **GIVEN** a workspace whose selected `composer.json` is named
+- **WHEN** `prepare` runs
+- **THEN** the selected file is read exactly once and parsed exactly once
+- **AND** package-name selection and PSR-4 extraction reuse that parsed value
+
+#### Scenario: Nameless Composer fallback is also read and parsed once
+
+- **GIVEN** a workspace whose bounded search selects a nameless `composer.json` for its own PSR-4 fallback
+- **WHEN** `prepare` runs
+- **THEN** the selected file is read exactly once and parsed exactly once
+- **AND** the fallback map is extracted from that same parsed value
+
+#### Scenario: autoload and autoload-dev share a prefix
+
+- **GIVEN** `autoload` maps `App\` to `src/` and `autoload-dev` maps `App\` to `tests/`
+- **WHEN** the PSR-4 map is prepared
+- **THEN** the prefix `App\` keeps `src/` then `tests/`
+- **AND** no directory is lost
+
+#### Scenario: Candidates follow the longest prefix first
+
+- **GIVEN** prefixes `App\` and `App\Http\` and the name `App\Http\Kernel`
+- **WHEN** `entrySurface` runs
+- **THEN** the candidate for `App\Http\` comes before the one for `App\`
+- **AND** the import depends only on the first candidate that is an indexed file
+
+#### Scenario: Own PSR-4 fallback without a Composer name
+
+- **GIVEN** a workspace whose `composer.json` has no `name` and maps `App\` to `src/`
+- **WHEN** a file in that workspace imports `App\Models\User`
+- **THEN** the import resolves through the workspace's own PSR-4 map to an indexed file
+
+#### Scenario: Own PSR-4 fallback never returns a test file for production code
+
+- **GIVEN** an `autoload-dev` directory containing the imported class and a production importer
+- **WHEN** the own fallback runs
+- **THEN** the test file is not the target
+
+#### Scenario: Own PSR-4 fallback never uses an absolute path
+
+- **GIVEN** a qualified name whose mapped file is not an indexed file
+- **WHEN** the own fallback runs
+- **THEN** the import stays unresolved and no absolute-path lookup occurs
+
+#### Scenario: Prepare prefers named composer.json over nearest nameless composer.json
+
+- **GIVEN** a workspace whose code root contains a nameless `composer.json` and whose parent inside the repository contains a named `composer.json`
+- **WHEN** `identity` and `prepare` run for that workspace
+- **THEN** both select the named `composer.json` in the parent directory
+
+#### Scenario: entrySurface performs no filesystem access during Pass 2
+
+- **GIVEN** prepared PSR-4 maps with canonicalized paths
+- **WHEN** `entrySurface` or `resolveToPath` runs in Pass 2
+- **THEN** no filesystem calls (including `realpathSync`) are performed
+
 ### Requirement: Resolution manifests
 
 #### Scenario: PHP declares only composer.json

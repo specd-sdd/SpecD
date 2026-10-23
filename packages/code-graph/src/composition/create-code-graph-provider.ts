@@ -1,4 +1,4 @@
-import { type SpecdConfig } from '@specd/core'
+import { type SpecdConfig, createVcsAdapter } from '@specd/core'
 import { AdapterRegistry } from '../infrastructure/tree-sitter/adapter-registry.js'
 import { TypeScriptLanguageAdapter } from '../infrastructure/tree-sitter/typescript-language-adapter.js'
 import { PythonLanguageAdapter } from '../infrastructure/tree-sitter/python-language-adapter.js'
@@ -16,6 +16,8 @@ import { createSqliteGraphStoreFactory } from './create-sqlite-graph-store-facto
 import { createGetGraphHealth } from './use-cases/get-graph-health.js'
 import { readInstalledCodeGraphVersion } from '../application/use-cases/_shared/installed-code-graph-version.js'
 import { NodeResolutionManifestSource } from '../infrastructure/fs/node-resolution-manifest-source.js'
+import { VcsRepositoryRootSource } from '../infrastructure/vcs/vcs-repository-root-source.js'
+import { NodeWorkspaceAccessibilitySource } from '../infrastructure/fs/node-workspace-accessibility-source.js'
 import { type WorkspaceIndexTarget } from '../domain/value-objects/index-options.js'
 
 const DEFAULT_GRAPH_STORE_ID = 'sqlite'
@@ -65,7 +67,13 @@ export function createCodeGraphProvider(
   }
 
   const manifestSource = new NodeResolutionManifestSource()
-  const indexer = new IndexCodeGraph(store, registry, manifestSource)
+  const indexer = new IndexCodeGraph(
+    store,
+    registry,
+    manifestSource,
+    new VcsRepositoryRootSource(createVcsAdapter),
+    new NodeWorkspaceAccessibilitySource(),
+  )
 
   const graphHealth = isSpecdConfig(options)
     ? {

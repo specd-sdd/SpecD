@@ -1,0 +1,126 @@
+- op: modified
+  description: Failure isolation keeps relative re-export linking independent of package identity failures
+  selector:
+    type: section
+    matches: 'Requirement: Adapter facet model'
+  content: |
+    A **facet** is a cohesive group of resolution services that an adapter provides only when it supports them. It is an object exposed as an optional readonly property of the adapter. All members of a facet are required: a facet MUST NOT contain optional members. An adapter that cannot provide every member of a facet MUST NOT expose that facet.
+
+    Presence of a facet is the adapter's declaration that it supports the capability behind it. The indexer, the resolver, and other consumers MUST decide what to do from the presence of the facet property and MUST NOT probe for individual methods. A consumer MUST NOT branch on a language identifier, a file extension, or a manifest name to compensate for an absent facet.
+
+    When a facet is absent:
+
+    - the behaviour that depends on it SHALL NOT run for that adapter;
+    - no error SHALL be raised and no heuristic fallback SHALL replace it;
+    - the affected items SHALL stay unresolved, and the run result SHALL list the adapter once (by its first declared language identifier, sorted) in `importDiagnostics.adaptersWithoutPackageResolution` when the missing facet is `packageResolution`. That listing is not a resolution failure and is never counted in `importDiagnostics.total`.
+
+    A facet that is present but throws while being used SHALL NOT stop the run. A failure inside per-file resolution is recorded for that file by the indexer's error isolation. A failure inside `identity`, `prepare`, or `link` is recorded as an indexing error, any package identities claimed solely by that adapter in earlier workspaces are dropped from the run's package map, and the adapter is treated as if it did not provide `packageResolution` for the rest of the run, including the other workspaces; such an adapter is also listed in `importDiagnostics.adaptersWithoutPackageResolution`.
+
+    A failure of `packageResolution` SHALL disable only package-addressed behaviour. It MUST NOT disable the same adapter's `reExportLinking` facet for relative routes: relative barrel re-exports SHALL still be linked, and only routes that need package data stay unresolved. Facets are isolated from each other, and one facet being treated as absent MUST NOT make another facet of the same adapter absent.
+
+    Facets are part of the public adapter contract. Each facet's members, argument and result types, purity, and I/O allowance are fixed by this spec. A new facet is added by a change to this spec; consumers MUST NOT rely on an adapter-specific extension.
+
+    Adding a new language SHALL require only a new adapter that implements the required core and any facets it supports. It MUST NOT require a change to the indexer, the index session, the resolver, or the graph stores.
+
+- op: modified
+  description: Define project root, code root and package root; repository-bounded manifest search; read-once prepare
+  selector:
+    type: section
+    matches: 'Requirement: Package resolution facet'
+  content: |
+    The `packageResolution` facet SHALL let the indexer connect a package specifier used in one workspace to the files that the target workspace's package publishes. It has these members:
+
+    - **`identity(codeRoot: string, repoRoot?: string, report?: (message: string) => void): string | undefined`** — searches at and above `codeRoot`, bounded by `repoRoot`, for the language's package manifest and returns the package identity, or `undefined` when none is found. An optional `report` callback receives non-fatal diagnostic messages when a manifest on the walk lacks the identity field. This method MAY perform I/O. It is called once per workspace before Pass 1 completes.
+    - **`prepare(context: PackagePreparationContext): void`** — prepares, for every configured workspace, the data that `matchSpecifier` and `entrySurface` need and stores it as compact immutable data in the run-scoped session. It MAY read manifests (I/O is allowed here and in `identity`). It MAY do nothing when the adapter derives everything from the package map, the matched package, the owning workspace, and the indexed file set; such an adapter still provides the member. Within one `prepare` call each manifest of a workspace MUST be read at most once, and only the compact data that `matchSpecifier` and `entrySurface` need MUST be kept, never the whole parsed manifest. `identity` MAY read the same manifest. `PackagePreparationContext` carries the `IndexSession`, the list of workspaces (`name`, `codeRoot`, and the repository root of that code root when one was detected), and the project root. The indexer calls it once per run, after all workspaces have been analyzed and before any import is resolved, and it MUST NOT be called again during Pass 2.
+    - **`matchSpecifier(specifier: string, knownPackages: readonly string[], session: IndexSession): string | undefined`** — returns which known package identity a non-relative specifier refers to, using the language's matching rules (for example the longest known prefix). It depends only on its arguments and on the data `prepare` stored in the session, performs no I/O, and has no side effects. Languages whose specifiers are not named after the package (for example PHP, where a qualified name belongs to the package whose autoload prefix matches it) read the prepared data through `session`.
+    - **`entrySurface(request: PackageEntryRequest): readonly PackageEntry[]`** — returns the ordered candidate entries through which the matched package publishes the requested specifier. A `PackageEntry` has a workspace-prefixed `filePath` and the public `surface` id under which that file's exports are stored (for most languages the file itself; for Go, the package). `PackageEntryRequest` carries the full specifier (including any subpath), the matched package identity, the target workspace name, and the `IndexSession`. It reads only the data stored by `prepare`; it MUST NOT perform I/O. It returns an empty array when the package publishes nothing for that specifier. The indexer discards entries whose file is not an indexed file.
+
+    The facet MUST derive entry files only from the language's package manifest and layout rules. It MUST NOT search symbols by name. The shared helper discards entries classified as tests, so a test file is never a package entry whether or not the facet returned it.
+
+    Every manifest basename the facet reads MUST appear in `resolutionManifests()`, and `resolutionManifests()` MUST NOT name a file the adapter does not read for package identity or import resolution.
+
+    Each adapter reads its language's manifest as follows:
+
+    | Language   | Manifest file    | Identity field   |
+    | ---------- | ---------------- | ---------------- |
+    | TypeScript | `package.json`   | `name`           |
+    | Python     | `pyproject.toml` | `[project].name` |
+    | Go         | `go.mod`         | `module`         |
+    | PHP        | `composer.json`  | `name`           |
+
+    Three roots are distinct and MUST NOT be confused:
+
+    - the **project root** is the directory of the project configuration; it anchors configuration, graph storage, and project-relative paths, and it is never a boundary for package resolution;
+    - the **code root** of a workspace is the directory holding that workspace's code; it MAY be inside the project root or outside it (for example a workspace that lives in another repository);
+    - the **package root** of a workspace is the directory of the manifest that gives the workspace its package identity.
+
+    The package root SHALL be found by one search shared by `identity` and `prepare`, so both always use the same manifest. The search starts at the canonical code root (symbolic links resolved, no trailing separator) and walks up to the first usable manifest. The walk is bounded by `repoRoot`, which is the root of the repository that contains that code root. The indexer resolves it once per workspace with the VCS adapter detection (`createVcsAdapter(codeRoot)` followed by `rootDir()`), making it VCS-agnostic (git, hg, svn, and registered external providers), and passes it to the adapter as data. When no VCS is detected for a code root, `repoRoot` is not provided and the search SHALL inspect only the code root itself and MUST NOT walk upward. The search MUST NOT walk past `repoRoot` and MUST NOT reach the filesystem root. A manifest that lacks the identity field or cannot be read is skipped with a non-fatal diagnostic reported through `report` (recorded in `IndexResult.errors` without failing the run) and the walk continues, still bounded by `repoRoot`. Every skipped manifest MUST be reported even when the bounded search ends without finding a usable manifest and `identity` returns `undefined`.
+
+    A language whose package directory is computed from the manifest location (for example Go, where the package directory is relative to the directory of `go.mod`) SHALL compute it relative to the package root, not to the code root.
+
+    An adapter that does not provide this facet contributes no package identities, and package-specifier imports from and to its workspaces stay unresolved.
+
+- op: modified
+  description: Every adapter is asked for an identity; ambiguity and subset runs
+  selector:
+    type: section
+    matches: 'Requirement: Package identity extraction'
+  content: |
+    Package identity SHALL be provided by `packageResolution.identity`, defined in "Package resolution facet". An adapter that does not provide the facet has no package identity, and cross-workspace resolution for its workspaces stays unresolved.
+
+    The indexer calls `identity` for each workspace's `codeRoot` to build a `packageName → workspaceName` map. This enables cross-workspace import resolution without coupling the indexer to any language's package system.
+
+    The indexer SHALL ask every adapter that provides `packageResolution` for an identity of each workspace, not only the first adapter that answers, so a workspace that holds several manifests (for example `package.json` and `composer.json`) keeps one identity per language. When two different workspaces claim the same package name, that name is ambiguous: it SHALL resolve to no workspace and SHALL be reported as an indexing error naming both workspaces. The same workspace claiming one name through several adapters is not an ambiguity.
+
+    The indexer SHALL map identities and prepare manifests for every configured workspace, including the workspaces that a partial run does not index. A workspace whose code root is not accessible (for example a repository that is not cloned on this machine) SHALL be skipped with a diagnostic entry in `IndexResult.errors`, its packages stay external, and it MUST NOT fail the run.
+
+    For Python, the identity field is the `name` key inside the `[project]` table only. A `name` key in any other table, including `[tool.poetry]`, MUST NOT be used. Double-quoted and single-quoted TOML strings MUST both match. When `[project].name` is absent, that file MUST NOT yield an identity and the search MUST continue to the next manifest on the walk.
+
+    `identity` and `prepare` perform I/O (they read manifest files from disk). `resolutionManifests()` MUST NOT perform that I/O.
+
+- op: modified
+  description: Align the wording of package-unknown with the indexer behaviour (counted, never a failure)
+  selector:
+    type: section
+    matches: 'Requirement: Package import resolution context'
+  content: |
+    `ImportResolutionContext` SHALL expose the data and the shared helpers an adapter needs to resolve non-relative imports without implementing the lookup itself:
+
+    - the list of workspaces (`name` and `codeRoot`) and the `packageName → workspaceName` map;
+    - **`packageEntryFiles(specifier: string): PackageEntryResolution`** — uses the importing adapter's `packageResolution` facet to match the specifier to a known package, obtain its `entrySurface`, and return the entries whose file is indexed;
+    - **`resolvePackageExport(request: PackageExportRequest): PackageExportResolution`** — for an exported name and the symbol spaces to consider, reads the public bindings stored under the surfaces of the entries that `packageEntryFiles` returned and resolves the name to a logical target. The adapter passes every space the import could address (for example `value` and `type` for a plain named import, `type` only for a type-only import).
+
+    `resolvePackageExport` SHALL resolve a name only when every binding found in every requested space and every entry leads to the same logical target. A binding without a target is ignored by this check. When nothing exports the name, or the bindings lead to different targets, the result is unresolved with a reason. The reasons are: `facet-absent`, `package-unknown`, `no-entry-surface`, `not-exported`, and `ambiguous`. The result for a resolved name carries the target logical id, the entry file, and the public binding id used.
+
+    An adapter SHALL resolve a package-specifier import by calling these helpers. It MUST NOT search symbols by name in the target workspace, and it MUST NOT choose the first or a unique same-name symbol. The helpers are implemented generically by the indexer and contain no language-specific logic.
+
+    `ResolvedImports` SHALL include a `steps` entry of kind `import:package` for each resolved package import, from the importing file's local binding id to the public binding id, and a diagnostics entry with the reason for each package import that stayed unresolved, including `package-unknown`. The indexer SHALL persist the steps and SHALL NOT persist the diagnostics. `package-unknown` is not a failure: an import of a package that no workspace declares is an external dependency, and the indexer only counts it in `externalPackageImports`, excluding it from the failure total, the per-reason counts, and the samples.
+
+- op: modified
+  description: Registration validates resolutionManifests values and malformed languages/extensions results
+  selector:
+    type: section
+    matches: 'Requirement: Adapter registry'
+  content: |
+    An `AdapterRegistry` SHALL map language identifiers to `LanguageAdapter` instances. It provides:
+
+    - **`register(adapter: LanguageAdapter): void`** — validates the adapter, then registers it for all languages it declares and all file extensions from `adapter.extensions()`
+    - **`getAdapter(languageId: string): LanguageAdapter | undefined`** — returns the adapter for a language, or `undefined` if none registered
+    - **`getAdapterForFile(filePath: string): LanguageAdapter | undefined`** — resolves extension → language → adapter using the dynamically built extension map
+    - **`getLanguageForFile(filePath: string): string | undefined`** — resolves extension → language identifier (e.g. `'typescript'`, `'python'`), or `undefined` if no adapter handles the extension
+    - **`getAdapters(): LanguageAdapter[]`** — returns all unique registered adapters
+
+    The extension-to-language map is built dynamically from registered adapters — there is no hardcoded extension list in the registry. Adding a new language requires only registering a new adapter.
+
+    Adapters SHALL be registered via `register()`. Built-in adapters (such as TypeScript, Python, Go, and PHP) are registered into the registry through composition providers.
+
+    `LanguageAdapter` is public API and adapters may be written outside this repository, so `register()` SHALL validate the adapter before changing any registry state. Registration MUST fail with a `SpecdError` carrying the code `INVALID_LANGUAGE_ADAPTER`, and MUST leave the registry unchanged, when:
+
+    - a required core member is missing or is not a function;
+    - `languages()` does not return an array of non-empty strings with at least one identifier, or `extensions()` does not return an object whose keys are extensions and whose values are strings, or maps an extension to a language the adapter does not declare;
+    - `resolutionManifests()` does not return an array of exact, non-empty basenames (a value containing a path separator or a glob character is invalid);
+    - a facet property is present but is not an object providing every member of that facet as a function.
+
+    The error message SHALL name the offending adapter language, the failed rule, and the missing or invalid member.
+
+    Registering an adapter for a language that is already registered SHALL replace the adapter previously registered for that language: the later registration wins, so a third-party adapter can substitute a built-in one. Replacement is per language. The extension mappings the new adapter declares overwrite earlier mappings of the same extension. An earlier adapter keeps every language the new adapter does not declare, and an adapter that no longer serves any language SHALL NOT be returned by `getAdapters()`, so no consumer consults it. Registering the same adapter instance again changes nothing.

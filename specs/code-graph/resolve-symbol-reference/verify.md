@@ -45,6 +45,28 @@
 - **WHEN** the text is `EditChange.execute`
 - **THEN** only the member visible in that file is returned
 
+#### Scenario: Anchor without an adapter leaves human text unresolved
+
+- **GIVEN** a request anchored to a Go package surface whose language has no `symbolReferenceSyntax` facet
+- **AND** the text is an owner-qualified spelling that is not a stored `qualified_name`
+- **WHEN** the reference is resolved
+- **THEN** the result is `unresolved`
+- **AND** no generic dotted or delimiter parser runs and no other adapter is consulted
+
+#### Scenario: Qualified name is not derived from owner and member
+
+- **GIVEN** a member whose stored `qualified_name` differs from the spelling `Owner.member` that could be derived from its owner and name
+- **WHEN** the unanchored text `Owner.member` is resolved
+- **THEN** the lookup compares only the stored `qualified_name`
+- **AND** the member is not matched through a derived name
+
+#### Scenario: Session and persisted lookup reject an unstored qualified spelling equally
+
+- **GIVEN** a logical member has an owner and name but no stored `qualified_name`
+- **WHEN** the same owner-qualified text is resolved once from the run session and once from the persisted store
+- **THEN** both lookups return the same candidate set
+- **AND** neither lookup derives a qualified spelling from the owner and member
+
 ### Requirement: Logical canonical targets
 
 #### Scenario: Overloads form one logical symbol

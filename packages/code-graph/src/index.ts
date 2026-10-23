@@ -37,6 +37,13 @@ export { PythonLanguageAdapter } from './infrastructure/tree-sitter/python-langu
 export { PhpLanguageAdapter } from './infrastructure/tree-sitter/php-language-adapter.js'
 export { GoLanguageAdapter } from './infrastructure/tree-sitter/go-language-adapter.js'
 export {
+  findPackageManifest,
+  findManifestField,
+  type ManifestInspection,
+  type PackageManifestMatch,
+  type PackageManifestSearchResult,
+} from './infrastructure/tree-sitter/find-manifest-field.js'
+export {
   buildLogicalDeclarationFacts,
   buildHierarchyReferenceFacts,
   containsSymbolRange,

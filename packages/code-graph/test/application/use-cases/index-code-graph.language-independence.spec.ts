@@ -5,6 +5,8 @@ import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
 import { IndexCodeGraph } from '../../../src/application/use-cases/index-code-graph.js'
 import { emptyResolutionManifestSource } from '../../../src/application/ports/resolution-manifest-source.js'
+import { emptyRepositoryRootSource } from '../../../src/application/ports/repository-root-source.js'
+import { NodeWorkspaceAccessibilitySource } from '../../../src/infrastructure/fs/node-workspace-accessibility-source.js'
 import { ResolveSymbolReference } from '../../../src/application/use-cases/resolve-symbol-reference.js'
 import { AdapterRegistry } from '../../../src/infrastructure/tree-sitter/adapter-registry.js'
 import { type IndexOptions } from '../../../src/domain/value-objects/index-options.js'
@@ -73,7 +75,13 @@ describe('Language independence of package import resolution', () => {
     await store.open()
     const registry = new AdapterRegistry()
     registry.register(new StubLanguageAdapter())
-    const indexer = new IndexCodeGraph(store, registry, emptyResolutionManifestSource)
+    const indexer = new IndexCodeGraph(
+      store,
+      registry,
+      emptyResolutionManifestSource,
+      emptyRepositoryRootSource,
+      new NodeWorkspaceAccessibilitySource(),
+    )
 
     const result = await indexer.execute(options())
 
@@ -101,7 +109,13 @@ describe('Language independence of package import resolution', () => {
     await store.open()
     const registry = new AdapterRegistry()
     registry.register(new StubLanguageAdapter())
-    await new IndexCodeGraph(store, registry, emptyResolutionManifestSource).execute(options())
+    await new IndexCodeGraph(
+      store,
+      registry,
+      emptyResolutionManifestSource,
+      emptyRepositoryRootSource,
+      new NodeWorkspaceAccessibilitySource(),
+    ).execute(options())
     const resolver = new ResolveSymbolReference(
       store,
       async () => ({ fresh: true, complete: true, reasonCodes: [] }) as never,
@@ -131,7 +145,13 @@ describe('Language independence of package import resolution', () => {
     await store.open()
     const registry = new AdapterRegistry()
     registry.register(new StubLanguageAdapter())
-    const indexer = new IndexCodeGraph(store, registry, emptyResolutionManifestSource)
+    const indexer = new IndexCodeGraph(
+      store,
+      registry,
+      emptyResolutionManifestSource,
+      emptyRepositoryRootSource,
+      new NodeWorkspaceAccessibilitySource(),
+    )
     await indexer.execute(options())
 
     write(libDir, { 'src/lib.z2': 'export Other\n' })

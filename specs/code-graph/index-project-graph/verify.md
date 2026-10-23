@@ -35,9 +35,9 @@
 
 #### Scenario: Prepared inputs are forwarded unchanged
 
-- **GIVEN** an already-open provider and prepared project inputs
+- **GIVEN** an already-open provider and prepared project inputs including `configuredWorkspaces`
 - **WHEN** the use case executes
-- **THEN** it invokes provider indexing with those inputs
+- **THEN** it invokes provider indexing with those inputs including `configuredWorkspaces`
 
 #### Scenario: Prepared provider lifecycle remains untouched
 

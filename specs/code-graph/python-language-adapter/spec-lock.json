@@ -10,8 +10,10 @@
   ],
   "implementation": [
     {
-      "file": "code-graph:src/infrastructure/tree-sitter/python-language-adapter.ts",
-      "symbols": ["PythonLanguageAdapter"]
+      "file": "code-graph:src/infrastructure/tree-sitter/python-language-adapter.ts"
+    },
+    {
+      "file": "code-graph:test/infrastructure/tree-sitter/python-language-adapter.spec.ts"
     }
   ],
   "optimizations": {

@@ -90,13 +90,17 @@ describe('runIndexProjectGraph', () => {
     })
   })
 
-  it('filters workspaces when a subset is requested', async () => {
+  it('Scenario: Partial run maps and prepares every configured workspace', async () => {
     await runIndexProjectGraph(ctx, { workspaces: ['cli'] })
 
     expect(createIndexProjectGraph).toHaveBeenCalledOnce()
     expect(indexExecute).toHaveBeenCalledWith(
       expect.objectContaining({
         workspaces: [expect.objectContaining({ name: 'cli' })],
+        configuredWorkspaces: [
+          expect.objectContaining({ name: 'core' }),
+          expect.objectContaining({ name: 'cli' }),
+        ],
       }),
     )
     expect(providerIndex).not.toHaveBeenCalled()

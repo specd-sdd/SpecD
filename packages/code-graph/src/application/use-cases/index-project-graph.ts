@@ -1,5 +1,5 @@
 import { type CodeGraphHostPort } from '../ports/code-graph-host-port.js'
-import { type GetSpecMetadata } from '@specd/core'
+import { type GetSpecMetadata, type ProjectWorkspace } from '@specd/core'
 import {
   type IndexProgressCallback,
   type ProjectGraphConfig,
@@ -12,6 +12,7 @@ export interface IndexProjectGraphInput {
   readonly provider: CodeGraphHostPort
   readonly projectRoot: string
   readonly workspaces: readonly WorkspaceIndexTarget[]
+  readonly configuredWorkspaces?: readonly ProjectWorkspace[]
   readonly graphConfig: ProjectGraphConfig
   readonly codeGraphVersion: string
   readonly vcsRoot: string | null
@@ -38,6 +39,9 @@ export class IndexProjectGraph {
     return input.provider.index({
       projectRoot: input.projectRoot,
       workspaces: [...input.workspaces],
+      ...(input.configuredWorkspaces !== undefined
+        ? { configuredWorkspaces: [...input.configuredWorkspaces] }
+        : {}),
       graphConfig: input.graphConfig,
       codeGraphVersion: input.codeGraphVersion,
       vcsRoot: input.vcsRoot,

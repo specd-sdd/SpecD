@@ -8,6 +8,9 @@ import { type GraphStore } from '../../../src/domain/ports/graph-store.js'
 import { type IndexOptions } from '../../../src/domain/value-objects/index-options.js'
 import { AdapterRegistry } from '../../../src/infrastructure/tree-sitter/adapter-registry.js'
 import { TypeScriptLanguageAdapter } from '../../../src/infrastructure/tree-sitter/typescript-language-adapter.js'
+import { emptyResolutionManifestSource } from '../../../src/application/ports/resolution-manifest-source.js'
+import { emptyRepositoryRootSource } from '../../../src/application/ports/repository-root-source.js'
+import { NodeWorkspaceAccessibilitySource } from '../../../src/infrastructure/fs/node-workspace-accessibility-source.js'
 import { RelationType } from '../../../src/domain/value-objects/relation-type.js'
 import { type Relation } from '../../../src/domain/value-objects/relation.js'
 import { SymbolKind } from '../../../src/domain/value-objects/symbol-kind.js'
@@ -67,7 +70,13 @@ export class DerivedService extends BaseService {
 `,
     })
 
-    const indexer = new IndexCodeGraph(store, registry)
+    const indexer = new IndexCodeGraph(
+      store,
+      registry,
+      emptyResolutionManifestSource,
+      emptyRepositoryRootSource,
+      new NodeWorkspaceAccessibilitySource(),
+    )
     const options: IndexOptions = {
       projectRoot: tempDir,
       vcsRoot: tempDir,
@@ -124,7 +133,13 @@ export enum UserRole {
 `,
     })
 
-    const indexer = new IndexCodeGraph(store, registry)
+    const indexer = new IndexCodeGraph(
+      store,
+      registry,
+      emptyResolutionManifestSource,
+      emptyRepositoryRootSource,
+      new NodeWorkspaceAccessibilitySource(),
+    )
     const options: IndexOptions = {
       projectRoot: tempDir,
       vcsRoot: tempDir,

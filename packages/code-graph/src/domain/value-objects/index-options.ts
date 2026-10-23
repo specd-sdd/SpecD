@@ -1,4 +1,5 @@
 import { type ProjectWorkspace, type SpecMetadata } from '@specd/core'
+export { type ProjectWorkspace } from '@specd/core'
 import { type GetSpecMetadata } from '@specd/core'
 
 /**
@@ -84,8 +85,8 @@ export interface ProjectGraphConfig {
  */
 export interface IndexOptions {
   /**
-   * The monorepo or project root directory.
-   * Used as the boundary for monorepo package resolution and project-global discovery.
+   * The directory of the project configuration.
+   * Anchors configuration, graph storage, and project-global discovery. Never a boundary for package resolution.
    */
   readonly projectRoot: string
 
@@ -95,6 +96,13 @@ export interface IndexOptions {
    * each workspace's repository instance.
    */
   readonly workspaces: readonly ProjectWorkspace[]
+
+  /**
+   * Every configured workspace, including workspaces not selected for this run. Used to map
+   * package identities and prepare manifests so a partial run resolves the same as a full run.
+   * Defaults to `workspaces` when omitted.
+   */
+  readonly configuredWorkspaces?: readonly ProjectWorkspace[]
 
   /**
    * Project-global graph configuration.

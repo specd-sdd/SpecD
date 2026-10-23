@@ -10,24 +10,8 @@
   ],
   "implementation": [
     {
-      "file": "code-graph:src/domain/value-objects/symbol-reference.ts",
-      "symbols": [
-        "DeclarationOccurrence",
-        "SourcePosition",
-        "LogicalResolutionTarget",
-        "DeclarationResolutionTarget",
-        "PublicBindingResolutionTarget",
-        "ResolvedSymbolTarget",
-        "ResolveSymbolReferenceInput",
-        "SymbolResolutionResult"
-      ]
-    },
-    {
-      "file": "code-graph:src/infrastructure/tree-sitter/reference-fact-helpers.ts",
-      "symbols": ["AdapterDeclarationDecision", "buildLogicalDeclarationFacts"]
-    },
-    {
-      "file": "code-graph:src/domain/value-objects/source-location.ts"
+      "file": "code-graph:src/domain/value-objects/file-node.ts",
+      "symbols": ["createFileNode", "FileNode"]
     }
   ],
   "optimizations": {

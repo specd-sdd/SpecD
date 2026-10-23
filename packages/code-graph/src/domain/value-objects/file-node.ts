@@ -16,6 +16,8 @@ export interface FileNode {
   readonly category: FileCategory
   readonly embedding: Float32Array | undefined
   readonly content?: string | undefined
+  readonly namespace?: string | undefined
+  readonly namespaceSeparator?: string | undefined
 }
 
 /**
@@ -38,6 +40,8 @@ function normalizePath(filePath: string): string {
  * @param params.category - Optional file category, defaults to 'source'.
  * @param params.embedding - Optional vector embedding.
  * @param params.content - Optional full textual content.
+ * @param params.namespace - Optional file namespace.
+ * @param params.namespaceSeparator - Optional namespace separator.
  * @returns A FileNode value object.
  */
 export function createFileNode(params: {
@@ -49,8 +53,10 @@ export function createFileNode(params: {
   category?: FileCategory | undefined
   embedding?: Float32Array | undefined
   content?: string
+  namespace?: string | undefined
+  namespaceSeparator?: string | undefined
 }): FileNode {
-  return {
+  const node: FileNode = {
     path: normalizePath(params.path),
     projectRelativePath: normalizePath(params.projectRelativePath ?? params.path),
     language: params.language,
@@ -59,5 +65,12 @@ export function createFileNode(params: {
     category: params.category ?? 'source',
     embedding: params.embedding ? new Float32Array(params.embedding) : undefined,
     content: params.content,
+    ...(params.namespace !== undefined
+      ? {
+          namespace: params.namespace,
+          namespaceSeparator: params.namespaceSeparator ?? '.',
+        }
+      : {}),
   }
+  return node
 }

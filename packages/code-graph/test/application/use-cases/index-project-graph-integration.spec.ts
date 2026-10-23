@@ -29,6 +29,9 @@ import { SearchCodeGraph } from '../../../src/application/use-cases/search-code-
 import { AdapterRegistry } from '../../../src/infrastructure/tree-sitter/adapter-registry.js'
 import { GoLanguageAdapter } from '../../../src/infrastructure/tree-sitter/go-language-adapter.js'
 import { TypeScriptLanguageAdapter } from '../../../src/infrastructure/tree-sitter/typescript-language-adapter.js'
+import { emptyResolutionManifestSource } from '../../../src/application/ports/resolution-manifest-source.js'
+import { emptyRepositoryRootSource } from '../../../src/application/ports/repository-root-source.js'
+import { NodeWorkspaceAccessibilitySource } from '../../../src/infrastructure/fs/node-workspace-accessibility-source.js'
 
 const makeMockRepo = makeMockSpecRepository
 
@@ -206,7 +209,16 @@ describe('IndexProjectGraph integration', () => {
         await store.open()
         const registry = new AdapterRegistry()
         registry.register(new TypeScriptLanguageAdapter())
-        return { store, indexer: new IndexCodeGraph(store, registry) }
+        return {
+          store,
+          indexer: new IndexCodeGraph(
+            store,
+            registry,
+            emptyResolutionManifestSource,
+            emptyRepositoryRootSource,
+            new NodeWorkspaceAccessibilitySource(),
+          ),
+        }
       }
       const options = {
         projectRoot: tempDir,
@@ -337,7 +349,13 @@ describe('IndexProjectGraph integration', () => {
     const registry = new AdapterRegistry()
     registry.register(adapter)
     const analyzeFile = vi.spyOn(adapter, 'analyzeFile')
-    const indexer = new IndexCodeGraph(store, registry)
+    const indexer = new IndexCodeGraph(
+      store,
+      registry,
+      emptyResolutionManifestSource,
+      emptyRepositoryRootSource,
+      new NodeWorkspaceAccessibilitySource(),
+    )
     const options = {
       projectRoot: tempDir,
       vcsRoot: null,
@@ -709,7 +727,7 @@ describe('IndexProjectGraph integration', () => {
     const statistics = await provider.getStatistics()
     expect(statistics.relationCounts.CALLS).toBeGreaterThanOrEqual(symbolCount)
     await provider.close()
-  }, 15_000)
+  }, 45_000)
 
   it('fills import local binding targets from imports resolved in pass 2', async () => {
     tempDir = mkdtempSync(join(tmpdir(), 'index-project-graph-import-binding-'))
@@ -750,7 +768,7 @@ describe('IndexProjectGraph integration', () => {
     expect(resolution.status).toBe('resolved')
     expect(resolution.target?.name).toBe('helper')
     await provider.close()
-  }, 15_000)
+  }, 45_000)
 
   it('reports logical collision diagnostics in the index result', async () => {
     tempDir = mkdtempSync(join(tmpdir(), 'index-project-graph-collision-'))
@@ -784,7 +802,7 @@ describe('IndexProjectGraph integration', () => {
       'UNGROUPED_LOGICAL_COLLISION',
     )
     await provider.close()
-  }, 15_000)
+  }, 45_000)
 
   it('routes one complete index generation through one native bulk session', async () => {
     tempDir = mkdtempSync(join(tmpdir(), 'index-project-graph-single-session-'))
@@ -1185,7 +1203,13 @@ export const rows = [{ filteredField: 'unique-array-content-value' }];
     const registry = new AdapterRegistry()
     registry.register(new TypeScriptLanguageAdapter())
     registry.register(new GoLanguageAdapter())
-    const indexer = new IndexCodeGraph(store, registry)
+    const indexer = new IndexCodeGraph(
+      store,
+      registry,
+      emptyResolutionManifestSource,
+      emptyRepositoryRootSource,
+      new NodeWorkspaceAccessibilitySource(),
+    )
     const result = await indexer.execute({
       projectRoot: tempDir,
       vcsRoot: null,

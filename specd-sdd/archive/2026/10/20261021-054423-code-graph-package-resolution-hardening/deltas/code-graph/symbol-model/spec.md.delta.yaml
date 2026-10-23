@@ -1,0 +1,11 @@
+- op: added
+  description: Persist the file namespace so unchanged files can fill the qualified-name lookup
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: File node'
+    after:
+      type: paragraph
+      contains: 'Two .FileNode. values are equal'
+  content: |
+    A `FileNode` additionally carries two optional fields reported by the language adapter in the file analysis. **`namespace`** (`string | undefined`) is the namespace the file declares (for example a PHP namespace); it is stored so that a file hydrated from the store without re-analysis still contributes its qualified names. **`namespaceSeparator`** (`string | undefined`) is the separator that joins `namespace` and a symbol name into a qualified name (for example `\` for PHP, `.` for Python). Both are absent when the file declares no namespace, and `namespaceSeparator` is present if and only if `namespace` is present. They do not take part in `FileNode` equality.

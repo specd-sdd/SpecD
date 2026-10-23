@@ -16,7 +16,7 @@ The indexer is language-agnostic. It discovers files, asks the adapter registere
 
 An indexing run has these steps, in order:
 
-1. **Package map.** Before any file is analyzed, `packageResolution.identity` names the package that each workspace's manifest declares. The first adapter that returns an identity for a workspace wins. The indexer builds a `package name → workspace` map from those answers.
+1. **Package map.** Before any file is analyzed, `packageResolution.identity` names the package that each workspace's manifest declares. Every adapter that provides package resolution is asked for every workspace; a multi-language workspace keeps one identity per language. If multiple workspaces claim the same name, the collision is recorded as an error and the name resolves to neither. The indexer builds a `package name → workspace` map from those answers.
 2. **Pass 1.** For each changed file, `analyzeFile` returns every fact the adapter can prove about it. Unchanged files keep their stored facts.
 3. **Preparation.** `packageResolution.prepare` is called once per adapter with every configured workspace, including unchanged ones. It stores compact data in the run's session and may be a no-op when the package map and the indexed files are enough.
 4. **Re-export linking.** `reExportLinking.link` turns re-export routes into public bindings, so that every package entry has its final set of exports before any import is resolved.
@@ -55,12 +55,22 @@ There are five facets.
 
 Connects a package specifier used in one workspace to the files that the target workspace's package publishes. Provide it when your language has packages that other workspaces import by name.
 
-| Member                                                         | Contract                                                                                                                                                                                                                |
-| -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `identity(codeRoot, repoRoot?)`                                | Returns the package identity that the manifest at or above `codeRoot` declares (searching no higher than `repoRoot` when given), or `undefined`. May read the filesystem.                                               |
-| `prepare({ session, workspaces, repoRoot? })`                  | Stores the facts the adapter needs for all configured workspaces once per run as compact, immutable data in the session. May read the filesystem and may be a no-op. Pass 2 never calls it again.                       |
-| `matchSpecifier(specifier, knownPackages, session)`            | Returns which known package a non-relative specifier refers to, or `undefined`. Depends only on its arguments and the data `prepare` stored. No I/O. Use the session when the specifier is not named after its package. |
-| `entrySurface({ specifier, packageName, workspace, session })` | Returns the ordered entries through which the package publishes the specifier. Each entry has a workspace-prefixed `filePath` and the public `surface` id under which that file's exports are stored. No I/O.           |
+Three directory roots are distinct and must not be confused:
+
+- The **project root** is where the project configuration lives; it anchors configuration, graph storage, and project-relative paths. It is never a boundary for package resolution.
+- The **code root** is the directory holding that workspace's code, which may be inside the project root or outside it (for example a workspace in another repository).
+- The **package root** is the directory of the manifest that gives the workspace its package identity.
+
+The package root is located by a single search shared between `identity` and `prepare`. The search starts at the canonical code root (symlinks resolved, no trailing slash) and walks upward to find the manifest, bounded by `repoRoot` (the root of the version-control repository containing that code root). When no VCS repository is detected, only the code root itself is inspected and the walk never goes upward.
+
+Candidate manifests are read and parsed once during the upward walk via `findPackageManifest`. When inspecting candidates, parsed values and terminal skip diagnostics are returned together (`{ match, skipped }`). Terminal skipped manifests (such as manifests lacking identity fields or displaced fallbacks) are always reported via the optional `report` diagnostic callback—including when no matching manifest is found across the entire walk up to `repoRoot`. When a valid manifest is selected, its already-parsed compact data is reused during preparation so manifest file contents are never re-parsed.
+
+| Member                                                         | Contract                                                                                                                                                                                                                                                                                                                    |
+| -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `identity(codeRoot, repoRoot?, report?)`                       | Returns the package identity declared in the manifest at or above `codeRoot` (bounded by `repoRoot` when given), or `undefined`. Receives optional `report?: (diagnostic: string) => void` for skipped manifests. Terminal skipped paths are always reported even when no valid manifest is found. May read the filesystem. |
+| `prepare({ session, workspaces, projectRoot })`                | Stores facts needed by `matchSpecifier` and `entrySurface` for all configured workspaces as compact, immutable data in the session. `workspaces` provides `{ name, codeRoot, repoRoot? }`. Reads candidate manifests once and reuses parsed compact manifest data. Pass 2 never calls it again.                             |
+| `matchSpecifier(specifier, knownPackages, session)`            | Returns which known package a non-relative specifier refers to, or `undefined`. Depends only on its arguments and the data `prepare` stored. No I/O. Use the session when the specifier is not named after its package.                                                                                                     |
+| `entrySurface({ specifier, packageName, workspace, session })` | Returns the ordered entries through which the package publishes the specifier. Each entry has a workspace-prefixed `filePath` and the public `surface` id under which that file's exports are stored. No I/O.                                                                                                               |
 
 Rules for `entrySurface`:
 
@@ -144,7 +154,7 @@ When the result is unresolved, add a diagnostic and nothing else:
 | `not-exported`     | No entry publishes the name. A unique symbol with that name elsewhere is not used.                              |
 | `ambiguous`        | Entries publish the name with different targets.                                                                |
 
-Unresolved imports create no relation, no binding target, and no step. The diagnostics are reported in the run result and are never stored in the graph. `importDiagnostics` holds the number of failures (`total`), the exact count per reason (`byReason`), and at most 20 sampled diagnostics per reason (`samples`). `package-unknown` is not a failure: the import names a package that no workspace declares, such as an npm dependency, so it is counted only in `externalPackageImports`. An adapter without the facet (or whose facet failed) is not a failure either: it is listed once in `adaptersWithoutPackageResolution` and never counted in `total`, `byReason`, or `samples`.
+Unresolved imports create no relation, no binding target, and no step. The diagnostics are reported in the run result and are never stored in the graph. `importDiagnostics` holds the number of failures (`total`), the exact count per reason (`byReason`), and at most 20 sampled diagnostics per reason (`samples`). `package-unknown` is not a failure: the import names a package that no workspace declares, such as an npm dependency, so it is counted only in `externalPackageImports` and excluded from `total`, `byReason`, and `samples`. An adapter without the facet (or whose facet failed) is not a failure either: it is listed once in `adaptersWithoutPackageResolution` and never counted in `total`, `byReason`, or `samples`.
 
 `resolveImports` also returns `steps` and `diagnostics` arrays. Return empty arrays when there is nothing to report.
 
@@ -273,5 +283,12 @@ Complete the steps in order. None of them touches the indexer, the index session
 3. Provide each facet the language supports, with every member. Skip a facet when the language has no equivalent concept. Never provide a partial facet.
 4. List every manifest your facets read in `resolutionManifests()`, and nothing else.
 5. Register the adapter and fix every `INVALID_LANGUAGE_ADAPTER` error.
-6. Pass the cross-language semantic conformance suite and the facet scenarios in the specification's verification. Useful extra tests: unresolved imports producing no relation, Pass 2 performing no filesystem reads after preparation, and incremental indexing equal to a clean rebuild.
-7. Write the adapter's specific spec and add it to the list of built-in adapter specs when it is built in.
+6. Verify semantic conformance and facet behavior with tests covering:
+   - syntax parsing, authoritative AST ranges, and comment attribution;
+   - declaration classification and policy;
+   - manifest search bounded by `repoRoot` with manifests read and parsed once, reporting terminal skips;
+   - unresolved imports producing no relation and no heuristic guessing;
+   - Pass 2 performing no filesystem reads after preparation;
+   - incremental indexing matching a clean rebuild;
+   - production importers never resolving to test symbols.
+7. Write the adapter specification under `specs/code-graph/<language>-language-adapter/` covering language identity, file extensions, manifest layout rules, facet contracts, and verification scenarios in Given/When/Then format. When adding a built-in adapter, register it in `AdapterRegistry` (`src/infrastructure/tree-sitter/adapter-registry.ts`) and add it to the built-in manifests table in this guide.

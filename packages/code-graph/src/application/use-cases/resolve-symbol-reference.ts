@@ -7,7 +7,6 @@ import {
 } from '../../domain/ports/graph-store.js'
 import { splitWorkspaceIdentity } from '../../domain/services/split-workspace-identity.js'
 import { isExactLaneQuery, qualifiedLookupText } from '../../domain/services/exact-lane-query.js'
-import { parseDottedMemberReference } from '../../domain/services/parse-member-reference.js'
 import { type AdapterRegistryPort } from '../../domain/ports/adapter-registry-port.js'
 import { IndexCoverageStatus } from '../../domain/value-objects/index-session.js'
 import {
@@ -19,12 +18,12 @@ import {
 import { type SymbolNode } from '../../domain/value-objects/symbol-node.js'
 import {
   parseLogicalSymbol,
-  deriveQualifiedName,
   DeclarationOccurrenceForm,
   type DeclarationOccurrence,
   type DeclarationResolutionTarget,
   type LogicalSymbol,
   type MemberSemantics,
+  type ParsedSymbolReference,
   type PublicBinding,
   type ResolutionCandidate,
   type ResolutionHealth,
@@ -1012,7 +1011,7 @@ function expandedLookups(input: ResolveSymbolReferenceInput): LogicalSymbolLooku
 /**
  * Resolves a single dotted or native member spelling by stored qualified name.
  * Other exact-lane text still needs a file or language adapter.
- * @param registry - Shared adapter registry. Absent adapters fall back to dotted parsing.
+ * @param registry - Shared adapter registry.
  * @param prepared - Prepared request and indexed facts.
  * @returns A terminal outcome, or undefined when the request is not an exact-lane member query.
  */
@@ -1032,9 +1031,8 @@ function resolveQualifiedMember(
     if (anchored === undefined && prepared.health.fresh === false) {
       return unresolved(prepared, prepared.health.reasonCodes[0] ?? 'GRAPH_STALE')
     }
-    const byId = new Map(prepared.allTargets.map((target) => [target.id, target]))
     const matches = prepared.allTargets.filter((target) => {
-      const stored = target.qualifiedName ?? deriveQualifiedName(target, byId)
+      const stored = target.qualifiedName
       if (stored !== spelling) return false
       if (anchored !== undefined) return symbolVisibleIn(prepared, target, anchored)
       return request.workspace.length === 0 || target.workspace === request.workspace
@@ -1046,7 +1044,7 @@ function resolveQualifiedMember(
     return unresolved(prepared, 'REFERENCE_UNPROVEN')
   }
   const parsed = parseAnchoredReference(registry, request, anchored)
-  if (parsed.candidates.length === 0) return undefined
+  if (parsed.candidates.length === 0) return unresolved(prepared, 'REFERENCE_UNPROVEN')
   if (parsed.candidates.length > 1) {
     return {
       request,
@@ -1091,13 +1089,13 @@ function resolveQualifiedMember(
  * @param registry - Shared adapter registry.
  * @param request - Normalized resolution request.
  * @param anchored - File or public surface used to choose an adapter.
- * @returns Parsed member candidates. Empty when a named language has no parser.
+ * @returns Parsed member candidates. Empty when a named language has no parser or no adapter is selected.
  */
 function parseAnchoredReference(
   registry: AdapterRegistryPort | undefined,
   request: ResolveSymbolReferenceInput,
   anchored: string | undefined,
-): ReturnType<typeof parseDottedMemberReference> {
+): ParsedSymbolReference {
   const adapter =
     request.language !== undefined
       ? registry
@@ -1106,13 +1104,12 @@ function parseAnchoredReference(
       : anchored === undefined
         ? undefined
         : registry?.getAdapterForFile(anchored)
-  if (adapter !== undefined) {
-    // An adapter without the `symbolReferenceSyntax` facet cannot prove human spellings;
-    // no other adapter's syntax is used.
-    return adapter.symbolReferenceSyntax?.parse(request.requested) ?? { candidates: [] }
+  if (adapter === undefined) {
+    return { candidates: [] }
   }
-  if (registry !== undefined && request.language !== undefined) return { candidates: [] }
-  return parseDottedMemberReference(request.requested)
+  // An adapter without the `symbolReferenceSyntax` facet cannot prove human spellings;
+  // no other adapter's syntax is used.
+  return adapter.symbolReferenceSyntax?.parse(request.requested) ?? { candidates: [] }
 }
 
 /**

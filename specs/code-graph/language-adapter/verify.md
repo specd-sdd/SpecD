@@ -116,6 +116,14 @@
 - **THEN** the import resolves to the exported symbol in the other workspace
 - **AND** the indexer, session, resolver, and stores needed no change
 
+#### Scenario: Package resolution failure keeps relative barrel linking
+
+- **GIVEN** an adapter whose `identity` throws for one workspace
+- **AND** a barrel file in another workspace that re-exports a relative module
+- **WHEN** the run completes
+- **THEN** the relative re-export is still linked by `reExportLinking`
+- **AND** only routes that need package data stay unresolved
+
 ### Requirement: Package resolution facet
 
 #### Scenario: Prepare runs once before import resolution
@@ -163,6 +171,70 @@
 - **GIVEN** the facet reads `go.mod`
 - **WHEN** the adapter reports `resolutionManifests()`
 - **THEN** the result includes `go.mod`
+
+#### Scenario: Identity and prepare use the same package root
+
+- **GIVEN** a workspace whose code root is `/repo/packages/core/src` and whose manifest is `/repo/packages/core/package.json`
+- **WHEN** `identity` and `prepare` run for that workspace
+- **THEN** both use the manifest at `/repo/packages/core`
+- **AND** the workspace has an identity and an entry surface, not an identity followed by `no-entry-surface`
+
+#### Scenario: Search stops at the repository root of the code root
+
+- **GIVEN** a code root inside repository `/ext/repo` and a manifest at `/ext/package.json` above that repository
+- **AND** `repoRoot` is `/ext/repo`
+- **WHEN** the package root is searched
+- **THEN** the manifest above `/ext/repo` is not read
+- **AND** the workspace has no identity from it
+
+#### Scenario: External code root uses its own repository boundary
+
+- **GIVEN** a workspace whose code root is outside the project root, in another repository, with its manifest above the code root inside that repository
+- **WHEN** the package root is searched with that repository's root
+- **THEN** the manifest is found
+- **AND** the project root is not used as the boundary
+
+#### Scenario: No detected repository inspects only the code root
+
+- **GIVEN** a code root for which no VCS is detected and a manifest in its parent directory
+- **WHEN** the package root is searched without a `repoRoot`
+- **THEN** only the code root itself is inspected
+- **AND** the search never walks upward or reaches the filesystem root
+
+#### Scenario: Manifest without the identity field is skipped with a diagnostic
+
+- **GIVEN** a nearest manifest without the identity field and a named manifest further up inside the repository
+- **WHEN** the package root is searched
+- **THEN** a diagnostic is reported for the skipped manifest
+- **AND** the named manifest provides the identity
+
+#### Scenario: Terminal skipped manifest still reports its diagnostic
+
+- **GIVEN** every manifest inside the bounded search is unreadable or lacks the required identity field
+- **WHEN** `identity` exhausts the search and returns `undefined`
+- **THEN** every skipped manifest is reported through `report`
+- **AND** the final diagnostic is not lost merely because no usable manifest was found
+
+#### Scenario: Symlinked and trailing-separator code roots are canonicalized
+
+- **GIVEN** a code root given with a trailing separator, or through a symbolic link
+- **WHEN** the package root is searched
+- **THEN** the search starts at the canonical code root
+- **AND** the result equals the one for the plain path
+
+#### Scenario: Prepare reads each manifest once and keeps compact data
+
+- **GIVEN** a workspace with a manifest
+- **WHEN** `prepare` runs
+- **THEN** the manifest is read exactly once during that call
+- **AND** only the data needed by `matchSpecifier` and `entrySurface` is stored, not the whole parsed manifest
+
+#### Scenario: Prepare covers workspaces outside the run
+
+- **GIVEN** a partial run that indexes only workspace A
+- **WHEN** `prepare` runs
+- **THEN** it receives and prepares workspace B as well
+- **AND** a package published by B is not treated as external
 
 ### Requirement: Relative import resolution facet
 
@@ -287,6 +359,20 @@
 - **WHEN** the run is persisted
 - **THEN** no relation, binding target, or step is stored for it
 - **AND** the diagnostic with its reason is available only as non-persisted output
+
+#### Scenario: Bindings without a target are ignored by the ambiguity check
+
+- **GIVEN** one public binding with target T and another public binding for the same name without a target
+- **WHEN** `resolvePackageExport` resolves the name
+- **THEN** the name resolves to T
+
+#### Scenario: Package-unknown is counted, never a failure
+
+- **GIVEN** an import of a package that no workspace declares
+- **WHEN** the import is resolved
+- **THEN** the result carries the reason `package-unknown`
+- **AND** the indexer increments `externalPackageImports`
+- **AND** the import is excluded from `total`, `byReason`, and `samples`
 
 ### Requirement: Full-file analysis contract
 
@@ -642,6 +728,24 @@
 - **WHEN** it is registered
 - **THEN** registration succeeds
 
+#### Scenario: Malformed languages result is rejected
+
+- **GIVEN** an adapter whose `languages()` returns a non-array or an array with an empty string
+- **WHEN** it is registered
+- **THEN** registration fails with `INVALID_LANGUAGE_ADAPTER` and the registry is unchanged
+
+#### Scenario: Malformed extensions result is rejected
+
+- **GIVEN** an adapter whose `extensions()` returns a non-object or maps an extension to a non-string
+- **WHEN** it is registered
+- **THEN** registration fails with `INVALID_LANGUAGE_ADAPTER` and the registry is unchanged
+
+#### Scenario: Invalid resolution manifest value is rejected
+
+- **GIVEN** an adapter whose `resolutionManifests()` returns a glob, a value with a path separator, or an empty string
+- **WHEN** it is registered
+- **THEN** registration fails with `INVALID_LANGUAGE_ADAPTER` naming `resolutionManifests`
+
 ### Requirement: Package identity extraction
 
 #### Scenario: TypeScript adapter reads package.json
@@ -720,6 +824,38 @@
 - **AND** a parent `pyproject.toml` inside the repository root has `[project]` `name = "project-name"`
 - **WHEN** the Python adapter reads package identity
 - **THEN** the result is `project-name`
+
+#### Scenario: Every adapter is asked for an identity
+
+- **GIVEN** a workspace holding both `package.json` and `composer.json`
+- **WHEN** the package map is built
+- **THEN** the TypeScript identity and the PHP identity are both stored for that workspace
+
+#### Scenario: Two workspaces claiming one name resolve to neither
+
+- **GIVEN** workspaces A and B whose manifests declare the same package name
+- **WHEN** the package map is built
+- **THEN** an error naming both workspaces is reported
+- **AND** the name resolves to no workspace
+
+#### Scenario: One workspace claiming a name through several adapters is not a conflict
+
+- **GIVEN** a workspace whose two adapters return the same name
+- **WHEN** the package map is built
+- **THEN** no conflict is reported
+
+#### Scenario: Inaccessible workspace is skipped
+
+- **GIVEN** a configured workspace whose code root does not exist on this machine
+- **WHEN** the package map is built
+- **THEN** a diagnostic is reported for that workspace
+- **AND** its packages count as external and the run does not fail
+
+#### Scenario: Adapter disabled on a later workspace drops earlier sole identities
+
+- **GIVEN** an adapter that returns package identity P for workspace A and then throws in `identity` or `prepare` for workspace B
+- **WHEN** the package map is finalized
+- **THEN** P is removed from the package map if no other enabled adapter claimed P for workspace A
 
 ### Requirement: Import specifier resolution
 

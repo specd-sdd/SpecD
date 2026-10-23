@@ -13,6 +13,9 @@ import { type LanguageAdapter } from '../../../src/domain/value-objects/language
 import { SymbolKind } from '../../../src/domain/value-objects/symbol-kind.js'
 import { type SymbolNode } from '../../../src/domain/value-objects/symbol-node.js'
 import { IndexCodeGraph } from '../../../src/application/use-cases/index-code-graph.js'
+import { emptyResolutionManifestSource } from '../../../src/application/ports/resolution-manifest-source.js'
+import { emptyRepositoryRootSource } from '../../../src/application/ports/repository-root-source.js'
+import { NodeWorkspaceAccessibilitySource } from '../../../src/infrastructure/fs/node-workspace-accessibility-source.js'
 import { analyzeResolvedSymbolImpact } from '../../../src/domain/services/analyze-impact.js'
 import { createSpecNode } from '../../../src/domain/value-objects/spec-node.js'
 import { createRelation } from '../../../src/domain/value-objects/relation.js'
@@ -469,7 +472,13 @@ async function indexProject(
   registry: AdapterRegistry,
   projectDir: string,
 ): Promise<void> {
-  const result = await new IndexCodeGraph(store, registry).execute({
+  const result = await new IndexCodeGraph(
+    store,
+    registry,
+    emptyResolutionManifestSource,
+    emptyRepositoryRootSource,
+    new NodeWorkspaceAccessibilitySource(),
+  ).execute({
     projectRoot: projectDir,
     vcsRoot: projectDir,
     workspaces: [

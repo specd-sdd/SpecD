@@ -6,25 +6,41 @@
   "dependsOn": ["code-graph:symbol-model"],
   "implementation": [
     {
-      "file": "code-graph:src/domain/value-objects/language-adapter-facets.ts"
+      "file": "code-graph:src/infrastructure/tree-sitter/find-manifest-field.ts",
+      "symbols": [
+        "findPackageManifest",
+        "findManifestField",
+        "PackageManifestMatch",
+        "ManifestInspection",
+        "PackageManifestSearchResult"
+      ]
+    },
+    {
+      "file": "code-graph:src/infrastructure/tree-sitter/index.ts"
+    },
+    {
+      "file": "code-graph:src/index.ts"
+    },
+    {
+      "file": "code-graph:src/public.ts"
+    },
+    {
+      "file": "code-graph:src/domain/value-objects/language-adapter-facets.ts",
+      "symbols": ["PackageWorkspace", "PackagePreparationContext", "PackageResolutionFacet"]
     },
     {
       "file": "code-graph:src/domain/value-objects/language-adapter.ts",
-      "symbols": ["LanguageAdapter", "ImportResolutionContext", "ResolvedImports"]
-    },
-    {
-      "file": "code-graph:src/domain/errors/invalid-language-adapter-error.ts",
-      "symbols": ["InvalidLanguageAdapterError"]
+      "symbols": ["AdapterAnalyzeContext", "ImportResolutionContext", "RelationBuildContext"]
     },
     {
       "file": "code-graph:src/infrastructure/tree-sitter/adapter-registry.ts",
       "symbols": ["AdapterRegistry"]
     },
     {
-      "file": "code-graph:src/domain/value-objects/import-declaration.ts"
+      "file": "code-graph:test/infrastructure/tree-sitter/package-resolution.spec.ts"
     },
     {
-      "file": "code-graph:src/domain/value-objects/index-result.ts"
+      "file": "code-graph:test/infrastructure/tree-sitter/find-manifest-field.spec.ts"
     }
   ],
   "optimizations": {

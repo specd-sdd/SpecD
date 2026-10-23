@@ -16,17 +16,34 @@ Performs two-pass indexing of workspace files and specifications, extracts symbo
 
 ### Constructor
 
-`new IndexCodeGraph(store: GraphStore, registry: AdapterRegistryPort)`
+```typescript
+new IndexCodeGraph(
+  store: GraphStore,
+  registry: AdapterRegistryPort,
+  manifestSource: ResolutionManifestSource,
+  repositoryRoots: RepositoryRootSource,
+  workspaceAccessibility: WorkspaceAccessibilitySource,
+)
+```
 
 - **`store`** (`GraphStore`): The underlying database/persistence layer.
 - **`registry`** (`AdapterRegistryPort`): Registry of pluggable language adapters (e.g. tree-sitter language parsers) used to extract code semantics.
+- **`manifestSource`** (`ResolutionManifestSource`): Application port abstracting manifest reading and presence checks.
+- **`repositoryRoots`** (`RepositoryRootSource`): Application port providing the enclosing repository root boundary for code roots.
+- **`workspaceAccessibility`** (`WorkspaceAccessibilitySource`): Application port probing directory accessibility for configured workspaces prior to indexing. Probe failures are non-fatal.
 
 ### Execution
 
 ```typescript
 import { IndexCodeGraph } from '@specd/code-graph'
 
-const indexer = new IndexCodeGraph(store, registry)
+const indexer = new IndexCodeGraph(
+  store,
+  registry,
+  manifestSource,
+  repositoryRoots,
+  workspaceAccessibility,
+)
 const result = await indexer.execute(options)
 ```
 
@@ -57,8 +74,14 @@ interface IndexResult {
   readonly duration: number
   readonly workspaces: readonly WorkspaceIndexBreakdown[]
   readonly vcsRef: string | null
-  readonly graphFingerprint: string | null
+  readonly graphFingerprint: string
+  readonly fullRebuild: boolean
   readonly fullRebuildReason: string | null
+  readonly phaseMetrics: IndexPhaseMetrics
+  readonly coverage: IndexRunCoverageSummary
+  readonly coverageDiagnostics: readonly IndexCoverageDiagnostic[]
+  readonly logicalDiagnostics: readonly LogicalDeclarationDiagnostic[]
+  readonly importDiagnostics: ImportDiagnosticSummary
 }
 ```
 

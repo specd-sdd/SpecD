@@ -1,5 +1,6 @@
-import { describe, it, expect, afterEach } from 'vitest'
-import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs'
+import { describe, it, expect, afterEach, vi } from 'vitest'
+import fs from 'node:fs'
+import { mkdtempSync, writeFileSync, mkdirSync, rmSync, realpathSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { tmpdir } from 'node:os'
 import { PhpLanguageAdapter } from '../../../src/infrastructure/tree-sitter/php-language-adapter.js'
@@ -18,6 +19,7 @@ import {
   resolveDependencyFacts,
 } from '../../../src/domain/services/scoped-binding-environment.js'
 import { type ImportDeclaration } from '../../../src/domain/value-objects/import-declaration.js'
+import { type FileAnalysis } from '../../../src/domain/value-objects/file-analysis.js'
 import { InMemoryIndexSession } from '../../../src/application/use-cases/in-memory-index-session.js'
 import { parseLogicalSymbol } from '../../../src/domain/value-objects/symbol-reference.js'
 import { createImportResolutionContext } from '../../helpers/import-resolution-context.js'
@@ -703,8 +705,8 @@ class ArticlesController {
       }
       adapter.packageResolution.prepare({
         session,
-        workspaces: [{ name: 'w', codeRoot }],
-        repoRoot: codeRoot,
+        workspaces: [{ name: 'w', codeRoot, repoRoot: codeRoot }],
+        projectRoot: codeRoot,
       })
       return session
     }
@@ -1777,7 +1779,7 @@ $top = new C();
         JSON.stringify({ autoload: { 'psr-4': { 'App\\': `${autoloadDir}/` } } }),
       )
       const session = new InMemoryIndexSession()
-      const filePath = join(root, 'main.php')
+      const filePath = 'ws:main.php'
       registerPhp(session, filePath)
       const draft = baseAdapter.analyzeFile(
         filePath,
@@ -1785,7 +1787,7 @@ $top = new C();
         { session, workspaceName: 'ws', codeRoot: root, repoRoot: root },
       )
       const analysis = session.registerAnalysis({ filePath, analysis: draft })
-      const target = join(root, autoloadDir, 'Models', 'User.php')
+      const target = `ws:${autoloadDir}/Models/User.php`
       registerPhp(session, target)
       // Pass 2 must rely on session-prepared metadata only: remove the manifest from disk.
       rmSync(join(root, 'composer.json'))
@@ -1826,7 +1828,7 @@ $top = new C();
         JSON.stringify({ autoload: { 'psr-4': { 'App\\': 'src/' } } }),
       )
       const session = new InMemoryIndexSession()
-      const filePath = join(root, 'main.php')
+      const filePath = 'ws:main.php'
       registerPhp(session, filePath)
       // Analyzed without a codeRoot, so no metadata is prepared for this session.
       const draft = baseAdapter.analyzeFile(
@@ -1835,7 +1837,7 @@ $top = new C();
         { session, workspaceName: 'ws' },
       )
       const analysis = session.registerAnalysis({ filePath, analysis: draft })
-      registerPhp(session, join(root, 'src', 'Models', 'User.php'))
+      registerPhp(session, 'ws:src/Models/User.php')
 
       const resolved = baseAdapter.resolveImports(
         analysis,
@@ -1993,10 +1995,10 @@ describe('PhpLanguageAdapter calls, PSR-4 arrays and written hierarchy spelling'
         JSON.stringify({ autoload: { 'psr-4': { 'App\\': ['src/', 'lib/'] } } }),
       )
       const session = new InMemoryIndexSession()
-      const filePath = join(root, 'main.php')
+      const filePath = 'ws:main.php'
       session.registerFile({
         filePath,
-        projectRelativePath: filePath,
+        projectRelativePath: 'main.php',
         language: 'php',
         contentHash: 'x',
         workspace: 'ws',
@@ -2014,10 +2016,10 @@ describe('PhpLanguageAdapter calls, PSR-4 arrays and written hierarchy spelling'
           },
         ),
       })
-      const target = join(root, 'lib', 'Models', 'User.php')
+      const target = 'ws:lib/Models/User.php'
       session.registerFile({
         filePath: target,
-        projectRelativePath: target,
+        projectRelativePath: 'lib/Models/User.php',
         language: 'php',
         contentHash: 'x',
         workspace: 'ws',
@@ -2379,5 +2381,386 @@ describe('PHP framework loader families', () => {
     }
 
     expect(importsOf(family, host(`    ${family.call}`))).toEqual([])
+  })
+
+  describe('PHP package resolution hardening', () => {
+    let tempDir: string
+
+    afterEach(() => {
+      if (tempDir !== undefined) rmSync(tempDir, { recursive: true, force: true })
+    })
+
+    it('Scenario: Prepare parses composer.json once and autoload and autoload-dev share a prefix', () => {
+      tempDir = mkdtempSync(join(tmpdir(), 'php-prep-once-'))
+      writeFileSync(
+        join(tempDir, 'composer.json'),
+        JSON.stringify({
+          name: 'fixture/pkg',
+          autoload: { 'psr-4': { 'App\\': 'src/' } },
+          'autoload-dev': { 'psr-4': { 'App\\': 'tests/' } },
+        }),
+      )
+
+      const session = new InMemoryIndexSession()
+      baseAdapter.packageResolution.prepare?.({
+        session,
+        workspaces: [{ name: 'ws', codeRoot: tempDir }],
+        projectRoot: tempDir,
+      })
+
+      // Delete manifest from disk
+      rmSync(join(tempDir, 'composer.json'))
+
+      // Prepared state has both src/ and tests/ in order
+      const state = session.getAdapterState<{
+        psr4ByCodeRoot: Map<string, Array<[string, string]>>
+      }>('php-resolution-metadata')
+      const canonicalTemp = realpathSync(tempDir)
+      const entries = state?.psr4ByCodeRoot.get(tempDir)
+      expect(entries).toBeDefined()
+      expect(entries).toEqual([
+        ['App\\', join(canonicalTemp, 'src')],
+        ['App\\', join(canonicalTemp, 'tests')],
+      ])
+    })
+
+    it('Scenario: Candidates follow the longest prefix first', () => {
+      tempDir = mkdtempSync(join(tmpdir(), 'php-longest-prefix-'))
+      writeFileSync(
+        join(tempDir, 'composer.json'),
+        JSON.stringify({
+          name: 'fixture/pkg',
+          autoload: {
+            'psr-4': {
+              'App\\': 'src/',
+              'App\\Http\\': 'src/Http/',
+            },
+          },
+        }),
+      )
+
+      const session = new InMemoryIndexSession()
+      session.registerFile({
+        filePath: 'pkg:src/Http/Kernel.php',
+        projectRelativePath: 'src/Http/Kernel.php',
+        language: 'php',
+        contentHash: 'hash',
+        workspace: 'pkg',
+      })
+      session.registerFile({
+        filePath: 'app:main.php',
+        projectRelativePath: 'main.php',
+        language: 'php',
+        contentHash: 'hash',
+        workspace: 'app',
+      })
+
+      baseAdapter.packageResolution.prepare?.({
+        session,
+        workspaces: [
+          { name: 'pkg', codeRoot: tempDir },
+          { name: 'app', codeRoot: tempDir },
+        ],
+        projectRoot: tempDir,
+      })
+
+      const surface = baseAdapter.packageResolution.entrySurface({
+        session,
+        workspace: 'pkg',
+        packageName: 'fixture/pkg',
+        specifier: 'App\\Http\\Kernel',
+      })
+
+      // The candidate for App\Http\ comes before the one for App\
+      expect(surface[0]?.filePath).toBe('pkg:src/Http/Kernel.php')
+
+      // In import resolution, only the first candidate that is an indexed file is imported
+      const draft = baseAdapter.analyzeFile(
+        'app:main.php',
+        '<?php\nuse App\\Http\\Kernel;\n$k = new Kernel();\n',
+        { session, workspaceName: 'app' },
+      )
+      const analysis: FileAnalysis = {
+        fileId: 2,
+        filePath: 'app:main.php',
+        projectRelativePath: 'main.php',
+        contentHash: 'hash',
+        workspace: 'app',
+        language: 'php',
+        symbols: draft.symbols,
+        imports: draft.imports,
+        bindingFacts: draft.bindingFacts,
+        callFacts: draft.callFacts,
+      }
+
+      const resolved = baseAdapter.resolveImports(
+        analysis,
+        createImportResolutionContext(
+          {
+            session,
+            packageToWorkspace: new Map([['fixture/pkg', 'pkg']]),
+          },
+          baseAdapter,
+        ),
+      )
+
+      expect(resolved.fileImports).toEqual(['pkg:src/Http/Kernel.php'])
+    })
+
+    it('Scenario: Own PSR-4 fallback without a Composer name', () => {
+      tempDir = mkdtempSync(join(tmpdir(), 'php-own-psr4-'))
+      // No name in composer.json
+      writeFileSync(
+        join(tempDir, 'composer.json'),
+        JSON.stringify({
+          autoload: { 'psr-4': { 'App\\': 'src/' } },
+        }),
+      )
+
+      const session = new InMemoryIndexSession()
+      session.registerFile({
+        filePath: 'ws:src/Models/User.php',
+        projectRelativePath: 'src/Models/User.php',
+        language: 'php',
+        contentHash: 'hash',
+        workspace: 'ws',
+      })
+      session.registerFile({
+        filePath: 'ws:src/Main.php',
+        projectRelativePath: 'src/Main.php',
+        language: 'php',
+        contentHash: 'hash',
+        workspace: 'ws',
+      })
+
+      baseAdapter.packageResolution.prepare?.({
+        session,
+        workspaces: [{ name: 'ws', codeRoot: tempDir }],
+        projectRoot: tempDir,
+      })
+
+      const draft = baseAdapter.analyzeFile(
+        'ws:src/Main.php',
+        '<?php\nuse App\\Models\\User;\n$u = new User();\n',
+        { session, workspaceName: 'ws', codeRoot: tempDir, repoRoot: tempDir },
+      )
+      const analysis: FileAnalysis = {
+        fileId: 2,
+        filePath: 'ws:src/Main.php',
+        projectRelativePath: 'src/Main.php',
+        contentHash: 'hash',
+        workspace: 'ws',
+        language: 'php',
+        symbols: draft.symbols,
+        imports: draft.imports,
+        bindingFacts: draft.bindingFacts,
+        callFacts: draft.callFacts,
+      }
+
+      const resolved = baseAdapter.resolveImports(
+        analysis,
+        createImportResolutionContext(
+          {
+            session,
+            packageToWorkspace: new Map(),
+            codeRoot: tempDir,
+            repoRoot: tempDir,
+          },
+          baseAdapter,
+        ),
+      )
+
+      expect(resolved.fileImports).toEqual(['ws:src/Models/User.php'])
+    })
+
+    it('Scenario: Own PSR-4 fallback never returns a test file for production code', () => {
+      tempDir = mkdtempSync(join(tmpdir(), 'php-test-dev-'))
+      writeFileSync(
+        join(tempDir, 'composer.json'),
+        JSON.stringify({
+          autoload: { 'psr-4': { 'App\\': 'src/' } },
+          'autoload-dev': { 'psr-4': { 'App\\': 'tests/' } },
+        }),
+      )
+
+      const session = new InMemoryIndexSession()
+      session.registerFile({
+        filePath: 'ws:tests/UserTest.php',
+        projectRelativePath: 'tests/UserTest.php',
+        language: 'php',
+        contentHash: 'hash',
+        workspace: 'ws',
+        category: 'test',
+      })
+      session.registerFile({
+        filePath: 'ws:src/Main.php',
+        projectRelativePath: 'src/Main.php',
+        language: 'php',
+        contentHash: 'hash',
+        workspace: 'ws',
+      })
+
+      baseAdapter.packageResolution.prepare?.({
+        session,
+        workspaces: [{ name: 'ws', codeRoot: tempDir }],
+        projectRoot: tempDir,
+      })
+
+      // Production file imports UserTest
+      const prodDraft = baseAdapter.analyzeFile(
+        'ws:src/Main.php',
+        '<?php\nuse App\\UserTest;\n$u = new UserTest();\n',
+        { session, workspaceName: 'ws', codeRoot: tempDir, repoRoot: tempDir },
+      )
+      const prodAnalysis: FileAnalysis = {
+        fileId: 2,
+        filePath: 'ws:src/Main.php',
+        projectRelativePath: 'src/Main.php',
+        contentHash: 'hash',
+        workspace: 'ws',
+        language: 'php',
+        symbols: prodDraft.symbols,
+        imports: prodDraft.imports,
+        bindingFacts: prodDraft.bindingFacts,
+        callFacts: prodDraft.callFacts,
+      }
+
+      const prodResolved = baseAdapter.resolveImports(
+        prodAnalysis,
+        createImportResolutionContext(
+          {
+            session,
+            codeRoot: tempDir,
+            repoRoot: tempDir,
+          },
+          baseAdapter,
+        ),
+      )
+      // Production file cannot import autoload-dev test file
+      expect(prodResolved.fileImports).toEqual([])
+
+      // But a test file CAN import it
+      session.registerFile({
+        filePath: 'ws:tests/OtherTest.php',
+        projectRelativePath: 'tests/OtherTest.php',
+        language: 'php',
+        contentHash: 'hash',
+        workspace: 'ws',
+        category: 'test',
+      })
+      const testDraft = baseAdapter.analyzeFile(
+        'ws:tests/OtherTest.php',
+        '<?php\nuse App\\UserTest;\n$u = new UserTest();\n',
+        { session, workspaceName: 'ws', codeRoot: tempDir, repoRoot: tempDir },
+      )
+      const testAnalysis: FileAnalysis = {
+        fileId: 3,
+        filePath: 'ws:tests/OtherTest.php',
+        projectRelativePath: 'tests/OtherTest.php',
+        contentHash: 'hash',
+        workspace: 'ws',
+        language: 'php',
+        symbols: testDraft.symbols,
+        imports: testDraft.imports,
+        bindingFacts: testDraft.bindingFacts,
+        callFacts: testDraft.callFacts,
+      }
+
+      const testResolved = baseAdapter.resolveImports(
+        testAnalysis,
+        createImportResolutionContext(
+          {
+            session,
+            codeRoot: tempDir,
+            repoRoot: tempDir,
+          },
+          baseAdapter,
+        ),
+      )
+      expect(testResolved.fileImports).toEqual(['ws:tests/UserTest.php'])
+    })
+
+    it('Scenario: composer.json without a name is skipped for identity', () => {
+      tempDir = mkdtempSync(join(tmpdir(), 'php-nameless-'))
+      writeFileSync(join(tempDir, 'composer.json'), JSON.stringify({ name: 'parent/pkg' }))
+      const subDir = join(tempDir, 'sub')
+      mkdirSync(subDir, { recursive: true })
+      writeFileSync(
+        join(subDir, 'composer.json'),
+        JSON.stringify({ autoload: { 'psr-4': { 'Sub\\': 'src/' } } }),
+      )
+
+      const skippedMessages: string[] = []
+      const report = (msg: string) => skippedMessages.push(msg)
+
+      const identity = baseAdapter.packageResolution.identity(subDir, tempDir, report)
+      expect(identity).toBe('parent/pkg')
+      expect(skippedMessages).toHaveLength(1)
+      expect(skippedMessages[0]).toContain('Package manifest skipped (no identity):')
+    })
+
+    it('Scenario: Prepare prefers named composer.json over nearest nameless composer.json', () => {
+      tempDir = mkdtempSync(join(tmpdir(), 'php-prefer-named-'))
+      writeFileSync(
+        join(tempDir, 'composer.json'),
+        JSON.stringify({
+          name: 'parent/pkg',
+          autoload: { 'psr-4': { 'Parent\\': 'src/' } },
+        }),
+      )
+      const subDir = join(tempDir, 'sub')
+      mkdirSync(subDir, { recursive: true })
+      writeFileSync(
+        join(subDir, 'composer.json'),
+        JSON.stringify({
+          autoload: { 'psr-4': { 'Sub\\': 'src/' } },
+        }),
+      )
+
+      const session = new InMemoryIndexSession()
+      baseAdapter.packageResolution.prepare?.({
+        session,
+        workspaces: [{ name: 'sub-ws', codeRoot: subDir, repoRoot: tempDir }],
+        projectRoot: tempDir,
+      })
+
+      const owners =
+        session.getAdapterState<readonly { workspace: string; packageName: string }[]>(
+          'php-package-owners',
+        )
+      expect(owners).toEqual([{ workspace: 'sub-ws', codeRoot: subDir, packageName: 'parent/pkg' }])
+    })
+
+    it('Scenario: entrySurface performs no filesystem access during Pass 2', () => {
+      tempDir = mkdtempSync(join(tmpdir(), 'php-no-io-entry-surface-'))
+      writeFileSync(
+        join(tempDir, 'composer.json'),
+        JSON.stringify({
+          name: 'fixture/pkg',
+          autoload: { 'psr-4': { 'App\\': 'src/' } },
+        }),
+      )
+
+      const session = new InMemoryIndexSession()
+      baseAdapter.packageResolution.prepare?.({
+        session,
+        workspaces: [{ name: 'pkg', codeRoot: tempDir, repoRoot: tempDir }],
+        projectRoot: tempDir,
+      })
+
+      const fsSpy = vi.spyOn(fs, 'realpathSync')
+      try {
+        const surface = baseAdapter.packageResolution.entrySurface({
+          session,
+          workspace: 'pkg',
+          packageName: 'fixture/pkg',
+          specifier: 'App\\Models\\User',
+        })
+        expect(surface).toBeDefined()
+        expect(fsSpy).not.toHaveBeenCalled()
+      } finally {
+        fsSpy.mockRestore()
+      }
+    })
   })
 })

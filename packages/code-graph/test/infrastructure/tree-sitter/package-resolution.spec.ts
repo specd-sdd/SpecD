@@ -81,6 +81,7 @@ describe('Package resolution facets', () => {
       adapter.packageResolution.prepare({
         session,
         workspaces: [{ name: 'pkg', codeRoot: root }],
+        projectRoot: root,
       })
       return adapter.packageResolution.entrySurface({
         specifier,
@@ -191,7 +192,11 @@ describe('Package resolution facets', () => {
         'package.json': JSON.stringify({ name: '@acme/pkg', exports: './dist/public.js' }),
       })
       const session = sessionWith(['pkg:src/public.ts'], 'typescript')
-      adapter.packageResolution.prepare({ session, workspaces: [{ name: 'pkg', codeRoot: root }] })
+      adapter.packageResolution.prepare({
+        session,
+        workspaces: [{ name: 'pkg', codeRoot: root }],
+        projectRoot: root,
+      })
       rmSync(join(root, 'package.json'))
 
       const result = adapter.packageResolution.entrySurface({
@@ -229,6 +234,7 @@ describe('Package resolution facets', () => {
           { name: 'a', codeRoot: join(root, 'a') },
           { name: 'b', codeRoot: join(root, 'b') },
         ],
+        projectRoot: root,
       })
 
       const entry = (workspace: string, name: string): string[] =>
@@ -327,8 +333,13 @@ describe('Package resolution facets', () => {
      * @returns Entry file paths.
      */
     function entries(specifier: string): string[] {
+      write(root, { 'go.mod': 'module github.com/acme/auth\n' })
       const session = sessionWith(files, 'go')
-      adapter.packageResolution.prepare({ session, workspaces: [{ name: 'auth', codeRoot: root }] })
+      adapter.packageResolution.prepare({
+        session,
+        workspaces: [{ name: 'auth', codeRoot: root }],
+        projectRoot: root,
+      })
       return adapter.packageResolution
         .entrySurface({
           specifier,
@@ -393,6 +404,7 @@ describe('Package resolution facets', () => {
           { name: 'shared', codeRoot: join(root, 'shared') },
           { name: 'billing', codeRoot: join(root, 'billing') },
         ],
+        projectRoot: root,
       })
       return session
     }
@@ -439,7 +451,7 @@ describe('Package resolution facets', () => {
       expect(result.map((entry) => entry.filePath)).toEqual(['billing:src/Invoice.php'])
     })
 
-    it('Given a package that does not own the name, when asked, then another workspace file is not returned', () => {
+    it('Given a package that matches a broader prefix, when asked, then a candidate within its own workspace is returned', () => {
       const session = prepared()
 
       const result = adapter.packageResolution.entrySurface({

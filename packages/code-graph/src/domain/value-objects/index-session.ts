@@ -110,8 +110,14 @@ export interface IndexSession {
 
   /**
    * Finds a symbol's ID by its qualified name.
+   * @param qualifiedName - Full qualified symbol name.
+   * @param options - Options; when `includeTests` is true, test-file symbols are also considered.
+   * @param options.includeTests - When true, test-file symbols are also considered.
    */
-  findSymbolByQualifiedName(qualifiedName: string): string | undefined
+  findSymbolByQualifiedName(
+    qualifiedName: string,
+    options?: { readonly includeTests?: boolean },
+  ): string | undefined
 
   /**
    * Finds all specifications linked to a symbol.
@@ -155,8 +161,10 @@ export interface IndexSession {
 
   /**
    * Retrieves the qualified name mapping.
+   * @param options - Options; when `includeTests` is true, returns production and test symbols (production wins on duplicates).
+   * @param options.includeTests - When true, returns production and test symbols (production wins on duplicates).
    */
-  getQualifiedNames(): ReadonlyMap<string, string>
+  getQualifiedNames(options?: { readonly includeTests?: boolean }): ReadonlyMap<string, string>
 
   /** Returns declaration occurrences grouped by their logical identity. */
   getDeclarationsByLogicalId(): ReadonlyMap<string, readonly DeclarationOccurrence[]>

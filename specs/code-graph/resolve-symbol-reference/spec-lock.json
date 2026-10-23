@@ -11,11 +11,18 @@
   ],
   "implementation": [
     {
-      "file": "code-graph:src/application/use-cases/resolve-symbol-reference.ts"
+      "file": "code-graph:src/application/use-cases/resolve-symbol-reference.ts",
+      "symbols": ["ResolveSymbolReference"]
     },
     {
-      "file": "code-graph:src/application/services/package-import-resolver.ts",
-      "symbols": ["PackageImportResolver"]
+      "file": "code-graph:test/application/use-cases/resolve-symbol-reference.spec.ts"
+    },
+    {
+      "file": "code-graph:src/application/services/session-reference-store.ts",
+      "symbols": ["SessionReferenceStore"]
+    },
+    {
+      "file": "code-graph:test/application/services/session-reference-store.spec.ts"
     }
   ],
   "optimizations": {

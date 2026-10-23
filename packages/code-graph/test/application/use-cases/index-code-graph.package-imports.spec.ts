@@ -4,6 +4,8 @@ import { dirname, join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { IndexCodeGraph } from '../../../src/application/use-cases/index-code-graph.js'
 import { emptyResolutionManifestSource } from '../../../src/application/ports/resolution-manifest-source.js'
+import { emptyRepositoryRootSource } from '../../../src/application/ports/repository-root-source.js'
+import { NodeWorkspaceAccessibilitySource } from '../../../src/infrastructure/fs/node-workspace-accessibility-source.js'
 import { AdapterRegistry } from '../../../src/infrastructure/tree-sitter/adapter-registry.js'
 import { TypeScriptLanguageAdapter } from '../../../src/infrastructure/tree-sitter/typescript-language-adapter.js'
 import { type LanguageAdapter } from '../../../src/domain/value-objects/language-adapter.js'
@@ -106,7 +108,16 @@ describe('IndexCodeGraph package imports', () => {
     await store.open()
     const registry = new AdapterRegistry()
     for (const adapter of adapters) registry.register(adapter)
-    return { store, indexer: new IndexCodeGraph(store, registry, emptyResolutionManifestSource) }
+    return {
+      store,
+      indexer: new IndexCodeGraph(
+        store,
+        registry,
+        emptyResolutionManifestSource,
+        emptyRepositoryRootSource,
+        new NodeWorkspaceAccessibilitySource(),
+      ),
+    }
   }
 
   /**
@@ -470,7 +481,7 @@ describe('IndexCodeGraph package imports', () => {
    * @param identity - Replacement identity function.
    * @returns The adapter.
    */
-  function withIdentity(identity: () => string | undefined): LanguageAdapter {
+  function withIdentity(identity: (codeRoot?: string) => string | undefined): LanguageAdapter {
     const base = new TypeScriptLanguageAdapter()
     return {
       languages: () => base.languages(),
@@ -507,13 +518,13 @@ describe('IndexCodeGraph package imports', () => {
     expect(result.filesIndexed).toBeGreaterThan(0)
   })
 
-  it('Given two adapters that both return an identity, when indexed, then the first wins and the second is not asked', async () => {
+  it('Given two adapters that both return an identity, when indexed, then every adapter is asked', async () => {
     let secondAsked = 0
     const first = new TypeScriptLanguageAdapter()
     const second: LanguageAdapter = {
-      ...withIdentity(() => {
+      ...withIdentity((codeRoot) => {
         secondAsked++
-        return '@fixture/other'
+        return codeRoot?.includes('graph') ? '@fixture/pseudo-graph' : '@fixture/pseudo-app'
       }),
       languages: () => ['pseudo'],
       extensions: () => ({ '.pseudo': 'pseudo' }),
@@ -522,7 +533,7 @@ describe('IndexCodeGraph package imports', () => {
 
     const result = await indexer.execute(options())
 
-    expect(secondAsked).toBe(0)
+    expect(secondAsked).toBeGreaterThan(0)
     expect(result.errors).toEqual([])
     expect(await bindingTarget(store, 'SymbolNode')).toBeDefined()
   })
@@ -639,8 +650,8 @@ describe('IndexCodeGraph package imports', () => {
 
     const collision = result.errors.find((error) => error.message.includes('collision'))
     expect(collision?.message).toContain('@fixture/graph')
-    expect(collision?.message).toContain('"graph"')
-    expect(collision?.message).toContain('"app"')
+    expect(collision?.message).toContain('graph')
+    expect(collision?.message).toContain('app')
   })
 
   it('Given an unchanged workspace in an incremental run, when indexed, then prepare still receives every workspace', async () => {

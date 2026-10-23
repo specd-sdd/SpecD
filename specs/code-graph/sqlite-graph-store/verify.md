@@ -763,3 +763,18 @@
 - **WHEN** they are written and read back through the store
 - **THEN** both rows exist with their own `start_line`, `start_column`, `end_line`, and `end_column`
 - **AND** their identities differ
+
+#### Scenario: Namespace round-trips through the files table
+
+- **GIVEN** a file upserted with `namespace` `App\Models` and `namespaceSeparator` `\`
+- **WHEN** the file is read back
+- **THEN** both values are returned unchanged
+- **AND** a file upserted without a namespace reads back with neither value
+
+#### Scenario: Version 15 database is rejected after the bump
+
+- **GIVEN** a database persisted with schema version 15
+- **WHEN** the public store is opened for an ordinary read
+- **THEN** it fails with `GraphStorageRecoveryRequiredError` and recovery reason `SCHEMA_INCOMPATIBLE`
+- **AND** any low-level `GraphSchemaIncompatibleError` remains internal cause or diagnostic evidence
+- **AND** `graph index` recreates derived storage as version 16 and rotates `storage.epoch`

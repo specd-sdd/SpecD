@@ -239,4 +239,87 @@ describe('AdapterRegistry validation', () => {
 
     expect(registry.getAdapter('pseudo')).toBe(adapter)
   })
+
+  it('Malformed languages result is rejected', () => {
+    const registry = new AdapterRegistry()
+
+    const notArray = failure(
+      registry,
+      pseudoAdapter({ languages: () => 'typescript' as unknown as string[] }),
+    )
+    expect(notArray.code).toBe('INVALID_LANGUAGE_ADAPTER')
+    expect(notArray.message).toContain('[<unknown>]')
+    expect(notArray.message).toContain('languages() must return an array of non-empty strings')
+    expect(registry.getAdapters()).toEqual([])
+
+    const emptyString = failure(registry, pseudoAdapter({ languages: () => [''] }))
+    expect(emptyString.code).toBe('INVALID_LANGUAGE_ADAPTER')
+    expect(emptyString.message).toContain('[<unknown>]')
+    expect(registry.getAdapters()).toEqual([])
+  })
+
+  it('Malformed extensions result is rejected', () => {
+    const registry = new AdapterRegistry()
+
+    const notObject = failure(
+      registry,
+      pseudoAdapter({ extensions: () => 'not-an-object' as unknown as Record<string, string> }),
+    )
+    expect(notObject.code).toBe('INVALID_LANGUAGE_ADAPTER')
+    expect(notObject.message).toContain('extensions() must return a plain object')
+    expect(registry.getAdapters()).toEqual([])
+
+    const nonStringValue = failure(
+      registry,
+      pseudoAdapter({ extensions: () => ({ '.ts': 123 as unknown as string }) }),
+    )
+    expect(nonStringValue.code).toBe('INVALID_LANGUAGE_ADAPTER')
+    expect(nonStringValue.message).toContain('extensions() must return a plain object')
+    expect(registry.getAdapters()).toEqual([])
+  })
+
+  it('Invalid resolution manifest value is rejected', () => {
+    const registry = new AdapterRegistry()
+
+    const withSlash = failure(
+      registry,
+      pseudoAdapter({ resolutionManifests: () => ['dir/package.json'] }),
+    )
+    expect(withSlash.code).toBe('INVALID_LANGUAGE_ADAPTER')
+    expect(withSlash.message).toContain(
+      'resolutionManifests() entry "dir/package.json" must be an exact basename',
+    )
+    expect(registry.getAdapters()).toEqual([])
+
+    const withGlob = failure(registry, pseudoAdapter({ resolutionManifests: () => ['*.json'] }))
+    expect(withGlob.code).toBe('INVALID_LANGUAGE_ADAPTER')
+    expect(withGlob.message).toContain(
+      'resolutionManifests() entry "*.json" must be an exact basename',
+    )
+    expect(registry.getAdapters()).toEqual([])
+
+    const empty = failure(registry, pseudoAdapter({ resolutionManifests: () => [''] }))
+    expect(empty.code).toBe('INVALID_LANGUAGE_ADAPTER')
+    expect(empty.message).toContain(
+      'resolutionManifests() must return an array of non-empty strings',
+    )
+    expect(registry.getAdapters()).toEqual([])
+  })
+
+  it('Capability flags and facets are separate; a facet does not satisfy a capability flag', () => {
+    const registry = new AdapterRegistry()
+    const adapter = pseudoAdapter({
+      packageResolution: {
+        identity: () => undefined,
+        prepare: () => undefined,
+        matchSpecifier: () => undefined,
+        entrySurface: () => [],
+      },
+      // does not provide capabilities()
+    })
+
+    registry.register(adapter)
+    expect(registry.getAdapter('pseudo')?.packageResolution).toBeDefined()
+    expect(registry.getCapabilities('pseudo')).toBeUndefined()
+  })
 })

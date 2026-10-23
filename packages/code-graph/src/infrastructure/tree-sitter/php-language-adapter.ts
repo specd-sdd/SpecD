@@ -27,7 +27,7 @@ import {
 import { type Relation, createRelation } from '../../domain/value-objects/relation.js'
 import { SymbolKind } from '../../domain/value-objects/symbol-kind.js'
 import { RelationType } from '../../domain/value-objects/relation-type.js'
-import { findManifestField } from './find-manifest-field.js'
+import { canonical, findPackageManifest, type ManifestInspection } from './find-manifest-field.js'
 import { splitWorkspaceIdentity } from '../../domain/services/split-workspace-identity.js'
 import {
   parseDottedMemberReference,
@@ -131,12 +131,22 @@ interface PhpPackageOwner {
   readonly packageName: string
 }
 
+/** Parsed Composer manifest data cached per workspace code root. */
+export interface ComposerManifestData {
+  readonly packageRoot: string
+  readonly canonicalCodeRoot: string
+  readonly name?: string | undefined
+  readonly psr4: Array<[string, string]>
+  readonly autoloadDevDirs: ReadonlySet<string>
+}
+
 /** Immutable Composer metadata prepared once per workspace in an indexing session. */
 interface PhpResolutionSessionState {
   readonly kind: 'php-resolution-metadata'
   readonly psr4ByCodeRoot: ReadonlyMap<string, readonly (readonly [string, string])[]>
   /** Workspace name by code root, for building workspace-prefixed file ids. */
-  readonly workspaceByCodeRoot?: ReadonlyMap<string, string>
+  readonly workspaceByCodeRoot?: ReadonlyMap<string, string> | undefined
+  readonly manifestByCodeRoot?: ReadonlyMap<string, ComposerManifestData | null> | undefined
 }
 
 /**
@@ -458,12 +468,90 @@ function getCakePackageKind(packageName: string): 'model' | 'controller' | 'comp
 }
 
 /**
+ * Parsed Composer manifest data extracted during single-pass inspection.
+ */
+interface ParsedComposerManifest {
+  readonly name?: string | undefined
+  readonly psr4: Array<[string, string]>
+  readonly autoloadDevDirs: ReadonlySet<string>
+}
+
+/**
+ * Inspects a candidate composer.json manifest.
+ * @param content - Manifest content.
+ * @param manifestPath - Absolute manifest path.
+ * @returns Manifest inspection result.
+ */
+function inspectComposerManifest(
+  content: string,
+  manifestPath: string,
+): ManifestInspection<ParsedComposerManifest> {
+  try {
+    const pkg = JSON.parse(content) as {
+      name?: unknown
+      autoload?: { 'psr-4'?: Record<string, string | string[]> }
+      'autoload-dev'?: { 'psr-4'?: Record<string, string | string[]> }
+    }
+    const manifestDir = path.dirname(manifestPath)
+    const prefixDirs = new Map<string, string[]>()
+    const autoloadDevDirs = new Set<string>()
+
+    for (const [prefix, relDirs] of Object.entries(pkg.autoload?.['psr-4'] ?? {})) {
+      const dirs = (Array.isArray(relDirs) ? relDirs : [relDirs]).filter(
+        (d): d is string => typeof d === 'string',
+      )
+      const existing = prefixDirs.get(prefix) ?? []
+      for (const relDir of dirs) {
+        const abs = canonical(path.resolve(manifestDir, relDir))
+        if (!existing.includes(abs)) existing.push(abs)
+      }
+      prefixDirs.set(prefix, existing)
+    }
+
+    for (const [prefix, relDirs] of Object.entries(pkg['autoload-dev']?.['psr-4'] ?? {})) {
+      const dirs = (Array.isArray(relDirs) ? relDirs : [relDirs]).filter(
+        (d): d is string => typeof d === 'string',
+      )
+      const existing = prefixDirs.get(prefix) ?? []
+      for (const relDir of dirs) {
+        const abs = canonical(path.resolve(manifestDir, relDir))
+        autoloadDevDirs.add(abs)
+        if (!existing.includes(abs)) existing.push(abs)
+      }
+      prefixDirs.set(prefix, existing)
+    }
+
+    const psr4: Array<[string, string]> = []
+    for (const [prefix, dirs] of prefixDirs) {
+      for (const dir of dirs) {
+        psr4.push([prefix, dir])
+      }
+    }
+    psr4.sort((a, b) => b[0].length - a[0].length)
+
+    const parsedName = typeof pkg.name === 'string' && pkg.name.trim() !== '' ? pkg.name : undefined
+    const parsed: ParsedComposerManifest = {
+      name: parsedName,
+      psr4,
+      autoloadDevDirs,
+    }
+
+    if (parsedName !== undefined) {
+      return { kind: 'match', value: parsed }
+    }
+    return { kind: 'fallback', value: parsed }
+  } catch {
+    return { kind: 'skip' }
+  }
+}
+
+/**
  * Language adapter for PHP files using tree-sitter via ast-grep.
  * Extracts functions, classes, methods, interfaces, enums, traits, and constants.
  */
 export class PhpLanguageAdapter implements LanguageAdapter {
   private readonly packageResolutionFacet: PackageResolutionFacet = {
-    identity: (codeRoot, repoRoot) => this.getPackageIdentity(codeRoot, repoRoot),
+    identity: (codeRoot, repoRoot, report) => this.getPackageIdentity(codeRoot, repoRoot, report),
     prepare: (context) => this.preparePackages(context),
     matchSpecifier: (specifier, knownPackages, session) =>
       this.matchQualifiedNameToPackage(specifier, knownPackages, session),
@@ -544,23 +632,6 @@ export class PhpLanguageAdapter implements LanguageAdapter {
       callableContainerKinds: PHP_CALLABLE_KINDS,
       structuralFactsAreParserAuthoritative: true,
     }
-  }
-  /**
-   * Resolves a package from specifier.
-   * @param specifier - The package specifier.
-   * @param knownPackages - Known package names.
-   * @returns Package identity, or undefined.
-   */
-  private resolvePackageFromSpecifier(
-    specifier: string,
-    knownPackages: string[],
-  ): string | undefined {
-    // PHP resolves imports using fully qualified class names (FQN) rather than package-specifiers.
-    // Therefore, package-specifier resolution is not used and always returns undefined.
-    if (!specifier || knownPackages.length === 0) {
-      return undefined
-    }
-    return undefined
   }
 
   /**
@@ -974,15 +1045,29 @@ export class PhpLanguageAdapter implements LanguageAdapter {
         // prefix still proves which file the import depends on.
         const entries = context.packageEntryFiles(imp.specifier)
         if (entries.status === 'resolved') {
-          for (const entry of entries.entries) fileImports.push(entry.filePath)
-          continue
+          const first = entries.entries[0]
+          if (first !== undefined) {
+            const isImporterTest = session.getFileCategory(analysis.filePath) === 'test'
+            const isTargetTest = session.getFileCategory(first.filePath) === 'test'
+            if (isImporterTest || !isTargetTest) {
+              fileImports.push(first.filePath)
+              continue
+            }
+          }
         }
         // A workspace without a Composer `name` has no package identity, but its own PSR-4 map
         // still proves the file. Only an indexed file is ever a dependency.
+        const ownOut = { excludedForNonTest: false }
         const ownFile =
           codeRoot === undefined
             ? undefined
-            : this.resolveQualifiedNameFromSession(imp.specifier, codeRoot, session)
+            : this.resolveQualifiedNameFromSession(
+                imp.specifier,
+                codeRoot,
+                session,
+                analysis.filePath,
+                ownOut,
+              )
         if (ownFile !== undefined) {
           fileImports.push(ownFile)
           continue
@@ -990,7 +1075,10 @@ export class PhpLanguageAdapter implements LanguageAdapter {
         diagnostics.push({
           filePath: analysis.filePath,
           specifier: imp.specifier,
-          reason: entries.reason,
+          reason:
+            entries.status === 'resolved' || ownOut.excludedForNonTest
+              ? 'not-exported'
+              : entries.reason,
         })
       }
     }
@@ -1019,7 +1107,7 @@ export class PhpLanguageAdapter implements LanguageAdapter {
     }
 
     if (!imp.isRelative && codeRoot) {
-      return this.resolveQualifiedNameFromSession(imp.specifier, codeRoot, session)
+      return this.resolveQualifiedNameFromSession(imp.specifier, codeRoot, session, filePath)
     }
 
     return undefined
@@ -2111,21 +2199,91 @@ export class PhpLanguageAdapter implements LanguageAdapter {
   }
 
   /**
+   * Reads and parses composer.json once per workspace, caching compact manifest data on the session.
+   * @param codeRoot - Workspace root path.
+   * @param repoRoot - Repo root path.
+   * @param session - Current indexing session.
+   * @returns Parsed Composer manifest data, or undefined.
+   */
+  private readComposerManifest(
+    codeRoot: string,
+    repoRoot: string | undefined,
+    session: IndexSession,
+  ): ComposerManifestData | undefined {
+    const key = 'php-resolution-metadata'
+    const state = session.getAdapterState<PhpResolutionSessionState>(key)
+    const manifestByCodeRoot = new Map(state?.manifestByCodeRoot ?? [])
+    if (manifestByCodeRoot.has(codeRoot)) {
+      const cached = manifestByCodeRoot.get(codeRoot)
+      return cached ?? undefined
+    }
+
+    const result = findPackageManifest<ParsedComposerManifest>(
+      codeRoot,
+      'composer.json',
+      inspectComposerManifest,
+      repoRoot,
+    )
+    if (result.match === undefined) {
+      manifestByCodeRoot.set(codeRoot, null)
+      session.setAdapterState<PhpResolutionSessionState>(key, {
+        kind: 'php-resolution-metadata',
+        psr4ByCodeRoot: state?.psr4ByCodeRoot ?? new Map(),
+        ...(state?.workspaceByCodeRoot === undefined
+          ? {}
+          : { workspaceByCodeRoot: state.workspaceByCodeRoot }),
+        manifestByCodeRoot,
+      })
+      return undefined
+    }
+
+    const canonicalCodeRoot = canonical(codeRoot)
+    const data: ComposerManifestData = {
+      packageRoot: result.match.packageRoot,
+      canonicalCodeRoot,
+      name: result.match.value.name,
+      psr4: result.match.value.psr4,
+      autoloadDevDirs: result.match.value.autoloadDevDirs,
+    }
+
+    manifestByCodeRoot.set(codeRoot, data)
+    const psr4ByCodeRoot = new Map(state?.psr4ByCodeRoot ?? [])
+    psr4ByCodeRoot.set(codeRoot, data.psr4)
+
+    session.setAdapterState<PhpResolutionSessionState>(key, {
+      kind: 'php-resolution-metadata',
+      psr4ByCodeRoot,
+      ...(state?.workspaceByCodeRoot === undefined
+        ? {}
+        : { workspaceByCodeRoot: state.workspaceByCodeRoot }),
+      manifestByCodeRoot,
+    })
+
+    return data
+  }
+
+  /**
    * Retrieves the package identity from composer.json.
    * @param codeRoot - Workspace root path.
    * @param repoRoot - Repo root path.
+   * @param report - Optional callback to report skipped manifests.
    * @returns Package name, or undefined.
    */
-  private getPackageIdentity(codeRoot: string, repoRoot?: string): string | undefined {
-    return findManifestField(
+  private getPackageIdentity(
+    codeRoot: string,
+    repoRoot?: string,
+    report?: (message: string) => void,
+  ): string | undefined {
+    const result = findPackageManifest<ParsedComposerManifest>(
       codeRoot,
       'composer.json',
-      (content) => {
-        const pkg = JSON.parse(content) as { name?: string }
-        return pkg.name
-      },
+      inspectComposerManifest,
       repoRoot,
     )
+    for (const skipped of result.skipped) {
+      report?.(`Package manifest skipped (no identity): ${skipped}`)
+    }
+    return result.match?.value.name
   }
 
   /**
@@ -2136,26 +2294,31 @@ export class PhpLanguageAdapter implements LanguageAdapter {
   private preparePackages(context: PackagePreparationContext): void {
     const key = 'php-resolution-metadata'
     const existing = context.session.getAdapterState<PhpResolutionSessionState>(key)
-    const psr4ByCodeRoot = new Map(existing?.psr4ByCodeRoot ?? [])
     const workspaceByCodeRoot = new Map(existing?.workspaceByCodeRoot ?? [])
     const owners: PhpPackageOwner[] = []
+
     for (const workspace of context.workspaces) {
       workspaceByCodeRoot.set(workspace.codeRoot, workspace.name)
-      if (!psr4ByCodeRoot.has(workspace.codeRoot)) {
-        psr4ByCodeRoot.set(
-          workspace.codeRoot,
-          this.buildPsr4Map(workspace.codeRoot, context.repoRoot),
-        )
-      }
-      const packageName = this.getPackageIdentity(workspace.codeRoot, context.repoRoot)
-      if (packageName !== undefined) {
-        owners.push({ workspace: workspace.name, codeRoot: workspace.codeRoot, packageName })
+      const data = this.readComposerManifest(
+        workspace.codeRoot,
+        workspace.repoRoot,
+        context.session,
+      )
+      if (data?.name !== undefined) {
+        owners.push({
+          workspace: workspace.name,
+          codeRoot: workspace.codeRoot,
+          packageName: data.name,
+        })
       }
     }
+
+    const state = context.session.getAdapterState<PhpResolutionSessionState>(key)
     context.session.setAdapterState<PhpResolutionSessionState>(key, {
       kind: 'php-resolution-metadata',
-      psr4ByCodeRoot,
+      psr4ByCodeRoot: state?.psr4ByCodeRoot ?? new Map(),
       workspaceByCodeRoot,
+      manifestByCodeRoot: state?.manifestByCodeRoot,
     })
     context.session.setAdapterState<readonly PhpPackageOwner[]>(PHP_PACKAGE_OWNERS_KEY, owners)
   }
@@ -2203,12 +2366,14 @@ export class PhpLanguageAdapter implements LanguageAdapter {
     )
     if (owner === undefined || metadata === undefined) return []
     const map = metadata.psr4ByCodeRoot.get(owner.codeRoot) ?? []
+    const manifest = metadata.manifestByCodeRoot?.get(owner.codeRoot)
     const name = request.specifier.replace(/^\\/, '')
     const entries: PackageEntry[] = []
+    const canonicalOwnerRoot = manifest?.canonicalCodeRoot ?? owner.codeRoot
     for (const absolute of this.resolveQualifiedNameCandidates(name, map)) {
-      const relative = path.relative(owner.codeRoot, absolute).split(path.sep).join('/')
-      if (relative.startsWith('..')) continue
-      const filePath = `${owner.workspace}:${relative}`
+      const rel = path.relative(canonicalOwnerRoot, absolute).split(path.sep).join('/')
+      if (rel.startsWith('..') || path.isAbsolute(rel)) continue
+      const filePath = `${owner.workspace}:${rel}`
       entries.push({ filePath, surface: filePath })
     }
     return entries
@@ -2221,52 +2386,17 @@ export class PhpLanguageAdapter implements LanguageAdapter {
   private prepareResolutionMetadata(context: AdapterAnalyzeContext): void {
     const codeRoot = context.codeRoot
     if (codeRoot === undefined) return
+    this.readComposerManifest(codeRoot, context.repoRoot, context.session)
     const key = 'php-resolution-metadata'
-    const existing = context.session.getAdapterState<PhpResolutionSessionState>(key)
-    if (existing?.psr4ByCodeRoot.has(codeRoot)) return
-    const psr4ByCodeRoot = new Map(existing?.psr4ByCodeRoot ?? [])
-    psr4ByCodeRoot.set(codeRoot, this.buildPsr4Map(codeRoot, context.repoRoot))
+    const state = context.session.getAdapterState<PhpResolutionSessionState>(key)
+    const workspaceByCodeRoot = new Map(state?.workspaceByCodeRoot ?? [])
+    workspaceByCodeRoot.set(codeRoot, context.workspaceName)
     context.session.setAdapterState<PhpResolutionSessionState>(key, {
       kind: 'php-resolution-metadata',
-      psr4ByCodeRoot,
-      ...(existing?.workspaceByCodeRoot === undefined
-        ? {}
-        : { workspaceByCodeRoot: existing.workspaceByCodeRoot }),
+      psr4ByCodeRoot: state?.psr4ByCodeRoot ?? new Map(),
+      workspaceByCodeRoot,
+      manifestByCodeRoot: state?.manifestByCodeRoot,
     })
-  }
-
-  /**
-   * Builds PSR-4 namespace mapping from composer.json if present.
-   * @param codeRoot - Workspace root path.
-   * @param repoRoot - Repo root path.
-   * @returns PSR-4 mapping entries.
-   */
-  private buildPsr4Map(codeRoot: string, repoRoot?: string): Array<[string, string]> {
-    const serialized = findManifestField(
-      codeRoot,
-      'composer.json',
-      (content) => {
-        const pkg = JSON.parse(content) as {
-          autoload?: { 'psr-4'?: Record<string, string | string[]> }
-          'autoload-dev'?: { 'psr-4'?: Record<string, string | string[]> }
-        }
-        // A prefix may map to one directory or to an array of directories.
-        const merged = { ...pkg.autoload?.['psr-4'], ...pkg['autoload-dev']?.['psr-4'] }
-        return Object.keys(merged).length > 0 ? JSON.stringify(merged) : undefined
-      },
-      repoRoot,
-    )
-    if (!serialized) {
-      return []
-    }
-    const entries = JSON.parse(serialized) as Record<string, string | string[]>
-    const map: Array<[string, string]> = Object.entries(entries).flatMap(([prefix, relDirs]) =>
-      (Array.isArray(relDirs) ? relDirs : [relDirs])
-        .filter((relDir): relDir is string => typeof relDir === 'string')
-        .map((relDir): [string, string] => [prefix, path.resolve(codeRoot, relDir)]),
-    )
-    map.sort((a, b) => b[0].length - a[0].length)
-    return map
   }
 
   /**
@@ -2275,38 +2405,47 @@ export class PhpLanguageAdapter implements LanguageAdapter {
    * @param qualifiedName - PHP qualified name.
    * @param codeRoot - Workspace root whose metadata was prepared.
    * @param session - Current indexing session.
+   * @param importingFilePath - Optional path of importing file to check test status.
+   * @param out - Optional output parameter to record whether candidates were excluded for non-test importer.
+   * @param out.excludedForNonTest - Flag indicating candidates were excluded.
    * @returns Resolved target path, or undefined.
    */
   private resolveQualifiedNameFromSession(
     qualifiedName: string,
     codeRoot: string,
     session: IndexSession,
+    importingFilePath?: string,
+    out?: { excludedForNonTest?: boolean },
   ): string | undefined {
     const metadata = session.getAdapterState<PhpResolutionSessionState>('php-resolution-metadata')
     const map = metadata?.psr4ByCodeRoot.get(codeRoot)
     if (map === undefined) return undefined
     const workspace = metadata?.workspaceByCodeRoot?.get(codeRoot)
-    // Only an indexed file proves the target. Indexed ids carry the workspace prefix.
+    if (workspace === undefined) return undefined
+    const isImportingTest =
+      importingFilePath !== undefined && session.getFileCategory(importingFilePath) === 'test'
+    const manifest = metadata?.manifestByCodeRoot?.get(codeRoot)
+    const autoloadDevDirs = manifest?.autoloadDevDirs ?? new Set<string>()
+    const canonicalCodeRoot = manifest?.canonicalCodeRoot ?? codeRoot
+
     for (const absolute of this.resolveQualifiedNameCandidates(qualifiedName, map)) {
-      const relative = path.relative(codeRoot, absolute).split(path.sep).join('/')
-      const ids = workspace === undefined ? [absolute] : [`${workspace}:${relative}`, absolute]
-      const indexed = ids.find((id) => session.getFileId(id) !== undefined)
-      if (indexed !== undefined) return indexed
+      const rel = path.relative(canonicalCodeRoot, absolute).split(path.sep).join('/')
+      if (rel.startsWith('..') || path.isAbsolute(rel)) continue
+      const targetId = `${workspace}:${rel}`
+      if (session.getFileId(targetId) === undefined) continue
+
+      const targetCategory = session.getFileCategory(targetId)
+      const inAutoloadDev = [...autoloadDevDirs].some((devDir) => {
+        const dRel = path.relative(devDir, absolute)
+        return !dRel.startsWith('..') && !path.isAbsolute(dRel)
+      })
+      if (!isImportingTest && (targetCategory === 'test' || inAutoloadDev)) {
+        if (out !== undefined) out.excludedForNonTest = true
+        continue
+      }
+      return targetId
     }
     return undefined
-  }
-
-  /**
-   * Resolves one qualified name from already-normalized PSR-4 entries.
-   * @param qualifiedName - PHP qualified name.
-   * @param map - Normalized prefix-to-directory entries.
-   * @returns Resolved target path, or undefined.
-   */
-  private resolveQualifiedNameWithMap(
-    qualifiedName: string,
-    map: readonly (readonly [string, string])[],
-  ): string | undefined {
-    return this.resolveQualifiedNameCandidates(qualifiedName, map)[0]
   }
 
   /**

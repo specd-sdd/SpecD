@@ -352,6 +352,26 @@
 - **THEN** it reads that relationship from the same run-scoped session
 - **AND** it does not rebuild a parallel cross-entity cache outside the session
 
+#### Scenario: Hydrated files fill the qualified-name lookup
+
+- **GIVEN** an incremental run where a PHP class file is unchanged and hydrated from the store
+- **AND** a changed file imports that class by qualified name
+- **WHEN** imports are resolved
+- **THEN** the qualified-name lookup contains the hydrated class
+- **AND** the result equals a clean rebuild
+
+#### Scenario: Production importers never resolve to a test symbol
+
+- **GIVEN** a symbol in a test file with the same qualified name as no production symbol
+- **WHEN** a production file imports that qualified name
+- **THEN** the import does not resolve to the test symbol
+
+#### Scenario: A test importer resolves to a test helper
+
+- **GIVEN** a helper symbol declared in a test file
+- **WHEN** another test file imports it by qualified name
+- **THEN** the import resolves and `graph impact` on the helper lists the importing test as a dependent
+
 ### Requirement: Scoped binding environment resolution
 
 #### Scenario: Constructor injection produces upstream dependent impact
@@ -502,13 +522,6 @@
 - **WHEN** the indexer builds the package map and the adapter resolves the re-export
 - **THEN** no cross-workspace binding is stored
 
-#### Scenario: First adapter identity wins once
-
-- **GIVEN** two adapters could answer for the same workspace and only the first returns a package name
-- **WHEN** the map is built
-- **THEN** that first non-empty identity is stored
-- **AND** the indexer still does not open either manifest itself
-
 #### Scenario: Identity collision is reported
 
 - **GIVEN** two workspaces whose manifests declare the same package identity
@@ -548,13 +561,6 @@
 - **WHEN** the helper resolves the name
 - **THEN** the reason is `ambiguous` and nothing is persisted
 
-#### Scenario: Identity is searched within the project
-
-- **GIVEN** a workspace whose own directory has no package manifest and whose parent above the project root has one
-- **WHEN** the package map is built
-- **THEN** `identity` is called with the project root as the repository root
-- **AND** the manifest above the project root is not read
-
 #### Scenario: External packages are counted, not reported as failures
 
 - **GIVEN** files that import `zod` and `node:fs`, which no workspace declares
@@ -574,6 +580,70 @@
 - **GIVEN** an adapter without `packageResolution`, an unknown package, and a facet returning no indexed entry
 - **WHEN** each import is resolved
 - **THEN** the reasons are `facet-absent`, `package-unknown`, and `no-entry-surface` respectively
+
+#### Scenario: Every adapter is asked for an identity
+
+- **GIVEN** two registered adapters that both return an identity for one workspace
+- **WHEN** the package map is built
+- **THEN** both identities are stored for that workspace
+- **AND** the indexer still does not open either manifest itself
+
+#### Scenario: Each code root gets the repository root of its own repository
+
+- **GIVEN** a workspace inside the project repository and a workspace whose code root is in another repository
+- **WHEN** the package map is built
+- **THEN** `identity` receives the project repository root for the first workspace and the other repository's root for the second
+- **AND** the project root is not used as the boundary for the second
+
+#### Scenario: No detected VCS inspects only the code root
+
+- **GIVEN** a workspace whose code root is not inside any repository (the VCS detection falls back to the null adapter)
+- **WHEN** the package map is built
+- **THEN** `identity` receives no repository root
+- **AND** only the code root is inspected for the manifest
+
+#### Scenario: VCS detection failure is not fatal
+
+- **GIVEN** a VCS detection that throws for one code root
+- **WHEN** the package map is built
+- **THEN** that workspace is treated as having no detected repository
+- **AND** the run continues
+
+#### Scenario: Partial run maps and prepares every configured workspace
+
+- **GIVEN** workspaces A and B and a run that indexes only A
+- **AND** A imports a package declared by B
+- **WHEN** the run completes
+- **THEN** the import resolves to B
+- **AND** the result equals the result of a run that indexes both workspaces
+
+#### Scenario: Inaccessible workspace is skipped without failing the run
+
+- **GIVEN** a configured workspace whose repository is not cloned
+- **WHEN** the run executes
+- **THEN** a diagnostic is reported for that workspace
+- **AND** imports of its packages count as external
+- **AND** the other workspaces are indexed normally
+
+#### Scenario: Workspace accessibility is supplied through an application port
+
+- **GIVEN** a fake accessibility port that reports one configured code root as inaccessible and another as accessible
+- **WHEN** the indexing use case executes without a real filesystem
+- **THEN** it skips and diagnoses only the inaccessible workspace
+- **AND** the application use case makes no direct `node:fs` call
+
+#### Scenario: Accessibility probe failure is non-fatal
+
+- **GIVEN** the injected accessibility port throws while probing one configured workspace
+- **WHEN** the package map is built
+- **THEN** that workspace is diagnosed and treated as inaccessible
+- **AND** the other workspaces continue indexing
+
+#### Scenario: Adapter serving several languages is listed once
+
+- **GIVEN** one adapter that serves `typescript`, `tsx`, `javascript`, and `jsx` without `packageResolution`
+- **WHEN** the run completes
+- **THEN** `adaptersWithoutPackageResolution` lists that adapter once, by its first declared language
 
 ### Requirement: Spec dependency indexing
 
@@ -924,6 +994,12 @@
 - **THEN** normalized physical symbols, logical symbols, declaration mappings, bindings, public bindings, dependency relations, provenance, and coverage are identical
 - **AND** equality is checked by semantic content rather than aggregate row counts
 
+#### Scenario: Name-addressed imports match a clean rebuild
+
+- **GIVEN** PHP, Python, and Go projects whose imports are addressed by qualified name or namespace
+- **WHEN** one file changes in an incremental run
+- **THEN** the normalized semantic state equals a clean rebuild of the same final source
+
 ### Requirement: Facet-driven language independence
 
 #### Scenario: Stub language resolves package imports without indexer change
@@ -954,14 +1030,8 @@
 - **WHEN** the package map is built
 - **THEN** the error is recorded as an indexing error
 - **AND** the adapter is treated as without `packageResolution` for the rest of the run and is listed in `adaptersWithoutPackageResolution`
+- **AND** the same adapter's relative barrel re-exports are still linked
 - **AND** the other workspaces and adapters are still indexed
-
-#### Scenario: The first adapter to return an identity wins
-
-- **GIVEN** two registered adapters that would both return an identity for one workspace
-- **WHEN** the package map is built
-- **THEN** the first adapter's identity is used
-- **AND** the second adapter is not asked for that workspace
 
 ### Requirement: Package import incremental closure
 
@@ -1003,3 +1073,4 @@
 - **WHEN** the closure is computed
 - **THEN** existing code files that may hold previously unresolved imports are re-extracted
 - **AND** an import whose target workspace file just appeared resolves and equals a clean rebuild
+- **AND** a run that adds only a non-code file (a document or an asset) does not trigger that re-extraction

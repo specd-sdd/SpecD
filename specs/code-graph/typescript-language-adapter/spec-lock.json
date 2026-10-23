@@ -12,6 +12,12 @@
     {
       "file": "code-graph:src/infrastructure/tree-sitter/typescript-language-adapter.ts",
       "symbols": ["TypeScriptLanguageAdapter"]
+    },
+    {
+      "file": "code-graph:test/infrastructure/tree-sitter/typescript-language-adapter.spec.ts"
+    },
+    {
+      "file": "code-graph:test/application/use-cases/package-resolution.spec.ts"
     }
   ],
   "optimizations": {

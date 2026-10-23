@@ -98,9 +98,10 @@ high-level API from `@specd/sdk`.
 `--force` is a logical full rebuild: it reprocesses every selected graph input through
 the existing open store rather than restarting SQLite as part of a healthy index run.
 Physical storage recreation is deliberately closed-provider-only. SDK orchestration may
-use it once after a typed `GraphStorageRecoveryRequiredError` from the initial open of a
-transient forced index; normal reads, non-forced indexes, explicit providers, and every
-other error propagate without deleting derived storage.
+use it once after a typed `GraphStorageRecoveryRequiredError` (such as reason
+`'SCHEMA_INCOMPATIBLE'`) from the initial open of a transient forced index; normal
+reads, non-forced indexes, explicit providers, and every other error propagate without
+deleting derived storage.
 
 ---
 

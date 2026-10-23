@@ -15,6 +15,8 @@ export interface PackageWorkspace {
   readonly name: string
   /** Absolute path of the workspace code root. */
   readonly codeRoot: string
+  /** Root of the repository that contains `codeRoot`; absent when no VCS is detected. */
+  readonly repoRoot?: string
 }
 
 /**
@@ -23,10 +25,10 @@ export interface PackageWorkspace {
 export interface PackagePreparationContext {
   /** Run-scoped session where the facet stores compact manifest facts. */
   readonly session: IndexSession
-  /** Every workspace of the run, including workspaces that were only hydrated. */
+  /** Every accessible configured workspace, including workspaces not selected for the run. */
   readonly workspaces: readonly PackageWorkspace[]
-  /** Repository root that bounds manifest searches, when known. */
-  readonly repoRoot?: string
+  /** Directory of the project configuration. Never a manifest search boundary. */
+  readonly projectRoot: string
 }
 
 /**
@@ -62,11 +64,17 @@ export interface PackageEntry {
 export interface PackageResolutionFacet {
   /**
    * Derives the package identity for a workspace. May perform I/O.
+   * Searches at and above `codeRoot`, bounded by `repoRoot`; when `repoRoot` is absent only `codeRoot` is inspected.
    * @param codeRoot - Absolute path of the workspace code root.
    * @param repoRoot - Optional repository root that bounds the manifest search.
+   * @param report - Optional callback receiving one diagnostic message per skipped manifest.
    * @returns The package identity, or `undefined` when no manifest is found.
    */
-  identity(codeRoot: string, repoRoot?: string): string | undefined
+  identity(
+    codeRoot: string,
+    repoRoot?: string,
+    report?: (message: string) => void,
+  ): string | undefined
 
   /**
    * Reads manifest facts for all workspaces once per run and stores compact immutable

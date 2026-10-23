@@ -12,6 +12,7 @@ Hosts (`graph index`, SDK `runIndexProjectGraph`) currently assemble workspace t
 
 - `projectRoot`
 - `workspaces`
+- optional `configuredWorkspaces`
 - `graphConfig`
 - `codeGraphVersion`
 - `vcsRoot`
@@ -35,8 +36,9 @@ before this use case is invoked.
 
 `IndexProjectGraph` SHALL accept an already-open `CodeGraphProvider` and prepared
 project inputs. `IndexProjectGraphInput` MUST include `provider`, `projectRoot`,
-`workspaces`, `graphConfig`, `codeGraphVersion`, `vcsRoot`, optional `vcsRef`,
-optional `force`, and optional `onProgress`; `vcsRoot` is forwarded unchanged.
+`workspaces`, optional `configuredWorkspaces`, `graphConfig`, `codeGraphVersion`,
+`vcsRoot`, optional `vcsRef`, optional `force`, and optional `onProgress`;
+`vcsRoot` and `configuredWorkspaces` (when provided) are forwarded unchanged.
 
 It MUST NOT resolve workspaces, acquire locks, spawn processes, open, close, clear
 directly, recreate, or otherwise own storage lifecycle. Its only force

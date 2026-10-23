@@ -12,27 +12,11 @@
   "implementation": [
     {
       "file": "code-graph:src/infrastructure/sqlite/schema.ts",
-      "symbols": ["SQLITE_SCHEMA_VERSION", "SQLITE_SCHEMA_DDL", "REQUIRED_COLUMNS"]
-    },
-    {
-      "file": "code-graph:src/infrastructure/sqlite/sqlite-worker-protocol.ts",
-      "symbols": ["SQLiteWorkerOperationMap"]
-    },
-    {
-      "file": "code-graph:src/infrastructure/sqlite/sqlite-worker.ts",
-      "symbols": ["handleMessage"]
+      "symbols": ["SQLITE_SCHEMA_VERSION", "SQLITE_SCHEMA_DDL"]
     },
     {
       "file": "code-graph:src/infrastructure/sqlite/sqlite-graph-database.ts",
-      "symbols": [
-        "findDeclarations",
-        "relationEndpointsExist",
-        "queryImpactFrontierDirection",
-        "SQLiteGraphDatabase"
-      ]
-    },
-    {
-      "file": "code-graph:test/infrastructure/sqlite/sqlite-worker-protocol.spec.ts"
+      "symbols": ["SQLiteGraphDatabase"]
     }
   ],
   "optimizations": {

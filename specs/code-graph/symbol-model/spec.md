@@ -19,6 +19,8 @@ A `FileNode` SHALL represent a single source file in the workspace. It contains:
 
 Two `FileNode` values are equal if and only if their `path` fields match (since `path` includes the workspace name prefix and remains the canonical graph identity). `projectRelativePath` exists for user-facing lookup and diagnostics; it MUST NOT replace the canonical workspace-prefixed path in persisted relations or symbol identifiers.
 
+A `FileNode` additionally carries two optional fields reported by the language adapter in the file analysis. **`namespace`** (`string | undefined`) is the namespace the file declares (for example a PHP namespace); it is stored so that a file hydrated from the store without re-analysis still contributes its qualified names. **`namespaceSeparator`** (`string | undefined`) is the separator that joins `namespace` and a symbol name into a qualified name (for example `\` for PHP, `.` for Python). Both are absent when the file declares no namespace, and `namespaceSeparator` is present if and only if `namespace` is present. They do not take part in `FileNode` equality.
+
 ### Requirement: Spec node
 
 A `SpecNode` SHALL represent a spec directory in the workspace. It contains:

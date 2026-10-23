@@ -35,6 +35,14 @@
 - **THEN** `projectRelativePath` is `../../packages/core/src/index.ts`
 - **AND** it does not replace the canonical `path`
 
+#### Scenario: File namespace is optional and paired
+
+- **GIVEN** a PHP file that declares `namespace App\Models;` and a Go file that declares no namespace
+- **WHEN** their file nodes are built
+- **THEN** the PHP node has `namespace` `App\Models` and `namespaceSeparator` `\`
+- **AND** the Go node has neither field
+- **AND** namespace data does not change `FileNode` equality
+
 ### Requirement: Spec node
 
 #### Scenario: SpecNode equality by specId

@@ -1592,7 +1592,14 @@ describe('SQLiteGraphStore', () => {
     db.close()
 
     const brokenStore = new SQLiteGraphStore(tempDir)
-    await expect(brokenStore.open()).rejects.toMatchObject({ reason: 'SCHEMA_INCOMPATIBLE' })
+    let brokenError: unknown
+    try {
+      await brokenStore.open()
+    } catch (err) {
+      brokenError = err
+    }
+    expect(brokenError).toBeInstanceOf(GraphStorageRecoveryRequiredError)
+    expect(brokenError).toMatchObject({ reason: 'SCHEMA_INCOMPATIBLE' })
 
     await brokenStore.recreate()
     await brokenStore.open()
@@ -1680,13 +1687,15 @@ describe('SQLiteGraphStore', () => {
   })
 
   it('declares sqlite schema version and fts-backed ddl', () => {
-    expect(SQLITE_SCHEMA_VERSION).toBe(15)
+    expect(SQLITE_SCHEMA_VERSION).toBe(16)
     expect(SQLITE_SCHEMA_DDL).toContain('CREATE TABLE IF NOT EXISTS files')
     expect(SQLITE_SCHEMA_DDL).toContain('project_relative_path TEXT NOT NULL')
     expect(SQLITE_SCHEMA_DDL).not.toContain('config_relative_path')
     expect(SQLITE_SCHEMA_DDL).toContain("category TEXT NOT NULL DEFAULT 'source'")
     expect(SQLITE_SCHEMA_DDL).toContain('idx_files_category')
     expect(SQLITE_SCHEMA_DDL).toContain('content TEXT')
+    expect(SQLITE_SCHEMA_DDL).toContain('namespace TEXT')
+    expect(SQLITE_SCHEMA_DDL).toContain('namespace_separator TEXT')
     expect(SQLITE_SCHEMA_DDL).toContain('CREATE TABLE IF NOT EXISTS documents')
     expect(SQLITE_SCHEMA_DDL).toContain('CREATE VIRTUAL TABLE IF NOT EXISTS symbol_fts')
     expect(SQLITE_SCHEMA_DDL).toContain('CREATE VIRTUAL TABLE IF NOT EXISTS spec_fts')
@@ -1718,7 +1727,7 @@ describe('SQLiteGraphStore', () => {
     )
   })
 
-  it.each(['10', '11', '12', '13', '14', '16'])(
+  it.each(['10', '11', '12', '13', '14', '15', '17'])(
     'rejects schema version %s without altering the table',
     async (version) => {
       const dir = mkdtempSync(join(tmpdir(), `code-graph-sqlite-schema-v${version}-`))
@@ -1754,8 +1763,8 @@ describe('SQLiteGraphStore', () => {
     },
   )
 
-  it('reopens current schema 15 without rebuilding stored member rows', async () => {
-    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-schema-v15-'))
+  it('reopens current schema 16 without rebuilding stored member rows', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-schema-v16-'))
     const owner = createLogicalSymbol({
       workspace: 'core',
       surface: 'core:src/edit.ts',
@@ -1858,8 +1867,8 @@ describe('SQLiteGraphStore', () => {
     }
   })
 
-  it('rejects schema 14 for reads and recreates it as schema 15 with a new storage epoch', async () => {
-    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-schema-v14-rebuild-'))
+  it('rejects schema 15 for reads and recreates it as schema 16 with a new storage epoch', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-schema-v15-rebuild-'))
     const databasePath = join(tempDir, 'graph', 'code-graph.sqlite')
     const initialStore = new SQLiteGraphStore(tempDir)
     await initialStore.open()
@@ -1867,20 +1876,25 @@ describe('SQLiteGraphStore', () => {
     const generationBefore = readStorageGeneration(tempDir)
 
     const oldDb = new Database(databasePath)
-    oldDb.prepare("UPDATE meta SET value = '14' WHERE key = 'schemaVersion'").run()
-    const columnsBefore = oldDb.prepare('PRAGMA table_info(logical_declarations)').all()
+    oldDb.prepare("UPDATE meta SET value = '15' WHERE key = 'schemaVersion'").run()
+    const columnsBefore = oldDb.prepare('PRAGMA table_info(files)').all()
     oldDb.close()
 
     const incompatibleStore = new SQLiteGraphStore(tempDir)
-    await expect(incompatibleStore.open()).rejects.toMatchObject({
+    let openError: unknown
+    try {
+      await incompatibleStore.open()
+    } catch (err) {
+      openError = err
+    }
+    expect(openError).toBeInstanceOf(GraphStorageRecoveryRequiredError)
+    expect(openError).toMatchObject({
       reason: 'SCHEMA_INCOMPATIBLE',
     })
     expect(readStorageGeneration(tempDir).token).toBe(generationBefore.token)
 
     const rejectedDb = new Database(databasePath, { readonly: true })
-    expect(rejectedDb.prepare('PRAGMA table_info(logical_declarations)').all()).toEqual(
-      columnsBefore,
-    )
+    expect(rejectedDb.prepare('PRAGMA table_info(files)').all()).toEqual(columnsBefore)
     rejectedDb.close()
 
     await incompatibleStore.recreate()
@@ -1891,12 +1905,13 @@ describe('SQLiteGraphStore', () => {
     const rebuiltDb = new Database(databasePath, { readonly: true })
     try {
       expect(rebuiltDb.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get()).toEqual(
-        { value: '15' },
+        { value: '16' },
       )
-      const rebuiltColumns = rebuiltDb
-        .prepare('PRAGMA table_info(logical_declarations)')
-        .all() as Array<{ name: string }>
-      expect(rebuiltColumns.map((column) => column.name)).toContain('occurrence_form')
+      const rebuiltColumns = rebuiltDb.prepare('PRAGMA table_info(files)').all() as Array<{
+        name: string
+      }>
+      expect(rebuiltColumns.map((column) => column.name)).toContain('namespace')
+      expect(rebuiltColumns.map((column) => column.name)).toContain('namespace_separator')
     } finally {
       rebuiltDb.close()
     }
@@ -3111,6 +3126,56 @@ describe('SQLiteGraphStore', () => {
     expect((await store.getFile(sourceFile.path))?.category).toBe('source')
     expect((await store.getFile(testFile.path))?.category).toBe('test')
     expect((await store.getFile(ignoredFile.path))?.category).toBe('ignored')
+
+    await store.close()
+  })
+
+  it('Namespace round-trips through the files table', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-namespace-'))
+    const store = new SQLiteGraphStore(tempDir)
+    await store.open()
+
+    const fileWithNamespace = createFileNode({
+      path: 'core:src/Service.php',
+      projectRelativePath: 'packages/core/src/Service.php',
+      language: 'php',
+      contentHash: 'sha256:ns1',
+      workspace: 'core',
+      namespace: 'App\\Services',
+      namespaceSeparator: '\\',
+    })
+    const fileWithoutNamespace = createFileNode({
+      path: 'core:src/index.ts',
+      projectRelativePath: 'packages/core/src/index.ts',
+      language: 'typescript',
+      contentHash: 'sha256:ns2',
+      workspace: 'core',
+    })
+
+    await store.upsertFile(fileWithNamespace, [], [])
+    await store.upsertFile(fileWithoutNamespace, [], [])
+
+    const fetchedWithNs = await store.getFile(fileWithNamespace.path)
+    expect(fetchedWithNs).toEqual(fileWithNamespace)
+    expect(fetchedWithNs?.namespace).toBe('App\\Services')
+    expect(fetchedWithNs?.namespaceSeparator).toBe('\\')
+
+    const fetchedWithoutNs = await store.getFile(fileWithoutNamespace.path)
+    expect(fetchedWithoutNs).toEqual(fileWithoutNamespace)
+    expect(fetchedWithoutNs?.namespace).toBeUndefined()
+    expect(fetchedWithoutNs?.namespaceSeparator).toBeUndefined()
+
+    // Test getFilesByPaths
+    const batch = await store.getFilesByPaths([fileWithNamespace.path, fileWithoutNamespace.path])
+    expect(batch[0]?.namespace).toBe('App\\Services')
+    expect(batch[0]?.namespaceSeparator).toBe('\\')
+    expect(batch[1]?.namespace).toBeUndefined()
+
+    // Test getAllFiles
+    const all = await store.getAllFiles()
+    const found = all.find((f) => f.path === fileWithNamespace.path)
+    expect(found?.namespace).toBe('App\\Services')
+    expect(found?.namespaceSeparator).toBe('\\')
 
     await store.close()
   })

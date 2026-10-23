@@ -129,6 +129,39 @@
 - **WHEN** imports are resolved
 - **THEN** the import stays unresolved
 
+#### Scenario: Dots and case normalize
+
+- **GIVEN** project name `Acme.Auth` and the import `import acme_auth.models`
+- **WHEN** the specifier is matched
+- **THEN** the package is `Acme.Auth`
+
+#### Scenario: Equal normalized names stay unresolved
+
+- **GIVEN** known packages `acme-auth` and `acme_auth` and the import `import acme_auth.models`
+- **WHEN** the specifier is matched
+- **THEN** the result is `undefined`
+- **AND** the registration order does not choose a package
+
+#### Scenario: Submodule import without an init file
+
+- **GIVEN** `from acme_auth import models` and no `acme_auth/__init__.py` while `acme_auth/models.py` is indexed
+- **WHEN** imports are resolved
+- **THEN** the file depends on `models.py`
+- **AND** no binding is created for `models`
+
+#### Scenario: Submodule indexed under two roots stays unresolved
+
+- **GIVEN** `acme_auth/models.py` indexed under both the code root and its `src/` directory
+- **WHEN** `from acme_auth import models` is resolved
+- **THEN** the import stays unresolved
+
+#### Scenario: pyproject.toml without a project name is skipped
+
+- **GIVEN** a nearest `pyproject.toml` without `[project].name` and a named one higher inside the repository
+- **WHEN** identity is computed
+- **THEN** a diagnostic is reported for the skipped file
+- **AND** the identity comes from the higher file
+
 ### Requirement: Resolution manifests
 
 #### Scenario: Python declares only pyproject.toml

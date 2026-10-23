@@ -91,6 +91,7 @@ export async function runIndexProjectGraph(
       provider,
       projectRoot,
       workspaces,
+      configuredWorkspaces: listed,
       graphConfig,
       codeGraphVersion,
       vcsRoot,

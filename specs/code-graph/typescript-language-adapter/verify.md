@@ -183,6 +183,13 @@
 - **WHEN** a package import of `SymbolNode` is resolved in Pass 2
 - **THEN** it sees the final public binding of `public.ts`
 
+#### Scenario: Type-only default import binds no value
+
+- **GIVEN** `import type X from 'pkg'` and an entry file whose default export is a value declaration
+- **WHEN** imports are resolved
+- **THEN** `X` is not bound to the value declaration
+- **AND** it binds only when the default export is in the type space
+
 ### Requirement: Scoped bindings, calls, types, and construction
 
 #### Scenario: Only proven receiver calls become relations
@@ -324,6 +331,51 @@
 
 - **WHEN** the adapter reports `resolutionManifests()`
 - **THEN** the result is exactly `['package.json']`
+
+#### Scenario: Code root below package.json keeps identity and entry surface
+
+- **GIVEN** `package.json` at the package root and a workspace code root `<root>/src`
+- **AND** `exports["."]` is `./src/index.js`
+- **WHEN** identity and the entry surface are computed
+- **THEN** the workspace has the manifest `name` as identity
+- **AND** the entry surface contains `index.ts` relative to the code root
+
+#### Scenario: Candidate outside the code root is dropped
+
+- **GIVEN** a code root `<root>/src` and `exports["."]` set to `./lib/index.js`
+- **WHEN** `entrySurface` runs
+- **THEN** no candidate is returned
+
+#### Scenario: package.json without a name is skipped
+
+- **GIVEN** a nearest `package.json` with only `{"type":"module"}` and a named `package.json` higher in the same repository
+- **WHEN** identity is computed
+- **THEN** a diagnostic is reported for the skipped file
+- **AND** the identity is the higher `name`
+
+#### Scenario: Prepared data is compact
+
+- **GIVEN** a `package.json` with many unrelated fields
+- **WHEN** `prepare` runs
+- **THEN** only `name`, `main`, `exports`, and the code root location are stored
+
+#### Scenario: Declaration files map to sources
+
+- **GIVEN** a published `./dist/index.d.ts` and an indexed `src/index.ts`
+- **WHEN** `entrySurface` runs
+- **THEN** it returns `src/index.ts`
+
+#### Scenario: Other build directories are not mapped
+
+- **GIVEN** a published `./build/index.js` and an indexed `src/index.ts` but no `build/index.ts`
+- **WHEN** `entrySurface` runs
+- **THEN** the candidates do not include `src/index.ts`
+
+#### Scenario: Workspace not indexed in this run is still prepared
+
+- **GIVEN** a partial run that does not index workspace B
+- **WHEN** `prepare` runs
+- **THEN** B's `package.json` is read once and its package resolves for imports from A
 
 ### Requirement: Capability truthfulness and failure behavior
 

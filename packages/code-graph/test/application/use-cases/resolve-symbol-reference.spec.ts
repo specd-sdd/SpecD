@@ -19,6 +19,7 @@ import {
 import { IndexCoverageStatus } from '../../../src/domain/value-objects/index-session.js'
 import { InMemoryGraphStore } from '../../helpers/in-memory-graph-store.js'
 import { AdapterRegistry } from '../../../src/infrastructure/tree-sitter/adapter-registry.js'
+import { GoLanguageAdapter } from '../../../src/infrastructure/tree-sitter/go-language-adapter.js'
 import { PhpLanguageAdapter } from '../../../src/infrastructure/tree-sitter/php-language-adapter.js'
 import { TypeScriptLanguageAdapter } from '../../../src/infrastructure/tree-sitter/typescript-language-adapter.js'
 import { type LanguageAdapter } from '../../../src/domain/value-objects/language-adapter.js'
@@ -1520,5 +1521,91 @@ describe('ResolveSymbolReference', () => {
     expect(result.status).toBe('ambiguous')
     expect(result.reasonCode).toBe('AMBIGUOUS_LOGICAL_TARGET')
     expect(result.candidates).toHaveLength(2)
+  })
+
+  it('Scenario: Anchor without an adapter leaves human text unresolved', async () => {
+    // GIVEN a request anchored to a Go package surface whose language has no symbolReferenceSyntax facet
+    // AND the text is an owner-qualified spelling that is not a stored qualified_name
+    const typescript = new TypeScriptLanguageAdapter()
+    const php = new PhpLanguageAdapter()
+    const tsParse = vi.spyOn(typescript.symbolReferenceSyntax, 'parse')
+    const phpParse = vi.spyOn(php.symbolReferenceSyntax, 'parse')
+    const go = new GoLanguageAdapter()
+    const registry = new AdapterRegistry()
+    registry.register(typescript)
+    registry.register(php)
+    registry.register(go)
+
+    const owner = symbol('Calculator', 'core:pkg/math/calc.go')
+    const member = createLogicalSymbol({
+      workspace: 'core',
+      surface: 'core:pkg/math/calc.go',
+      name: 'Add',
+      space: SymbolSpace.Value,
+      ownerId: owner.id,
+      memberSemantics: { kind: MemberKind.Method, dispatch: MemberDispatch.Instance },
+    })
+    const store = await makeStore({
+      symbols: [owner, member],
+      declarations: [
+        { logicalSymbolId: owner.id, filePath: 'core:pkg/math/calc.go' },
+        { logicalSymbolId: member.id, filePath: 'core:pkg/math/calc.go' },
+      ],
+    })
+    const resolver = new ResolveSymbolReference(store, async () => freshHealth, undefined, registry)
+
+    // WHEN the reference is resolved
+    const result = await resolver.execute({
+      workspace: 'core',
+      requested: 'Calculator.Add()',
+      filePath: 'core:pkg/math/calc.go',
+      publicSurface: 'core:pkg/math',
+      language: 'go',
+    })
+
+    // THEN the result is unresolved
+    // AND no generic dotted or delimiter parser runs and no other adapter is consulted
+    expect(result.status).toBe('unresolved')
+    expect(tsParse).not.toHaveBeenCalled()
+    expect(phpParse).not.toHaveBeenCalled()
+  })
+
+  it('Scenario: Qualified name is not derived from owner and member', async () => {
+    // GIVEN a member whose stored qualified_name differs from the spelling Owner.member that could be derived from its owner and name
+    const owner = symbol('Owner', 'src/types.ts')
+    const member = createLogicalSymbol({
+      workspace: 'core',
+      surface: 'src/types.ts',
+      name: 'member',
+      space: SymbolSpace.Value,
+      ownerId: owner.id,
+      memberSemantics: { kind: MemberKind.Method, dispatch: MemberDispatch.Instance },
+      qualifiedName: 'Custom.different',
+    })
+    const store = await makeStore({
+      symbols: [owner, member],
+      declarations: [
+        { logicalSymbolId: owner.id, filePath: 'core:src/types.ts' },
+        { logicalSymbolId: member.id, filePath: 'core:src/types.ts' },
+      ],
+    })
+    const resolver = new ResolveSymbolReference(store, async () => freshHealth)
+
+    // WHEN the unanchored text Owner.member is resolved
+    const result = await resolver.execute({
+      workspace: 'core',
+      requested: 'Owner.member',
+    })
+
+    // THEN the lookup compares only the stored qualified_name
+    // AND the member is not matched through a derived name
+    expect(result.status).toBe('unresolved')
+
+    const storedResult = await resolver.execute({
+      workspace: 'core',
+      requested: 'Custom.different',
+    })
+    expect(storedResult.status).toBe('resolved')
+    expect(storedResult.target?.id).toBe(member.id)
   })
 })

@@ -97,19 +97,96 @@ export class AdapterRegistry implements AdapterRegistryPort {
         )
       }
     }
-    const languages = adapter.languages()
-    if (languages.length === 0) {
-      throw new InvalidLanguageAdapterError(languages, 'languages() returned no language')
+
+    let rawLanguages: unknown
+    try {
+      rawLanguages = adapter.languages()
+    } catch {
+      rawLanguages = undefined
     }
-    const extensions = adapter.extensions()
+
+    if (
+      !Array.isArray(rawLanguages) ||
+      rawLanguages.some((lang) => typeof lang !== 'string' || lang.trim() === '')
+    ) {
+      throw new InvalidLanguageAdapterError(
+        ['<unknown>'],
+        'languages() must return an array of non-empty strings with at least one element',
+        'languages',
+      )
+    }
+
+    if (rawLanguages.length === 0) {
+      throw new InvalidLanguageAdapterError(
+        ['<unknown>'],
+        'languages() returned no language',
+        'languages',
+      )
+    }
+
+    const languages = rawLanguages as readonly string[]
+
+    let rawExtensions: unknown
+    try {
+      rawExtensions = adapter.extensions()
+    } catch {
+      rawExtensions = undefined
+    }
+
+    if (
+      typeof rawExtensions !== 'object' ||
+      rawExtensions === null ||
+      Array.isArray(rawExtensions) ||
+      Object.values(rawExtensions).some((value) => typeof value !== 'string')
+    ) {
+      throw new InvalidLanguageAdapterError(
+        languages,
+        'extensions() must return a plain object whose values are all strings',
+        'extensions',
+      )
+    }
+
+    const extensions = rawExtensions as Record<string, string>
     for (const [ext, lang] of Object.entries(extensions)) {
       if (!languages.includes(lang)) {
         throw new InvalidLanguageAdapterError(
           languages,
           `extension "${ext}" maps to undeclared language "${lang}"`,
+          'extensions',
         )
       }
     }
+
+    let rawManifests: unknown
+    try {
+      rawManifests = adapter.resolutionManifests()
+    } catch {
+      rawManifests = undefined
+    }
+
+    if (
+      !Array.isArray(rawManifests) ||
+      rawManifests.some((m) => typeof m !== 'string' || m.trim() === '')
+    ) {
+      throw new InvalidLanguageAdapterError(
+        languages,
+        'resolutionManifests() must return an array of non-empty strings',
+        'resolutionManifests',
+      )
+    }
+
+    const manifests = rawManifests as readonly string[]
+    const INVALID_MANIFEST_CHARS = /[/\\]|[*?[\]{}]/
+    for (const manifest of manifests) {
+      if (INVALID_MANIFEST_CHARS.test(manifest)) {
+        throw new InvalidLanguageAdapterError(
+          languages,
+          `resolutionManifests() entry "${manifest}" must be an exact basename without path separators or glob characters`,
+          'resolutionManifests',
+        )
+      }
+    }
+
     for (const [facet, members] of Object.entries(FACET_MEMBERS)) {
       const value = record[facet]
       if (value === undefined) continue

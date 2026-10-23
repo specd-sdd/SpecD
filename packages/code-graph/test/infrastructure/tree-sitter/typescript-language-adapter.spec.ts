@@ -1,9 +1,13 @@
-import { describe, it, expect, afterEach } from 'vitest'
-import { mkdtempSync, writeFileSync, mkdirSync, rmSync, readFileSync } from 'node:fs'
+import { describe, it, expect, afterEach, vi } from 'vitest'
+import { mkdtempSync, writeFileSync, mkdirSync, rmSync, readFileSync, realpathSync } from 'node:fs'
+import fs from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { parse, Lang } from '@ast-grep/napi'
-import { TypeScriptLanguageAdapter } from '../../../src/infrastructure/tree-sitter/typescript-language-adapter.js'
+import {
+  TypeScriptLanguageAdapter,
+  type PackageEntryManifest,
+} from '../../../src/infrastructure/tree-sitter/typescript-language-adapter.js'
 import { SymbolKind } from '../../../src/domain/value-objects/symbol-kind.js'
 import { RelationType } from '../../../src/domain/value-objects/relation-type.js'
 import { ImportDeclarationKind } from '../../../src/domain/value-objects/import-declaration-kind.js'
@@ -12,12 +16,20 @@ import {
   type BindingFact,
 } from '../../../src/domain/value-objects/binding-fact.js'
 import { CallForm, type CallFact } from '../../../src/domain/value-objects/call-fact.js'
-import { type SourceRange, type SymbolNode } from '../../../src/domain/value-objects/symbol-node.js'
+import {
+  type SourceRange,
+  type SymbolNode,
+  createSymbolNode,
+} from '../../../src/domain/value-objects/symbol-node.js'
 import { type Relation } from '../../../src/domain/value-objects/relation.js'
 import { type FileAnalysis } from '../../../src/domain/value-objects/file-analysis.js'
 import { type ImportDeclaration } from '../../../src/domain/value-objects/import-declaration.js'
 import { InMemoryIndexSession } from '../../../src/application/use-cases/in-memory-index-session.js'
-import { parseLogicalSymbol } from '../../../src/domain/value-objects/symbol-reference.js'
+import {
+  parseLogicalSymbol,
+  createPublicBinding,
+  SymbolSpace,
+} from '../../../src/domain/value-objects/symbol-reference.js'
 import { createImportResolutionContext } from '../../helpers/import-resolution-context.js'
 import {
   type PackageResolutionFacet,
@@ -2391,5 +2403,408 @@ describe('TypeScript type-only imports', () => {
       imports.map((item) => [item.localName, item.typeOnly === true]),
     )
     expect(typeOnly).toEqual({ A: true, B: true, C: false, D: false })
+  })
+
+  it('Scenario: Type-only default import binds no value', () => {
+    const session = new InMemoryIndexSession()
+    session.registerFile({
+      filePath: 'ws:src/use.ts',
+      projectRelativePath: 'src/use.ts',
+      language: 'typescript',
+      contentHash: 'h1',
+      workspace: 'ws',
+    })
+    session.registerFile({
+      filePath: 'target:src/entry.ts',
+      projectRelativePath: 'src/entry.ts',
+      language: 'typescript',
+      contentHash: 'h2',
+      workspace: 'target',
+    })
+
+    // Declare a value-space default export in target:src/entry.ts
+    const sym = createSymbolNode({
+      name: 'client',
+      filePath: 'target:src/entry.ts',
+      kind: SymbolKind.Function,
+      line: 1,
+      column: 0,
+      endLine: 1,
+      endColumn: 20,
+    })
+    session.registerAnalysis({
+      filePath: 'target:src/entry.ts',
+      analysis: {
+        language: 'typescript',
+        symbols: [sym],
+        imports: [],
+        bindingFacts: [],
+        callFacts: [],
+        referenceFacts: {
+          declarations: [
+            {
+              logicalId: 'logical:client',
+              symbolId: sym.id,
+              location: { filePath: sym.filePath, line: sym.line, column: sym.column },
+              kind: SymbolKind.Function,
+            },
+          ],
+          publicBindings: [
+            createPublicBinding({
+              surface: 'target:src/entry.ts',
+              exportedName: 'default',
+              space: SymbolSpace.Value,
+              targetId: 'logical:client',
+            }),
+          ],
+          localBindings: [],
+          hierarchy: [],
+          steps: [],
+          capabilities: {
+            declarations: true,
+            members: false,
+            publicBindings: true,
+            localBindings: false,
+            hierarchy: false,
+            buildContext: false,
+          },
+        },
+      },
+    })
+
+    const adapter = new TypeScriptLanguageAdapter()
+    const context = createImportResolutionContext(
+      {
+        session,
+        packageToWorkspace: new Map([['@fixture/target', 'target']]),
+        packageEntryFiles: () => ({
+          status: 'resolved',
+          packageName: '@fixture/target',
+          workspace: 'target',
+          entries: [{ filePath: 'target:src/entry.ts', surface: 'target:src/entry.ts' }],
+        }),
+      },
+      adapter,
+    )
+
+    // Analyze `import type Client from '@fixture/target'`
+    const analysisDraft = adapter.analyzeFile(
+      'ws:src/use.ts',
+      "import type Client from '@fixture/target'\n",
+      { session, workspaceName: 'ws' },
+    )
+    const analysis: FileAnalysis = {
+      fileId: 1,
+      filePath: 'ws:src/use.ts',
+      projectRelativePath: 'src/use.ts',
+      contentHash: 'hash',
+      workspace: 'ws',
+      language: 'typescript',
+      symbols: analysisDraft.symbols,
+      imports: analysisDraft.imports,
+      bindingFacts: analysisDraft.bindingFacts,
+      callFacts: analysisDraft.callFacts,
+      ...(analysisDraft.referenceFacts !== undefined
+        ? { referenceFacts: analysisDraft.referenceFacts }
+        : {}),
+    }
+
+    const resolved = adapter.resolveImports(analysis, context)
+    // Value declaration is NOT bound
+    expect(resolved.importMap.get('Client')).toBeUndefined()
+    // But file import dependency is recorded
+    expect(resolved.fileImports).toContain('target:src/entry.ts')
+  })
+})
+
+describe('TypeScript package resolution hardening', () => {
+  it('Scenario: Code root below package.json keeps identity and entry surface', () => {
+    const pkgDir = realpathSync(mkdtempSync(join(tmpdir(), 'specd-ts-pkg-')))
+    try {
+      const srcDir = join(pkgDir, 'src')
+      mkdirSync(srcDir, { recursive: true })
+      writeFileSync(
+        join(pkgDir, 'package.json'),
+        JSON.stringify({
+          name: '@fixture/sub',
+          exports: { '.': './src/index.js' },
+        }),
+      )
+      writeFileSync(join(srcDir, 'index.ts'), 'export const val = 1\n')
+
+      const adapter = new TypeScriptLanguageAdapter()
+      const identity = adapter.packageResolution.identity(srcDir, pkgDir)
+      expect(identity).toBe('@fixture/sub')
+
+      const session = new InMemoryIndexSession()
+      session.registerFile({
+        filePath: 'ws:index.ts',
+        projectRelativePath: 'src/index.ts',
+        language: 'typescript',
+        contentHash: 'hash',
+        workspace: 'ws',
+      })
+      adapter.packageResolution.prepare({
+        session,
+        workspaces: [{ name: 'ws', codeRoot: srcDir, repoRoot: pkgDir }],
+        projectRoot: pkgDir,
+      })
+
+      const surface = adapter.packageResolution.entrySurface({
+        specifier: '@fixture/sub',
+        packageName: '@fixture/sub',
+        workspace: 'ws',
+        session,
+      })
+      expect(surface.map((e) => e.filePath)).toContain('ws:index.ts')
+    } finally {
+      rmSync(pkgDir, { recursive: true, force: true })
+    }
+  })
+
+  it('Scenario: Candidate outside the code root is dropped', () => {
+    const pkgDir = realpathSync(mkdtempSync(join(tmpdir(), 'specd-ts-outside-')))
+    try {
+      const srcDir = join(pkgDir, 'src')
+      const libDir = join(pkgDir, 'lib')
+      mkdirSync(srcDir, { recursive: true })
+      mkdirSync(libDir, { recursive: true })
+      writeFileSync(
+        join(pkgDir, 'package.json'),
+        JSON.stringify({
+          name: '@fixture/outside',
+          exports: { '.': './lib/index.js' },
+        }),
+      )
+      writeFileSync(join(libDir, 'index.ts'), 'export const val = 1\n')
+
+      const adapter = new TypeScriptLanguageAdapter()
+      const session = new InMemoryIndexSession()
+      session.registerFile({
+        filePath: 'ws:lib/index.ts',
+        projectRelativePath: 'lib/index.ts',
+        language: 'typescript',
+        contentHash: 'hash',
+        workspace: 'ws',
+      })
+      adapter.packageResolution.prepare({
+        session,
+        workspaces: [{ name: 'ws', codeRoot: srcDir, repoRoot: pkgDir }],
+        projectRoot: pkgDir,
+      })
+
+      const surface = adapter.packageResolution.entrySurface({
+        specifier: '@fixture/outside',
+        packageName: '@fixture/outside',
+        workspace: 'ws',
+        session,
+      })
+      expect(surface).toHaveLength(0)
+    } finally {
+      rmSync(pkgDir, { recursive: true, force: true })
+    }
+  })
+
+  it('Scenario: package.json without a name is skipped', () => {
+    const repoDir = realpathSync(mkdtempSync(join(tmpdir(), 'specd-ts-nameless-')))
+    try {
+      const subDir = join(repoDir, 'packages', 'app')
+      mkdirSync(subDir, { recursive: true })
+      writeFileSync(join(repoDir, 'package.json'), JSON.stringify({ name: '@fixture/higher' }))
+      writeFileSync(join(subDir, 'package.json'), JSON.stringify({ type: 'module' }))
+
+      const reports: string[] = []
+      const adapter = new TypeScriptLanguageAdapter()
+      const identity = adapter.packageResolution.identity(subDir, repoDir, (msg) =>
+        reports.push(msg),
+      )
+
+      expect(identity).toBe('@fixture/higher')
+      expect(reports).toHaveLength(1)
+      expect(reports[0]).toContain('Package manifest skipped (no identity)')
+      expect(reports[0]).toContain(join(subDir, 'package.json'))
+    } finally {
+      rmSync(repoDir, { recursive: true, force: true })
+    }
+  })
+
+  it('Scenario: Prepared data is compact', () => {
+    const pkgDir = realpathSync(mkdtempSync(join(tmpdir(), 'specd-ts-compact-')))
+    try {
+      writeFileSync(
+        join(pkgDir, 'package.json'),
+        JSON.stringify({
+          name: '@fixture/bloated',
+          version: '1.2.3',
+          description: 'A very large description',
+          scripts: { test: 'vitest', build: 'tsc' },
+          dependencies: { lodash: '^4.17.21' },
+          devDependencies: { vitest: '^2.0.0' },
+          main: './dist/index.js',
+          exports: { '.': './dist/index.js' },
+        }),
+      )
+
+      const adapter = new TypeScriptLanguageAdapter()
+      const session = new InMemoryIndexSession()
+      adapter.packageResolution.prepare({
+        session,
+        workspaces: [{ name: 'ws', codeRoot: pkgDir, repoRoot: pkgDir }],
+        projectRoot: pkgDir,
+      })
+
+      const manifests = session.getAdapterState<Map<string, PackageEntryManifest | null>>(
+        'typescript:package-manifests',
+      )
+      expect(manifests).toBeDefined()
+      const entry = manifests!.get(pkgDir)
+      expect(entry).toBeDefined()
+      expect(Object.keys(entry!).sort()).toEqual(['codeRootOffset', 'exports', 'main', 'name'])
+    } finally {
+      rmSync(pkgDir, { recursive: true, force: true })
+    }
+  })
+
+  it('Scenario: Declaration files map to sources', () => {
+    const pkgDir = realpathSync(mkdtempSync(join(tmpdir(), 'specd-ts-dts-')))
+    try {
+      writeFileSync(
+        join(pkgDir, 'package.json'),
+        JSON.stringify({
+          name: '@fixture/dts',
+          exports: { '.': './dist/index.d.ts' },
+        }),
+      )
+
+      const adapter = new TypeScriptLanguageAdapter()
+      const session = new InMemoryIndexSession()
+      session.registerFile({
+        filePath: 'ws:src/index.ts',
+        projectRelativePath: 'src/index.ts',
+        language: 'typescript',
+        contentHash: 'hash',
+        workspace: 'ws',
+      })
+      adapter.packageResolution.prepare({
+        session,
+        workspaces: [{ name: 'ws', codeRoot: pkgDir, repoRoot: pkgDir }],
+        projectRoot: pkgDir,
+      })
+
+      const surface = adapter.packageResolution.entrySurface({
+        specifier: '@fixture/dts',
+        packageName: '@fixture/dts',
+        workspace: 'ws',
+        session,
+      })
+      expect(surface.map((e) => e.filePath)).toEqual(['ws:src/index.ts'])
+    } finally {
+      rmSync(pkgDir, { recursive: true, force: true })
+    }
+  })
+
+  it('Scenario: Other build directories are not mapped', () => {
+    const pkgDir = realpathSync(mkdtempSync(join(tmpdir(), 'specd-ts-otherbuild-')))
+    try {
+      writeFileSync(
+        join(pkgDir, 'package.json'),
+        JSON.stringify({
+          name: '@fixture/otherbuild',
+          exports: { '.': './build/index.js' },
+        }),
+      )
+
+      const adapter = new TypeScriptLanguageAdapter()
+      const session = new InMemoryIndexSession()
+      session.registerFile({
+        filePath: 'ws:src/index.ts',
+        projectRelativePath: 'src/index.ts',
+        language: 'typescript',
+        contentHash: 'hash',
+        workspace: 'ws',
+      })
+      adapter.packageResolution.prepare({
+        session,
+        workspaces: [{ name: 'ws', codeRoot: pkgDir, repoRoot: pkgDir }],
+        projectRoot: pkgDir,
+      })
+
+      const surface = adapter.packageResolution.entrySurface({
+        specifier: '@fixture/otherbuild',
+        packageName: '@fixture/otherbuild',
+        workspace: 'ws',
+        session,
+      })
+      expect(surface.map((e) => e.filePath)).not.toContain('ws:src/index.ts')
+    } finally {
+      rmSync(pkgDir, { recursive: true, force: true })
+    }
+  })
+
+  it('Scenario: Prepare reads each manifest once and entrySurface performs no read', () => {
+    const pkgDir = realpathSync(mkdtempSync(join(tmpdir(), 'specd-ts-readonce-')))
+    try {
+      const pkgJsonPath = join(pkgDir, 'package.json')
+      writeFileSync(
+        pkgJsonPath,
+        JSON.stringify({
+          name: '@fixture/readonce',
+          exports: { '.': './dist/index.js' },
+        }),
+      )
+
+      const adapter = new TypeScriptLanguageAdapter()
+      const session = new InMemoryIndexSession()
+      session.registerFile({
+        filePath: 'ws:src/index.ts',
+        projectRelativePath: 'src/index.ts',
+        language: 'typescript',
+        contentHash: 'hash',
+        workspace: 'ws',
+      })
+
+      // Prepare workspace once
+      adapter.packageResolution.prepare({
+        session,
+        workspaces: [{ name: 'ws', codeRoot: pkgDir, repoRoot: pkgDir }],
+        projectRoot: pkgDir,
+      })
+
+      // Delete package.json to prove entrySurface and subsequent calls perform no I/O on it
+      rmSync(pkgJsonPath)
+
+      // Call entrySurface multiple times - must still resolve from in-memory session cache
+      const surface1 = adapter.packageResolution.entrySurface({
+        specifier: '@fixture/readonce',
+        packageName: '@fixture/readonce',
+        workspace: 'ws',
+        session,
+      })
+      const surface2 = adapter.packageResolution.entrySurface({
+        specifier: '@fixture/readonce',
+        packageName: '@fixture/readonce',
+        workspace: 'ws',
+        session,
+      })
+
+      expect(surface1.map((e) => e.filePath)).toEqual(['ws:src/index.ts'])
+      expect(surface2.map((e) => e.filePath)).toEqual(['ws:src/index.ts'])
+
+      // Calling prepare again also does not fail or overwrite with null
+      adapter.packageResolution.prepare({
+        session,
+        workspaces: [{ name: 'ws', codeRoot: pkgDir, repoRoot: pkgDir }],
+        projectRoot: pkgDir,
+      })
+      const surface3 = adapter.packageResolution.entrySurface({
+        specifier: '@fixture/readonce',
+        packageName: '@fixture/readonce',
+        workspace: 'ws',
+        session,
+      })
+      expect(surface3.map((e) => e.filePath)).toEqual(['ws:src/index.ts'])
+    } finally {
+      rmSync(pkgDir, { recursive: true, force: true })
+    }
   })
 })

@@ -1,5 +1,4 @@
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { relative } from 'node:path'
 import { parse, Lang } from '@ast-grep/napi'
 import { type SgNode } from '@ast-grep/napi'
 import {
@@ -30,7 +29,7 @@ import {
   type SymbolReferenceSyntaxFacet,
   type ReExportLinkingFacet,
 } from '../../domain/value-objects/language-adapter-facets.js'
-import { findManifestField } from './find-manifest-field.js'
+import { canonical, findPackageManifest } from './find-manifest-field.js'
 import { splitWorkspaceIdentity } from '../../domain/services/split-workspace-identity.js'
 import {
   parseDottedMemberReference,
@@ -551,9 +550,12 @@ const WORKSPACE_CODE_ROOTS_KEY = 'typescript:workspace-code-roots'
 const PACKAGE_MANIFESTS_KEY = 'typescript:package-manifests'
 
 /** Fields of a package manifest that decide its published entry. */
-interface PackageEntryManifest {
-  readonly exports?: unknown
+export interface PackageEntryManifest {
+  readonly name: string
   readonly main?: string
+  readonly exports?: unknown
+  /** `codeRoot` relative to the manifest directory, forward slashes, '' when equal. */
+  readonly codeRootOffset: string
 }
 
 /**
@@ -572,25 +574,70 @@ function sessionScopedState<T>(session: IndexSession, key: string, create: () =>
 }
 
 /**
- * Reads a workspace package manifest once per run, before pass 2, and stores it on the session.
+ * Reads a workspace package manifest once per run, before pass 2, and stores compact data on the session.
  * @param session - Session owned by one indexing run.
- * @param codeRoot - Workspace code root that may contain `package.json`.
+ * @param workspace - Workspace to prepare.
+ * @param workspace.codeRoot - Workspace code root.
+ * @param workspace.repoRoot - Optional repository root bounding the search.
  */
-function prepareWorkspaceManifest(session: IndexSession, codeRoot: string): void {
+function prepareWorkspaceManifest(
+  session: IndexSession,
+  workspace: { readonly codeRoot: string; readonly repoRoot?: string },
+): void {
   const manifests = sessionScopedState(
     session,
     PACKAGE_MANIFESTS_KEY,
     () => new Map<string, PackageEntryManifest | null>(),
   )
-  if (manifests.has(codeRoot)) return
-  try {
-    manifests.set(
-      codeRoot,
-      JSON.parse(readFileSync(join(codeRoot, 'package.json'), 'utf8')) as PackageEntryManifest,
-    )
-  } catch {
-    manifests.set(codeRoot, null)
+  if (manifests.has(workspace.codeRoot)) return
+  const result = findPackageManifest<{
+    readonly name: string
+    readonly main?: string
+    readonly exports?: unknown
+  }>(
+    workspace.codeRoot,
+    'package.json',
+    (content) => {
+      try {
+        const raw = JSON.parse(content) as {
+          name?: unknown
+          main?: unknown
+          exports?: unknown
+        }
+        if (typeof raw.name === 'string' && raw.name.trim() !== '') {
+          return {
+            kind: 'match',
+            value: {
+              name: raw.name,
+              ...(typeof raw.main === 'string' ? { main: raw.main } : {}),
+              ...(raw.exports !== undefined && raw.exports !== null
+                ? { exports: raw.exports }
+                : {}),
+            },
+          }
+        }
+        return { kind: 'skip' }
+      } catch {
+        return { kind: 'skip' }
+      }
+    },
+    workspace.repoRoot,
+  )
+  if (!result.match) {
+    manifests.set(workspace.codeRoot, null)
+    return
   }
+  const codeRootOffset = relative(
+    canonical(result.match.packageRoot),
+    canonical(workspace.codeRoot),
+  ).replaceAll('\\', '/')
+  const compact: PackageEntryManifest = {
+    name: result.match.value.name,
+    ...(result.match.value.main !== undefined ? { main: result.match.value.main } : {}),
+    ...(result.match.value.exports !== undefined ? { exports: result.match.value.exports } : {}),
+    codeRootOffset,
+  }
+  manifests.set(workspace.codeRoot, compact)
 }
 
 /** A local declaration published under an exported name (alias, default, or same name). */
@@ -622,7 +669,7 @@ interface TypeScriptParserState {
  */
 export class TypeScriptLanguageAdapter implements LanguageAdapter {
   private readonly packageResolutionFacet: PackageResolutionFacet = {
-    identity: (codeRoot, repoRoot) => this.getPackageIdentity(codeRoot, repoRoot),
+    identity: (codeRoot, repoRoot, report) => this.getPackageIdentity(codeRoot, repoRoot, report),
     prepare: (context) => {
       // Every workspace is prepared, including workspaces that were only hydrated in an
       // incremental run, so entry surfaces never depend on which files were analyzed.
@@ -633,7 +680,7 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
       )
       for (const workspace of context.workspaces) {
         roots.set(workspace.name, workspace.codeRoot)
-        prepareWorkspaceManifest(context.session, workspace.codeRoot)
+        prepareWorkspaceManifest(context.session, workspace)
       }
     },
     matchSpecifier: (specifier, knownPackages) =>
@@ -789,7 +836,10 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
         WORKSPACE_CODE_ROOTS_KEY,
         () => new Map<string, string>(),
       ).set(context.workspaceName, context.codeRoot)
-      prepareWorkspaceManifest(context.session, context.codeRoot)
+      prepareWorkspaceManifest(context.session, {
+        codeRoot: context.codeRoot,
+        ...(context.repoRoot !== undefined ? { repoRoot: context.repoRoot } : {}),
+      })
     }
     const root = sgRoot.root()
     const symbols: SymbolNode[] = []
@@ -1402,7 +1452,9 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
           // A namespace or default import depends on the module itself.
           fileImports.push(moduleFile)
           if (imp.kind === ImportDeclarationKind.Default) {
-            const target = this.findDefaultExportDeclaration(session, moduleFile)
+            const allowedSpaces =
+              imp.typeOnly === true ? [SymbolSpace.Type] : [SymbolSpace.Value, SymbolSpace.Type]
+            const target = this.findDefaultExportDeclaration(session, moduleFile, allowedSpaces)
             if (target !== undefined) importMap.set(imp.localName, target)
           }
           continue
@@ -1517,9 +1569,15 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
       for (const entry of entries.entries) fileImports.push(entry.filePath)
       if (imp.kind === ImportDeclarationKind.Default) {
         // Bind only when the entry files declare exactly one default export.
+        const allowedSpaces =
+          imp.typeOnly === true ? [SymbolSpace.Type] : [SymbolSpace.Value, SymbolSpace.Type]
         const targets = new Set<string>()
         for (const entry of entries.entries) {
-          const target = this.findDefaultExportDeclaration(context.session, entry.filePath)
+          const target = this.findDefaultExportDeclaration(
+            context.session,
+            entry.filePath,
+            allowedSpaces,
+          )
           if (target !== undefined) targets.add(target)
         }
         const [only] = [...targets]
@@ -1594,16 +1652,21 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
    * Finds the declaration published under `default` by one module.
    * @param session - Index session holding public bindings and declarations.
    * @param moduleFile - Indexed module file id.
+   * @param allowedSpaces - Optional symbol spaces allowed for the default export.
    * @returns The default export's declaration id, or undefined for anonymous or absent defaults.
    */
   private findDefaultExportDeclaration(
     session: IndexSession,
     moduleFile: string,
+    allowedSpaces?: readonly SymbolSpace[],
   ): string | undefined {
     const binding = session
       .getPublicBindings()
       .find((item) => item.surface === moduleFile && item.exportedName === 'default')
     if (binding?.targetId === undefined) return undefined
+    if (allowedSpaces !== undefined && !allowedSpaces.includes(binding.space)) {
+      return undefined
+    }
     const fileSymbolIds = new Set(session.findSymbolsByFile(moduleFile).map((symbol) => symbol.id))
     return session
       .getDeclarationsByLogicalId()
@@ -2152,7 +2215,7 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
       if (!sourceNode) continue
       const specifier = sourceNode.text().replace(/['"]/g, '')
       const isRelative = specifier.startsWith('.')
-      const statementTypeOnly = /^import\s+type\b/.test(child.text())
+      const statementTypeOnly = /(?:^|\s)import\s+type(?:\s+(?!from\b)|\s*\{)/.test(child.text())
       let hasClause = false
 
       for (const importChild of child.children()) {
@@ -2186,6 +2249,7 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
                 specifier,
                 isRelative,
                 kind: ImportDeclarationKind.Default,
+                ...(statementTypeOnly ? { typeOnly: true } : {}),
               })
             } else if (clauseKind === 'namespace_import') {
               // Namespace import: import * as Foo from '...'
@@ -3036,7 +3100,7 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
     const indexed = (paths: readonly string[]): string[] => [
       ...new Set(
         paths
-          .flatMap((published) => sourceCandidates(workspace, published))
+          .flatMap((published) => sourceCandidates(workspace, published, manifest.codeRootOffset))
           .filter((candidate) => session.getFileId(candidate) !== undefined),
       ),
     ]
@@ -3116,18 +3180,36 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
    * the given directory, bounded by the repository root.
    * @param codeRoot - Absolute path to the workspace's code root.
    * @param repoRoot - Optional repository root to bound the search.
+   * @param report - Optional diagnostic report callback.
    * @returns The `name` field from the nearest `package.json`, or undefined.
    */
-  private getPackageIdentity(codeRoot: string, repoRoot?: string): string | undefined {
-    return findManifestField(
+  private getPackageIdentity(
+    codeRoot: string,
+    repoRoot?: string,
+    report?: (message: string) => void,
+  ): string | undefined {
+    const result = findPackageManifest<{ readonly name: string }>(
       codeRoot,
       'package.json',
       (content) => {
-        const pkg = JSON.parse(content) as { name?: string }
-        return pkg.name
+        try {
+          const pkg = JSON.parse(content) as { name?: unknown }
+          if (typeof pkg.name === 'string' && pkg.name.trim() !== '') {
+            return { kind: 'match', value: { name: pkg.name } }
+          }
+          return { kind: 'skip' }
+        } catch {
+          return { kind: 'skip' }
+        }
       },
       repoRoot,
     )
+    if (report && result.skipped.length > 0) {
+      for (const skippedPath of result.skipped) {
+        report(`Package manifest skipped (no identity): ${skippedPath}`)
+      }
+    }
+    return result.match?.value.name
   }
 }
 
@@ -3208,14 +3290,43 @@ function publishedTargets(manifest: PackageEntryManifest, subpath: string): Publ
  * Maps a published package path onto indexed source file ids.
  * @param workspace - Workspace that owns the package.
  * @param published - Relative path from package exports or main.
+ * @param codeRootOffset - Offset of workspace code root relative to package root.
  * @returns Candidate source file ids. The caller keeps the candidates that are indexed files.
  */
-function sourceCandidates(workspace: string, published: string): readonly string[] {
+function sourceCandidates(
+  workspace: string,
+  published: string,
+  codeRootOffset: string,
+): readonly string[] {
   let relative = published.replace(/^\.\//, '')
   relative = relative.replace(/\.d\.(?:ts|mts|cts)$/, '')
   relative = relative.replace(/\.(?:js|jsx|mjs|cjs)$/, '')
-  if (relative.startsWith('dist/')) relative = `src/${relative.slice('dist/'.length)}`
+  if (relative === 'dist') {
+    relative = 'src'
+  } else if (relative.startsWith('dist/')) {
+    relative = `src/${relative.slice('dist/'.length)}`
+  }
   relative = relative.replace(/\.(?:ts|tsx)$/, '')
+
+  if (codeRootOffset !== '') {
+    if (relative === codeRootOffset) {
+      relative = ''
+    } else if (relative.startsWith(`${codeRootOffset}/`)) {
+      relative = relative.slice(codeRootOffset.length + 1)
+    } else {
+      return []
+    }
+  }
+
+  if (relative === '') {
+    return [
+      `${workspace}:index.ts`,
+      `${workspace}:index.tsx`,
+      `${workspace}:index.js`,
+      `${workspace}:index.jsx`,
+    ]
+  }
+
   // TypeScript sources first, then JavaScript sources for packages written in JavaScript.
   return [
     `${workspace}:${relative}.ts`,

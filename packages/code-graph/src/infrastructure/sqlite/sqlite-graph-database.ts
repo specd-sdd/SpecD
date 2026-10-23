@@ -457,7 +457,7 @@ export class SQLiteGraphDatabase {
    */
   getFile(path: string): FileNode | undefined {
     const row = this.statement(
-      'SELECT path, project_relative_path, language, content_hash, workspace, category, embedding, content FROM files WHERE path = ?',
+      'SELECT path, project_relative_path, language, content_hash, workspace, category, embedding, content, namespace, namespace_separator FROM files WHERE path = ?',
     ).get(path) as
       | {
           path: string
@@ -468,6 +468,8 @@ export class SQLiteGraphDatabase {
           category?: string | null
           embedding: Buffer | null
           content: string | null
+          namespace?: string | null
+          namespace_separator?: string | null
         }
       | undefined
     return row === undefined ? undefined : this.mapFileRow(row)
@@ -502,7 +504,7 @@ export class SQLiteGraphDatabase {
    */
   findFilesByProjectRelativePath(projectRelativePath: string): FileNode[] {
     const rows = this.statement(
-      'SELECT path, project_relative_path, language, content_hash, workspace, category, embedding, content FROM files WHERE project_relative_path = ?',
+      'SELECT path, project_relative_path, language, content_hash, workspace, category, embedding, content, namespace, namespace_separator FROM files WHERE project_relative_path = ?',
     ).all(projectRelativePath) as Array<{
       path: string
       project_relative_path: string
@@ -512,6 +514,8 @@ export class SQLiteGraphDatabase {
       category?: string | null
       embedding: Buffer | null
       content: string | null
+      namespace?: string | null
+      namespace_separator?: string | null
     }>
     return rows.map((row) => this.mapFileRow(row))
   }
@@ -708,7 +712,7 @@ export class SQLiteGraphDatabase {
     for (const chunk of chunksOf(uniquePaths, SQLITE_BATCH_PARAMETER_LIMIT)) {
       const placeholders = chunk.map(() => '?').join(', ')
       const rows = this.statement(
-        `SELECT path, project_relative_path, language, content_hash, workspace, category, embedding, content FROM files WHERE path IN (${placeholders})`,
+        `SELECT path, project_relative_path, language, content_hash, workspace, category, embedding, content, namespace, namespace_separator FROM files WHERE path IN (${placeholders})`,
       ).all(...chunk) as Array<{
         path: string
         project_relative_path: string
@@ -718,6 +722,8 @@ export class SQLiteGraphDatabase {
         category?: string | null
         embedding: Buffer | null
         content: string | null
+        namespace?: string | null
+        namespace_separator?: string | null
       }>
       for (const row of rows) filesByPath.set(row.path, this.mapFileRow(row))
     }
@@ -1173,7 +1179,7 @@ export class SQLiteGraphDatabase {
   getAllFiles(): FileNode[] {
     const rows = this.ensureOpen()
       .prepare(
-        'SELECT path, project_relative_path, language, content_hash, workspace, category, embedding, content FROM files',
+        'SELECT path, project_relative_path, language, content_hash, workspace, category, embedding, content, namespace, namespace_separator FROM files',
       )
       .all() as Array<{
       path: string
@@ -1184,6 +1190,8 @@ export class SQLiteGraphDatabase {
       category?: string | null
       embedding: Buffer | null
       content: string | null
+      namespace?: string | null
+      namespace_separator?: string | null
     }>
     return rows.map((row) => this.mapFileRow(row))
   }
@@ -1982,6 +1990,8 @@ export class SQLiteGraphDatabase {
                   f.category,
                   f.embedding,
                   f.content,
+                  f.namespace,
+                  f.namespace_separator,
                   (-bm25(file_content_fts)) AS backend_score
                 FROM file_content_fts
                 INNER JOIN files f ON f.path = file_content_fts.path
@@ -2004,6 +2014,8 @@ export class SQLiteGraphDatabase {
             category?: string | null
             embedding: Buffer | null
             content: string | null
+            namespace?: string | null
+            namespace_separator?: string | null
             backend_score: number
           }>)
         : (db
@@ -2018,6 +2030,8 @@ export class SQLiteGraphDatabase {
                   f.category,
                   f.embedding,
                   f.content,
+                  f.namespace,
+                  f.namespace_separator,
                   1.0 AS backend_score
                 FROM files f
                 WHERE f.content IS NOT NULL
@@ -2035,6 +2049,8 @@ export class SQLiteGraphDatabase {
             category?: string | null
             embedding: Buffer | null
             content: string | null
+            namespace?: string | null
+            namespace_separator?: string | null
             backend_score: number
           }>)
 
@@ -2803,8 +2819,8 @@ export class SQLiteGraphDatabase {
   private insertFile(db: SqliteDatabase, file: FileNode): void {
     db.prepare(
       `
-        INSERT INTO files (path, project_relative_path, language, content_hash, workspace, category, embedding, content)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO files (path, project_relative_path, language, content_hash, workspace, category, embedding, content, namespace, namespace_separator)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(path) DO UPDATE SET
           project_relative_path = excluded.project_relative_path,
           language = excluded.language,
@@ -2812,7 +2828,9 @@ export class SQLiteGraphDatabase {
           workspace = excluded.workspace,
           category = excluded.category,
           embedding = excluded.embedding,
-          content = excluded.content
+          content = excluded.content,
+          namespace = excluded.namespace,
+          namespace_separator = excluded.namespace_separator
       `,
     ).run(
       file.path,
@@ -2823,6 +2841,8 @@ export class SQLiteGraphDatabase {
       file.category,
       this.serializeEmbedding(file.embedding),
       file.content ?? null,
+      file.namespace ?? null,
+      file.namespaceSeparator ?? null,
     )
   }
 
@@ -2835,7 +2855,7 @@ export class SQLiteGraphDatabase {
   private insertFiles(db: SqliteDatabase, files: readonly FileNode[]): void {
     executeBatchedInsert(
       db,
-      'INSERT INTO files (path, project_relative_path, language, content_hash, workspace, category, embedding, content)',
+      'INSERT INTO files (path, project_relative_path, language, content_hash, workspace, category, embedding, content, namespace, namespace_separator)',
       files.map((file) => [
         file.path,
         file.projectRelativePath,
@@ -2845,6 +2865,8 @@ export class SQLiteGraphDatabase {
         file.category,
         this.serializeEmbedding(file.embedding),
         file.content ?? null,
+        file.namespace ?? null,
+        file.namespaceSeparator ?? null,
       ]),
       `ON CONFLICT(path) DO UPDATE SET
         project_relative_path = excluded.project_relative_path,
@@ -2853,7 +2875,9 @@ export class SQLiteGraphDatabase {
         workspace = excluded.workspace,
         category = excluded.category,
         embedding = excluded.embedding,
-        content = excluded.content`,
+        content = excluded.content,
+        namespace = excluded.namespace,
+        namespace_separator = excluded.namespace_separator`,
     )
   }
 
@@ -3791,6 +3815,8 @@ export class SQLiteGraphDatabase {
    * @param row.embedding - The embedding value.
    * @param row.content - The content value.
    * @param row.category - The category value.
+   * @param row.namespace - The namespace value.
+   * @param row.namespace_separator - The namespace separator value.
    * @returns The result of map file row.
    */
   private mapFileRow(row: {
@@ -3802,6 +3828,8 @@ export class SQLiteGraphDatabase {
     category?: string | null
     embedding: Buffer | null
     content: string | null
+    namespace?: string | null
+    namespace_separator?: string | null
   }): FileNode {
     return createFileNode({
       path: row.path,
@@ -3812,6 +3840,14 @@ export class SQLiteGraphDatabase {
       category: (row.category as FileCategory | undefined) ?? 'source',
       ...(row.embedding !== null ? { embedding: this.deserializeEmbedding(row.embedding) } : {}),
       ...(row.content !== null ? { content: row.content } : {}),
+      ...(row.namespace !== null && row.namespace !== undefined
+        ? {
+            namespace: row.namespace,
+            ...(row.namespace_separator !== null && row.namespace_separator !== undefined
+              ? { namespaceSeparator: row.namespace_separator }
+              : {}),
+          }
+        : {}),
     })
   }
 
