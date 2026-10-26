@@ -1524,6 +1524,83 @@ describe('reconciled validity and next action', () => {
     expect(stdout()).not.toContain(hash)
   })
 
+  it('renders fingerprint input diagnostic lines under validity in text output', async () => {
+    const { kernel, stdout } = setup()
+    kernel.changes.status.execute.mockResolvedValue({
+      schemaWarnings: [],
+      change: makeMockChange({ name: 'my-change', state: 'designing' }),
+      specDependsOn: {},
+      implementationTracking: { trackedFiles: [], links: [] },
+      artifactStatuses: [],
+      lifecycle: defaultLifecycle,
+      blockers: [],
+      nextAction: defaultNextAction,
+      validity: {
+        fingerprintIssues: [
+          {
+            scope: 'artifact',
+            key: 'proposal.md',
+            reason: 'missing',
+            message: "Artifact file 'proposal.md' does not exist",
+          },
+        ],
+        blockers: [],
+      },
+    })
+    const program = makeProgram()
+    registerChangeStatus(program.command('change'))
+    await program.parseAsync(['node', 'specd', 'change', 'status', 'my-change', '--format', 'text'])
+
+    const out = stdout()
+    expect(out).toContain(
+      "issue:         fingerprint input artifact 'proposal.md' missing: Artifact file 'proposal.md' does not exist",
+    )
+    expect(out).not.toContain('FINGERPRINT_INPUT_ERROR')
+    expect(out).not.toContain('blockers:')
+  })
+
+  it.each(['json', 'toon'] as const)(
+    'serializes fingerprintIssues under validity in %s format',
+    async (format) => {
+      const { kernel, stdout } = setup()
+      const issue = {
+        scope: 'artifact',
+        key: 'proposal.md',
+        reason: 'missing',
+        message: "Artifact file 'proposal.md' does not exist",
+      }
+      kernel.changes.status.execute.mockResolvedValue({
+        schemaWarnings: [],
+        change: makeMockChange({ name: 'my-change', state: 'designing' }),
+        specDependsOn: {},
+        implementationTracking: { trackedFiles: [], links: [] },
+        artifactStatuses: [],
+        lifecycle: defaultLifecycle,
+        blockers: [],
+        nextAction: defaultNextAction,
+        validity: {
+          fingerprintIssues: [issue],
+          blockers: [],
+        },
+      })
+      const program = makeProgram()
+      registerChangeStatus(program.command('change'))
+      await program.parseAsync([
+        'node',
+        'specd',
+        'change',
+        'status',
+        'my-change',
+        '--format',
+        format,
+      ])
+
+      const parsed = format === 'json' ? JSON.parse(stdout()) : decodeToon(stdout())
+      expect(parsed.validity?.fingerprintIssues).toEqual([issue])
+      expect(parsed.blockers).toEqual([])
+    },
+  )
+
   it('renders the pipeline in the order Core reports and omits disabled steps', async () => {
     const step = (name: string, optional = false) => ({
       step: name,

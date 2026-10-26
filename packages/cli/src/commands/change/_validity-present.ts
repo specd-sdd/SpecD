@@ -29,6 +29,14 @@ export interface PublicNextAction {
   readonly command: string | null
 }
 
+/** One unreadable or missing fingerprint input surfaced for status display. */
+export interface PublicFingerprintIssue {
+  readonly scope: string
+  readonly key: string
+  readonly reason: string
+  readonly message: string
+}
+
 /** Validity verdict fields the CLI is allowed to render. */
 export interface PublicValidity {
   readonly specApproval?: string
@@ -43,6 +51,7 @@ export interface PublicValidity {
     readonly filename: string
     readonly origin: string
   }[]
+  readonly fingerprintIssues?: readonly PublicFingerprintIssue[]
 }
 
 /** Fingerprint summary that counts files and names algorithms. */
@@ -101,6 +110,36 @@ export function publicDifferences(differences: unknown): readonly PublicFingerpr
 }
 
 /**
+ * Maps raw fingerprint failures to public representation.
+ *
+ * @param issues - Raw issues array
+ * @returns Sanitized public issues
+ */
+export function publicFingerprintIssues(issues: unknown): readonly PublicFingerprintIssue[] {
+  if (!Array.isArray(issues)) return []
+  const result: PublicFingerprintIssue[] = []
+  for (const issue of issues) {
+    if (typeof issue !== 'object' || issue === null) continue
+    const item = issue as { scope?: unknown; key?: unknown; reason?: unknown; message?: unknown }
+    if (
+      typeof item.scope !== 'string' ||
+      typeof item.key !== 'string' ||
+      typeof item.reason !== 'string' ||
+      typeof item.message !== 'string'
+    ) {
+      continue
+    }
+    result.push({
+      scope: item.scope,
+      key: item.key,
+      reason: item.reason,
+      message: item.message,
+    })
+  }
+  return result
+}
+
+/**
  * Copies a Core validity verdict into a hash-free view.
  *
  * @param value - `GetStatus.validity` or another reconciler verdict
@@ -116,6 +155,7 @@ export function publicValidity(value: unknown): PublicValidity | undefined {
     blockers?: unknown
     projectionChanges?: unknown
     affectedArtifacts?: unknown
+    fingerprintIssues?: unknown
   }
   return {
     ...(typeof record.specApproval === 'string' ? { specApproval: record.specApproval } : {}),
@@ -141,6 +181,9 @@ export function publicValidity(value: unknown): PublicValidity | undefined {
       : {}),
     ...(Array.isArray(record.affectedArtifacts)
       ? { affectedArtifacts: publicAffectedArtifacts(record.affectedArtifacts) }
+      : {}),
+    ...(Array.isArray(record.fingerprintIssues)
+      ? { fingerprintIssues: publicFingerprintIssues(record.fingerprintIssues) }
       : {}),
   }
 }
@@ -234,6 +277,11 @@ export function validityTextLines(
     }
     for (const blocker of validity.blockers ?? []) {
       lines.push(`blocker:       ${blocker.code}: ${blocker.message}`)
+    }
+    for (const issue of validity.fingerprintIssues ?? []) {
+      lines.push(
+        `issue:         fingerprint input ${issue.scope} '${issue.key}' ${issue.reason}: ${issue.message}`,
+      )
     }
     for (const change of validity.projectionChanges ?? []) {
       lines.push(

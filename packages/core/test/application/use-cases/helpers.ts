@@ -1284,6 +1284,7 @@ export const openValidityVerdict: ChangeValidityVerdict = {
   specApproval: 'not-required',
   signoff: 'not-required',
   verification: 'not-required',
+  fingerprintIssues: [],
   blockers: [],
   recovery: null,
 }

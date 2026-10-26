@@ -52,6 +52,7 @@ import {
   type ArtifactReviewTarget,
   type AutomaticRecovery,
   type ChangeValidityVerdict,
+  type FingerprintInputFailure,
   type ProjectionChange,
   type ValidityBlocker,
 } from '../../domain/services/change-validity.js'
@@ -114,6 +115,9 @@ function projectValidityStatus(
     automaticReturn: verdict.recovery,
     projectionChanges: verdict.projectionChanges,
     affectedArtifacts: verdict.affectedArtifacts,
+    ...(verdict.fingerprintIssues !== undefined && verdict.fingerprintIssues.length > 0
+      ? { fingerprintIssues: verdict.fingerprintIssues }
+      : {}),
     blockers: verdict.blockers,
     nextAction,
   }
@@ -309,6 +313,7 @@ export interface ValidityStatusProjection {
   readonly automaticReturn: AutomaticRecovery | null
   readonly projectionChanges: readonly ProjectionChange[]
   readonly affectedArtifacts: readonly ArtifactReviewTarget[]
+  readonly fingerprintIssues?: readonly FingerprintInputFailure[]
   readonly blockers: readonly ValidityBlocker[]
   readonly nextAction: NextAction
 }

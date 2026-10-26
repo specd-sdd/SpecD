@@ -15,7 +15,24 @@
     "core:transition-checks",
     "core:workflow-topology"
   ],
-  "implementation": [],
+  "implementation": [
+    {
+      "file": "core:src/domain/services/change-validity.ts",
+      "symbols": ["ValidityBlocker", "ChangeValidityVerdict", "evaluateChangeValidity"]
+    },
+    {
+      "file": "core:test/domain/services/change-validity.spec.ts"
+    },
+    {
+      "file": "core:test/application/use-cases/helpers.ts"
+    },
+    {
+      "file": "core:test/domain/services/lifecycle-engine.spec.ts"
+    },
+    {
+      "file": "core:test/domain/services/lifecycle-verdict.spec.ts"
+    }
+  ],
   "optimizations": {
     "optimizedDescription": {
       "value": "`Change` is immutable-identity aggregate for scoped specs, event-derived lifecycle, artifacts, approvals, verification, and implementation tracking.",

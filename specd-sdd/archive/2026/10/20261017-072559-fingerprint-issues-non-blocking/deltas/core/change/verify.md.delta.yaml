@@ -1,0 +1,26 @@
+- op: modified
+  description: Add scenario for unreadable fingerprint inputs not creating progress blockers
+  selector:
+    type: section
+    matches: 'Requirement: Validity fingerprint scope'
+  content: |
+    #### Scenario: Conservative normalization ignores only declared whitespace differences
+
+    - **GIVEN** two linked text files differ only by BOM, line endings, trailing horizontal whitespace, blank-line whitespace, or final newline
+    - **WHEN** `text-v1` fingerprints them
+    - **THEN** they compare equal
+    - **AND** internal whitespace or any binary-byte difference remains significant
+
+    #### Scenario: Task artifacts do not invalidate evidence
+
+    - **GIVEN** an artifact type declares `hasTasks: true`
+    - **WHEN** only its task content changes
+    - **THEN** approval and verification fingerprints remain unchanged
+    - **AND** live task completion can still block transition or archive
+
+    #### Scenario: Unreadable fingerprint inputs invalidate evidence without creating progress blockers
+
+    - **GIVEN** a change has missing or unreadable artifact files that make fingerprint collection fail
+    - **WHEN** change validity is reconciled
+    - **THEN** unreadable differences invalidate existing approval or verification evidence
+    - **AND** the unreadable inputs do not produce a progress blocker on the change

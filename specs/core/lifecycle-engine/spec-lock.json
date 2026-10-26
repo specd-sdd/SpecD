@@ -21,36 +21,36 @@
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Plain domain verdict functions project artifact DAG, check-derived transition availability, blockers, review, and next-hop guidance.",
+      "value": "Plain verdict functions project artifact DAG, check-derived lifecycle availability, blockers, review, and next-hop guidance.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:2278d8de6c116a46a5708606e4f6585c43371aafaee9ed28a11c5c4292eec279",
-          "lastModified": "2026-10-20T14:34:09.524Z"
+          "hash": "sha256:d2f0421e2222186b042a55bde39af08a332bdeb60ef0f22ef0d67bb8dd9a2ede",
+          "lastModified": "2026-10-22T14:47:46.147Z"
         },
         "verify.md": {
-          "hash": "sha256:4d633ff076163ba95fac3280fa4abfae2cf841c0f7f1bc7a525410bd874686e4",
-          "lastModified": "2026-10-20T20:56:26.852Z"
+          "hash": "sha256:a51ec252070807e3771e9faba6a39b131b7a83ef456066518d16a69a1d324757",
+          "lastModified": "2026-10-22T15:09:46.260Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# Lifecycle Engine\n\n## Rules\n- Domain exports `evaluateLifecycleVerdict`, `projectArtifacts`, `findBlockingParent`, `resolveLifecycleNextHop`; no `LifecycleEngine` class. Application `evaluateLifecycle` adds command guidance.\n- Project supplied predicate `CheckResult` only; domain runs no I/O/effects/snapshots/fallback check execution. Status collects candidates; transition fail-fast protocol.\n- Effective artifacts: preserve review states; complete with review-blocked parent → `pending-parent-artifact-review`; other incomplete parent → `in-progress`; review wins. Canonical states only.\n- Blockers include code/message/skippability/bypass/affected files; active bypass removes blocker. Core codes cover incomplete, drift/review, tasks, overlap, invalid transition, approval.\n- Pipeline, legal transitions, available targets, optional skips derive workflow topology plus complete candidate results; no hardcoded sequence. `impl.linksInScope` alone skippable.\n- `nextHop` selects furthest bypassable optional path; no command. Application maps selected target to skills/approvals/archive and never recomputes.\n- Archiving exposes recovery `archivable` and redesign; recovery skips normal requires/tasks. Next artifact scans `artifactDag().topologicalOrder()`.\n\n## Constraints\n- Persisted aggregate/history remains on `Change`; DAG state derived.\n- Effects never execute in verdict.\n- Live archive overlap differs from victim overlap review.",
+      "value": "# Lifecycle Engine\n\n## Rules\n- Exports `evaluateLifecycleVerdict`, `projectArtifacts`, `findBlockingParent`, `resolveLifecycleNextHop`; application `evaluateLifecycle` adds command guidance.\n- Domain consumes supplied predicate `CheckResult`; no I/O, effects, snapshot fallback, or check execution.\n- Effective artifact status preserves review; upstream review creates `pending-parent-artifact-review`. Canonical blockers carry code, message, skippability, bypass, files.\n- Workflow topology plus candidate predicates determine valid/available targets; no fixed sequence. `nextHop` selects furthest permitted bypass.\n- Recovery and archive use canonical reconciled results; next artifact follows `artifactDag().topologicalOrder()`.\n\n## Constraints\n- `Change` persists aggregate/history; DAG state derived.\n- Effects never execute in verdict.\n- Archive overlap and review overlap differ.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:2278d8de6c116a46a5708606e4f6585c43371aafaee9ed28a11c5c4292eec279",
-          "lastModified": "2026-10-20T14:34:09.524Z"
+          "hash": "sha256:d2f0421e2222186b042a55bde39af08a332bdeb60ef0f22ef0d67bb8dd9a2ede",
+          "lastModified": "2026-10-22T14:47:46.147Z"
         },
         "verify.md": {
-          "hash": "sha256:4d633ff076163ba95fac3280fa4abfae2cf841c0f7f1bc7a525410bd874686e4",
-          "lastModified": "2026-10-20T20:56:26.852Z"
+          "hash": "sha256:a51ec252070807e3771e9faba6a39b131b7a83ef456066518d16a69a1d324757",
+          "lastModified": "2026-10-22T15:09:46.260Z"
         }
       }
     }

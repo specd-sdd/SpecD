@@ -492,7 +492,7 @@ The same persisted projection status, artifact review state, and lifecycle state
 
 **Returns:** `Promise<ReconcileChangeValidityResult>` — `change`, `verdict`, `projectionChanges`, `affectedArtifacts`, `automaticReturn`, and `changed`. `mutate` adds the caller `result`.
 
-**Throws:** `ChangeNotFoundError` when the change is missing. Fingerprint collection failures are verdict blockers (`FINGERPRINT_INPUT_ERROR`) rather than a partial fingerprint. A partial fingerprint is `null`.
+**Throws:** `ChangeNotFoundError` when the change is missing. Fingerprint collection failures produce non-blocking diagnostic issues (`validity.fingerprintIssues`) and a `null` fingerprint rather than verdict blockers.
 
 ### StartVerification
 

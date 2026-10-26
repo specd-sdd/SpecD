@@ -448,13 +448,18 @@ A change MUST require task completion only for artifact types that declare `hasT
 
 ### Requirement: Validity fingerprint scope
 
-Spec approval SHALL fingerprint the exact sorted, deduplicated canonical spec scope together with schema-relevant non-task artifact files after their configured `preHashCleanup`. Scope equality is set equality: ordering alone is immaterial, while additions and removals produce explicit differences. Verification and sign-off SHALL fingerprint the same artifact view plus the confirmed in-scope implementation file set.
+Approval and verification evidence SHALL record a scope-aware fingerprint covering the change's required inputs. The fingerprint structure separates artifacts from linked implementation files:
 
-Implementation fingerprints SHALL be deterministic maps from deduplicated project-relative paths to whole-file hashes. The complete path set participates in equality, so adding, removing, renaming, or unlinking a file changes the fingerprint. An empty map is a valid observed snapshot; missing or `null` is legacy unknown evidence.
+- **`artifacts`** — map of artifact file paths to their SHA-256 content hashes, excluding task-capable artifacts.
+- **`implementation`** — map of linked implementation file paths to their normalized content hashes.
+
+A change with no linked implementation files SHALL record `implementation: {}`. Path keys use canonical repo-relative paths with POSIX separators. Order does not affect equality, so adding, removing, renaming, or unlinking a file changes the fingerprint. An empty map is a valid observed snapshot; missing or `null` is legacy unknown evidence.
 
 Text fingerprint algorithm `text-v1` removes an initial UTF-8 BOM, converts CRLF and CR to LF, removes trailing horizontal whitespace, turns whitespace-only lines into empty lines, and normalizes the final newline. It MUST NOT parse source languages, format code, strip internal whitespace, or hash only symbol ranges. Binary inputs SHALL be hashed byte-for-byte with their algorithm recorded. Missing or unreadable linked files SHALL fail fingerprint calculation rather than being omitted.
 
 Artifacts marked `hasTasks: true` SHALL be excluded from approval and verification fingerprints and automatic content-drift invalidation. They remain required when declared, structurally validated, live-counted for task completion, and checked again before archive.
+
+When fingerprint calculation fails due to missing, unreadable, or unsafe inputs, fingerprint calculation returns `null` and records the input failures. Such failures invalidate existing approval or verification evidence, but SHALL NOT synthesize an unconditional progress blocker on the change. Checks and operations that specifically require a valid fingerprint SHALL enforce that requirement directly.
 
 ### Requirement: Sovereign schema for validity fingerprints
 

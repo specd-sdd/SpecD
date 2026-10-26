@@ -509,6 +509,13 @@ Scenarios:
 - **THEN** the public value is `ValidityStatusProjection` assembled from verdict and committed aggregate
 - **AND** neither record is lost by returning the raw evaluator verdict
 
+#### Scenario: Unreadable fingerprint inputs are exposed as non-blocking diagnostics
+
+- **GIVEN** a change has unreadable or missing artifact files
+- **WHEN** GetStatus is called
+- **THEN** validity.fingerprintIssues lists the failures
+- **AND** the unreadable inputs are not reported in blockers
+
 ### Requirement: Config-based factory delegates through resolveGetStatusDeps
 
 #### Scenario: createGetStatus config form derives GetStatusDeps through resolveGetStatusDeps

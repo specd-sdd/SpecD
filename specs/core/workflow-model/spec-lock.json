@@ -23,36 +23,36 @@
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Schema workflow rows map lifecycle states to dynamic topology, artifact/task gates, checks, and boundary hooks.",
+      "value": "Schema workflow rows map lifecycle states to topology, artifact/task gates, checks, and boundary hooks.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:e7dea19e7071237144fde90b7838afd81aa644e3c71210f1214e912df9a1b404",
-          "lastModified": "2026-10-20T20:56:27.578Z"
+          "hash": "sha256:7626472116bcdb0813de9e011e84eace4d3e78538b7ff5fb5a7559d6410b0ca7",
+          "lastModified": "2026-10-22T15:09:47.156Z"
         },
         "verify.md": {
-          "hash": "sha256:f0c50d4667758592620ac207de90bf6bfa276874f8b1eaf42cc5a297b83da684",
-          "lastModified": "2026-10-20T14:34:09.447Z"
+          "hash": "sha256:c6b40e39e2b04aaa984fecbd755ac0d35d4433609acfa31cce62a74079dee924",
+          "lastModified": "2026-10-22T14:47:46.158Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# Workflow Model\n\n## Rules\n- Workflow rows reference `ChangeState`; define semantic requires, task gate, checks/skip-checks, disabled/optional behavior, hooks; schema remains sovereign.\n- `evaluateLifecycleVerdict` projects availability from predicate results and DAG artifacts; `CompileContext` never evaluates hops.\n- Pipeline/order, legal transitions, shortcuts derive from `workflow-topology` and active schema/approvals; omitted canonical steps default enabled.\n- `requires` holds artifact IDs, never step names; empty requires has no artifact gate. Schema validates declared artifacts, DAG, task subsets.\n- `requiresTaskCompletion` controls completion gating, not artifact presence; patterns compile with `safeRegex`, invalid/nested-quantifier patterns non-match.\n- Hooks execute at actual step boundaries in declared execution modes; `archiving` uses dedicated `ArchiveChange`.\n\n## Constraints\n- No hardcoded lifecycle sequence.\n- Availability dynamic, uncached, predicate/DAG-derived.\n- Disabled rows excluded from progress axis.",
+      "value": "# Workflow Model\n\n## Rules\n- `workflow[].step` references non-drain `ChangeState`; configures extras only. Omitted canonical states stay enabled. Topology owns legal hops/pipeline.\n- `requires` holds artifact IDs; `requiresTaskCompletion` subset of requires. `workflow.requires` and `workflow.taskCompletion` evaluate gates; task pattern uses `safeRegex`.\n- Optional permits topology bypass only when effective step-skip predicates pass; disabled removes non-bedrock step. Core projects availability dynamically from predicate results.\n- Schema validates state names, declarations, governance, archive-only checks, DAG and task subset. Rows normalized to canonical order.\n- Hooks run at actual boundaries; `TransitionChange` predicates then effects. `ArchiveChange` owns archive operation.\n\n## Constraints\n- No hardcoded lifecycle sequence or agent-inferred bypass.\n- `CompileContext` never evaluates hops.\n- Drain approval states never workflow steps.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:e7dea19e7071237144fde90b7838afd81aa644e3c71210f1214e912df9a1b404",
-          "lastModified": "2026-10-20T20:56:27.578Z"
+          "hash": "sha256:7626472116bcdb0813de9e011e84eace4d3e78538b7ff5fb5a7559d6410b0ca7",
+          "lastModified": "2026-10-22T15:09:47.156Z"
         },
         "verify.md": {
-          "hash": "sha256:f0c50d4667758592620ac207de90bf6bfa276874f8b1eaf42cc5a297b83da684",
-          "lastModified": "2026-10-20T14:34:09.447Z"
+          "hash": "sha256:c6b40e39e2b04aaa984fecbd755ac0d35d4433609acfa31cce62a74079dee924",
+          "lastModified": "2026-10-22T14:47:46.158Z"
         }
       }
     }

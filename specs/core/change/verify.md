@@ -806,6 +806,13 @@ Scenarios:
 - **THEN** approval and verification fingerprints remain unchanged
 - **AND** live task completion can still block transition or archive
 
+#### Scenario: Unreadable fingerprint inputs invalidate evidence without creating progress blockers
+
+- **GIVEN** a change has missing or unreadable artifact files that make fingerprint collection fail
+- **WHEN** change validity is reconciled
+- **THEN** unreadable differences invalidate existing approval or verification evidence
+- **AND** the unreadable inputs do not produce a progress blocker on the change
+
 ### Requirement: Sovereign schema for validity fingerprints
 
 #### Scenario: Fingerprint artifact selection ignores a different workspace default

@@ -199,7 +199,7 @@ Status SHALL expose independently:
 - any automatic return committed during this request
 - the canonical blockers and next action from the shared validity verdict
 
-The public result SHALL expose a rich `ValidityStatusProjection` assembled from the reconciled aggregate and canonical verdict. It SHALL NOT expose the evaluator's raw `ChangeValidityVerdict` as a substitute for status. The projection MUST retain active-attempt and completed-evidence fields simultaneously when both exist.
+The public result SHALL expose a rich `ValidityStatusProjection` assembled from the reconciled aggregate and canonical verdict. It SHALL NOT expose the evaluator's raw `ChangeValidityVerdict` as a substitute for status. The projection MUST retain active-attempt and completed-evidence fields simultaneously when both exist. The projection SHALL include `fingerprintIssues` containing unreadable, missing, or unsafe fingerprint input failures as a non-blocking diagnostic, and unreadable fingerprint inputs SHALL NOT synthesize progress blockers in `blockers`.
 
 Required stale spec consent has recovery priority and yields committed `designing` guidance. Required stale sign-off alone returns a later change to `done`; stale verification then recommends verification before renewed sign-off. Verification staleness in `designing`, `ready`, or `implementing` remains context and MUST NOT replace the phase's normal next action. At verification-requiring boundaries, missing or stale completed evidence recommends running the verification skill in the current state. A mismatched active attempt requires explicit start and repeated checks before completion, never a forced exit/re-entry. Status MUST NOT call `CompleteVerification` or treat an active attempt as completed evidence.
 

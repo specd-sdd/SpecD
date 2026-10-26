@@ -1173,6 +1173,7 @@ describe('canonical validity guidance', () => {
       specApproval: 'not-required' as const,
       signoff: 'not-required' as const,
       verification: 'not-required' as const,
+      fingerprintIssues: [],
       blockers: [],
       recovery: null,
       ...overrides,

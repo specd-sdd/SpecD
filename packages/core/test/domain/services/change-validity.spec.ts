@@ -260,4 +260,55 @@ describe('evaluateChangeValidity', () => {
     expect(verdict.affectedArtifacts).toEqual([])
     expect(verdict.recovery).toBeNull()
   })
+
+  it('surfaces fingerprint input failures as non-blocking fingerprintIssues', () => {
+    const failure = {
+      scope: 'artifact' as const,
+      key: 'proposal.md',
+      reason: 'missing' as const,
+      message: "Artifact file 'proposal.md' does not exist",
+    }
+    const verdict = evaluateChangeValidity(
+      changeIn('designing'),
+      facts({
+        currentFingerprint: null,
+        fingerprintFailures: [failure],
+      }),
+      DEFAULT_INVALIDATION_POLICY,
+    )
+    expect(verdict.fingerprintIssues).toEqual([failure])
+    expect(verdict.blockers.map((b) => b.code)).not.toContain('FINGERPRINT_INPUT_ERROR')
+  })
+
+  it('invalidates stored evidence when fingerprint failures occur without adding FINGERPRINT_INPUT_ERROR blocker', () => {
+    const change = changeIn('implementing')
+    change.recordSpecApproval(
+      'approved',
+      makeSpecApprovalFingerprint(change.specIds, artifactFingerprint),
+      testActor,
+    )
+    const failure = {
+      scope: 'artifact' as const,
+      key: 'proposal.md',
+      reason: 'unreadable' as const,
+      message: 'Permission denied',
+    }
+    const verdict = evaluateChangeValidity(
+      change,
+      facts({
+        currentFingerprint: null,
+        fingerprintFailures: [failure],
+        approvalsRequired: { spec: true, signoff: false },
+      }),
+      DEFAULT_INVALIDATION_POLICY,
+    )
+    expect(verdict.fingerprintIssues).toEqual([failure])
+    expect(verdict.specApproval).toBe('stale')
+    expect(verdict.blockers.map((b) => b.code)).not.toContain('FINGERPRINT_INPUT_ERROR')
+    expect(verdict.recovery).toEqual({
+      cause: 'spec-approval',
+      from: 'implementing',
+      to: 'designing',
+    })
+  })
 })

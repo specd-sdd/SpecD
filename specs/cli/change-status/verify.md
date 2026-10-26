@@ -192,6 +192,13 @@
 - **THEN** it exposes paths, difference kinds, algorithms, and freshness only
 - **AND** it does not expose source contents, actor-private metadata, or raw internal evaluator objects
 
+#### Scenario: Unreadable fingerprint inputs are displayed as non-blocking diagnostics
+
+- **GIVEN** a change has unreadable or missing artifact files reported in validity.fingerprintIssues
+- **WHEN** status is rendered in text, JSON, or TOON
+- **THEN** unreadable fingerprint inputs are not rendered as progress blockers
+- **AND** they are rendered under validity diagnostics or warnings
+
 ### Requirement: Text status omits duplicated review file lists
 
 #### Scenario: Artifact-review-required does not reprint files under review

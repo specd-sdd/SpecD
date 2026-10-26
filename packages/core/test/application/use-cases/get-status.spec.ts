@@ -1896,3 +1896,43 @@ describe('GetStatus — archive hints from the effective archive bindings', () =
     expect(blocker?.bypassFlag).toBeUndefined()
   })
 })
+
+describe('GetStatus — fingerprint input diagnostics', () => {
+  it('projects fingerprintIssues as non-blocking diagnostics for missing artifacts and does not emit FINGERPRINT_INPUT_ERROR blocker', async () => {
+    const change = makeChange('fresh-change', {
+      artifacts: new Map([
+        [
+          'proposal',
+          new ChangeArtifact({
+            type: 'proposal',
+            files: new Map([
+              ['proposal', new ArtifactFile({ key: 'proposal', filename: 'proposal.md' })],
+            ]),
+          }),
+        ],
+      ]),
+    })
+    change.transition('designing', testActor)
+    const schema = makeStdSchema()
+    const repo = makeChangeRepository([change])
+    const provider = makeSchemaProvider(schema)
+    const approvals = { spec: false, signoff: false }
+    const uc = makeGetStatus(repo, {
+      schema,
+      approvals,
+      reconcile: makeRealReconcile(repo, provider, approvals),
+    })
+
+    const result = await uc.execute({ name: 'fresh-change' })
+
+    expect(result.validity?.fingerprintIssues).toBeDefined()
+    expect(result.validity?.fingerprintIssues?.length).toBeGreaterThan(0)
+    expect(result.validity?.fingerprintIssues?.[0]).toEqual(
+      expect.objectContaining({
+        scope: 'artifact',
+        reason: 'missing',
+      }),
+    )
+    expect(result.blockers.map((b) => b.code)).not.toContain('FINGERPRINT_INPUT_ERROR')
+  })
+})

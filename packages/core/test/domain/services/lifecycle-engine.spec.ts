@@ -115,6 +115,7 @@ describe('LifecycleEngine with disabled verification', () => {
       specApproval: 'not-required',
       signoff: 'not-required',
       verification: 'absent',
+      fingerprintIssues: [],
       blockers: [],
       recovery: null,
     }
@@ -141,6 +142,7 @@ describe('LifecycleEngine with disabled verification', () => {
       specApproval: 'not-required',
       signoff: 'not-required',
       verification: 'absent',
+      fingerprintIssues: [],
       blockers: [],
       recovery: null,
     }
@@ -173,6 +175,7 @@ describe('LifecycleEngine with disabled verification', () => {
       specApproval: 'not-required',
       signoff: 'not-required',
       verification: 'absent',
+      fingerprintIssues: [],
       blockers: [],
       recovery: null,
     }
@@ -209,6 +212,7 @@ describe('LifecycleEngine with disabled verification', () => {
       specApproval: 'not-required',
       signoff: 'not-required',
       verification: 'absent',
+      fingerprintIssues: [],
       blockers: [],
       recovery: null,
     }
@@ -263,6 +267,7 @@ describe('LifecycleEngine with disabled verification', () => {
       specApproval: 'not-required',
       signoff,
       verification: 'not-required',
+      fingerprintIssues: [],
       blockers: [],
       recovery: null,
     })
@@ -324,6 +329,7 @@ describe('LifecycleEngine with disabled verification', () => {
       specApproval: 'not-required',
       signoff: 'not-required',
       verification: 'absent',
+      fingerprintIssues: [],
       blockers: [],
       recovery: null,
     }

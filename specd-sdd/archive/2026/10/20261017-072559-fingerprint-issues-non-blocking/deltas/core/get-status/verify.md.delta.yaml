@@ -1,0 +1,33 @@
+- op: modified
+  description: Add scenario for unreadable fingerprint inputs exposed as non-blocking diagnostics in GetStatus
+  selector:
+    type: section
+    matches: 'Requirement: Approval, verification, and fingerprint status projection'
+  content: |
+    #### Scenario: Attempt and completed evidence are distinct
+
+    - **GIVEN** a stale completed verification and a newer unfinished attempt
+    - **WHEN** status is rendered
+    - **THEN** both records and their freshness are shown separately
+    - **AND** the attempt is not presented as successful evidence
+
+    #### Scenario: Required boundary recommends in-place verification
+
+    - **GIVEN** current verification is missing at `verifying`
+    - **WHEN** status determines the next action
+    - **THEN** it recommends the verification skill in the current state
+    - **AND** does not require a lifecycle self-transition or rollback
+
+    #### Scenario: Status exposes the rich projection contract
+
+    - **GIVEN** a completed record and a newer active attempt coexist
+    - **WHEN** `GetStatus` returns validity
+    - **THEN** the public value is `ValidityStatusProjection` assembled from verdict and committed aggregate
+    - **AND** neither record is lost by returning the raw evaluator verdict
+
+    #### Scenario: Unreadable fingerprint inputs are exposed as non-blocking diagnostics
+
+    - **GIVEN** a change has unreadable or missing artifact files
+    - **WHEN** GetStatus is called
+    - **THEN** validity.fingerprintIssues lists the failures
+    - **AND** the unreadable inputs are not reported in blockers

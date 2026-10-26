@@ -23,29 +23,29 @@
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:8262bf0e43d8082246428c202344f85fb7effaa10a9ae909b85149ee0be22e3f",
-          "lastModified": "2026-10-20T14:34:09.467Z"
+          "hash": "sha256:ce1413fb256ca2807766656b1b8ce640a8dd09a4d22f6a27bb2811d4ad262367",
+          "lastModified": "2026-10-22T14:47:46.134Z"
         },
         "verify.md": {
-          "hash": "sha256:ecf96861ca102311ec4d52f046c89f071ebb82c5071f8dcbf56f9cc09bee8444",
-          "lastModified": "2026-10-20T14:34:09.468Z"
+          "hash": "sha256:bcc3dee5287cf0363fc5d6a3f8a4e3131eb36ebcd418c9dd51484b14b0fb2b39",
+          "lastModified": "2026-10-22T14:47:46.135Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# Check Registry\n\n## Rules\n- `CheckRegistry` catalogs canonical `Check` definitions and default `CheckBinding`; expose `get`, `has`, `list`, `bindings`.\n- Constructor installs immutable built-ins: protocol, workflow, dependency, workspace, implementation, approval, schema, archive, overlap, verification, hooks. No public built-in mutation/unregister.\n- `register(pluginName, check, defaultBindings?, options?)` requires `^[a-zA-Z0-9_-]+$`; canonical ID `@${pluginName}.${check.id}`; duplicate throws `DuplicateCheckError`.\n- `CustomCheckDefinition` becomes predicate `Check`; explicit non-predicate `kind` throws `InvalidCheckKindError`. Checks never run commands, subprocesses, or filesystem mutation.\n- Binding identity: transition `{checkId,scope:'transition',to,along}`; archive `{checkId,scope:'archive'}`; skip `{checkId,scope:'step-skip',step}`. Exact duplicate throws `DuplicateCheckBindingError`.\n- Governance separates placement, binding policy, config, disablement. Code-set false locks monotonic across schema layers; schema-owned bindings remain schema-editable under check-level locks.\n- Categories A/B forbid embedding, override, disable; Category C policy checks permit all. Composition forwards every plugin governance field/default binding. Executable application checks, never fixture matchers, serve runtime bindings.\n- Resolver deep-merges config: check default → binding → schema; objects merge, arrays concatenate, later scalars replace; runner receives immutable resolved config.\n\n## Constraints\n- Pure domain: no filesystem, subprocess, console.\n- Existing built-in resolution remains compatible.\n- Constructed checks/bindings immutable during workflow.",
+      "value": "# Check Registry\n\n## Rules\n- `CheckRegistry` catalogs `Check` definitions and default `CheckBinding`; exposes `get`, `has`, `list`, `bindings`.\n- Built-ins immutable. `register(pluginName, check, ...)` uses canonical `@${pluginName}.${check.id}` and rejects invalid names/duplicates/kinds.\n- Bindings identify transition, archive, or step-skip coordinates; exact duplicate fails.\n- Governance separates placement, binding policy, config, disablement. Code locks are monotonic; schema-owned bindings remain editable within check locks.\n- Categories A/B restrict embedding/override/disable; policy checks permit governed overrides. Resolver merges check -> binding -> schema config.\n\n## Constraints\n- Pure domain: no filesystem, subprocess, console.\n- Existing built-in resolution remains compatible.\n- Checks and bindings immutable after construction.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:8262bf0e43d8082246428c202344f85fb7effaa10a9ae909b85149ee0be22e3f",
-          "lastModified": "2026-10-20T14:34:09.467Z"
+          "hash": "sha256:ce1413fb256ca2807766656b1b8ce640a8dd09a4d22f6a27bb2811d4ad262367",
+          "lastModified": "2026-10-22T14:47:46.134Z"
         },
         "verify.md": {
-          "hash": "sha256:ecf96861ca102311ec4d52f046c89f071ebb82c5071f8dcbf56f9cc09bee8444",
-          "lastModified": "2026-10-20T14:34:09.468Z"
+          "hash": "sha256:bcc3dee5287cf0363fc5d6a3f8a4e3131eb36ebcd418c9dd51484b14b0fb2b39",
+          "lastModified": "2026-10-22T14:47:46.135Z"
         }
       }
     }

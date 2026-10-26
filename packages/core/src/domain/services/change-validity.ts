@@ -33,7 +33,6 @@ export interface ValidityBlocker {
   readonly code:
     | 'ARTIFACT_DRIFT'
     | 'ARTIFACT_REVIEW_REQUIRED'
-    | 'FINGERPRINT_INPUT_ERROR'
     | 'APPROVAL_REQUIRED'
     | 'APPROVAL_STALE'
     | 'APPROVAL_REVOKED'
@@ -90,6 +89,7 @@ export interface ChangeValidityVerdict {
   readonly specApproval: 'not-required' | 'absent' | ProjectionStatus
   readonly signoff: 'not-required' | 'absent' | ProjectionStatus
   readonly verification: 'not-required' | 'absent' | 'attempt-active' | 'valid' | 'stale'
+  readonly fingerprintIssues?: readonly FingerprintInputFailure[]
   readonly blockers: readonly ValidityBlocker[]
   readonly recovery: AutomaticRecovery | null
 }
@@ -156,6 +156,7 @@ export function evaluateChangeValidity(
     specApproval,
     signoff,
     verification,
+    fingerprintIssues: facts.fingerprintFailures,
     blockers: buildBlockers(facts, reviewTargets, specApproval, signoff, verification),
     recovery: selectAutomaticRecovery(
       change.state,
@@ -504,13 +505,6 @@ function buildBlockers(
   verification: ChangeValidityVerdict['verification'],
 ): readonly ValidityBlocker[] {
   const blockers: ValidityBlocker[] = []
-  if (facts.fingerprintFailures.length > 0) {
-    blockers.push({
-      code: 'FINGERPRINT_INPUT_ERROR',
-      message: 'Fingerprint inputs could not be read',
-      details: { failures: facts.fingerprintFailures },
-    })
-  }
   const drifted = reviewTargets.filter((target) =>
     facts.driftedArtifacts.some(
       (drift) => drift.artifactId === target.artifactId && drift.fileKey === target.fileKey,

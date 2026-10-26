@@ -1,0 +1,4 @@
+releases:
+  core:change: patch
+  core:get-status: patch
+  cli:change-status: patch

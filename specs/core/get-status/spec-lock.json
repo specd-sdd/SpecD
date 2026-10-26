@@ -19,7 +19,10 @@
   "implementation": [
     {
       "file": "core:src/application/use-cases/get-status.ts",
-      "symbols": ["GetStatus"]
+      "symbols": ["ValidityStatusProjection", "GetStatus"]
+    },
+    {
+      "file": "core:test/application/use-cases/get-status.spec.ts"
     }
   ],
   "optimizations": {

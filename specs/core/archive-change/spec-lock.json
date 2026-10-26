@@ -56,29 +56,29 @@
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:ecc80e55931be72fab285d9be59171a7a5d855e093c6ea91bdca24140f853bfc",
-          "lastModified": "2026-10-20T14:34:09.918Z"
+          "hash": "sha256:b08d53c9d8ce418d191526613fb5d9a84e54a136fdb9ba5757ea1321fe61e351",
+          "lastModified": "2026-10-22T14:47:46.132Z"
         },
         "verify.md": {
-          "hash": "sha256:908c81a8292d5648dd0747ad2a81dd988e6d98a751c670d979e8ee5cc9e6b7ce",
-          "lastModified": "2026-10-20T14:34:09.919Z"
+          "hash": "sha256:c6fb667d9b1fb25253587351651c6cc5774e978635d2fcf5c27126d18103e9a7",
+          "lastModified": "2026-10-22T15:09:45.073Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# ArchiveChange\n\n## Rules\n- Inject repositories, schema/parser/extractor registries, `archiveBindings`, reconciler, `MaterializeSpecMetadata`, actor, batch snapshot, hashing; never `RunStepHooks`/`HookRunner`.\n- `execute({ name, skipChecks })`: skip list defaults empty; only resolved skippable check IDs accepted. Aliases map to checks. Never bypass unrelated checks.\n- Accept only `archivable|archiving`; run archive predicates before hooks/snapshots: schema, archivable, overlap, workspace/deps, implementation, verification. Reconcile fresh facts after pre-effects; committed recovery remains persisted.\n- Use bindings for pre/post effects; skip phases never skips predicates. Pre failure aborts unchanged. Read-only or failed predicates: no hooks/writes.\n- Fully prepare merged artifacts, dependencies, persisted state, locks, implementation links, and all validations before canonical writes. Snapshot whole batch; transition `archivable→archiving` immediately before first publish.\n- Commit failure restores all snapshots; return `archivable` only after complete restore. Orphan matching backup restores then aborts; foreign/unreadable backup aborts.\n- Publish via `SpecRepository.publish({ persistedState, expectedRevision })`; preserve optimizations. Archive through `archiveRepository.archive(change,{ actor })`; metadata/post-effects failures are nonfatal results.\n- On bypassed `spec.overlap`, reconcile each peer with `spec-overlap-conflict`; never `change.invalidate()`.\n\n## Constraints\n- No hooks, snapshots, or writes before `change.assertArchivable()`.\n- Preflight and snapshots precede `archiving` and first publication.\n- Successful archive never rolls back for metadata/post-effect failure.",
+      "value": "# ArchiveChange\n\n## Rules\n- Inject repositories, registries, `archiveBindings`, reconciler, metadata materializer, actor, snapshot, hashing; no `RunStepHooks`/`HookRunner`.\n- `execute({ name, skipChecks })` accepts only resolved skippable checks; aliases map to checks. Predicates always run.\n- Accept `archivable|archiving`; reconcile fresh facts and predicate preflight before effects, snapshots, or writes.\n- Fully prepare merged artifacts, deps, state, locks, implementation links and validations; snapshot batch; enter `archiving` immediately before publish.\n- Commit failure restores all snapshots and returns `archivable` only after restoration. Publish preserves optimizations; archive persists actor.\n- Metadata and post-effects failures report nonfatally. Bypassed overlap reconciles peers with `spec-overlap-conflict`.\n\n## Constraints\n- No hooks, snapshots, or writes before `change.assertArchivable()`.\n- Preflight/snapshots precede state change/publication.\n- Successful archive never rolls back for post-publish failures.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:ecc80e55931be72fab285d9be59171a7a5d855e093c6ea91bdca24140f853bfc",
-          "lastModified": "2026-10-20T14:34:09.918Z"
+          "hash": "sha256:b08d53c9d8ce418d191526613fb5d9a84e54a136fdb9ba5757ea1321fe61e351",
+          "lastModified": "2026-10-22T14:47:46.132Z"
         },
         "verify.md": {
-          "hash": "sha256:908c81a8292d5648dd0747ad2a81dd988e6d98a751c670d979e8ee5cc9e6b7ce",
-          "lastModified": "2026-10-20T14:34:09.919Z"
+          "hash": "sha256:c6fb667d9b1fb25253587351651c6cc5774e978635d2fcf5c27126d18103e9a7",
+          "lastModified": "2026-10-22T15:09:45.073Z"
         }
       }
     }

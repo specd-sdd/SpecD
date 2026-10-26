@@ -28,29 +28,29 @@
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:dcd099b89db6617e0a0a183c78e8a87e733492b0177ec1f2a9ef12378ccb9900",
-          "lastModified": "2026-10-20T14:34:09.484Z"
+          "hash": "sha256:e9e066001c23455953a786afe17069377e24e90cfb48cbce67b57f996b8982f7",
+          "lastModified": "2026-10-22T14:47:46.154Z"
         },
         "verify.md": {
-          "hash": "sha256:3c83c2e6275910cea24821460e03baf1bf70065ed94dac9f5e6095b7e810474d",
-          "lastModified": "2026-10-20T14:34:09.485Z"
+          "hash": "sha256:9ded1605e44f4af42ccec0a65c7630091b01b971745d49a1c2ee0108e33cf7ac",
+          "lastModified": "2026-10-22T14:47:46.155Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# Transition Checks\n\n## Rules\n- Stable check IDs: `protocol.edge`, workflow, deps/workspace, implementation, approval, schema/archive/overlap, verification, hooks. `Check.execute(ctx)` returns pass/fail/skip; effects and predicates distinct.\n- Registry binding alone selects `from/to/along` or archive operation, effect phase, failure policy, resolved config. No snapshot bag, ID timing switches, or duplicate gathering.\n- Candidate evaluation runs matching predicates once; `TransitionChange` fail-fast on `protocol.edge`, `GetStatus` collects all. Effects execute by binding slot: pre aborts, post collects.\n- Archive is operation, never fake edge; do not bind `approval.signoff`.\n- Single `ReconcileChangeValidity` owns fresh facts, verdict, review, approvals, verification, recovery, audit, atomic persistence. All mutators delegate; no direct `Change.invalidate` fallback.\n- Recovery priority: stale required spec approval → `designing`; stale signoff later state → `done`; stale verification renews in place; then artifact policy. Preserve review stays phase.\n- Required bindings govern protocol, artifacts/tasks, ready dependency/workspace, implementation exit/start, verification→done, approvals, archive predicates and effects.\n- Approval commands record consent; transitions never use pending approval hops. Verification start/complete use exact non-task artifact + implementation fingerprint.\n\n## Constraints\n- Result origin metadata, never split result DTO arrays.\n- Recovery not backward; dry run predicates only.\n- Schema YAML never lists check IDs.\n- New checks require no central snapshot/use-case gather edits.",
+      "value": "# Transition Checks\n\n## Rules\n- Registry bindings select predicates/effects by transition or archive operation; `Check.execute(ctx)` returns pass/fail/skip. Effects have binding phase and failure policy.\n- Candidate evaluator runs `protocol.edge` first, matching transition predicates, then optional bypass step-skip predicates. `GetStatus` collects; `TransitionChange` fail-fast only on edge failure.\n- `ReconcileChangeValidity` owns fresh facts, verdict, review, approvals, verification, recovery, audit, atomic persistence. All mutators delegate.\n- Recovery priority: stale required spec approval -> `designing`; stale signoff later state -> `done`; stale verification renews in place; then artifact policy.\n- Bindings cover workflow, deps/workspace, implementation, approvals, verification, archive, hooks. Approval commands record consent; no pending approval transitions.\n\n## Constraints\n- No snapshot bag or duplicate check gathering.\n- Archive is operation, never fake transition.\n- Schema never lists check IDs.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:dcd099b89db6617e0a0a183c78e8a87e733492b0177ec1f2a9ef12378ccb9900",
-          "lastModified": "2026-10-20T14:34:09.484Z"
+          "hash": "sha256:e9e066001c23455953a786afe17069377e24e90cfb48cbce67b57f996b8982f7",
+          "lastModified": "2026-10-22T14:47:46.154Z"
         },
         "verify.md": {
-          "hash": "sha256:3c83c2e6275910cea24821460e03baf1bf70065ed94dac9f5e6095b7e810474d",
-          "lastModified": "2026-10-20T14:34:09.485Z"
+          "hash": "sha256:9ded1605e44f4af42ccec0a65c7630091b01b971745d49a1c2ee0108e33cf7ac",
+          "lastModified": "2026-10-22T14:47:46.155Z"
         }
       }
     }
