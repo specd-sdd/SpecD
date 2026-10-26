@@ -266,3 +266,30 @@
 - **WHEN** the adapter reports `hierarchy: true`
 - **THEN** non-empty hierarchy and provenance facts are emitted
 - **AND** unsupported Composer or trait behavior remains explicit coverage
+
+### Requirement: Bounded PHP member classification and compact state
+
+#### Scenario: Large class body is not traversed per method
+
+- **GIVEN** a generated PHP class contains hundreds of methods with large nested bodies
+- **AND** deterministic instrumentation records visits used for owner-level member classification
+- **WHEN** the adapter analyzes the file
+- **THEN** the class declaration list is indexed once
+- **AND** method bodies are not visited to determine constructor or static dispatch
+- **AND** adding method-body statements without adding members does not multiply member-classification visits by the method count
+
+#### Scenario: Direct and nested declarations retain their own semantics
+
+- **GIVEN** an outer class, nested or anonymous class-like syntax, repeated method names, same-line declarations, a static method, and `__construct`
+- **WHEN** members are associated with owners
+- **THEN** only direct declarations belong to each owner
+- **AND** the static method has static dispatch
+- **AND** `__construct` remains a constructor
+- **AND** equal names and lines do not cross owner boundaries
+
+#### Scenario: Analysis retains no unconsumed routine source
+
+- **GIVEN** PHP functions and methods contain large bodies
+- **WHEN** `analyzeFile` returns its compact parser state
+- **THEN** the state contains no `scopes` collection with full routine text
+- **AND** import resolution and relation building produce the same facts without that state

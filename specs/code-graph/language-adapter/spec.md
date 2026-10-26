@@ -413,6 +413,18 @@ A new language adapter SHALL be added by completing these steps, in order, witho
 
 The same guide, restated for readers without access to the specs, SHALL be published in `docs/code-graph/language-adapters.md`. The spec and the page MUST state the same rules.
 
+### Requirement: Bounded per-file structural analysis
+
+A language adapter SHALL derive parser-backed facts with work bounded by the source structures and semantic candidates that must be inspected. When several declarations or references require the same owner, scope, node classification, or callable ordering, the adapter or shared helper SHALL build that structural evidence once per file, owner, scope, or policy and reuse it.
+
+Member classification MUST NOT recursively traverse an unchanged owning type subtree once per member. Lexical-shadowing resolution MUST NOT traverse an unchanged enclosing scope body once per reference. Shared callable-containment resolution MUST NOT filter and sort the complete symbol collection independently for each call position.
+
+File-local indexes SHALL use parser-authoritative declaration identity and explicit scope or owner boundaries. They MUST NOT replace parser evidence with source-line regular expressions, name-only association, nearest-preceding heuristics, or bindings collected from nested lexical scopes.
+
+For identical content and equivalent session context, optimization SHALL preserve symbol identities and ordering, construct and selection ranges, declaration parents, imports, binding facts, call facts, public bindings, member semantics, hierarchy evidence, coverage, diagnostics, and persisted relations. Ambiguous or unsupported syntax MUST remain unresolved rather than becoming a guessed fact.
+
+Complexity verification SHALL use deterministic evidence that repeated structures are indexed or summarized once. Wall-clock timing MAY supplement that evidence but MUST NOT be the sole conformance criterion.
+
 ## Constraints
 
 - LanguageAdapter is an interface, not an abstract class — adapters are stateless

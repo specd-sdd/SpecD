@@ -236,3 +236,30 @@
 - **WHEN** the adapter reports `hierarchy: true`
 - **THEN** shared hierarchy and ordered provenance facts are emitted
 - **AND** partial package coverage is not replaced by name-only inference
+
+### Requirement: Indexed Go declarations and method sets
+
+#### Scenario: Named and receiver declarations use direct indexes
+
+- **GIVEN** a Go file contains many structs, interfaces, fields, value receivers, pointer receivers, and repeated method names
+- **AND** deterministic instrumentation records complete-symbol searches after index construction
+- **WHEN** type and receiver information is collected
+- **THEN** each declaration is associated through the parser-backed index
+- **AND** no declaration or receiver lookup scans the complete symbol collection
+- **AND** owner IDs, pointer evidence, ranges, and package visibility remain unchanged
+
+#### Scenario: Embedded interface closure is memoized
+
+- **GIVEN** many concrete types are compared with interfaces that share local embedded-interface chains
+- **WHEN** interface satisfaction is evaluated
+- **THEN** each interface's complete local method set is expanded at most once
+- **AND** every concrete-type comparison reuses the memoized result
+- **AND** only types containing every required receiver method emit `IMPLEMENTS`
+
+#### Scenario: Unknown method set remains unknown when cached
+
+- **GIVEN** an interface embeds an unresolved package-qualified interface and another embedding path is cyclic
+- **WHEN** their method sets are requested repeatedly for several concrete types
+- **THEN** the unknown result is memoized without recursion failure
+- **AND** no concrete type is claimed to implement either interface
+- **AND** no member-level `OVERRIDES` relation is emitted

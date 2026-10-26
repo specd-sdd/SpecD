@@ -57,12 +57,16 @@ import {
 import {
   buildHierarchyReferenceFacts,
   buildLogicalDeclarationFacts,
-  containsSymbolRange,
   createAdapterDeclarationDescriptor,
+  createCallableContainmentIndex,
+  createDeclarationSymbolIndex,
   createImportedHierarchyMetadata,
   createPhysicalOnlyDeclarationDescriptor,
-  findContainingCallableSymbol,
   type AdapterHierarchyDescriptor,
+  type CallableContainmentIndex,
+  type DeclarationSymbolIndex,
+  getStructuralWorkObserver,
+  type StructuralWorkObserver,
   withEnclosingTypeParents,
   WHOLE_FILE_START,
 } from './reference-fact-helpers.js'
@@ -78,15 +82,6 @@ export interface DynamicLoaderFact {
   readonly candidates: readonly string[]
   readonly aliasNames: readonly string[]
   readonly scope: 'file' | 'class' | 'method'
-}
-
-/**
- * Internal PHP scope representation.
- */
-interface PhpScopeInfo {
-  readonly name: string
-  readonly line: number
-  readonly text: string
 }
 
 /**
@@ -118,7 +113,6 @@ interface PhpParserState {
   readonly typeInfos: readonly SerializedPhpTypeInfo[]
   readonly requireRelations: readonly Relation[]
   readonly dynamicLoaders: readonly DynamicLoaderFact[]
-  readonly scopes: readonly PhpScopeInfo[]
 }
 
 /** Session state key holding the Composer package that owns each workspace. */
@@ -384,32 +378,141 @@ function getPhpClassTail(value: string): string {
 }
 
 /**
- * Classifies a PHP method from its declaration name and the modifier nodes of its definition.
- * Modifiers are read from the parser node of the method itself, never from the text of its line,
- * so neighbouring declarations on the same or previous line cannot change the form.
- * @param symbol - Extracted method declaration.
- * @param ownerNode - Class-like declaration node that contains the method.
+ * Direct member evidence for an owner in PHP.
+ */
+export interface PhpDirectMemberEvidence {
+  readonly ownerSymbolId: string
+  readonly symbol: SymbolNode
+  readonly node: SgNode
+  readonly semantics: MemberSemantics
+}
+
+/**
+ * Classifies a PHP method from its declaration name and the direct modifiers of its definition.
+ * Modifiers are read directly from the parser node of the method itself, never by scanning the owner class.
+ * @param symbol - Extracted method declaration symbol.
+ * @param memberNode - AST node of the method declaration.
  * @returns Proven shared member form.
  */
-function phpMemberSemantics(symbol: SymbolNode, ownerNode: SgNode): MemberSemantics {
+function phpMemberSemantics(symbol: SymbolNode, memberNode: SgNode): MemberSemantics {
   if (symbol.name.toLowerCase() === '__construct') return { kind: MemberKind.Constructor }
-  const methods: SgNode[] = []
-  const collect = (node: SgNode): void => {
-    if (nodeKind(node) === 'method_declaration') methods.push(node)
-    for (const child of node.children()) collect(child)
-  }
-  collect(ownerNode)
-  const method = methods.find(
-    (candidate) =>
-      candidate.field('name')?.text() === symbol.name &&
-      candidate.range().start.line + 1 === symbol.line,
-  )
-  const isStatic =
-    method?.children().some((child) => nodeKind(child) === 'static_modifier') === true
+  const isStatic = memberNode.children().some((child) => nodeKind(child) === 'static_modifier')
   return {
     kind: MemberKind.Method,
     dispatch: isStatic ? MemberDispatch.Static : MemberDispatch.Instance,
   }
+}
+
+/**
+ * Collects direct-member evidence for a PHP class-like owner without descending into method bodies.
+ * @param ownerNode - Class-like AST node (class, interface, enum, trait).
+ * @param ownerSymbol - Symbol corresponding to the owner.
+ * @param symbols - Declaration symbol index for exact symbol lookup.
+ * @param observer - Optional observer recording structural work.
+ * @returns Array of direct member evidence in source order.
+ */
+export function collectPhpDirectMemberEvidence(
+  ownerNode: SgNode,
+  ownerSymbol: SymbolNode,
+  symbols: DeclarationSymbolIndex,
+  observer?: StructuralWorkObserver,
+): readonly PhpDirectMemberEvidence[] {
+  let bodyNode: SgNode | undefined
+  for (const child of ownerNode.children()) {
+    const k = nodeKind(child)
+    if (k === 'declaration_list' || k === 'enum_declaration_list') {
+      bodyNode = child
+      break
+    }
+  }
+  if (!bodyNode) return []
+
+  const results: PhpDirectMemberEvidence[] = []
+
+  for (const member of bodyNode.children()) {
+    observer?.record('owner-member-node-visited')
+    const mk = nodeKind(member)
+
+    if (mk === 'method_declaration') {
+      const nameNode = member.field('name')
+      const name = nameNode?.text()
+      if (!name) continue
+      const line = member.range().start.line + 1
+      const col = member.range().start.column
+      const symbol = symbols.find(SymbolKind.Method, name, line, col)
+      if (!symbol) continue
+      const semantics = phpMemberSemantics(symbol, member)
+      results.push({
+        ownerSymbolId: ownerSymbol.id,
+        symbol,
+        node: member,
+        semantics,
+      })
+    } else if (mk === 'property_declaration') {
+      for (const propChild of member.children()) {
+        if (nodeKind(propChild) !== 'property_element') continue
+        const varName = propChild.field('name')
+        if (!varName) continue
+        const name = varName.text().replace(/^\$/, '')
+        if (!name) continue
+        const line = member.range().start.line + 1
+        const col = member.range().start.column
+        const symbol = symbols.find(SymbolKind.Property, name, line, col)
+        if (!symbol) continue
+        results.push({
+          ownerSymbolId: ownerSymbol.id,
+          symbol,
+          node: member,
+          semantics: {
+            kind: MemberKind.Property,
+            dispatch: MemberDispatch.Instance,
+          },
+        })
+      }
+    } else if (mk === 'const_declaration') {
+      for (const constChild of member.children()) {
+        if (nodeKind(constChild) !== 'const_element') continue
+        const nameNode = constChild.child(0)
+        if (nameNode && nodeKind(nameNode) === 'name') {
+          const name = nameNode.text()
+          const line = constChild.range().start.line + 1
+          const col = constChild.range().start.column
+          const symbol = symbols.find(SymbolKind.Property, name, line, col)
+          if (!symbol) continue
+          results.push({
+            ownerSymbolId: ownerSymbol.id,
+            symbol,
+            node: constChild,
+            semantics: {
+              kind: MemberKind.Property,
+              dispatch: MemberDispatch.Instance,
+            },
+          })
+        }
+      }
+    } else if (mk === 'enum_case') {
+      const nameNode = member.field('name') ?? member.children().find((c) => nodeKind(c) === 'name')
+      const name = nameNode?.text()
+      if (name) {
+        const line = member.range().start.line + 1
+        const col = member.range().start.column
+        const symbol = symbols.find(SymbolKind.Property, name, line, col)
+        if (symbol) {
+          results.push({
+            ownerSymbolId: ownerSymbol.id,
+            symbol,
+            node: member,
+            semantics: {
+              kind: MemberKind.Property,
+              dispatch: MemberDispatch.Instance,
+            },
+          })
+        }
+      }
+    }
+  }
+
+  return results
 }
 
 /**
@@ -774,10 +877,24 @@ export class PhpLanguageAdapter implements LanguageAdapter {
     }
     walkRequires(root)
 
-    const bindingFacts = this.extractBindingFactsFromData(root, filePath, content, symbols, imports)
-    const callFacts = this.extractCallFactsFromData(root, filePath, content, symbols)
+    const observer = getStructuralWorkObserver(this)
+    const declarationIndex = createDeclarationSymbolIndex(symbols, observer)
+    const callableIndex = createCallableContainmentIndex(
+      symbols,
+      { callableKinds: PHP_CALLABLE_KINDS },
+      observer,
+    )
+    const bindingFacts = this.extractBindingFactsFromData(
+      root,
+      filePath,
+      content,
+      symbols,
+      imports,
+      callableIndex,
+    )
+    const callFacts = this.extractCallFactsFromData(root, filePath, content, symbols, callableIndex)
 
-    const typeInfos = this.collectPhpTypeInfo(root, filePath, symbols)
+    const typeInfos = this.collectPhpTypeInfo(root, filePath, symbols, declarationIndex, observer)
     const serializedInfos = typeInfos.map((info) => {
       const methodsByName: Record<string, string> = {}
       const memberFormsById: Record<string, MemberSemantics> = {}
@@ -794,26 +911,6 @@ export class PhpLanguageAdapter implements LanguageAdapter {
 
     const requireRelations = this.extractRequireRelations(root, filePath)
     const rawDynamicLoaders = this.collectRawDynamicLoaders(root, filePath)
-
-    const scopes: Array<{ name: string; line: number; text: string }> = []
-    const walkScopes = (node: SgNode): void => {
-      const kind = nodeKind(node)
-      if (kind === 'function_definition' || kind === 'method_declaration') {
-        const name = node.field('name')?.text()
-        if (name) {
-          scopes.push({
-            name,
-            line: node.range().start.line + 1,
-            text: node.text(),
-          })
-        }
-        return
-      }
-      for (const child of node.children()) {
-        walkScopes(child)
-      }
-    }
-    walkScopes(root)
 
     const referenceFacts = this.buildReferenceFacts(
       context.workspaceName,
@@ -836,7 +933,6 @@ export class PhpLanguageAdapter implements LanguageAdapter {
         typeInfos: serializedInfos,
         requireRelations,
         dynamicLoaders: rawDynamicLoaders,
-        scopes,
       },
     }
   }
@@ -1417,9 +1513,18 @@ export class PhpLanguageAdapter implements LanguageAdapter {
    * @param root - The root AST node.
    * @param filePath - The path of the file being analyzed.
    * @param symbols - Existing symbol nodes to reference.
+   * @param declarationIndex - Optional exact declaration index for symbol lookup.
+   * @param observer - Optional observer recording structural work.
    * @returns An array of PHP type information structures.
    */
-  private collectPhpTypeInfo(root: SgNode, filePath: string, symbols: SymbolNode[]): PhpTypeInfo[] {
+  private collectPhpTypeInfo(
+    root: SgNode,
+    filePath: string,
+    symbols: SymbolNode[],
+    declarationIndex?: DeclarationSymbolIndex,
+    observer?: StructuralWorkObserver,
+  ): PhpTypeInfo[] {
+    const declIndex = declarationIndex ?? createDeclarationSymbolIndex(symbols, observer)
     const infos: PhpTypeInfo[] = []
 
     const walk = (node: SgNode): void => {
@@ -1442,13 +1547,8 @@ export class PhpLanguageAdapter implements LanguageAdapter {
                   ? SymbolKind.Enum
                   : SymbolKind.Type
           const line = node.range().start.line + 1
-          const ownerSymbol = symbols.find(
-            (symbol) =>
-              symbol.filePath === filePath &&
-              symbol.kind === kind &&
-              symbol.name === name &&
-              symbol.line === line,
-          )
+          const col = node.range().start.column
+          const ownerSymbol = declIndex.find(kind, name, line, col)
 
           if (ownerSymbol) {
             const extendsNames: string[] = []
@@ -1525,26 +1625,18 @@ export class PhpLanguageAdapter implements LanguageAdapter {
             const methodsByName = new Map<string, string>()
             const memberSymbolIds: string[] = []
             const memberFormsById = new Map<string, MemberSemantics>()
-            for (const symbol of symbols) {
-              if (
-                symbol.filePath !== filePath ||
-                (symbol.kind !== SymbolKind.Method &&
-                  symbol.kind !== SymbolKind.Variable &&
-                  symbol.kind !== SymbolKind.Property)
-              ) {
-                continue
+            const directMembers = collectPhpDirectMemberEvidence(
+              node,
+              ownerSymbol,
+              declIndex,
+              observer,
+            )
+            for (const dm of directMembers) {
+              memberSymbolIds.push(dm.symbol.id)
+              if (dm.symbol.kind === SymbolKind.Method) {
+                methodsByName.set(dm.symbol.name, dm.symbol.id)
               }
-              if (!containsSymbolRange(ownerSymbol, symbol)) continue
-              memberSymbolIds.push(symbol.id)
-              if (symbol.kind === SymbolKind.Method) {
-                methodsByName.set(symbol.name, symbol.id)
-                memberFormsById.set(symbol.id, phpMemberSemantics(symbol, node))
-              } else if (symbol.kind === SymbolKind.Property) {
-                memberFormsById.set(symbol.id, {
-                  kind: MemberKind.Property,
-                  dispatch: MemberDispatch.Instance,
-                })
-              }
+              memberFormsById.set(dm.symbol.id, dm.semantics)
             }
 
             infos.push({
@@ -1581,6 +1673,7 @@ export class PhpLanguageAdapter implements LanguageAdapter {
    * @param _content - The file content.
    * @param symbols - The extracted symbols.
    * @param imports - The resolved imports.
+   * @param callableIndex - Optional prebuilt callable containment index for the file.
    * @returns An array of extracted binding facts.
    */
   private extractBindingFactsFromData(
@@ -1589,9 +1682,15 @@ export class PhpLanguageAdapter implements LanguageAdapter {
     _content: string,
     symbols: SymbolNode[],
     imports: ImportDeclaration[],
+    callableIndex?: CallableContainmentIndex,
   ): BindingFact[] {
     const facts: BindingFact[] = []
     const seen = new Set<string>()
+    const callables =
+      callableIndex ??
+      createCallableContainmentIndex(symbols, {
+        callableKinds: PHP_CALLABLE_KINDS,
+      })
 
     const addFact = (
       name: string,
@@ -1611,16 +1710,7 @@ export class PhpLanguageAdapter implements LanguageAdapter {
       facts.push({
         name,
         filePath,
-        scopeId:
-          scopeId ??
-          findContainingCallableSymbol(
-            symbols,
-            { line, column },
-            {
-              callableKinds: PHP_CALLABLE_KINDS,
-            },
-          )?.id ??
-          filePath,
+        scopeId: scopeId ?? callables.find({ line, column })?.id ?? filePath,
         sourceKind,
         location,
         targetName,
@@ -1848,6 +1938,7 @@ export class PhpLanguageAdapter implements LanguageAdapter {
    * @param filePath - The file path.
    * @param _content - The file content.
    * @param symbols - Existing symbol nodes to map callers.
+   * @param callableIndex - Optional prebuilt callable containment index for the file.
    * @returns An array of extracted call facts.
    */
   private extractCallFactsFromData(
@@ -1855,9 +1946,15 @@ export class PhpLanguageAdapter implements LanguageAdapter {
     filePath: string,
     _content: string,
     symbols: SymbolNode[],
+    callableIndex?: CallableContainmentIndex,
   ): CallFact[] {
     const facts: CallFact[] = []
     const seen = new Set<string>()
+    const callables =
+      callableIndex ??
+      createCallableContainmentIndex(symbols, {
+        callableKinds: PHP_CALLABLE_KINDS,
+      })
 
     const addFact = (
       form: CallForm,
@@ -1871,11 +1968,7 @@ export class PhpLanguageAdapter implements LanguageAdapter {
       const location = { filePath, line, column, endLine, endColumn }
       const key = `${form}:${receiverName ?? ''}:${name}:${location.line}:${location.column}`
       if (seen.has(key)) return
-      const callerSymbol = findContainingCallableSymbol(
-        symbols,
-        { line: location.line, column: location.column },
-        { callableKinds: PHP_CALLABLE_KINDS },
-      )
+      const callerSymbol = callables.find({ line: location.line, column: location.column })
       facts.push({
         filePath,
         scopeId: callerSymbol?.id ?? filePath,

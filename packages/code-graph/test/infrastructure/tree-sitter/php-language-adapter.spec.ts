@@ -21,7 +21,17 @@ import {
 import { type ImportDeclaration } from '../../../src/domain/value-objects/import-declaration.js'
 import { type FileAnalysis } from '../../../src/domain/value-objects/file-analysis.js'
 import { InMemoryIndexSession } from '../../../src/application/use-cases/in-memory-index-session.js'
-import { parseLogicalSymbol } from '../../../src/domain/value-objects/symbol-reference.js'
+import {
+  parseLogicalSymbol,
+  MemberDispatch,
+  MemberKind,
+} from '../../../src/domain/value-objects/symbol-reference.js'
+import {
+  setStructuralWorkObserverForTesting,
+  type StructuralWorkKind,
+  type StructuralWorkObserver,
+} from '../../../src/infrastructure/tree-sitter/reference-fact-helpers.js'
+import { collectPhpDirectMemberEvidence } from '../../../src/infrastructure/tree-sitter/php-language-adapter.js'
 import { createImportResolutionContext } from '../../helpers/import-resolution-context.js'
 import {
   type PackageResolutionFacet,
@@ -2762,5 +2772,292 @@ describe('PHP framework loader families', () => {
         fsSpy.mockRestore()
       }
     })
+  })
+})
+
+function registerPhpTestFile(session: InMemoryIndexSession, filePath: string): void {
+  session.registerFile({
+    filePath,
+    projectRelativePath: filePath,
+    language: 'php',
+    contentHash: 'abc',
+    workspace: 'ws',
+  })
+}
+
+describe('PHP direct and nested member semantics (Task 2.7)', () => {
+  it('Scenario: Direct and nested declarations retain their own semantics', () => {
+    const session = new InMemoryIndexSession()
+    registerPhpTestFile(session, 'ws:src/members.php')
+    const code = `<?php
+namespace App;
+
+interface Greeter {
+  public function greet(): string;
+}
+
+trait LoggerTrait {
+  public function log(string $msg): void {}
+}
+
+enum Status {
+  case Active;
+  case Inactive;
+}
+
+class Service implements Greeter {
+  use LoggerTrait;
+
+  public const TIMEOUT = 30;
+  private string $name;
+
+  public function __construct(string $name) {
+    $this->name = $name;
+  }
+
+  public function greet(): string {
+    // Nested anonymous class with its own method
+    $helper = new class {
+      public function innerMethod(): int { return 42; }
+    };
+    return "Hello " . $this->name;
+  }
+
+  /* Multiline comment
+     before static modifier */
+  public static
+  function createDefault(): self {
+    return new self("default");
+  }
+}
+`
+    const draft = baseAdapter.analyzeFile('ws:src/members.php', code, {
+      session,
+      workspaceName: 'ws',
+    })
+
+    const typeInfos = (
+      draft.parserState as unknown as {
+        typeInfos: Array<{
+          name: string
+          methodsByName: Record<string, string>
+          memberSymbolIds: readonly string[]
+          memberFormsById: Record<string, { kind: MemberKind; dispatch?: MemberDispatch }>
+        }>
+      }
+    ).typeInfos
+
+    const serviceInfo = typeInfos.find((t) => t.name === 'Service')
+    expect(serviceInfo).toBeDefined()
+    expect(serviceInfo?.methodsByName['greet']).toBeDefined()
+    expect(serviceInfo?.methodsByName['createDefault']).toBeDefined()
+    expect(serviceInfo?.methodsByName['__construct']).toBeDefined()
+
+    // Service methods should NOT include innerMethod from the nested anonymous class
+    expect(serviceInfo?.methodsByName['innerMethod']).toBeUndefined()
+
+    const constructId = serviceInfo!.methodsByName['__construct']!
+    const greetId = serviceInfo!.methodsByName['greet']!
+    const createDefaultId = serviceInfo!.methodsByName['createDefault']!
+
+    expect(serviceInfo!.memberFormsById[constructId]?.kind).toBe(MemberKind.Constructor)
+    expect(serviceInfo!.memberFormsById[greetId]?.kind).toBe(MemberKind.Method)
+    expect(serviceInfo!.memberFormsById[greetId]?.dispatch).toBe(MemberDispatch.Instance)
+    expect(serviceInfo!.memberFormsById[createDefaultId]?.kind).toBe(MemberKind.Method)
+    expect(serviceInfo!.memberFormsById[createDefaultId]?.dispatch).toBe(MemberDispatch.Static)
+
+    // Enum check
+    const statusInfo = typeInfos.find((t) => t.name === 'Status')
+    expect(statusInfo).toBeDefined()
+    expect(statusInfo?.memberSymbolIds.length).toBe(2)
+
+    // Interface check
+    const greeterInfo = typeInfos.find((t) => t.name === 'Greeter')
+    expect(greeterInfo).toBeDefined()
+    expect(greeterInfo?.methodsByName['greet']).toBeDefined()
+  })
+})
+
+describe('PHP structural bounds and compact parser state (Task 2.8)', () => {
+  it('Scenario: Large class body is not traversed per method and retains no routine source', () => {
+    const session = new InMemoryIndexSession()
+    registerPhpTestFile(session, 'ws:src/large.php')
+    const counts = new Map<StructuralWorkKind, number>()
+    const observer: StructuralWorkObserver = {
+      record(kind): void {
+        counts.set(kind, (counts.get(kind) ?? 0) + 1)
+      },
+    }
+    const adapter = new PhpLanguageAdapter()
+    setStructuralWorkObserverForTesting(adapter, observer)
+
+    // Generate 400 methods with unique bodies and routine body markers
+    const methods = Array.from({ length: 400 }, (_, i) => {
+      return `  public function action${i}() {
+    $a = 1;
+    $b = 2;
+    $c = $a + $b;
+    // UNIQUE_BODY_MARKER_${i}
+    return $c;
+  }`
+    }).join('\n')
+
+    const code = `<?php
+namespace App;
+
+class LargeController {
+${methods}
+}
+`
+    const draft = adapter.analyzeFile('ws:src/large.php', code, {
+      session,
+      workspaceName: 'ws',
+    })
+
+    const parserState = draft.parserState as unknown as {
+      kind: string
+      typeInfos: Array<{
+        name: string
+        memberSymbolIds: readonly string[]
+        methodsByName: Record<string, string>
+      }>
+      scopes?: unknown
+    }
+
+    expect(parserState.kind).toBe('php')
+    // scopes must be absent from newly produced parser state
+    expect('scopes' in parserState).toBe(false)
+
+    // Serialized parser state must NOT retain routine body text
+    const serialized = JSON.stringify(parserState)
+    expect(serialized.includes('UNIQUE_BODY_MARKER_')).toBe(false)
+
+    // Confirm that 400 methods were extracted
+    const controller = parserState.typeInfos.find((t) => t.name === 'LargeController')
+    expect(controller).toBeDefined()
+    expect(controller?.memberSymbolIds.length).toBe(400)
+    expect(Object.keys(controller?.methodsByName ?? {}).length).toBe(400)
+    // The declaration list plus its two structural children are visited once; method bodies are never entered.
+    expect(counts.get('owner-member-node-visited')).toBe(402)
+
+    // Body growth comparison: 400 methods with small bodies must yield the EXACT same owner-member-node-visited count
+    const smallCounts = new Map<StructuralWorkKind, number>()
+    const smallObserver: StructuralWorkObserver = {
+      record(kind): void {
+        smallCounts.set(kind, (smallCounts.get(kind) ?? 0) + 1)
+      },
+    }
+    const smallAdapter = new PhpLanguageAdapter()
+    setStructuralWorkObserverForTesting(smallAdapter, smallObserver)
+    const smallMethods = Array.from(
+      { length: 400 },
+      (_, i) => `  public function action${i}() { return 1; }`,
+    ).join('\n')
+    const smallCode = `<?php\nnamespace App;\nclass SmallController {\n${smallMethods}\n}\n`
+    registerPhpTestFile(session, 'ws:src/small.php')
+    smallAdapter.analyzeFile('ws:src/small.php', smallCode, {
+      session,
+      workspaceName: 'ws',
+    })
+    expect(smallCounts.get('owner-member-node-visited')).toBe(402)
+    expect(counts.get('owner-member-node-visited')).toBe(
+      smallCounts.get('owner-member-node-visited'),
+    )
+  })
+})
+
+describe('PHP complete output parity (Task 2.9)', () => {
+  it('Scenario: Indexed and baseline semantics are equivalent across analysis artifacts', () => {
+    const session = new InMemoryIndexSession()
+    registerPhpTestFile(session, 'ws:src/sample.php')
+
+    const code = `<?php
+namespace App\\Http;
+
+use App\\Models\\User;
+use App\\Services\\AuthService as Auth;
+
+class LoginController {
+  private Auth $auth;
+
+  public function __construct(Auth $auth) {
+    $this->auth = $auth;
+  }
+
+  public function login(string $email, string $password): bool {
+    $user = User::findByEmail($email);
+    if (!$user) {
+      return false;
+    }
+    return $this->auth->verify($user, $password);
+  }
+}
+`
+    const draft = baseAdapter.analyzeFile('ws:src/sample.php', code, {
+      session,
+      workspaceName: 'ws',
+    })
+
+    // Complete normalized symbol parity: exact names and kinds
+    const symbolSummaries = draft.symbols.map((s) => ({ name: s.name, kind: s.kind }))
+    expect(symbolSummaries).toEqual([
+      { name: 'LoginController', kind: SymbolKind.Class },
+      { name: 'auth', kind: SymbolKind.Property },
+      { name: '__construct', kind: SymbolKind.Method },
+      { name: 'login', kind: SymbolKind.Method },
+    ])
+
+    // Complete normalized import parity
+    expect(draft.imports).toEqual([
+      {
+        specifier: 'App\\Models\\User',
+        localName: 'User',
+        originalName: 'User',
+        isRelative: false,
+        kind: 'named',
+      },
+      {
+        specifier: 'App\\Services\\AuthService',
+        localName: 'Auth',
+        originalName: 'AuthService',
+        isRelative: false,
+        kind: 'named',
+      },
+    ])
+
+    // TypeInfos accurately populated
+    const parserState = draft.parserState as unknown as {
+      typeInfos: Array<{
+        name: string
+        methodsByName: Record<string, string>
+        memberSymbolIds: readonly string[]
+      }>
+    }
+    const info = parserState.typeInfos.find((t) => t.name === 'LoginController')
+    expect(info).toBeDefined()
+    expect(info?.methodsByName['__construct']).toBeDefined()
+    expect(info?.methodsByName['login']).toBeDefined()
+
+    // Complete call facts parity with exact scopes
+    const callSummaries = draft.callFacts?.map((c) => ({
+      name: c.name,
+      form: c.form,
+      scopeId: c.scopeId,
+      receiverName: c.receiverName,
+    }))
+    expect(callSummaries).toEqual([
+      {
+        name: 'findByEmail',
+        form: 'static',
+        scopeId: info?.methodsByName['login'],
+        receiverName: 'User',
+      },
+      {
+        name: 'verify',
+        form: 'member',
+        scopeId: info?.methodsByName['login'],
+        receiverName: 'auth',
+      },
+    ])
   })
 })

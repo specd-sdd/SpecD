@@ -29,7 +29,15 @@ import {
   parseLogicalSymbol,
   createPublicBinding,
   SymbolSpace,
+  MemberKind,
+  MemberDispatch,
+  MemberAccessor,
 } from '../../../src/domain/value-objects/symbol-reference.js'
+import {
+  setStructuralWorkObserverForTesting,
+  type StructuralWorkObserver,
+  type StructuralWorkKind,
+} from '../../../src/infrastructure/tree-sitter/reference-fact-helpers.js'
 import { createImportResolutionContext } from '../../helpers/import-resolution-context.js'
 import {
   type PackageResolutionFacet,
@@ -2806,5 +2814,274 @@ describe('TypeScript package resolution hardening', () => {
     } finally {
       rmSync(pkgDir, { recursive: true, force: true })
     }
+  })
+})
+
+describe('TypeScript indexed association and declaration distinctions (Task 4.7)', () => {
+  it('Scenario: Large type collection uses indexed association and preserves declaration distinctions', () => {
+    const counts = new Map<StructuralWorkKind, number>()
+    const observer: StructuralWorkObserver = {
+      record: (k) => counts.set(k, (counts.get(k) ?? 0) + 1),
+    }
+    const testAdapter = new TypeScriptLanguageAdapter()
+    setStructuralWorkObserverForTesting(testAdapter, observer)
+    const session = new InMemoryIndexSession()
+
+    // Generate 80 classes, each with 20 members
+    const classDecls = Array.from({ length: 80 }, (_, cIdx) => {
+      const methods = Array.from({ length: 14 }, (_, mIdx) => {
+        return `  method_${mIdx}() { return ${mIdx}; }`
+      }).join('\n')
+
+      return `
+export class Service_${cIdx} extends BaseService implements IService {
+  fieldProp: string = 'test';
+  constructor() { super(); }
+  static staticWorker() { return 1; }
+  get value() { return 42; }
+  set value(v: number) {}
+  compute(x: number): number;
+  compute(x: string): string;
+  compute(x: any): any { return x; }
+${methods}
+}
+`
+    }).join('\n')
+
+    const code = `
+class BaseService {}
+interface IService {}
+
+${classDecls}
+
+class OuterContainer {
+  outerMethod() { return 1; }
+  static InnerService = class {
+    innerMethod() { return 2; }
+  };
+}
+`
+
+    const draft = testAdapter.analyzeFile('large_types.ts', code, {
+      session,
+      workspaceName: 'ws',
+    })
+
+    const state = draft.parserState as unknown as {
+      declarations: Array<{
+        name: string
+        memberSymbolIds: readonly string[]
+        memberIdsByName: Record<string, string[]>
+        memberSemanticsById: Record<string, { kind: string; dispatch?: string; accessor?: string }>
+        extendsNames: readonly string[]
+        implementsNames: readonly string[]
+      }>
+    }
+
+    expect(state.declarations.length).toBeGreaterThanOrEqual(82)
+
+    // Inspect Service_0
+    const svc0 = state.declarations.find((d) => d.name === 'Service_0')
+    expect(svc0).toBeDefined()
+    expect(svc0?.extendsNames).toEqual(['BaseService'])
+    expect(svc0?.implementsNames).toEqual(['IService'])
+
+    // Member count for Service_0:
+    // fieldProp (1) + constructor (1) + staticWorker (1) + value get/set (2) + compute overloads/impl (3) + 14 methods = 22 direct members
+    expect(svc0?.memberSymbolIds.length).toBe(22)
+
+    // Check overload ordering
+    const computeIds = svc0?.memberIdsByName['compute']
+    expect(computeIds).toBeDefined()
+    expect(computeIds?.length).toBe(3)
+    const [c0, c1, c2] = computeIds ?? []
+    expect(c0).toBeDefined()
+    expect(c1).toBeDefined()
+    expect(c2).toBeDefined()
+    // The overloads must appear in source order in memberSymbolIds
+    const firstIdx = svc0?.memberSymbolIds.indexOf(c0!)
+    const secondIdx = svc0?.memberSymbolIds.indexOf(c1!)
+    const thirdIdx = svc0?.memberSymbolIds.indexOf(c2!)
+    expect(firstIdx).toBeLessThan(secondIdx!)
+    expect(secondIdx).toBeLessThan(thirdIdx!)
+
+    // Check semantics
+    const constructorId = svc0?.memberIdsByName['constructor']?.[0]
+    expect(constructorId).toBeDefined()
+    expect(svc0?.memberSemanticsById[constructorId!]).toEqual({
+      kind: MemberKind.Constructor,
+    })
+
+    const staticId = svc0?.memberIdsByName['staticWorker']?.[0]
+    expect(staticId).toBeDefined()
+    expect(svc0?.memberSemanticsById[staticId!]).toEqual({
+      kind: MemberKind.Method,
+      dispatch: MemberDispatch.Static,
+    })
+
+    const valueIds = svc0?.memberIdsByName['value']
+    expect(valueIds).toBeDefined()
+    expect(valueIds?.length).toBe(2)
+    const getterId = valueIds?.find(
+      (id) => svc0?.memberSemanticsById[id]?.accessor === MemberAccessor.Get,
+    )
+    const setterId = valueIds?.find(
+      (id) => svc0?.memberSemanticsById[id]?.accessor === MemberAccessor.Set,
+    )
+    expect(getterId).toBeDefined()
+    expect(setterId).toBeDefined()
+
+    // Nested class isolation: OuterContainer must NOT contain innerMethod
+    const outer = state.declarations.find((d) => d.name === 'OuterContainer')
+    expect(outer).toBeDefined()
+    expect(outer?.memberIdsByName['innerMethod']).toBeUndefined()
+
+    // Linear owner-member-node-visited counts: 80 * 22 members + base/outer ~= 1,770 visits, must be strictly under 2,500 (not 80 * 1700 = 136,000)
+    const memberVisits = counts.get('owner-member-node-visited') ?? 0
+    expect(memberVisits).toBeGreaterThanOrEqual(1700)
+    expect(memberVisits).toBeLessThan(2500)
+  })
+})
+
+describe('TypeScript lexical-summary reuse (Task 4.8)', () => {
+  it('Scenario: Functions, blocks, and catch scopes share one summary per scope', () => {
+    const counts = new Map<StructuralWorkKind, number>()
+    const observer: StructuralWorkObserver = {
+      record: (k) => counts.set(k, (counts.get(k) ?? 0) + 1),
+    }
+    const testAdapter = new TypeScriptLanguageAdapter()
+    setStructuralWorkObserverForTesting(testAdapter, observer)
+    const session = new InMemoryIndexSession()
+
+    const code = `
+function outerProcess(param1: string, param2: number) {
+  // Many calls inside function scope
+  call1();
+  call2();
+  call3();
+  call4();
+  param1(); // shadowed by param
+
+  {
+    const blockLocal = 123;
+    let anotherLocal = 456;
+    call5();
+    call6();
+    call7();
+    blockLocal(); // shadowed by block local
+  }
+
+  try {
+    call8();
+  } catch (err) {
+    call9();
+    call10();
+    err(); // shadowed by catch param
+  }
+}
+`
+
+    const draft = testAdapter.analyzeFile('scopes.ts', code, {
+      session,
+      workspaceName: 'ws',
+    })
+
+    const calledNames = (draft.callFacts ?? []).map((c) => c.name)
+    // Unshadowed calls exist
+    for (let i = 1; i <= 10; i++) {
+      expect(calledNames).toContain(`call${i}`)
+    }
+    // Shadowed calls are omitted
+    expect(calledNames).not.toContain('param1')
+    expect(calledNames).not.toContain('blockLocal')
+    expect(calledNames).not.toContain('err')
+
+    // Bounded lexical scope node visits:
+    // 1 function scope + 1 inner statement block + 1 try block + 1 catch block + 1 catch clause = at most 5 scope summary visits
+    const scopeVisits = counts.get('lexical-scope-node-visited') ?? 0
+    expect(scopeVisits).toBeGreaterThan(0)
+    expect(scopeVisits).toBeLessThanOrEqual(6)
+  })
+})
+
+describe('TypeScript/JavaScript complete output parity (Task 4.9)', () => {
+  it('Scenario: Preserves semantic output across TypeScript, TSX, JavaScript, and JSX dialects', () => {
+    const session = new InMemoryIndexSession()
+
+    const tsCode = `
+import { readFile } from 'fs';
+export interface Greeter {
+  greet(name: string): string;
+}
+export abstract class AbstractGreeter {
+  abstract greet(name: string): string;
+}
+export class DefaultGreeter implements Greeter {
+  version: string = '1.0';
+  constructor(private prefix: string) {}
+  greet(name: string): string {
+    return this.prefix + ' ' + name;
+  }
+}
+`
+
+    const tsxCode = `
+import React from 'react';
+export function HelloComponent(props: { name: string }) {
+  return <div>{props.name}</div>;
+}
+`
+
+    const jsCode = `
+const path = require('path');
+class Calculator {
+  add(a, b) {
+    return a + b;
+  }
+}
+module.exports = { Calculator };
+`
+
+    const jsxCode = `
+import React from 'react';
+function App() {
+  return <span>App</span>;
+}
+`
+
+    const tsDraft = baseAdapter.analyzeFile('ws:src/file.ts', tsCode, {
+      session,
+      workspaceName: 'ws',
+    })
+    const tsxDraft = baseAdapter.analyzeFile('ws:src/file.tsx', tsxCode, {
+      session,
+      workspaceName: 'ws',
+    })
+    const jsDraft = baseAdapter.analyzeFile('ws:src/file.js', jsCode, {
+      session,
+      workspaceName: 'ws',
+    })
+    const jsxDraft = baseAdapter.analyzeFile('ws:src/file.jsx', jsxCode, {
+      session,
+      workspaceName: 'ws',
+    })
+
+    // TS assertions
+    expect(tsDraft.symbols.length).toBeGreaterThan(0)
+    expect(tsDraft.imports.length).toBe(1)
+    const tsState = tsDraft.parserState as unknown as { declarations: Array<{ name: string }> }
+    expect(tsState.declarations.map((d) => d.name)).toContain('DefaultGreeter')
+    expect(tsState.declarations.map((d) => d.name)).toContain('Greeter')
+    expect(tsState.declarations.map((d) => d.name)).toContain('AbstractGreeter')
+    expect(tsDraft.symbols.some((symbol) => symbol.name === 'greet')).toBe(true)
+
+    // TSX assertions
+    expect(tsxDraft.symbols.some((s) => s.name === 'HelloComponent')).toBe(true)
+
+    // JS assertions
+    expect(jsDraft.symbols.some((s) => s.name === 'Calculator')).toBe(true)
+
+    // JSX assertions
+    expect(jsxDraft.symbols.some((s) => s.name === 'App')).toBe(true)
   })
 })

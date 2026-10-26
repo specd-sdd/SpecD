@@ -1,0 +1,757 @@
+{
+  "name": "optimize-language-adapter-ast-traversals",
+  "createdAt": "2026-10-23T07:13:20.177Z",
+  "updatedAt": "2026-10-26T07:16:05.941Z",
+  "description": "Eliminate O(M*N) AST traversals in language adapter member semantics and scope resolution to prevent indexing freezes on large files",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "code-graph:php-language-adapter",
+    "code-graph:python-language-adapter",
+    "code-graph:language-adapter",
+    "code-graph:typescript-language-adapter",
+    "code-graph:go-language-adapter"
+  ],
+  "specDependsOn": {
+    "code-graph:php-language-adapter": [
+      "code-graph:language-adapter",
+      "code-graph:symbol-model",
+      "code-graph:workspace-integration"
+    ],
+    "code-graph:python-language-adapter": [
+      "code-graph:language-adapter",
+      "code-graph:symbol-model",
+      "code-graph:workspace-integration"
+    ],
+    "code-graph:language-adapter": ["code-graph:symbol-model"],
+    "code-graph:typescript-language-adapter": [
+      "code-graph:language-adapter",
+      "code-graph:symbol-model",
+      "code-graph:workspace-integration"
+    ],
+    "code-graph:go-language-adapter": [
+      "code-graph:language-adapter",
+      "code-graph:symbol-model",
+      "code-graph:workspace-integration"
+    ]
+  },
+  "invalidationPolicy": "downstream",
+  "implementationTrackingStartedAt": "2026-10-23T11:24:36.178Z",
+  "trackedImplementationFiles": [
+    {
+      "file": "EXPLORATION_GRAPH_CLI_OUTPUT_OPTIMIZATION.md",
+      "state": "ignored"
+    },
+    {
+      "file": "EXPLORATION_KERNEL_PLUGINS.md",
+      "state": "ignored"
+    },
+    {
+      "file": "SpecD — Análisis de identidad LogicalSymbol dependencias y casos de uso.md",
+      "state": "ignored"
+    },
+    {
+      "file": "dev/scripts/graph-file-doc.js",
+      "state": "ignored"
+    },
+    {
+      "file": "dev/scripts/spec-metadata-diff-poc/index.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "dev/scripts/spec-metadata-diff-poc/vcs-spec-repository.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "dev/scripts/spec-metadata-diff-poc/working-copy-spec-repository.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "dev/scripts/symbol-inspect-poc.mjs",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/language-adapter/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/sqlite-graph-store/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/symbol-model/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/change-manifest/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/config-writer-port/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/reference-fact-helpers.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/php-language-adapter.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/python-language-adapter.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/typescript-language-adapter.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/go-language-adapter.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/go-language-adapter.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/language-adapter-conformance.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/php-language-adapter.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/python-language-adapter.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/reference-fact-helpers.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/typescript-language-adapter.spec.ts",
+      "state": "ignored"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "code-graph:language-adapter",
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/reference-fact-helpers.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "StructuralWorkKind",
+        "StructuralWorkObserver",
+        "DeclarationSymbolIndex",
+        "createDeclarationSymbolIndex",
+        "CallableContainmentIndex",
+        "createCallableContainmentIndex",
+        "findContainingCallableSymbol"
+      ]
+    },
+    {
+      "specId": "code-graph:php-language-adapter",
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/php-language-adapter.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["PhpDirectMemberEvidence", "collectPhpDirectMemberEvidence", "PhpLanguageAdapter"]
+    },
+    {
+      "specId": "code-graph:python-language-adapter",
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/python-language-adapter.ts",
+      "fileLinkExplicit": true,
+      "symbols": ["PythonLanguageAdapter"]
+    },
+    {
+      "specId": "code-graph:typescript-language-adapter",
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/typescript-language-adapter.ts",
+      "fileLinkExplicit": true,
+      "symbols": ["TypeScriptLanguageAdapter"]
+    },
+    {
+      "specId": "code-graph:go-language-adapter",
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/go-language-adapter.ts",
+      "fileLinkExplicit": true,
+      "symbols": ["GoLanguageAdapter"]
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:01bc9d38717e50da8d58e83ca2f2bc0fda54962d88cc17dfeaa46c5283f8f816"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "code-graph:php-language-adapter",
+          "filename": "deltas/code-graph/php-language-adapter/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:af97df1de1dbfc91ba375b2a9af89e781574e5575df3be48587d3469ec2a5248"
+        },
+        {
+          "key": "code-graph:python-language-adapter",
+          "filename": "deltas/code-graph/python-language-adapter/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:174970496676f44528cd1e588846cae10d3ac1e69385105ce9d2f46213def8e7"
+        },
+        {
+          "key": "code-graph:language-adapter",
+          "filename": "deltas/code-graph/language-adapter/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:ef14f4f4099d5ae5d922383e613ec901f7fb386f37969fc73be2a17d73fc58cd"
+        },
+        {
+          "key": "code-graph:typescript-language-adapter",
+          "filename": "deltas/code-graph/typescript-language-adapter/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:111786660f421a5cdb5d578344df65906d7c273272a15907fa05b05bb48be783"
+        },
+        {
+          "key": "code-graph:go-language-adapter",
+          "filename": "deltas/code-graph/go-language-adapter/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:0bf17d2b71f2f2dfdafaec50b036d670f7aea9fac0c0213f9092765698723c78"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "code-graph:php-language-adapter",
+          "filename": "deltas/code-graph/php-language-adapter/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:5f87efab03138534455b09f4a4e39c5cd8f81b9fcd5866f7b73f47790aa60503"
+        },
+        {
+          "key": "code-graph:python-language-adapter",
+          "filename": "deltas/code-graph/python-language-adapter/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:6fc147fc23bbd70b3046c951439d9dba86d3e7715ec33e1c3006d76d778ccb92"
+        },
+        {
+          "key": "code-graph:language-adapter",
+          "filename": "deltas/code-graph/language-adapter/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:83c0bab9bdbae5ccd22d0cc43f1480bcb1ce16152eb3dfcf8cea5cfc848a487f"
+        },
+        {
+          "key": "code-graph:typescript-language-adapter",
+          "filename": "deltas/code-graph/typescript-language-adapter/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b5c727c9048fabaed9733d389b430d6076203ad651cdc1d8e58c8a59eed5beac"
+        },
+        {
+          "key": "code-graph:go-language-adapter",
+          "filename": "deltas/code-graph/go-language-adapter/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:a7611cf976ef1f572721890ca3574115bbaea3a8528222a3cc9f9c97e991affc"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:a71ff1a20c54b618d9500db539915247efb98c1bd7b2eaf6b6bdd58c2f4b68aa"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "verify", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:83341b25c282a962d3fb33d2a14db4d3dfe0614f1873b163f749a08a0d6496f1"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-10-23T07:13:20.177Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": [
+        "code-graph:php-language-adapter",
+        "code-graph:python-language-adapter",
+        "code-graph:language-adapter"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-23T07:13:20.209Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:php-language-adapter"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:python-language-adapter"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:language-adapter"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:php-language-adapter"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:python-language-adapter"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:language-adapter"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-23T08:49:06.411Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'code-graph-package-resolution-hardening' was archived with overlapping specs: code-graph:language-adapter, code-graph:php-language-adapter, code-graph:python-language-adapter",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:php-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:language-adapter"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:php-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:language-adapter"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-23T08:49:06.411Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-23T08:49:19.175Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'code-graph-package-resolution-hardening' was archived with overlapping specs: code-graph:language-adapter, code-graph:php-language-adapter, code-graph:python-language-adapter",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:php-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:language-adapter"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:php-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:language-adapter"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-23T08:49:47.071Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'code-graph-package-resolution-hardening' was archived with overlapping specs: code-graph:language-adapter, code-graph:php-language-adapter, code-graph:python-language-adapter",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:php-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:language-adapter"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:php-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:language-adapter"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-23T10:48:12.458Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:php-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:language-adapter"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:php-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:language-adapter"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-23T10:48:12.460Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "code-graph:typescript-language-adapter"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:typescript-language-adapter"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-23T10:48:37.514Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:php-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:language-adapter",
+            "code-graph:typescript-language-adapter"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:php-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:language-adapter",
+            "code-graph:typescript-language-adapter"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-23T10:48:37.516Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "code-graph:go-language-adapter"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:go-language-adapter"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-23T11:00:14.389Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:php-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:language-adapter",
+            "code-graph:typescript-language-adapter",
+            "code-graph:go-language-adapter"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:php-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:language-adapter",
+            "code-graph:typescript-language-adapter",
+            "code-graph:go-language-adapter"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-23T11:23:45.446Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-23T11:24:36.178Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-25T16:47:47.063Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-25T17:12:09.561Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-25T20:28:04.817Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-26T06:58:34.708Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-26T06:59:01.131Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-26T07:16:05.938Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-10-26T07:16:06.132Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

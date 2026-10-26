@@ -81,6 +81,289 @@ export interface CallableContainmentPolicy {
   readonly eligibleSymbolIds?: ReadonlySet<string>
 }
 
+/** Work categories observable by deterministic complexity tests. */
+export type StructuralWorkKind =
+  | 'declaration-symbol-indexed'
+  | 'declaration-symbol-lookup'
+  | 'callable-symbol-indexed'
+  | 'callable-interval-visited'
+  | 'owner-member-node-visited'
+  | 'lexical-scope-node-visited'
+  | 'interface-method-set-expanded'
+
+/** Optional package-internal observer used only to count structural work. */
+export interface StructuralWorkObserver {
+  record(kind: StructuralWorkKind): void
+}
+
+const ADAPTER_TEST_OBSERVERS = new WeakMap<object, StructuralWorkObserver>()
+
+/**
+ * Sets a package-internal structural-work observer on an adapter instance for focused testing.
+ * @param adapter - The adapter instance.
+ * @param observer - The observer to attach, or undefined to detach.
+ */
+export function setStructuralWorkObserverForTesting(
+  adapter: object,
+  observer: StructuralWorkObserver | undefined,
+): void {
+  if (observer) {
+    ADAPTER_TEST_OBSERVERS.set(adapter, observer)
+  } else {
+    ADAPTER_TEST_OBSERVERS.delete(adapter)
+  }
+}
+
+/**
+ * Retrieves the structural-work observer attached to an adapter instance, if any.
+ * @param adapter - The adapter instance.
+ * @returns The attached observer or undefined.
+ */
+export function getStructuralWorkObserver(adapter: object): StructuralWorkObserver | undefined {
+  return ADAPTER_TEST_OBSERVERS.get(adapter)
+}
+
+/** Exact declaration lookup over extracted symbols. */
+export interface DeclarationSymbolIndex {
+  readonly size: number
+  find(kind: SymbolKind, name: string, line: number, column: number): SymbolNode | undefined
+}
+
+/**
+ * Creates one exact declaration index; duplicate exact keys resolve by stable symbol id.
+ * @param symbols - Extracted declaration symbols in the file.
+ * @param observer - Optional test observer recording build and lookup operations.
+ * @returns Immutable declaration index for constant-time exact symbol lookup.
+ */
+export function createDeclarationSymbolIndex(
+  symbols: readonly SymbolNode[],
+  observer?: StructuralWorkObserver,
+): DeclarationSymbolIndex {
+  const map = new Map<string, SymbolNode[]>()
+
+  for (const sym of symbols) {
+    observer?.record('declaration-symbol-indexed')
+    const key = `${sym.kind}\u0000${sym.line}\u0000${sym.column}\u0000${sym.name}`
+    const existing = map.get(key)
+    if (existing === undefined) {
+      map.set(key, [sym])
+    } else {
+      existing.push(sym)
+    }
+  }
+
+  for (const entries of map.values()) {
+    if (entries.length > 1) {
+      entries.sort((a, b) => a.id.localeCompare(b.id))
+    }
+  }
+
+  return {
+    get size(): number {
+      return map.size
+    },
+    find(kind: SymbolKind, name: string, line: number, column: number): SymbolNode | undefined {
+      observer?.record('declaration-symbol-lookup')
+      const key = `${kind}\u0000${line}\u0000${column}\u0000${name}`
+      const entries = map.get(key)
+      return entries?.[0]
+    },
+  }
+}
+
+/** Reusable half-open interval lookup for innermost callable ownership. */
+export interface CallableContainmentIndex {
+  readonly size: number
+  find(position: SourcePosition): SymbolNode | undefined
+}
+
+/** Bounded interval representation for a callable declaration. */
+interface CallableInterval {
+  readonly symbol: SymbolNode
+  readonly start: SourcePosition
+  readonly end: SourcePosition
+}
+
+/** Node in the balanced callable interval tree. */
+interface CallableIntervalNode {
+  readonly interval: CallableInterval
+  readonly minStart: SourcePosition
+  readonly maxEnd: SourcePosition
+  readonly left?: CallableIntervalNode
+  readonly right?: CallableIntervalNode
+}
+
+/**
+ * Compares two source positions lexicographically.
+ * @param a - First position.
+ * @param b - Second position.
+ * @returns Negative if a < b, positive if a > b, 0 if equal.
+ */
+function comparePositions(a: SourcePosition, b: SourcePosition): number {
+  if (a.line !== b.line) return a.line - b.line
+  return a.column - b.column
+}
+
+/**
+ * Checks whether position a is before or equal to position b.
+ * @param a - First position.
+ * @param b - Second position.
+ * @returns True when a <= b.
+ */
+function isBeforeOrEqual(a: SourcePosition, b: SourcePosition): boolean {
+  return a.line < b.line || (a.line === b.line && a.column <= b.column)
+}
+
+/**
+ * Checks whether position a is strictly before position b.
+ * @param a - First position.
+ * @param b - Second position.
+ * @returns True when a < b.
+ */
+function isBefore(a: SourcePosition, b: SourcePosition): boolean {
+  return a.line < b.line || (a.line === b.line && a.column < b.column)
+}
+
+/**
+ * Determines whether candidate is a better (innermost) match than best.
+ * @param candidate - Candidate interval to evaluate.
+ * @param best - Current best interval.
+ * @returns True when candidate is innermost according to policy rules.
+ */
+function isBetterCandidate(candidate: CallableInterval, best: CallableInterval): boolean {
+  const startCmp = comparePositions(candidate.start, best.start)
+  if (startCmp > 0) return true
+  if (startCmp < 0) return false
+  const endCmp = comparePositions(candidate.end, best.end)
+  if (endCmp < 0) return true
+  if (endCmp > 0) return false
+  return candidate.symbol.id.localeCompare(best.symbol.id) < 0
+}
+
+/**
+ * Recursively builds a balanced interval tree from sorted callable intervals.
+ * @param items - Sorted interval list.
+ * @param startIdx - Subtree start index.
+ * @param endIdx - Subtree end index.
+ * @returns Root node of the balanced interval tree or undefined when empty.
+ */
+function buildIntervalTree(
+  items: readonly CallableInterval[],
+  startIdx: number,
+  endIdx: number,
+): CallableIntervalNode | undefined {
+  if (startIdx > endIdx) return undefined
+  const mid = Math.floor((startIdx + endIdx) / 2)
+  const current = items[mid]!
+  const left = buildIntervalTree(items, startIdx, mid - 1)
+  const right = buildIntervalTree(items, mid + 1, endIdx)
+
+  let minStart = current.start
+  let maxEnd = current.end
+
+  if (left !== undefined) {
+    if (comparePositions(left.minStart, minStart) < 0) {
+      minStart = left.minStart
+    }
+    if (comparePositions(left.maxEnd, maxEnd) > 0) {
+      maxEnd = left.maxEnd
+    }
+  }
+
+  if (right !== undefined) {
+    if (comparePositions(right.minStart, minStart) < 0) {
+      minStart = right.minStart
+    }
+    if (comparePositions(right.maxEnd, maxEnd) > 0) {
+      maxEnd = right.maxEnd
+    }
+  }
+
+  return {
+    interval: current,
+    minStart,
+    maxEnd,
+    ...(left !== undefined ? { left } : {}),
+    ...(right !== undefined ? { right } : {}),
+  }
+}
+
+/**
+ * Builds one callable interval tree for one immutable symbol collection and policy.
+ * @param symbols - Extracted declaration symbols in the file.
+ * @param policy - Callable kinds and eligibility constraints.
+ * @param observer - Optional test observer recording build and lookup operations.
+ * @returns Balanced interval tree for innermost callable lookup.
+ */
+export function createCallableContainmentIndex(
+  symbols: readonly SymbolNode[],
+  policy: CallableContainmentPolicy,
+  observer?: StructuralWorkObserver,
+): CallableContainmentIndex {
+  const intervals: CallableInterval[] = []
+
+  for (const symbol of symbols) {
+    if (!policy.callableKinds.has(symbol.kind)) continue
+    if (policy.eligibleSymbolIds !== undefined && !policy.eligibleSymbolIds.has(symbol.id)) {
+      continue
+    }
+    if (symbol.endLine === undefined || symbol.endColumn === undefined) continue
+
+    observer?.record('callable-symbol-indexed')
+    intervals.push({
+      symbol,
+      start: { line: symbol.line, column: symbol.column },
+      end: { line: symbol.endLine, column: symbol.endColumn },
+    })
+  }
+
+  intervals.sort((a, b) => {
+    const startCmp = comparePositions(a.start, b.start)
+    if (startCmp !== 0) return startCmp
+    const endCmp = comparePositions(b.end, a.end)
+    if (endCmp !== 0) return endCmp
+    return a.symbol.id.localeCompare(b.symbol.id)
+  })
+
+  const rootNode = buildIntervalTree(intervals, 0, intervals.length - 1)
+
+  return {
+    get size(): number {
+      return intervals.length
+    },
+    find(position: SourcePosition): SymbolNode | undefined {
+      if (rootNode === undefined) return undefined
+
+      let best: CallableInterval | undefined = undefined
+
+      const search = (node: CallableIntervalNode | undefined): void => {
+        if (node === undefined) return
+
+        if (isBefore(position, node.minStart) || isBeforeOrEqual(node.maxEnd, position)) {
+          return
+        }
+
+        observer?.record('callable-interval-visited')
+
+        if (
+          isBeforeOrEqual(node.interval.start, position) &&
+          isBefore(position, node.interval.end)
+        ) {
+          if (best === undefined || isBetterCandidate(node.interval, best)) {
+            best = node.interval
+          }
+        }
+
+        search(node.left)
+        search(node.right)
+      }
+
+      search(rootNode)
+      return (best as CallableInterval | undefined)?.symbol
+    },
+  }
+}
+
 /**
  * Creates a declaration descriptor while omitting unproven optional evidence.
  * @param input - Syntax-proven declaration dimensions.
@@ -251,39 +534,7 @@ export function findContainingCallableSymbol(
   position: SourcePosition,
   policy: CallableContainmentPolicy,
 ): SymbolNode | undefined {
-  const eligible = symbols.filter((symbol) => {
-    if (!policy.callableKinds.has(symbol.kind)) return false
-    if (policy.eligibleSymbolIds !== undefined && !policy.eligibleSymbolIds.has(symbol.id)) {
-      return false
-    }
-    if (symbol.endLine === undefined || symbol.endColumn === undefined) return false
-
-    // Half-open range containment: start <= position < end
-    const startBeforeOrAt =
-      symbol.line < position.line ||
-      (symbol.line === position.line && symbol.column <= position.column)
-    if (!startBeforeOrAt) return false
-
-    const positionBeforeEnd =
-      position.line < symbol.endLine ||
-      (position.line === symbol.endLine && position.column < symbol.endColumn)
-    if (!positionBeforeEnd) return false
-
-    return true
-  })
-
-  if (eligible.length === 0) return undefined
-
-  // "Innermost" is the candidate with the latest start and earliest end; equal ranges break ties by SymbolNode.id
-  eligible.sort((left, right) => {
-    if (left.line !== right.line) return right.line - left.line
-    if (left.column !== right.column) return right.column - left.column
-    if (left.endLine !== right.endLine) return left.endLine - right.endLine
-    if (left.endColumn !== right.endColumn) return left.endColumn - right.endColumn
-    return left.id.localeCompare(right.id)
-  })
-
-  return eligible[0]
+  return createCallableContainmentIndex(symbols, policy).find(position)
 }
 
 /**

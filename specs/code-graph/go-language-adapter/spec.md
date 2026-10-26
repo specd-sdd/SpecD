@@ -90,6 +90,16 @@ The adapter SHALL advertise `buildContext: false`. Alternatives that depend on u
 
 The adapter SHALL advertise `hierarchy: true` only while embedding paths and proven interface method-set facts are emitted in the shared hierarchy/provenance model. Parse failure, partial package coverage, and unsupported semantics SHALL be surfaced through shared coverage. All facts, relations, and candidate ordering SHALL be deterministic for identical content and session context.
 
+### Requirement: Indexed Go declarations and method sets
+
+The adapter SHALL associate named types, interface methods, struct fields, and receiver methods with extracted symbols through file-local parser-backed indexes. Resolving one declaration or receiver MUST NOT linearly search the complete symbol collection after those indexes are built.
+
+Interface-signature membership and member ownership SHALL use direct symbol-ID sets or maps rather than scanning every type for each method. Pointer-receiver evidence, package visibility, exact declaration ranges, and canonical receiver-type ownership SHALL remain unchanged.
+
+The complete local method set of an interface, including locally resolvable embedded interfaces, SHALL be computed at most once per interface and reused for all implementation checks. The memoized result SHALL distinguish a proven method set from an unknown set caused by an unresolved, package-qualified, cyclic, or otherwise unsupported embedding path.
+
+Comparing each concrete named type with candidate interfaces MAY remain when required to emit distinct `IMPLEMENTS` facts, but the comparison MUST reuse indexed receiver methods and memoized interface method sets. An empty, incomplete, or unknown method set MUST NOT prove implementation, and no member-level `OVERRIDES` relation SHALL be invented.
+
 ## Constraints
 
 - The adapter MUST NOT execute `go list`, compile code, or infer runtime interface values.

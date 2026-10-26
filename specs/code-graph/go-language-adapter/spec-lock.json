@@ -10,10 +10,8 @@
   ],
   "implementation": [
     {
-      "file": "code-graph:src/infrastructure/tree-sitter/go-language-adapter.ts"
-    },
-    {
-      "file": "code-graph:test/infrastructure/tree-sitter/go-language-adapter.spec.ts"
+      "file": "code-graph:src/infrastructure/tree-sitter/go-language-adapter.ts",
+      "symbols": ["GoLanguageAdapter"]
     }
   ],
   "optimizations": {

@@ -94,6 +94,16 @@ Namespace declarations SHALL be addressable through their namespace-qualified lo
 
 Build-context support SHALL remain false while Composer classmap/files, runtime configuration, and conditional autoload behavior are unsupported. Parse failures, partial framework resolution, and unsupported semantics SHALL be represented through shared coverage rather than name-only inference. Outputs SHALL be deterministic for identical content and context.
 
+### Requirement: Bounded PHP member classification and compact state
+
+The adapter SHALL inspect each class, interface, enum, or trait body at most once to associate its direct member declarations with extracted symbols and to derive constructor, static, instance, property, and method semantics. Resolving one direct member MUST NOT recursively traverse the complete owner or descend into function or method bodies.
+
+Direct member association SHALL use parser-backed declaration identity including owner containment, declared name, kind, and source position. A method of a nested or unrelated class-like declaration MUST NOT be classified as a member of the outer owner, including when names or source lines coincide.
+
+`__construct` SHALL remain a constructor. Static dispatch SHALL be proven by the direct method declaration's `static_modifier`; absence of that parser evidence SHALL retain instance dispatch. Existing class-like ownership, trait-use, extends, implements, property, range, and hierarchy semantics SHALL remain unchanged.
+
+Parser-specific state returned from analysis SHALL contain only compact facts consumed by later phases. The adapter MUST NOT retain full function or method source text, or an unconsumed scope collection containing that text, in `FileAnalysis.parserState`.
+
 ## Constraints
 
 - The adapter MUST NOT execute PHP, instantiate framework containers, or invoke Composer autoloaders.

@@ -59,12 +59,16 @@ import {
 import {
   buildHierarchyReferenceFacts,
   buildLogicalDeclarationFacts,
-  containsSymbolRange,
   createAdapterDeclarationDescriptor,
+  createCallableContainmentIndex,
+  createDeclarationSymbolIndex,
   createImportedHierarchyMetadata,
   createPhysicalOnlyDeclarationDescriptor,
-  findContainingCallableSymbol,
   type AdapterHierarchyDescriptor,
+  type CallableContainmentIndex,
+  type DeclarationSymbolIndex,
+  getStructuralWorkObserver,
+  type StructuralWorkObserver,
   withEnclosingTypeParents,
   WHOLE_FILE_START,
 } from './reference-fact-helpers.js'
@@ -234,44 +238,90 @@ function collectBoundNames(node: SgNode, names: Set<string>): void {
 }
 
 /**
+ * Reusable lexical binding lookup for TypeScript and JavaScript enclosing scopes.
+ */
+export interface TsLexicalBindingIndex {
+  isBound(node: SgNode, name: string): boolean
+}
+
+/**
+ * Creates one lazy lexical binding index caching bound names per function, block, or catch scope.
+ * @param observer - Optional observer recording structural work.
+ * @returns Lexical binding index.
+ */
+export function createTsLexicalBindingIndex(
+  observer?: StructuralWorkObserver,
+): TsLexicalBindingIndex {
+  const scopeCache = new Map<string, ReadonlySet<string>>()
+
+  const getScopeBoundNames = (scopeNode: SgNode): ReadonlySet<string> => {
+    const r = scopeNode.range()
+    const key = `${nodeKind(scopeNode)}:${r.start.index}:${r.end.index}`
+    const cached = scopeCache.get(key)
+    if (cached !== undefined) return cached
+
+    observer?.record('lexical-scope-node-visited')
+    const names = new Set<string>()
+    const kind = nodeKind(scopeNode)
+
+    if (FUNCTION_SCOPE_KINDS.has(kind)) {
+      const params = scopeNode.field('parameters') ?? scopeNode.field('parameter')
+      if (params !== null) collectBoundNames(params, names)
+    } else if (kind === 'statement_block') {
+      for (const statement of scopeNode.children()) {
+        const statementKind = nodeKind(statement)
+        if (statementKind === 'lexical_declaration' || statementKind === 'variable_declaration') {
+          for (const declarator of statement.children()) {
+            if (nodeKind(declarator) !== 'variable_declarator') continue
+            const target = declarator.field('name')
+            if (target !== null) collectBoundNames(target, names)
+          }
+        }
+      }
+    } else if (kind === 'catch_clause') {
+      const parameter = scopeNode.field('parameter')
+      if (parameter !== null) collectBoundNames(parameter, names)
+    }
+
+    scopeCache.set(key, names)
+    return names
+  }
+
+  return {
+    isBound(node: SgNode, name: string): boolean {
+      let current = node.parent()
+      while (current !== null) {
+        const kind = nodeKind(current)
+        if (
+          FUNCTION_SCOPE_KINDS.has(kind) ||
+          kind === 'statement_block' ||
+          kind === 'catch_clause'
+        ) {
+          const bound = getScopeBoundNames(current)
+          if (bound.has(name)) return true
+        }
+        current = current.parent()
+      }
+      return false
+    },
+  }
+}
+
+/**
  * Returns whether a call target name is rebound by a parameter or block-local declaration
  * that encloses the call, so the call cannot refer to an imported or outer declaration.
  * Module-level declarations never shadow, they are ordinary same-file targets.
  * @param node - Call or construction node.
  * @param name - Callee identifier.
+ * @param bindings - Reusable lexical binding index for enclosing scopes.
  * @returns True when an enclosing function parameter or local declaration binds the name.
  */
-function isShadowedByEnclosingScope(node: SgNode, name: string): boolean {
-  let current = node.parent()
-  while (current !== null) {
-    const kind = nodeKind(current)
-    if (FUNCTION_SCOPE_KINDS.has(kind)) {
-      const names = new Set<string>()
-      const params = current.field('parameters') ?? current.field('parameter')
-      if (params !== null) collectBoundNames(params, names)
-      if (names.has(name)) return true
-    } else if (kind === 'statement_block') {
-      for (const statement of current.children()) {
-        const statementKind = nodeKind(statement)
-        if (statementKind === 'lexical_declaration' || statementKind === 'variable_declaration') {
-          for (const declarator of statement.children()) {
-            if (nodeKind(declarator) !== 'variable_declarator') continue
-            const names = new Set<string>()
-            const target = declarator.field('name')
-            if (target !== null) collectBoundNames(target, names)
-            if (names.has(name)) return true
-          }
-        }
-      }
-    } else if (kind === 'catch_clause') {
-      const names = new Set<string>()
-      const parameter = current.field('parameter')
-      if (parameter !== null) collectBoundNames(parameter, names)
-      if (names.has(name)) return true
-    }
-    current = current.parent()
-  }
-  return false
+function isShadowedByEnclosingScope(
+  node: SgNode,
+  name: string,
+  bindings: TsLexicalBindingIndex,
+): boolean {
+  return bindings.isBound(node, name)
 }
 
 /**
@@ -517,12 +567,34 @@ interface TsTypeDeclarationInfo {
 }
 
 /**
+ * Supported TypeScript and JavaScript member node kinds inside classes and interfaces.
+ */
+export const TS_MEMBER_NODE_KINDS: ReadonlySet<string> = new Set([
+  'method_definition',
+  'method_signature',
+  'property_signature',
+  'field_definition',
+  'public_field_definition',
+  'property_definition',
+])
+
+/**
+ * Direct member evidence associated with its declaring type owner.
+ */
+export interface TsDirectMemberEvidence {
+  readonly ownerSymbolId: string
+  readonly symbol: SymbolNode
+  readonly node: SgNode
+  readonly semantics: MemberSemantics
+}
+
+/**
  * Classifies a TypeScript member form from its declaring syntax.
- * @param node - Method definition or interface signature node.
+ * @param node - Method definition, property signature, or field definition node.
  * @param name - Declared member name.
  * @returns Proven shared member form.
  */
-function typeScriptMemberSemantics(node: SgNode, name: string): MemberSemantics {
+export function typeScriptMemberSemantics(node: SgNode, name: string): MemberSemantics {
   if (name === 'constructor') return { kind: MemberKind.Constructor }
   if (nodeKind(node) === 'method_signature') return { kind: MemberKind.Signature }
   // Modifier keywords are parser tokens that precede the member name. A member merely named
@@ -540,7 +612,91 @@ function typeScriptMemberSemantics(node: SgNode, name: string): MemberSemantics 
   if (leadingTokens.has('set')) {
     return { kind: MemberKind.Property, dispatch, accessor: MemberAccessor.Set }
   }
+  const k = nodeKind(node)
+  if (
+    k === 'property_signature' ||
+    k === 'field_definition' ||
+    k === 'public_field_definition' ||
+    k === 'property_definition'
+  ) {
+    const valueNode = node.field('value')
+    if (
+      valueNode &&
+      (nodeKind(valueNode) === 'arrow_function' ||
+        nodeKind(valueNode) === 'function' ||
+        nodeKind(valueNode) === 'function_expression' ||
+        nodeKind(valueNode) === 'generator_function')
+    ) {
+      return { kind: MemberKind.Method, dispatch }
+    }
+    return { kind: MemberKind.Property, dispatch }
+  }
   return { kind: MemberKind.Method, dispatch }
+}
+
+/**
+ * Collects direct member evidence for a TypeScript class or interface owner.
+ * @param ownerNode - Class or interface AST node.
+ * @param ownerSymbol - Extracted symbol for the owner.
+ * @param declIndex - Declaration symbol index.
+ * @param observer - Optional test observer recording structural work.
+ * @returns Sorted array of direct member evidence.
+ */
+export function collectTsDirectMemberEvidence(
+  ownerNode: SgNode,
+  ownerSymbol: SymbolNode,
+  declIndex: DeclarationSymbolIndex,
+  observer?: StructuralWorkObserver,
+): readonly TsDirectMemberEvidence[] {
+  const body =
+    ownerNode.field('body') ??
+    ownerNode
+      .children()
+      .find(
+        (c) =>
+          nodeKind(c) === 'class_body' ||
+          nodeKind(c) === 'interface_body' ||
+          nodeKind(c) === 'object_type',
+      )
+  if (!body) return []
+
+  const results: TsDirectMemberEvidence[] = []
+  for (const child of body.children()) {
+    observer?.record('owner-member-node-visited')
+    const mk = nodeKind(child)
+    if (!TS_MEMBER_NODE_KINDS.has(mk)) continue
+
+    const nameNode = child.field('name')
+    const name = nameNode ? nameNode.text().trim() : getName(child)
+    if (!name) continue
+
+    const line = child.range().start.line + 1
+    const column = child.range().start.column
+
+    let symbol = declIndex.find(SymbolKind.Method, name, line, column)
+    if (!symbol) {
+      symbol = declIndex.find(SymbolKind.Property, name, line, column)
+    }
+    if (!symbol) continue
+
+    const semantics = typeScriptMemberSemantics(child, name)
+    results.push({
+      ownerSymbolId: ownerSymbol.id,
+      symbol,
+      node: child,
+      semantics,
+    })
+  }
+
+  results.sort((a, b) => {
+    const lineDiff = a.symbol.line - b.symbol.line
+    if (lineDiff !== 0) return lineDiff
+    const colDiff = a.symbol.column - b.symbol.column
+    if (colDiff !== 0) return colDiff
+    return a.symbol.id.localeCompare(b.symbol.id)
+  })
+
+  return results
 }
 
 /** Session state key holding workspace code roots for the current indexing run. */
@@ -892,9 +1048,6 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
       'function_declaration',
       'class_declaration',
       'abstract_class_declaration',
-      'method_definition',
-      'method_signature',
-      'property_signature',
       'type_alias_declaration',
       'interface_declaration',
       'enum_declaration',
@@ -902,12 +1055,10 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
       'variable_declaration',
       'export_statement',
       'assignment_expression',
-      'field_definition',
-      'public_field_definition',
       'pair',
-      'property_definition',
       'arrow_function',
       'function_expression',
+      ...TS_MEMBER_NODE_KINDS,
     ])
     collectByKind(root, targetKinds, allNodes)
 
@@ -1054,11 +1205,26 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
       }
     }
 
+    const observer = getStructuralWorkObserver(this)
+    const declarationIndex = createDeclarationSymbolIndex(symbols, observer)
+    const callableIndex = createCallableContainmentIndex(
+      symbols,
+      { callableKinds: TS_CALLABLE_KINDS },
+      observer,
+    )
+    const lexicalIndex = createTsLexicalBindingIndex(observer)
+
     const imports = this.extractImportedNamesFromData(content, root)
     const bindingFacts = this.extractBindingFactsFromData(filePath, content, symbols, imports, root)
-    const callFacts = this.extractCallFactsFromData(filePath, symbols, root)
+    const callFacts = this.extractCallFactsFromData(
+      filePath,
+      symbols,
+      root,
+      callableIndex,
+      lexicalIndex,
+    )
 
-    const declarations = this.collectTypeDeclarations(root, symbols)
+    const declarations = this.collectTypeDeclarations(root, symbols, declarationIndex, observer)
 
     for (const child of root.children()) {
       if (nodeKind(child) !== 'export_statement') continue
@@ -1186,7 +1352,9 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
   ): ReferenceFacts {
     const ownerByMemberId = new Map<string, string>()
     const semanticsByMemberId = new Map<string, MemberSemantics>()
+    const typeDeclarationsById = new Map<string, TsTypeDeclarationInfo>()
     for (const declaration of typeDeclarations) {
+      typeDeclarationsById.set(declaration.symbolId, declaration)
       for (const methodId of declaration.memberSymbolIds) {
         ownerByMemberId.set(methodId, declaration.symbolId)
       }
@@ -1229,7 +1397,7 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
         let sem = semanticsByMemberId.get(symbol.id) ?? this.memberSemantics(symbol)
 
         // Check if this owner has an implementation for this method name
-        const ownerDecl = typeDeclarations.find((d) => d.symbolId === ownerId)
+        const ownerDecl = ownerId !== undefined ? typeDeclarationsById.get(ownerId) : undefined
         const hasImplementation = ownerDecl?.memberSymbolIds.some(
           (id) =>
             ownerDecl.memberIdsByName[symbol.name]?.includes(id) &&
@@ -2400,15 +2568,29 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
    * @param filePath - Path of the file.
    * @param symbols - SymbolNode array.
    * @param root - SgNode root.
+   * @param callableIndex - Optional callable containment index.
+   * @param lexicalIndex - Optional lexical binding index.
    * @returns Array of call facts.
    */
   private extractCallFactsFromData(
     filePath: string,
     symbols: SymbolNode[],
     root: SgNode,
+    callableIndex?: CallableContainmentIndex,
+    lexicalIndex?: TsLexicalBindingIndex,
   ): CallFact[] {
     const facts: CallFact[] = []
     const seen = new Set<string>()
+
+    const callables =
+      callableIndex ?? createCallableContainmentIndex(symbols, { callableKinds: TS_CALLABLE_KINDS })
+    const lexicals = lexicalIndex ?? createTsLexicalBindingIndex()
+
+    const staticReceiverNames = new Set(
+      symbols
+        .filter((s) => s.kind === SymbolKind.Class || s.kind === SymbolKind.Enum)
+        .map((s) => s.name),
+    )
 
     const callNodes: SgNode[] = []
     collectByKind(root, new Set(['call_expression', 'new_expression']), callNodes)
@@ -2416,11 +2598,7 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
     for (const node of callNodes) {
       const k = nodeKind(node)
       const range = rangeOf(node)
-      const caller = findContainingCallableSymbol(
-        symbols,
-        { line: range.startLine, column: range.startColumn },
-        { callableKinds: TS_CALLABLE_KINDS },
-      )
+      const caller = callables.find({ line: range.startLine, column: range.startColumn })
       const callerSymbolId = caller?.id
       const argsNode = node.field('arguments')
       const arity = argsNode ? countAstArguments(argsNode) : 0
@@ -2440,7 +2618,7 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
         const ctorKind = nodeKind(ctor)
         if (ctorKind === 'identifier') {
           name = ctor.text().trim()
-          if (isShadowedByEnclosingScope(node, name)) continue
+          if (isShadowedByEnclosingScope(node, name, lexicals)) continue
         } else if (ctorKind === 'member_expression') {
           name = ctor.field('property')?.text().trim() ?? ctor.text().trim()
           const obj = ctor.field('object')
@@ -2479,7 +2657,7 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
 
         if (fnKind === 'identifier') {
           name = fn.text().trim()
-          if (isShadowedByEnclosingScope(node, name)) continue
+          if (isShadowedByEnclosingScope(node, name, lexicals)) continue
           form = CallForm.Free
         } else if (fnKind === 'member_expression') {
           const prop = fn.field('property')
@@ -2494,13 +2672,7 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
               receiverName = obj.field('property')?.text().trim() ?? obj.text().trim()
             }
           }
-          const isStatic =
-            receiverName !== undefined &&
-            symbols.some(
-              (s) =>
-                s.name === receiverName &&
-                (s.kind === SymbolKind.Class || s.kind === SymbolKind.Enum),
-            )
+          const isStatic = receiverName !== undefined && staticReceiverNames.has(receiverName)
           form = isStatic ? CallForm.Static : CallForm.Member
         } else if (fnKind === 'super' || fn.text().trim() === 'super') {
           name = 'super'
@@ -2746,9 +2918,17 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
    * Collects type declarations using AST traversal.
    * @param root - SgNode root.
    * @param symbols - SymbolNode array.
+   * @param declarationIndex - Optional declaration symbol index.
+   * @param observer - Optional test observer recording structural work.
    * @returns Array of type declarations.
    */
-  private collectTypeDeclarations(root: SgNode, symbols: SymbolNode[]): TsTypeDeclarationInfo[] {
+  private collectTypeDeclarations(
+    root: SgNode,
+    symbols: SymbolNode[],
+    declarationIndex?: DeclarationSymbolIndex,
+    observer?: StructuralWorkObserver,
+  ): TsTypeDeclarationInfo[] {
+    const declIndex = declarationIndex ?? createDeclarationSymbolIndex(symbols, observer)
     const declarations: TsTypeDeclarationInfo[] = []
     const nodes: SgNode[] = []
     collectByKind(
@@ -2756,21 +2936,16 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
       new Set(['class_declaration', 'abstract_class_declaration', 'interface_declaration']),
       nodes,
     )
-    const memberNodes: SgNode[] = []
-    collectByKind(root, new Set(['method_definition', 'method_signature']), memberNodes)
 
     for (const node of nodes) {
       const name = getName(node)
       if (!name) continue
 
       const lineStart = node.range().start.line + 1
-      const ownerSymbol = symbols.find(
-        (symbol) =>
-          symbol.name === name &&
-          symbol.line === lineStart &&
-          symbol.column === node.range().start.column &&
-          (symbol.kind === SymbolKind.Class || symbol.kind === SymbolKind.Interface),
-      )
+      const colStart = node.range().start.column
+      const k = nodeKind(node)
+      const expectedKind = k === 'interface_declaration' ? SymbolKind.Interface : SymbolKind.Class
+      const ownerSymbol = declIndex.find(expectedKind, name, lineStart, colStart)
       if (!ownerSymbol) continue
       const symbolId = ownerSymbol.id
 
@@ -2779,7 +2954,7 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
       let extendsRanges: SourceRange[] = []
       let implementsRanges: SourceRange[] = []
 
-      if (nodeKind(node) === 'interface_declaration') {
+      if (k === 'interface_declaration') {
         const extendsClause = node.children().find((c) => nodeKind(c) === 'extends_type_clause')
         if (extendsClause) {
           extendsNames = parseTypeNames(extendsClause.text().replace(/^extends\s+/, ''))
@@ -2806,6 +2981,8 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
         }
       }
 
+      const directMembers = collectTsDirectMemberEvidence(node, ownerSymbol, declIndex, observer)
+
       const memberIdsByName: Record<string, string[]> = Object.create(null) as Record<
         string,
         string[]
@@ -2813,22 +2990,15 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
       const memberSymbolIds: string[] = []
       const memberSemanticsById: Record<string, MemberSemantics> = {}
 
-      for (const symbol of symbols) {
-        if (symbol.kind !== SymbolKind.Method && symbol.kind !== SymbolKind.Property) continue
-        if (!containsSymbolRange(ownerSymbol, symbol)) continue
-        const memberNode = memberNodes.find(
-          (candidate) =>
-            candidate.range().start.line + 1 === symbol.line && getName(candidate) === symbol.name,
-        )
-        if (!memberNode) continue
-        memberSymbolIds.push(symbol.id)
-        const existing = memberIdsByName[symbol.name]
+      for (const member of directMembers) {
+        memberSymbolIds.push(member.symbol.id)
+        const existing = memberIdsByName[member.symbol.name]
         if (Array.isArray(existing)) {
-          existing.push(symbol.id)
+          existing.push(member.symbol.id)
         } else {
-          memberIdsByName[symbol.name] = [symbol.id]
+          memberIdsByName[member.symbol.name] = [member.symbol.id]
         }
-        memberSemanticsById[symbol.id] = typeScriptMemberSemantics(memberNode, symbol.name)
+        memberSemanticsById[member.symbol.id] = member.semantics
       }
 
       declarations.push({

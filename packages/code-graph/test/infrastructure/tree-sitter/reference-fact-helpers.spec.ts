@@ -13,12 +13,16 @@ import {
   buildLogicalDeclarationFacts,
   containsSymbolRange,
   createAdapterDeclarationDescriptor,
+  createCallableContainmentIndex,
+  createDeclarationSymbolIndex,
   createImportedHierarchyMetadata,
   createPhysicalOnlyDeclarationDescriptor,
   createLexicalBindingDeclarationDescriptor,
   findContainingCallableSymbol,
   withEnclosingTypeParents,
   type CallableContainmentPolicy,
+  type StructuralWorkKind,
+  type StructuralWorkObserver,
 } from '../../../src/infrastructure/tree-sitter/reference-fact-helpers.js'
 
 function symbol(name: string, kind: SymbolKind, line: number) {
@@ -730,5 +734,374 @@ describe('createImportedHierarchyMetadata', () => {
         resolvedTargetSymbolId: 'ws:base.ts:class:Base:1:0',
       },
     })
+  })
+})
+
+describe('createDeclarationSymbolIndex', () => {
+  it('handles empty symbol inputs with size 0 and returns undefined for lookups', () => {
+    const index = createDeclarationSymbolIndex([])
+    expect(index.size).toBe(0)
+    expect(index.find(SymbolKind.Method, 'test', 1, 0)).toBeUndefined()
+  })
+
+  it('matches exact kind, name, line, and column and misses on any dimension difference', () => {
+    const target = createSymbolNode({
+      name: 'processItem',
+      kind: SymbolKind.Method,
+      filePath: 'ws:src/service.ts',
+      line: 10,
+      column: 4,
+      endLine: 20,
+      endColumn: 5,
+    })
+    const sibling = createSymbolNode({
+      name: 'processItem',
+      kind: SymbolKind.Method,
+      filePath: 'ws:src/service.ts',
+      line: 30,
+      column: 4,
+      endLine: 40,
+      endColumn: 5,
+    })
+    const functionWithSameName = createSymbolNode({
+      name: 'processItem',
+      kind: SymbolKind.Function,
+      filePath: 'ws:src/service.ts',
+      line: 10,
+      column: 4,
+      endLine: 20,
+      endColumn: 5,
+    })
+
+    const index = createDeclarationSymbolIndex([target, sibling, functionWithSameName])
+    expect(index.size).toBe(3)
+
+    // Exact matches
+    expect(index.find(SymbolKind.Method, 'processItem', 10, 4)?.id).toBe(target.id)
+    expect(index.find(SymbolKind.Method, 'processItem', 30, 4)?.id).toBe(sibling.id)
+    expect(index.find(SymbolKind.Function, 'processItem', 10, 4)?.id).toBe(functionWithSameName.id)
+
+    // Misses
+    expect(index.find(SymbolKind.Method, 'processItem', 10, 5)).toBeUndefined() // wrong column
+    expect(index.find(SymbolKind.Method, 'processItem', 11, 4)).toBeUndefined() // wrong line
+    expect(index.find(SymbolKind.Method, 'other', 10, 4)).toBeUndefined() // wrong name
+    expect(index.find(SymbolKind.Class, 'processItem', 10, 4)).toBeUndefined() // wrong kind
+  })
+
+  it('resolves duplicate exact keys deterministically by lowest symbol ID', () => {
+    // Both symbols have identical kind, name, line, and column, but different IDs
+    const symB = createSymbolNode({
+      name: 'duplicate',
+      kind: SymbolKind.Method,
+      filePath: 'ws:src/b.ts',
+      line: 5,
+      column: 2,
+    })
+    const symA = createSymbolNode({
+      name: 'duplicate',
+      kind: SymbolKind.Method,
+      filePath: 'ws:src/a.ts',
+      line: 5,
+      column: 2,
+    })
+
+    const [lower, higher] = [symA, symB].sort((x, y) => x.id.localeCompare(y.id))
+
+    // Test insertion order 1: [higher, lower]
+    const index1 = createDeclarationSymbolIndex([higher!, lower!])
+    expect(index1.find(SymbolKind.Method, 'duplicate', 5, 2)?.id).toBe(lower!.id)
+
+    // Test insertion order 2: [lower, higher]
+    const index2 = createDeclarationSymbolIndex([lower!, higher!])
+    expect(index2.find(SymbolKind.Method, 'duplicate', 5, 2)?.id).toBe(lower!.id)
+  })
+
+  it('records build and lookup events in the optional observer', () => {
+    const recorded: StructuralWorkKind[] = []
+    const observer: StructuralWorkObserver = {
+      record: (kind) => recorded.push(kind),
+    }
+
+    const sym1 = createSymbolNode({
+      name: 'alpha',
+      kind: SymbolKind.Function,
+      filePath: 'ws:src/test.ts',
+      line: 1,
+      column: 0,
+    })
+    const sym2 = createSymbolNode({
+      name: 'beta',
+      kind: SymbolKind.Function,
+      filePath: 'ws:src/test.ts',
+      line: 10,
+      column: 0,
+    })
+
+    const index = createDeclarationSymbolIndex([sym1, sym2], observer)
+    expect(recorded).toEqual(['declaration-symbol-indexed', 'declaration-symbol-indexed'])
+
+    index.find(SymbolKind.Function, 'alpha', 1, 0)
+    index.find(SymbolKind.Function, 'gamma', 20, 0)
+    expect(recorded).toEqual([
+      'declaration-symbol-indexed',
+      'declaration-symbol-indexed',
+      'declaration-symbol-lookup',
+      'declaration-symbol-lookup',
+    ])
+  })
+})
+
+describe('createCallableContainmentIndex parity with findContainingCallableSymbol', () => {
+  const policy: CallableContainmentPolicy = {
+    callableKinds: new Set([SymbolKind.Function, SymbolKind.Method]),
+  }
+
+  it('matches across empty symbols, missing ends, policy filtering, and boundary positions', () => {
+    const fn1 = createSymbolNode({
+      name: 'outer',
+      kind: SymbolKind.Function,
+      filePath: 'ws:src/sample.ts',
+      line: 10,
+      column: 0,
+      endLine: 50,
+      endColumn: 1,
+    })
+    const fn2 = createSymbolNode({
+      name: 'inner',
+      kind: SymbolKind.Function,
+      filePath: 'ws:src/sample.ts',
+      line: 20,
+      column: 4,
+      endLine: 30,
+      endColumn: 5,
+    })
+    const sibling = createSymbolNode({
+      name: 'sibling',
+      kind: SymbolKind.Method,
+      filePath: 'ws:src/sample.ts',
+      line: 60,
+      column: 0,
+      endLine: 70,
+      endColumn: 0,
+    })
+    const missingEnd = createSymbolNode({
+      name: 'incomplete',
+      kind: SymbolKind.Function,
+      filePath: 'ws:src/sample.ts',
+      line: 80,
+      column: 0,
+    })
+    const nonCallable = createSymbolNode({
+      name: 'NotCallable',
+      kind: SymbolKind.Class,
+      filePath: 'ws:src/sample.ts',
+      line: 5,
+      column: 0,
+      endLine: 90,
+      endColumn: 0,
+    })
+
+    const symbols = [fn1, fn2, sibling, missingEnd, nonCallable]
+    const index = createCallableContainmentIndex(symbols, policy)
+
+    const testPositions = [
+      { line: 5, column: 0 }, // inside class only -> undefined
+      { line: 10, column: 0 }, // exact start of fn1 -> fn1
+      { line: 15, column: 2 }, // inside fn1, outside fn2 -> fn1
+      { line: 20, column: 4 }, // exact start of fn2 -> fn2
+      { line: 25, column: 10 }, // inside fn2 -> fn2
+      { line: 30, column: 4 }, // before end of fn2 -> fn2
+      { line: 30, column: 5 }, // exact end of fn2 -> fn1 (outer)
+      { line: 40, column: 0 }, // inside fn1 -> fn1
+      { line: 50, column: 0 }, // inside fn1 -> fn1
+      { line: 50, column: 1 }, // exact end of fn1 -> undefined
+      { line: 55, column: 0 }, // gap -> undefined
+      { line: 60, column: 0 }, // exact start of sibling -> sibling
+      { line: 70, column: 0 }, // exact end of sibling -> undefined
+      { line: 85, column: 0 }, // inside incomplete -> undefined
+      { line: 100, column: 0 }, // past all -> undefined
+    ]
+
+    for (const pos of testPositions) {
+      const fromLegacy = findContainingCallableSymbol(symbols, pos, policy)
+      const fromIndex = index.find(pos)
+      expect(fromIndex?.id).toBe(fromLegacy?.id)
+    }
+  })
+
+  it('breaks ties on equal ranges by lowest symbol ID identically', () => {
+    const sym1 = createSymbolNode({
+      name: 'first',
+      kind: SymbolKind.Function,
+      filePath: 'ws:src/tie.ts',
+      line: 10,
+      column: 0,
+      endLine: 20,
+      endColumn: 0,
+    })
+    const sym2 = createSymbolNode({
+      name: 'second',
+      kind: SymbolKind.Function,
+      filePath: 'ws:src/tie.ts',
+      line: 10,
+      column: 0,
+      endLine: 20,
+      endColumn: 0,
+    })
+
+    const symbols = [sym1, sym2]
+    const index = createCallableContainmentIndex(symbols, policy)
+    const pos = { line: 15, column: 0 }
+
+    const legacy = findContainingCallableSymbol(symbols, pos, policy)
+    const indexed = index.find(pos)
+
+    expect(indexed?.id).toBe(legacy?.id)
+  })
+
+  it('respects eligibleSymbolIds restriction identically', () => {
+    const fnA = createSymbolNode({
+      name: 'fnA',
+      kind: SymbolKind.Function,
+      filePath: 'ws:src/a.ts',
+      line: 10,
+      column: 0,
+      endLine: 20,
+      endColumn: 0,
+    })
+    const fnB = createSymbolNode({
+      name: 'fnB',
+      kind: SymbolKind.Function,
+      filePath: 'ws:src/a.ts',
+      line: 30,
+      column: 0,
+      endLine: 40,
+      endColumn: 0,
+    })
+
+    const restrictedPolicy: CallableContainmentPolicy = {
+      callableKinds: new Set([SymbolKind.Function]),
+      eligibleSymbolIds: new Set([fnB.id]),
+    }
+
+    const symbols = [fnA, fnB]
+    const index = createCallableContainmentIndex(symbols, restrictedPolicy)
+
+    expect(index.find({ line: 15, column: 0 })).toBeUndefined()
+    expect(index.find({ line: 35, column: 0 })?.id).toBe(fnB.id)
+
+    expect(
+      findContainingCallableSymbol(symbols, { line: 15, column: 0 }, restrictedPolicy),
+    ).toBeUndefined()
+    expect(
+      findContainingCallableSymbol(symbols, { line: 35, column: 0 }, restrictedPolicy)?.id,
+    ).toBe(fnB.id)
+  })
+})
+
+describe('createCallableContainmentIndex bounded work counter', () => {
+  it('indexes eligible symbols once during build and never reindexes during queries', () => {
+    const counts = new Map<StructuralWorkKind, number>()
+    const observer: StructuralWorkObserver = {
+      record: (kind) => {
+        counts.set(kind, (counts.get(kind) ?? 0) + 1)
+      },
+    }
+
+    const callableSymbols = Array.from({ length: 50 }, (_, i) =>
+      createSymbolNode({
+        name: `func_${i}`,
+        kind: SymbolKind.Function,
+        filePath: 'ws:src/scale.ts',
+        line: i * 10 + 1,
+        column: 0,
+        endLine: i * 10 + 9,
+        endColumn: 0,
+      }),
+    )
+
+    const nonCallable = createSymbolNode({
+      name: 'MyClass',
+      kind: SymbolKind.Class,
+      filePath: 'ws:src/scale.ts',
+      line: 1,
+      column: 0,
+      endLine: 600,
+      endColumn: 0,
+    })
+
+    const policy: CallableContainmentPolicy = {
+      callableKinds: new Set([SymbolKind.Function]),
+    }
+
+    // Build index with 50 eligible + 1 ineligible symbol
+    const index = createCallableContainmentIndex(
+      [...callableSymbols, nonCallable],
+      policy,
+      observer,
+    )
+
+    expect(index.size).toBe(50)
+    expect(counts.get('callable-symbol-indexed')).toBe(50)
+
+    const indexedCountBeforeQueries = counts.get('callable-symbol-indexed')
+
+    // Perform 20 queries at various positions
+    for (let q = 0; q < 20; q++) {
+      index.find({ line: q * 10 + 3, column: 5 })
+    }
+
+    // Proves that queries do NOT re-index eligible symbols or rebuild tree
+    expect(counts.get('callable-symbol-indexed')).toBe(indexedCountBeforeQueries)
+    // Proves that interval tree visits were recorded during queries
+    expect(counts.get('callable-interval-visited') ?? 0).toBeGreaterThan(0)
+  })
+
+  it('Task 7.3: synthetic scaling evidence across 50/100/200/400 size inputs', () => {
+    const sizes = [50, 100, 200, 400] as const
+    const policy: CallableContainmentPolicy = {
+      callableKinds: new Set([SymbolKind.Function]),
+    }
+
+    for (const size of sizes) {
+      const counts = new Map<StructuralWorkKind, number>()
+      const observer: StructuralWorkObserver = {
+        record: (kind) => {
+          counts.set(kind, (counts.get(kind) ?? 0) + 1)
+        },
+      }
+
+      const symbols = Array.from({ length: size }, (_, i) =>
+        createSymbolNode({
+          name: `func_${i}`,
+          kind: SymbolKind.Function,
+          filePath: 'ws:src/scale.ts',
+          line: i * 10 + 1,
+          column: 0,
+          endLine: i * 10 + 9,
+          endColumn: 0,
+        }),
+      )
+
+      // 1. DeclarationSymbolIndex build: exact size
+      const declIndex = createDeclarationSymbolIndex(symbols, observer)
+      expect(declIndex.size).toBe(size)
+      expect(counts.get('declaration-symbol-indexed')).toBe(size)
+
+      // 2. CallableContainmentIndex build: exact size
+      const callableIndex = createCallableContainmentIndex(symbols, policy, observer)
+      expect(callableIndex.size).toBe(size)
+      expect(counts.get('callable-symbol-indexed')).toBe(size)
+
+      // 3. Execute 2 * size queries
+      for (let q = 0; q < size * 2; q++) {
+        declIndex.find(SymbolKind.Function, `func_${q % size}`, (q % size) * 10 + 1, 0)
+        callableIndex.find({ line: (q % size) * 10 + 3, column: 5 })
+      }
+
+      // Assert index-build counts scale strictly with indexed structures (O(N)) and DO NOT multiply with queries
+      expect(counts.get('declaration-symbol-indexed')).toBe(size)
+      expect(counts.get('callable-symbol-indexed')).toBe(size)
+    }
   })
 })

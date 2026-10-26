@@ -6,7 +6,16 @@ import {
   GO_MODULE_OFFSETS_KEY,
   GoLanguageAdapter,
   readGoModulePath,
+  completeGoInterfaceMethodSet,
+  type GoMethodSetCache,
+  type GoTypeInfo,
 } from '../../../src/infrastructure/tree-sitter/go-language-adapter.js'
+import {
+  setStructuralWorkObserverForTesting,
+  type StructuralWorkKind,
+  type StructuralWorkObserver,
+} from '../../../src/infrastructure/tree-sitter/reference-fact-helpers.js'
+import { MemberKind } from '../../../src/domain/value-objects/symbol-reference.js'
 import { SymbolKind } from '../../../src/domain/value-objects/symbol-kind.js'
 import { RelationType } from '../../../src/domain/value-objects/relation-type.js'
 import { ImportDeclarationKind } from '../../../src/domain/value-objects/import-declaration-kind.js'
@@ -1423,6 +1432,427 @@ describe('Go embedded interfaces, blank imports and shadowing', () => {
           surface: 'ws1:pkg',
         },
       ])
+    })
+  })
+
+  describe('Go indexed declaration and receiver association (Task 5.7)', () => {
+    it('Scenario: Named and receiver declarations use direct indexes', () => {
+      const counts = new Map<StructuralWorkKind, number>()
+      const observer: StructuralWorkObserver = {
+        record: (k) => counts.set(k, (counts.get(k) ?? 0) + 1),
+      }
+      const testAdapter = new GoLanguageAdapter()
+      setStructuralWorkObserverForTesting(testAdapter, observer)
+      const session = new InMemoryIndexSession()
+
+      // Generate 40 structs and 40 interfaces with methods (total 80 types, 160 methods)
+      const lines: string[] = ['package main\n']
+      for (let i = 0; i < 40; i++) {
+        lines.push(`type Interface${i} interface {`)
+        lines.push(`  MethodA${i}()`)
+        lines.push(`  MethodB${i}()`)
+        lines.push(`}`)
+        lines.push(`type Struct${i} struct {`)
+        lines.push(`  Field${i} int`)
+        lines.push(`}`)
+        // Value receiver
+        lines.push(`func (s Struct${i}) MethodA${i}() {}`)
+        // Pointer receiver
+        lines.push(`func (s *Struct${i}) MethodB${i}() {}`)
+      }
+
+      const code = lines.join('\n')
+      const draft = testAdapter.analyzeFile('ws:main.go', code, {
+        session,
+        workspaceName: 'ws',
+      })
+
+      const state = draft.parserState as unknown as {
+        typeInfos: GoTypeInfo[]
+        pointerReceiverMethodIds: string[]
+        methodReceivers: Record<string, Record<string, string>>
+        interfaceMethods: Record<string, string[]>
+      }
+
+      expect(state.typeInfos).toHaveLength(80)
+      expect(state.pointerReceiverMethodIds).toHaveLength(40)
+
+      // Verify each struct and interface mapping
+      for (let i = 0; i < 40; i++) {
+        expect(state.methodReceivers[`Struct${i}`]).toBeDefined()
+        expect(state.methodReceivers[`Struct${i}`]?.[`MethodA${i}`]).toBeDefined()
+        expect(state.methodReceivers[`Struct${i}`]?.[`MethodB${i}`]).toBeDefined()
+        expect(state.interfaceMethods[`Interface${i}`]).toEqual([`MethodA${i}`, `MethodB${i}`])
+      }
+
+      // Check declaration member semantics in referenceFacts
+      const methodA0s = (draft.referenceFacts?.declarations ?? [])
+        .map((declaration) => parseLogicalSymbol(declaration.logicalId!))
+        .filter((logical) => logical?.name === 'MethodA0')
+      expect(methodA0s.map((l) => l?.memberSemantics)).toContainEqual({ kind: 'signature' })
+      expect(methodA0s.map((l) => l?.memberSemantics)).toContainEqual({
+        kind: 'method',
+        dispatch: 'instance',
+      })
+
+      // Owner-member node visits must be linear in members (~160), not quadratic (80 * 160 = 12,800)
+      const memberVisits = counts.get('owner-member-node-visited') ?? 0
+      expect(memberVisits).toBeGreaterThanOrEqual(160)
+      expect(memberVisits).toBeLessThan(500)
+    })
+  })
+
+  describe('Go method-set memoization and conservative unknowns (Task 5.8)', () => {
+    it('Scenario: Embedded interface closure is memoized', () => {
+      const counts = new Map<StructuralWorkKind, number>()
+      const observer: StructuralWorkObserver = {
+        record: (k) => counts.set(k, (counts.get(k) ?? 0) + 1),
+      }
+      const testAdapter = new GoLanguageAdapter()
+      setStructuralWorkObserverForTesting(testAdapter, observer)
+      const session = new InMemoryIndexSession()
+
+      const code = `
+package main
+
+type Base interface {
+  Close()
+}
+
+type Left interface {
+  Base
+  Read()
+}
+
+type Right interface {
+  Base
+  Write()
+}
+
+type Combined interface {
+  Left
+  Right
+}
+
+type Device struct {}
+func (d Device) Close() {}
+func (d Device) Read() {}
+func (d Device) Write() {}
+
+type ExtraStruct1 struct {}
+func (e ExtraStruct1) Close() {}
+func (e ExtraStruct1) Read() {}
+func (e ExtraStruct1) Write() {}
+
+type ExtraStruct2 struct {}
+func (e ExtraStruct2) Close() {}
+func (e ExtraStruct2) Read() {}
+func (e ExtraStruct2) Write() {}
+`
+
+      const draft = testAdapter.analyzeFile('ws:diamond.go', code, {
+        session,
+        workspaceName: 'ws',
+      })
+
+      const resolvedImports = {
+        importMap: new Map<string, string>(),
+        fileImports: [],
+        steps: [],
+        diagnostics: [],
+      }
+      const relations = testAdapter.buildRelations(draft as FileAnalysis, {
+        session,
+        resolvedImports,
+      })
+
+      // Device implements Combined, Left, Right, Base
+      const implementsRelations = relations.filter((r) => r.type === RelationType.Implements)
+      expect(implementsRelations.length).toBeGreaterThanOrEqual(12) // 3 structs * 4 interfaces = 12 implements
+
+      // Extends relations for embedded interfaces
+      const extendsRelations = relations.filter((r) => r.type === RelationType.Extends)
+      expect(extendsRelations.length).toBe(4) // Combined->Left, Combined->Right, Left->Base, Right->Base
+
+      // Each of the 4 interfaces expands AT MOST ONCE in the memoized cache across all struct comparisons
+      const expansionCount = counts.get('interface-method-set-expanded') ?? 0
+      expect(expansionCount).toBe(4)
+    })
+
+    it('Scenario: Unknown method set remains unknown when cached', () => {
+      const testAdapter = new GoLanguageAdapter()
+      const session = new InMemoryIndexSession()
+
+      const code = `
+package main
+
+// Cycle between CycleA and CycleB
+type CycleA interface {
+  CycleB
+  MethodA()
+}
+
+type CycleB interface {
+  CycleA
+  MethodB()
+}
+
+// Struct providing both methods of the cycle
+type CycleStruct struct {}
+func (c CycleStruct) MethodA() {}
+func (c CycleStruct) MethodB() {}
+
+// External/unresolved embed
+type ExtIface interface {
+  io.Reader
+  Custom()
+}
+
+type ExtStruct struct {}
+func (e ExtStruct) Read() {}
+func (e ExtStruct) Custom() {}
+
+// Empty interface
+type EmptyIface interface {}
+type EmptyStruct struct {}
+`
+
+      const draft = testAdapter.analyzeFile('ws:unknowns.go', code, {
+        session,
+        workspaceName: 'ws',
+      })
+
+      const resolvedImports = {
+        importMap: new Map<string, string>(),
+        fileImports: [],
+        steps: [],
+        diagnostics: [],
+      }
+      const relations = testAdapter.buildRelations(draft as FileAnalysis, {
+        session,
+        resolvedImports,
+      })
+
+      const state = draft.parserState as unknown as {
+        typeInfos: GoTypeInfo[]
+        interfaceMethods: Record<string, string[]>
+      }
+      const typeByName = new Map(state.typeInfos.map((i) => [i.name, i]))
+      const cache: GoMethodSetCache = new Map()
+
+      // Cycle yields null
+      const cycleASet = completeGoInterfaceMethodSet(
+        'CycleA',
+        typeByName,
+        state.interfaceMethods,
+        cache,
+      )
+      expect(cycleASet).toBeNull()
+      const cycleBSet = completeGoInterfaceMethodSet(
+        'CycleB',
+        typeByName,
+        state.interfaceMethods,
+        cache,
+      )
+      expect(cycleBSet).toBeNull()
+
+      // External embed yields null
+      const extSet = completeGoInterfaceMethodSet(
+        'ExtIface',
+        typeByName,
+        state.interfaceMethods,
+        cache,
+      )
+      expect(extSet).toBeNull()
+
+      // No IMPLEMENTS relation may be emitted for cyclic or unknown interfaces
+      const cycleStruct = state.typeInfos.find((t) => t.name === 'CycleStruct')!
+      const cycleA = state.typeInfos.find((t) => t.name === 'CycleA')!
+      const cycleB = state.typeInfos.find((t) => t.name === 'CycleB')!
+      const extIface = state.typeInfos.find((t) => t.name === 'ExtIface')!
+      const emptyIface = state.typeInfos.find((t) => t.name === 'EmptyIface')!
+
+      expect(
+        relations.some((r) => r.source === cycleStruct.symbolId && r.target === cycleA.symbolId),
+      ).toBe(false)
+      expect(
+        relations.some((r) => r.source === cycleStruct.symbolId && r.target === cycleB.symbolId),
+      ).toBe(false)
+      expect(
+        relations.some((r) => r.target === extIface.symbolId && r.type === RelationType.Implements),
+      ).toBe(false)
+      expect(
+        relations.some(
+          (r) => r.target === emptyIface.symbolId && r.type === RelationType.Implements,
+        ),
+      ).toBe(false)
+
+      // Must not emit member-level OVERRIDES relations
+      expect(relations.some((r) => r.type === RelationType.Overrides)).toBe(false)
+
+      // Cached unknown values must be stored as null and reused without recomputation
+      expect(cache.get('CycleA')).toBeNull()
+      expect(cache.get('CycleB')).toBeNull()
+      expect(cache.get('ExtIface')).toBeNull()
+      const cycleARecheck = completeGoInterfaceMethodSet(
+        'CycleA',
+        typeByName,
+        state.interfaceMethods,
+        cache,
+      )
+      expect(cycleARecheck).toBeNull()
+    })
+  })
+
+  describe('Go lexical-summary reuse and complete parity (Task 5.9)', () => {
+    it('Scenario: Routine and block scopes share one summary per scope', () => {
+      const counts = new Map<StructuralWorkKind, number>()
+      const observer: StructuralWorkObserver = {
+        record: (k) => counts.set(k, (counts.get(k) ?? 0) + 1),
+      }
+      const testAdapter = new GoLanguageAdapter()
+      setStructuralWorkObserverForTesting(testAdapter, observer)
+      const session = new InMemoryIndexSession()
+
+      const code = `
+package main
+
+type Service struct {}
+
+func (s Service) Process(param1 string, param2 int) {
+  // Many calls inside routine
+  call1()
+  call2()
+  call3()
+  call4()
+  param1() // shadowed by param
+  s()      // shadowed by receiver
+
+  {
+    localShort := "value"
+    call5()
+    call6()
+    call7()
+    localShort() // shadowed by short-var
+  }
+
+  {
+    var localVar int
+    const localConst = 10
+    call8()
+    call9()
+    localVar()   // shadowed by var
+    localConst() // shadowed by const
+  }
+}
+`
+
+      const draft = testAdapter.analyzeFile('ws:shadowing.go', code, {
+        session,
+        workspaceName: 'ws',
+      })
+
+      const callNames = (draft.callFacts ?? []).map((c) => c.name)
+
+      // Unshadowed calls exist
+      for (let i = 1; i <= 9; i++) {
+        expect(callNames).toContain(`call${i}`)
+      }
+
+      // Shadowed calls are omitted
+      expect(callNames).not.toContain('param1')
+      expect(callNames).not.toContain('s')
+      expect(callNames).not.toContain('localShort')
+      expect(callNames).not.toContain('localVar')
+      expect(callNames).not.toContain('localConst')
+
+      // Scopes: 1 method routine scope + 2 block scopes = at most 4 scope visits
+      const scopeVisits = counts.get('lexical-scope-node-visited') ?? 0
+      expect(scopeVisits).toBeGreaterThan(0)
+      expect(scopeVisits).toBeLessThanOrEqual(4)
+    })
+
+    it('Scenario: Indexed and baseline semantics are equivalent', () => {
+      const session = new InMemoryIndexSession()
+
+      const code = `
+package service
+
+import (
+  "fmt"
+  "strings"
+)
+
+type UserReader interface {
+  GetUser(id int) string
+}
+
+type UserService struct {
+  Name string
+}
+
+func (u UserService) GetUser(id int) string {
+  fmt.Println("fetching user")
+  return strings.TrimSpace("user")
+}
+
+func HelperFunction() {
+  u := UserService{Name: "admin"}
+  _ = u.GetUser(1)
+}
+`
+
+      const draft = baseAdapter.analyzeFile('ws:service.go', code, {
+        session,
+        workspaceName: 'ws',
+      })
+
+      expect(draft.language).toBe('go')
+      expect(draft.symbols.length).toBeGreaterThan(0)
+      expect(draft.imports).toHaveLength(2)
+
+      // Complete normalized symbol parity: exact names and kinds
+      const symbolSummaries = draft.symbols.map((s) => ({ name: s.name, kind: s.kind }))
+      expect(symbolSummaries).toEqual([
+        { name: 'UserReader', kind: SymbolKind.Interface },
+        { name: 'GetUser', kind: SymbolKind.Method },
+        { name: 'UserService', kind: SymbolKind.Class },
+        { name: 'Name', kind: SymbolKind.Property },
+        { name: 'GetUser', kind: SymbolKind.Method },
+        { name: 'HelperFunction', kind: SymbolKind.Function },
+      ])
+
+      // Complete normalized import parity
+      expect(draft.imports.map((i) => i.localName).sort()).toEqual(['fmt', 'strings'])
+
+      const resolvedImports = {
+        importMap: new Map<string, string>(),
+        fileImports: [],
+        steps: [],
+        diagnostics: [],
+      }
+      const relations = baseAdapter.buildRelations(draft as FileAnalysis, {
+        session,
+        resolvedImports,
+      })
+
+      // Defines relations exist for symbols
+      const defines = relations.filter((r) => r.type === RelationType.Defines)
+      expect(defines.length).toBe(draft.symbols.length)
+
+      // UserService implements UserReader
+      const userReader = draft.symbols.find((s) => s.name === 'UserReader')!
+      const userService = draft.symbols.find(
+        (s) => s.name === 'UserService' && s.kind === SymbolKind.Class,
+      )!
+      const impl = relations.find(
+        (r) =>
+          r.source === userService.id &&
+          r.target === userReader.id &&
+          r.type === RelationType.Implements,
+      )
+      expect(impl).toBeDefined()
+      expect(relations.some((relation) => relation.type === RelationType.Overrides)).toBe(false)
     })
   })
 })

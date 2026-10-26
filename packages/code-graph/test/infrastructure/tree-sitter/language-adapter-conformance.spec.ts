@@ -12,6 +12,7 @@ import { InMemoryIndexSession } from '../../../src/application/use-cases/in-memo
 import { type LanguageAdapter } from '../../../src/domain/value-objects/language-adapter.js'
 import { SymbolKind } from '../../../src/domain/value-objects/symbol-kind.js'
 import { type SymbolNode } from '../../../src/domain/value-objects/symbol-node.js'
+import { type CallFact } from '../../../src/domain/value-objects/call-fact.js'
 import { IndexCodeGraph } from '../../../src/application/use-cases/index-code-graph.js'
 import { emptyResolutionManifestSource } from '../../../src/application/ports/resolution-manifest-source.js'
 import { emptyRepositoryRootSource } from '../../../src/application/ports/repository-root-source.js'
@@ -517,6 +518,13 @@ async function semanticState(store: InMemoryGraphStore): Promise<unknown> {
       .map((entry) => `${entry.logicalSymbolId}|${entry.declaration.symbolId}`)
       .sort(),
     publicBindings: facts.publicBindings.map((binding) => binding.id).sort(),
+    // Preserve the complete normalized fact payload, not merely its identifiers. This is an
+    // explicit oracle for ranges, owners, member semantics, diagnostics, and provenance.
+    referenceFacts: JSON.parse(JSON.stringify(facts)),
+    relationMetadata: store
+      .allRelationsForTest()
+      .map((relation): unknown => JSON.parse(JSON.stringify(relation)))
+      .sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right))),
   }
 }
 
@@ -1219,6 +1227,143 @@ describe('LanguageAdapter Conformance Suite', () => {
         ),
         'non-conformant nearest-preceding adapter must be detected and rejected',
       ).toBe(true)
+    })
+  })
+
+  describe('Cross-language bounded-analysis conformance (Wave 6)', () => {
+    describe('Task 6.1: Shared structural-index scenarios and exact boundaries', () => {
+      it('Scenario: Callable containment preserves exact boundaries across all adapters', () => {
+        const adapters: LanguageAdapter[] = [
+          new TypeScriptLanguageAdapter(),
+          new PythonLanguageAdapter(),
+          new GoLanguageAdapter(),
+          new PhpLanguageAdapter(),
+        ]
+
+        for (const [lang, fixture] of Object.entries(CONFORMANCE_FIXTURES)) {
+          const adapter = adapters.find((a) => a.languages().includes(lang))
+          expect(adapter).toBeDefined()
+          if (!adapter) continue
+
+          // 1. Caller outside: call outside callable has no callerSymbolId
+          const outsideDraft = adapter.analyzeFile(fixture.fileName, fixture.callerOutsideSnippet, {
+            session: new InMemoryIndexSession(),
+            workspaceName: 'ws',
+          })
+          const outsideCalls = outsideDraft.callFacts ?? []
+          const uncontainedCall = outsideCalls.find((c: CallFact) => !c.callerSymbolId)
+          expect(
+            uncontainedCall,
+            `${lang}: call outside any callable must have undefined callerSymbolId`,
+          ).toBeDefined()
+
+          // 2. Contained caller: call inside callable has callerSymbolId
+          const insideDraft = adapter.analyzeFile(
+            fixture.fileName,
+            fixture.containedCallerSnippet,
+            {
+              session: new InMemoryIndexSession(),
+              workspaceName: 'ws',
+            },
+          )
+          const insideCalls = insideDraft.callFacts ?? []
+          const containedCall = insideCalls.find((c: CallFact) => Boolean(c.callerSymbolId))
+          expect(
+            containedCall,
+            `${lang}: call inside callable must have callerSymbolId`,
+          ).toBeDefined()
+
+          // 3. Ownership snippet: methods in distinct owners have distinct logical symbols
+          const ownerDraft = adapter.analyzeFile(fixture.fileName, fixture.ownershipSnippet, {
+            session: new InMemoryIndexSession(),
+            workspaceName: 'ws',
+          })
+          const symbols = ownerDraft.symbols as SymbolNode[]
+          const methodSymbols = symbols.filter((s: SymbolNode) => s.kind === SymbolKind.Method)
+          expect(
+            methodSymbols.length,
+            `${lang}: must extract methods from both owners`,
+          ).toBeGreaterThanOrEqual(2)
+          const parentIds = new Set(
+            methodSymbols.map((m: SymbolNode) => m.parentId).filter(Boolean),
+          )
+          expect(
+            parentIds.size,
+            `${lang}: methods must belong to distinct parent IDs`,
+          ).toBeGreaterThanOrEqual(2)
+
+          // 4. Stable deterministic ordering without snapshots
+          const firstRun = adapter.analyzeFile(fixture.fileName, fixture.ownershipSnippet, {
+            session: new InMemoryIndexSession(),
+            workspaceName: 'ws',
+          })
+          const secondRun = adapter.analyzeFile(fixture.fileName, fixture.ownershipSnippet, {
+            session: new InMemoryIndexSession(),
+            workspaceName: 'ws',
+          })
+          expect((firstRun.symbols as SymbolNode[]).map((s: SymbolNode) => s.id)).toEqual(
+            (secondRun.symbols as SymbolNode[]).map((s: SymbolNode) => s.id),
+          )
+          expect(((firstRun.callFacts ?? []) as CallFact[]).map((c: CallFact) => c.name)).toEqual(
+            ((secondRun.callFacts ?? []) as CallFact[]).map((c: CallFact) => c.name),
+          )
+        }
+      })
+    })
+
+    describe('Task 6.2: Full, incremental, and hydrated equivalence', () => {
+      it('Scenario: Indexed and baseline semantics are equivalent across clean, incremental, and reindexed store states', async () => {
+        const registry = new AdapterRegistry()
+        const adapters: LanguageAdapter[] = [
+          new TypeScriptLanguageAdapter(),
+          new PythonLanguageAdapter(),
+          new GoLanguageAdapter(),
+          new PhpLanguageAdapter(),
+        ]
+        for (const adapter of adapters) registry.register(adapter)
+
+        for (const [lang, fixture] of Object.entries(CONFORMANCE_FIXTURES)) {
+          const project = mkdtempSync(join(tmpdir(), `conformance-wave6-${lang}-`))
+          for (const [relativePath, content] of Object.entries(fixture.incremental.files)) {
+            const absolutePath = join(project, relativePath)
+            mkdirSync(dirname(absolutePath), { recursive: true })
+            writeFileSync(absolutePath, content)
+          }
+
+          // 1. Clean full index
+          const cleanStore = new InMemoryGraphStore()
+          await cleanStore.open()
+          await indexProject(cleanStore, registry, project)
+          const cleanState = await semanticState(cleanStore)
+
+          // 2. Incremental index (edit one file, reindex, then restore and reindex)
+          const incrementalStore = new InMemoryGraphStore()
+          await incrementalStore.open()
+          await indexProject(incrementalStore, registry, project)
+
+          const editPath = join(project, fixture.incremental.editFile)
+          const original = fixture.incremental.files[fixture.incremental.editFile] ?? ''
+          writeFileSync(
+            editPath,
+            original.replace(fixture.incremental.before, fixture.incremental.after),
+          )
+          await indexProject(incrementalStore, registry, project)
+
+          // Revert edit back to original and reindex: must match clean state exactly
+          writeFileSync(editPath, original)
+          await indexProject(incrementalStore, registry, project)
+          const restoredState = await semanticState(incrementalStore)
+
+          expect(
+            restoredState,
+            `${lang}: restored incremental state must equal clean rebuild`,
+          ).toEqual(cleanState)
+
+          rmSync(project, { recursive: true, force: true })
+          await cleanStore.close()
+          await incrementalStore.close()
+        }
+      })
     })
   })
 })

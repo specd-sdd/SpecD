@@ -56,10 +56,15 @@ import {
   buildLogicalDeclarationFacts,
   containsSymbolRange,
   createAdapterDeclarationDescriptor,
+  createCallableContainmentIndex,
+  createDeclarationSymbolIndex,
   createImportedHierarchyMetadata,
   createPhysicalOnlyDeclarationDescriptor,
-  findContainingCallableSymbol,
   type AdapterHierarchyDescriptor,
+  type CallableContainmentIndex,
+  type DeclarationSymbolIndex,
+  getStructuralWorkObserver,
+  type StructuralWorkObserver,
   withEnclosingTypeParents,
   WHOLE_FILE_START,
 } from './reference-fact-helpers.js'
@@ -135,48 +140,95 @@ function collectPythonBoundNames(node: SgNode, names: Set<string>): void {
 }
 
 /**
+ * Reusable lexical binding lookup for Python functions and lambdas.
+ */
+export interface PythonLexicalBindingIndex {
+  isBound(node: SgNode, name: string): boolean
+}
+
+/**
+ * Creates one lazy lexical binding index caching bound names per function or lambda scope.
+ * @param observer - Optional observer recording structural work.
+ * @returns Lexical binding index.
+ */
+export function createPythonLexicalBindingIndex(
+  observer?: StructuralWorkObserver,
+): PythonLexicalBindingIndex {
+  const scopeCache = new Map<string, ReadonlySet<string>>()
+
+  const getScopeBoundNames = (scopeNode: SgNode): ReadonlySet<string> => {
+    const range = scopeNode.range()
+    const key = `${nodeKind(scopeNode)}:${range.start.line}:${range.start.column}:${range.end.line}:${range.end.column}`
+    const cached = scopeCache.get(key)
+    if (cached !== undefined) return cached
+
+    observer?.record('lexical-scope-node-visited')
+    const names = new Set<string>()
+
+    const parameters = scopeNode.field('parameters')
+    if (parameters !== null) collectPythonBoundNames(parameters, names)
+
+    const body = scopeNode.field('body')
+    if (body !== null) {
+      const stack: SgNode[] = [body]
+      while (stack.length > 0) {
+        const candidate = stack.pop()!
+        const kind = nodeKind(candidate)
+        if (PY_FUNCTION_SCOPE_KINDS.has(kind) || kind === 'class_definition') continue
+
+        if (kind === 'assignment' || kind === 'augmented_assignment') {
+          const left = candidate.field('left')
+          if (left !== null) collectPythonBoundNames(left, names)
+        } else if (kind === 'for_statement' || kind === 'for_in_clause') {
+          const left = candidate.field('left')
+          if (left !== null) collectPythonBoundNames(left, names)
+        } else if (kind === 'as_pattern') {
+          const alias = candidate.field('alias')
+          if (alias !== null) collectPythonBoundNames(alias, names)
+        } else if (kind === 'named_expression') {
+          const target = candidate.field('name')
+          if (target !== null) collectPythonBoundNames(target, names)
+        }
+
+        for (const child of candidate.children()) {
+          stack.push(child)
+        }
+      }
+    }
+
+    scopeCache.set(key, names)
+    return names
+  }
+
+  return {
+    isBound(node: SgNode, name: string): boolean {
+      let current = node.parent()
+      while (current !== null) {
+        if (PY_FUNCTION_SCOPE_KINDS.has(nodeKind(current))) {
+          const bound = getScopeBoundNames(current)
+          if (bound.has(name)) return true
+        }
+        current = current.parent()
+      }
+      return false
+    },
+  }
+}
+
+/**
  * Returns whether a bare call target is rebound inside the enclosing function by a parameter,
  * assignment, loop variable or `as` binding, so it cannot reach an imported or module callable.
  * @param node - Call node.
  * @param name - Callee identifier.
+ * @param bindings - Reusable lexical binding index for enclosing scopes.
  * @returns True when an enclosing function scope binds the name locally.
  */
-function isPythonShadowedByEnclosingScope(node: SgNode, name: string): boolean {
-  let current = node.parent()
-  while (current !== null) {
-    if (PY_FUNCTION_SCOPE_KINDS.has(nodeKind(current))) {
-      const names = new Set<string>()
-      const parameters = current.field('parameters')
-      if (parameters !== null) collectPythonBoundNames(parameters, names)
-      if (names.has(name)) return true
-      const body = current.field('body')
-      if (body !== null) {
-        const stack: SgNode[] = [body]
-        while (stack.length > 0) {
-          const candidate = stack.pop()!
-          const kind = nodeKind(candidate)
-          if (PY_FUNCTION_SCOPE_KINDS.has(kind) || kind === 'class_definition') continue
-          if (kind === 'assignment' || kind === 'augmented_assignment') {
-            const left = candidate.field('left')
-            if (left !== null) collectPythonBoundNames(left, names)
-          } else if (kind === 'for_statement' || kind === 'for_in_clause') {
-            const left = candidate.field('left')
-            if (left !== null) collectPythonBoundNames(left, names)
-          } else if (kind === 'as_pattern') {
-            const alias = candidate.field('alias')
-            if (alias !== null) collectPythonBoundNames(alias, names)
-          } else if (kind === 'named_expression') {
-            const target = candidate.field('name')
-            if (target !== null) collectPythonBoundNames(target, names)
-          }
-          for (const child of candidate.children()) stack.push(child)
-        }
-        if (names.has(name)) return true
-      }
-    }
-    current = current.parent()
-  }
-  return false
+function isPythonShadowedByEnclosingScope(
+  node: SgNode,
+  name: string,
+  bindings: PythonLexicalBindingIndex,
+): boolean {
+  return bindings.isBound(node, name)
 }
 
 /**
@@ -225,32 +277,29 @@ function normalizePythonTypeName(reference: string): string {
 }
 
 /**
- * Classifies a Python method from its name and the decorator nodes attached to its definition.
- * Decorators are read from the parser tree, so multiline decorators and comments between a
- * decorator and the `def` cannot hide or invent a form.
- * @param symbol - Extracted method declaration.
- * @param classNode - Class definition node that contains the method.
+ * Direct member evidence for a class in Python.
+ */
+export interface PythonDirectMemberEvidence {
+  readonly ownerSymbolId: string
+  readonly symbol: SymbolNode
+  readonly definitionNode: SgNode
+  readonly decorators: readonly string[]
+}
+
+/**
+ * Classifies a Python method from its name and precomputed direct-member evidence.
+ * @param symbol - Extracted method declaration symbol.
+ * @param member - Direct member evidence containing decorator tokens.
  * @returns Proven shared member form.
  */
-function pythonMemberSemantics(symbol: SymbolNode, classNode: SgNode): MemberSemantics {
+function pythonMemberSemantics(
+  symbol: SymbolNode,
+  member: PythonDirectMemberEvidence,
+): MemberSemantics {
   if (symbol.name === '__init__' || symbol.name === '__new__') {
     return { kind: MemberKind.Constructor }
   }
-  const definitions: SgNode[] = []
-  collectByKind(classNode, new Set(['function_definition']), definitions)
-  const definition = definitions.find(
-    (candidate) =>
-      candidate.field('name')?.text().trim() === symbol.name &&
-      candidate.range().start.line + 1 === symbol.line,
-  )
-  const decorated = definition?.parent()
-  const decorators =
-    decorated !== null && decorated !== undefined && nodeKind(decorated) === 'decorated_definition'
-      ? decorated
-          .children()
-          .filter((child) => nodeKind(child) === 'decorator')
-          .map((child) => child.text().replace(/^@\s*/, '').trim())
-      : []
+  const decorators = member.decorators
   const dispatch = decorators.some((text) => text === 'staticmethod' || text === 'classmethod')
     ? MemberDispatch.Static
     : MemberDispatch.Instance
@@ -261,6 +310,93 @@ function pythonMemberSemantics(symbol: SymbolNode, classNode: SgNode): MemberSem
     return { kind: MemberKind.Property, dispatch, accessor: MemberAccessor.Get }
   }
   return { kind: MemberKind.Method, dispatch }
+}
+
+/**
+ * Collects direct member evidence from a Python class block without descending into nested bodies.
+ * @param classNode - Class definition AST node.
+ * @param ownerSymbol - Symbol corresponding to the class.
+ * @param symbols - Declaration symbol index for exact symbol lookup.
+ * @param observer - Optional observer recording structural work.
+ * @returns Array of direct member evidence in source order.
+ */
+export function collectPythonDirectMemberEvidence(
+  classNode: SgNode,
+  ownerSymbol: SymbolNode,
+  symbols: DeclarationSymbolIndex,
+  observer?: StructuralWorkObserver,
+): readonly PythonDirectMemberEvidence[] {
+  const block = classNode.field('body') ?? classNode.children().find((c) => nodeKind(c) === 'block')
+  if (!block) return []
+
+  const results: PythonDirectMemberEvidence[] = []
+
+  for (const child of block.children()) {
+    observer?.record('owner-member-node-visited')
+    const k = nodeKind(child)
+
+    if (k === 'function_definition' || k === 'async_function_definition') {
+      const name = child.field('name')?.text().trim()
+      if (!name) continue
+      const line = child.range().start.line + 1
+      const col = child.range().start.column
+      const symbol = symbols.find(SymbolKind.Method, name, line, col)
+      if (!symbol) continue
+      results.push({
+        ownerSymbolId: ownerSymbol.id,
+        symbol,
+        definitionNode: child,
+        decorators: [],
+      })
+    } else if (k === 'decorated_definition') {
+      const decorators: string[] = []
+      let defNode: SgNode | undefined
+
+      for (const grandChild of child.children()) {
+        const gk = nodeKind(grandChild)
+        if (gk === 'decorator') {
+          decorators.push(grandChild.text().replace(/^@\s*/, '').trim())
+        } else if (gk === 'function_definition' || gk === 'async_function_definition') {
+          defNode = grandChild
+        }
+      }
+
+      if (defNode) {
+        const name = defNode.field('name')?.text().trim()
+        if (!name) continue
+        const line = defNode.range().start.line + 1
+        const col = defNode.range().start.column
+        const symbol = symbols.find(SymbolKind.Method, name, line, col)
+        if (!symbol) continue
+        results.push({
+          ownerSymbolId: ownerSymbol.id,
+          symbol,
+          definitionNode: defNode,
+          decorators,
+        })
+      }
+    } else if (k === 'expression_statement') {
+      const firstChild = child.child(0)
+      if (firstChild && nodeKind(firstChild) === 'assignment') {
+        const left = firstChild.field('left')
+        if (left && nodeKind(left) === 'identifier') {
+          const name = left.text()
+          const line = child.range().start.line + 1
+          const col = child.range().start.column
+          const symbol = symbols.find(SymbolKind.Property, name, line, col)
+          if (!symbol) continue
+          results.push({
+            ownerSymbolId: ownerSymbol.id,
+            symbol,
+            definitionNode: child,
+            decorators: [],
+          })
+        }
+      }
+    }
+  }
+
+  return results
 }
 
 /**
@@ -715,13 +851,22 @@ export class PythonLanguageAdapter implements LanguageAdapter {
       }
     }
 
+    const observer = getStructuralWorkObserver(this)
+    const declarationIndex = createDeclarationSymbolIndex(symbols, observer)
+    const callableIndex = createCallableContainmentIndex(
+      symbols,
+      { callableKinds: PY_CALLABLE_KINDS },
+      observer,
+    )
+    const lexicalIndex = createPythonLexicalBindingIndex(observer)
+
     const bindingFacts = this.extractBindingFactsFromData(filePath, symbols, imports, root)
     const callFacts = [
-      ...this.extractCallFactsFromData(filePath, symbols, root),
-      ...this.extractDecoratorCallFacts(root, filePath, symbols),
+      ...this.extractCallFactsFromData(filePath, symbols, root, callableIndex, lexicalIndex),
+      ...this.extractDecoratorCallFacts(root, filePath, symbols, declarationIndex),
     ]
 
-    const classes = this.collectClassInfo(root, filePath, symbols)
+    const classes = this.collectClassInfo(root, filePath, symbols, declarationIndex, observer)
     const serializedClasses = classes.map((cls) => {
       const methodsByName: Record<string, string> = {}
       const memberFormsById: Record<string, MemberSemantics> = {}
@@ -1278,13 +1423,18 @@ export class PythonLanguageAdapter implements LanguageAdapter {
    * @param root - SgNode AST root.
    * @param filePath - Path of the file.
    * @param symbols - Extracted symbols array.
+   * @param declarationIndex - Optional declaration symbol index.
+   * @param observer - Optional observer recording structural work.
    * @returns Array of class info.
    */
   private collectClassInfo(
     root: SgNode,
     filePath: string,
     symbols: SymbolNode[],
+    declarationIndex?: DeclarationSymbolIndex,
+    observer?: StructuralWorkObserver,
   ): PythonClassInfo[] {
+    const declIndex = declarationIndex ?? createDeclarationSymbolIndex(symbols, observer)
     const infos: PythonClassInfo[] = []
     const classNodes: SgNode[] = []
     collectByKind(root, new Set(['class_definition']), classNodes)
@@ -1294,14 +1444,7 @@ export class PythonLanguageAdapter implements LanguageAdapter {
       if (!name) continue
       const line = classNode.range().start.line + 1
       const column = classNode.range().start.column
-      const ownerSymbol = symbols.find(
-        (symbol) =>
-          symbol.filePath === filePath &&
-          symbol.name === name &&
-          symbol.line === line &&
-          symbol.column === column &&
-          symbol.kind === SymbolKind.Class,
-      )
+      const ownerSymbol = declIndex.find(SymbolKind.Class, name, line, column)
       if (!ownerSymbol) continue
 
       const argsNode =
@@ -1331,13 +1474,11 @@ export class PythonLanguageAdapter implements LanguageAdapter {
           const parentName = current.field('name')?.text().trim()
           const parentLine = current.range().start.line + 1
           const parentCol = current.range().start.column
-          const parentSym = symbols.find(
-            (symbol) =>
-              symbol.filePath === filePath &&
-              symbol.name === parentName &&
-              symbol.line === parentLine &&
-              symbol.column === parentCol &&
-              symbol.kind === SymbolKind.Class,
+          const parentSym = declIndex.find(
+            SymbolKind.Class,
+            parentName ?? '',
+            parentLine,
+            parentCol,
           )
           if (parentSym) {
             ownerSymbolId = parentSym.id
@@ -1351,29 +1492,20 @@ export class PythonLanguageAdapter implements LanguageAdapter {
       const memberSymbolIds: string[] = []
       const memberFormsById = new Map<string, MemberSemantics>()
 
-      for (const symbol of symbols) {
-        if (
-          symbol.filePath !== filePath ||
-          (symbol.kind !== SymbolKind.Method && symbol.kind !== SymbolKind.Property)
-        ) {
-          continue
-        }
-        if (!containsSymbolRange(ownerSymbol, symbol)) continue
-        const isInsideInnerClass = symbols.some(
-          (inner) =>
-            inner.kind === SymbolKind.Class &&
-            inner.id !== ownerSymbol.id &&
-            containsSymbolRange(ownerSymbol, inner) &&
-            containsSymbolRange(inner, symbol),
-        )
-        if (isInsideInnerClass) continue
+      const directMembers = collectPythonDirectMemberEvidence(
+        classNode,
+        ownerSymbol,
+        declIndex,
+        observer,
+      )
 
-        memberSymbolIds.push(symbol.id)
-        if (symbol.kind === SymbolKind.Method) {
-          methodsByName.set(symbol.name, symbol.id)
-          memberFormsById.set(symbol.id, pythonMemberSemantics(symbol, classNode))
-        } else if (symbol.kind === SymbolKind.Property) {
-          memberFormsById.set(symbol.id, {
+      for (const member of directMembers) {
+        memberSymbolIds.push(member.symbol.id)
+        if (member.symbol.kind === SymbolKind.Method) {
+          methodsByName.set(member.symbol.name, member.symbol.id)
+          memberFormsById.set(member.symbol.id, pythonMemberSemantics(member.symbol, member))
+        } else if (member.symbol.kind === SymbolKind.Property) {
+          memberFormsById.set(member.symbol.id, {
             kind: MemberKind.Property,
             dispatch: MemberDispatch.Instance,
           })
@@ -1597,15 +1729,23 @@ export class PythonLanguageAdapter implements LanguageAdapter {
    * @param filePath - Path of the file.
    * @param symbols - Extracted symbols array.
    * @param root - SgNode root.
+   * @param callableIndex - Optional callable containment index.
+   * @param lexicalIndex - Optional lexical binding index.
    * @returns Array of call facts.
    */
   private extractCallFactsFromData(
     filePath: string,
     symbols: SymbolNode[],
     root: SgNode,
+    callableIndex?: CallableContainmentIndex,
+    lexicalIndex?: PythonLexicalBindingIndex,
   ): CallFact[] {
     const facts: CallFact[] = []
     const seen = new Set<string>()
+
+    const callables =
+      callableIndex ?? createCallableContainmentIndex(symbols, { callableKinds: PY_CALLABLE_KINDS })
+    const lexicals = lexicalIndex ?? createPythonLexicalBindingIndex()
 
     const callNodes: SgNode[] = []
     collectByKind(root, new Set(['call']), callNodes)
@@ -1640,7 +1780,7 @@ export class PythonLanguageAdapter implements LanguageAdapter {
         ) {
           continue
         }
-        if (isPythonShadowedByEnclosingScope(node, name)) continue
+        if (isPythonShadowedByEnclosingScope(node, name, lexicals)) continue
         // Python call syntax does not distinguish class construction from a normal
         // callable invocation. Resolution may prove a class target later.
         form = CallForm.Free
@@ -1667,11 +1807,7 @@ export class PythonLanguageAdapter implements LanguageAdapter {
         endColumn: range.endColumn,
       }
 
-      const caller = findContainingCallableSymbol(
-        symbols,
-        { line: range.startLine, column: range.startColumn },
-        { callableKinds: PY_CALLABLE_KINDS },
-      )
+      const caller = callables.find({ line: range.startLine, column: range.startColumn })
       const callerSymbolId = caller?.id
 
       let arity: number | undefined
@@ -1713,12 +1849,14 @@ export class PythonLanguageAdapter implements LanguageAdapter {
    * @param root - AST root node.
    * @param filePath - File path being analyzed.
    * @param symbols - Emitted symbol nodes.
+   * @param declarationIndex - Optional declaration symbol index.
    * @returns Extracted call facts for decorators.
    */
   private extractDecoratorCallFacts(
     root: SgNode,
     filePath: string,
     symbols: readonly SymbolNode[],
+    declarationIndex?: DeclarationSymbolIndex,
   ): CallFact[] {
     const facts: CallFact[] = []
     const seen = new Set<string>()
@@ -1739,9 +1877,15 @@ export class PythonLanguageAdapter implements LanguageAdapter {
         if (defNode && decorators.length > 0) {
           const defName = defNode.field('name')?.text()
           const defLine = defNode.range().start.line + 1
-          const caller = symbols.find(
-            (s) => s.filePath === filePath && s.line === defLine && s.name === defName,
-          )
+          const defCol = defNode.range().start.column
+          const defKind =
+            nodeKind(defNode) === 'class_definition' ? SymbolKind.Class : SymbolKind.Function
+          const caller = declarationIndex
+            ? (declarationIndex.find(defKind, defName ?? '', defLine, defCol) ??
+              declarationIndex.find(SymbolKind.Method, defName ?? '', defLine, defCol))
+            : symbols.find(
+                (s) => s.filePath === filePath && s.line === defLine && s.name === defName,
+              )
 
           if (caller) {
             for (const deco of decorators) {

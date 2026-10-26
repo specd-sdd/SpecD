@@ -112,6 +112,16 @@ Import resolution SHALL emit a dependency relation only when the configured work
 
 An imported `extends` or `implements` target SHALL emit its physical hierarchy relation together with exactly one matching shared hierarchy reference fact. That fact MUST retain the source range of the heritage-clause type expression, import-resolution provenance, and resolved target used by the relation.
 
+### Requirement: Indexed TypeScript type-member association
+
+The adapter SHALL associate classes and interfaces with their extracted owners and direct members through file-local parser-backed indexes. After index construction, resolving one owner or member MUST NOT linearly search the complete symbol collection or the complete collection of method nodes.
+
+Association SHALL use declaration kind, declared name, exact parser start position, and nearest declaring-owner containment. Equal names, overloads, same-line declarations, and nested types MUST remain distinct unless the existing logical declaration contract explicitly groups them.
+
+Indexed analysis SHALL preserve constructor, method, property, getter, setter, static, instance, abstract, and interface-signature semantics; declaration parents; overload order; heritage names and ranges; exact construct and selection ranges; and conservative unresolved behavior.
+
+Index construction and consumption SHALL inspect each collected type, member node, and extracted symbol a bounded number of times, excluding separate hierarchy comparisons that are necessary to emit distinct semantic relations.
+
 ## Constraints
 
 - The adapter MUST NOT execute project code or invoke the TypeScript compiler as an implicit fallback.

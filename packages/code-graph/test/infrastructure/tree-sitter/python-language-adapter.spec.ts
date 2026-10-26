@@ -20,7 +20,16 @@ import { type Relation } from '../../../src/domain/value-objects/relation.js'
 import { type ImportDeclaration } from '../../../src/domain/value-objects/import-declaration.js'
 import { type FileAnalysis } from '../../../src/domain/value-objects/file-analysis.js'
 import { InMemoryIndexSession } from '../../../src/application/use-cases/in-memory-index-session.js'
-import { parseLogicalSymbol } from '../../../src/domain/value-objects/symbol-reference.js'
+import {
+  MemberKind,
+  MemberDispatch,
+  parseLogicalSymbol,
+} from '../../../src/domain/value-objects/symbol-reference.js'
+import {
+  setStructuralWorkObserverForTesting,
+  type StructuralWorkObserver,
+  type StructuralWorkKind,
+} from '../../../src/infrastructure/tree-sitter/reference-fact-helpers.js'
 import {
   type PackageResolutionFacet,
   type RelativeImportResolutionFacet,
@@ -1522,5 +1531,246 @@ describe('Python imported base expression ranges', () => {
       expect(skippedMessages).toHaveLength(1)
       expect(skippedMessages[0]).toContain('Package manifest skipped (no identity):')
     })
+  })
+})
+
+describe('Python direct-member semantics and bounds (Task 3.7)', () => {
+  it('Scenario: Large class indexes direct definitions once and captures member forms', () => {
+    const counts = new Map<StructuralWorkKind, number>()
+    const observer: StructuralWorkObserver = {
+      record: (k) => counts.set(k, (counts.get(k) ?? 0) + 1),
+    }
+    const testAdapter = new PythonLanguageAdapter()
+    setStructuralWorkObserverForTesting(testAdapter, observer)
+    const session = new InMemoryIndexSession()
+
+    const methods = Array.from({ length: 400 }, (_, i) => {
+      return `    def method_${i}(self):\n        x = ${i}\n        return x`
+    }).join('\n\n')
+
+    const code = `
+class LargePythonService:
+    class_prop = 123
+
+    def __init__(self):
+        self.val = 42
+
+    @staticmethod
+    def static_worker():
+        return 1
+
+    @classmethod
+    def class_worker(cls):
+        return 2
+
+    @property
+    def my_prop(self):
+        return self.val
+
+    @my_prop.setter
+    def my_prop(self, v):
+        self.val = v
+
+${methods}
+
+    class InnerClass:
+        def inner_method(self):
+            return 99
+`
+
+    const draft = testAdapter.analyzeFile('large_service.py', code, {
+      session,
+      workspaceName: 'ws',
+    })
+
+    const parserState = draft.parserState as unknown as {
+      classes: Array<{
+        name: string
+        memberSymbolIds: readonly string[]
+        methodsByName: Record<string, string>
+        memberFormsById: Record<string, { kind: string; dispatch?: string; accessor?: string }>
+      }>
+    }
+
+    const largeCls = parserState.classes.find((c) => c.name === 'LargePythonService')
+    expect(largeCls).toBeDefined()
+    expect(largeCls?.memberSymbolIds.length).toBe(406)
+
+    // Check semantics of direct members
+    const initId = largeCls?.methodsByName['__init__']
+    expect(initId).toBeDefined()
+    expect(largeCls?.memberFormsById[initId!]).toEqual({ kind: MemberKind.Constructor })
+
+    const staticId = largeCls?.methodsByName['static_worker']
+    expect(staticId).toBeDefined()
+    expect(largeCls?.memberFormsById[staticId!]).toEqual({
+      kind: MemberKind.Method,
+      dispatch: MemberDispatch.Static,
+    })
+
+    const classId = largeCls?.methodsByName['class_worker']
+    expect(classId).toBeDefined()
+    expect(largeCls?.memberFormsById[classId!]).toEqual({
+      kind: MemberKind.Method,
+      dispatch: MemberDispatch.Static,
+    })
+
+    // Inner class is isolated and NOT in largeCls methods
+    expect(largeCls?.methodsByName['inner_method']).toBeUndefined()
+    const innerCls = parserState.classes.find((c) => c.name === 'InnerClass')
+    expect(innerCls).toBeDefined()
+    expect(innerCls?.methodsByName['inner_method']).toBeDefined()
+
+    // Structural work counts: owner-member-node-visited must be linear in direct members
+    const ownerMemberVisits = counts.get('owner-member-node-visited') ?? 0
+    expect(ownerMemberVisits).toBeGreaterThanOrEqual(406)
+    expect(ownerMemberVisits).toBeLessThan(500)
+  })
+})
+
+describe('Python lexical-summary reuse and boundaries (Task 3.8)', () => {
+  it('Scenario: Calls in one scope share one bound-name summary', () => {
+    const counts = new Map<StructuralWorkKind, number>()
+    const observer: StructuralWorkObserver = {
+      record: (k) => counts.set(k, (counts.get(k) ?? 0) + 1),
+    }
+    const testAdapter = new PythonLanguageAdapter()
+    setStructuralWorkObserverForTesting(testAdapter, observer)
+    const session = new InMemoryIndexSession()
+
+    const code = `
+def scope_with_many_calls(param1, param2):
+    local_var = 10
+    aug_binding = 5
+    for loop_var in range(5):
+        pass
+    with open('file') as as_binding:
+        pass
+    (walrus_target := 42)
+    aug_binding += 1
+
+    # Nested definitions with names matching calls: must NOT shadow outer calls
+    def nested_func():
+        call1 = 99
+        inner_local = 1
+
+    class NestedClass:
+        call2 = 99
+
+    call1()
+    call2()
+    call3()
+    call4()
+    call5()
+    call6()
+    call7()
+    call8()
+    call9()
+    call10()
+
+    param1()
+    local_var()
+    aug_binding()
+    loop_var()
+    as_binding()
+    walrus_target()
+`
+
+    const draft = testAdapter.analyzeFile('many_calls.py', code, {
+      session,
+      workspaceName: 'ws',
+    })
+
+    const unshadowedNames = draft.callFacts?.map((c) => c.name) ?? []
+    for (let i = 1; i <= 10; i++) {
+      expect(unshadowedNames).toContain(`call${i}`)
+    }
+    expect(unshadowedNames).not.toContain('param1')
+    expect(unshadowedNames).not.toContain('local_var')
+    expect(unshadowedNames).not.toContain('aug_binding')
+    expect(unshadowedNames).not.toContain('loop_var')
+    expect(unshadowedNames).not.toContain('as_binding')
+    expect(unshadowedNames).not.toContain('walrus_target')
+
+    const scopeVisits = counts.get('lexical-scope-node-visited') ?? 0
+    expect(scopeVisits).toBe(1)
+  })
+})
+
+describe('Python complete output parity (Task 3.9)', () => {
+  it('Scenario: Indexed and baseline semantics are equivalent across analysis artifacts on .py and .pyi', () => {
+    const session = new InMemoryIndexSession()
+
+    const pyCode = `
+import os
+from typing import Protocol, Optional
+from math import sqrt
+
+class Calculator(Protocol):
+    def calculate(self, x: int) -> float: ...
+
+class AdvancedCalculator:
+    version = "1.0"
+
+    def __init__(self, offset: float = 0.0):
+        self.offset = offset
+
+    @staticmethod
+    def identity(x: float) -> float:
+        return x
+
+    def calculate(self, x: int) -> float:
+        val = sqrt(x)
+        return val + self.offset
+`
+
+    const pyiCode = `
+from typing import Protocol
+
+class Formatter(Protocol):
+    def format(self, value: str) -> str: ...
+`
+
+    const pyDraft = baseAdapter.analyzeFile('calc.py', pyCode, {
+      session,
+      workspaceName: 'ws',
+    })
+    const pyiDraft = baseAdapter.analyzeFile('calc.pyi', pyiCode, {
+      session,
+      workspaceName: 'ws',
+    })
+
+    // .py assertions
+    expect(pyDraft.symbols.length).toBeGreaterThan(0)
+    expect(pyDraft.imports.length).toBe(4)
+    expect(pyDraft.bindingFacts?.length).toBeGreaterThan(0)
+    expect(pyDraft.callFacts?.length).toBeGreaterThan(0)
+
+    const parserState = pyDraft.parserState as unknown as {
+      classes: Array<{
+        name: string
+        kind: SymbolKind
+        methodsByName: Record<string, string>
+        memberFormsById: Record<string, { kind: string; dispatch?: string }>
+      }>
+    }
+    const proto = parserState.classes.find((c) => c.name === 'Calculator')
+    expect(proto?.kind).toBe(SymbolKind.Interface)
+    const adv = parserState.classes.find((c) => c.name === 'AdvancedCalculator')
+    expect(adv?.kind).toBe(SymbolKind.Class)
+    expect(adv?.methodsByName['__init__']).toBeDefined()
+    expect(adv?.methodsByName['identity']).toBeDefined()
+    expect(adv?.methodsByName['calculate']).toBeDefined()
+
+    // .pyi assertions
+    expect(pyiDraft.symbols.length).toBeGreaterThan(0)
+    const pyiParserState = pyiDraft.parserState as unknown as {
+      classes: Array<{
+        name: string
+        kind: SymbolKind
+      }>
+    }
+    const pyiProto = pyiParserState.classes.find((c) => c.name === 'Formatter')
+    expect(pyiProto?.kind).toBe(SymbolKind.Interface)
   })
 })

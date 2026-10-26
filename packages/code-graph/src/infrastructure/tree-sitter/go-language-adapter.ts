@@ -51,15 +51,27 @@ import {
   buildLogicalDeclarationFacts,
   containsSymbolRange,
   createAdapterDeclarationDescriptor,
+  createCallableContainmentIndex,
+  createDeclarationSymbolIndex,
   createPhysicalOnlyDeclarationDescriptor,
-  findContainingCallableSymbol,
   type AdapterHierarchyDescriptor,
+  type CallableContainmentIndex,
+  type DeclarationSymbolIndex,
+  getStructuralWorkObserver,
+  type StructuralWorkObserver,
   withOwnerParents,
   withEnclosingTypeParents,
   WHOLE_FILE_START,
 } from './reference-fact-helpers.js'
 
 const GO_CALLABLE_KINDS = new Set<SymbolKind>([SymbolKind.Function, SymbolKind.Method])
+
+/** Scope node kinds in Go that define lexical routines. */
+export const GO_ROUTINE_SCOPE_KINDS: ReadonlySet<string> = new Set([
+  'function_declaration',
+  'method_declaration',
+  'func_literal',
+])
 
 /**
  * Determines whether an import declaration is file-only/side-effect only.
@@ -80,7 +92,7 @@ function isFileOnlyImport(declaration: ImportDeclaration): boolean {
  * @param node - Parameter list, expression list, or var spec subtree.
  * @param names - Accumulator of bound names.
  */
-function collectGoBoundNames(node: SgNode, names: Set<string>): void {
+export function collectGoBoundNames(node: SgNode, names: Set<string>): void {
   const kind = nodeKind(node)
   if (kind === 'identifier') {
     names.add(node.text().trim())
@@ -97,34 +109,43 @@ function collectGoBoundNames(node: SgNode, names: Set<string>): void {
 }
 
 /**
- * Returns whether a bare call target is rebound by a parameter or function-local declaration
- * enclosing the call, so it cannot reach a package-level or imported callable.
- * @param node - Call node.
- * @param name - Callee identifier.
- * @returns True when an enclosing parameter, `:=`, or `var` binds the name.
+ * Reusable lexical binding lookup for Go enclosing scopes.
  */
-function isGoShadowedByEnclosingScope(node: SgNode, name: string): boolean {
-  let current = node.parent()
-  while (current !== null) {
-    const kind = nodeKind(current)
-    if (
-      kind === 'function_declaration' ||
-      kind === 'method_declaration' ||
-      kind === 'func_literal'
-    ) {
-      const names = new Set<string>()
-      const parameters = current.field('parameters')
+export interface GoLexicalBindingIndex {
+  isBound(node: SgNode, name: string): boolean
+}
+
+/**
+ * Creates one lazy lexical binding index caching bound names per routine or block scope in Go.
+ * @param observer - Optional observer recording structural work.
+ * @returns Lexical binding index.
+ */
+export function createGoLexicalBindingIndex(
+  observer?: StructuralWorkObserver,
+): GoLexicalBindingIndex {
+  const scopeCache = new Map<string, ReadonlySet<string>>()
+
+  const getScopeBoundNames = (scopeNode: SgNode): ReadonlySet<string> => {
+    const r = scopeNode.range()
+    const key = `${nodeKind(scopeNode)}:${r.start.index}:${r.end.index}`
+    const cached = scopeCache.get(key)
+    if (cached !== undefined) return cached
+
+    observer?.record('lexical-scope-node-visited')
+    const names = new Set<string>()
+    const kind = nodeKind(scopeNode)
+
+    if (GO_ROUTINE_SCOPE_KINDS.has(kind)) {
+      const parameters = scopeNode.field('parameters')
       if (parameters !== null) collectGoBoundNames(parameters, names)
-      const receiver = current.field('receiver')
+      const receiver = scopeNode.field('receiver')
       if (receiver !== null) collectGoBoundNames(receiver, names)
-      if (names.has(name)) return true
     } else if (kind === 'block') {
-      const statements = current
+      const statements = scopeNode
         .children()
         .flatMap((child) => (nodeKind(child) === 'statement_list' ? child.children() : [child]))
       for (const statement of statements) {
         const statementKind = nodeKind(statement)
-        const names = new Set<string>()
         if (statementKind === 'short_var_declaration') {
           const left = statement.field('left')
           if (left !== null) collectGoBoundNames(left, names)
@@ -137,12 +158,46 @@ function isGoShadowedByEnclosingScope(node: SgNode, name: string): boolean {
             }
           }
         }
-        if (names.has(name)) return true
       }
     }
-    current = current.parent()
+
+    scopeCache.set(key, names)
+    return names
   }
-  return false
+
+  return {
+    isBound(node: SgNode, name: string): boolean {
+      let current = node.parent()
+      while (current !== null) {
+        const kind = nodeKind(current)
+        if (GO_ROUTINE_SCOPE_KINDS.has(kind) || kind === 'block') {
+          const bound = getScopeBoundNames(current)
+          if (bound.has(name)) return true
+        }
+        current = current.parent()
+      }
+      return false
+    },
+  }
+}
+
+/**
+ * Returns whether a bare call target is rebound by a parameter or function-local declaration
+ * enclosing the call, so it cannot reach a package-level or imported callable.
+ * @param node - Call node.
+ * @param name - Callee identifier.
+ * @param bindings - Optional reusable Go lexical binding index.
+ * @returns True when an enclosing parameter, `:=`, or `var` binds the name.
+ */
+export function isGoShadowedByEnclosingScope(
+  node: SgNode,
+  name: string,
+  bindings?: GoLexicalBindingIndex,
+): boolean {
+  if (bindings) {
+    return bindings.isBound(node, name)
+  }
+  return createGoLexicalBindingIndex().isBound(node, name)
 }
 
 /**
@@ -189,13 +244,92 @@ function locationFromIndex(filePath: string, content: string, index: number): So
 /**
  * Represents a local Go type declaration relevant to hierarchy extraction.
  */
-interface GoTypeInfo {
+export interface GoTypeInfo {
   readonly name: string
   readonly symbolId: string
   readonly kind: 'class' | 'interface'
   readonly line: number
   readonly interfaceEmbeds: readonly string[]
   readonly interfaceMethodIds: Readonly<Record<string, string>>
+}
+
+/**
+ * Cache of expanded method sets for Go interfaces.
+ * Key: interface name.
+ * Value: sorted array of method names if fully known; null if unprovable / unknown / cycle.
+ */
+export type GoMethodSetCache = Map<string, readonly string[] | null>
+
+/**
+ * Expands and memoizes the complete method set of a Go interface, including embedded interfaces.
+ * Returns null if the method set cannot be fully determined (e.g., embedded type is external, missing, non-interface, or cyclical).
+ *
+ * @param interfaceName - Name of the interface to expand.
+ * @param typeByName - Map of local type declarations.
+ * @param interfaceMethods - Map of direct interface method names.
+ * @param cache - Cache of previously computed method sets.
+ * @param visiting - Set of interface names currently in the recursion stack to detect cycles.
+ * @param observer - Optional test observer recording work.
+ * @returns Sorted array of method names, or null if unknown/unprovable.
+ */
+export function completeGoInterfaceMethodSet(
+  interfaceName: string,
+  typeByName: ReadonlyMap<string, GoTypeInfo>,
+  interfaceMethods: Readonly<Record<string, readonly string[]>>,
+  cache: GoMethodSetCache,
+  visiting: Set<string> = new Set<string>(),
+  observer?: StructuralWorkObserver,
+): readonly string[] | null {
+  if (cache.has(interfaceName)) {
+    return cache.get(interfaceName)!
+  }
+
+  if (visiting.has(interfaceName)) {
+    cache.set(interfaceName, null)
+    return null
+  }
+
+  const info = typeByName.get(interfaceName)
+  if (info === undefined || info.kind !== SymbolKind.Interface) {
+    cache.set(interfaceName, null)
+    return null
+  }
+
+  observer?.record('interface-method-set-expanded')
+  visiting.add(interfaceName)
+
+  const directMethods = interfaceMethods[interfaceName] ?? []
+  const accumulated = new Set<string>(directMethods)
+  let failed = false
+
+  for (const embedded of info.interfaceEmbeds) {
+    const embeddedMethods = completeGoInterfaceMethodSet(
+      embedded,
+      typeByName,
+      interfaceMethods,
+      cache,
+      visiting,
+      observer,
+    )
+    if (embeddedMethods === null) {
+      failed = true
+      break
+    }
+    for (const m of embeddedMethods) {
+      accumulated.add(m)
+    }
+  }
+
+  visiting.delete(interfaceName)
+
+  if (failed) {
+    cache.set(interfaceName, null)
+    return null
+  }
+
+  const sortedMethods = [...accumulated].sort((a, b) => a.localeCompare(b))
+  cache.set(interfaceName, sortedMethods)
+  return sortedMethods
 }
 
 /** Session state key for the directory index of indexed Go files. */
@@ -524,12 +658,35 @@ export class GoLanguageAdapter implements LanguageAdapter {
       }
     }
 
+    const observer = getStructuralWorkObserver(this)
+    const declarationIndex = createDeclarationSymbolIndex(symbols, observer)
+    const callableIndex = createCallableContainmentIndex(
+      symbols,
+      { callableKinds: GO_CALLABLE_KINDS },
+      observer,
+    )
+    const lexicalIndex = createGoLexicalBindingIndex(observer)
+
     const imports = this.extractImportedNamesFromData(content, root)
     const bindingFacts = this.extractBindingFactsFromData(root, filePath, content, symbols, imports)
-    const callFacts = this.extractCallFactsFromData(root, filePath, content, symbols)
+    const callFacts = this.extractCallFactsFromData(
+      root,
+      filePath,
+      content,
+      symbols,
+      callableIndex,
+      lexicalIndex,
+    )
 
-    const typeInfos = this.collectTypeInfo(root, filePath, symbols)
-    const receiverFacts = this.collectMethodReceivers(root, content, filePath, symbols)
+    const typeInfos = this.collectTypeInfo(root, filePath, symbols, declarationIndex, observer)
+    const receiverFacts = this.collectMethodReceivers(
+      root,
+      content,
+      filePath,
+      symbols,
+      declarationIndex,
+      observer,
+    )
     const methodReceivers = receiverFacts.methods
     const serializedMethodReceivers: Record<string, Record<string, string>> = {}
     for (const [receiver, methods] of methodReceivers.entries()) {
@@ -561,9 +718,11 @@ export class GoLanguageAdapter implements LanguageAdapter {
       if (owner === undefined) continue
       for (const methodId of methods.values()) ownerByMemberId.set(methodId, owner.symbolId)
     }
+    const interfaceSignatureIds = new Set<string>()
     for (const info of typeInfos) {
       for (const methodId of Object.values(info.interfaceMethodIds)) {
         ownerByMemberId.set(methodId, info.symbolId)
+        interfaceSignatureIds.add(methodId)
       }
     }
     return {
@@ -611,9 +770,11 @@ export class GoLanguageAdapter implements LanguageAdapter {
       if (!owner) continue
       for (const methodId of methods.values()) ownerByMemberId.set(methodId, owner.symbolId)
     }
+    const interfaceSignatureIds = new Set<string>()
     for (const info of typeInfos) {
       for (const methodId of Object.values(info.interfaceMethodIds)) {
         ownerByMemberId.set(methodId, info.symbolId)
+        interfaceSignatureIds.add(methodId)
       }
     }
 
@@ -672,7 +833,7 @@ export class GoLanguageAdapter implements LanguageAdapter {
           groupKey: symbol.id,
           memberSemantics:
             symbol.kind === SymbolKind.Method
-              ? typeInfos.some((info) => info.interfaceMethodIds[symbol.name] === symbol.id)
+              ? interfaceSignatureIds.has(symbol.id)
                 ? { kind: MemberKind.Signature }
                 : { kind: MemberKind.Method, dispatch: MemberDispatch.Instance }
               : symbol.kind === SymbolKind.Property
@@ -803,6 +964,7 @@ export class GoLanguageAdapter implements LanguageAdapter {
    * @returns The build relations.
    */
   buildRelations(analysis: FileAnalysis, context: RelationBuildContext): Relation[] {
+    const observer = getStructuralWorkObserver(this)
     const relations: Relation[] = []
 
     for (const symbol of analysis.symbols) {
@@ -847,33 +1009,21 @@ export class GoLanguageAdapter implements LanguageAdapter {
 
     const interfaces = typeInfos.filter((info) => info.kind === SymbolKind.Interface)
     const structs = typeInfos.filter((info) => info.kind === SymbolKind.Class)
-    // An interface's method set includes the methods of every embedded interface. When an
-    // embedded interface cannot be resolved locally the set is unknown and nothing is claimed.
-    const completeMethodSet = (
-      name: string,
-      visiting = new Set<string>(),
-    ): string[] | undefined => {
-      if (visiting.has(name)) return undefined
-      const info = typeByName.get(name)
-      if (info === undefined || info.kind !== SymbolKind.Interface) return undefined
-      visiting.add(name)
-      const methods = new Set(interfaceMethods[name] ?? [])
-      for (const embedded of info.interfaceEmbeds) {
-        const embeddedMethods = completeMethodSet(embedded, visiting)
-        if (embeddedMethods === undefined) {
-          visiting.delete(name)
-          return undefined
-        }
-        for (const method of embeddedMethods) methods.add(method)
-      }
-      visiting.delete(name)
-      return [...methods]
-    }
+
+    const methodSetCache: GoMethodSetCache = new Map()
+
     for (const structInfo of structs) {
       const receiverMethods = methodReceivers[structInfo.name] ?? {}
       for (const iface of interfaces) {
-        const ifaceMethods = completeMethodSet(iface.name)
-        if (ifaceMethods === undefined || ifaceMethods.length === 0) continue
+        const ifaceMethods = completeGoInterfaceMethodSet(
+          iface.name,
+          typeByName,
+          interfaceMethods,
+          methodSetCache,
+          new Set(),
+          observer,
+        )
+        if (ifaceMethods === null || ifaceMethods.length === 0) continue
         const implementsAll = ifaceMethods.every((methodName) => methodName in receiverMethods)
         if (!implementsAll) continue
 
@@ -936,12 +1086,16 @@ export class GoLanguageAdapter implements LanguageAdapter {
    * @param root - The root SgNode of the parsed Go AST.
    * @param filePath - The path of the Go file.
    * @param symbols - Extracted symbol nodes.
+   * @param declarationIndex - Optional declaration index for exact symbol lookup.
+   * @param observer - Optional test observer recording structural work.
    * @returns Array of type info objects.
    */
   private collectTypeInfo(
     root: SgNode,
     filePath: string,
     symbols: readonly SymbolNode[],
+    declarationIndex?: DeclarationSymbolIndex,
+    observer?: StructuralWorkObserver,
   ): GoTypeInfo[] {
     const infos: GoTypeInfo[] = []
 
@@ -955,15 +1109,18 @@ export class GoLanguageAdapter implements LanguageAdapter {
         if (!name || !typeNode) continue
         const typeKind = nodeKind(typeNode)
         const line = spec.range().start.line + 1
+        const column = spec.range().start.column
 
         if (typeKind === 'struct_type') {
-          const ownerSymbol = symbols.find(
-            (symbol) =>
-              symbol.filePath === filePath &&
-              symbol.kind === SymbolKind.Class &&
-              symbol.name === name &&
-              symbol.line === line,
-          )
+          const ownerSymbol = declarationIndex
+            ? declarationIndex.find(SymbolKind.Class, name, line, column)
+            : symbols.find(
+                (symbol) =>
+                  symbol.filePath === filePath &&
+                  symbol.kind === SymbolKind.Class &&
+                  symbol.name === name &&
+                  symbol.line === line,
+              )
           if (ownerSymbol) {
             infos.push({
               name,
@@ -975,19 +1132,24 @@ export class GoLanguageAdapter implements LanguageAdapter {
             })
           }
         } else if (typeKind === 'interface_type') {
-          const ownerSymbol = symbols.find(
-            (symbol) =>
-              symbol.filePath === filePath &&
-              symbol.kind === SymbolKind.Interface &&
-              symbol.name === name &&
-              symbol.line === line,
-          )
+          const ownerSymbol = declarationIndex
+            ? declarationIndex.find(SymbolKind.Interface, name, line, column)
+            : symbols.find(
+                (symbol) =>
+                  symbol.filePath === filePath &&
+                  symbol.kind === SymbolKind.Interface &&
+                  symbol.name === name &&
+                  symbol.line === line,
+              )
           if (ownerSymbol) {
             const interfaceEmbeds: string[] = []
             const interfaceMethodIds: Record<string, string> = {}
 
             for (const elem of typeNode.children()) {
               const elemKind = nodeKind(elem)
+              if (elemKind === 'type_elem' || elemKind === 'method_elem') {
+                observer?.record('owner-member-node-visited')
+              }
               if (elemKind === 'type_elem') {
                 const typeIdent =
                   elem
@@ -1001,12 +1163,16 @@ export class GoLanguageAdapter implements LanguageAdapter {
               } else if (elemKind === 'method_elem') {
                 const methodName = elem.field('name')?.text()
                 if (methodName) {
-                  const methodSymbol = symbols.find(
-                    (s) =>
-                      s.kind === SymbolKind.Method &&
-                      s.name === methodName &&
-                      containsSymbolRange(ownerSymbol, s),
-                  )
+                  const mLine = elem.range().start.line + 1
+                  const mCol = elem.range().start.column
+                  const methodSymbol = declarationIndex
+                    ? declarationIndex.find(SymbolKind.Method, methodName, mLine, mCol)
+                    : symbols.find(
+                        (s) =>
+                          s.kind === SymbolKind.Method &&
+                          s.name === methodName &&
+                          containsSymbolRange(ownerSymbol, s),
+                      )
                   if (methodSymbol) {
                     interfaceMethodIds[methodName] = methodSymbol.id
                   }
@@ -1036,6 +1202,8 @@ export class GoLanguageAdapter implements LanguageAdapter {
    * @param content - Source file content.
    * @param filePath - The path of the Go file.
    * @param symbols - Extracted symbol nodes.
+   * @param declarationIndex - Optional declaration index for exact symbol lookup.
+   * @param observer - Optional test observer recording structural work.
    * @returns Receiver mappings and pointer receiver method identities.
    */
   private collectMethodReceivers(
@@ -1043,12 +1211,15 @@ export class GoLanguageAdapter implements LanguageAdapter {
     content: string,
     filePath: string,
     symbols: SymbolNode[],
+    declarationIndex?: DeclarationSymbolIndex,
+    observer?: StructuralWorkObserver,
   ): GoReceiverFacts {
     const methods = new Map<string, Map<string, string>>()
     const pointerMethodIds = new Set<string>()
 
     for (const child of root.children()) {
       if (nodeKind(child) !== 'method_declaration') continue
+      observer?.record('owner-member-node-visited')
       const nameNode = child.field('name')
       const methodName = nameNode?.text()
       const receiverList = child.field('receiver')
@@ -1077,13 +1248,17 @@ export class GoLanguageAdapter implements LanguageAdapter {
 
       if (!receiverName) continue
       const line = child.range().start.line + 1
-      const methodId = symbols.find(
-        (symbol) =>
-          symbol.filePath === filePath &&
-          symbol.kind === SymbolKind.Method &&
-          symbol.name === methodName &&
-          symbol.line === line,
-      )?.id
+      const column = child.range().start.column
+      const methodSymbol = declarationIndex
+        ? declarationIndex.find(SymbolKind.Method, methodName, line, column)
+        : symbols.find(
+            (symbol) =>
+              symbol.filePath === filePath &&
+              symbol.kind === SymbolKind.Method &&
+              symbol.name === methodName &&
+              symbol.line === line,
+          )
+      const methodId = methodSymbol?.id
       if (!methodId) continue
       if (isPointer) pointerMethodIds.add(methodId)
       const receiverMethods = methods.get(receiverName) ?? new Map<string, string>()
@@ -1293,6 +1468,8 @@ export class GoLanguageAdapter implements LanguageAdapter {
    * @param filePath - The path of the Go file.
    * @param content - Source file content.
    * @param symbols - Extracted symbol nodes.
+   * @param callables - Optional callable containment index for fast caller lookup.
+   * @param lexicalIndex - Optional lexical binding index for fast scope lookup.
    * @returns Array of call facts.
    */
   private extractCallFactsFromData(
@@ -1300,9 +1477,16 @@ export class GoLanguageAdapter implements LanguageAdapter {
     filePath: string,
     content: string,
     symbols: SymbolNode[],
+    callables?: CallableContainmentIndex,
+    lexicalIndex?: GoLexicalBindingIndex,
   ): CallFact[] {
     const facts: CallFact[] = []
     const seen = new Set<string>()
+    const observer = getStructuralWorkObserver(this)
+    const callableIndex =
+      callables ??
+      createCallableContainmentIndex(symbols, { callableKinds: GO_CALLABLE_KINDS }, observer)
+    const lexicals = lexicalIndex ?? createGoLexicalBindingIndex(observer)
 
     const addFact = (
       form: CallForm,
@@ -1314,11 +1498,7 @@ export class GoLanguageAdapter implements LanguageAdapter {
       const key = `${form}:${receiverName ?? ''}:${name}:${location.line}:${location.column}`
       if (seen.has(key)) return
       seen.add(key)
-      const caller = findContainingCallableSymbol(
-        symbols,
-        { line: location.line, column: location.column },
-        { callableKinds: GO_CALLABLE_KINDS },
-      )
+      const caller = callableIndex.find({ line: location.line, column: location.column })
       facts.push({
         filePath,
         scopeId: filePath,
@@ -1349,7 +1529,10 @@ export class GoLanguageAdapter implements LanguageAdapter {
             }
           } else if (fnKind === 'identifier') {
             const name = fn.text()
-            if (!this.isExcludedFreeCall(name) && !isGoShadowedByEnclosingScope(node, name)) {
+            if (
+              !this.isExcludedFreeCall(name) &&
+              !isGoShadowedByEnclosingScope(node, name, lexicals)
+            ) {
               addFact(CallForm.Free, name, undefined, node.range().start.index)
             }
           }

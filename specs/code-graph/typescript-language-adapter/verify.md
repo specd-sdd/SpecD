@@ -415,3 +415,22 @@
 - **WHEN** hierarchy evidence is emitted
 - **THEN** the physical hierarchy relation and shared hierarchy reference fact identify the same target
 - **AND** the fact retains the heritage-clause expression range and import-resolution provenance
+
+### Requirement: Indexed TypeScript type-member association
+
+#### Scenario: Large type collection uses indexed association
+
+- **GIVEN** a generated TypeScript file contains many classes and interfaces with many members
+- **AND** deterministic instrumentation records full symbol and member-node collection searches
+- **WHEN** type declarations are collected
+- **THEN** owner and member indexes are built once
+- **AND** each collected type, member node, and extracted symbol is consumed a bounded number of times
+- **AND** no member lookup performs a linear search over all method nodes
+
+#### Scenario: Indexed keys preserve declaration distinctions
+
+- **GIVEN** nested classes and interfaces contain equal member names, overload signatures, accessors, constructors, abstract members, static members, and same-line declarations
+- **WHEN** parser nodes are associated with extracted symbols
+- **THEN** every member retains its nearest declaring owner and exact range
+- **AND** overload ordering and established grouping remain unchanged
+- **AND** constructor, accessor, abstract, signature, static, and instance semantics match the established analysis
