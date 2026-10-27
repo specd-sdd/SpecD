@@ -1789,6 +1789,225 @@ storage:
       expect(defaultWs?.graph?.testPaths).toEqual(['**/*.spec.ts'])
       expect(defaultWs?.graph?.ignorePaths).toEqual(['fixtures/**'])
     })
+
+    it('parses workspace graph.maxFileBytes and graph.largeFilePaths correctly', async () => {
+      const configPath = await writeConfig(`
+schema: "@specd/schema-std"
+workspaces:
+  default:
+    specs:
+      adapter: fs
+      fs:
+        path: specs
+    graph:
+      maxFileBytes: 131072
+      largeFilePaths:
+        - "generated/**"
+        - "!generated/small.ts"
+storage:
+  changes:
+    adapter: fs
+    fs:
+      path: .specd/changes
+  drafts:
+    adapter: fs
+    fs:
+      path: .specd/drafts
+  discarded:
+    adapter: fs
+    fs:
+      path: .specd/discarded
+  archive:
+    adapter: fs
+    fs:
+      path: .specd/archive
+`)
+      const loader = createLoader({ configPath })
+      const config = await loader.load()
+      const defaultWs = config.workspaces.find((w) => w.name === 'default')
+
+      expect(defaultWs?.graph?.maxFileBytes).toBe(131072)
+      expect(defaultWs?.graph?.largeFilePaths).toEqual(['generated/**', '!generated/small.ts'])
+    })
+
+    it('workspace maxFileBytes and largeFilePaths are undefined when omitted', async () => {
+      const configPath = await writeConfig(`
+schema: "@specd/schema-std"
+workspaces:
+  default:
+    specs:
+      adapter: fs
+      fs:
+        path: specs
+    graph:
+      respectGitignore: false
+storage:
+  changes:
+    adapter: fs
+    fs:
+      path: .specd/changes
+  drafts:
+    adapter: fs
+    fs:
+      path: .specd/drafts
+  discarded:
+    adapter: fs
+    fs:
+      path: .specd/discarded
+  archive:
+    adapter: fs
+    fs:
+      path: .specd/archive
+`)
+      const loader = createLoader({ configPath })
+      const config = await loader.load()
+      const defaultWs = config.workspaces.find((w) => w.name === 'default')
+
+      expect(defaultWs?.graph?.maxFileBytes).toBeUndefined()
+      expect(defaultWs?.graph?.largeFilePaths).toBeUndefined()
+    })
+
+    it('accepts workspace graph.maxFileBytes: 0', async () => {
+      const configPath = await writeConfig(`
+schema: "@specd/schema-std"
+workspaces:
+  default:
+    specs:
+      adapter: fs
+      fs:
+        path: specs
+    graph:
+      maxFileBytes: 0
+storage:
+  changes:
+    adapter: fs
+    fs:
+      path: .specd/changes
+  drafts:
+    adapter: fs
+    fs:
+      path: .specd/drafts
+  discarded:
+    adapter: fs
+    fs:
+      path: .specd/discarded
+  archive:
+    adapter: fs
+    fs:
+      path: .specd/archive
+`)
+      const loader = createLoader({ configPath })
+      const config = await loader.load()
+      const defaultWs = config.workspaces.find((w) => w.name === 'default')
+
+      expect(defaultWs?.graph?.maxFileBytes).toBe(0)
+    })
+
+    it('rejects workspace graph.maxFileBytes when negative, fractional, or non-number', async () => {
+      const invalidValues = [-1, 1.5, '256KB']
+      for (const val of invalidValues) {
+        const configPath = await writeConfig(`
+schema: "@specd/schema-std"
+workspaces:
+  default:
+    specs:
+      adapter: fs
+      fs:
+        path: specs
+    graph:
+      maxFileBytes: ${typeof val === 'string' ? `"${val}"` : val}
+storage:
+  changes:
+    adapter: fs
+    fs:
+      path: .specd/changes
+  drafts:
+    adapter: fs
+    fs:
+      path: .specd/drafts
+  discarded:
+    adapter: fs
+    fs:
+      path: .specd/discarded
+  archive:
+    adapter: fs
+    fs:
+      path: .specd/archive
+`)
+        const loader = createLoader({ configPath })
+        await expect(loader.load()).rejects.toThrow(ConfigValidationError)
+        await expect(createLoader({ configPath }).load()).rejects.toThrow(
+          /workspaces\.default\.graph\.maxFileBytes/,
+        )
+      }
+    })
+
+    it('rejects workspace graph.largeFilePaths when given non-array or non-string array', async () => {
+      const configPath1 = await writeConfig(`
+schema: "@specd/schema-std"
+workspaces:
+  default:
+    specs:
+      adapter: fs
+      fs:
+        path: specs
+    graph:
+      largeFilePaths: "generated/**"
+storage:
+  changes:
+    adapter: fs
+    fs:
+      path: .specd/changes
+  drafts:
+    adapter: fs
+    fs:
+      path: .specd/drafts
+  discarded:
+    adapter: fs
+    fs:
+      path: .specd/discarded
+  archive:
+    adapter: fs
+    fs:
+      path: .specd/archive
+`)
+      await expect(createLoader({ configPath: configPath1 }).load()).rejects.toThrow(
+        /workspaces\.default\.graph\.largeFilePaths/,
+      )
+
+      const configPath2 = await writeConfig(`
+schema: "@specd/schema-std"
+workspaces:
+  default:
+    specs:
+      adapter: fs
+      fs:
+        path: specs
+    graph:
+      largeFilePaths:
+        - 123
+storage:
+  changes:
+    adapter: fs
+    fs:
+      path: .specd/changes
+  drafts:
+    adapter: fs
+    fs:
+      path: .specd/drafts
+  discarded:
+    adapter: fs
+    fs:
+      path: .specd/discarded
+  archive:
+    adapter: fs
+    fs:
+      path: .specd/archive
+`)
+      await expect(createLoader({ configPath: configPath2 }).load()).rejects.toThrow(
+        /workspaces\.default\.graph\.largeFilePaths/,
+      )
+    })
   })
 
   describe('Requirement: Project graph config', () => {
@@ -1880,6 +2099,93 @@ graph:
       ])
       expect(config.graph?.ignorePaths).toEqual([])
     })
+
+    it('parses project graph.maxFileBytes and graph.largeFilePaths correctly', async () => {
+      const configPath = await writeConfig(
+        minimalYaml(`
+graph:
+  maxFileBytes: 524288
+  largeFilePaths:
+    - "vendor/**"
+    - "!vendor/stub.ts"
+`),
+      )
+      const loader = createLoader({ configPath })
+      const config = await loader.load()
+
+      expect(config.graph?.maxFileBytes).toBe(524288)
+      expect(config.graph?.largeFilePaths).toEqual(['vendor/**', '!vendor/stub.ts'])
+    })
+
+    it('project maxFileBytes and largeFilePaths are undefined when omitted', async () => {
+      const configPath = await writeConfig(minimalYaml())
+      const loader = createLoader({ configPath })
+      const config = await loader.load()
+
+      expect(config.graph?.maxFileBytes).toBeUndefined()
+      expect(config.graph?.largeFilePaths).toBeUndefined()
+    })
+
+    it('accepts project graph.maxFileBytes: 0', async () => {
+      const configPath = await writeConfig(
+        minimalYaml(`
+graph:
+  maxFileBytes: 0
+`),
+      )
+      const loader = createLoader({ configPath })
+      const config = await loader.load()
+
+      expect(config.graph?.maxFileBytes).toBe(0)
+    })
+
+    it('rejects project graph.maxFileBytes when negative, fractional, or non-number', async () => {
+      const invalidValues = [-1, 2.5, '1MB']
+      for (const val of invalidValues) {
+        const configPath = await writeConfig(
+          minimalYaml(`
+graph:
+  maxFileBytes: ${typeof val === 'string' ? `"${val}"` : val}
+`),
+        )
+        const loader = createLoader({ configPath })
+        await expect(loader.load()).rejects.toThrow(ConfigValidationError)
+        await expect(createLoader({ configPath }).load()).rejects.toThrow(/graph\.maxFileBytes/)
+      }
+    })
+
+    it('rejects project graph.largeFilePaths when given non-array or non-string array', async () => {
+      const configPath1 = await writeConfig(
+        minimalYaml(`
+graph:
+  largeFilePaths: "vendor/**"
+`),
+      )
+      await expect(createLoader({ configPath: configPath1 }).load()).rejects.toThrow(
+        /graph\.largeFilePaths/,
+      )
+
+      const configPath2 = await writeConfig(
+        minimalYaml(`
+graph:
+  largeFilePaths:
+    - 456
+`),
+      )
+      await expect(createLoader({ configPath: configPath2 }).load()).rejects.toThrow(
+        /graph\.largeFilePaths/,
+      )
+    })
+
+    it('rejects unknown fields inside the project graph block', async () => {
+      const configPath = await writeConfig(
+        minimalYaml(`
+graph:
+  unknownKey: true
+`),
+      )
+      await expect(createLoader({ configPath }).load()).rejects.toThrow(ConfigValidationError)
+    })
   })
 
   describe('Requirement: Reserved root workspace namespace', () => {
@@ -1950,6 +2256,33 @@ contextIncludeSpecs:
 
       // Arrays are appended: both entries present
       expect(config.contextIncludeSpecs).toEqual(['default:*', 'default:arch/*'])
+    })
+
+    it('cascades graph.maxFileBytes (later scalar wins) and graph.largeFilePaths (arrays append)', async () => {
+      await writeConfig(
+        minimalYaml(`
+graph:
+  maxFileBytes: 100000
+  largeFilePaths:
+    - "base/**"
+`),
+      )
+      await writeConfig(
+        `
+extends: true
+graph:
+  maxFileBytes: 200000
+  largeFilePaths:
+    - "overlay/**"
+`.trim(),
+        'specd.local.yaml',
+      )
+
+      const loader = createLoader({ startDir: tmpDir })
+      const config = await loader.load()
+
+      expect(config.graph?.maxFileBytes).toBe(200000)
+      expect(config.graph?.largeFilePaths).toEqual(['base/**', 'overlay/**'])
     })
 
     it('extends: <path> attaches when base is in the active chain', async () => {

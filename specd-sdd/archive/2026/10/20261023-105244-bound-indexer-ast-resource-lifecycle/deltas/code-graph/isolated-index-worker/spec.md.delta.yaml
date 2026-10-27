@@ -1,0 +1,134 @@
+- op: modified
+  description: Add the activity message and the protocol version rule
+  selector:
+    type: section
+    matches: 'Requirement: Validated IPC lifecycle'
+  content: |
+    Parent and child SHALL communicate through a tagged, runtime-validated IPC protocol.
+    The protocol MUST distinguish:
+
+    - zero or more progress messages;
+    - zero or more activity messages that announce the item the child is about to process;
+    - one successful terminal result;
+    - one task-reported terminal failure;
+    - malformed or unsupported protocol messages;
+    - child termination without a valid terminal message.
+
+    The protocol identifier MUST carry a version and MUST change whenever the set of message types or their fields changes. Parent and child ship in the same package, so a version mismatch SHALL be classified as a protocol failure.
+
+    Each run MUST accept at most one terminal message. A duplicate or late terminal message
+    SHALL be classified as a protocol failure and MUST NOT trigger a second result,
+    rejection, signal action, or lock release.
+
+    Raw IPC envelopes and child bootstrap commands MUST remain internal. The public surface
+    MAY expose presentation-neutral progress and failure value types required by hosts, but
+    MUST NOT require hosts to send, parse, or validate child-process messages.
+
+- op: modified
+  description: Add resource-limit, native-crash and diagnostic details to the failure classification
+  selector:
+    type: section
+    matches: 'Requirement: Typed failure classification'
+  content: |
+    The high-level operation SHALL preserve distinct typed failures for:
+
+    - graph index already busy;
+    - fork startup or IPC-channel creation failure;
+    - invalid task module or task contract;
+    - task-reported failure;
+    - malformed, unsupported, late, or duplicate IPC;
+    - non-zero exit or exit before a valid terminal result;
+    - signal-based termination.
+
+    Every failure produced after the child started SHALL carry a closed `cause` classification and structured diagnostics. The `cause` SHALL be one of `start-failed`, `task-contract`, `task-error`, `protocol`, `cancelled` (termination caused by a signal the supervisor forwarded), `native-crash` (termination by `SIGSEGV`, `SIGBUS`, `SIGILL`, or `SIGABRT`, or an abort exit), `resource-limit` (termination attributable to memory exhaustion, such as a fatal out-of-memory report in the captured error output or an operating-system kill after that evidence), or `exited` (any other exit without a valid terminal result). The classification SHALL use the exit code, the signal, and the captured output tails, and SHALL fall back to `exited` or the signal-derived cause when the evidence is insufficient.
+
+    The diagnostics SHALL include the last activity announced by the child (the active item and how long ago it was announced) and the captured standard output and standard error tails defined by Requirement: Child output capture.
+
+    Worker failure types MUST extend the package's `SpecdCodeGraphError` hierarchy, expose
+    stable upper-snake-case error codes, retain an actionable message, and include structured
+    exit code or signal details when applicable. Hosts MUST NOT need to parse stderr or
+    error-message text to distinguish these cases.
+
+- op: added
+  description: Capture of child output instead of discarding it
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Typed failure classification'
+  content: |
+    ### Requirement: Child output capture
+
+    The supervisor SHALL capture the child's standard output and standard error instead of discarding them. It SHALL keep a bounded tail of each (the most recent output, no more than 16 KiB per stream, decoded as UTF-8 with invalid sequences replaced) and SHALL release the buffers when the run ends. Captured output MUST NOT be written to the host's standard streams and MUST NOT be forwarded as progress or as an event. It SHALL appear only in the diagnostics of a failure.
+
+- op: added
+  description: Activity messages and supervisor-side silence watchdog
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Child output capture'
+  content: |
+    ### Requirement: Activity and silence watchdog
+
+    The child task contract SHALL allow the task to announce the item it is about to process (for example the file path), marking the announcement as mandatory when the item is expected to be expensive. The child SHALL forward announcements as activity messages and SHALL bound their rate to at most four per second, except that mandatory announcements are always forwarded, so that the item being processed during a stall is never the one whose announcement was withheld. The supervisor SHALL record the latest announced item and the time of the latest message of any kind (progress, activity, or terminal).
+
+    The analysis a child performs is synchronous, so the watchdog MUST run in the supervisor and not in the child. When no message of any kind has arrived for 10 seconds, the supervisor SHALL deliver a `worker-silent` event naming the last announced item and the silent duration, and SHALL repeat it at most once per further 10 seconds of silence. The watchdog MUST NOT terminate the child and MUST NOT change task execution. A receiver that throws while handling an event, including the `stale-lock-recovered` event and the string warning receiver delivered while the lock is acquired and before any child exists, is a host failure, not a worker failure: it ends the run with a typed progress-handler error (`GraphIndexProgressHandlerError`) after terminating the child when one exists; the lock lease is released.
+
+    Both the activity announcements and the `worker-silent` event SHALL be delivered through the optional typed event receiver defined by Requirement: Typed worker events. The `worker-silent` event carries the last announced item and the silent duration; it carries no captured output.
+
+- op: added
+  description: Typed worker events next to the string warning receiver
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Activity and silence watchdog'
+  content: |
+    ### Requirement: Typed worker events
+
+    `RunIsolatedGraphIndexInput` SHALL accept an optional `onEvent` receiver in addition to the unchanged `onProgress` and `onWarning` receivers. It SHALL be called with presentation-neutral, JSON-serializable events that carry a stable `kind` identifier and structured fields, never display sentences. The kinds SHALL be `activity` (the announced item), `worker-silent` (the last announced item and the silent duration in milliseconds), and `stale-lock-recovered` (the recovery that `onWarning` also reports as text). Events SHALL be delivered in arrival order, and the absence of the receiver MUST NOT change task execution.
+
+- op: added
+  description: Child runtime options needed for the garbage-collection request
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Typed worker events'
+  content: |
+    ### Requirement: Child runtime options
+
+    The supervisor SHALL start the child in a runtime in which the garbage-collection request used by the indexer's parser-resource lifecycle is available, through a fork execution argument and not by modifying runtime flags after startup. The supervisor SHALL preserve the execution arguments it needs for the published ESM entrypoint and MUST NOT remove arguments supplied by the host runtime.
+
+- op: modified
+  description: The task entrypoint also receives the activity announcer
+  selector:
+    type: section
+    matches: 'Requirement: Trusted injected task module'
+  content: |
+    The worker SHALL dynamically load exactly the task-module URL or absolute path supplied
+    programmatically by the host. The module MUST expose the documented asynchronous graph
+    index task entrypoint.
+
+    The task entrypoint SHALL receive:
+
+    - the JSON-serializable task input supplied by the host;
+    - a progress emitter that accepts JSON-serializable progress data;
+    - an activity announcer that accepts the item the task is about to process and an optional mandatory flag, as defined by Requirement: Activity and silence watchdog. A task that does not need it MAY ignore it.
+
+    The task entrypoint SHALL return one JSON-serializable result or throw one failure. The
+    worker MUST reject a missing entrypoint, non-callable entrypoint, non-serializable input,
+    progress value, or result as a typed task/protocol failure.
+
+    Task-module selection MUST NOT be exposed as an end-user CLI argument by this
+    capability. The operation assumes the calling host selected a trusted, installed,
+    version-affine module; it is not a sandbox for untrusted code.

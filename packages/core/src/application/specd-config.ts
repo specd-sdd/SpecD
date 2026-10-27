@@ -85,6 +85,20 @@ export interface SpecdWorkspaceGraphConfig {
    * Additive on top of project-level ignorePaths.
    */
   readonly ignorePaths?: readonly string[]
+  /**
+   * Maximum file size in bytes for source files and documents owned by this workspace.
+   * Files exceeding this limit are skipped during graph indexing with coverage reason 'file-too-large'.
+   *
+   * Setting this to `0` disables the file size limit for this workspace.
+   * When omitted, falls back to project-level `graph.maxFileBytes` (or built-in default applied by the code graph).
+   */
+  readonly maxFileBytes?: number
+  /**
+   * Gitignore-syntax exemption patterns evaluated relative to the workspace `codeRoot`.
+   * Files matching these patterns are analysed even if their size exceeds `maxFileBytes`.
+   * Added to the project-level `graph.largeFilePaths` list.
+   */
+  readonly largeFilePaths?: readonly string[]
 }
 
 /** Project-level code graph configuration from `specd.yaml`. */
@@ -114,6 +128,21 @@ export interface SpecdGraphConfig {
    * When omitted, defaults to empty list.
    */
   readonly ignorePaths?: readonly string[]
+  /**
+   * Maximum file size in bytes for source files and documents across the project.
+   * Files exceeding this limit are skipped during graph indexing with coverage reason 'file-too-large'.
+   *
+   * Setting this to `0` disables the file size limit across the project.
+   * When omitted, the code-graph layer applies its built-in default (262144 bytes / 256 KiB).
+   * Can be overridden per workspace via `workspaces.<name>.graph.maxFileBytes`.
+   */
+  readonly maxFileBytes?: number
+  /**
+   * Gitignore-syntax exemption patterns evaluated relative to the project root.
+   * Files matching these patterns are analysed even if their size exceeds `maxFileBytes`.
+   * Workspace-level `largeFilePaths` patterns are evaluated relative to their `codeRoot` and appended to this list.
+   */
+  readonly largeFilePaths?: readonly string[]
 }
 
 /** Built-in default test file patterns for code graph indexing. */

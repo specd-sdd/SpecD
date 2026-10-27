@@ -44,6 +44,23 @@ export interface GetGraphHealthInput {
   readonly manifestSource?: ResolutionManifestSource
 }
 
+/**
+ * Aggregate completeness of the persisted index coverage, including configuration-induced gaps.
+ *
+ * `complete-with-warnings` means that coverage is complete under the aggregate coverage rule but
+ * some files were skipped by configuration (see {@link CoverageWarning}), so the absence of a
+ * symbol or reference is not proven for code that may live in those files.
+ */
+export type CoverageCompleteness = 'complete' | 'complete-with-warnings' | 'incomplete' | 'unknown'
+
+/** A configuration-induced gap in otherwise complete index coverage. */
+export interface CoverageWarning {
+  /** Stable machine-readable warning code. */
+  readonly code: 'file-too-large'
+  /** Number of coverage records that carry this warning. */
+  readonly count: number
+}
+
 /** Graph statistics enriched with staleness and fingerprint diagnostics. */
 export interface GetGraphHealthResult extends GraphStatistics {
   readonly state: FreshnessState
@@ -54,6 +71,10 @@ export interface GetGraphHealthResult extends GraphStatistics {
   readonly fingerprintMismatch: boolean | null
   readonly contentFresh: boolean | null
   readonly coverageComplete: boolean | null
+  /** Aggregate coverage completeness, distinguishing complete coverage that has warnings. */
+  readonly coverageCompleteness: CoverageCompleteness
+  /** Warnings for gaps caused by configuration; empty unless completeness has warnings. */
+  readonly coverageWarnings: readonly CoverageWarning[]
   readonly coverage: IndexCoverageHealthSummary
   readonly schemaCompatible: boolean
   readonly generationCurrent: boolean
@@ -107,6 +128,7 @@ export class GetGraphHealth {
         fingerprintMismatch: null,
         contentFresh: false,
         coverageComplete: coverage.complete,
+        ...deriveCoverageCompleteness(coverage.complete, coverage.facts),
         coverage: coverage.summary,
         schemaCompatible: true,
         generationCurrent: true,
@@ -231,12 +253,43 @@ export class GetGraphHealth {
       fingerprintMismatch,
       contentFresh,
       coverageComplete,
+      ...deriveCoverageCompleteness(coverage.complete, coverage.facts),
       coverage: coverage.summary,
       schemaCompatible: true,
       generationCurrent: true,
       reasonCodes,
     }
   }
+}
+
+/**
+ * Derives the completeness state and warnings from the aggregate coverage rule and the facts.
+ *
+ * The boolean aggregate keeps its meaning: only `parse-failed`, `partial` and integrity
+ * mismatches make coverage incomplete. Files skipped by the size limit are terminal, explicit
+ * outcomes, so they leave the aggregate complete and raise a `file-too-large` warning instead.
+ * @param complete - Aggregate coverage completeness (`null` when it cannot be assessed).
+ * @param facts - Persisted coverage facts.
+ * @returns The completeness state and its warnings.
+ */
+function deriveCoverageCompleteness(
+  complete: boolean | null,
+  facts: readonly IndexCoverage[],
+): {
+  readonly coverageCompleteness: CoverageCompleteness
+  readonly coverageWarnings: readonly CoverageWarning[]
+} {
+  if (complete === null) return { coverageCompleteness: 'unknown', coverageWarnings: [] }
+  if (!complete) return { coverageCompleteness: 'incomplete', coverageWarnings: [] }
+  const skipped = facts.filter(
+    (fact) => fact.status === IndexCoverageStatus.Unsupported && fact.reason === 'file-too-large',
+  ).length
+  return skipped > 0
+    ? {
+        coverageCompleteness: 'complete-with-warnings',
+        coverageWarnings: [{ code: 'file-too-large', count: skipped }],
+      }
+    : { coverageCompleteness: 'complete', coverageWarnings: [] }
 }
 
 /**
@@ -536,6 +589,9 @@ async function assessObservedContent(
     for (const workspace of new Set(resources.map((resource) => resource.workspace))) {
       const coverageLocators = coverageFacts
         .filter((fact) => fact.filePath.startsWith(`${workspace}:`))
+        // A file skipped for size is a terminal outcome, not an indexed member: visibility
+        // already leaves it out, so keeping it here would report every such run as changed.
+        .filter((fact) => !(fact.status === 'unsupported' && fact.reason === 'file-too-large'))
         .map((fact) => {
           const target = workspaceTargets.get(workspace)
           if (target === undefined) return null

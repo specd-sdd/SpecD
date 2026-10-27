@@ -14,6 +14,9 @@
       "symbols": ["runIndexProjectGraph"]
     },
     {
+      "file": "sdk:src/index.ts"
+    },
+    {
       "file": "sdk:test/orchestration/run-index-project-graph.spec.ts"
     }
   ],

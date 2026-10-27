@@ -119,17 +119,17 @@ This is exactly how specd's own project uses it: the `default` workspace has `pr
 
 The full set of fields available on any workspace:
 
-| Field                 | Required           | Default (`default` ws) | Default (non-`default` ws)                                               | Description                                                                        |
-| --------------------- | ------------------ | ---------------------- | ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------- |
-| `specs`               | always             | —                      | —                                                                        | Storage adapter and path where spec files live                                     |
-| `specs.metadataPath`  | no                 | `{specdPath}/metadata` | `{specdPath}/metadata` (internal) / nearest `.specd/metadata` (external) | Custom path for workspace spec metadata (`metadata.json`)                          |
-| `codeRoot`            | non-`default` only | project root           | (must be declared)                                                       | Directory where implementation code lives                                          |
-| `schemas`             | no                 | `.specd/schemas`       | (none)                                                                   | Storage adapter and path for named local schemas                                   |
-| `ownership`           | no                 | `owned`                | `readOnly`                                                               | The project's relationship to these specs (`owned`, `shared`, `readOnly`)          |
-| `prefix`              | no                 | (none)                 | (none)                                                                   | Prepend leading path segment to capability path in spec IDs (display only)         |
-| `contextIncludeSpecs` | no                 | `[]` (None)            | `[]` (None)                                                              | Include patterns applied when this workspace is active                             |
-| `contextExcludeSpecs` | no                 | `[]`                   | `[]`                                                                     | Exclude patterns applied when this workspace is active                             |
-| `graph`               | no                 | (defaults)             | (defaults)                                                               | Code graph discovery settings (`respectGitignore`, `excludePaths`, `allowedPaths`) |
+| Field                 | Required           | Default (`default` ws) | Default (non-`default` ws)                                               | Description                                                                                                          |
+| --------------------- | ------------------ | ---------------------- | ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
+| `specs`               | always             | —                      | —                                                                        | Storage adapter and path where spec files live                                                                       |
+| `specs.metadataPath`  | no                 | `{specdPath}/metadata` | `{specdPath}/metadata` (internal) / nearest `.specd/metadata` (external) | Custom path for workspace spec metadata (`metadata.json`)                                                            |
+| `codeRoot`            | non-`default` only | project root           | (must be declared)                                                       | Directory where implementation code lives                                                                            |
+| `schemas`             | no                 | `.specd/schemas`       | (none)                                                                   | Storage adapter and path for named local schemas                                                                     |
+| `ownership`           | no                 | `owned`                | `readOnly`                                                               | The project's relationship to these specs (`owned`, `shared`, `readOnly`)                                            |
+| `prefix`              | no                 | (none)                 | (none)                                                                   | Prepend leading path segment to capability path in spec IDs (display only)                                           |
+| `contextIncludeSpecs` | no                 | `[]` (None)            | `[]` (None)                                                              | Include patterns applied when this workspace is active                                                               |
+| `contextExcludeSpecs` | no                 | `[]`                   | `[]`                                                                     | Exclude patterns applied when this workspace is active                                                               |
+| `graph`               | no                 | (defaults)             | (defaults)                                                               | Code graph discovery settings (`respectGitignore`, `excludePaths`, `allowedPaths`, `maxFileBytes`, `largeFilePaths`) |
 
 All relative paths resolve from the directory containing `specd.yaml`.
 
@@ -263,6 +263,23 @@ Both the `default` and `core` workspaces are active for that change. Context com
 `codeRoot` tells specd where the implementation code for a workspace lives. When an agent compiles context for a change in the `core` workspace, the compiled output tells it to write code under `packages/core`. This ensures the agent knows exactly where each workspace's implementation sits, without having to guess from the workspace name.
 
 `codeRoot` is required for non-`default` workspaces — there is no sensible default for external or package workspaces.
+
+### Workspace code graph configuration
+
+Workspaces can customize code graph discovery and indexing limits relative to their own `codeRoot`:
+
+- **`maxFileBytes`**: Overrides the project-level file size limit (default `262144` bytes = 256 KiB) specifically for files inside this workspace. Files strictly exceeding this threshold are skipped during code graph indexing with reason `file-too-large`. Setting `maxFileBytes: 0` disables the size limit entirely for this workspace.
+- **`largeFilePaths`**: A list of gitignore-syntax pattern strings evaluated **relative to the workspace `codeRoot`** (in contrast to project-level `graph.largeFilePaths` which resolve relative to the project root). Oversized files matching these patterns are indexed despite exceeding `maxFileBytes`. An exemption only bypasses the size limit; matching files must still satisfy `allowedPaths`, `excludePaths`, gitignore rules, and binary content detection. Workspace exemptions are additive over project-level exemptions.
+
+```yaml
+workspaces:
+  core:
+    codeRoot: packages/core
+    graph:
+      maxFileBytes: 524288 # Replaces project limit with 512 KiB for packages/core
+      largeFilePaths:
+        - 'src/generated/ast-tokens.ts' # Relative to packages/core codeRoot
+```
 
 ---
 

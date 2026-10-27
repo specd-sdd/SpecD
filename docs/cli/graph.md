@@ -37,6 +37,35 @@ specd graph index [options]
 | `--path <path>`               | Repository root bootstrap path (ignores discovered config).       |
 | `--format <text\|json\|toon>` | Output format (`text`, `json`, `toon`).                           |
 
+### Output & Behavior
+
+- **File Size Gating & Summary:** Files larger than the effective `maxFileBytes` (default: 256 KiB) are skipped during indexing with coverage reason `file-too-large`.
+  - In `text` format, a size-skip section lists the largest skipped files with their sizes (capped at 10 items, followed by `... and N more`), a ready-to-paste `graph.largeFilePaths` snippet (root-level files are anchored with a leading `/` so that they match only that file), and the option to raise `graph.maxFileBytes` (`0` disables the limit).
+  - In `json` and `toon` formats, result objects include:
+    - `filesSkippedForSize` (`number`): Count of files skipped due to size limits.
+    - `largestSkippedForSize` (`Array<{ filePath, projectRelativePath, sizeBytes, limitBytes }>`): The largest skipped files, in descending size order (at most 25 entries).
+    - `sizeExemptAnalysed` (`Array<{ filePath, projectRelativePath, sizeBytes }>`): Oversized files that are indexed because they are exempt through `graph.largeFilePaths`.
+- **Errors vs diagnostics:** `errors` lists files or specs that failed to produce their indexed content; each one is also `parse-failed` in coverage and is retried by the next normal run, even when its content did not change. `diagnostics` lists problems found while resolving packages or linking re-exports (for example a package identity declared by several workspaces). A diagnostic is not a failure: in `text` format it is printed as a `warning:` line under `finished with N diagnostic(s)`, the exit code is unchanged, and the structured formats expose `diagnostics` next to `errors`. Neither keeps the graph stale: a run that commits clears the stale latches, and a file that failed has no observation, so it shows as unknown (`OBSERVATION_MISSING`) until it indexes successfully.
+- **Worker Silence Watchdog:** If the isolated indexing worker produces no activity for 10 seconds, a warning is printed to `stderr` in text mode:
+  ```text
+  warning: no progress for 10s while processing core:src/parser.ts. If that file is not needed, add it to graph.excludePaths or lower graph.maxFileBytes.
+  ```
+  The warning repeats at most every 10 seconds while the worker remains silent, but never terminates the worker.
+- **Failure Classification & Diagnostics:** When indexing fails, the command exits with code `3` and reports classified diagnostics:
+  - **Failure Causes:** `start-failed`, `task-contract`, `task-error`, `protocol`, `cancelled`, `native-crash`, `resource-limit` (out-of-memory), or `exited`.
+  - **Diagnostics:** Reported in structured formats and rendered to `stderr` in text format, including the failure cause, the last activity item being processed, elapsed time since last activity, and the trailing 16 KiB of worker `stdoutTail` and `stderrTail`.
+
+### Example: Exempting Large Files
+
+To index specific oversized files that exceed `maxFileBytes`:
+
+```yaml
+graph:
+  largeFilePaths:
+    - 'packages/core/src/generated/schema.ts'
+    - 'specs/**/*.md'
+```
+
 ---
 
 ## graph search
@@ -203,6 +232,13 @@ Report summary metrics, health, and freshness of the code graph store.
 ```bash
 specd graph stats [options]
 ```
+
+Coverage is reported with `coverageCompleteness`: `complete`, `complete-with-warnings` (coverage is
+complete but some files were skipped by the `graph.maxFileBytes` limit, so a missing symbol is not
+proof of absence for code that may live in them), `incomplete` (parse-failed or partial inputs) or
+`unknown`. `coverageWarnings` lists the warnings with their counts (`{ code: 'file-too-large', count }`).
+Text output prints `coverage: complete with warnings (N file(s) skipped: file-too-large)` and a hint;
+`json` and `toon` carry both fields without hint text.
 
 ### Options
 

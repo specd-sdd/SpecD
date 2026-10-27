@@ -469,7 +469,7 @@ describe('IndexCodeGraph package imports', () => {
 
     const result = await indexer.execute(options())
 
-    expect(result.errors.some((error) => error.message.includes('boom'))).toBe(true)
+    expect(result.diagnostics.some((error) => error.message.includes('boom'))).toBe(true)
     expect(await bindingTarget(store, 'SymbolNode')).toBeUndefined()
     expect(result.importDiagnostics.adaptersWithoutPackageResolution.length).toBeGreaterThanOrEqual(
       1,
@@ -513,7 +513,7 @@ describe('IndexCodeGraph package imports', () => {
 
     const result = await indexer.execute(options())
 
-    expect(result.errors.some((error) => error.message.includes('identity-boom'))).toBe(true)
+    expect(result.diagnostics.some((error) => error.message.includes('identity-boom'))).toBe(true)
     expect(result.importDiagnostics.adaptersWithoutPackageResolution.length).toBe(1)
     expect(result.filesIndexed).toBeGreaterThan(0)
   })
@@ -638,7 +638,7 @@ describe('IndexCodeGraph package imports', () => {
 
     const result = await indexer.execute(options())
 
-    expect(result.errors.some((error) => error.message.includes('link-boom'))).toBe(true)
+    expect(result.diagnostics.some((error) => error.message.includes('link-boom'))).toBe(true)
     expect(result.importDiagnostics.adaptersWithoutPackageResolution.length).toBe(1)
   })
 
@@ -648,7 +648,7 @@ describe('IndexCodeGraph package imports', () => {
 
     const result = await indexer.execute(options())
 
-    const collision = result.errors.find((error) => error.message.includes('collision'))
+    const collision = result.diagnostics.find((error) => error.message.includes('collision'))
     expect(collision?.message).toContain('@fixture/graph')
     expect(collision?.message).toContain('graph')
     expect(collision?.message).toContain('app')
@@ -726,7 +726,7 @@ describe('IndexCodeGraph package imports', () => {
 
     const result = await indexer.execute(options())
 
-    expect(result.errors.some((error) => error.message.includes('link-only-boom'))).toBe(true)
+    expect(result.diagnostics.some((error) => error.message.includes('link-only-boom'))).toBe(true)
     const listed = result.importDiagnostics.adaptersWithoutPackageResolution.filter((l) =>
       l.startsWith('pseudo'),
     )

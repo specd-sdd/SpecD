@@ -36,6 +36,99 @@
 - **WHEN** `specd graph index --format json` is run
 - **THEN** stdout is valid JSON containing `filesDiscovered`, `filesIndexed`, `documentsIndexed`, `filesSkipped`, `filesRemoved`, `specsIndexed`, `errors`, and `duration`
 
+### Requirement: Size-skip summary and hint
+
+#### Scenario: Text output lists the skipped files and the snippet
+
+- **GIVEN** a result with three files skipped for size
+- **WHEN** the command prints in `text` mode
+- **THEN** the output states the count and the applied limit
+- **AND** lists the three files with project-relative paths and human-readable sizes
+- **AND** prints a `graph.largeFilePaths` YAML snippet containing those paths
+- **AND** mentions raising `graph.maxFileBytes` and that `0` disables the limit
+- **AND** states the memory cost of large files
+
+#### Scenario: The list is capped at ten
+
+- **GIVEN** a result with twenty-five files skipped for size
+- **WHEN** the command prints in `text` mode
+- **THEN** the ten largest are listed
+- **AND** a line states that fifteen more were skipped and the total of twenty-five is shown
+
+#### Scenario: Special characters are escaped in the snippet
+
+- **GIVEN** a skipped file whose path contains a character that gitignore syntax treats specially
+- **WHEN** the snippet is printed
+- **THEN** the character is escaped so that the pattern matches only that file
+
+#### Scenario: Exempt files that were analysed are listed separately
+
+- **GIVEN** a result with `sizeExemptAnalysed` entries
+- **WHEN** the command prints in `text` mode
+- **THEN** they appear in a separate list with their sizes
+
+#### Scenario: Output is unchanged when nothing exceeded the limit
+
+- **GIVEN** a result without skipped or exempt oversized files
+- **WHEN** the command prints in `text` mode
+- **THEN** the output equals the output before this requirement
+
+#### Scenario: Structured modes carry data and no hint
+
+- **GIVEN** a result with skipped files
+- **WHEN** the command prints in `json` or `toon` mode
+- **THEN** the new result fields are present and no hint or snippet text is added
+
+#### Scenario: The command never edits the configuration
+
+- **GIVEN** a run that skipped files
+- **WHEN** the command finishes
+- **THEN** `specd.yaml` is unchanged
+
+### Requirement: Worker diagnostics presentation
+
+#### Scenario: A silent worker produces a warning on standard error
+
+- **GIVEN** a `worker-silent` event naming `src/big.ts` after ten seconds
+- **WHEN** the CLI renders it in `text` mode
+- **THEN** a warning on standard error names the file and the duration
+- **AND** suggests `graph.excludePaths` or a lower `graph.maxFileBytes`
+
+#### Scenario: Structured modes do not print warnings
+
+- **GIVEN** the same event
+- **WHEN** the command runs in `json` or `toon` mode
+- **THEN** the standard output contains only the final result
+
+#### Scenario: A native crash prints its cause and context
+
+- **GIVEN** an isolated run that fails with cause `native-crash`
+- **WHEN** the CLI prints the failure in `text` mode
+- **THEN** the output shows the cause, the last announced file, and the captured standard error tail
+- **AND** the exit code is the one of Requirement: Error cases
+
+#### Scenario: Structured failure output carries the cause as data
+
+- **GIVEN** the same failure in `json` mode
+- **WHEN** the CLI prints it
+- **THEN** the cause and the diagnostics are structured fields and the CLI adds no sentence
+
+#### Scenario: Events cross the worker boundary as JSON values
+
+- **GIVEN** the packaged task module
+- **WHEN** it emits an event
+- **THEN** the value is JSON-serializable and no new message format is introduced
+
+### Requirement: Resolution diagnostics presentation
+
+#### Scenario: Diagnostics are warnings and do not fail the run
+
+- **GIVEN** an index result with two diagnostics and no errors
+- **WHEN** `graph index` prints it in `text` mode
+- **THEN** the output states that the run finished with 2 diagnostics and lists them as warnings
+- **AND** the exit code is 0
+- **AND** in `json` mode `diagnostics` appears next to `errors`
+
 ### Requirement: Forced indexing result completeness
 
 #### Scenario: Forced structured output reports complete reconsideration
@@ -103,6 +196,14 @@
 - **THEN** `--exclude-path`, `--force`, `--config`, `--path`, and `--format` are documented with descriptions
 - **AND** project-global `graph.includePaths`, global `graph.excludePaths`, and workspace `graph.respectGitignore` / `graph.allowedPaths` behavior are explained
 - **AND** the bootstrap-only nature of `--path` and no-config fallback is stated
+
+#### Scenario: Size limit configuration is documented
+
+- **GIVEN** the CLI reference
+- **WHEN** the `graph index` documentation is read
+- **THEN** it documents `graph.maxFileBytes` and `graph.largeFilePaths`, the 256 KiB default, `0` disabling the limit, and the project and workspace scope
+- **AND** it includes an example that indexes a specific large file through `graph.largeFilePaths`
+- **AND** it describes the size-skip summary and the failure causes
 
 ### Requirement: Indexing behaviour
 

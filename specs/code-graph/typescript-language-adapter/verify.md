@@ -11,6 +11,31 @@
 - **THEN** language selection and every persisted fact are deterministic
 - **AND** Pass 2 completes without reparsing source or retaining AST nodes in the file draft
 
+#### Scenario: The TypeScript parse result is registered right after parsing
+
+- **GIVEN** a TypeScript file analysed by the adapter in an indexing session whose parser-resource scope is observed
+- **WHEN** `analyzeFile` runs
+- **THEN** exactly the parse result is registered in `session.parserResources`
+- **AND** the registration happens before the adapter traverses the parse result
+
+#### Scenario: A failure during traversal still releases the parse result
+
+- **GIVEN** a TypeScript file whose analysis throws after parsing
+- **WHEN** the indexer closes the epoch of that file
+- **THEN** the registered parse result is released and no parser object remains reachable from the session
+
+#### Scenario: Nothing outlives the file's analysis
+
+- **GIVEN** the epoch of the analysed TypeScript file has been closed
+- **WHEN** the adapter instance, the session adapter state, and the returned draft are inspected
+- **THEN** none of them refers to the parsed resource and the draft is plain serializable data
+
+#### Scenario: No run-wide keepalive state exists
+
+- **GIVEN** an indexing run over several TypeScript files
+- **WHEN** the run ends
+- **THEN** the session holds no adapter-state entry that collects parser objects
+
 ### Requirement: Declaration extraction and ranges
 
 #### Scenario: Extended declarations retain authoritative ranges

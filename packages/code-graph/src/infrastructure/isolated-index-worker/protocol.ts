@@ -2,7 +2,10 @@ import { type GraphIndexJsonValue } from '../../application/ports/isolated-graph
 import { isGraphIndexJsonValue } from './json-value.js'
 
 /** Versioned, internal IPC protocol identifier. */
-export const GRAPH_INDEX_PROTOCOL = 'specd.graph-index.v1'
+export const GRAPH_INDEX_PROTOCOL = 'specd.graph-index.v2'
+
+/** Maximum length of an activity message item string. */
+export const ACTIVITY_ITEM_MAX_CHARS = 4096
 
 /** Initial parent-to-child task invocation envelope. */
 export interface StartMessage {
@@ -20,12 +23,17 @@ export interface SerializedTaskError {
   readonly stack: string | null
 }
 
-/** Child-to-parent progress or terminal IPC envelope. */
+/** Child-to-parent progress, activity, or terminal IPC envelope. */
 export type ChildMessage =
   | {
       readonly protocol: typeof GRAPH_INDEX_PROTOCOL
       readonly type: 'progress'
       readonly value: GraphIndexJsonValue
+    }
+  | {
+      readonly protocol: typeof GRAPH_INDEX_PROTOCOL
+      readonly type: 'activity'
+      readonly item: string
     }
   | {
       readonly protocol: typeof GRAPH_INDEX_PROTOCOL
@@ -107,6 +115,13 @@ export function isChildMessage(value: unknown): value is ChildMessage {
     hasExactKeys(value, ['protocol', 'type', 'value'])
   ) {
     return isGraphIndexJsonValue(value.value)
+  }
+  if (value.type === 'activity' && hasExactKeys(value, ['protocol', 'type', 'item'])) {
+    return (
+      typeof value.item === 'string' &&
+      value.item.length > 0 &&
+      value.item.length <= ACTIVITY_ITEM_MAX_CHARS
+    )
   }
   return (
     value.type === 'failure' &&

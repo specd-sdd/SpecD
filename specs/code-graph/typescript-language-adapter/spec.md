@@ -10,7 +10,7 @@ The TypeScript language adapter translates TypeScript, TSX, JavaScript, and JSX 
 
 `TypeScriptLanguageAdapter` SHALL handle `.ts`, `.tsx`, `.js`, and `.jsx` as `typescript`, `tsx`, `javascript`, and `jsx` respectively. It SHALL parse the supplied content once through the registered Tree-sitter/ast-grep grammar and SHALL return one complete `FileAnalysisDraft` without reading source files or retaining AST nodes in persisted analysis state.
 
-The draft SHALL contain symbols, imports, scoped binding facts, call facts, reference facts, and compact serializable parser state sufficient for Pass 2 import, export, hierarchy, and relation construction. Parser-runtime keepalive state MAY be retained only in the run-scoped indexing session.
+The draft SHALL contain symbols, imports, scoped binding facts, call facts, reference facts, and compact serializable parser state sufficient for Pass 2 import, export, hierarchy, and relation construction. The adapter SHALL register the parse result in the parser-resource scope of the `IndexSession` (`session.parserResources`), as defined by Requirement: Parser-owned resource registration of `code-graph:language-adapter`. The registration SHALL happen inside `analyzeFile`, immediately after the content is parsed and before any traversal of the parse result, so that the resource is released at the end of the file's epoch even when the analysis throws. The adapter MUST NOT keep parser objects in adapter-private session state, in adapter-instance fields, or in the returned draft.
 
 ### Requirement: Declaration extraction and ranges
 

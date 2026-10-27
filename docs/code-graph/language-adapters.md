@@ -37,6 +37,15 @@ Every adapter implements these six members. All of them are synchronous and dete
 
 `resolutionManifests()` has a second job: the indexer includes those manifests in the graph's derivation fingerprint. When any of them changes, the next run rebuilds the graph. List every manifest your facets read and nothing else.
 
+### Parser resource lifecycle and memory management
+
+An adapter whose parsing library holds native, WASM, or otherwise explicitly managed memory (such as tree-sitter C/C++ bindings) **MUST** register the parser-owned resources it creates while analysing a file into the parser-resource scope exposed by the `IndexSession`:
+
+1. **Immediate registration:** The registration `session.parserResources.register(resource, () => resource.delete())` MUST happen inside `analyzeFile`, immediately after the content is parsed and before any traversal of the parse result. This guarantees that the resource is released when the file's epoch closes, even if subsequent AST traversal throws an unhandled error.
+2. **No external retention:** Adapters MUST NOT retain parser AST nodes, syntax trees, or native handles in adapter-private session state, in adapter-instance fields, or in any collection that outlives the single file's analysis.
+3. **Plain data return:** Everything returned in the `FileAnalysisDraft` from `analyzeFile` MUST be plain, memory-friendly data structures. It must not retain AST nodes, parse trees, or references to parser-runtime objects.
+4. **No-op for managed libraries:** An adapter whose parser requires no explicit retention or release (e.g. pure TypeScript/JavaScript parsers whose ASTs are managed entirely by V8 GC) registers nothing. The registration contract is independent of any specific parsing technology.
+
 ## Facets
 
 A **facet** is a group of resolution services that an adapter provides only when it supports them. An adapter exposes a facet as an optional read-only property.
@@ -278,7 +287,7 @@ No change to the indexer is needed for this language to resolve package imports 
 
 Complete the steps in order. None of them touches the indexer, the index session, the resolver, or the graph stores.
 
-1. Implement the required core: `languages`, `extensions`, `resolutionManifests`, `analyzeFile`, `resolveImports`, `buildRelations`.
+1. Implement the required core: `languages`, `extensions`, `resolutionManifests`, `analyzeFile`, `resolveImports`, `buildRelations`. In `analyzeFile`, register parser-owned resources in `session.parserResources` immediately after parsing, and return only plain data.
 2. Declare `capabilities()` and `declarationPolicy()` truthfully for the semantic categories the adapter can prove. See [Identity and adapter contract](./index.md#identity-and-adapter-contract) for the rules about declaration classification, parser authority, ranges, and hierarchy provenance.
 3. Provide each facet the language supports, with every member. Skip a facet when the language has no equivalent concept. Never provide a partial facet.
 4. List every manifest your facets read in `resolutionManifests()`, and nothing else.
@@ -286,6 +295,7 @@ Complete the steps in order. None of them touches the indexer, the index session
 6. Verify semantic conformance and facet behavior with tests covering:
    - syntax parsing, authoritative AST ranges, and comment attribution;
    - declaration classification and policy;
+   - parser resource registration and disposal (resources registered immediately, disposed at epoch closure, no AST instances leaking into instance fields or drafts);
    - manifest search bounded by `repoRoot` with manifests read and parsed once, reporting terminal skips;
    - unresolved imports producing no relation and no heuristic guessing;
    - Pass 2 performing no filesystem reads after preparation;

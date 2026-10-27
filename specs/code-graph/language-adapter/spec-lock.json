@@ -4,20 +4,7 @@
     "version": 1
   },
   "dependsOn": ["code-graph:symbol-model"],
-  "implementation": [
-    {
-      "file": "code-graph:src/infrastructure/tree-sitter/reference-fact-helpers.ts",
-      "symbols": [
-        "StructuralWorkKind",
-        "StructuralWorkObserver",
-        "DeclarationSymbolIndex",
-        "createDeclarationSymbolIndex",
-        "CallableContainmentIndex",
-        "createCallableContainmentIndex",
-        "findContainingCallableSymbol"
-      ]
-    }
-  ],
+  "implementation": [],
   "optimizations": {
     "optimizedDescription": {
       "value": "Deterministic adapter contract for complete parser facts, exact ranges, imports, bindings, hierarchy, and language-owned resolution.",

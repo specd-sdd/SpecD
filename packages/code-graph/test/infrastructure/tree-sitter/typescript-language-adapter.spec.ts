@@ -3084,4 +3084,23 @@ function App() {
     // JSX assertions
     expect(jsxDraft.symbols.some((s) => s.name === 'App')).toBe(true)
   })
+
+  describe('Parser-owned resource registration', () => {
+    it('registers SgRoot into session.parserResources and leaves no keepalive in session state', () => {
+      const tsAdapter = new TypeScriptLanguageAdapter()
+      const session = new InMemoryIndexSession()
+      const draft = tsAdapter.analyzeFile('file.ts', 'export function test(): void {}', {
+        session,
+        workspaceName: 'ws',
+      })
+
+      expect(draft.symbols.length).toBe(1)
+      expect(session.parserResources.size).toBe(1)
+      expect(session.getAdapterState('napi-keepalive')).toBeUndefined()
+
+      const closeResult = session.parserResources.close()
+      expect(closeResult.registered).toBe(1)
+      expect(session.parserResources.size).toBe(0)
+    })
+  })
 })

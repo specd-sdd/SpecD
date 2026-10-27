@@ -225,6 +225,226 @@
 - **THEN** it contains compact facts and shared lookup indexes needed for Pass 2
 - **AND** it does not retain AST nodes, parser trees, or equivalent heavyweight parser-runtime objects
 
+#### Scenario: Retention is bounded across files and chunks
+
+- **GIVEN** a project of many files split into several chunks and an adapter that registers parser-owned resources for every file
+- **WHEN** the indexer analyses the files
+- **THEN** after each file has been analysed the session holds no parser-owned resource of an earlier file
+- **AND** the number of parser-owned resources held at any moment never exceeds those of the single file being analysed
+
+### Requirement: Parser resource lifecycle
+
+#### Scenario: Epoch is closed after every analysed file
+
+- **GIVEN** an adapter that registers a parser-owned resource with a disposal function for every file
+- **WHEN** the indexer analyses three files
+- **THEN** the disposal function of each file has run before the next file is analysed
+- **AND** the references held by the scope are dropped after each file
+
+#### Scenario: Files that exit early also close the epoch
+
+- **GIVEN** a document without a language adapter and a file with undecodable content among the files to process, next to files the adapter analyses
+- **WHEN** the indexer processes them
+- **THEN** the epoch is closed after each file, so no resource registered while handling one of them outlives it
+- **AND** each analysed file starts with an empty scope
+
+#### Scenario: Files skipped for size never open a scope
+
+- **GIVEN** a file over the size limit among the files of a run
+- **WHEN** the indexer runs
+- **THEN** no parser resource is registered for it and it produces a `file-skipped` event instead of processing events
+
+#### Scenario: Parse failure closes the epoch
+
+- **GIVEN** an adapter that registers a resource and then throws while analysing a file
+- **WHEN** the indexer analyses that file
+- **THEN** the resource is disposed
+- **AND** the error is collected as a per-file error and the run continues
+
+#### Scenario: Cancellation closes the epoch
+
+- **GIVEN** an indexing run that is cancelled while a file is being analysed
+- **WHEN** the run stops
+- **THEN** the resources registered for that file are disposed and no parser-owned resource remains reachable from the session
+
+#### Scenario: Persistence failure closes the epoch
+
+- **GIVEN** an indexing run whose bulk load fails after analysis
+- **WHEN** the run ends with the persistence error
+- **THEN** no parser-owned resource remains reachable from the session
+
+#### Scenario: A failing disposal does not mask the original error or stop the others
+
+- **GIVEN** two registered resources whose disposal functions fail, and an analysis that threw an error
+- **WHEN** the epoch is closed
+- **THEN** both disposal functions are attempted, in reverse registration order
+- **AND** the original error is the one reported for the file
+- **AND** each disposal failure is reported as a typed `resource-disposal-failed` diagnostic and does not fail the run
+
+#### Scenario: Garbage collection is requested when available
+
+- **GIVEN** a host that exposes a garbage-collection request
+- **WHEN** an epoch is closed
+- **THEN** the request is issued after the disposals and after the references are dropped
+
+#### Scenario: Missing garbage-collection request is harmless
+
+- **GIVEN** a host that does not expose a garbage-collection request
+- **WHEN** an epoch is closed
+- **THEN** the indexing run completes with the same result and no error
+
+#### Scenario: Adapters without parser-owned resources are unaffected
+
+- **GIVEN** a language adapter that registers nothing
+- **WHEN** files of that language are indexed
+- **THEN** the indexer produces the same result as before this requirement and closing the epoch is a no-op
+
+#### Scenario: The indexer is independent of the parsing library
+
+- **GIVEN** a test adapter built on a fake parsing library that requires explicit release
+- **WHEN** the adapter registers its resource with a disposal function
+- **THEN** the indexer disposes it without referring to any specific library type
+
+#### Scenario: No run-wide retention remains
+
+- **GIVEN** a completed indexing run
+- **WHEN** the session state is inspected
+- **THEN** the `napi-keepalive` adapter-state key does not exist
+- **AND** no collection of parser-owned resources is reachable from the session
+
+### Requirement: Per-file size limit
+
+#### Scenario: The default limit applies when nothing is configured
+
+- **GIVEN** no `maxFileBytes` at the project or workspace level and a source file of 262145 bytes
+- **WHEN** the indexer processes it
+- **THEN** the file is skipped for size with the applied limit 262144
+
+#### Scenario: A file exactly at the limit is indexed
+
+- **GIVEN** an effective limit of 1000 bytes and a file of exactly 1000 bytes
+- **WHEN** the indexer processes it
+- **THEN** the file is indexed
+
+#### Scenario: A limit of zero disables the check
+
+- **GIVEN** an effective `maxFileBytes` of `0` and a file of several megabytes that discovery keeps
+- **WHEN** the indexer processes it
+- **THEN** the file is read and indexed
+
+#### Scenario: A workspace limit replaces the project limit
+
+- **GIVEN** a project `maxFileBytes` of 1000, a workspace `maxFileBytes` of 5000, and a 3000-byte file in that workspace
+- **WHEN** the indexer processes it
+- **THEN** the file is indexed
+- **AND** a 3000-byte file in another workspace without an override is skipped
+
+#### Scenario: The size is measured in bytes on disk
+
+- **GIVEN** a file of 600 multibyte characters that occupy 1200 bytes and an effective limit of 1000
+- **WHEN** the indexer processes it
+- **THEN** the file is skipped for size
+
+#### Scenario: An oversized file is neither read nor hashed
+
+- **GIVEN** an oversized file and an instrumented filesystem
+- **WHEN** the indexer runs, including its change-detection phase
+- **THEN** no read of the file content is performed
+- **AND** no content hash is computed for it
+
+#### Scenario: The size is evaluated once per file
+
+- **GIVEN** a run that reuses the size in the change-detection and analysis phases
+- **WHEN** the indexer processes a file
+- **THEN** the filesystem metadata of that file is requested for the size decision a single time
+
+#### Scenario: Documents are subject to the limit
+
+- **GIVEN** a textual file without a language adapter that exceeds the limit
+- **WHEN** the indexer processes it
+- **THEN** no document node is created and the file is skipped for size
+
+#### Scenario: The limit applies to every category
+
+- **GIVEN** an oversized file that matches `testPaths` and another that matches `ignorePaths`
+- **WHEN** the indexer processes them
+- **THEN** both are skipped for size
+
+#### Scenario: A project-level exemption applies from the project root
+
+- **GIVEN** a project `largeFilePaths` entry `app/controllers/legacy.php` and an oversized file at that path
+- **WHEN** the indexer processes it
+- **THEN** the file is analysed
+- **AND** it is reported in the exempt-and-analysed list with its size
+
+#### Scenario: A workspace-level exemption applies from the code root
+
+- **GIVEN** a workspace with `codeRoot` `packages/api` and `largeFilePaths` entry `generated/**`
+- **WHEN** the indexer processes an oversized file at `packages/api/generated/schema.ts`
+- **THEN** the file is analysed
+
+#### Scenario: Workspace and project exemptions are combined
+
+- **GIVEN** an exemption in the project list and another in the workspace list
+- **WHEN** the indexer processes the files of that workspace
+- **THEN** both files are exempt
+
+#### Scenario: An exemption does not bypass discovery exclusions
+
+- **GIVEN** an oversized file that is matched by both `excludePaths` and `largeFilePaths`
+- **WHEN** the indexer processes the project
+- **THEN** the file is not indexed and is reported as excluded, not as skipped for size
+
+#### Scenario: An exemption does not bypass the binary filter
+
+- **GIVEN** a file with a known binary extension listed in `largeFilePaths`
+- **WHEN** the indexer processes the project
+- **THEN** the file is filtered as binary
+
+#### Scenario: Skipped files are recorded in coverage
+
+- **GIVEN** a file skipped for size
+- **WHEN** the run completes
+- **THEN** the coverage entry has status `unsupported` and reason `file-too-large`
+- **AND** the size in bytes and the applied limit are reported by the run result and by the `file-skipped` event, and are not persisted in coverage
+- **AND** no file node, document node, symbol, or relation exists for the file
+
+#### Scenario: Lookups about a skipped file are unproven, not absent
+
+- **GIVEN** a file skipped for size that would declare a symbol
+- **WHEN** a consumer looks the file up, or reads the graph health
+- **THEN** no file node exists for it, so the lookup finds nothing indexed for that file
+- **AND** graph health reports `coverageCompleteness` `complete-with-warnings` with a `file-too-large` warning
+
+### Requirement: Size skip in incremental runs and dependents
+
+#### Scenario: A file that grows beyond the limit is removed from the graph
+
+- **GIVEN** a file that was indexed with its symbols and relations and now exceeds the effective limit
+- **WHEN** the next incremental run processes it
+- **THEN** its previous nodes, symbols, and relations are removed
+- **AND** its coverage records the size skip
+
+#### Scenario: A file that shrinks below the limit is indexed
+
+- **GIVEN** a file that was skipped for size and now falls below the limit
+- **WHEN** the next run processes it
+- **THEN** the file is indexed and its coverage becomes `indexed`
+
+#### Scenario: Raising the limit triggers the rebuild
+
+- **GIVEN** a graph built with a limit that skipped a file and a configuration whose limit now admits it
+- **WHEN** the next run starts
+- **THEN** the fingerprint mismatch triggers the rebuild defined for incompatible derivations
+- **AND** the file is indexed
+
+#### Scenario: Importing a skipped file keeps the import unresolved and the cause discoverable
+
+- **GIVEN** a file that imports a module whose file was skipped for size
+- **WHEN** Pass 2 resolves imports
+- **THEN** the import remains unresolved and no relation to the skipped file is created
+- **AND** the skipped file has a coverage entry with reason `file-too-large` and appears in the files skipped for size of the run result
+
 ### Requirement: Discovery fingerprint uses effective config
 
 #### Scenario: Synthetic spec-root exclusions affect fingerprint
@@ -240,6 +460,24 @@
 - **WHEN** the discovery fingerprint is computed
 - **THEN** those files do not change the digest
 - **AND** changing any one of them, while declared manifests stay unchanged, leaves the digest unchanged
+
+#### Scenario: Changing the size limit changes the fingerprint
+
+- **GIVEN** two runs over the same files whose effective `maxFileBytes` differs
+- **WHEN** the indexer computes the graph fingerprint for each run
+- **THEN** the fingerprints differ
+
+#### Scenario: Changing the size exemptions changes the fingerprint
+
+- **GIVEN** two runs over the same files where the effective `largeFilePaths` of one workspace differ
+- **WHEN** the indexer computes the graph fingerprint for each run
+- **THEN** the fingerprints differ
+
+#### Scenario: Equal effective limits give an equal fingerprint however they are declared
+
+- **GIVEN** one run that declares the default limit only at the project level and another that declares the same value for every workspace
+- **WHEN** the indexer computes the graph fingerprint for each run
+- **THEN** the fingerprints are equal
 
 ### Requirement: Adapter-sourced resolution fingerprint
 
@@ -468,6 +706,54 @@
 - **WHEN** a phase like discovery or pass 1 finishes
 - **THEN** the progress callback is fired immediately with the next phase label
 - **AND** this happens before synchronous heavy work begins, such as session index finalization or relation aggregation
+
+### Requirement: Typed indexing events
+
+#### Scenario: File activity is announced before processing
+
+- **GIVEN** an `onEvent` receiver and a file to process
+- **WHEN** the indexer starts that file
+- **THEN** a `file-activity` event with its path is delivered before the file is read
+
+#### Scenario: Files skipped by the analysis are announced and counted
+
+- **GIVEN** a document without a language adapter and a file with undecodable content among the files to process
+- **WHEN** the indexer traverses them
+- **THEN** each of them produces a `file-activity` event
+- **AND** each of them is counted in the progress counters
+
+#### Scenario: Files that never enter processing are not announced as activity
+
+- **GIVEN** a file over the size limit and a file excluded by discovery rules
+- **WHEN** the indexer runs
+- **THEN** neither produces a `file-activity` event
+- **AND** the oversized file produces a `file-skipped` event
+
+#### Scenario: Every file is announced with its size
+
+- **GIVEN** thousands of tiny files and one large file processed in one run
+- **WHEN** the run proceeds
+- **THEN** the receiver gets one `file-activity` event per file, each with the file size when it is known
+- **AND** the indexer applies no rate limit of its own
+
+#### Scenario: A size skip produces a typed event
+
+- **GIVEN** an oversized file
+- **WHEN** the indexer skips it
+- **THEN** a `file-skipped` event carries its path, `sizeBytes`, `limitBytes`, and the reason `file-too-large`
+
+#### Scenario: Events carry data and not sentences
+
+- **GIVEN** any event delivered to the receiver
+- **WHEN** it is inspected
+- **THEN** it has a stable `kind` and structured fields, and no human-readable message is required to interpret it
+
+#### Scenario: Omitting the receiver changes nothing
+
+- **GIVEN** a run without `onEvent`
+- **WHEN** it completes
+- **THEN** the result equals the result of the same run with a receiver
+- **AND** `onProgress` receives the same calls in both runs
 
 ### Requirement: Phase execution timing logging
 
@@ -788,6 +1074,21 @@
 - **WHEN** it is indexed
 - **THEN** no node is created in the graph
 
+#### Scenario: Size-skip summary fields in the result
+
+- **GIVEN** a run in which twelve files exceed the limit and one exempt file exceeds it but is analysed
+- **WHEN** the run completes
+- **THEN** `filesSkippedForSize` is 12
+- **AND** `largestSkippedForSize` holds at least ten entries in descending size order and then by path, each with `filePath`, `projectRelativePath`, `sizeBytes`, and `limitBytes`
+- **AND** `sizeExemptAnalysed` lists the exempt file with its size
+
+#### Scenario: Result is unchanged when nothing exceeds the limit
+
+- **GIVEN** a run in which no file exceeds the effective limit
+- **WHEN** the run completes
+- **THEN** `filesSkippedForSize` is 0
+- **AND** `largestSkippedForSize` and `sizeExemptAnalysed` are empty
+
 ### Requirement: Prefer LLM-optimized description
 
 #### Scenario: Indexer uses optimized description
@@ -925,6 +1226,67 @@
 - **WHEN** the bulk generation commits
 - **THEN** observations record logical identity, non-absolute locator, content hash, and available mtime, size, or revision evidence
 - **AND** workspace and aggregate stale latches are cleared only after success
+
+#### Scenario: A package identity collision does not keep the graph stale
+
+- **GIVEN** two workspaces whose manifests declare the same package identity and a graph whose latches are set
+- **WHEN** the indexer completes
+- **THEN** the collision is reported in `diagnostics` and `errors` is empty
+- **AND** observations are captured for every produced resource
+- **AND** the workspace and aggregate stale latches are cleared
+
+#### Scenario: A file that fails does not keep the graph stale
+
+- **GIVEN** a graph whose latches are set and a file whose analysis throws
+- **WHEN** the indexer completes and commits
+- **THEN** the failure is reported in `errors` and the file's coverage is `parse-failed`
+- **AND** the stale latches are cleared and observations are captured for the produced resources
+- **AND** the failed file has no observation
+
+#### Scenario: A run that does not commit keeps the latches
+
+- **GIVEN** a graph whose latches are set and a store failure while committing
+- **WHEN** the indexer aborts
+- **THEN** the latches and the previous observations are unchanged
+
+#### Scenario: A spec that fails has no observation
+
+- **GIVEN** a graph whose latches are set and a spec whose processing throws
+- **WHEN** the indexer completes and commits
+- **THEN** the failure is in `errors` under the spec identifier and no observation exists for that spec
+- **AND** the observations of the other resources are captured
+
+#### Scenario: A hashing failure is one parse-failed error
+
+- **GIVEN** a discovered file that cannot be read for hashing
+- **WHEN** the indexer completes
+- **THEN** `errors` holds one entry for that path and its coverage is `parse-failed`
+
+#### Scenario: A forced run records the content it read
+
+- **GIVEN** a graph in which a file changed and another file is new, and a forced run
+- **WHEN** the indexer completes
+- **THEN** each of those files has an observation carrying the hash of the content read by that run
+
+### Requirement: Retry of failed targets
+
+#### Scenario: A non-forced run retries a parse-failed file whose content did not change
+
+- **GIVEN** a file persisted with coverage `parse-failed` and a content hash equal to its current hash
+- **WHEN** a normal incremental run executes
+- **THEN** the file is analysed again
+
+#### Scenario: A retry that succeeds replaces the failure
+
+- **GIVEN** the same file and an adapter that now analyses it successfully
+- **WHEN** a normal incremental run executes
+- **THEN** the file is indexed, its coverage is `indexed`, and it has an observation
+
+#### Scenario: A retry that fails again leaves the failure reported
+
+- **GIVEN** the same file and an adapter that still fails
+- **WHEN** a normal incremental run executes
+- **THEN** the failure is in `errors` and in coverage, and the graph is not stale because of it
 
 ### Requirement: Bounded incremental relation construction
 

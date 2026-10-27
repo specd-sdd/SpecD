@@ -3,6 +3,11 @@ import { type ProjectWorkspace } from '@specd/core'
 import { type ProjectGraphConfig } from '../../../domain/value-objects/index-options.js'
 import { DEFAULT_EXCLUDE_PATHS } from '../discover-files.js'
 
+/**
+ * Built-in default per-file size limit in bytes (256 KiB).
+ */
+export const DEFAULT_MAX_FILE_BYTES = 262144
+
 /** Effective workspace discovery settings after global resolution. */
 export interface EffectiveWorkspaceGraphConfig {
   /** Optional include filters relative to the workspace code root. */
@@ -11,6 +16,12 @@ export interface EffectiveWorkspaceGraphConfig {
   readonly excludePaths: readonly string[]
   /** Whether `.gitignore` files remain active for this workspace. */
   readonly respectGitignore: boolean
+  /** Effective per-file limit in bytes; 0 means no limit. Workspace value, else project value, else DEFAULT_MAX_FILE_BYTES. */
+  readonly maxFileBytes: number
+  /** Project-level exemption patterns, evaluated relative to the project root. */
+  readonly projectLargeFilePaths: readonly string[]
+  /** Workspace-level exemption patterns, evaluated relative to the workspace code root. */
+  readonly workspaceLargeFilePaths: readonly string[]
 }
 
 /** Effective graph discovery settings consumed by index and stats flows. */
@@ -23,6 +34,10 @@ export interface EffectiveGraphConfig {
   readonly syntheticSpecExcludePaths: readonly string[]
   /** Final exclusion list used by project-global root discovery. */
   readonly rootExcludePaths: readonly string[]
+  /** Limit applied to `root:` project-global files: the project value, else the default. */
+  readonly rootMaxFileBytes: number
+  /** Exemption patterns for `root:` files (the project-level ones). */
+  readonly rootLargeFilePaths: readonly string[]
   /** Per-workspace resolved discovery settings. */
   readonly workspaces: ReadonlyMap<string, EffectiveWorkspaceGraphConfig>
 }
@@ -78,15 +93,23 @@ export function resolveEffectiveGraphConfig(
   const syntheticSpecExcludePaths = computeSyntheticSpecExcludePaths(projectRoot, workspaces)
   const globalExcludePaths = [...(graphConfig.excludePaths ?? DEFAULT_EXCLUDE_PATHS)]
   const rootExcludePaths = [...globalExcludePaths, ...syntheticSpecExcludePaths]
+  const rootMaxFileBytes = graphConfig.maxFileBytes ?? DEFAULT_MAX_FILE_BYTES
+  const rootLargeFilePaths = [...(graphConfig.largeFilePaths ?? [])]
 
   return {
     includePaths: [...(graphConfig.includePaths ?? [])],
     globalExcludePaths,
     syntheticSpecExcludePaths,
     rootExcludePaths,
+    rootMaxFileBytes,
+    rootLargeFilePaths,
     workspaces: new Map(
       workspaces.map((workspace) => {
         const workspaceGraph = graphConfig.workspaces?.get(workspace.name)
+        const maxFileBytes =
+          workspaceGraph?.maxFileBytes ?? graphConfig.maxFileBytes ?? DEFAULT_MAX_FILE_BYTES
+        const workspaceLargeFilePaths = [...(workspaceGraph?.largeFilePaths ?? [])]
+
         return [
           workspace.name,
           {
@@ -99,6 +122,9 @@ export function resolveEffectiveGraphConfig(
               ...(workspaceGraph?.excludePaths ?? []),
             ],
             respectGitignore: workspaceGraph?.respectGitignore ?? true,
+            maxFileBytes,
+            projectLargeFilePaths: rootLargeFilePaths,
+            workspaceLargeFilePaths,
           },
         ] satisfies [string, EffectiveWorkspaceGraphConfig]
       }),

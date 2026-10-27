@@ -34,6 +34,8 @@ export {
   GetGraphHealth,
   type GetGraphHealthInput,
   type GetGraphHealthResult,
+  type CoverageCompleteness,
+  type CoverageWarning,
   type IndexCoverageHealthSummary,
 } from './application/use-cases/get-graph-health.js'
 export { createGetGraphHealth } from './composition/use-cases/get-graph-health.js'
@@ -290,6 +292,7 @@ export {
 } from './domain/errors/graph-storage-recovery-required-error.js'
 export { GraphStoreRecreateRequiresClosedError } from './domain/errors/graph-store-recreate-requires-closed-error.js'
 export {
+  GraphIndexWorkerError,
   GraphIndexWorkerStartError,
   GraphIndexTaskContractError,
   GraphIndexTaskExecutionError,
@@ -298,6 +301,22 @@ export {
   GraphIndexWorkerSignalError,
   GraphIndexProgressHandlerError,
 } from './domain/errors/isolated-graph-index-errors.js'
+export {
+  type IndexEvent,
+  type FileActivityEvent,
+  type FileSkippedEvent,
+  type ResourceDisposalFailedEvent,
+  type IndexEventReceiver,
+  type SizeSkippedFile,
+  type SizeExemptFile,
+} from './domain/value-objects/index-event.js'
+export {
+  type GraphIndexTaskAnnouncer,
+  type GraphIndexWorkerEvent,
+  type GraphIndexFailureCause,
+  type GraphIndexWorkerDiagnostics,
+} from './domain/value-objects/graph-index-worker-types.js'
+export { DEFAULT_MAX_FILE_BYTES } from './application/use-cases/_shared/resolve-effective-graph-config.js'
 
 import { readInstalledCodeGraphVersion } from './application/use-cases/_shared/installed-code-graph-version.js'
 

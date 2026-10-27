@@ -81,4 +81,53 @@ describe('buildProjectGraphConfig', () => {
     expect(graphConfig.excludePaths).toEqual([...DEFAULT_EXCLUDE_PATHS, 'foo', 'bar'])
     expect(graphConfig.workspaces?.get('default')?.excludePaths).toBeUndefined()
   })
+
+  it('maps maxFileBytes and largeFilePaths without applying defaults and copies arrays', () => {
+    const projectLarge = ['proj-large/**']
+    const wsLarge = ['ws-large/**']
+
+    const config = makeMockConfig({
+      graph: {
+        maxFileBytes: 500_000,
+        largeFilePaths: projectLarge,
+      },
+      workspaces: [
+        {
+          name: 'default',
+          specsPath: '/project/specs',
+          specsAdapter: { adapter: 'fs', config: { path: '/project/specs' } },
+          schemasPath: null,
+          schemasAdapter: null,
+          codeRoot: '/project',
+          ownership: 'owned',
+          isExternal: false,
+          graph: {
+            maxFileBytes: 1_000_000,
+            largeFilePaths: wsLarge,
+          },
+        },
+      ],
+    })
+
+    const graphConfig = buildProjectGraphConfig(config)
+
+    expect(graphConfig.maxFileBytes).toBe(500_000)
+    expect(graphConfig.largeFilePaths).toEqual(projectLarge)
+    expect(graphConfig.largeFilePaths).not.toBe(projectLarge)
+
+    const wsConfig = graphConfig.workspaces?.get('default')
+    expect(wsConfig?.maxFileBytes).toBe(1_000_000)
+    expect(wsConfig?.largeFilePaths).toEqual(wsLarge)
+    expect(wsConfig?.largeFilePaths).not.toBe(wsLarge)
+  })
+
+  it('leaves maxFileBytes and largeFilePaths undefined when not declared in config (no default applied at builder stage)', () => {
+    const config = makeMockConfig()
+    const graphConfig = buildProjectGraphConfig(config)
+
+    expect(graphConfig.maxFileBytes).toBeUndefined()
+    expect(graphConfig.largeFilePaths).toBeUndefined()
+    expect(graphConfig.workspaces?.get('default')?.maxFileBytes).toBeUndefined()
+    expect(graphConfig.workspaces?.get('default')?.largeFilePaths).toBeUndefined()
+  })
 })

@@ -14,18 +14,16 @@
   ],
   "implementation": [
     {
-      "file": "cli:src/graph-index-task.ts",
-      "symbols": ["CliGraphIndexContextDescriptor", "runGraphIndexTask"]
+      "file": "cli:src/graph-index-task.ts"
     },
     {
       "file": "cli:src/commands/graph/index-graph.ts",
-      "symbols": ["registerGraphIndex"]
-    },
-    {
-      "file": "cli:test/commands/graph-index.spec.ts"
-    },
-    {
-      "file": "cli:test/graph-index-task.spec.ts"
+      "symbols": [
+        "toLargeFilePathsEntry",
+        "yamlScalar",
+        "escapeGitignorePattern",
+        "formatTextIndexResult"
+      ]
     }
   ],
   "optimizations": {

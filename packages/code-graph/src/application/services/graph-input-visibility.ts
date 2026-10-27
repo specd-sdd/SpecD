@@ -5,6 +5,7 @@ import { type ProjectGraphConfig } from '../../domain/value-objects/index-option
 import { type IndexedInputObservation } from '../../domain/value-objects/indexed-input-freshness.js'
 import { discoverFiles } from '../use-cases/discover-files.js'
 import { resolveEffectiveGraphConfig } from '../use-cases/_shared/resolve-effective-graph-config.js'
+import { createFileSizeGate } from './file-size-gate.js'
 
 /** Current graph-visible filesystem membership and explicit input-channel boundaries. */
 export interface GraphInputVisibilitySnapshot {
@@ -29,6 +30,7 @@ export function buildGraphInputVisibilitySnapshot(
   observations: readonly IndexedInputObservation[],
 ): GraphInputVisibilitySnapshot {
   const effective = resolveEffectiveGraphConfig(projectRoot, workspaces, graphConfig)
+  const sizeGate = createFileSizeGate(effective)
   const currentInputs = new Map<string, Map<string, string>>()
   const persistedInputs = new Map<string, Set<string>>()
   const specRoots = new Map<string, string>()
@@ -54,7 +56,15 @@ export function buildGraphInputVisibilitySnapshot(
         : {}),
     })) {
       const absolutePath = join(workspace.codeRoot, relativePath)
-      workspaceInputs.set(toProjectRelative(projectRoot, absolutePath), absolutePath)
+      const projectRelative = toProjectRelative(projectRoot, absolutePath)
+      const decision = sizeGate.decide({
+        workspaceName: workspace.name,
+        relativeToCodeRoot: relativePath,
+        projectRelativePath: projectRelative,
+        absolutePath,
+      })
+      if (decision.kind === 'skip') continue
+      workspaceInputs.set(projectRelative, absolutePath)
     }
     currentInputs.set(workspace.name, workspaceInputs)
 
@@ -74,7 +84,15 @@ export function buildGraphInputVisibilitySnapshot(
     })) {
       const absolutePath = join(projectRoot, relativePath)
       if (workspaces.some((workspace) => isWithin(absolutePath, workspace.codeRoot))) continue
-      rootInputs.set(normalizePortablePath(relativePath), absolutePath)
+      const projectRelative = normalizePortablePath(relativePath)
+      const decision = sizeGate.decide({
+        workspaceName: 'root',
+        relativeToCodeRoot: projectRelative,
+        projectRelativePath: projectRelative,
+        absolutePath,
+      })
+      if (decision.kind === 'skip') continue
+      rootInputs.set(projectRelative, absolutePath)
     }
     currentInputs.set('root', rootInputs)
   }

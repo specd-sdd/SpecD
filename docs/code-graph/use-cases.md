@@ -49,15 +49,16 @@ const result = await indexer.execute(options)
 
 #### Input Parameters (`IndexOptions`)
 
-| Field              | Type                          | Required | Description                                                                       |
-| :----------------- | :---------------------------- | :------- | :-------------------------------------------------------------------------------- |
-| `projectRoot`      | `string`                      | yes      | The absolute directory path of the project.                                       |
-| `workspaces`       | `readonly ProjectWorkspace[]` | yes      | Workspace definitions including prefixes, ownership, and roots.                   |
-| `graphConfig`      | `ProjectGraphConfig`          | yes      | Project-global graph exclude paths and workspace configuration overrides.         |
-| `onProgress`       | `IndexProgressCallback`       | no       | Callback invoked periodically to report percentage (0-100) and phase description. |
-| `chunkBytes`       | `number`                      | no       | Sequential chunk processing budget in bytes (default 20MB).                       |
-| `vcsRef`           | `string`                      | no       | Current VCS reference hash stored as metadata on completion.                      |
-| `codeGraphVersion` | `string`                      | no       | Version string used in derivation fingerprinting.                                 |
+| Field              | Type                          | Required | Description                                                                          |
+| :----------------- | :---------------------------- | :------- | :----------------------------------------------------------------------------------- |
+| `projectRoot`      | `string`                      | yes      | The absolute directory path of the project.                                          |
+| `workspaces`       | `readonly ProjectWorkspace[]` | yes      | Workspace definitions including prefixes, ownership, and roots.                      |
+| `graphConfig`      | `ProjectGraphConfig`          | yes      | Project-global graph exclude paths and workspace configuration overrides.            |
+| `onProgress`       | `IndexProgressCallback`       | no       | Callback invoked periodically to report percentage (0-100) and phase description.    |
+| `chunkBytes`       | `number`                      | no       | Sequential chunk processing budget in bytes (default 20MB).                          |
+| `vcsRef`           | `string`                      | no       | Current VCS reference hash stored as metadata on completion.                         |
+| `codeGraphVersion` | `string`                      | no       | Version string used in derivation fingerprinting.                                    |
+| `onEvent`          | `IndexEventReceiver`          | no       | Optional receiver for typed indexing events (`file-activity`, `file-skipped`, etc.). |
 
 #### Returns: `Promise<IndexResult>`
 
@@ -68,9 +69,13 @@ interface IndexResult {
   readonly documentsIndexed: number
   readonly filesRemoved: number
   readonly filesSkipped: number
+  readonly filesSkippedForSize: number
+  readonly largestSkippedForSize: readonly SizeSkippedFile[]
+  readonly sizeExemptAnalysed: readonly SizeExemptFile[]
   readonly specsDiscovered: number
   readonly specsIndexed: number
   readonly errors: readonly IndexError[]
+  readonly diagnostics: readonly IndexError[]
   readonly duration: number
   readonly workspaces: readonly WorkspaceIndexBreakdown[]
   readonly vcsRef: string | null
@@ -84,6 +89,15 @@ interface IndexResult {
   readonly importDiagnostics: ImportDiagnosticSummary
 }
 ```
+
+### Execution Lifecycle: Size Gate and Parser Epochs
+
+1. **Size Gate Evaluation:** For every candidate file, `IndexCodeGraph` checks filesystem size before reading bytes. If the size strictly exceeds effective `maxFileBytes` (default: 256 KiB) and the file is not exempt in `largeFilePaths`, the file is marked skipped (`file-too-large`), counted in `filesSkippedForSize`, and excluded from analysis.
+2. **Per-File Parser Epoch:** Each admitted source file is parsed inside an isolated `ParserResourceScope`. Adapters register their parser AST trees and disposal callbacks in `session.parserResources`.
+3. **Deterministic Cleanup & Yield:** Once the file's symbols and facts are extracted (or if an error throws), `closeParserResourceEpoch` runs:
+   - Disposes all registered resources in LIFO order.
+   - Invokes `globalThis.gc()` if available to clean up native V8 handle wrappers.
+   - Yields the event loop via `setImmediate` to allow libuv/V8 finalizers to run before the next file begins.
 
 ---
 

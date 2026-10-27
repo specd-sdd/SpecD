@@ -923,6 +923,74 @@ export const rows = [{ filteredField: 'unique-array-content-value' }];
     await provider.close()
   })
 
+  describe('size-skipped files and the freshness comparison', () => {
+    const indexFixture = async (
+      files: Record<string, string>,
+    ): Promise<{
+      provider: ReturnType<typeof createCodeGraphProvider>
+      codeRoot: string
+    }> => {
+      tempDir = mkdtempSync(join(tmpdir(), 'index-project-graph-size-skip-'))
+      const codeRoot = join(tempDir, 'workspace')
+      mkdirSync(codeRoot, { recursive: true })
+      for (const [name, content] of Object.entries(files)) {
+        writeFileSync(join(codeRoot, name), content)
+      }
+      const projectConfig = makeConfig(tempDir, codeRoot)
+      const provider = createCodeGraphProvider(projectConfig)
+      await provider.open()
+      await provider.index({
+        projectRoot: tempDir,
+        vcsRoot: null,
+        workspaces: [
+          {
+            name: 'fixture',
+            prefix: null,
+            codeRoot,
+            specRepo: makeMockRepo(),
+            ownership: 'owned',
+            isExternal: false,
+          },
+        ],
+        graphConfig: buildProjectGraphConfig(projectConfig),
+        codeGraphVersion: readInstalledCodeGraphVersion(),
+      })
+      return { provider, codeRoot }
+    }
+
+    it('does not report a changed file set right after an index that skipped a file for size', async () => {
+      // Given a run that skipped one oversized file
+      const { provider } = await indexFixture({
+        'small.ts': 'export const a = 1\n',
+        'big.ts': `export const b = 1\n`.padEnd(300 * 1024, ' '),
+      })
+
+      // When health is computed without any change since the run
+      const health = await provider.getGraphHealth()
+
+      // Then the workspace is not reported as a changed file set
+      expect(health.workspaces[0]?.reasons).not.toContain('FILESET_CHANGED')
+      expect(health.coverageCompleteness).toBe('complete-with-warnings')
+      await provider.close()
+    })
+
+    it('reports a changed file set when an indexed file grows past the limit', async () => {
+      // Given an index with two small files
+      const { provider, codeRoot } = await indexFixture({
+        'small.ts': 'export const a = 1\n',
+        'grows.ts': 'export const g = 1\n',
+      })
+
+      // When one file grows beyond the limit without a new run
+      writeFileSync(join(codeRoot, 'grows.ts'), `export const g = 1\n`.padEnd(300 * 1024, ' '))
+      const health = await provider.getGraphHealth()
+
+      // Then the membership change is reported
+      expect(health.workspaces[0]?.reasons).toContain('FILESET_CHANGED')
+      await provider.close()
+    })
+  })
+
   it('classifies absent references as unresolved while indexed content is dirty', async () => {
     tempDir = mkdtempSync(join(tmpdir(), 'index-project-graph-dirty-reference-'))
     const codeRoot = join(tempDir, 'workspace')

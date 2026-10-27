@@ -81,6 +81,8 @@ function setup() {
       fingerprintMismatch: false,
       contentFresh: true,
       coverageComplete: true,
+      coverageCompleteness: 'complete',
+      coverageWarnings: [],
       coverage: {
         total: 1,
         byStatus: { indexed: 1, excluded: 0, unsupported: 0, 'parse-failed': 0, partial: 0 },

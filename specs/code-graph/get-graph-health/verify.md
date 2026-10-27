@@ -93,6 +93,41 @@
 - **THEN** the affected scope and aggregate evidence remain unknown
 - **AND** no stale latch is set and no dirty-content mismatch is invented
 
+### Requirement: Coverage completeness with warnings
+
+#### Scenario: Size skips produce complete-with-warnings
+
+- **GIVEN** a graph whose coverage has three `unsupported` records with reason `file-too-large` and no `parse-failed` or `partial` target
+- **WHEN** graph health is computed
+- **THEN** `coverageCompleteness` is `complete-with-warnings`
+- **AND** `coverageWarnings` contains `{ code: 'file-too-large', count: 3 }`
+- **AND** `coverageComplete` is `true`
+
+#### Scenario: No skips give complete
+
+- **GIVEN** a graph whose coverage has only `indexed` records
+- **WHEN** graph health is computed
+- **THEN** `coverageCompleteness` is `complete` and `coverageWarnings` is empty
+
+#### Scenario: Other unsupported or excluded outcomes raise no warning
+
+- **GIVEN** coverage with `unsupported` records for files without a language adapter and `excluded` records
+- **WHEN** graph health is computed
+- **THEN** `coverageCompleteness` is `complete` and `coverageWarnings` is empty
+
+#### Scenario: Parse failures dominate the warnings
+
+- **GIVEN** coverage with one `parse-failed` target and two `file-too-large` records
+- **WHEN** graph health is computed
+- **THEN** `coverageCompleteness` is `incomplete`
+- **AND** `coverageComplete` is `false`
+
+#### Scenario: Unassessable coverage is unknown
+
+- **GIVEN** a coverage assessment that fails
+- **WHEN** graph health is computed
+- **THEN** `coverageCompleteness` is `unknown` and `coverageComplete` is `null`
+
 ### Requirement: Indexed-content integrity assessment
 
 #### Scenario: Retained indexed coverage over an empty graph is inconsistent
@@ -165,3 +200,16 @@
 - **WHEN** efficient scope assessment runs
 - **THEN** it does not inspect every symbol
 - **AND** it does not invoke exact-resource freshness for the entire graph
+
+#### Scenario: A fresh index with size skips is not reported as a changed file set
+
+- **GIVEN** a workspace indexed with one file skipped for size and no change since the run
+- **WHEN** graph health is computed
+- **THEN** the workspace is not reported with the reason `FILESET_CHANGED`
+- **AND** the aggregate and workspace latches are unchanged
+
+#### Scenario: A file that grows past the limit after indexing is a membership change
+
+- **GIVEN** a workspace in which a file was indexed and later grew beyond the effective limit without a new run
+- **WHEN** graph health is computed
+- **THEN** the workspace is reported stale with the reason `FILESET_CHANGED`

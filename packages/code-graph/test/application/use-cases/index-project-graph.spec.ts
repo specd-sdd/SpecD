@@ -10,9 +10,13 @@ const INDEX_RESULT: IndexResult = {
   documentsIndexed: 0,
   filesRemoved: 0,
   filesSkipped: 0,
+  filesSkippedForSize: 0,
+  largestSkippedForSize: [],
+  sizeExemptAnalysed: [],
   specsDiscovered: 0,
   specsIndexed: 0,
   errors: [],
+  diagnostics: [],
   duration: 10,
   workspaces: [],
   vcsRef: null,
@@ -213,5 +217,23 @@ describe('IndexProjectGraph', () => {
     expect(provider.clear).not.toHaveBeenCalled()
     expect(provider.recreate).not.toHaveBeenCalled()
     expect(result).toBe(INDEX_RESULT)
+  })
+
+  it('forwards onEvent receiver unchanged to provider.index', async () => {
+    const provider = makeProvider()
+    const onEvent = vi.fn()
+
+    await new IndexProjectGraph().execute({
+      provider,
+      ...baseInput,
+      force: false,
+      onEvent,
+    })
+
+    expect(provider.index).toHaveBeenCalledWith(
+      expect.objectContaining({
+        onEvent,
+      }),
+    )
   })
 })

@@ -524,4 +524,124 @@ describe('Fingerprint logic', () => {
     })
     expect(fp).toHaveLength(64)
   })
+
+  it('detects changes in maxFileBytes limit and largeFilePaths exemptions', () => {
+    const baseFp = computeWorkspaceFingerprint(
+      codeGraphVersion,
+      projectRoot,
+      mockWorkspace,
+      [mockWorkspace],
+      mockGraphConfig,
+      adapters,
+      repoRoot,
+    )
+
+    const limitChangedFp = computeWorkspaceFingerprint(
+      codeGraphVersion,
+      projectRoot,
+      mockWorkspace,
+      [mockWorkspace],
+      { ...mockGraphConfig, maxFileBytes: 500_000 },
+      adapters,
+      repoRoot,
+    )
+    expect(limitChangedFp).not.toBe(baseFp)
+
+    const exemptionsChangedFp = computeWorkspaceFingerprint(
+      codeGraphVersion,
+      projectRoot,
+      mockWorkspace,
+      [mockWorkspace],
+      { ...mockGraphConfig, largeFilePaths: ['vendor/**'] },
+      adapters,
+      repoRoot,
+    )
+    expect(exemptionsChangedFp).not.toBe(baseFp)
+  })
+
+  it('produces equal fingerprints when effective size values are equal regardless of declaration level', () => {
+    // Config 1: default 262144 at project level (or omitted)
+    const configImplicitDefault = {
+      ...mockGraphConfig,
+    }
+    // Config 2: explicit 262144 at project level
+    const configExplicitProject = {
+      ...mockGraphConfig,
+      maxFileBytes: 262144,
+    }
+    // Config 3: repeated in workspace map
+    const configRepeatedWorkspace = {
+      ...mockGraphConfig,
+      workspaces: new Map([
+        [
+          mockWorkspace.name,
+          {
+            maxFileBytes: 262144,
+          },
+        ],
+      ]),
+    }
+
+    const fp1 = computeWorkspaceFingerprint(
+      codeGraphVersion,
+      projectRoot,
+      mockWorkspace,
+      [mockWorkspace],
+      configImplicitDefault,
+      adapters,
+      repoRoot,
+    )
+    const fp2 = computeWorkspaceFingerprint(
+      codeGraphVersion,
+      projectRoot,
+      mockWorkspace,
+      [mockWorkspace],
+      configExplicitProject,
+      adapters,
+      repoRoot,
+    )
+    const fp3 = computeWorkspaceFingerprint(
+      codeGraphVersion,
+      projectRoot,
+      mockWorkspace,
+      [mockWorkspace],
+      configRepeatedWorkspace,
+      adapters,
+      repoRoot,
+    )
+
+    expect(fp1).toBe(fp2)
+    expect(fp2).toBe(fp3)
+  })
+
+  it('detects size limit and exemption changes in root fingerprint', () => {
+    const baseRootFp = computeRootFingerprint(
+      codeGraphVersion,
+      projectRoot,
+      [mockWorkspace],
+      mockGraphConfig,
+      adapters,
+      repoRoot,
+    )
+
+    const limitChangedRootFp = computeRootFingerprint(
+      codeGraphVersion,
+      projectRoot,
+      [mockWorkspace],
+      { ...mockGraphConfig, maxFileBytes: 100_000 },
+      adapters,
+      repoRoot,
+    )
+    expect(limitChangedRootFp).not.toBe(baseRootFp)
+
+    const exemptionChangedRootFp = computeRootFingerprint(
+      codeGraphVersion,
+      projectRoot,
+      [mockWorkspace],
+      { ...mockGraphConfig, largeFilePaths: ['root-large/**'] },
+      adapters,
+      repoRoot,
+    )
+    expect(exemptionChangedRootFp).not.toBe(baseRootFp)
+  })
 })

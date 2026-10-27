@@ -6,6 +6,7 @@ import {
   serializeTaskError,
   type StartMessage,
 } from './protocol.js'
+import { createAnnouncer } from './child-announcer.js'
 
 /** Minimal child-process IPC surface used by the isolated runtime. */
 type ChildProcessWithIpc = NodeJS.Process & {
@@ -19,6 +20,7 @@ type GraphIndexTaskModule = {
   readonly runGraphIndexTask?: (
     input: unknown,
     emitProgress: (value: unknown) => void,
+    announce: (item: string, options?: { readonly mandatory?: boolean }) => void,
   ) => Promise<unknown>
 }
 
@@ -26,6 +28,24 @@ const childProcess = process as ChildProcessWithIpc
 let receivedStart = false
 let sentTerminal = false
 let deliveryFailed = false
+
+/**
+ * Announces active item to the supervisor, rate-limited unless mandatory.
+ *
+ * @param item - Identifier of the active item being processed.
+ * @param options - Optional flags (e.g. mandatory for large files).
+ */
+const announce = createAnnouncer(
+  (msg) => {
+    childProcess.send?.(msg, (error) => {
+      if (error) failDelivery()
+    })
+  },
+  {
+    isTerminalSent: () => sentTerminal,
+    isConnected: () => Boolean(childProcess.connected && typeof childProcess.send === 'function'),
+  },
+)
 
 /** Failure at the strict JSON/IPC boundary rather than inside task domain logic. */
 class ProtocolBoundaryError extends Error {}
@@ -61,7 +81,9 @@ function disconnectAfterTerminal(): void {
  * @param message - Valid terminal envelope to deliver to the parent.
  * @returns Whether delivery was scheduled on the IPC channel.
  */
-function sendTerminal(message: Exclude<ChildMessage, { readonly type: 'progress' }>): boolean {
+function sendTerminal(
+  message: Exclude<ChildMessage, { readonly type: 'progress' } | { readonly type: 'activity' }>,
+): boolean {
   if (sentTerminal) return false
   sentTerminal = true
 
@@ -202,7 +224,7 @@ async function runTask(message: StartMessage): Promise<void> {
   }
 
   try {
-    const result = await module.runGraphIndexTask(message.taskInput, sendProgress)
+    const result = await module.runGraphIndexTask(message.taskInput, sendProgress, announce)
     try {
       assertGraphIndexJsonValue(result)
     } catch {

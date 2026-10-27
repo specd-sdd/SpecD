@@ -3060,4 +3060,23 @@ class LoginController {
       },
     ])
   })
+
+  describe('Parser-owned resource registration', () => {
+    it('registers SgRoot into session.parserResources and leaves no keepalive in session state', () => {
+      const phpAdapter = new PhpLanguageAdapter()
+      const session = new InMemoryIndexSession()
+      const draft = phpAdapter.analyzeFile('file.php', '<?php function test() {}', {
+        session,
+        workspaceName: 'ws',
+      })
+
+      expect(draft.symbols.length).toBe(1)
+      expect(session.parserResources.size).toBe(1)
+      expect(session.getAdapterState('napi-keepalive')).toBeUndefined()
+
+      const closeResult = session.parserResources.close()
+      expect(closeResult.registered).toBe(1)
+      expect(session.parserResources.size).toBe(0)
+    })
+  })
 })

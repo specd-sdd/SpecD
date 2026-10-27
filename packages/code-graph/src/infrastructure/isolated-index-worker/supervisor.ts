@@ -10,6 +10,7 @@ import {
   GraphIndexProgressHandlerError,
   GraphIndexTaskContractError,
   GraphIndexTaskExecutionError,
+  GraphIndexWorkerError,
   GraphIndexWorkerExitError,
   GraphIndexWorkerProtocolError,
   GraphIndexWorkerSignalError,
@@ -28,16 +29,40 @@ import {
   type ChildMessage,
   type StartMessage,
 } from './protocol.js'
+import { OutputTail } from './output-tail.js'
+import { classifyWorkerFailure } from './classify-failure.js'
+
+/** Silence threshold before a watchdog warning is emitted (10 s). */
+const SILENCE_THRESHOLD_MS = 10000
+
+/** Interval between silence checks (1 s). */
+const SILENCE_CHECK_INTERVAL_MS = 1000
+
+/** Longest wait, after the child exits, for its output streams to close before settling (1 s). */
+const STREAM_CLOSE_GRACE_MS = 1000
 
 /** Signals that the supervisor forwards to an active child. */
 type ParentSignal = 'SIGINT' | 'SIGTERM' | 'SIGBREAK'
+
+/** Watchdog timer dependencies injected into the supervisor. */
+export interface IsolatedGraphIndexTimers {
+  readonly setInterval: (fn: () => void, ms: number) => unknown
+  readonly clearInterval: (handle: unknown) => void
+  /** One-shot timer used as a safety net while waiting for the child's output streams to close. */
+  readonly setTimeout?: (fn: () => void, ms: number) => unknown
+  /** Cancels a one-shot timer created by `setTimeout`. */
+  readonly clearTimeout?: (handle: unknown) => void
+  readonly now: () => number
+}
 
 /** Dependencies used by the supervisor; exported only for direct infrastructure tests. */
 export interface IsolatedGraphIndexRuntime {
   /** Launches the packaged child entrypoint. */
   readonly fork: typeof nodeFork
   /** Parent process listener and environment surface. */
-  readonly process: Pick<NodeJS.Process, 'on' | 'removeListener' | 'execPath' | 'env'>
+  readonly process: Pick<NodeJS.Process, 'on' | 'removeListener' | 'execPath' | 'env'> & {
+    readonly execArgv?: readonly string[]
+  }
   /** Installed child entrypoint URL. */
   readonly workerUrl: URL
   /** Acquires the internal exclusive graph-index lease. */
@@ -45,6 +70,8 @@ export interface IsolatedGraphIndexRuntime {
     storageRoot: string,
     onStaleLockRecovered?: (info: StaleGraphIndexLockInfo) => void,
   ) => GraphIndexLockLease
+  /** Supervisor watchdog timers. When omitted, global setInterval/clearInterval/Date.now are used. */
+  readonly timers?: IsolatedGraphIndexTimers
 }
 
 /** Node implementation of the application process-isolation runner port. */
@@ -101,9 +128,29 @@ export function runIsolatedGraphIndexWithRuntime<
     try {
       lease = runtime.acquireLock(
         storageRoot,
-        input.onWarning === undefined
+        input.onWarning === undefined && input.onEvent === undefined
           ? undefined
-          : (info) => input.onWarning?.(formatStaleLockWarning(info)),
+          : (info) => {
+              try {
+                if (input.onWarning !== undefined) {
+                  input.onWarning(formatStaleLockWarning(info))
+                }
+                if (input.onEvent !== undefined) {
+                  input.onEvent({
+                    kind: 'stale-lock-recovered',
+                    reason: info.reason,
+                    lockPath: info.lockPath,
+                    ...(info.pid !== undefined ? { pid: info.pid } : {}),
+                    ...(info.startedAt !== undefined ? { startedAt: info.startedAt } : {}),
+                  })
+                }
+              } catch (error) {
+                throw new GraphIndexProgressHandlerError(
+                  'The graph-index event handler threw.',
+                  error,
+                )
+              }
+            },
       )
     } catch (error) {
       rejectPromise(
@@ -117,6 +164,23 @@ export function runIsolatedGraphIndexWithRuntime<
       return
     }
 
+    const timers: IsolatedGraphIndexTimers = {
+      setInterval: runtime.timers?.setInterval ?? ((fn, ms) => globalThis.setInterval(fn, ms)),
+      clearInterval:
+        runtime.timers?.clearInterval ??
+        ((handle) =>
+          globalThis.clearInterval(handle as Parameters<typeof globalThis.clearInterval>[0])),
+      setTimeout: runtime.timers?.setTimeout ?? ((fn, ms) => globalThis.setTimeout(fn, ms)),
+      clearTimeout:
+        runtime.timers?.clearTimeout ??
+        ((handle) =>
+          globalThis.clearTimeout(handle as Parameters<typeof globalThis.clearTimeout>[0])),
+      now: runtime.timers?.now ?? (() => Date.now()),
+    }
+
+    const stdoutTail = new OutputTail()
+    const stderrTail = new OutputTail()
+
     let child: ChildProcess | undefined
     let terminal:
       | { readonly kind: 'result'; readonly value: GraphIndexJsonValue }
@@ -125,12 +189,55 @@ export function runIsolatedGraphIndexWithRuntime<
     let forwardedSignal: ParentSignal | undefined
     let finalized: Promise<void> | undefined
     let settled = false
+    let exitCode: number | null = null
+    let signal: NodeJS.Signals | null = null
+    let lastMessageAt = timers.now()
+    let lastActivity: { readonly item: string; readonly at: number } | undefined
+    let lastSilentWarnAt = -Infinity
+    let silenceInterval: unknown
+    let childExited = false
+    let closeTimer: unknown
+
+    const onStdoutData = (chunk: Buffer | string): void => {
+      stdoutTail.push(chunk)
+    }
+
+    const onStderrData = (chunk: Buffer | string): void => {
+      stderrTail.push(chunk)
+    }
+
+    const attach = (error: Error): Error => {
+      if (child !== undefined && error instanceof GraphIndexWorkerError) {
+        error.withDiagnostics({
+          cause: classifyWorkerFailure({
+            error,
+            exitCode,
+            signal,
+            ...(forwardedSignal !== undefined ? { forwardedSignal } : {}),
+            stderrTail: stderrTail.toString(),
+          }),
+          lastActivity:
+            lastActivity === undefined
+              ? null
+              : {
+                  item: lastActivity.item,
+                  agoMs: timers.now() - lastActivity.at,
+                },
+          stdoutTail: stdoutTail.toString(),
+          stderrTail: stderrTail.toString(),
+        })
+      }
+      return error
+    }
 
     const settle = (error?: Error, value?: TResult): void => {
       if (settled) return
       settled = true
+      const attachedError = error !== undefined ? attach(error) : undefined
       void finalize().then(() =>
-        error === undefined ? resolvePromise(value as TResult) : rejectPromise(error),
+        attachedError === undefined
+          ? resolvePromise(value as TResult)
+          : rejectPromise(attachedError),
       )
     }
 
@@ -138,11 +245,26 @@ export function runIsolatedGraphIndexWithRuntime<
       target.removeListener('message', onMessage)
       target.removeListener('error', onError)
       target.removeListener('exit', onExit)
+      target.removeListener('close', onClose)
+      target.stdout?.removeListener('data', onStdoutData)
+      target.stderr?.removeListener('data', onStderrData)
+    }
+
+    const stopWatchdog = (): void => {
+      if (silenceInterval !== undefined) {
+        timers.clearInterval(silenceInterval)
+        silenceInterval = undefined
+      }
     }
 
     const finalize = (): Promise<void> => {
       if (finalized !== undefined) return finalized
       finalized = Promise.resolve().then(() => {
+        stopWatchdog()
+        if (closeTimer !== undefined) {
+          timers.clearTimeout?.(closeTimer)
+          closeTimer = undefined
+        }
         runtime.process.removeListener('SIGINT', onSigint)
         runtime.process.removeListener('SIGTERM', onSigterm)
         runtime.process.removeListener('SIGBREAK', onSigbreak)
@@ -153,6 +275,8 @@ export function runIsolatedGraphIndexWithRuntime<
           detachChild(currentChild)
           if (currentChild.connected) currentChild.disconnect()
         }
+        stdoutTail.dispose()
+        stderrTail.dispose()
         lease.release()
       })
       return finalized
@@ -180,8 +304,27 @@ export function runIsolatedGraphIndexWithRuntime<
         protocolFailure('The graph-index worker sent an invalid IPC message.')
         return
       }
+      lastMessageAt = timers.now()
       if (terminal !== undefined) {
         protocolFailure(`The graph-index worker sent ${message.type} after a terminal message.`)
+        return
+      }
+      if (message.type === 'activity') {
+        lastActivity = { item: message.item, at: lastMessageAt }
+        if (input.onEvent !== undefined) {
+          try {
+            input.onEvent({ kind: 'activity', item: message.item })
+          } catch (error) {
+            terminal = {
+              kind: 'failure',
+              error: new GraphIndexProgressHandlerError(
+                'The graph-index event handler threw.',
+                error,
+              ),
+            }
+            terminate()
+          }
+        }
         return
       }
       if (message.type === 'progress') {
@@ -216,7 +359,28 @@ export function runIsolatedGraphIndexWithRuntime<
       if (terminal.kind === 'failure') settle(terminal.error)
     }
 
-    const onExit = (exitCode: number | null, signal: NodeJS.Signals | null): void => {
+    const outputStreamsOpen = (): boolean =>
+      [child?.stdout, child?.stderr].some((stream) => stream?.destroyed === false)
+
+    const onExit = (code: number | null, sig: NodeJS.Signals | null): void => {
+      exitCode = code
+      signal = sig
+      childExited = true
+      // The streams may still hold the child's last output (for example a fatal out-of-memory
+      // report), which the classification needs. Wait for them, but never longer than the grace.
+      if (outputStreamsOpen()) {
+        closeTimer = timers.setTimeout?.(settleFromExit, STREAM_CLOSE_GRACE_MS)
+        if (closeTimer !== undefined) return
+      }
+      settleFromExit()
+    }
+
+    const onClose = (): void => {
+      if (childExited) settleFromExit()
+    }
+
+    const settleFromExit = (): void => {
+      if (settled) return
       if (forwardedSignal !== undefined) {
         settle(
           new GraphIndexWorkerSignalError(
@@ -279,19 +443,62 @@ export function runIsolatedGraphIndexWithRuntime<
       lease.release()
     }
 
+    const hostExecArgv = runtime.process.execArgv ?? process.execArgv
+    const execArgv = hostExecArgv.includes('--expose-gc')
+      ? [...hostExecArgv]
+      : [...hostExecArgv, '--expose-gc']
+
     try {
       child = runtime.fork(fileURLToPath(runtime.workerUrl), [], {
         serialization: 'json',
-        stdio: ['ignore', 'ignore', 'ignore', 'ipc'],
+        stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
+        execArgv,
         env: { ...runtime.process.env, ...createGraphIndexLockHandoffEnv(lease) },
       })
+      child.stdout?.on('data', onStdoutData)
+      child.stderr?.on('data', onStderrData)
       child.on('message', onMessage)
       child.on('error', onError)
       child.on('exit', onExit)
+      child.on('close', onClose)
       runtime.process.on('SIGINT', onSigint)
       runtime.process.on('SIGTERM', onSigterm)
       runtime.process.on('SIGBREAK', onSigbreak)
       runtime.process.on('exit', onProcessExit)
+
+      silenceInterval = timers.setInterval(() => {
+        if (terminal !== undefined) {
+          // A terminal outcome is already recorded: the silence no longer means anything.
+          stopWatchdog()
+          return
+        }
+        const t = timers.now()
+        const silentForMs = t - lastMessageAt
+        if (silentForMs >= SILENCE_THRESHOLD_MS && t - lastSilentWarnAt >= SILENCE_THRESHOLD_MS) {
+          lastSilentWarnAt = t
+          if (input.onEvent !== undefined) {
+            try {
+              input.onEvent({
+                kind: 'worker-silent',
+                item: lastActivity?.item ?? null,
+                silentForMs,
+              })
+            } catch (error) {
+              terminal ??= {
+                kind: 'failure',
+                error: new GraphIndexProgressHandlerError(
+                  'The graph-index event handler threw.',
+                  error,
+                ),
+              }
+              terminate()
+            }
+          }
+        }
+      }, SILENCE_CHECK_INTERVAL_MS)
+      // The watchdog must never keep the host process alive on its own.
+      ;(silenceInterval as { unref?: () => void } | undefined)?.unref?.()
+
       if (!child.connected) {
         terminal = {
           kind: 'failure',

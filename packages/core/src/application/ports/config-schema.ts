@@ -160,6 +160,8 @@ export const WorkspaceGraphZodSchema = z
     allowedPaths: z.array(z.string()).optional(),
     testPaths: z.array(z.string()).optional(),
     ignorePaths: z.array(z.string()).optional(),
+    maxFileBytes: z.number().int().nonnegative().optional(),
+    largeFilePaths: z.array(z.string()).optional(),
   })
   .strict()
 
@@ -169,6 +171,8 @@ export const ProjectGraphZodSchema = z
     excludePaths: z.array(z.string()).optional(),
     testPaths: z.array(z.string()).optional(),
     ignorePaths: z.array(z.string()).optional(),
+    maxFileBytes: z.number().int().nonnegative().optional(),
+    largeFilePaths: z.array(z.string()).optional(),
   })
   .strict()
 

@@ -438,6 +438,103 @@ describe('GetGraphHealth', () => {
     expect(result.state).not.toBe('current')
   })
 
+  describe('coverage completeness with warnings', () => {
+    const runWithCoverage = async (
+      facts: ReadonlyArray<{
+        readonly filePath: string
+        readonly status: IndexCoverageStatus
+        readonly reason: string | undefined
+      }> | null,
+    ): Promise<Awaited<ReturnType<GetGraphHealth['execute']>>> => {
+      vi.mocked(createVcsAdapter).mockResolvedValue({
+        ref: vi.fn().mockResolvedValue('abc1234'),
+      } as never)
+      const base = makeProvider({ ...BASE_STATS, graphFingerprint: matchingFingerprint() })
+      const provider =
+        facts === null
+          ? ({ getStatistics: base.getStatistics } as unknown as CodeGraphHostPort)
+          : ({
+              ...base,
+              getAllIndexCoverage: vi
+                .fn()
+                .mockResolvedValue(
+                  facts.map((fact) => ({ ...fact, contentHash: undefined, capabilities: [] })),
+                ),
+            } as unknown as CodeGraphHostPort)
+      return getGraphHealth().execute({ config, provider, codeGraphVersion, workspaces })
+    }
+
+    it('reports complete-with-warnings, with the count, when files were skipped for size', async () => {
+      // Given coverage with three size skips and nothing failed
+      const result = await runWithCoverage([
+        ...['a', 'b', 'c'].map((name) => ({
+          filePath: `core:src/${name}.ts`,
+          status: IndexCoverageStatus.Unsupported,
+          reason: 'file-too-large',
+        })),
+      ])
+
+      // Then the aggregate flag is unchanged and the completeness carries the warning
+      expect(result.coverageComplete).toBe(true)
+      expect(result.coverageCompleteness).toBe('complete-with-warnings')
+      expect(result.coverageWarnings).toEqual([{ code: 'file-too-large', count: 3 }])
+    })
+
+    it('reports complete with no warnings when nothing was skipped for size', async () => {
+      const result = await runWithCoverage([
+        { filePath: 'core:src/a.ts', status: IndexCoverageStatus.Indexed, reason: undefined },
+      ])
+
+      expect(result.coverageCompleteness).toBe('complete')
+      expect(result.coverageWarnings).toEqual([])
+    })
+
+    it('raises no warning for other unsupported or excluded outcomes', async () => {
+      const result = await runWithCoverage([
+        {
+          filePath: 'core:docs/readme.txt',
+          status: IndexCoverageStatus.Unsupported,
+          reason: 'no-language-adapter',
+        },
+        {
+          filePath: 'core:vendor/x.ts',
+          status: IndexCoverageStatus.Excluded,
+          reason: 'PATH_EXCLUDED',
+        },
+      ])
+
+      expect(result.coverageCompleteness).toBe('complete')
+      expect(result.coverageWarnings).toEqual([])
+    })
+
+    it('lets parse failures dominate the warnings', async () => {
+      const result = await runWithCoverage([
+        {
+          filePath: 'core:src/broken.ts',
+          status: IndexCoverageStatus.ParseFailed,
+          reason: 'PARSER_FAILED',
+        },
+        {
+          filePath: 'core:src/big.ts',
+          status: IndexCoverageStatus.Unsupported,
+          reason: 'file-too-large',
+        },
+      ])
+
+      expect(result.coverageComplete).toBe(false)
+      expect(result.coverageCompleteness).toBe('incomplete')
+      expect(result.coverageWarnings).toEqual([])
+    })
+
+    it('reports unknown when coverage cannot be assessed', async () => {
+      const result = await runWithCoverage(null)
+
+      expect(result.coverageComplete).toBeNull()
+      expect(result.coverageCompleteness).toBe('unknown')
+      expect(result.coverageWarnings).toEqual([])
+    })
+  })
+
   it('marks indexed coverage without a persisted graph node as inconsistent without mutating storage', async () => {
     vi.mocked(createVcsAdapter).mockResolvedValue({
       ref: vi.fn().mockResolvedValue('abc1234'),

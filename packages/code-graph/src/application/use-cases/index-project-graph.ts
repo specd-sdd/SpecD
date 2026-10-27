@@ -6,6 +6,7 @@ import {
   type WorkspaceIndexTarget,
 } from '../../domain/value-objects/index-options.js'
 import { type IndexResult } from '../../domain/value-objects/index-result.js'
+import { type IndexEventReceiver } from '../../domain/value-objects/index-event.js'
 
 /** Input for project graph indexing on an open provider. */
 export interface IndexProjectGraphInput {
@@ -21,6 +22,7 @@ export interface IndexProjectGraphInput {
   /** Repair strategy for an incompatible stored derivation; defaults to in-place rebuild. */
   readonly derivationMismatch?: 'rebuild' | 'fail'
   readonly onProgress?: IndexProgressCallback
+  readonly onEvent?: IndexEventReceiver
   /** Materialized spec metadata source used for spec-content fingerprinting. */
   readonly getSpecMetadata?: GetSpecMetadata
 }
@@ -51,6 +53,7 @@ export class IndexProjectGraph {
         : {}),
       ...(input.vcsRef !== undefined ? { vcsRef: input.vcsRef } : {}),
       ...(input.onProgress !== undefined ? { onProgress: input.onProgress } : {}),
+      ...(input.onEvent !== undefined ? { onEvent: input.onEvent } : {}),
       ...(input.getSpecMetadata !== undefined ? { getSpecMetadata: input.getSpecMetadata } : {}),
     })
   }

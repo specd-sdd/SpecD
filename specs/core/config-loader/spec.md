@@ -135,6 +135,12 @@ The loader MUST apply the following defaults when workspace fields are omitted:
 - **`codeRoot`**: the config file directory for the `default` workspace. For non-default workspaces, `codeRoot` is required — its absence MUST produce `ConfigValidationError`.
 - **`schemasPath`**: for the `default` workspace, when `schemas` is omitted, defaults to `<configDir>/.specd/schemas`. For non-default workspaces, when `schemas` is omitted, `schemasPath` MUST be `null`.
 
+### Requirement: Graph size limit fields
+
+The loader SHALL accept `maxFileBytes` and `largeFilePaths` in the project-level `graph` section and in each workspace `graph` block, and SHALL expose them on the resolved configuration exactly as declared, without applying a default: a field that no layer declares is absent. The structural validation of the `graph` blocks stays strict, so these two keys are the only new keys accepted and any other unknown key is still rejected.
+
+The loader MUST reject a `maxFileBytes` that is not a non-negative integer with a `ConfigValidationError` that names the offending key and its location. The layer merge rules apply unchanged: `maxFileBytes` from a later layer wins and `largeFilePaths` entries append.
+
 ### Requirement: contextIncludeSpecs and contextExcludeSpecs pattern validation
 
 The loader MUST validate all `contextIncludeSpecs` and `contextExcludeSpecs` patterns at both project level and workspace level. Valid pattern forms are:

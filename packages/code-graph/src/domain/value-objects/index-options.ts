@@ -1,6 +1,7 @@
 import { type ProjectWorkspace, type SpecMetadata } from '@specd/core'
 export { type ProjectWorkspace } from '@specd/core'
 import { type GetSpecMetadata } from '@specd/core'
+import { type IndexEventReceiver } from './index-event.js'
 
 /**
  * Progress callback invoked during indexing to report completion percentage and phase.
@@ -42,6 +43,20 @@ export interface ProjectGraphConfig {
   readonly ignorePaths?: readonly string[]
 
   /**
+   * Maximum file size in bytes eligible for indexing across the project.
+   * Files exceeding this limit are skipped with coverage reason 'file-too-large'.
+   * When set to 0, file size limits are disabled.
+   * If omitted, the default (262144 bytes / 256 KiB) is applied during effective resolution.
+   */
+  readonly maxFileBytes?: number
+
+  /**
+   * Gitignore-syntax exemption patterns relative to the project root.
+   * Files matching these patterns are analysed even if they exceed maxFileBytes.
+   */
+  readonly largeFilePaths?: readonly string[]
+
+  /**
    * Per-workspace graph overrides.
    *
    * Keyed by workspace name.
@@ -76,6 +91,19 @@ export interface ProjectGraphConfig {
        * Defaults to `true`. When `false`, only `excludePaths` governs exclusion.
        */
       readonly respectGitignore?: boolean
+
+      /**
+       * Maximum file size in bytes for files owned by this workspace.
+       * Replaces the project-level maxFileBytes setting.
+       * When set to 0, file size limits are disabled for this workspace.
+       */
+      readonly maxFileBytes?: number
+
+      /**
+       * Gitignore-syntax exemption patterns relative to the workspace codeRoot.
+       * Added to the project-level largeFilePaths set.
+       */
+      readonly largeFilePaths?: readonly string[]
     }
   >
 }
@@ -115,6 +143,12 @@ export interface IndexOptions {
    * Receives percentage (0-100) and phase/detail strings.
    */
   readonly onProgress?: IndexProgressCallback
+
+  /**
+   * Optional presentation-neutral indexing event receiver.
+   * Receives structured indexing events (activity, skips, resource disposal failures).
+   */
+  readonly onEvent?: IndexEventReceiver
 
   /**
    * Maximum byte budget for sequential processing chunks (default 20MB).

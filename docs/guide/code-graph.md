@@ -72,6 +72,31 @@ The indexer walks every workspace declared in `specd.yaml`, extracts AST symbols
   specd graph index --exclude-path "**/dist/**" --exclude-path "**/fixtures/**"
   ```
 
+#### File Size Limits and Memory Safety
+
+AST parsing with native tree-sitter bindings incurs significant memory overhead — typically ~3 KB of memory per source byte. A single 10 MB generated file or minified asset can easily consume tens of megabytes of native memory during AST construction, risking process out-of-memory crashes.
+
+To keep worker indexing memory bounded and predictable:
+
+- **Default Limit:** SpecD enforces a default per-file size limit of **256 KiB** (`262,144` bytes). Files strictly larger than this limit are skipped during graph indexing and recorded with coverage status `unsupported` and reason `file-too-large`.
+- **Reporting Skipped Files:** In CLI text output, any size-skipped files are reported in a summary section with their workspace-relative paths and sizes, along with an actionable configuration hint:
+
+  ```text
+  Size-skipped files (limit 256.0 KiB):
+    - packages/core/src/generated/schema.ts (412.5 KiB)
+    - 2 file(s) skipped; largest: 412.5 KiB
+
+  Hint: To index a file anyway, add its pattern to graph.largeFilePaths in specd.yaml:
+    graph:
+      largeFilePaths:
+        - "packages/core/src/generated/schema.ts"
+  Or raise maxFileBytes (e.g. maxFileBytes: 524288 for 512 KiB; 0 disables the limit).
+  ```
+
+  Structured formats (`--format json` and `--format toon`) report `filesSkippedForSize`, `largestSkippedForSize`, and `sizeExemptAnalysed`.
+
+- **Indexing a Large File Anyway:** To exempt a specific oversized file from the size gate without disabling limits globally, add its path to `graph.largeFilePaths` in `specd.yaml` (relative to project root at project level, or relative to `codeRoot` inside a workspace block). An exemption only bypasses the file size threshold; the file must still satisfy gitignore, `excludePaths`, `allowedPaths`, and binary file checks. To disable file size gating entirely, set `maxFileBytes: 0`.
+
 ### Inspecting Graph Statistics & Freshness (`specd graph stats`)
 
 To inspect graph health, node counts, supported languages, and staleness:

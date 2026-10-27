@@ -665,16 +665,8 @@ export class PythonLanguageAdapter implements LanguageAdapter {
   ): FileAnalysisDraft {
     ensureLanguagesRegistered()
     const sgRoot = parse('python', content)
-    // Keep the parsed SgRoot instance alive in the session state to prevent
-    // V8 garbage collection from running its native Rust finalizer during
-    // event loop yields. This avoids a SIGSEGV segmentation fault caused
-    // by a native concurrency/double-free bug in @ast-grep/napi.
-    let keepAlive = context.session.getAdapterState<unknown[]>('napi-keepalive')
-    if (!keepAlive) {
-      keepAlive = []
-      context.session.setAdapterState('napi-keepalive', keepAlive)
-    }
-    keepAlive.push(sgRoot)
+    // Register the parsed root in the session's parser resource scope for epoch lifecycle management.
+    context.session.parserResources.register(sgRoot)
     const root = sgRoot.root()
     const symbols: SymbolNode[] = []
     const seenSymbol = new Set<string>()

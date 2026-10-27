@@ -1,6 +1,7 @@
 import type { IndexCoverageStatus } from './index-session.js'
 import type { LogicalDeclarationDiagnostic } from './symbol-reference.js'
 import type { ImportDiagnostic, ImportUnresolvedReason } from './language-adapter-facets.js'
+import type { SizeSkippedFile, SizeExemptFile } from './index-event.js'
 
 /**
  * Describes an error encountered while indexing a specific file.
@@ -92,6 +93,9 @@ export interface ImportDiagnosticSummary {
 /** Maximum number of sampled import diagnostics kept per reason. */
 export const IMPORT_DIAGNOSTIC_SAMPLE_LIMIT = 20
 
+/** Maximum number of size-skipped files reported in largestSkippedForSize. */
+export const SIZE_SKIP_LIST_LIMIT = 25
+
 /**
  * Summary of an indexing operation including counts and errors.
  */
@@ -101,9 +105,25 @@ export interface IndexResult {
   readonly documentsIndexed: number
   readonly filesRemoved: number
   readonly filesSkipped: number
+  /** Number of files skipped because their byte size exceeded the effective limit. */
+  readonly filesSkippedForSize: number
+  /** Sample of up to {@link SIZE_SKIP_LIST_LIMIT} largest skipped files, sorted descending by size. */
+  readonly largestSkippedForSize: readonly SizeSkippedFile[]
+  /**
+   * Files whose size exceeds the effective limit and that are indexed because they are exempt.
+   * The list covers every such file in the indexed set, including exempt files that an incremental
+   * run did not need to analyse again because their content was unchanged.
+   */
+  readonly sizeExemptAnalysed: readonly SizeExemptFile[]
   readonly specsDiscovered: number
   readonly specsIndexed: number
+  /** Files or specs that failed to produce their indexed content. */
   readonly errors: readonly IndexError[]
+  /**
+   * Problems found while resolving packages or linking re-exports. They do not mean that a file or
+   * spec failed: the run completed and everything it produced is valid.
+   */
+  readonly diagnostics: readonly IndexError[]
   readonly duration: number
   readonly workspaces: readonly WorkspaceIndexBreakdown[]
   readonly vcsRef: string | null

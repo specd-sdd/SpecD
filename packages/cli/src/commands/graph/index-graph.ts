@@ -1,5 +1,6 @@
 import { Command, Option } from 'commander'
 import {
+  GraphIndexWorkerError,
   runIsolatedGraphIndex,
   type IndexPhaseMetric,
   type RunIndexProjectGraphResult,
@@ -12,6 +13,47 @@ import type {
 import { output, parseFormat } from '../../formatter.js'
 import { cliError } from '../../handle-error.js'
 import { resolveGraphCliContext } from './resolve-graph-cli-context.js'
+
+/** Maximum number of skipped files listed in CLI text output. */
+const CLI_SIZE_SKIP_LIST_MAX = 10
+
+/**
+ * Formats a byte count into a human-readable size string.
+ * @param bytes - Byte count.
+ * @returns Human-readable size (e.g., '512 B', '256 KB', '1.5 MB'); kilobytes are rounded up.
+ */
+export function formatSize(bytes: number): string {
+  if (bytes < 1024) {
+    return `${bytes} B`
+  }
+  if (bytes < 1048576) {
+    // Round up so a file above a limit never prints as equal to it.
+    return `${Math.ceil(bytes / 1024)} KB`
+  }
+  return `${(bytes / 1048576).toFixed(1)} MB`
+}
+
+/**
+ * Escapes a project-relative path so it can be safely placed in a gitignore pattern list.
+ * @param path - Project-relative path.
+ * @returns Escaped gitignore pattern.
+ */
+export function escapeGitignorePattern(path: string): string {
+  let escaped = path
+    .replaceAll('\\', '\\\\')
+    .replaceAll('*', '\\*')
+    .replaceAll('?', '\\?')
+    .replaceAll('[', '\\[')
+    .replaceAll(']', '\\]')
+
+  if (escaped.startsWith('!') || escaped.startsWith('#') || escaped.startsWith(' ')) {
+    escaped = `\\${escaped}`
+  }
+  if (escaped.endsWith(' ') && escaped !== '\\ ') {
+    escaped = `${escaped.slice(0, -1)}\\ `
+  }
+  return escaped
+}
 
 /**
  * Registers the `graph index` command.
@@ -41,10 +83,14 @@ JSON/TOON output schema:
     filesIndexed: number
     documentsIndexed: number
     filesSkipped: number
+    filesSkippedForSize: number
+    largestSkippedForSize: Array<{ filePath, projectRelativePath, sizeBytes, limitBytes }>
+    sizeExemptAnalysed: Array<{ filePath, projectRelativePath, sizeBytes }>
     filesRemoved: number
     specsDiscovered: number
     specsIndexed: number
     errors: Array<{ filePath, message }>
+    diagnostics: Array<{ filePath, message }>
     duration: number
     workspaces: Array<{ name, filesDiscovered, filesIndexed, documentsIndexed, filesSkipped, filesRemoved, specsDiscovered, specsIndexed }>
     vcsRef: string | null
@@ -124,9 +170,24 @@ JSON/TOON output schema:
             taskInput,
             ...(fmt === 'text'
               ? {
-                  onProgress: ({ percent, phase }) => {
-                    const pct = Math.round(percent)
-                    process.stdout.write(`\rIndexing: ${pct}% ${phase}${' '.repeat(20)}`)
+                  onProgress: (progress) => {
+                    if ('event' in progress) {
+                      if (progress.event.kind === 'resource-disposal-failed') {
+                        process.stderr.write(
+                          `warning: could not release a parser resource while processing ${progress.event.filePath}: ${progress.event.message}\n`,
+                        )
+                      }
+                      return
+                    }
+                    const pct = Math.round(progress.percent)
+                    process.stdout.write(`\rIndexing: ${pct}% ${progress.phase}${' '.repeat(20)}`)
+                  },
+                  onEvent: (event) => {
+                    if (event.kind === 'worker-silent') {
+                      process.stderr.write(
+                        `\nwarning: no progress for ${Math.round(event.silentForMs / 1000)}s${event.item !== null ? ` while processing ${event.item}` : ''}. If that file is not needed, add it to graph.excludePaths or lower graph.maxFileBytes.\n`,
+                      )
+                    }
                   },
                 }
               : {}),
@@ -138,12 +199,67 @@ JSON/TOON output schema:
           } else {
             output(result, fmt)
           }
-          process.exit(0)
         } catch (err) {
-          cliError(err instanceof Error ? err.message : 'indexing failed', opts.format, 3)
+          if (!(err instanceof GraphIndexWorkerError) || err.diagnostics === undefined) {
+            cliError(err instanceof Error ? err.message : 'indexing failed', opts.format, 3)
+          } else {
+            const d = err.diagnostics
+            const detail =
+              fmt === 'text'
+                ? [
+                    `cause: ${d.cause}`,
+                    d.lastActivity
+                      ? `last file: ${d.lastActivity.item} (${Math.round(d.lastActivity.agoMs / 1000)}s before the failure)`
+                      : null,
+                    d.stderrTail !== '' ? `--- worker stderr (tail) ---\n${d.stderrTail}` : null,
+                  ]
+                    .filter((line): line is string => line !== null)
+                    .join('\n')
+                : undefined
+            cliError(err.message, opts.format, 3, 'CLI_ERROR', {
+              ...(detail !== undefined ? { detail } : {}),
+              metadata: {
+                cause: d.cause,
+                lastActivity: d.lastActivity,
+                stdoutTail: d.stdoutTail,
+                stderrTail: d.stderrTail,
+              },
+            })
+          }
         }
+        // Ends the process explicitly after a successful run. It sits outside the try block so that
+        // a host which makes process.exit throw cannot route that exit into the error handler above.
+        process.exit(0)
       },
     )
+}
+
+/**
+ * Builds the `graph.largeFilePaths` entry that exempts exactly one project-relative file.
+ *
+ * A gitignore pattern without a slash matches at any depth, so a root-level file is anchored with
+ * a leading `/`. Paths that contain a slash are already anchored to the project root.
+ * @param path - Project-relative path of the file.
+ * @returns A gitignore-syntax pattern that matches only that file.
+ */
+export function toLargeFilePathsEntry(path: string): string {
+  return path.includes('/') ? escapeGitignorePattern(path) : `/${escapeGitignorePattern(path)}`
+}
+
+/**
+ * Renders a string as a YAML scalar, single-quoting it when a plain scalar would be misread.
+ * @param value - Scalar text.
+ * @returns The plain text, or a single-quoted scalar with embedded quotes doubled.
+ */
+export function yamlScalar(value: string): string {
+  const needsQuotes =
+    value === '' ||
+    /^[\s\-?:,[\]{}#&*!|>'"%@`]/.test(value) ||
+    /\s$/.test(value) ||
+    value.includes(': ') ||
+    value.includes(' #') ||
+    value.endsWith(':')
+  return needsQuotes ? `'${value.replaceAll("'", "''")}'` : value
 }
 
 /**
@@ -152,7 +268,7 @@ JSON/TOON output schema:
  * @param result - The completed indexing result.
  * @returns Human-readable text output.
  */
-function formatTextIndexResult(result: RunIndexProjectGraphResult): string {
+export function formatTextIndexResult(result: RunIndexProjectGraphResult): string {
   const lines = [
     `Indexed ${String(result.filesIndexed)} file(s) in ${String(result.duration)}ms`,
     `  discovered: ${String(result.filesDiscovered)}`,
@@ -204,6 +320,44 @@ function formatTextIndexResult(result: RunIndexProjectGraphResult): string {
 
   for (const error of result.errors) {
     lines.push(`    ${error.filePath}: ${error.message}`)
+  }
+
+  if (result.diagnostics.length > 0) {
+    lines.push(`  finished with ${String(result.diagnostics.length)} diagnostic(s):`)
+    for (const diagnostic of result.diagnostics) {
+      lines.push(`    warning: ${diagnostic.filePath}: ${diagnostic.message}`)
+    }
+  }
+
+  if (result.filesSkippedForSize > 0) {
+    const distinctLimits = [...new Set(result.largestSkippedForSize.map((f) => f.limitBytes))]
+    const limitsLabel = distinctLimits.join(', ')
+    lines.push(
+      `  size limit: ${String(result.filesSkippedForSize)} file(s) skipped (larger than graph.maxFileBytes, ${limitsLabel} bytes)`,
+    )
+    const listed = result.largestSkippedForSize.slice(0, CLI_SIZE_SKIP_LIST_MAX)
+    for (const file of listed) {
+      lines.push(`    ${file.projectRelativePath}   ${formatSize(file.sizeBytes)}`)
+    }
+    if (result.filesSkippedForSize > listed.length) {
+      const remaining = result.filesSkippedForSize - listed.length
+      lines.push(`    ... and ${String(remaining)} more`)
+    }
+    lines.push('  to index them anyway, add to specd.yaml:')
+    lines.push('    graph:')
+    lines.push('      largeFilePaths:')
+    for (const file of listed) {
+      lines.push(`        - ${yamlScalar(toLargeFilePathsEntry(file.projectRelativePath))}`)
+    }
+    lines.push('  or raise graph.maxFileBytes (0 disables the limit).')
+    lines.push('  large files cost roughly 3 KB of memory per source byte while they are analysed.')
+  }
+
+  if (result.sizeExemptAnalysed.length > 0) {
+    lines.push('  size-exempt files analysed:')
+    for (const file of result.sizeExemptAnalysed) {
+      lines.push(`    ${file.projectRelativePath}   ${formatSize(file.sizeBytes)}`)
+    }
   }
 
   return lines.join('\n')

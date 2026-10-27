@@ -1,13 +1,21 @@
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest'
 import {
   GraphDerivationMismatchError,
   GraphStorageRecoveryRequiredError,
   type CodeGraphProvider,
 } from '@specd/code-graph'
 import { type SdkHostContext } from '../../src/composition/host-context.js'
+import type {
+  GraphIndexFailureCause,
+  GraphIndexWorkerDiagnostics,
+  GraphIndexWorkerEvent,
+  IndexEvent,
+  IndexEventReceiver,
+  RunIndexProjectGraphInput,
+} from '../../src/index.js'
 import { InvalidProviderLifecycleError } from '../../src/domain/errors/invalid-provider-lifecycle-error.js'
 
 const {
@@ -374,5 +382,110 @@ describe('runIndexProjectGraph', () => {
     } catch (error: unknown) {
       expect((error as InvalidProviderLifecycleError).code).toBe('INVALID_PROVIDER_LIFECYCLE')
     }
+  })
+
+  it('forwards onEvent to IndexProjectGraph', async () => {
+    const onEvent = vi.fn()
+    await runIndexProjectGraph(ctx, { onEvent })
+
+    expect(createIndexProjectGraph).toHaveBeenCalledOnce()
+    expect(indexExecute).toHaveBeenCalledWith(expect.objectContaining({ onEvent }))
+    expect(providerIndex).not.toHaveBeenCalled()
+  })
+
+  it('exports the indexer and worker event types, and keeps their kinds apart', () => {
+    // Then the indexer events carry only indexer kinds and the worker events only worker kinds
+    expectTypeOf<IndexEvent['kind']>().toEqualTypeOf<
+      'file-activity' | 'file-skipped' | 'resource-disposal-failed'
+    >()
+    expectTypeOf<GraphIndexWorkerEvent['kind']>().toEqualTypeOf<
+      'activity' | 'worker-silent' | 'stale-lock-recovered'
+    >()
+    expectTypeOf<RunIndexProjectGraphInput['onEvent']>().toEqualTypeOf<
+      IndexEventReceiver | undefined
+    >()
+    expectTypeOf<GraphIndexWorkerDiagnostics['cause']>().toEqualTypeOf<GraphIndexFailureCause>()
+  })
+
+  it('never hands a worker event to the indexer event receiver', async () => {
+    const received: unknown[] = []
+    await runIndexProjectGraph(ctx, { onEvent: (event) => received.push(event) })
+
+    const passed = (indexExecute.mock.calls[0] as [{ onEvent: (event: unknown) => void }])[0]
+    expect(passed.onEvent).toBeTypeOf('function')
+    expect(received).toEqual([])
+  })
+
+  it('omits onEvent when not provided while keeping onProgress functional', async () => {
+    const onProgress = vi.fn()
+    await runIndexProjectGraph(ctx, { onProgress })
+
+    expect(createIndexProjectGraph).toHaveBeenCalledOnce()
+    const callArgs = indexExecute.mock.calls[0] as [Record<string, unknown>]
+    expect(callArgs[0]).toMatchObject({ onProgress })
+    expect('onEvent' in callArgs[0]).toBe(false)
+    expect(providerIndex).not.toHaveBeenCalled()
+  })
+
+  it('passes the diagnostics of the run through next to the errors', async () => {
+    indexExecute.mockResolvedValueOnce({
+      filesIndexed: 3,
+      errors: [{ filePath: 'ws:src/bad.ts', message: 'analysis failed' }],
+      diagnostics: [{ filePath: 'backend:<manifest>', message: 'Package identity collision' }],
+    })
+
+    const result = await runIndexProjectGraph(ctx)
+
+    expect(result.errors).toEqual([{ filePath: 'ws:src/bad.ts', message: 'analysis failed' }])
+    expect(result.diagnostics).toEqual([
+      { filePath: 'backend:<manifest>', message: 'Package identity collision' },
+    ])
+  })
+
+  it('passes through the three size-skip result fields', async () => {
+    indexExecute.mockResolvedValueOnce({
+      filesIndexed: 10,
+      filesSkippedForSize: 2,
+      largestSkippedForSize: [
+        {
+          filePath: 'large.ts',
+          projectRelativePath: 'large.ts',
+          sizeBytes: 300000,
+          limitBytes: 262144,
+        },
+      ],
+      sizeExemptAnalysed: [
+        { filePath: 'exempt.ts', projectRelativePath: 'exempt.ts', sizeBytes: 400000 },
+      ],
+    })
+
+    const result = await runIndexProjectGraph(ctx)
+
+    expect(result.filesIndexed).toBe(10)
+    expect(result.filesSkippedForSize).toBe(2)
+    expect(result.largestSkippedForSize).toEqual([
+      {
+        filePath: 'large.ts',
+        projectRelativePath: 'large.ts',
+        sizeBytes: 300000,
+        limitBytes: 262144,
+      },
+    ])
+    expect(result.sizeExemptAnalysed).toEqual([
+      { filePath: 'exempt.ts', projectRelativePath: 'exempt.ts', sizeBytes: 400000 },
+    ])
+  })
+
+  it('exports new worker errors and lifecycle types from SDK root', async () => {
+    const sdk = await import('../../src/index.js')
+    expect(sdk.GraphIndexWorkerError).toBeDefined()
+    expect(sdk.GraphIndexWorkerStartError).toBeDefined()
+    expect(sdk.GraphIndexTaskContractError).toBeDefined()
+    expect(sdk.GraphIndexTaskExecutionError).toBeDefined()
+    expect(sdk.GraphIndexWorkerProtocolError).toBeDefined()
+    expect(sdk.GraphIndexWorkerExitError).toBeDefined()
+    expect(sdk.GraphIndexWorkerSignalError).toBeDefined()
+    expect(sdk.GraphIndexProgressHandlerError).toBeDefined()
+    expect(sdk.DEFAULT_MAX_FILE_BYTES).toBe(262144)
   })
 })

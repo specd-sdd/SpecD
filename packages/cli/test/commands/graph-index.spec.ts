@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@specd/sdk', async (importOriginal) => ({
@@ -6,10 +7,11 @@ vi.mock('@specd/sdk', async (importOriginal) => ({
   runIsolatedGraphIndex: vi.fn(),
 }))
 
-import { runIsolatedGraphIndex } from '@specd/sdk'
+import { runIsolatedGraphIndex, GraphIndexWorkerExitError } from '@specd/sdk'
 import { registerGraphIndex } from '../../src/commands/graph/index-graph.js'
 import * as resolveContext from '../../src/commands/graph/resolve-graph-cli-context.js'
 import {
+  captureStderr,
   captureStdout,
   ExitSentinel,
   makeMockConfig,
@@ -23,9 +25,13 @@ const result = {
   documentsIndexed: 3,
   filesRemoved: 1,
   filesSkipped: 2,
+  filesSkippedForSize: 0,
+  largestSkippedForSize: [],
+  sizeExemptAnalysed: [],
   specsDiscovered: 3,
   specsIndexed: 3,
   errors: [{ filePath: 'bad.ts', message: 'parse error' }],
+  diagnostics: [],
   duration: 1234,
   vcsRef: 'abc1234',
   graphFingerprint: 'fp-test',
@@ -153,6 +159,8 @@ describe('graph index', () => {
       'code-graph:indexer: code-graph:src/index.ts#missingSymbol (SYMBOL_NOT_FOUND)',
     )
     expect(stdout()).toContain('Indexing: 13% symbols')
+    // A successful run ends the process explicitly with code 0 (it must not rely on an empty event loop)
+    expect(process.exit).toHaveBeenCalledWith(0)
   })
 
   it('keeps validation failures local and maps worker errors to code 3', async () => {
@@ -194,5 +202,306 @@ describe('graph index', () => {
       /child_process|SPECD_GRAPH_INDEX_(?:WORKER|NO_WORKER|LOCK_HELD)|acquireGraphIndexLock/,
     )
     expect(packageJson).not.toContain('"@specd/code-graph"')
+  })
+
+  it('renders size-skip section with count, limit, files, YAML snippet and memory note in text mode', async () => {
+    setup()
+    vi.mocked(runIsolatedGraphIndex).mockResolvedValueOnce({
+      ...result,
+      filesSkippedForSize: 2,
+      largestSkippedForSize: [
+        {
+          filePath: '/project/src/huge.ts',
+          projectRelativePath: 'src/huge.ts',
+          sizeBytes: 524288,
+          limitBytes: 262144,
+        },
+        {
+          filePath: '/project/src/large.ts',
+          projectRelativePath: 'src/large.ts',
+          sizeBytes: 300000,
+          limitBytes: 262144,
+        },
+      ],
+      sizeExemptAnalysed: [],
+    })
+    const stdout = captureStdout()
+    await run(makeIndexProgram())
+
+    const output = stdout()
+    expect(output).toContain(
+      'size limit: 2 file(s) skipped (larger than graph.maxFileBytes, 262144 bytes)',
+    )
+    expect(output).toContain('src/huge.ts   512 KB')
+    expect(output).toContain('src/large.ts   293 KB')
+    expect(output).toContain('to index them anyway, add to specd.yaml:')
+    expect(output).toContain('largeFilePaths:')
+    expect(output).toContain('- src/huge.ts')
+    expect(output).toContain('- src/large.ts')
+    expect(output).toContain('or raise graph.maxFileBytes (0 disables the limit).')
+    expect(output).toContain(
+      'large files cost roughly 3 KB of memory per source byte while they are analysed.',
+    )
+  })
+
+  it('caps skipped files listing at 10 and prints ... and N more', async () => {
+    setup()
+    const skippedList = Array.from({ length: 12 }, (_, i) => ({
+      filePath: `/project/src/file-${i}.ts`,
+      projectRelativePath: `src/file-${i}.ts`,
+      sizeBytes: 300000 + i * 1000,
+      limitBytes: 262144,
+    }))
+    vi.mocked(runIsolatedGraphIndex).mockResolvedValueOnce({
+      ...result,
+      filesSkippedForSize: 12,
+      largestSkippedForSize: skippedList,
+      sizeExemptAnalysed: [],
+    })
+    const stdout = captureStdout()
+    await run(makeIndexProgram())
+
+    const output = stdout()
+    expect(output).toContain('size limit: 12 file(s) skipped')
+    expect(output).toContain('src/file-0.ts')
+    expect(output).toContain('src/file-9.ts')
+    expect(output).toContain('... and 2 more')
+  })
+
+  it('renders separate exempt list when sizeExemptAnalysed is present', async () => {
+    setup()
+    vi.mocked(runIsolatedGraphIndex).mockResolvedValueOnce({
+      ...result,
+      filesSkippedForSize: 0,
+      largestSkippedForSize: [],
+      sizeExemptAnalysed: [
+        {
+          filePath: '/project/src/exempt.ts',
+          projectRelativePath: 'src/exempt.ts',
+          sizeBytes: 1572864,
+        },
+      ],
+    })
+    const stdout = captureStdout()
+    await run(makeIndexProgram())
+
+    const output = stdout()
+    expect(output).toContain('size-exempt files analysed:')
+    expect(output).toContain('src/exempt.ts   1.5 MB')
+  })
+
+  it('leaves text output unchanged when filesSkippedForSize is 0 and sizeExemptAnalysed is empty', async () => {
+    setup()
+    const stdout = captureStdout()
+    await run(makeIndexProgram())
+
+    const output = stdout()
+    expect(output).not.toContain('size limit:')
+    expect(output).not.toContain('size-exempt files analysed:')
+    expect(output).not.toContain('largeFilePaths:')
+  })
+
+  it('prints resolution diagnostics as warnings and keeps exit code 0', async () => {
+    setup()
+    vi.mocked(runIsolatedGraphIndex).mockResolvedValueOnce({
+      ...result,
+      errors: [],
+      diagnostics: [
+        { filePath: 'backend:<manifest>', message: 'Package identity collision: "a/b"' },
+        { filePath: 'cake:<manifest>', message: 'Package identity collision: "a/b"' },
+      ],
+    })
+    const stdout = captureStdout()
+    await run(makeIndexProgram())
+
+    const output = stdout()
+    expect(output).toContain('finished with 2 diagnostic(s):')
+    expect(output).toContain('warning: backend:<manifest>: Package identity collision: "a/b"')
+    expect(output).toContain('errors:     0')
+    expect(process.exit).toHaveBeenCalledWith(0)
+  })
+
+  it('omits the diagnostics section when there are none', async () => {
+    setup()
+    const stdout = captureStdout()
+    await run(makeIndexProgram())
+
+    expect(stdout()).not.toContain('diagnostic(s)')
+  })
+
+  it('exposes diagnostics next to errors in json mode', async () => {
+    setup()
+    vi.mocked(runIsolatedGraphIndex).mockResolvedValueOnce({
+      ...result,
+      diagnostics: [{ filePath: 'backend:<manifest>', message: 'collision' }],
+    })
+    const stdout = captureStdout()
+    await run(makeIndexProgram(), '--format', 'json')
+
+    const json = JSON.parse(stdout())
+    expect(json.diagnostics).toEqual([{ filePath: 'backend:<manifest>', message: 'collision' }])
+    expect(json.errors).toHaveLength(1)
+  })
+
+  it('includes size-skip fields in structured JSON format without hints', async () => {
+    setup()
+    vi.mocked(runIsolatedGraphIndex).mockResolvedValueOnce({
+      ...result,
+      filesSkippedForSize: 1,
+      largestSkippedForSize: [
+        {
+          filePath: '/project/src/big.ts',
+          projectRelativePath: 'src/big.ts',
+          sizeBytes: 400000,
+          limitBytes: 262144,
+        },
+      ],
+      sizeExemptAnalysed: [],
+    })
+    const stdout = captureStdout()
+    await run(makeIndexProgram(), '--format', 'json')
+
+    const json = JSON.parse(stdout())
+    expect(json.filesSkippedForSize).toBe(1)
+    expect(json.largestSkippedForSize).toHaveLength(1)
+    expect(json.sizeExemptAnalysed).toHaveLength(0)
+    expect(stdout()).not.toContain('to index them anyway')
+  })
+
+  it('prints warning on stderr for resource-disposal-failed progress in text mode', async () => {
+    setup()
+    const stderr = captureStderr()
+    await run(makeIndexProgram())
+
+    const onProgress = vi.mocked(runIsolatedGraphIndex).mock.calls[0]?.[0].onProgress
+    onProgress?.({
+      event: {
+        kind: 'resource-disposal-failed',
+        filePath: '/project/bad.ts',
+        message: 'Disposal failed',
+      },
+    })
+
+    expect(stderr()).toContain(
+      'warning: could not release a parser resource while processing /project/bad.ts: Disposal failed',
+    )
+  })
+
+  it('prints worker-silent warning on stderr only in text mode', async () => {
+    setup()
+    const stderr = captureStderr()
+    await run(makeIndexProgram())
+
+    const onEvent = vi.mocked(runIsolatedGraphIndex).mock.calls[0]?.[0].onEvent
+    onEvent?.({
+      kind: 'worker-silent',
+      item: 'slow.ts',
+      silentForMs: 15000,
+    })
+
+    expect(stderr()).toContain(
+      'warning: no progress for 15s while processing slow.ts. If that file is not needed, add it to graph.excludePaths or lower graph.maxFileBytes.',
+    )
+  })
+
+  it('renders worker failure diagnostics with exit code 3 in text mode', async () => {
+    setup()
+    const workerError = new GraphIndexWorkerExitError('Worker crashed')
+    workerError.withDiagnostics({
+      cause: 'resource-limit',
+      lastActivity: { item: 'giant.ts', agoMs: 500 },
+      stdoutTail: 'Processing giant.ts\n',
+      stderrTail: 'FATAL ERROR: JavaScript heap out of memory\n',
+    })
+    vi.mocked(runIsolatedGraphIndex).mockRejectedValueOnce(workerError)
+    const stderr = captureStderr()
+
+    await run(makeIndexProgram())
+
+    expect(process.exit).toHaveBeenCalledWith(3)
+    const errText = stderr()
+    expect(errText).toContain('Worker crashed')
+    expect(errText).toContain('cause: resource-limit')
+    expect(errText).toContain('last file: giant.ts')
+    expect(errText).toContain('JavaScript heap out of memory')
+  })
+
+  it('carries the failure cause and tails as structured data in json mode, without detail lines', async () => {
+    setup()
+    const workerError = new GraphIndexWorkerExitError('Worker crashed')
+    workerError.withDiagnostics({
+      cause: 'native-crash',
+      lastActivity: { item: 'giant.ts', agoMs: 500 },
+      stdoutTail: 'Processing giant.ts\n',
+      stderrTail: 'segmentation fault\n',
+    })
+    vi.mocked(runIsolatedGraphIndex).mockRejectedValueOnce(workerError)
+    const stdout = captureStdout()
+    const stderr = captureStderr()
+
+    await run(makeIndexProgram(), '--format', 'json')
+
+    expect(process.exit).toHaveBeenCalledWith(3)
+    const payload = JSON.parse(stdout()) as {
+      result: string
+      metadata: { cause: string; lastActivity: { item: string }; stderrTail: string }
+    }
+    expect(payload.result).toBe('error')
+    expect(payload.metadata.cause).toBe('native-crash')
+    expect(payload.metadata.lastActivity.item).toBe('giant.ts')
+    expect(payload.metadata.stderrTail).toContain('segmentation fault')
+    expect(stderr()).not.toContain('last file:')
+  })
+
+  it('carries the failure cause as structured data in toon mode', async () => {
+    setup()
+    const workerError = new GraphIndexWorkerExitError('Worker crashed')
+    workerError.withDiagnostics({
+      cause: 'exited',
+      lastActivity: null,
+      stdoutTail: '',
+      stderrTail: '',
+    })
+    vi.mocked(runIsolatedGraphIndex).mockRejectedValueOnce(workerError)
+    const stdout = captureStdout()
+
+    await run(makeIndexProgram(), '--format', 'toon')
+
+    expect(process.exit).toHaveBeenCalledWith(3)
+    expect(stdout()).toContain('cause')
+    expect(stdout()).toContain('exited')
+  })
+
+  it('exposes the size-skip fields in toon mode without hint text', async () => {
+    setup()
+    vi.mocked(runIsolatedGraphIndex).mockResolvedValueOnce({
+      ...result,
+      filesSkippedForSize: 1,
+      largestSkippedForSize: [
+        {
+          filePath: '/project/src/big.ts',
+          projectRelativePath: 'src/big.ts',
+          sizeBytes: 400000,
+          limitBytes: 262144,
+        },
+      ],
+      sizeExemptAnalysed: [],
+    })
+    const stdout = captureStdout()
+
+    await run(makeIndexProgram(), '--format', 'toon')
+
+    expect(stdout()).toContain('filesSkippedForSize')
+    expect(stdout()).toContain('src/big.ts')
+    expect(stdout()).not.toContain('to index them anyway')
+  })
+
+  it('never writes to the project configuration file', () => {
+    // The command only reads configuration; it must not import any file-writing primitive
+    const source = readFileSync(
+      fileURLToPath(new URL('../../src/commands/graph/index-graph.ts', import.meta.url)),
+      'utf-8',
+    )
+    expect(source).not.toMatch(/writeFile|appendFile|createWriteStream|copyFile|rename\(/)
   })
 })

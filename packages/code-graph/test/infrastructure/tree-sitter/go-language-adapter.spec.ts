@@ -1855,4 +1855,23 @@ func HelperFunction() {
       expect(relations.some((relation) => relation.type === RelationType.Overrides)).toBe(false)
     })
   })
+
+  describe('Parser-owned resource registration', () => {
+    it('registers SgRoot into session.parserResources and leaves no keepalive in session state', () => {
+      const goAdapter = new GoLanguageAdapter()
+      const session = new InMemoryIndexSession()
+      const draft = goAdapter.analyzeFile('file.go', 'package main\nfunc Test() {}', {
+        session,
+        workspaceName: 'ws',
+      })
+
+      expect(draft.symbols.length).toBe(1)
+      expect(session.parserResources.size).toBe(1)
+      expect(session.getAdapterState('napi-keepalive')).toBeUndefined()
+
+      const closeResult = session.parserResources.close()
+      expect(closeResult.registered).toBe(1)
+      expect(session.parserResources.size).toBe(0)
+    })
+  })
 })

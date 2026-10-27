@@ -36,7 +36,29 @@ export {
   type IndexRunCoverageSummary,
   type ImportDiagnosticSummary,
   IMPORT_DIAGNOSTIC_SAMPLE_LIMIT,
+  SIZE_SKIP_LIST_LIMIT,
 } from './index-result.js'
+export {
+  type ParserResourceDisposer,
+  type ParserResourceDisposalFailure,
+  type ParserResourceCloseResult,
+  type ParserResourceScope,
+} from './parser-resource-scope.js'
+export {
+  type FileActivityEvent,
+  type FileSkippedEvent,
+  type ResourceDisposalFailedEvent,
+  type IndexEvent,
+  type IndexEventReceiver,
+  type SizeSkippedFile,
+  type SizeExemptFile,
+} from './index-event.js'
+export {
+  type GraphIndexFailureCause,
+  type GraphIndexWorkerDiagnostics,
+  type GraphIndexWorkerEvent,
+  type GraphIndexTaskAnnouncer,
+} from './graph-index-worker-types.js'
 export {
   type LanguageAdapter,
   type AdapterAnalyzeContext,

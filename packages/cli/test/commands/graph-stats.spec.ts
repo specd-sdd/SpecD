@@ -573,4 +573,152 @@ describe('graph stats — staleness detection', () => {
     expect(getStderr()).toBe('')
     expect(getStdout()).toContain('DERIVATION_MISMATCH')
   })
+
+  describe('coverage completeness presentation', () => {
+    const healthWith = (
+      coverageCompleteness: string,
+      coverageWarnings: ReadonlyArray<{ code: string; count: number }>,
+    ): Record<string, unknown> => ({
+      ...DEFAULT_STATS,
+      lastIndexedRef: 'abc1234def',
+      state: 'current',
+      knownStaleSinceLastIndex: false,
+      workspaces: [],
+      stale: false,
+      currentRef: 'abc1234def',
+      fingerprintMismatch: false,
+      contentFresh: true,
+      coverageComplete: true,
+      coverageCompleteness,
+      coverageWarnings,
+      coverage: {
+        total: 4,
+        byStatus: { indexed: 1, excluded: 0, unsupported: 3, 'parse-failed': 0, partial: 0 },
+        reasons: ['file-too-large'],
+      },
+      schemaCompatible: true,
+      generationCurrent: true,
+      reasonCodes: [],
+    })
+
+    it('labels a graph with size skips as complete with warnings and shows the hint', async () => {
+      // Given graph health that reports three size skips
+      const { mockProvider, getStdout } = setup('configured')
+      mockProvider.getGraphHealth.mockResolvedValue(
+        healthWith('complete-with-warnings', [{ code: 'file-too-large', count: 3 }]),
+      )
+
+      // When stats prints in text mode
+      await runStats(makeStatsProgram(), 'graph', 'stats')
+
+      // Then the warning and the hint appear and absence is not claimed to be provable
+      const out = getStdout()
+      expect(out).toContain('coverage: complete with warnings (3 file(s) skipped: file-too-large)')
+      expect(out).toContain('graph.maxFileBytes')
+      expect(out).toContain('graph.largeFilePaths')
+      expect(out).toContain('Symbol absence cannot be proven')
+    })
+
+    it('prints no warning line for a complete graph', async () => {
+      const { mockProvider, getStdout } = setup('configured')
+      mockProvider.getGraphHealth.mockResolvedValue(healthWith('complete', []))
+
+      await runStats(makeStatsProgram(), 'graph', 'stats')
+
+      expect(getStdout()).not.toContain('complete with warnings')
+    })
+
+    it('does not print a plain complete label next to the warning', async () => {
+      // Given graph health with size skips
+      const { mockProvider, getStdout } = setup('configured')
+      mockProvider.getGraphHealth.mockResolvedValue(
+        healthWith('complete-with-warnings', [{ code: 'file-too-large', count: 3 }]),
+      )
+
+      // When stats prints in text mode
+      await runStats(makeStatsProgram(), 'graph', 'stats')
+
+      // Then the boolean complete line is not shown
+      expect(getStdout()).not.toContain('Coverage complete:')
+    })
+
+    it('keeps the plain complete line for a complete graph', async () => {
+      const { mockProvider, getStdout } = setup('configured')
+      mockProvider.getGraphHealth.mockResolvedValue(healthWith('complete', []))
+
+      await runStats(makeStatsProgram(), 'graph', 'stats')
+
+      expect(getStdout()).toContain('Coverage complete: true')
+    })
+
+    it('renders incomplete and unknown completeness without the warning label', async () => {
+      for (const completeness of ['incomplete', 'unknown']) {
+        const { mockProvider, getStdout } = setup('configured')
+        mockProvider.getGraphHealth.mockResolvedValue({
+          ...healthWith(completeness, []),
+          coverageComplete: completeness === 'unknown' ? null : false,
+        })
+
+        await runStats(makeStatsProgram(), 'graph', 'stats')
+
+        const out = getStdout()
+        expect(out).not.toContain('complete with warnings')
+        expect(out).toContain('Coverage complete: ')
+      }
+    })
+
+    it('prints the warning label without parentheses when no warning is listed', async () => {
+      const { mockProvider, getStdout } = setup('configured')
+      mockProvider.getGraphHealth.mockResolvedValue(healthWith('complete-with-warnings', []))
+
+      await runStats(makeStatsProgram(), 'graph', 'stats')
+
+      expect(getStdout()).toContain('coverage: complete with warnings\n')
+      expect(getStdout()).not.toContain('complete with warnings (')
+    })
+
+    it('exposes the completeness fields in TOON output', async () => {
+      const { mockProvider, getStdout } = setup('configured')
+      mockProvider.getGraphHealth.mockResolvedValue(
+        healthWith('complete-with-warnings', [{ code: 'file-too-large', count: 3 }]),
+      )
+
+      await runStats(makeStatsProgram(), 'graph', 'stats', '--format', 'toon')
+
+      const out = getStdout()
+      expect(out).toContain('complete-with-warnings')
+      expect(out).toContain('file-too-large')
+      expect(out).not.toContain('graph.largeFilePaths')
+    })
+
+    it('lists every warning code with its own count', async () => {
+      const { mockProvider, getStdout } = setup('configured')
+      mockProvider.getGraphHealth.mockResolvedValue(
+        healthWith('complete-with-warnings', [
+          { code: 'file-too-large', count: 2 },
+          { code: 'other-warning', count: 1 },
+        ]),
+      )
+
+      await runStats(makeStatsProgram(), 'graph', 'stats')
+
+      expect(getStdout()).toContain(
+        'coverage: complete with warnings (2 file(s) skipped: file-too-large; 1 file(s) skipped: other-warning)',
+      )
+    })
+
+    it('exposes the fields unchanged in structured output without hint text', async () => {
+      const { mockProvider, getStdout } = setup('configured')
+      mockProvider.getGraphHealth.mockResolvedValue(
+        healthWith('complete-with-warnings', [{ code: 'file-too-large', count: 3 }]),
+      )
+
+      await runStats(makeStatsProgram(), 'graph', 'stats', '--format', 'json')
+
+      const parsed = parseStdoutJson(getStdout)
+      expect(parsed.coverageCompleteness).toBe('complete-with-warnings')
+      expect(parsed.coverageWarnings).toEqual([{ code: 'file-too-large', count: 3 }])
+      expect(getStdout()).not.toContain('graph.largeFilePaths')
+    })
+  })
 })

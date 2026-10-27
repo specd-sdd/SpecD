@@ -207,9 +207,16 @@ describe('IndexCodeGraph package resolution', () => {
       })
 
       const { store, indexer } = await makeIndexer([new TypeScriptLanguageAdapter()])
+      await store.markWorkspacesAndGraphStaleSinceLastIndex(['app', 'graph'])
       const result = await indexer.execute(makeOptions())
 
-      const collisionError = result.errors.find((e) =>
+      // The collision is a diagnostic: it is not a failure and it does not keep the graph stale
+      expect(result.errors).toEqual([])
+      const latches = await store.getFreshnessLatches(['app', 'graph'])
+      expect(latches.graph).toBe(false)
+      expect(latches.workspaces).toEqual({ app: false, graph: false })
+
+      const collisionError = result.diagnostics.find((e) =>
         e.message.includes('Package identity collision'),
       )
       expect(collisionError).toBeDefined()
@@ -246,7 +253,7 @@ describe('IndexCodeGraph package resolution', () => {
       const result = await indexer.execute(makeOptions())
 
       // No collision error
-      const collisionErrors = result.errors.filter((e) =>
+      const collisionErrors = result.diagnostics.filter((e) =>
         e.message.includes('Package identity collision'),
       )
       expect(collisionErrors).toHaveLength(0)
@@ -397,7 +404,7 @@ describe('IndexCodeGraph package resolution', () => {
       const { indexer } = await makeIndexer([new TypeScriptLanguageAdapter()])
       const result = await indexer.execute(partialOptions)
 
-      const skippedError = result.errors.find((e) =>
+      const skippedError = result.diagnostics.find((e) =>
         e.message.includes('skipped for package resolution'),
       )
       expect(skippedError).toBeDefined()
@@ -424,12 +431,14 @@ describe('IndexCodeGraph package resolution', () => {
       expect(fakeAccessibility.isAccessibleDirectory).toHaveBeenCalledWith(graphDir)
       expect(fakeAccessibility.isAccessibleDirectory).toHaveBeenCalledWith(appDir)
 
-      const skippedError = result.errors.find((e) =>
+      const skippedError = result.diagnostics.find((e) =>
         e.message.includes('Workspace "app" skipped for package resolution'),
       )
       expect(skippedError).toBeDefined()
       expect(skippedError?.filePath).toBe('app:<manifest>')
-      expect(result.errors.some((e) => e.message.includes('Workspace "graph" skipped'))).toBe(false)
+      expect(result.diagnostics.some((e) => e.message.includes('Workspace "graph" skipped'))).toBe(
+        false,
+      )
     })
 
     it('Scenario: Accessibility probe failure is non-fatal', async () => {
@@ -451,7 +460,7 @@ describe('IndexCodeGraph package resolution', () => {
       )
       const result = await indexer.execute(opts)
 
-      const skippedError = result.errors.find((e) =>
+      const skippedError = result.diagnostics.find((e) =>
         e.message.includes('Workspace "app" skipped for package resolution'),
       )
       expect(skippedError).toBeDefined()
@@ -481,7 +490,7 @@ describe('IndexCodeGraph package resolution', () => {
       const result = await indexer.execute(makeOptions())
 
       // Error was recorded
-      expect(result.errors.some((e) => e.message.includes('identity-exploded'))).toBe(true)
+      expect(result.diagnostics.some((e) => e.message.includes('identity-exploded'))).toBe(true)
       // Faulty adapter listed in adaptersWithoutPackageResolution
       expect(result.importDiagnostics.adaptersWithoutPackageResolution).toContain('typescript')
 
@@ -507,7 +516,7 @@ describe('IndexCodeGraph package resolution', () => {
       const { store, indexer } = await makeIndexer([faultyAdapter])
       const result = await indexer.execute(makeOptions())
 
-      expect(result.errors.some((e) => e.message.includes('prepare-exploded'))).toBe(true)
+      expect(result.diagnostics.some((e) => e.message.includes('prepare-exploded'))).toBe(true)
       expect(result.importDiagnostics.adaptersWithoutPackageResolution).toContain('typescript')
 
       // Barrel step still exists
@@ -537,7 +546,9 @@ describe('IndexCodeGraph package resolution', () => {
       const { store, indexer } = await makeIndexer([faultyAdapter])
       const result = await indexer.execute(makeOptions())
 
-      expect(result.errors.some((e) => e.message.includes('identity-exploded-on-app'))).toBe(true)
+      expect(result.diagnostics.some((e) => e.message.includes('identity-exploded-on-app'))).toBe(
+        true,
+      )
       expect(result.importDiagnostics.adaptersWithoutPackageResolution).toContain('typescript')
 
       // Because the sole adapter claiming '@fixture/graph' was disabled, its package identity was dropped,

@@ -10,7 +10,7 @@ The PHP language adapter translates PHP namespaces, declarations, Composer mappi
 
 `PhpLanguageAdapter` SHALL handle `.php` files as `php`. It SHALL parse supplied content once through the registered Tree-sitter/ast-grep grammar and return one complete `FileAnalysisDraft` containing namespace, symbols, imports, binding and call facts, reference facts, and compact serializable parser state required for Pass 2 relations.
 
-The adapter MUST NOT execute PHP, autoload project code, or retain parser AST nodes in persisted analysis state. Registered loader rules and run-scoped parser keepalive state MAY be used only within the indexing session.
+The adapter MUST NOT execute PHP, autoload project code, or retain parser AST nodes in persisted analysis state. Registered loader rules MAY be used only within the indexing session. The adapter SHALL register the parse result in the parser-resource scope of the `IndexSession` (`session.parserResources`), as defined by Requirement: Parser-owned resource registration of `code-graph:language-adapter`. The registration SHALL happen inside `analyzeFile`, immediately after the content is parsed and before any traversal of the parse result, so that the resource is released at the end of the file's epoch even when the analysis throws. The adapter MUST NOT keep parser objects in adapter-private session state, in adapter-instance fields, or in the returned draft.
 
 ### Requirement: PHP parser-authoritative structural extraction
 
@@ -18,7 +18,7 @@ The adapter SHALL derive type declarations, traits and adaptations, parameters a
 
 CakePHP, CodeIgniter, Yii, Laravel, Zend, Drupal, and other registered framework rules MAY interpret known callee names and literal argument conventions only after the adapter has established the call expression, receiver or static target, arguments, and containing scope from parser nodes. A matching string in a comment, literal, heredoc, or unrelated expression MUST NOT emit a loader, binding, import, or call fact.
 
-Pass 2 alias, construction, member-call, require/include, and loader relation extraction SHALL visit the retained AST or immutable parser-derived facts. It MUST NOT scan callable body text with regular expressions to rediscover those constructs.
+Pass 2 alias, construction, member-call, require/include, and loader relation extraction SHALL consume the immutable parser-derived facts produced during the file's analysis. It MUST NOT depend on a parsed syntax tree remaining available after the file's analysis has finished, and it MUST NOT scan callable body text with regular expressions to rediscover those constructs.
 
 Parsing `composer.json` and bounded PSR-4 metadata MAY remain non-AST metadata processing, but that metadata SHALL be prepared once in run-scoped adapter session state before per-file Pass 2 analysis. Pass 2 MUST NOT read the filesystem or consult mutable adapter-instance caches whose contents can leak between indexing sessions. Token extraction MAY operate inside a parser-proven type or literal node, but neither exception permits unbounded reconstruction of PHP source structure.
 

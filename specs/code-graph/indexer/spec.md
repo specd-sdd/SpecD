@@ -72,6 +72,8 @@ The effective fingerprint inputs MUST include:
 - each workspace's `allowedPaths`
 - each workspace's `excludePaths`
 - each workspace's `respectGitignore`
+- each workspace's effective `maxFileBytes` (the workspace value, otherwise the project value, otherwise the default)
+- each workspace's effective `largeFilePaths` (the project patterns and the workspace patterns, kept as two lists in the fingerprint because they are evaluated against different roots)
 - any synthetic exclusions derived from filesystem-backed repository `specsPath` roots
 - the newline-normalized resolution-manifest hashes from Requirement: Adapter-sourced resolution fingerprint
 
@@ -140,6 +142,42 @@ The indexer's discovery process SHALL filter out known binary and non-source fil
 The indexer SHALL reduce repeated allocation pressure by reusing shared session lookups across passes and by storing compact per-file analysis results instead of re-deriving imports, bindings, and relations from raw content multiple times.
 
 The indexer MUST NOT retain parser ASTs, parse trees, or equivalent heavyweight parser objects across the full run. Pass 1 MAY allocate such structures transiently while analyzing an individual file, but the retained run-scoped state MUST be limited to compact normalized facts and common indexes that Pass 2 requires.
+
+This bound applies to retention across files and chunks, not only within one file: at any moment the indexer SHALL retain the parser-owned resources of at most the one file being analysed, as defined by Requirement: Parser resource lifecycle.
+
+### Requirement: Parser resource lifecycle
+
+The indexing session SHALL expose a parser-resource scope. A language adapter that parses with a library holding native, WASM, or otherwise explicitly managed memory SHALL register what it parsed in that scope, optionally together with a disposal function when its library requires explicit release. Adapters whose libraries need no retention or release SHALL register nothing. The indexer and the session MUST NOT depend on any specific parsing library, node type, or binding, and an adapter MUST NOT keep parser objects in adapter-private session state.
+
+The indexer SHALL close the scope's current epoch after every file it begins to analyse, including files that exit early because they are binary, unsupported, over the size limit, or fail to parse. The close MUST run on every exit path of the per-file work: success, parse failure, cancellation, persistence failure, and any thrown error. Closing an epoch SHALL:
+
+1. run every registered disposal function, in reverse registration order, so that a failing disposal neither prevents the remaining disposals nor replaces the error that caused the exit;
+2. drop every reference held by the scope;
+3. request a garbage collection when the epoch held at least one registered resource and the host exposes one, as a best-effort action that has no effect when it is unavailable. Closing an epoch that held nothing performs no garbage-collection request.
+
+A disposal failure SHALL be reported as a typed diagnostic and MUST NOT fail the run on its own.
+
+The indexer has no cooperative abort of its own. An in-process run ends early when a host callback (such as the progress callback) throws, and an isolated run is cancelled by terminating the child; the close rules above apply to every such exit.
+
+Analysis results retained after an epoch closes MUST NOT reference parser-owned resources. After a run ends, whether it succeeded, failed, or was cancelled, no parser-owned resource SHALL remain reachable from the session. The indexer MUST NOT keep a run-wide collection of parser resources, and the `napi-keepalive` adapter-state key SHALL NOT exist.
+
+### Requirement: Per-file size limit
+
+The indexer SHALL NOT read, hash, decode, analyse, or store a file whose size exceeds the effective `maxFileBytes` limit, unless the file is exempt. The limit applies to every file the indexer would read in full in order to index it, whether it would become source nodes or a document, regardless of its category (source, test, or ignored) and of its language.
+
+The effective limit for a file SHALL be the `maxFileBytes` of the workspace that owns it, otherwise the project-level `maxFileBytes`, otherwise the built-in default of 262144 bytes. A limit of `0` SHALL mean that no limit applies.
+
+The size SHALL be the size in bytes on disk, obtained from the filesystem metadata, decided once per file from a single filesystem-metadata request made before any content is read, and reused by every phase that needs the size decision. Other phases MAY request metadata for their own purposes, such as change detection. Discovery rules (`excludePaths`, `allowedPaths`, gitignore, and the binary file filter) SHALL be applied first; the size check applies only to files that discovery keeps.
+
+A file is exempt when it matches the effective `largeFilePaths`: the project-level patterns, evaluated relative to the project root, together with the patterns of the owning workspace, evaluated relative to its `codeRoot`. The exemption applies only to the size limit and MUST NOT make a file that discovery rules exclude become indexed.
+
+A file skipped for size SHALL be recorded in index coverage with status `unsupported` and reason `file-too-large`; the persisted coverage carries no size or limit, because those are reported by the run result and the `file-skipped` event of the run that skipped the file. A lookup addressed to such a file SHALL report it as not indexed, and absence claims that could depend on it SHALL be treated as unproven: graph health reports the coverage as `complete-with-warnings` as defined by `code-graph:get-graph-health`. No file node, document node, symbol, or relation SHALL be created for it.
+
+### Requirement: Size skip in incremental runs and dependents
+
+When a file that is already in the graph now exceeds the effective limit and is not exempt, the indexer SHALL remove its previously indexed nodes, symbols, and relations exactly as for a file that is no longer indexed, and SHALL record the size skip in coverage. When a previously skipped file falls below the limit or becomes exempt, the indexer SHALL index it in the next run. A change of the effective limit or of the exemptions is a change of the discovery fingerprint, so it triggers the rebuild defined by Requirement: Incompatible derivation rebuild.
+
+An import or reference that resolves to a file skipped for size SHALL remain unresolved, exactly as for any file that is not indexed. The cause SHALL be discoverable without inspecting the importer: the skipped file has a coverage entry with reason `file-too-large`, and the run result lists it among the files skipped for size.
 
 ### Requirement: Two-pass extraction with in-memory index
 
@@ -224,6 +262,16 @@ Progress updates include a detail string (e.g. `"150/460 files"`) for phases tha
 
 The indexer SHALL ensure progress callbacks are fired immediately when a phase finishes, before starting the next synchronous or heavy CPU-bound internal processing (such as session index finalization or relation aggregation), so the user interface does not display stale phase labels.
 
+### Requirement: Typed indexing events
+
+`IndexOptions` SHALL accept an optional `onEvent` receiver, in addition to the unchanged `onProgress` callback. The receiver SHALL be called with presentation-neutral, serializable events that carry a stable `kind` identifier and structured fields, never display sentences. The following kinds SHALL exist:
+
+- `file-activity` — the file about to be processed (`filePath`, `sizeBytes` when known, and its position among the files to process), emitted for every file that enters per-file processing before its content is read, including files that processing then skips because they have no language adapter or their content cannot be decoded; files that never enter per-file processing (excluded by discovery rules or skipped for size) are not announced by this event, and size skips are reported by `file-skipped`; the indexer MUST NOT throttle it, because a receiver that must name the file responsible for a stall needs the announcement of every file being processed, and rate limiting belongs to the receiver
+- `file-skipped` — a file skipped for size (`filePath`, `sizeBytes`, `limitBytes`, `reason: file-too-large`)
+- `resource-disposal-failed` — a registered parser-resource disposal that failed (`filePath`, `message`)
+
+Files that enter per-file processing and are then skipped by the analysis (no language adapter, undecodable content) SHALL be counted in the progress counters, so that the progress detail does not stall while such files are being traversed. Existing behaviour of `onProgress` SHALL be preserved.
+
 ### Requirement: Phase execution timing logging
 
 The indexer SHALL log the execution time of each major internal phase (e.g., File Discovery, Pass 1, Pass 2, Spec Indexing, Bulk Load) at the `debug` level to facilitate performance diagnostics and bottleneck detection without blocking or polluting standard output.
@@ -276,9 +324,13 @@ Only infrastructure-level errors (e.g. store connection lost, disk full) may abo
 - **`filesIndexed`** — files that were new or changed and successfully processed
 - **`filesRemoved`** — files removed from the store (deleted from disk)
 - **`filesSkipped`** — files skipped because their hash matched and the graph fingerprint was still valid
+- **`filesSkippedForSize`** — files not indexed because they exceeded the effective size limit and were not exempt
+- **`largestSkippedForSize`** — a bounded list of the largest of those files, in descending size order and then by path, each `{ filePath, projectRelativePath, sizeBytes, limitBytes }`; the list MUST hold at least ten entries when that many exist
+- **`sizeExemptAnalysed`** — the files that exceeded the effective size limit but were analysed because they are exempt, each `{ filePath, projectRelativePath, sizeBytes }`
 - **`specsDiscovered`** — total spec directories found
 - **`specsIndexed`** — specs that were new or changed and successfully processed
-- **`errors`** — array of `{ filePath: string; message: string }` for files or specs that failed
+- **`errors`** — array of `{ filePath: string; message: string }` for files or specs that failed to produce their indexed content
+- **`diagnostics`** — array of `{ filePath: string; message: string }` for problems found while resolving packages or linking re-exports (a package identity declared by several workspaces, an inaccessible workspace root, an adapter that failed to prepare or link). A diagnostic does not mean that a file or spec failed: the run completed and every resource it produced is valid
 - **`duration`** — elapsed time in milliseconds
 - **`workspaces`** — per-workspace breakdown array of `{ name, filesDiscovered, filesIndexed, filesSkipped, filesRemoved, specsDiscovered, specsIndexed }`
 - **`vcsRef`** — the VCS ref that was persisted, or `null` if none was provided
@@ -333,7 +385,15 @@ Recreation applies when the run replaces the whole graph, that is, when every st
 
 A successful index SHALL atomically replace indexed-input observations for every produced file, document, and spec resource, including every physical or repository input of aggregate specs. It SHALL record current hash and observation evidence with `stale: false`, replace workspace VCS-scope base-ref/diff evidence, and clear workspace and aggregate stale latches only when the complete indexing session commits.
 
+An index is successful when its generation commits, whether or not `errors` or `diagnostics` hold entries. Freshness and processing outcome are separate axes: observations record the content the indexer saw, and a file that failed to be analysed is reported in `errors` and in coverage as `parse-failed` (which makes coverage incomplete), not as stale content. A failed resource has no observation, so health reports it with the reason `OBSERVATION_MISSING` as unknown until it is indexed successfully. A failed file is identified by its workspace-prefixed path and a failed spec by its spec identifier, in the same form that the observation of that resource uses, so that the failure and the missing observation always refer to the same resource. A failure while hashing or inspecting a discovered file counts as a failure of that file: it is recorded once in `errors` and in coverage as `parse-failed`.
+
+Every observation MUST carry the hash and the filesystem stamp of the content that this run read for the resource, on every kind of run, including a forced run and a run after a fingerprint mismatch. A resource for which the run did not read content does not receive an observation. Only a run that does not commit, such as an infrastructure failure of the store or the disk, leaves the latches and the previous observations as they were.
+
 Failed or partial indexing MUST NOT clear stale evidence. Removed resources and obsolete inputs SHALL be pruned in the same committed generation.
+
+### Requirement: Retry of failed targets
+
+A normal incremental run SHALL reconsider every discovered target whose last persisted outcome is a failure: a coverage record with status `parse-failed`, or a target for which the last run reported an error and left no observation. Persisted content hashes, coverage hashes, and observations MUST NOT authorize treating such a target as unchanged. A run that retries and succeeds replaces the failure with the normal outcome and records its observation; a run that fails again leaves the failure in `errors` and in coverage without keeping the graph stale.
 
 ### Requirement: Bounded incremental relation construction
 

@@ -11,6 +11,14 @@
   ],
   "implementation": [
     {
+      "file": "code-graph:src/application/use-cases/_shared/compute-graph-fingerprint.ts",
+      "symbols": [
+        "computeGraphFingerprint",
+        "computeWorkspaceFingerprint",
+        "computeRootFingerprint"
+      ]
+    },
+    {
       "file": "code-graph:src/application/use-cases/index-project-graph.ts",
       "symbols": ["IndexProjectGraph"]
     }

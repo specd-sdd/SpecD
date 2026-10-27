@@ -1,0 +1,9 @@
+- op: modified
+  description: Register the parse result in the shared parser-resource scope, at a stated place
+  selector:
+    type: section
+    matches: 'Requirement: Supported files and deterministic analysis'
+  content: |
+    `PythonLanguageAdapter` SHALL handle `.py` and `.pyi` files as `python`. It SHALL parse supplied content once through the registered Tree-sitter/ast-grep grammar and return one complete `FileAnalysisDraft` containing symbols, imports, binding and call facts, reference facts, and compact serializable parser state for Pass 2.
+
+    The adapter MUST NOT import or execute analyzed modules, and MUST NOT persist parser objects in file analysis. The adapter SHALL register the parse result in the parser-resource scope of the `IndexSession` (`session.parserResources`), as defined by Requirement: Parser-owned resource registration of `code-graph:language-adapter`. The registration SHALL happen inside `analyzeFile`, immediately after the content is parsed and before any traversal of the parse result, so that the resource is released at the end of the file's epoch even when the analysis throws. The adapter MUST NOT keep parser objects in adapter-private session state, in adapter-instance fields, or in the returned draft.

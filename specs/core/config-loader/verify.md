@@ -367,6 +367,38 @@
 - **WHEN** `load()` is called
 - **THEN** that workspace's `schemasPath` is `null`
 
+### Requirement: Graph size limit fields
+
+#### Scenario: Declared values are exposed exactly
+
+- **GIVEN** a configuration that declares `maxFileBytes` and `largeFilePaths` at the project level and in one workspace
+- **WHEN** the loader resolves it
+- **THEN** the resolved configuration carries the declared values at each level
+
+#### Scenario: Undeclared values are not defaulted
+
+- **GIVEN** a configuration that declares neither field
+- **WHEN** the loader resolves it
+- **THEN** the fields are absent in the resolved configuration
+
+#### Scenario: An invalid limit names the key and its location
+
+- **GIVEN** a workspace `graph.maxFileBytes` of `-5`
+- **WHEN** the loader resolves the configuration
+- **THEN** it fails with a `ConfigValidationError` that names `maxFileBytes` and the workspace
+
+#### Scenario: Layer merge applies unchanged
+
+- **GIVEN** a base layer and a later layer that both declare the fields
+- **WHEN** the loader merges them
+- **THEN** the later `maxFileBytes` wins and the `largeFilePaths` entries are appended
+
+#### Scenario: Unknown keys remain rejected
+
+- **GIVEN** a `graph` block with an unknown key next to `maxFileBytes`
+- **WHEN** the loader validates it
+- **THEN** the unknown key is rejected
+
 ### Requirement: contextIncludeSpecs and contextExcludeSpecs pattern validation
 
 #### Scenario: Valid bare wildcard

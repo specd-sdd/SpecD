@@ -1,0 +1,3470 @@
+{
+  "name": "bound-indexer-ast-resource-lifecycle",
+  "createdAt": "2026-10-23T10:52:44.180Z",
+  "updatedAt": "2026-10-27T11:13:35.868Z",
+  "description": "Bound native AST root lifetime and make isolated graph indexing resilient and observable under memory pressure",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "code-graph:indexer",
+    "code-graph:isolated-index-worker",
+    "core:config",
+    "core:config-loader",
+    "code-graph:index-project-graph",
+    "code-graph:language-adapter",
+    "sdk:run-index-project-graph",
+    "cli:graph-index",
+    "code-graph:typescript-language-adapter",
+    "code-graph:python-language-adapter",
+    "code-graph:php-language-adapter",
+    "code-graph:go-language-adapter",
+    "code-graph:get-graph-health",
+    "cli:graph-stats"
+  ],
+  "specDependsOn": {
+    "code-graph:indexer": [
+      "code-graph:graph-store",
+      "code-graph:language-adapter",
+      "code-graph:symbol-model",
+      "code-graph:workspace-integration",
+      "core:config",
+      "core:spec-repository-port",
+      "core:list-workspaces",
+      "code-graph:document-model",
+      "core:get-spec-metadata",
+      "code-graph:sqlite-graph-store"
+    ],
+    "code-graph:isolated-index-worker": ["code-graph:sqlite-graph-store"],
+    "core:config": ["core:vcs-adapter-port", "default:_global/architecture"],
+    "core:config-loader": [
+      "core:config",
+      "core:composition",
+      "core:schema-merge",
+      "default:_global/architecture",
+      "core:vcs-adapter-port",
+      "core:vcs-adapter"
+    ],
+    "code-graph:index-project-graph": [
+      "code-graph:composition",
+      "code-graph:indexer",
+      "code-graph:graph-store",
+      "core:config"
+    ],
+    "code-graph:language-adapter": ["code-graph:symbol-model"],
+    "sdk:run-index-project-graph": [
+      "sdk:with-open-graph-provider",
+      "code-graph:index-project-graph",
+      "core:list-workspaces"
+    ],
+    "cli:graph-index": [
+      "cli:entrypoint",
+      "core:config",
+      "core:list-workspaces",
+      "sdk:run-index-project-graph",
+      "sdk:host-context",
+      "code-graph:isolated-index-worker",
+      "core:config-loader"
+    ],
+    "code-graph:typescript-language-adapter": [
+      "code-graph:language-adapter",
+      "code-graph:symbol-model",
+      "code-graph:workspace-integration"
+    ],
+    "code-graph:python-language-adapter": [
+      "code-graph:language-adapter",
+      "code-graph:symbol-model",
+      "code-graph:workspace-integration"
+    ],
+    "code-graph:php-language-adapter": [
+      "code-graph:language-adapter",
+      "code-graph:symbol-model",
+      "code-graph:workspace-integration"
+    ],
+    "code-graph:go-language-adapter": [
+      "code-graph:language-adapter",
+      "code-graph:symbol-model",
+      "code-graph:workspace-integration"
+    ],
+    "code-graph:get-graph-health": [
+      "code-graph:composition",
+      "code-graph:staleness-detection",
+      "core:config",
+      "core:list-workspaces"
+    ],
+    "cli:graph-stats": [
+      "cli:entrypoint",
+      "core:config",
+      "code-graph:staleness-detection",
+      "core:list-workspaces",
+      "code-graph:get-graph-health",
+      "sdk:with-open-graph-provider",
+      "cli:graph-cli-context"
+    ]
+  },
+  "invalidationPolicy": "downstream",
+  "implementationTrackingStartedAt": "2026-10-26T13:46:11.176Z",
+  "trackedImplementationFiles": [
+    {
+      "file": "EXPLORATION_GRAPH_CLI_OUTPUT_OPTIMIZATION.md",
+      "state": "ignored"
+    },
+    {
+      "file": "EXPLORATION_KERNEL_PLUGINS.md",
+      "state": "ignored"
+    },
+    {
+      "file": "SpecD — Análisis de identidad LogicalSymbol dependencias y casos de uso.md",
+      "state": "ignored"
+    },
+    {
+      "file": "dev/scripts/graph-file-doc.js",
+      "state": "ignored"
+    },
+    {
+      "file": "dev/scripts/spec-metadata-diff-poc/index.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "dev/scripts/spec-metadata-diff-poc/vcs-spec-repository.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "dev/scripts/spec-metadata-diff-poc/working-copy-spec-repository.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "dev/scripts/symbol-inspect-poc.mjs",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/sqlite-graph-store/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/symbol-model/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/change-manifest/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/config-writer-port/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/parser-resource-scope.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/index-event.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/graph-index-worker-types.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/index-session.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/index-options.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/index-result.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/errors/isolated-graph-index-errors.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/errors/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/use-cases/in-memory-parser-resource-scope.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/use-cases/in-memory-index-session.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/services/request-garbage-collection.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/services/close-parser-resource-epoch.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/typescript-language-adapter.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/python-language-adapter.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/go-language-adapter.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/php-language-adapter.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/ports/config-schema.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/specd-config.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/config-loader.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/use-cases/_shared/resolve-effective-graph-config.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/services/build-project-graph-config.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/use-cases/_shared/compute-graph-fingerprint.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/services/file-size-gate.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/services/graph-input-visibility.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/use-cases/index-code-graph.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/use-cases/index-project-graph.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/orchestration/run-index-project-graph.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/isolated-index-worker/protocol.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/ports/isolated-graph-index-runner.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/isolated-index-worker/isolated-index-worker-child.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/isolated-index-worker/output-tail.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/isolated-index-worker/classify-failure.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/isolated-index-worker/supervisor.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/public.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/graph-index-task.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/index-graph.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/graph-index-task.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/services/bootstrap-graph-config.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/services/build-project-graph-config.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/services/close-parser-resource-epoch.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/services/file-size-gate.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/services/graph-input-visibility.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/compute-graph-fingerprint.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/in-memory-parser-resource-scope.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/index-code-graph-incremental.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/index-code-graph.events.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/index-code-graph.parser-resources.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/index-code-graph.size-limit.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/index-project-graph.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/resolve-effective-graph-config.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/parser-resource-lifecycle.integration.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/generated/guides-sdk.json",
+      "state": "resolved"
+    },
+    {
+      "file": ".changeset/20261026-bound-indexer-ast-resource-lifecycle-specd.md",
+      "state": "resolved"
+    },
+    {
+      "file": ".changeset/20261026-bound-indexer-ast-resource-lifecycle.md",
+      "state": "resolved"
+    },
+    {
+      "file": "EXPLORATION_CODE_GRAPH_FLOWS.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/cli/cli-reference.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/cli/graph.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/code-graph/index.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/code-graph/language-adapters.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/code-graph/use-cases.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/core/ports.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/guide/code-graph.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/guide/configuration-examples.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/guide/configuration.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/guide/workspaces.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/sdk/index.md",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/graph-index.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/graph/escape-gitignore-pattern.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/graph/format-size.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/guide-sdk/guide-sdk.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/isolated-index-worker/child-announcer.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/barrel.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/fixtures/isolated-index-worker/built-gc-observation-task.mjs",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/isolated-index-worker/child.activity.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/isolated-index-worker/classify-failure.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/isolated-index-worker/dist.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/isolated-index-worker/output-tail.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/isolated-index-worker/protocol.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/isolated-index-worker/supervisor.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/go-language-adapter.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/language-adapter-conformance.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/php-language-adapter.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/python-language-adapter.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/typescript-language-adapter.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/infrastructure/artifact-parser/delta-validation-real.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/infrastructure/fs/config-loader.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/generated/guides.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/test/integration/sdk-catalog.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/test/orchestration/run-index-project-graph.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/use-cases/get-graph-health.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/stats.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/graph-stats.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/project-dashboard.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/project/status.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/composition/code-graph-provider.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/get-graph-health.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/fixtures/isolated-index-worker/built-silent-noisy-failure-task.mjs",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/index-project-graph-integration.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/index-code-graph-package-resolution.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/index-code-graph.failed-targets.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/index-code-graph.package-imports.spec.ts",
+      "state": "resolved"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "code-graph:indexer",
+      "file": "packages/code-graph/src/domain/value-objects/parser-resource-scope.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "ParserResourceDisposer",
+        "ParserResourceDisposalFailure",
+        "ParserResourceCloseResult",
+        "ParserResourceScope"
+      ]
+    },
+    {
+      "specId": "code-graph:indexer",
+      "file": "packages/code-graph/src/domain/value-objects/index-event.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "FileActivityEvent",
+        "FileSkippedEvent",
+        "ResourceDisposalFailedEvent",
+        "IndexEvent",
+        "IndexEventReceiver",
+        "SizeSkippedFile",
+        "SizeExemptFile"
+      ]
+    },
+    {
+      "specId": "code-graph:isolated-index-worker",
+      "file": "packages/code-graph/src/domain/value-objects/graph-index-worker-types.ts",
+      "fileLinkExplicit": true,
+      "symbols": [
+        "GraphIndexFailureCause",
+        "GraphIndexWorkerDiagnostics",
+        "GraphIndexWorkerEvent",
+        "GraphIndexTaskAnnouncer"
+      ]
+    },
+    {
+      "specId": "code-graph:indexer",
+      "file": "packages/code-graph/src/domain/value-objects/index-session.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["IndexSession"]
+    },
+    {
+      "specId": "code-graph:indexer",
+      "file": "packages/code-graph/src/domain/value-objects/index-options.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["ProjectGraphConfig", "IndexOptions"]
+    },
+    {
+      "specId": "code-graph:indexer",
+      "file": "packages/code-graph/src/domain/value-objects/index-result.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["SIZE_SKIP_LIST_LIMIT", "IndexResult"]
+    },
+    {
+      "specId": "code-graph:isolated-index-worker",
+      "file": "packages/code-graph/src/domain/errors/isolated-graph-index-errors.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "GraphIndexWorkerError",
+        "GraphIndexWorkerStartError",
+        "GraphIndexTaskContractError",
+        "GraphIndexTaskExecutionError",
+        "GraphIndexWorkerProtocolError",
+        "GraphIndexWorkerExitError",
+        "GraphIndexWorkerSignalError",
+        "GraphIndexProgressHandlerError"
+      ]
+    },
+    {
+      "specId": "code-graph:indexer",
+      "file": "packages/code-graph/src/domain/value-objects/index.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:indexer",
+      "file": "packages/code-graph/src/domain/index.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:isolated-index-worker",
+      "file": "packages/code-graph/src/domain/errors/index.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:indexer",
+      "file": "packages/code-graph/src/application/use-cases/in-memory-parser-resource-scope.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["InMemoryParserResourceScope"]
+    },
+    {
+      "specId": "code-graph:indexer",
+      "file": "packages/code-graph/src/application/use-cases/in-memory-index-session.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["InMemoryIndexSession"]
+    },
+    {
+      "specId": "code-graph:indexer",
+      "file": "packages/code-graph/src/application/services/request-garbage-collection.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["requestGarbageCollection"]
+    },
+    {
+      "specId": "code-graph:indexer",
+      "file": "packages/code-graph/src/application/services/close-parser-resource-epoch.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["closeParserResourceEpoch"]
+    },
+    {
+      "specId": "code-graph:typescript-language-adapter",
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/typescript-language-adapter.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["TypeScriptLanguageAdapter"]
+    },
+    {
+      "specId": "code-graph:python-language-adapter",
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/python-language-adapter.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["PythonLanguageAdapter"]
+    },
+    {
+      "specId": "code-graph:go-language-adapter",
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/go-language-adapter.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["GoLanguageAdapter"]
+    },
+    {
+      "specId": "code-graph:php-language-adapter",
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/php-language-adapter.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["PhpLanguageAdapter"]
+    },
+    {
+      "specId": "core:config",
+      "file": "packages/core/src/application/ports/config-schema.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["WorkspaceGraphZodSchema", "ProjectGraphZodSchema"]
+    },
+    {
+      "specId": "core:config",
+      "file": "packages/core/src/application/specd-config.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["SpecdWorkspaceGraphConfig", "SpecdGraphConfig"]
+    },
+    {
+      "specId": "core:config-loader",
+      "file": "packages/core/src/infrastructure/fs/config-loader.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["FsConfigLoader"]
+    },
+    {
+      "specId": "code-graph:indexer",
+      "file": "packages/code-graph/src/application/use-cases/_shared/resolve-effective-graph-config.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "DEFAULT_MAX_FILE_BYTES",
+        "EffectiveWorkspaceGraphConfig",
+        "EffectiveGraphConfig",
+        "resolveEffectiveGraphConfig"
+      ]
+    },
+    {
+      "specId": "code-graph:indexer",
+      "file": "packages/code-graph/src/application/services/build-project-graph-config.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["buildProjectGraphConfig"]
+    },
+    {
+      "specId": "code-graph:index-project-graph",
+      "file": "packages/code-graph/src/application/use-cases/_shared/compute-graph-fingerprint.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "computeGraphFingerprint",
+        "computeWorkspaceFingerprint",
+        "computeRootFingerprint"
+      ]
+    },
+    {
+      "specId": "code-graph:indexer",
+      "file": "packages/code-graph/src/application/services/file-size-gate.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createFileSizeGate"]
+    },
+    {
+      "specId": "code-graph:indexer",
+      "file": "packages/code-graph/src/application/services/graph-input-visibility.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["buildGraphInputVisibilitySnapshot"]
+    },
+    {
+      "specId": "code-graph:indexer",
+      "file": "packages/code-graph/src/application/use-cases/index-code-graph.ts",
+      "fileLinkExplicit": true,
+      "symbols": ["IndexCodeGraph"]
+    },
+    {
+      "specId": "code-graph:index-project-graph",
+      "file": "packages/code-graph/src/application/use-cases/index-project-graph.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["IndexProjectGraph"]
+    },
+    {
+      "specId": "sdk:run-index-project-graph",
+      "file": "packages/sdk/src/orchestration/run-index-project-graph.ts",
+      "fileLinkExplicit": true,
+      "symbols": ["runIndexProjectGraph"]
+    },
+    {
+      "specId": "code-graph:isolated-index-worker",
+      "file": "packages/code-graph/src/infrastructure/isolated-index-worker/protocol.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["GRAPH_INDEX_PROTOCOL", "isChildMessage", "ACTIVITY_ITEM_MAX_CHARS"]
+    },
+    {
+      "specId": "code-graph:isolated-index-worker",
+      "file": "packages/code-graph/src/application/ports/isolated-graph-index-runner.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["GraphIndexTask", "RunIsolatedGraphIndexInput"]
+    },
+    {
+      "specId": "code-graph:isolated-index-worker",
+      "file": "packages/code-graph/src/infrastructure/isolated-index-worker/isolated-index-worker-child.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:isolated-index-worker",
+      "file": "packages/code-graph/src/infrastructure/isolated-index-worker/output-tail.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["OutputTail"]
+    },
+    {
+      "specId": "code-graph:isolated-index-worker",
+      "file": "packages/code-graph/src/infrastructure/isolated-index-worker/classify-failure.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["classifyWorkerFailure"]
+    },
+    {
+      "specId": "code-graph:isolated-index-worker",
+      "file": "packages/code-graph/src/infrastructure/isolated-index-worker/supervisor.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:isolated-index-worker",
+      "file": "packages/code-graph/src/public.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:isolated-index-worker",
+      "file": "packages/code-graph/src/index.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "sdk:run-index-project-graph",
+      "file": "packages/sdk/src/index.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:graph-index",
+      "file": "packages/cli/src/graph-index-task.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:graph-index",
+      "file": "packages/cli/src/commands/graph/index-graph.ts",
+      "fileLinkExplicit": true,
+      "symbols": [
+        "toLargeFilePathsEntry",
+        "yamlScalar",
+        "escapeGitignorePattern",
+        "formatTextIndexResult"
+      ]
+    },
+    {
+      "specId": "code-graph:get-graph-health",
+      "file": "packages/code-graph/src/application/use-cases/get-graph-health.ts",
+      "fileLinkExplicit": true,
+      "symbols": ["CoverageCompleteness", "CoverageWarning", "GetGraphHealthResult"]
+    },
+    {
+      "specId": "cli:graph-stats",
+      "file": "packages/cli/src/commands/graph/stats.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "sdk:run-index-project-graph",
+      "file": "packages/sdk/test/orchestration/run-index-project-graph.spec.ts",
+      "fileLinkExplicit": true
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:97a45f95540d21edba1c511e33fd554afdb5efa3ee57caffb1cdf07d24374272"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "code-graph:indexer",
+          "filename": "deltas/code-graph/indexer/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:6a344f7463133e526c678fe0c9e1de48879b0ce001532364fc43af5eeae0e662"
+        },
+        {
+          "key": "code-graph:isolated-index-worker",
+          "filename": "deltas/code-graph/isolated-index-worker/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:2b66d7d64035252886500c09e7ebdaf41cea01bdeed338a69380bc661e89e62b"
+        },
+        {
+          "key": "core:config",
+          "filename": "deltas/core/config/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:fa58a54b84598278cfda0a51f3d902900eb4fefcd01c7e6575634525d9abef68"
+        },
+        {
+          "key": "core:config-loader",
+          "filename": "deltas/core/config-loader/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:55439ec40c683e9aaa6c30731ac799702152cfebc5a4a7d5d894afbc010238f3"
+        },
+        {
+          "key": "code-graph:index-project-graph",
+          "filename": "deltas/code-graph/index-project-graph/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:90db2d738a93afa3fd9bcb61cc95c3f260245829f4dfeae23d4f3f088cbd5d09"
+        },
+        {
+          "key": "code-graph:language-adapter",
+          "filename": "deltas/code-graph/language-adapter/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:621c0e1dc8e6194c61582d0e2e3b10d0ffaacaf7c14ab1487757afc2d5f9be99"
+        },
+        {
+          "key": "sdk:run-index-project-graph",
+          "filename": "deltas/sdk/run-index-project-graph/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:0b27095eaa6729e7a61a42d2069037936322574ad88733cd30f69c10626ed312"
+        },
+        {
+          "key": "cli:graph-index",
+          "filename": "deltas/cli/graph-index/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:44045d220a314703a7a5b0fffb32af015765121f64f3f82b21b5876cc49382da"
+        },
+        {
+          "key": "code-graph:typescript-language-adapter",
+          "filename": "deltas/code-graph/typescript-language-adapter/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:8f04aecf8ece15433fa3302f47c8d9df3a94e8aef8b2a1a3076bffc713a23954"
+        },
+        {
+          "key": "code-graph:python-language-adapter",
+          "filename": "deltas/code-graph/python-language-adapter/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:1ee65dceb215ebf93e1ffb2c450c305737512a3c6eb8eda64813349dd4cf6170"
+        },
+        {
+          "key": "code-graph:php-language-adapter",
+          "filename": "deltas/code-graph/php-language-adapter/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:9c6fdab1e58ec17fa7d3a5f7ee755704ca19ca98c00bfa51c9ab9140d0c66974"
+        },
+        {
+          "key": "code-graph:go-language-adapter",
+          "filename": "deltas/code-graph/go-language-adapter/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:64f1edcd7e8a484702e729e7a1308690b10858ed435b3dfec6070b68c4f11d83"
+        },
+        {
+          "key": "code-graph:get-graph-health",
+          "filename": "deltas/code-graph/get-graph-health/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:92ff1f2c5f818f34bf3a79bf8adb838a7b3fcea0d09127273bcd576814fc59be"
+        },
+        {
+          "key": "cli:graph-stats",
+          "filename": "deltas/cli/graph-stats/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:146853f3dc9c9fe6ecc8526057681dd904887fdaf409db28c17baa0a9fc95080"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "code-graph:indexer",
+          "filename": "deltas/code-graph/indexer/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:f6ce0c1961a4842ef06554dcfcce3dfd6b3b9d48c275b824dbb4def44e87f04d"
+        },
+        {
+          "key": "code-graph:isolated-index-worker",
+          "filename": "deltas/code-graph/isolated-index-worker/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:53bd40bc62c3ae24961fd97198ba55d847e99f764fcbe2ae6553150ee0d56dcf"
+        },
+        {
+          "key": "core:config",
+          "filename": "deltas/core/config/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:49071f8e1777278d521de93b6e6b1d18fa81efe674d53acfdaf9499ca1a12e75"
+        },
+        {
+          "key": "core:config-loader",
+          "filename": "deltas/core/config-loader/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:fea56a2ad25beeae9444e3b5e7321ca3a2e7f0b44af3a5157b4ed3ec9c4137dd"
+        },
+        {
+          "key": "code-graph:index-project-graph",
+          "filename": "deltas/code-graph/index-project-graph/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:37498a6a95e07b230f2d77dce8abb2b9022d4e9477e581c466c9c8b376687189"
+        },
+        {
+          "key": "code-graph:language-adapter",
+          "filename": "deltas/code-graph/language-adapter/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:ee41c65eeb0f431f952b64f6b09a82beca3e75147776cf5aeefeb7c7340eabe7"
+        },
+        {
+          "key": "sdk:run-index-project-graph",
+          "filename": "deltas/sdk/run-index-project-graph/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:9aa8e36191f60568a50c5900f4a6d258cdc8803afdc5f6e98d369fb7ba6ba6a7"
+        },
+        {
+          "key": "cli:graph-index",
+          "filename": "deltas/cli/graph-index/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:4e0461af58317c73a95d235a52477c50f1b5ebb0f7efe3ebd8d4d5415783ae8e"
+        },
+        {
+          "key": "code-graph:typescript-language-adapter",
+          "filename": "deltas/code-graph/typescript-language-adapter/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:89e379c69c124802f5df4214f3b03cd2bbd61c69f9dd22f56319ea2823f0b711"
+        },
+        {
+          "key": "code-graph:python-language-adapter",
+          "filename": "deltas/code-graph/python-language-adapter/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:ccf2556224431bb646d8b92e55bb90b8fc2b717e4bd8341f4a7592766e39d8dd"
+        },
+        {
+          "key": "code-graph:php-language-adapter",
+          "filename": "deltas/code-graph/php-language-adapter/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:986aa150fe3f1b4c5804bd61be66d60fde746a448264aee4004551190b62e121"
+        },
+        {
+          "key": "code-graph:go-language-adapter",
+          "filename": "deltas/code-graph/go-language-adapter/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:f348286e4fddd8e0adf81cc738bb499153cd814910224031f5ae4047b017259c"
+        },
+        {
+          "key": "code-graph:get-graph-health",
+          "filename": "deltas/code-graph/get-graph-health/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:8c54c01507615410d90b5cda9a719b4e235a3ccabd8228a0b71a32c8e0412002"
+        },
+        {
+          "key": "cli:graph-stats",
+          "filename": "deltas/cli/graph-stats/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:4d99a9fd24fa8721c17f8cf4d42aa9e5f9627ce174d0d215feb55f58d238babb"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:2c1010856900ee9f3dda72c90a56df8929110a59c658d84fac72a7de9413dfba"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "verify", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:599dc2776e614cd0b642109bcbaa67b19e88ee3b7e6eae6d4d9400ea532f61e1"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-10-23T10:52:44.180Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": ["code-graph:indexer", "code-graph:isolated-index-worker"],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-23T10:52:44.202Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:indexer"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:isolated-index-worker"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:indexer"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:isolated-index-worker"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-26T10:10:19.061Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-26T11:59:44.848Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["code-graph:indexer", "code-graph:isolated-index-worker"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:indexer", "code-graph:isolated-index-worker"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-26T11:59:44.850Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:config"
+        },
+        {
+          "type": "verify",
+          "key": "core:config"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-26T11:59:45.644Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["code-graph:indexer", "code-graph:isolated-index-worker", "core:config"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:indexer", "code-graph:isolated-index-worker", "core:config"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-26T11:59:45.645Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:config-loader"
+        },
+        {
+          "type": "verify",
+          "key": "core:config-loader"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-26T11:59:46.177Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:indexer",
+            "code-graph:isolated-index-worker",
+            "core:config",
+            "core:config-loader"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:indexer",
+            "code-graph:isolated-index-worker",
+            "core:config",
+            "core:config-loader"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-26T11:59:46.179Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "code-graph:index-project-graph"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:index-project-graph"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-26T12:09:42.113Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:indexer",
+            "code-graph:isolated-index-worker",
+            "core:config",
+            "core:config-loader",
+            "code-graph:index-project-graph"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:indexer",
+            "code-graph:isolated-index-worker",
+            "core:config",
+            "core:config-loader",
+            "code-graph:index-project-graph"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-26T12:12:03.700Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:indexer",
+            "code-graph:isolated-index-worker",
+            "core:config",
+            "core:config-loader",
+            "code-graph:index-project-graph"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:indexer",
+            "code-graph:isolated-index-worker",
+            "core:config",
+            "core:config-loader",
+            "code-graph:index-project-graph"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-26T12:16:08.241Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:indexer",
+            "code-graph:isolated-index-worker",
+            "core:config",
+            "core:config-loader",
+            "code-graph:index-project-graph"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:indexer",
+            "code-graph:isolated-index-worker",
+            "core:config",
+            "core:config-loader",
+            "code-graph:index-project-graph"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-26T12:16:08.252Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "code-graph:language-adapter"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:language-adapter"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-26T12:25:53.134Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:indexer",
+            "code-graph:isolated-index-worker",
+            "core:config",
+            "core:config-loader",
+            "code-graph:index-project-graph",
+            "code-graph:language-adapter"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:indexer",
+            "code-graph:isolated-index-worker",
+            "core:config",
+            "core:config-loader",
+            "code-graph:index-project-graph",
+            "code-graph:language-adapter"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-26T12:39:05.386Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:indexer",
+            "code-graph:isolated-index-worker",
+            "core:config",
+            "core:config-loader",
+            "code-graph:index-project-graph",
+            "code-graph:language-adapter"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:indexer",
+            "code-graph:isolated-index-worker",
+            "core:config",
+            "core:config-loader",
+            "code-graph:index-project-graph",
+            "code-graph:language-adapter"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-26T12:39:05.389Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "sdk:run-index-project-graph"
+        },
+        {
+          "type": "verify",
+          "key": "sdk:run-index-project-graph"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-26T12:39:05.966Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:indexer",
+            "code-graph:isolated-index-worker",
+            "core:config",
+            "core:config-loader",
+            "code-graph:index-project-graph",
+            "code-graph:language-adapter",
+            "sdk:run-index-project-graph"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:indexer",
+            "code-graph:isolated-index-worker",
+            "core:config",
+            "core:config-loader",
+            "code-graph:index-project-graph",
+            "code-graph:language-adapter",
+            "sdk:run-index-project-graph"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-26T12:39:05.969Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "cli:graph-index"
+        },
+        {
+          "type": "verify",
+          "key": "cli:graph-index"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-26T12:42:29.463Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:indexer",
+            "code-graph:isolated-index-worker",
+            "core:config",
+            "core:config-loader",
+            "code-graph:index-project-graph",
+            "code-graph:language-adapter",
+            "sdk:run-index-project-graph",
+            "cli:graph-index"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:indexer",
+            "code-graph:isolated-index-worker",
+            "core:config",
+            "core:config-loader",
+            "code-graph:index-project-graph",
+            "code-graph:language-adapter",
+            "sdk:run-index-project-graph",
+            "cli:graph-index"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-26T12:46:26.176Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:indexer",
+            "code-graph:isolated-index-worker",
+            "core:config",
+            "core:config-loader",
+            "code-graph:index-project-graph",
+            "code-graph:language-adapter",
+            "sdk:run-index-project-graph",
+            "cli:graph-index"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:indexer",
+            "code-graph:isolated-index-worker",
+            "core:config",
+            "core:config-loader",
+            "code-graph:index-project-graph",
+            "code-graph:language-adapter",
+            "sdk:run-index-project-graph",
+            "cli:graph-index"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-26T12:48:36.214Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:indexer",
+            "code-graph:isolated-index-worker",
+            "core:config",
+            "core:config-loader",
+            "code-graph:index-project-graph",
+            "code-graph:language-adapter",
+            "sdk:run-index-project-graph",
+            "cli:graph-index"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:indexer",
+            "code-graph:isolated-index-worker",
+            "core:config",
+            "core:config-loader",
+            "code-graph:index-project-graph",
+            "code-graph:language-adapter",
+            "sdk:run-index-project-graph",
+            "cli:graph-index"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-26T12:51:06.152Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:indexer",
+            "code-graph:isolated-index-worker",
+            "core:config",
+            "core:config-loader",
+            "code-graph:index-project-graph",
+            "code-graph:language-adapter",
+            "sdk:run-index-project-graph",
+            "cli:graph-index"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:indexer",
+            "code-graph:isolated-index-worker",
+            "core:config",
+            "core:config-loader",
+            "code-graph:index-project-graph",
+            "code-graph:language-adapter",
+            "sdk:run-index-project-graph",
+            "cli:graph-index"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-26T13:00:08.452Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [code-graph:indexer, code-graph:isolated-index-worker]; verify [code-graph:indexer, code-graph:isolated-index-worker]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:indexer", "code-graph:isolated-index-worker"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:indexer", "code-graph:isolated-index-worker"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-26T13:00:39.409Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:indexer",
+            "code-graph:isolated-index-worker",
+            "core:config",
+            "core:config-loader",
+            "code-graph:index-project-graph",
+            "code-graph:language-adapter",
+            "sdk:run-index-project-graph",
+            "cli:graph-index"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:indexer",
+            "code-graph:isolated-index-worker",
+            "core:config",
+            "core:config-loader",
+            "code-graph:index-project-graph",
+            "code-graph:language-adapter",
+            "sdk:run-index-project-graph",
+            "cli:graph-index"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-26T13:01:25.202Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]; specs [code-graph:indexer]; verify [code-graph:indexer]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-26T13:04:02.137Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]; specs [code-graph:indexer]; verify [code-graph:indexer]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-26T13:13:26.245Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:indexer",
+            "code-graph:isolated-index-worker",
+            "core:config",
+            "core:config-loader",
+            "code-graph:index-project-graph",
+            "code-graph:language-adapter",
+            "sdk:run-index-project-graph",
+            "cli:graph-index"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:indexer",
+            "code-graph:isolated-index-worker",
+            "core:config",
+            "core:config-loader",
+            "code-graph:index-project-graph",
+            "code-graph:language-adapter",
+            "sdk:run-index-project-graph",
+            "cli:graph-index"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-26T13:13:26.249Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "code-graph:typescript-language-adapter"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:typescript-language-adapter"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-26T13:13:26.746Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:indexer",
+            "code-graph:isolated-index-worker",
+            "core:config",
+            "core:config-loader",
+            "code-graph:index-project-graph",
+            "code-graph:language-adapter",
+            "sdk:run-index-project-graph",
+            "cli:graph-index",
+            "code-graph:typescript-language-adapter"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:indexer",
+            "code-graph:isolated-index-worker",
+            "core:config",
+            "core:config-loader",
+            "code-graph:index-project-graph",
+            "code-graph:language-adapter",
+            "sdk:run-index-project-graph",
+            "cli:graph-index",
+            "code-graph:typescript-language-adapter"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-26T13:13:26.748Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "code-graph:python-language-adapter"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:python-language-adapter"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-26T13:13:27.263Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:indexer",
+            "code-graph:isolated-index-worker",
+            "core:config",
+            "core:config-loader",
+            "code-graph:index-project-graph",
+            "code-graph:language-adapter",
+            "sdk:run-index-project-graph",
+            "cli:graph-index",
+            "code-graph:typescript-language-adapter",
+            "code-graph:python-language-adapter"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:indexer",
+            "code-graph:isolated-index-worker",
+            "core:config",
+            "core:config-loader",
+            "code-graph:index-project-graph",
+            "code-graph:language-adapter",
+            "sdk:run-index-project-graph",
+            "cli:graph-index",
+            "code-graph:typescript-language-adapter",
+            "code-graph:python-language-adapter"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-26T13:13:27.266Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "code-graph:php-language-adapter"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:php-language-adapter"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-26T13:15:03.329Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:indexer",
+            "code-graph:isolated-index-worker",
+            "core:config",
+            "core:config-loader",
+            "code-graph:index-project-graph",
+            "code-graph:language-adapter",
+            "sdk:run-index-project-graph",
+            "cli:graph-index",
+            "code-graph:typescript-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:php-language-adapter"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:indexer",
+            "code-graph:isolated-index-worker",
+            "core:config",
+            "core:config-loader",
+            "code-graph:index-project-graph",
+            "code-graph:language-adapter",
+            "sdk:run-index-project-graph",
+            "cli:graph-index",
+            "code-graph:typescript-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:php-language-adapter"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-26T13:15:03.332Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "code-graph:go-language-adapter"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:go-language-adapter"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-26T13:17:39.802Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-26T13:18:38.745Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-26T13:46:11.176Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-26T16:16:21.923Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-26T16:16:21.923Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-26T17:47:53.784Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-26T17:48:12.038Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-26T17:48:13.851Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-26T18:19:00.940Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-26T18:40:00.563Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:indexer",
+            "code-graph:isolated-index-worker",
+            "core:config",
+            "core:config-loader",
+            "code-graph:index-project-graph",
+            "code-graph:language-adapter",
+            "sdk:run-index-project-graph",
+            "cli:graph-index",
+            "code-graph:typescript-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:php-language-adapter",
+            "code-graph:go-language-adapter"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:indexer",
+            "code-graph:isolated-index-worker",
+            "core:config",
+            "core:config-loader",
+            "code-graph:index-project-graph",
+            "code-graph:language-adapter",
+            "sdk:run-index-project-graph",
+            "cli:graph-index",
+            "code-graph:typescript-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:php-language-adapter",
+            "code-graph:go-language-adapter"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-26T18:40:00.563Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-26T21:08:39.062Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:indexer",
+            "code-graph:isolated-index-worker",
+            "core:config",
+            "core:config-loader",
+            "code-graph:index-project-graph",
+            "code-graph:language-adapter",
+            "sdk:run-index-project-graph",
+            "cli:graph-index",
+            "code-graph:typescript-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:php-language-adapter",
+            "code-graph:go-language-adapter"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:indexer",
+            "code-graph:isolated-index-worker",
+            "core:config",
+            "core:config-loader",
+            "code-graph:index-project-graph",
+            "code-graph:language-adapter",
+            "sdk:run-index-project-graph",
+            "cli:graph-index",
+            "code-graph:typescript-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:php-language-adapter",
+            "code-graph:go-language-adapter"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-26T21:08:39.075Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "code-graph:get-graph-health"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:get-graph-health"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-26T21:08:40.887Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:indexer",
+            "code-graph:isolated-index-worker",
+            "core:config",
+            "core:config-loader",
+            "code-graph:index-project-graph",
+            "code-graph:language-adapter",
+            "sdk:run-index-project-graph",
+            "cli:graph-index",
+            "code-graph:typescript-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:php-language-adapter",
+            "code-graph:go-language-adapter",
+            "code-graph:get-graph-health"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:indexer",
+            "code-graph:isolated-index-worker",
+            "core:config",
+            "core:config-loader",
+            "code-graph:index-project-graph",
+            "code-graph:language-adapter",
+            "sdk:run-index-project-graph",
+            "cli:graph-index",
+            "code-graph:typescript-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:php-language-adapter",
+            "code-graph:go-language-adapter",
+            "code-graph:get-graph-health"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-26T21:08:40.891Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "cli:graph-stats"
+        },
+        {
+          "type": "verify",
+          "key": "cli:graph-stats"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-26T21:45:31.745Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-26T21:45:54.421Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-27T01:54:40.695Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-27T06:53:38.985Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:indexer",
+            "code-graph:isolated-index-worker",
+            "core:config",
+            "core:config-loader",
+            "code-graph:index-project-graph",
+            "code-graph:language-adapter",
+            "sdk:run-index-project-graph",
+            "cli:graph-index",
+            "code-graph:typescript-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:php-language-adapter",
+            "code-graph:go-language-adapter",
+            "code-graph:get-graph-health",
+            "cli:graph-stats"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:indexer",
+            "code-graph:isolated-index-worker",
+            "core:config",
+            "core:config-loader",
+            "code-graph:index-project-graph",
+            "code-graph:language-adapter",
+            "sdk:run-index-project-graph",
+            "cli:graph-index",
+            "code-graph:typescript-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:php-language-adapter",
+            "code-graph:go-language-adapter",
+            "code-graph:get-graph-health",
+            "cli:graph-stats"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-27T06:53:38.985Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-27T06:56:55.529Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-27T06:57:10.923Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-27T07:04:16.896Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-27T08:02:15.226Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-27T08:10:14.098Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:indexer",
+            "code-graph:isolated-index-worker",
+            "core:config",
+            "core:config-loader",
+            "code-graph:index-project-graph",
+            "code-graph:language-adapter",
+            "sdk:run-index-project-graph",
+            "cli:graph-index",
+            "code-graph:typescript-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:php-language-adapter",
+            "code-graph:go-language-adapter",
+            "code-graph:get-graph-health",
+            "cli:graph-stats"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:indexer",
+            "code-graph:isolated-index-worker",
+            "core:config",
+            "core:config-loader",
+            "code-graph:index-project-graph",
+            "code-graph:language-adapter",
+            "sdk:run-index-project-graph",
+            "cli:graph-index",
+            "code-graph:typescript-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:php-language-adapter",
+            "code-graph:go-language-adapter",
+            "code-graph:get-graph-health",
+            "cli:graph-stats"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-27T08:10:14.098Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-27T08:13:37.989Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-27T08:33:03.300Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-27T09:00:14.967Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-27T09:10:07.441Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-27T09:10:19.057Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-27T09:16:56.151Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:indexer",
+            "code-graph:isolated-index-worker",
+            "core:config",
+            "core:config-loader",
+            "code-graph:index-project-graph",
+            "code-graph:language-adapter",
+            "sdk:run-index-project-graph",
+            "cli:graph-index",
+            "code-graph:typescript-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:php-language-adapter",
+            "code-graph:go-language-adapter",
+            "code-graph:get-graph-health",
+            "cli:graph-stats"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:indexer",
+            "code-graph:isolated-index-worker",
+            "core:config",
+            "core:config-loader",
+            "code-graph:index-project-graph",
+            "code-graph:language-adapter",
+            "sdk:run-index-project-graph",
+            "cli:graph-index",
+            "code-graph:typescript-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:php-language-adapter",
+            "code-graph:go-language-adapter",
+            "code-graph:get-graph-health",
+            "cli:graph-stats"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-27T09:16:56.151Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-27T09:18:26.708Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-27T09:18:54.904Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-27T09:37:25.950Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:indexer",
+            "code-graph:isolated-index-worker",
+            "core:config",
+            "core:config-loader",
+            "code-graph:index-project-graph",
+            "code-graph:language-adapter",
+            "sdk:run-index-project-graph",
+            "cli:graph-index",
+            "code-graph:typescript-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:php-language-adapter",
+            "code-graph:go-language-adapter",
+            "code-graph:get-graph-health",
+            "cli:graph-stats"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:indexer",
+            "code-graph:isolated-index-worker",
+            "core:config",
+            "core:config-loader",
+            "code-graph:index-project-graph",
+            "code-graph:language-adapter",
+            "sdk:run-index-project-graph",
+            "cli:graph-index",
+            "code-graph:typescript-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:php-language-adapter",
+            "code-graph:go-language-adapter",
+            "code-graph:get-graph-health",
+            "cli:graph-stats"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-27T09:37:25.950Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-27T09:40:05.601Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-27T09:40:23.838Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [cli:graph-index]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["cli:graph-index"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-27T09:40:23.838Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-27T09:40:59.787Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-27T09:45:19.594Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:indexer",
+            "code-graph:isolated-index-worker",
+            "core:config",
+            "core:config-loader",
+            "code-graph:index-project-graph",
+            "code-graph:language-adapter",
+            "sdk:run-index-project-graph",
+            "cli:graph-index",
+            "code-graph:typescript-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:php-language-adapter",
+            "code-graph:go-language-adapter",
+            "code-graph:get-graph-health",
+            "cli:graph-stats"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:indexer",
+            "code-graph:isolated-index-worker",
+            "core:config",
+            "core:config-loader",
+            "code-graph:index-project-graph",
+            "code-graph:language-adapter",
+            "sdk:run-index-project-graph",
+            "cli:graph-index",
+            "code-graph:typescript-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:php-language-adapter",
+            "code-graph:go-language-adapter",
+            "code-graph:get-graph-health",
+            "cli:graph-stats"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-27T09:45:19.594Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-27T09:46:16.448Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-27T10:07:47.539Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-27T10:24:06.212Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-27T10:46:37.579Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:indexer",
+            "code-graph:isolated-index-worker",
+            "core:config",
+            "core:config-loader",
+            "code-graph:index-project-graph",
+            "code-graph:language-adapter",
+            "sdk:run-index-project-graph",
+            "cli:graph-index",
+            "code-graph:typescript-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:php-language-adapter",
+            "code-graph:go-language-adapter",
+            "code-graph:get-graph-health",
+            "cli:graph-stats"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:indexer",
+            "code-graph:isolated-index-worker",
+            "core:config",
+            "core:config-loader",
+            "code-graph:index-project-graph",
+            "code-graph:language-adapter",
+            "sdk:run-index-project-graph",
+            "cli:graph-index",
+            "code-graph:typescript-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:php-language-adapter",
+            "code-graph:go-language-adapter",
+            "code-graph:get-graph-health",
+            "cli:graph-stats"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-27T10:46:37.579Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-27T10:48:48.908Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-27T10:50:18.708Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-27T11:09:36.940Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-27T11:10:29.941Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-27T11:10:38.420Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-27T11:13:35.865Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-10-27T11:13:36.372Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

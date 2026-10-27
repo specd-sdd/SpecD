@@ -390,6 +390,44 @@
 - **THEN** the retained state uses plain compact data structures
 - **AND** it does not retain AST nodes or parser-runtime objects
 
+### Requirement: Parser-owned resource registration
+
+#### Scenario: Registration happens right after parsing and before traversal
+
+- **GIVEN** a test adapter that records the order of its parse call, its registration, and its first traversal step
+- **WHEN** it analyses a file
+- **THEN** the registration happens after the parse call and before the first traversal step
+
+#### Scenario: A built-in adapter registers what it parses
+
+- **GIVEN** each built-in adapter that parses with a library holding native memory
+- **WHEN** it analyses a file
+- **THEN** the parsed resource is registered in the session's parser-resource scope and not in adapter-private state
+
+#### Scenario: An adapter keeps nothing after analysis
+
+- **GIVEN** a built-in adapter that analysed a file and the epoch has been closed
+- **WHEN** the adapter instance and the session are inspected
+- **THEN** neither refers to the parsed resource
+
+#### Scenario: The draft is plain data
+
+- **GIVEN** the draft returned by `analyzeFile`
+- **WHEN** it is serialized and compared with the registered resources
+- **THEN** it does not reference any registered resource
+
+#### Scenario: An adapter without parser resources registers nothing
+
+- **GIVEN** an adapter whose library needs no release
+- **WHEN** it analyses files
+- **THEN** it registers no resource and the indexing result is unaffected
+
+#### Scenario: A new adapter on another parser library fits the contract
+
+- **GIVEN** a test adapter on a fake library that needs explicit release and registers a disposal function
+- **WHEN** it is added to the registry without changing the indexer, session, resolver, or stores
+- **THEN** its resources are disposed at the file boundary
+
 ### Requirement: Parser-authoritative structural fact extraction
 
 #### Scenario: Lookalike text creates no structural fact

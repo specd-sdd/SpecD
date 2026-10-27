@@ -21,3 +21,13 @@ export {
 } from './graph-storage-recovery-required-error.js'
 export { GraphStoreRecreateRequiresClosedError } from './graph-store-recreate-requires-closed-error.js'
 export { GraphDerivationMismatchError } from './graph-derivation-mismatch-error.js'
+export {
+  GraphIndexWorkerError,
+  GraphIndexWorkerStartError,
+  GraphIndexTaskContractError,
+  GraphIndexTaskExecutionError,
+  GraphIndexWorkerProtocolError,
+  GraphIndexWorkerExitError,
+  GraphIndexWorkerSignalError,
+  GraphIndexProgressHandlerError,
+} from './isolated-graph-index-errors.js'

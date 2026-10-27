@@ -23,12 +23,12 @@
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:ab37ae28fbae97886c2b5b39c5dba7ff21495da30fd43be4b8eb7f046035d013",
-          "lastModified": "2026-07-25T11:53:31.663Z"
+          "hash": "sha256:b78739b2b2dcf3b3192e6d73c9a8bdf3331ab36def0c9480f6f393319d9350ca",
+          "lastModified": "2026-09-29T13:47:41.622Z"
         },
         "verify.md": {
-          "hash": "sha256:2582e2f73124ca0287186ca7c6c5d9e5f84691aa96ee03038d198bf8e3a2d97f",
-          "lastModified": "2026-07-25T11:53:31.663Z"
+          "hash": "sha256:0a354409f30b5db8a7d2085da4917fac7919a02851fc7fa270b04c6e0f3353b0",
+          "lastModified": "2026-09-29T13:47:41.622Z"
         }
       }
     },
@@ -40,12 +40,12 @@
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:ab37ae28fbae97886c2b5b39c5dba7ff21495da30fd43be4b8eb7f046035d013",
-          "lastModified": "2026-07-25T11:53:31.663Z"
+          "hash": "sha256:b78739b2b2dcf3b3192e6d73c9a8bdf3331ab36def0c9480f6f393319d9350ca",
+          "lastModified": "2026-09-29T13:47:41.622Z"
         },
         "verify.md": {
-          "hash": "sha256:2582e2f73124ca0287186ca7c6c5d9e5f84691aa96ee03038d198bf8e3a2d97f",
-          "lastModified": "2026-07-25T11:53:31.663Z"
+          "hash": "sha256:0a354409f30b5db8a7d2085da4917fac7919a02851fc7fa270b04c6e0f3353b0",
+          "lastModified": "2026-09-29T13:47:41.622Z"
         }
       }
     }

@@ -4,9 +4,13 @@ import {
   openSpecdHost,
   runIndexProjectGraph,
   type GraphIndexTask,
+  type IndexEvent,
   type RunIndexProjectGraphResult,
 } from '@specd/sdk'
 import { buildCliKernelOptions } from './helpers/cli-context.js'
+
+/** Threshold in bytes above which a file-activity event triggers a mandatory child announcement. */
+const LARGE_FILE_ANNOUNCE_BYTES = 32768
 
 /** Serializable description of the graph context reconstructed by the task. */
 export type CliGraphIndexContextDescriptor =
@@ -45,12 +49,17 @@ export interface CliGraphIndexTaskInput {
 }
 
 /** Progress emitted by the CLI task for presentation in its parent process. */
-export interface CliGraphIndexProgress {
-  /** Percentage reported by the indexer. */
-  readonly percent: number
-  /** Current indexing phase. */
-  readonly phase: string
-}
+export type CliGraphIndexProgress =
+  | {
+      /** Percentage reported by the indexer. */
+      readonly percent: number
+      /** Current indexing phase. */
+      readonly phase: string
+    }
+  | {
+      /** Strongly-typed index event for CLI presentation. */
+      readonly event: IndexEvent
+    }
 
 /**
  * Reconstructs a CLI-equivalent SDK context and indexes the graph once.
@@ -60,13 +69,14 @@ export interface CliGraphIndexProgress {
  *
  * @param input - Serializable graph context and indexing options.
  * @param emitProgress - Reports index progress to the isolated-run supervisor.
+ * @param announce - Announces file activity to the host supervisor.
  * @returns The unmodified SDK indexing result.
  */
 export const runGraphIndexTask: GraphIndexTask<
   CliGraphIndexTaskInput,
   CliGraphIndexProgress,
   RunIndexProjectGraphResult
-> = async (input, emitProgress) => {
+> = async (input, emitProgress, announce) => {
   const kernel = buildCliKernelOptions()
   const host =
     input.context.mode === 'forced'
@@ -91,5 +101,13 @@ export const runGraphIndexTask: GraphIndexTask<
     force: input.index.force,
     ...(input.index.excludePaths !== undefined ? { excludePaths: input.index.excludePaths } : {}),
     onProgress: (percent, phase) => emitProgress({ percent, phase }),
+    onEvent: (event) => {
+      if (event.kind === 'file-activity') {
+        const mandatory = (event.sizeBytes ?? 0) >= LARGE_FILE_ANNOUNCE_BYTES
+        announce(event.filePath, { mandatory })
+      } else {
+        emitProgress({ event })
+      }
+    },
   })
 }

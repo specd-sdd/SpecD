@@ -12,10 +12,7 @@
   "implementation": [
     {
       "file": "code-graph:src/application/use-cases/get-graph-health.ts",
-      "symbols": ["GetGraphHealth"]
-    },
-    {
-      "file": "code-graph:test/application/use-cases/get-graph-health.spec.ts"
+      "symbols": ["CoverageCompleteness", "CoverageWarning", "GetGraphHealthResult"]
     }
   ],
   "optimizations": {

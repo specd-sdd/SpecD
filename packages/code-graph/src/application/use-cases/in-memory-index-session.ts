@@ -26,6 +26,8 @@ import {
 import { type ReferenceFactsWrite } from '../../domain/ports/graph-store.js'
 import { RelationType } from '../../domain/value-objects/relation-type.js'
 import { DuplicateDeclarationMappingError } from '../../domain/errors/duplicate-declaration-mapping-error.js'
+import { type ParserResourceScope } from '../../domain/value-objects/parser-resource-scope.js'
+import { InMemoryParserResourceScope } from './in-memory-parser-resource-scope.js'
 
 /**
  * Builds the lookup key of one public route.
@@ -43,6 +45,16 @@ function publicRouteKey(surface: string, exportedName: string, space: SymbolSpac
  * Coordinates lookup structures, file-level analyses, and deduplicated relations.
  */
 export class InMemoryIndexSession implements IndexSession {
+  private readonly parserResourceScope: ParserResourceScope = new InMemoryParserResourceScope()
+
+  /**
+   * Scope holding the parser-owned resources of the file currently being analysed.
+   * @returns The single scope of this session; it cannot be replaced.
+   */
+  get parserResources(): ParserResourceScope {
+    return this.parserResourceScope
+  }
+
   private nextFileId = 1
   private readonly files = new Map<
     string,

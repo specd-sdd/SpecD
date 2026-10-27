@@ -6,20 +6,12 @@
   "dependsOn": ["core:vcs-adapter-port", "default:_global/architecture"],
   "implementation": [
     {
-      "file": "core:src/application/specd-config.ts",
-      "symbols": ["SpecdGraphConfig", "SpecdWorkspaceGraphConfig"]
-    },
-    {
       "file": "core:src/application/ports/config-schema.ts",
-      "symbols": ["ProjectGraphZodSchema", "WorkspaceGraphZodSchema"]
+      "symbols": ["WorkspaceGraphZodSchema", "ProjectGraphZodSchema"]
     },
     {
-      "file": "core:src/infrastructure/fs/config-loader.ts",
-      "symbols": ["FsConfigLoader"]
-    },
-    {
-      "file": "core:test/infrastructure/fs/config-loader.spec.ts",
-      "symbols": ["FsConfigLoader"]
+      "file": "core:src/application/specd-config.ts",
+      "symbols": ["SpecdWorkspaceGraphConfig", "SpecdGraphConfig"]
     }
   ],
   "optimizations": {

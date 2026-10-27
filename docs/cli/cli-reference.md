@@ -1251,6 +1251,12 @@ using a successful exit code as proof that every input became a graph node.
 Completed results also include counts and elapsed milliseconds for import resolution,
 dependency facts, adapter relations, re-exports, hierarchy/overrides, persistence,
 and search-index rebuilding in text and structured output.
+Results also report size gating metrics: `filesSkippedForSize` (count of skipped oversized files),
+`largestSkippedForSize` (array of `{ filePath, projectRelativePath, sizeBytes, limitBytes }`, largest
+first, at most 25) and `sizeExemptAnalysed` (array of `{ filePath, projectRelativePath, sizeBytes }`
+for oversized files indexed under exemption). In text output, skipped files are summarized with
+formatted byte sizes and an actionable `graph.largeFilePaths` YAML snippet (root-level files are
+anchored with a leading `/`).
 
 Code Graph owns the shared writer lock and the process-isolated worker used for every
 production index run. The CLI supplies its trusted packaged task through the SDK and
@@ -1258,6 +1264,12 @@ renders only the returned progress, result, and typed failure. During an active 
 Code Graph forwards `SIGINT` or `SIGTERM` to that run's child, waits for cleanup, and
 returns a typed failure without terminating or re-signalling the CLI host. There is no
 public in-process indexing mode.
+A silence watchdog monitors child worker activity: if 10 seconds elapse without IPC activity,
+a warning is emitted to `stderr` in text mode (`warning: no progress for 10s while processing <file>. If that file is not needed, add it to graph.excludePaths or lower graph.maxFileBytes.`),
+repeating at most every 10 seconds while silent.
+Worker failures exit with code 3 and report structured diagnostics: failure cause (`start-failed`,
+`task-contract`, `task-error`, `protocol`, `cancelled`, `native-crash`, `resource-limit`,
+`exited`), last activity item and time ago, and trailing 16 KiB tails of child stdout and stderr.
 
 | Option                      | Description                                                                                    |
 | --------------------------- | ---------------------------------------------------------------------------------------------- |
@@ -1267,7 +1279,7 @@ public in-process indexing mode.
 | `--exclude-path <pattern>`  | Gitignore-syntax pattern to exclude (repeatable; merges with config).                          |
 | `--format text\|json\|toon` | Output format.                                                                                 |
 
-#### Config fields: `graph.includePaths`, `graph.excludePaths`, `graph.respectGitignore`, and `workspace.graph.allowedPaths`
+#### Config fields: `graph.includePaths`, `graph.excludePaths`, `graph.respectGitignore`, `graph.maxFileBytes`, `graph.largeFilePaths`, and `workspace.graph.allowedPaths`
 
 Each workspace in `specd.yaml` may declare a `graph` block:
 
@@ -1277,6 +1289,9 @@ workspaces:
     codeRoot: ./
     graph:
       respectGitignore: true # optional; default: true
+      maxFileBytes: 262144 # optional; override limit in bytes (0 disables limit)
+      largeFilePaths: # optional; size exemptions relative to codeRoot
+        - 'src/generated/ast-tokens.ts'
       excludePaths: # optional; gitignore-syntax, supports ! negation
         - node_modules/
         - dist/
@@ -1286,6 +1301,9 @@ workspaces:
         - src/**
         - package.json
 graph:
+  maxFileBytes: 262144 # optional; project-global limit in bytes (default: 262144 = 256 KiB)
+  largeFilePaths: # optional; project-global size exemptions relative to projectRoot
+    - 'docs/adr/0029-cross-language-symbol-semantics.md'
   includePaths: # optional; gitignore-syntax paths relative to projectRoot, indexed as root:...
     - docs/**
     - pnpm-workspace.yaml
@@ -1293,6 +1311,10 @@ graph:
     - specd-sdd/
     - specs/
 ```
+
+**`graph.maxFileBytes`** — project-global maximum file size in bytes for indexing code and documents (default `262144` = 256 KiB). Files exceeding this threshold are skipped during code graph indexing with coverage reason `file-too-large`. Setting `0` disables size gating. Workspaces may override this limit individually.
+
+**`graph.largeFilePaths`** — project-global gitignore-syntax patterns (relative to project root) exempting oversized files from the `maxFileBytes` limit. Exempt files are indexed even when oversized, but must still pass gitignore, `excludePaths`, `allowedPaths`, and binary detection. Workspaces can add workspace-relative exemptions via `workspaces.<name>.graph.largeFilePaths`.
 
 **`graph.excludePaths`** — global exclusions for file/document discovery. When set in config, they replace the built-in defaults; CLI `--exclude-path` flags are appended on top. Patterns follow gitignore syntax and support `!` negation. The built-in defaults are:
 
@@ -1545,6 +1567,13 @@ reason, VCS visibility, derivation fingerprint, schema/generation, and index cov
 dimension separate. A current VCS ref alone does not prove current indexed content.
 Text output includes persisted coverage counts for indexed, excluded, unsupported,
 parse-failed, and partial inputs; structured output preserves the same summary.
+Health also reports `coverageCompleteness` (`complete`, `complete-with-warnings`,
+`incomplete`, or `unknown`) and `coverageWarnings`. Files skipped by the per-file size limit
+(`graph.maxFileBytes`) leave the aggregate `coverageComplete` flag `true`, because skipping them is
+an explicit outcome, but they make the completeness `complete-with-warnings`: text output then
+prints `coverage: complete with warnings (N file(s) skipped: file-too-large)` and a hint to exempt
+files with `graph.largeFilePaths`, and a missing symbol is not proof of absence for code that may
+live in those files. JSON and TOON expose both fields unchanged.
 
 VCS workspaces assess normalized graph-visible staged, unstaged, untracked, deleted,
 and renamed paths once per repository. Non-VCS workspaces compare persisted

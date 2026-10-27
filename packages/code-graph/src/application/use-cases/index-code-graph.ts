@@ -28,12 +28,20 @@ import {
 } from '../../domain/value-objects/index-options.js'
 import {
   IMPORT_DIAGNOSTIC_SAMPLE_LIMIT,
+  SIZE_SKIP_LIST_LIMIT,
   type ImportDiagnosticSummary,
   type IndexResult,
   type IndexError,
   type IndexRunCoverageSummary,
   type WorkspaceIndexBreakdown,
 } from '../../domain/value-objects/index-result.js'
+import {
+  type IndexEvent,
+  type SizeSkippedFile,
+  type SizeExemptFile,
+} from '../../domain/value-objects/index-event.js'
+import { createFileSizeGate } from '../services/file-size-gate.js'
+import { closeParserResourceEpoch } from '../services/close-parser-resource-epoch.js'
 import { type AdapterRegistryPort } from '../../domain/ports/adapter-registry-port.js'
 import { type ResolutionManifestSource } from '../ports/resolution-manifest-source.js'
 import { type RepositoryRootSource } from '../ports/repository-root-source.js'
@@ -388,26 +396,40 @@ function readRelationsStageChunk(stageDir: string, filename: string): RelationsS
 }
 
 /**
+ * Compares two strings by UTF-16 code units so that ordering does not depend on the host locale.
+ * @param a - First string.
+ * @param b - Second string.
+ * @returns A negative number, zero, or a positive number.
+ */
+function compareCodeUnits(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0
+}
+
+/**
  * Groups file paths into chunks where each chunk's total source size
  * does not exceed the byte budget.
  * @param files - Array of [workspace-prefixed path, absolute path] tuples.
  * @param budget - Maximum bytes per chunk.
+ * @param sizeLookup - Optional lookup for cached file sizes.
  * @returns An array of tuple arrays (chunks).
  */
 function groupIntoChunks(
   files: Array<[string, string]>,
   budget: number,
+  sizeLookup?: (absPath: string) => number | null | undefined,
 ): Array<Array<[string, string]>> {
   const chunks: Array<Array<[string, string]>> = []
   let current: Array<[string, string]> = []
   let currentBytes = 0
 
   for (const entry of files) {
-    let size = 0
-    try {
-      size = statSync(entry[1]).size
-    } catch {
-      size = 0
+    let size: number | null | undefined = sizeLookup ? sizeLookup(entry[1]) : null
+    if (size === null || size === undefined) {
+      try {
+        size = statSync(entry[1]).size
+      } catch {
+        size = 0
+      }
     }
 
     if (current.length > 0 && currentBytes + size > budget) {
@@ -475,12 +497,17 @@ export class IndexCodeGraph {
    * This is the primary write path into the code graph. It handles both code files
    * (via language adapters) and textual documents (as generic DocumentNodes).
    *
+   * Discovered files are evaluated against the effective size gate before reading or hashing.
+   * Files exceeding the effective size limit (default 256 KiB) are skipped with coverage reason 'file-too-large'.
+   * Parser resources are tracked in per-file epochs that are closed in finally blocks before event-loop yields.
+   *
    * @param options - Options controlling the indexing run, including rich workspaces.
    * @returns A summary result with counts and any errors encountered.
    */
   async execute(options: IndexOptions): Promise<IndexResult> {
     const start = performance.now()
     const errors: IndexError[] = []
+    const diagnostics: IndexError[] = []
     const phaseMetrics = {
       importResolution: { count: 0, durationMs: 0 },
       dependencyFacts: { count: 0, durationMs: 0 },
@@ -494,9 +521,17 @@ export class IndexCodeGraph {
     const chunkBudget = options.chunkBytes ?? DEFAULT_CHUNK_BYTES
     const runId = `index-stage-${Date.now()}`
     const stageDir = makeStageDir(this.store.storagePath, runId)
+    let activeSession: IndexSession | undefined
     try {
       const progress = (pct: number, phase: string, detail?: string): void => {
         onProgress(Math.min(pct, 100), detail ? `${phase} — ${detail}` : phase)
+      }
+      const emitEvent = (event: IndexEvent): void => {
+        try {
+          options.onEvent?.(event)
+        } catch (error) {
+          Logger.debug(`[IndexCodeGraph] onEvent listener threw: ${String(error)}`)
+        }
       }
 
       // ── Discovery (0-5%) ──
@@ -514,6 +549,10 @@ export class IndexCodeGraph {
         options.workspaces,
         options.graphConfig,
       )
+      const sizeGate = createFileSizeGate(effectiveGraphConfig)
+      const fileSizes = new Map<string, number | null>()
+      const sizeSkipped = new Map<string, SizeSkippedFile>()
+      const sizeExempt = new Map<string, SizeExemptFile>()
 
       // 1. Workspace Discovery
       for (const ws of options.workspaces) {
@@ -539,14 +578,45 @@ export class IndexCodeGraph {
         for (const relPath of discovered) {
           const prefixed = `${ws.name}:${relPath}`
           const absPath = join(ws.codeRoot, relPath)
-          const projectRel = toPortableGraphPath(relative(options.projectRoot, absPath))
+          const rawProjectRel = toPortableGraphPath(relative(options.projectRoot, absPath))
+          const projectRel = rawProjectRel.startsWith('./') ? rawProjectRel.slice(2) : rawProjectRel
 
-          allDiscoveredPaths.push(prefixed)
-          absolutePaths.set(prefixed, absPath)
-          projectRelativePaths.set(
-            prefixed,
-            projectRel.startsWith('./') ? projectRel.slice(2) : projectRel,
-          )
+          const decision = sizeGate.decide({
+            workspaceName: ws.name,
+            relativeToCodeRoot: relPath,
+            projectRelativePath: projectRel,
+            absolutePath: absPath,
+          })
+
+          if (decision.kind === 'skip') {
+            projectRelativePaths.set(prefixed, projectRel)
+            sizeSkipped.set(prefixed, {
+              filePath: prefixed,
+              projectRelativePath: projectRel,
+              sizeBytes: decision.sizeBytes,
+              limitBytes: decision.limitBytes,
+            })
+            emitEvent({
+              kind: 'file-skipped',
+              filePath: prefixed,
+              projectRelativePath: projectRel,
+              sizeBytes: decision.sizeBytes,
+              limitBytes: decision.limitBytes,
+              reason: 'file-too-large',
+            })
+          } else {
+            fileSizes.set(prefixed, decision.sizeBytes)
+            if (decision.kind === 'exempt') {
+              sizeExempt.set(prefixed, {
+                filePath: prefixed,
+                projectRelativePath: projectRel,
+                sizeBytes: decision.sizeBytes,
+              })
+            }
+            allDiscoveredPaths.push(prefixed)
+            absolutePaths.set(prefixed, absPath)
+            projectRelativePaths.set(prefixed, projectRel)
+          }
         }
       }
 
@@ -579,10 +649,56 @@ export class IndexCodeGraph {
         for (const relPath of filteredRootDiscovered) {
           const prefixed = `root:${relPath}`
           const absPath = join(options.projectRoot, relPath)
-          allDiscoveredPaths.push(prefixed)
-          absolutePaths.set(prefixed, absPath)
-          projectRelativePaths.set(prefixed, toPortableGraphPath(relPath))
+          const projectRel = toPortableGraphPath(relPath)
+
+          const decision = sizeGate.decide({
+            workspaceName: 'root',
+            relativeToCodeRoot: projectRel,
+            projectRelativePath: projectRel,
+            absolutePath: absPath,
+          })
+
+          if (decision.kind === 'skip') {
+            projectRelativePaths.set(prefixed, projectRel)
+            sizeSkipped.set(prefixed, {
+              filePath: prefixed,
+              projectRelativePath: projectRel,
+              sizeBytes: decision.sizeBytes,
+              limitBytes: decision.limitBytes,
+            })
+            emitEvent({
+              kind: 'file-skipped',
+              filePath: prefixed,
+              projectRelativePath: projectRel,
+              sizeBytes: decision.sizeBytes,
+              limitBytes: decision.limitBytes,
+              reason: 'file-too-large',
+            })
+          } else {
+            fileSizes.set(prefixed, decision.sizeBytes)
+            if (decision.kind === 'exempt') {
+              sizeExempt.set(prefixed, {
+                filePath: prefixed,
+                projectRelativePath: projectRel,
+                sizeBytes: decision.sizeBytes,
+              })
+            }
+            allDiscoveredPaths.push(prefixed)
+            absolutePaths.set(prefixed, absPath)
+            projectRelativePaths.set(prefixed, projectRel)
+          }
         }
+      }
+
+      // Record coverage for size-skipped files on every run
+      for (const [skippedPath] of sizeSkipped) {
+        coverageByFilePath.set(skippedPath, {
+          filePath: skippedPath,
+          contentHash: undefined,
+          status: IndexCoverageStatus.Unsupported,
+          reason: 'file-too-large',
+          capabilities: [],
+        })
       }
 
       const existingFiles = await this.store.getAllFiles()
@@ -597,9 +713,14 @@ export class IndexCodeGraph {
         existingArtifactHashes.set(document.path, document.contentHash)
         indexedResourceKinds.set(document.path, IndexedResourceKind.Document)
       }
-      const existingCoverage = await this.store.findIndexCoverage(allDiscoveredPaths)
+      const existingCoverage = await this.store.findIndexCoverage([
+        ...allDiscoveredPaths,
+        ...sizeSkipped.keys(),
+      ])
       for (const coverage of existingCoverage) {
-        coverageByFilePath.set(coverage.filePath, coverage)
+        if (!coverageByFilePath.has(coverage.filePath)) {
+          coverageByFilePath.set(coverage.filePath, coverage)
+        }
         if (coverage.contentHash !== undefined && !existingArtifactHashes.has(coverage.filePath)) {
           existingArtifactHashes.set(coverage.filePath, coverage.contentHash)
         }
@@ -763,6 +884,13 @@ export class IndexCodeGraph {
             }
           } catch (err) {
             errors.push({ filePath: prefixedPath, message: String(err) })
+            coverageByFilePath.set(prefixedPath, {
+              filePath: prefixedPath,
+              contentHash: undefined,
+              status: IndexCoverageStatus.ParseFailed,
+              reason: 'hash-failed',
+              capabilities: [],
+            })
           }
           if (i % 200 === 0) {
             progress(
@@ -781,10 +909,21 @@ export class IndexCodeGraph {
           const existingHash = existingArtifactHashes.get(prefixedPath)
           if (existingHash === undefined) {
             newFiles.push(prefixedPath)
-          } else if (hash && existingHash !== hash) {
+          } else if (hash === undefined) {
+            // The content could not be hashed in this run: the target is retried, never skipped.
+            if (coverageByFilePath.get(prefixedPath)?.status === IndexCoverageStatus.ParseFailed) {
+              changedFiles.push(prefixedPath)
+            }
+          } else if (existingHash !== hash) {
             changedFiles.push(prefixedPath)
-          } else if (hash && existingHash === hash) {
-            skippedFiles.push(prefixedPath)
+          } else if (existingHash === hash) {
+            // The persisted hash does not authorize skipping a target whose last outcome was a
+            // failure: a normal incremental run retries it.
+            if (coverageByFilePath.get(prefixedPath)?.status === IndexCoverageStatus.ParseFailed) {
+              changedFiles.push(prefixedPath)
+            } else {
+              skippedFiles.push(prefixedPath)
+            }
           }
         }
 
@@ -794,11 +933,14 @@ export class IndexCodeGraph {
           ...existingDocuments.map((existing) => existing.path),
           ...existingCoverage.map((coverage) => coverage.filePath),
         ])
+        const sizeSkippedPaths = new Set(sizeSkipped.keys())
         for (const existingPath of existingPaths) {
           const workspace = workspaceIdentityName(existingPath)
-          if (!discoveredSet.has(existingPath) && indexedWorkspaceNames.has(workspace)) {
-            deletedFiles.push(existingPath)
-          }
+          if (!indexedWorkspaceNames.has(workspace)) continue
+          if (discoveredSet.has(existingPath)) continue
+          const skippedForSize = sizeSkippedPaths.has(existingPath)
+          if (skippedForSize && !indexedResourceKinds.has(existingPath)) continue
+          deletedFiles.push(existingPath)
         }
       }
 
@@ -856,17 +998,37 @@ export class IndexCodeGraph {
       )
 
       // ── Pass 1: Extract symbols (7-50%) ──
+      // Files within size limits (or exempt) are grouped into chunks using cached sizes.
+      // For each file, the adapter registers parser resources into the session's scope.
+      // In the per-file finally block, the parser-resource epoch is closed and garbage collection
+      // is requested before any event-loop yield, bounding native memory retention to at most one file.
+      // A target that fails after its analysis (import resolution, relation building) is recorded
+      // as parse-failed so that a normal incremental run retries it even when its hash is unchanged.
+      const markStageFailed = (prefixedPath: string, reason: string): void => {
+        coverageByFilePath.set(prefixedPath, {
+          filePath: prefixedPath,
+          contentHash: fileHashes.get(prefixedPath),
+          status: IndexCoverageStatus.ParseFailed,
+          reason,
+          capabilities: [],
+        })
+      }
       Logger.debug('[IndexCodeGraph] Code Indexing Phase 1 (analyze/register) started')
       const pass1Start = performance.now()
       const fileTuples: Array<[string, string]> = filesToProcess.map((p) => [
         p,
         absolutePaths.get(p)!,
       ])
-      const chunks = groupIntoChunks(fileTuples, chunkBudget)
+      const sizeByAbsolutePath = new Map<string, number | null>()
+      for (const [prefixed, abs] of absolutePaths) {
+        sizeByAbsolutePath.set(abs, fileSizes.get(prefixed) ?? null)
+      }
+      const chunks = groupIntoChunks(fileTuples, chunkBudget, (abs) => sizeByAbsolutePath.get(abs))
       const totalToProcess = filesToProcess.length
       let filesIndexed = 0
       let documentsIndexed = 0
       const session = new InMemoryIndexSession()
+      activeSession = session
       if (persistedReferenceFacts !== undefined) {
         const replacedPaths = new Set([...filesToProcess, ...deletedFiles])
         const retainedFiles = existingFiles.filter((file) => !replacedPaths.has(file.path))
@@ -906,7 +1068,7 @@ export class IndexCodeGraph {
         if (isAccessible) {
           accessible.push(ws)
         } else {
-          errors.push({
+          diagnostics.push({
             filePath: `${ws.name}:<manifest>`,
             message: `Workspace "${ws.name}" skipped for package resolution: code root "${ws.codeRoot}" is not accessible`,
           })
@@ -966,10 +1128,10 @@ export class IndexCodeGraph {
           let identity: string | undefined
           try {
             identity = adapter.packageResolution.identity(ws.codeRoot, wsRepoRoot, (message) => {
-              errors.push({ filePath: `${ws.name}:<manifest>`, message })
+              diagnostics.push({ filePath: `${ws.name}:<manifest>`, message })
             })
           } catch (err) {
-            errors.push({
+            diagnostics.push({
               filePath: `${ws.name}:<manifest>`,
               message: `Package identity failed for adapter "${adapter.languages().join(',')}": ${String(err)}`,
             })
@@ -987,7 +1149,7 @@ export class IndexCodeGraph {
               existingClaims.add(ws.name)
               packageToWorkspace.delete(identity)
               const sorted = [...existingClaims].sort().join(', ')
-              errors.push({
+              diagnostics.push({
                 filePath: `${ws.name}:<manifest>`,
                 message: `Package identity collision: "${identity}" is claimed by workspaces ${sorted}`,
               })
@@ -1062,6 +1224,13 @@ export class IndexCodeGraph {
         const chunkSymbols: SymbolNode[] = []
         for (const [prefixedPath, absPath] of chunk) {
           processed++
+          emitEvent({
+            kind: 'file-activity',
+            filePath: prefixedPath,
+            sizeBytes: fileSizes.get(prefixedPath) ?? null,
+            index: processed,
+            total: totalToProcess,
+          })
           if (processed % 50 === 0 || processed === 1) {
             progress(
               7 + Math.round((processed / Math.max(totalToProcess, 1)) * 43),
@@ -1096,6 +1265,7 @@ export class IndexCodeGraph {
               }
               const wsName = workspaceIdentityName(prefixedPath)
               const hash = fileHashes.get(prefixedPath) ?? computeContentHash(decodedContent)
+              fileHashes.set(prefixedPath, hash)
               const document = createDocumentNode({
                 path: prefixedPath,
                 projectRelativePath: projectRelativePaths.get(prefixedPath) ?? '',
@@ -1133,6 +1303,7 @@ export class IndexCodeGraph {
             const language = this.registry.getLanguageForFile(relPath) ?? 'unknown'
             const content = contentBuffer.toString('utf-8')
             const hash = fileHashes.get(prefixedPath) ?? computeContentHash(content)
+            fileHashes.set(prefixedPath, hash)
             const wsName = workspaceIdentityName(prefixedPath)
             const ws = options.workspaces.find((w) => w.name === wsName)
             const wsRepoRoot =
@@ -1239,12 +1410,19 @@ export class IndexCodeGraph {
               reason: 'analysis-failed',
               capabilities: [],
             })
-          }
-
-          if (processed % 50 === 0) {
-            Logger.debug(`[IndexCodeGraph] Yielding event loop at ${processed} files`)
-            await new Promise<void>((resolve) => setImmediate(resolve))
-            Logger.debug(`[IndexCodeGraph] Resuming from event loop yield at ${processed} files`)
+          } finally {
+            closeParserResourceEpoch(session.parserResources, (failure) =>
+              emitEvent({
+                kind: 'resource-disposal-failed',
+                filePath: prefixedPath,
+                message: failure.message,
+              }),
+            )
+            if (processed % 50 === 0) {
+              Logger.debug(`[IndexCodeGraph] Yielding event loop at ${processed} files`)
+              await new Promise<void>((resolve) => setImmediate(resolve))
+              Logger.debug(`[IndexCodeGraph] Resuming from event loop yield at ${processed} files`)
+            }
           }
         }
         const stageFile = `pass1-${String(chunkIndex).padStart(5, '0')}.json`
@@ -1309,7 +1487,7 @@ export class IndexCodeGraph {
             projectRoot: options.projectRoot,
           })
         } catch (err) {
-          errors.push({
+          diagnostics.push({
             filePath: `${adapter.languages().join(',')}:<packageResolution>`,
             message: String(err),
           })
@@ -1328,7 +1506,7 @@ export class IndexCodeGraph {
           session.addReferenceFacts(linked)
           reexportCount += linked.publicBindings.length + linked.steps.length
         } catch (err) {
-          errors.push({
+          diagnostics.push({
             filePath: `${adapter.languages().join(',')}:<reExportLinking>`,
             message: String(err),
           })
@@ -1402,6 +1580,7 @@ export class IndexCodeGraph {
             phaseMetrics.importResolution.count += resolvedImports.fileImports.length
           } catch (err) {
             errors.push({ filePath: prefixedPath, message: String(err) })
+            markStageFailed(prefixedPath, 'import-resolution-failed')
           }
         }
         phaseMetrics.importResolution.durationMs += performance.now() - importResolutionStart
@@ -1481,6 +1660,7 @@ export class IndexCodeGraph {
             }
           } catch (err) {
             errors.push({ filePath: prefixedPath, message: String(err) })
+            markStageFailed(prefixedPath, 'relation-build-failed')
           }
         }
 
@@ -1730,7 +1910,10 @@ export class IndexCodeGraph {
             specsIndexed++
             if (wsBreakdown) wsBreakdown.specsIndexed++
           } catch (err) {
-            errors.push({ filePath: repoSpec.name.toString(), message: String(err) })
+            errors.push({
+              filePath: `${ws.name}:${repoSpec.name.toString()}`,
+              message: String(err),
+            })
           }
         }
 
@@ -1822,36 +2005,41 @@ export class IndexCodeGraph {
       )
       const serializedFingerprintMap = serializeFingerprintMap(currentFingerprintMap)
       const observations: IndexedInputObservation[] = []
-      if (errors.length === 0) {
-        observations.push(...specObservations)
-        for (const resourceId of allDiscoveredPaths) {
-          const resourceKind = indexedResourceKinds.get(resourceId)
-          const absolutePath = absolutePaths.get(resourceId)
-          const inputLocator = projectRelativePaths.get(resourceId)
-          const indexedContentHash =
-            fileHashes.get(resourceId) ?? existingArtifactHashes.get(resourceId)
-          if (
-            resourceKind === undefined ||
-            absolutePath === undefined ||
-            inputLocator === undefined ||
-            indexedContentHash === undefined
-          ) {
-            continue
-          }
-          const stat = statSync(absolutePath)
-          observations.push({
-            workspace: workspaceIdentityName(resourceId),
-            resourceKind,
-            resourceId,
-            inputKind: IndexedInputKind.Filesystem,
-            inputLocator,
-            indexedContentHash,
-            lastObservedMtime: stat.mtimeMs,
-            lastObservedSize: stat.size,
-            generation: serializedFingerprintMap,
-            stale: false,
-          })
+      // Freshness and processing outcome are separate axes: a target that failed in this run has no
+      // observation (it shows as unknown until a later run indexes it), and every other target
+      // records the content that was seen, so a failure never keeps the graph stale.
+      const failedTargets = new Set(errors.map((error) => error.filePath))
+      observations.push(
+        ...specObservations.filter((observation) => !failedTargets.has(observation.resourceId)),
+      )
+      for (const resourceId of allDiscoveredPaths) {
+        const resourceKind = indexedResourceKinds.get(resourceId)
+        const absolutePath = absolutePaths.get(resourceId)
+        const inputLocator = projectRelativePaths.get(resourceId)
+        const indexedContentHash =
+          fileHashes.get(resourceId) ?? existingArtifactHashes.get(resourceId)
+        if (
+          failedTargets.has(resourceId) ||
+          resourceKind === undefined ||
+          absolutePath === undefined ||
+          inputLocator === undefined ||
+          indexedContentHash === undefined
+        ) {
+          continue
         }
+        const stat = statSync(absolutePath)
+        observations.push({
+          workspace: workspaceIdentityName(resourceId),
+          resourceKind,
+          resourceId,
+          inputKind: IndexedInputKind.Filesystem,
+          inputLocator,
+          indexedContentHash,
+          lastObservedMtime: stat.mtimeMs,
+          lastObservedSize: stat.size,
+          generation: serializedFingerprintMap,
+          stale: false,
+        })
       }
       const hierarchyStart = performance.now()
       const crossFileOverrides = this.deriveCrossFileOverrideRelations(
@@ -1908,7 +2096,7 @@ export class IndexCodeGraph {
         steps: session
           .getResolutionSteps()
           .filter((step) => knownReferenceIds.has(step.fromId) && knownReferenceIds.has(step.toId)),
-        coverage: allDiscoveredPaths.map(
+        coverage: [...allDiscoveredPaths, ...sizeSkipped.keys()].map(
           (filePath): IndexCoverage =>
             coverageByFilePath.get(filePath) ?? {
               filePath,
@@ -1942,12 +2130,8 @@ export class IndexCodeGraph {
         rebuildSearchIndexes,
         ...(options.vcsRef === undefined ? {} : { vcsRef: options.vcsRef }),
         graphFingerprint: serializedFingerprintMap,
-        ...(errors.length === 0
-          ? {
-              indexedWorkspaces: [...indexedWorkspaceNames],
-              clearGraphStaleLatch: true,
-            }
-          : {}),
+        indexedWorkspaces: [...indexedWorkspaceNames],
+        clearGraphStaleLatch: true,
       })
       try {
         const persistenceStart = performance.now()
@@ -2028,16 +2212,29 @@ export class IndexCodeGraph {
         })
       }
 
-      session.setAdapterState('napi-keepalive', null)
+      const sortedLargestSkipped = [...sizeSkipped.values()]
+        .sort((a, b) => b.sizeBytes - a.sizeBytes || compareCodeUnits(a.filePath, b.filePath))
+        .slice(0, SIZE_SKIP_LIST_LIMIT)
+      const sortedSizeExempt = [...sizeExempt.values()].sort(
+        (a, b) => b.sizeBytes - a.sizeBytes || compareCodeUnits(a.filePath, b.filePath),
+      )
+
       return {
-        filesDiscovered: allDiscoveredPaths.length,
+        filesDiscovered: allDiscoveredPaths.length + sizeSkipped.size,
         filesIndexed: filesIndexed + documentsIndexed,
         documentsIndexed,
         filesRemoved: filesRemovedCount,
         filesSkipped: skippedFiles.length,
+        filesSkippedForSize: sizeSkipped.size,
+        largestSkippedForSize: sortedLargestSkipped,
+        sizeExemptAnalysed: sortedSizeExempt,
         specsDiscovered: totalSpecsToProcess,
         specsIndexed,
-        errors,
+        errors: errors.filter(
+          (error, index) =>
+            errors.findIndex((other) => other.filePath === error.filePath) === index,
+        ),
+        diagnostics,
         duration: performance.now() - start,
         workspaces,
         vcsRef: options.vcsRef ?? null,
@@ -2057,6 +2254,13 @@ export class IndexCodeGraph {
         } satisfies ImportDiagnosticSummary,
       }
     } finally {
+      if (activeSession !== undefined) {
+        closeParserResourceEpoch(activeSession.parserResources, (failure) =>
+          Logger.debug(
+            `[IndexCodeGraph] parser resource disposal failed while closing the run: ${failure.message}`,
+          ),
+        )
+      }
       rmSync(stageDir, { recursive: true, force: true })
     }
   }

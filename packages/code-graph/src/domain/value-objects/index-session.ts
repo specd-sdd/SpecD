@@ -4,6 +4,7 @@ import { type DocumentNode } from './document-node.js'
 import { type Relation } from './relation.js'
 import { type FileAnalysis, type FileAnalysisDraft } from './file-analysis.js'
 import { type FileCategory } from './file-node.js'
+import { type ParserResourceScope } from './parser-resource-scope.js'
 import {
   type DeclarationOccurrence,
   type LocalBinding,
@@ -66,6 +67,11 @@ export interface RegisterAnalysisInput {
  * file-level analysis results, and relations during an indexing run.
  */
 export interface IndexSession {
+  /**
+   * Scope holding parser-owned resources for the file currently being analysed.
+   */
+  readonly parserResources: ParserResourceScope
+
   /**
    * Registers a file and returns its numeric ID.
    */

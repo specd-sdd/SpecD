@@ -62,6 +62,8 @@ JSON/TOON output schema:
             workspaces,
             contentFresh,
             coverageComplete,
+            coverageCompleteness,
+            coverageWarnings,
             coverage,
             schemaCompatible,
             generationCurrent,
@@ -113,7 +115,20 @@ JSON/TOON output schema:
             lines.push(`Content fresh:    ${String(contentFresh)}`)
             lines.push(`Graph state:      ${aggregateState}`)
             lines.push(`Known stale:      ${String(aggregateLatch)}`)
-            lines.push(`Coverage complete: ${String(coverageComplete)}`)
+            if (coverageCompleteness === 'complete-with-warnings') {
+              const warnings = coverageWarnings ?? []
+              const detail = warnings.map((w) => `${String(w.count)} file(s) skipped: ${w.code}`)
+              lines.push(
+                detail.length > 0
+                  ? `coverage: complete with warnings (${detail.join('; ')})`
+                  : 'coverage: complete with warnings',
+              )
+              lines.push(
+                '  files above graph.maxFileBytes are not indexed; exempt them with graph.largeFilePaths',
+              )
+            } else {
+              lines.push(`Coverage complete: ${String(coverageComplete)}`)
+            }
             lines.push(
               `Coverage: indexed=${String(coverageSummary.byStatus.indexed)}, excluded=${String(coverageSummary.byStatus.excluded)}, unsupported=${String(coverageSummary.byStatus.unsupported)}, parse-failed=${String(coverageSummary.byStatus['parse-failed'])}, partial=${String(coverageSummary.byStatus.partial)}`,
             )
@@ -121,6 +136,7 @@ JSON/TOON output schema:
             lines.push(`Generation current: ${String(generationCurrent)}`)
             if (
               coverageComplete !== true ||
+              coverageCompleteness === 'complete-with-warnings' ||
               contentFresh !== true ||
               aggregateState !== 'current'
             ) {

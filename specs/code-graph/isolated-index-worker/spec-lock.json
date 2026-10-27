@@ -6,14 +6,57 @@
   "dependsOn": ["code-graph:sqlite-graph-store"],
   "implementation": [
     {
-      "file": "code-graph:src/infrastructure/isolated-index-worker/supervisor.ts",
-      "symbols": ["runIsolatedGraphIndexWithRuntime"]
+      "file": "code-graph:src/domain/value-objects/graph-index-worker-types.ts",
+      "symbols": [
+        "GraphIndexFailureCause",
+        "GraphIndexWorkerDiagnostics",
+        "GraphIndexWorkerEvent",
+        "GraphIndexTaskAnnouncer"
+      ]
     },
     {
-      "file": "code-graph:src/application/ports/isolated-graph-index-runner.ts"
+      "file": "code-graph:src/domain/errors/isolated-graph-index-errors.ts",
+      "symbols": [
+        "GraphIndexWorkerError",
+        "GraphIndexWorkerStartError",
+        "GraphIndexTaskContractError",
+        "GraphIndexTaskExecutionError",
+        "GraphIndexWorkerProtocolError",
+        "GraphIndexWorkerExitError",
+        "GraphIndexWorkerSignalError",
+        "GraphIndexProgressHandlerError"
+      ]
     },
     {
-      "file": "code-graph:test/infrastructure/isolated-index-worker/supervisor.spec.ts"
+      "file": "code-graph:src/domain/errors/index.ts"
+    },
+    {
+      "file": "code-graph:src/infrastructure/isolated-index-worker/protocol.ts",
+      "symbols": ["GRAPH_INDEX_PROTOCOL", "isChildMessage", "ACTIVITY_ITEM_MAX_CHARS"]
+    },
+    {
+      "file": "code-graph:src/application/ports/isolated-graph-index-runner.ts",
+      "symbols": ["GraphIndexTask", "RunIsolatedGraphIndexInput"]
+    },
+    {
+      "file": "code-graph:src/infrastructure/isolated-index-worker/isolated-index-worker-child.ts"
+    },
+    {
+      "file": "code-graph:src/infrastructure/isolated-index-worker/output-tail.ts",
+      "symbols": ["OutputTail"]
+    },
+    {
+      "file": "code-graph:src/infrastructure/isolated-index-worker/classify-failure.ts",
+      "symbols": ["classifyWorkerFailure"]
+    },
+    {
+      "file": "code-graph:src/infrastructure/isolated-index-worker/supervisor.ts"
+    },
+    {
+      "file": "code-graph:src/public.ts"
+    },
+    {
+      "file": "code-graph:src/index.ts"
     }
   ],
   "optimizations": {

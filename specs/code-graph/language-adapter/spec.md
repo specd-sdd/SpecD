@@ -143,6 +143,16 @@ The draft MUST include every deterministic analysis fact the adapter needs later
 
 The draft MAY include compact per-file parser-specific state when that state avoids repeated deterministic work in Pass 2, but it MUST remain serializable in memory-friendly plain data structures and MUST NOT retain AST nodes, parser trees, or other heavyweight parser-runtime objects.
 
+Parser-owned resources that must outlive the synchronous parse call only until the file's analysis is finished are governed by Requirement: Parser-owned resource registration, not by the draft.
+
+### Requirement: Parser-owned resource registration
+
+An adapter whose parsing library holds native, WASM, or otherwise explicitly managed memory SHALL register the parser-owned resources it creates while analysing a file in the parser-resource scope exposed by the `IndexSession`, together with a disposal function when its library requires explicit release. The registration SHALL happen inside `analyzeFile`, immediately after the content is parsed and before any traversal of the parse result, so that the resource is released at the end of the file's epoch even when the analysis throws. Every built-in adapter (TypeScript, Python, Go, and PHP) SHALL follow this rule, and each of their specs states it for that adapter. It MUST NOT keep those resources in adapter-private session state, in adapter-instance fields, or in any collection that outlives the file's analysis.
+
+An adapter whose library needs no retention or release SHALL register nothing. The registration contract MUST be independent of any specific parsing library, so a new adapter built on a different parser library SHALL satisfy it without a change to the indexer, the index session, the resolver, or the graph stores.
+
+Everything that remains after `analyzeFile` returns SHALL be plain data that does not reference a registered resource.
+
 ### Requirement: Parser-authoritative structural fact extraction
 
 When the configured parser represents a source construct, an adapter SHALL derive the construct's declaration role, call or construction form, import, binding, type reference, hierarchy relation, owner, scope, caller, arguments, and source range from typed parser nodes, named fields, ancestry, and parser coordinates. Raw-source regular expressions or substring scans MUST NOT independently decide that such a structural or semantic fact exists.

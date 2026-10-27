@@ -1,3 +1,8 @@
+import {
+  type GraphIndexTaskAnnouncer,
+  type GraphIndexWorkerEvent,
+} from '../../domain/value-objects/graph-index-worker-types.js'
+
 /** A primitive value accepted by the isolated graph-index JSON boundary. */
 export type GraphIndexJsonPrimitive = null | boolean | number | string
 
@@ -21,6 +26,7 @@ export type GraphIndexTaskProgressEmitter<TProgress> = (progress: TProgress) => 
 export type GraphIndexTask<TInput, TProgress, TResult> = (
   input: TInput,
   emitProgress: GraphIndexTaskProgressEmitter<TProgress>,
+  announce: GraphIndexTaskAnnouncer,
 ) => Promise<TResult>
 
 /** Host-facing input for one isolated graph-index execution. */
@@ -35,6 +41,8 @@ export interface RunIsolatedGraphIndexInput<TInput, TProgress> {
   readonly onProgress?: (progress: TProgress) => void
   /** Optional receiver for non-fatal warnings such as recovery of a stale index lock. */
   readonly onWarning?: (message: string) => void
+  /** Optional receiver for structured worker events (activity, silence, stale-lock recovery). */
+  readonly onEvent?: (event: GraphIndexWorkerEvent) => void
 }
 
 /** Application port for process-isolated graph-index task execution. */

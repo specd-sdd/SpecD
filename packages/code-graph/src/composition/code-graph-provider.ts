@@ -647,6 +647,8 @@ export class CodeGraphProviderImpl implements CodeGraphProvider {
         fingerprintMismatch: null,
         contentFresh: null,
         coverageComplete: null,
+        coverageCompleteness: 'unknown',
+        coverageWarnings: [],
         coverage: {
           total: 0,
           byStatus: {

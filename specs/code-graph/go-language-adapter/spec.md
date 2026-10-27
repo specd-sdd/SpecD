@@ -10,7 +10,7 @@ The Go language adapter translates Go source into package-aware code-graph symbo
 
 `GoLanguageAdapter` SHALL handle `.go` files as `go`. It SHALL parse supplied content once through the registered Tree-sitter/ast-grep grammar and return one complete `FileAnalysisDraft` containing symbols, imports, scoped facts, call facts, reference facts, and compact serializable parser state needed in Pass 2.
 
-The adapter SHALL derive the declared package from source and package identity from the nearest bounded `go.mod`. It MUST NOT invoke the Go toolchain, compile packages, or retain parser AST objects in persisted analysis state.
+The adapter SHALL derive the declared package from source and package identity from the nearest bounded `go.mod`. It MUST NOT invoke the Go toolchain, compile packages, or retain parser AST objects in persisted analysis state. The adapter SHALL register the parse result in the parser-resource scope of the `IndexSession` (`session.parserResources`), as defined by Requirement: Parser-owned resource registration of `code-graph:language-adapter`. The registration SHALL happen inside `analyzeFile`, immediately after the content is parsed and before any traversal of the parse result, so that the resource is released at the end of the file's epoch even when the analysis throws. The adapter MUST NOT keep parser objects in adapter-private session state, in adapter-instance fields, or in the returned draft.
 
 ### Requirement: Go parser-authoritative structural extraction
 

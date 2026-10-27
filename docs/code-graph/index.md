@@ -257,6 +257,26 @@ Derivation fingerprints include normalized content hashes for package/build inpu
 such as package/tsconfig, Python project, Go module/workspace, and Composer manifests.
 Changing one therefore invalidates resolution evidence even when source files do not.
 
+### File size gate and memory bounds
+
+Before reading candidate file contents into memory, the indexing engine probes each file's size with filesystem stat calls:
+
+1. **Size evaluation:** If a file's byte size strictly exceeds the effective `maxFileBytes` (default: 256 KiB) and the path is not exempt by `largeFilePaths`, the file is skipped with coverage status `unsupported` and reason `file-too-large`.
+2. **I/O avoidance:** Skipped files are never read into memory, never hashed, and never passed to language adapters. No `File` or `Symbol` graph nodes are created for them.
+3. **Failures and diagnostics:** A file that fails to be analysed is reported in `errors` and as `parse-failed` coverage, and every normal incremental run retries it. Package-resolution and re-export-linking problems are reported in `diagnostics`, apart from `errors`. Neither keeps the stale latches set once the run commits.
+4. **Tracking & Metrics:** Results report `filesSkippedForSize`, `largestSkippedForSize`, and `sizeExemptAnalysed`. In incremental runs, shrinking a previously skipped file automatically indexes it, while growing past the limit removes prior nodes and counts the file in `filesRemoved`.
+
+### Per-file parser-resource epoch & yield-after-close
+
+Tree-sitter parser allocations and AST trees allocate native memory outside the V8 heap (~3 KB per source byte). To prevent memory exhaustion during long indexing runs:
+
+1. **Bounded Resource Scope:** Each file's analysis occurs within a strictly scoped `ParserResourceScope`. Language adapters register their native AST tree instances via `session.parserResources.register(tree, () => tree.delete())`.
+2. **Deterministic Epoch Closure:** When parsing and symbol extraction for a file finishes — or fails with an error — `closeParserResourceEpoch` runs immediately:
+   - All registered resources in the scope are disposed in reverse (LIFO) registration order.
+   - If `globalThis.gc` is available (e.g. via `--expose-gc` in the isolated worker), garbage collection is triggered to reclaim native binding wrappers.
+   - Any disposal failures emit a `ResourceDisposalFailedEvent` and do not abort the indexing run.
+3. **Yield-After-Close Rule:** The indexer yields execution to the Node.js event loop (`await setImmediate()`) after closing each file's epoch. This yield allows the V8 runtime and libuv threadpool to run asynchronous finalizers and reclaim external native memory before the next file begins parsing. Max parser scope size remains 1 across all file transitions.
+
 ## Bulk indexing
 
 One `IndexWriteSession` owns each index generation. Indexing prebuilds lookup maps,

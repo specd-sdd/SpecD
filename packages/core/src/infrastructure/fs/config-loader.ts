@@ -470,6 +470,12 @@ export class FsConfigLoader extends ConfigLoader {
                 ...(ws.graph.ignorePaths !== undefined
                   ? { ignorePaths: ws.graph.ignorePaths }
                   : {}),
+                ...(ws.graph.maxFileBytes !== undefined
+                  ? { maxFileBytes: ws.graph.maxFileBytes }
+                  : {}),
+                ...(ws.graph.largeFilePaths !== undefined
+                  ? { largeFilePaths: ws.graph.largeFilePaths }
+                  : {}),
               },
             }
           : {}),
@@ -633,6 +639,12 @@ export class FsConfigLoader extends ConfigLoader {
           : {}),
         testPaths: data.graph?.testPaths ?? DEFAULT_GRAPH_TEST_PATHS,
         ignorePaths: data.graph?.ignorePaths ?? DEFAULT_GRAPH_IGNORE_PATHS,
+        ...(data.graph?.maxFileBytes !== undefined
+          ? { maxFileBytes: data.graph.maxFileBytes }
+          : {}),
+        ...(data.graph?.largeFilePaths !== undefined
+          ? { largeFilePaths: data.graph.largeFilePaths }
+          : {}),
       },
       logging: { level: data.logging?.level ?? 'info' },
       ...(data.actorProvider !== undefined ? { actorProvider: data.actorProvider } : {}),

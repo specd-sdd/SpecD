@@ -6,6 +6,7 @@ import {
   GraphStorageRecoveryRequiredError,
   type IndexProgressCallback,
   type IndexResult,
+  type IndexEventReceiver,
 } from '@specd/code-graph'
 import { createVcsAdapter } from '@specd/core'
 import { type SdkHostContext } from '../composition/host-context.js'
@@ -21,6 +22,8 @@ export interface RunIndexProjectGraphInput {
   readonly workspaces?: readonly string[]
   /** Progress callback forwarded to the indexer. */
   readonly onProgress?: IndexProgressCallback
+  /** Presentation-neutral indexing event receiver. */
+  readonly onEvent?: IndexEventReceiver
   /** Hook invoked before provider open (only applies when creating a transient provider). */
   readonly beforeOpen?: (provider: CodeGraphProvider) => Promise<void>
   /** Hook invoked after provider close (only applies when creating a transient provider). */
@@ -99,6 +102,7 @@ export async function runIndexProjectGraph(
       derivationMismatch,
       ...(vcsRef !== undefined ? { vcsRef } : {}),
       ...(input.onProgress !== undefined ? { onProgress: input.onProgress } : {}),
+      ...(input.onEvent !== undefined ? { onEvent: input.onEvent } : {}),
       getSpecMetadata: ctx.kernel.specs.getMetadata,
     })
     return {

@@ -17,6 +17,56 @@
 - **WHEN** indexing runs
 - **THEN** the callback is passed to `provider.index()`
 
+#### Scenario: The event receiver is forwarded unchanged
+
+- **GIVEN** an input with `onEvent`
+- **WHEN** `execute` calls `provider.index()`
+- **THEN** the `IndexOptions` carries the same receiver
+
+### Requirement: Effective size limit resolution
+
+#### Scenario: The default is applied when nothing is declared
+
+- **GIVEN** a graph configuration without `maxFileBytes`
+- **WHEN** the effective graph configuration is built
+- **THEN** every workspace has an effective limit of 262144 bytes
+
+#### Scenario: A workspace value overrides the project value
+
+- **GIVEN** a project limit and a different limit for one workspace
+- **WHEN** the effective graph configuration is built
+- **THEN** that workspace gets its own value and the others get the project value
+
+#### Scenario: Zero means no limit
+
+- **GIVEN** a limit of `0`
+- **WHEN** the effective graph configuration is built
+- **THEN** the effective limit expresses that no limit applies
+
+#### Scenario: The bootstrap configuration gets the same default
+
+- **GIVEN** no `specd.yaml` and the bootstrapped graph configuration
+- **WHEN** the effective graph configuration is built
+- **THEN** the effective limit is 262144 bytes
+
+#### Scenario: Exemptions keep their base directories
+
+- **GIVEN** project and workspace `largeFilePaths`
+- **WHEN** the effective graph configuration is built
+- **THEN** the project patterns resolve against the project root and the workspace patterns against its `codeRoot`
+
+#### Scenario: The resolved values feed the fingerprint
+
+- **GIVEN** two configurations that differ only in the resolved limit
+- **WHEN** their fingerprints are computed
+- **THEN** the fingerprints differ
+
+#### Scenario: No other call site applies the default
+
+- **GIVEN** the indexing run and the health computation
+- **WHEN** they need the limit
+- **THEN** both read it from the effective graph configuration and neither defines the default itself
+
 ### Requirement: Supports forced logical reindex
 
 #### Scenario: Force intent reaches provider indexing

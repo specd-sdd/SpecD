@@ -135,6 +135,11 @@ Use this pattern in a monorepo where a top-level `default` workspace coordinates
 ```yaml
 schema: '@specd/schema-std'
 
+graph:
+  maxFileBytes: 262144 # Project-wide size limit: 256 KiB (default)
+  largeFilePaths:
+    - 'docs/generated/**/*.md' # Exempt from project-level limit (relative to project root)
+
 workspaces:
   # The default workspace covers root-level scripts, configs, and shared global specs.
   # Because codeRoot defaults to '.' (the repo root), it physically encloses all child packages.
@@ -173,6 +178,10 @@ workspaces:
     ownership: owned
     contextIncludeSpecs:
       - 'core:composition'
+    graph:
+      maxFileBytes: 524288 # Workspace override: 512 KiB limit for packages/core
+      largeFilePaths:
+        - 'src/generated/ast-tokens.ts' # Relative to packages/core codeRoot
 
   cli:
     specs:
@@ -223,6 +232,7 @@ storage:
 - **`prefix: _global`:** Specs located under `specs/_global/architecture.md` are referenced with ID `default:_global/architecture`.
 - **Targeted context filters:** When `core` is active in a change, its `composition` specs are automatically pulled into context.
 - **Yearly and monthly archive folders:** Changes archive into `.specd/archive/2026/09/20260924-143511-my-change/`.
+- **File size limits and large file exemptions:** `graph.maxFileBytes` configures a project-level limit (default `262144` = 256 KiB) to protect indexing memory. Oversized files are skipped with reason `file-too-large`. Workspaces can override the threshold (e.g. `core` overrides `maxFileBytes: 524288`) and exempt oversized files with `graph.largeFilePaths` (resolved relative to project root at project level, or relative to workspace `codeRoot` in workspace graph blocks).
 
 ---
 
@@ -485,6 +495,13 @@ graph:
     - 'build/'
     - 'coverage/'
     - '**/*.spec.ts'
+  # File size limit in bytes (Default: 262144 = 256 KiB; 0 disables the limit):
+  maxFileBytes: 262144
+  # Gitignore-syntax patterns relative to project root exempt from file size limit:
+  largeFilePaths:
+    - 'docs/adr/0029-cross-language-symbol-semantics.md'
+    - 'tools/generated/**/*.ts'
+    - '!tools/generated/unsupported/**'
 
 # 12. Workspaces Configuration
 # Defines repositories and sub-directories containing specs and source code.
@@ -528,6 +545,12 @@ workspaces:
     ownership: owned
     contextIncludeSpecs:
       - 'core:ports/*'
+    graph:
+      # Workspace file size limit override (replaces project limit for this workspace):
+      maxFileBytes: 524288 # 512 KiB
+      # Gitignore-syntax patterns relative to codeRoot exempt from size limit:
+      largeFilePaths:
+        - 'src/generated/ast-tokens.ts'
 
   external-service:
     specs:

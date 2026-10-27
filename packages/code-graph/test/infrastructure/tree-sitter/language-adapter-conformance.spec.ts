@@ -9,7 +9,15 @@ import { PythonLanguageAdapter } from '../../../src/infrastructure/tree-sitter/p
 import { GoLanguageAdapter } from '../../../src/infrastructure/tree-sitter/go-language-adapter.js'
 import { PhpLanguageAdapter } from '../../../src/infrastructure/tree-sitter/php-language-adapter.js'
 import { InMemoryIndexSession } from '../../../src/application/use-cases/in-memory-index-session.js'
-import { type LanguageAdapter } from '../../../src/domain/value-objects/language-adapter.js'
+import {
+  type AdapterAnalyzeContext,
+  type LanguageAdapter,
+} from '../../../src/domain/value-objects/language-adapter.js'
+import { type FileAnalysisDraft } from '../../../src/domain/value-objects/file-analysis.js'
+import {
+  type ParserResourceScope,
+  type ParserResourceDisposer,
+} from '../../../src/domain/value-objects/parser-resource-scope.js'
 import { SymbolKind } from '../../../src/domain/value-objects/symbol-kind.js'
 import { type SymbolNode } from '../../../src/domain/value-objects/symbol-node.js'
 import { type CallFact } from '../../../src/domain/value-objects/call-fact.js'
@@ -1363,6 +1371,336 @@ describe('LanguageAdapter Conformance Suite', () => {
           await cleanStore.close()
           await incrementalStore.close()
         }
+      })
+    })
+
+    describe('Requirement: Parser-owned resource registration', () => {
+      it('registers parse result right after parsing and before traversal for all built-in adapters', () => {
+        const adapters: Record<string, LanguageAdapter> = {
+          typescript: new TypeScriptLanguageAdapter(),
+          python: new PythonLanguageAdapter(),
+          go: new GoLanguageAdapter(),
+          php: new PhpLanguageAdapter(),
+        }
+
+        for (const [lang, adapter] of Object.entries(adapters)) {
+          const fixture = CONFORMANCE_FIXTURES[lang]
+          if (!fixture) continue
+
+          const session = new InMemoryIndexSession()
+          const events: string[] = []
+          let registeredObj: object | null = null
+
+          const origScope = session.parserResources
+          const wrappedScope: ParserResourceScope = {
+            get size(): number {
+              return origScope.size
+            },
+            register(resource: object, dispose?: ParserResourceDisposer): void {
+              events.push('register')
+              registeredObj = resource
+              origScope.register(resource, dispose)
+            },
+            close() {
+              events.push('close')
+              return origScope.close()
+            },
+          }
+          Object.defineProperty(session, 'parserResources', {
+            value: wrappedScope,
+            configurable: true,
+          })
+
+          const draft = adapter.analyzeFile(fixture.fileName, fixture.containedCallerSnippet, {
+            session,
+            workspaceName: 'ws',
+          })
+
+          expect(events).toEqual(['register'])
+          expect(registeredObj).not.toBeNull()
+          expect(origScope.size).toBe(1)
+          expect(draft.symbols.length).toBeGreaterThan(0)
+
+          // Closes and releases
+          const closeResult = session.parserResources.close()
+          expect(closeResult.registered).toBe(1)
+          expect(origScope.size).toBe(0)
+        }
+      })
+
+      it('releases parse resource when traversal throws during analyzeFile', () => {
+        const adapters: Record<string, LanguageAdapter> = {
+          typescript: new TypeScriptLanguageAdapter(),
+          python: new PythonLanguageAdapter(),
+          go: new GoLanguageAdapter(),
+          php: new PhpLanguageAdapter(),
+        }
+
+        for (const [lang, adapter] of Object.entries(adapters)) {
+          const fixture = CONFORMANCE_FIXTURES[lang]
+          if (!fixture) continue
+
+          const session = new InMemoryIndexSession()
+          let registeredObj: Record<string, unknown> | null = null
+
+          const origScope = session.parserResources
+          const wrappedScope: ParserResourceScope = {
+            get size(): number {
+              return origScope.size
+            },
+            register(resource: object, dispose?: ParserResourceDisposer): void {
+              registeredObj = resource as Record<string, unknown>
+              origScope.register(resource, dispose)
+              // Tamper with root() so traversal throws immediately
+              if (typeof registeredObj.root === 'function') {
+                registeredObj.root = () => {
+                  throw new Error(`Simulated traversal error for ${lang}`)
+                }
+              }
+            },
+            close() {
+              return origScope.close()
+            },
+          }
+          Object.defineProperty(session, 'parserResources', {
+            value: wrappedScope,
+            configurable: true,
+          })
+
+          expect(() => {
+            adapter.analyzeFile(fixture.fileName, fixture.containedCallerSnippet, {
+              session,
+              workspaceName: 'ws',
+            })
+          }).toThrow(`Simulated traversal error for ${lang}`)
+
+          // The resource was already registered before traversal threw
+          expect(session.parserResources.size).toBe(1)
+          const closeResult = session.parserResources.close()
+          expect(closeResult.registered).toBe(1)
+          expect(session.parserResources.size).toBe(0)
+        }
+      })
+
+      it('holds no run-wide keepalive state and keeps nothing in instance fields or adapter state', () => {
+        const adapters: Record<string, LanguageAdapter> = {
+          typescript: new TypeScriptLanguageAdapter(),
+          python: new PythonLanguageAdapter(),
+          go: new GoLanguageAdapter(),
+          php: new PhpLanguageAdapter(),
+        }
+
+        for (const [lang, adapter] of Object.entries(adapters)) {
+          const fixture = CONFORMANCE_FIXTURES[lang]
+          if (!fixture) continue
+
+          const session = new InMemoryIndexSession()
+          let registeredRef: WeakRef<object> | null = null
+
+          const origScope = session.parserResources
+          const wrappedScope: ParserResourceScope = {
+            get size(): number {
+              return origScope.size
+            },
+            register(resource: object, dispose?: ParserResourceDisposer): void {
+              registeredRef = new WeakRef(resource)
+              origScope.register(resource, dispose)
+            },
+            close() {
+              return origScope.close()
+            },
+          }
+          Object.defineProperty(session, 'parserResources', {
+            value: wrappedScope,
+            configurable: true,
+          })
+
+          adapter.analyzeFile(fixture.fileName, fixture.containedCallerSnippet, {
+            session,
+            workspaceName: 'ws',
+          })
+
+          expect(session.getAdapterState('napi-keepalive')).toBeUndefined()
+          session.parserResources.close()
+          expect(session.parserResources.size).toBe(0)
+
+          // Adapter instance fields must not retain the registered resource
+          const deref = (registeredRef as WeakRef<object> | null)?.deref()
+          if (deref) {
+            for (const val of Object.values(adapter)) {
+              expect(val).not.toBe(deref)
+            }
+          }
+        }
+      })
+
+      it('returns a draft with no registered resource', () => {
+        const adapters: Record<string, LanguageAdapter> = {
+          typescript: new TypeScriptLanguageAdapter(),
+          python: new PythonLanguageAdapter(),
+          go: new GoLanguageAdapter(),
+          php: new PhpLanguageAdapter(),
+        }
+
+        for (const [lang, adapter] of Object.entries(adapters)) {
+          const fixture = CONFORMANCE_FIXTURES[lang]
+          if (!fixture) continue
+
+          const session = new InMemoryIndexSession()
+          let registeredObj: object | null = null
+
+          const origScope = session.parserResources
+          const wrappedScope: ParserResourceScope = {
+            get size(): number {
+              return origScope.size
+            },
+            register(resource: object, dispose?: ParserResourceDisposer): void {
+              registeredObj = resource
+              origScope.register(resource, dispose)
+            },
+            close() {
+              return origScope.close()
+            },
+          }
+          Object.defineProperty(session, 'parserResources', {
+            value: wrappedScope,
+            configurable: true,
+          })
+
+          const draft = adapter.analyzeFile(fixture.fileName, fixture.containedCallerSnippet, {
+            session,
+            workspaceName: 'ws',
+          })
+
+          function containsTarget(value: unknown, target: object): boolean {
+            if (value === target) return true
+            if (value && typeof value === 'object') {
+              for (const child of Object.values(value)) {
+                if (containsTarget(child, target)) return true
+              }
+            }
+            return false
+          }
+
+          expect(containsTarget(draft, registeredObj!)).toBe(false)
+        }
+      })
+
+      it('returns a draft made only of plain data, holding no parser node or native object', () => {
+        const adapters: Record<string, LanguageAdapter> = {
+          typescript: new TypeScriptLanguageAdapter(),
+          python: new PythonLanguageAdapter(),
+          go: new GoLanguageAdapter(),
+          php: new PhpLanguageAdapter(),
+        }
+
+        /**
+         * Collects the paths of values that are not plain data (class instances, functions).
+         * @param value - Value to inspect.
+         * @param path - Path of the value, for the failure message.
+         * @param seen - Objects already visited, to stop on cycles.
+         * @returns Paths of the offending values.
+         */
+        function nonPlainPaths(value: unknown, path: string, seen = new Set<object>()): string[] {
+          if (value === null || value === undefined) return []
+          if (typeof value === 'function') return [path]
+          if (typeof value !== 'object') return []
+          if (seen.has(value)) return []
+          seen.add(value)
+          if (value instanceof Map) {
+            return [...value.entries()].flatMap(([key, item]) =>
+              nonPlainPaths(item, `${path}[${String(key)}]`, seen),
+            )
+          }
+          if (value instanceof Set) {
+            return [...value].flatMap((item, index) =>
+              nonPlainPaths(item, `${path}[${index}]`, seen),
+            )
+          }
+          if (Array.isArray(value)) {
+            return value.flatMap((item, index) => nonPlainPaths(item, `${path}[${index}]`, seen))
+          }
+          const proto = Object.getPrototypeOf(value) as object | null
+          if (proto !== Object.prototype && proto !== null) return [path]
+          return Object.entries(value).flatMap(([key, item]) =>
+            nonPlainPaths(item, `${path}.${key}`, seen),
+          )
+        }
+
+        for (const [lang, adapter] of Object.entries(adapters)) {
+          const fixture = CONFORMANCE_FIXTURES[lang]
+          if (!fixture) continue
+          const session = new InMemoryIndexSession()
+          const draft = adapter.analyzeFile(fixture.fileName, fixture.containedCallerSnippet, {
+            session,
+            workspaceName: 'ws',
+          })
+
+          expect({ lang, offending: nonPlainPaths(draft, 'draft') }).toEqual({
+            lang,
+            offending: [],
+          })
+        }
+      })
+
+      it('supports a fake-library adapter with explicit disposal without core changes', () => {
+        let disposed = false
+        const fakeRoot = { ast: 'fake-ast', tree: {} }
+
+        const fakeAdapter: LanguageAdapter = {
+          languages(): string[] {
+            return ['fakelang']
+          },
+          extensions(): Record<string, string> {
+            return { '.fake': 'fakelang' }
+          },
+          resolutionManifests(): readonly string[] {
+            return []
+          },
+          analyzeFile(
+            filePath: string,
+            _content: string,
+            context: AdapterAnalyzeContext,
+          ): FileAnalysisDraft {
+            context.session.parserResources.register(fakeRoot, () => {
+              disposed = true
+            })
+            return {
+              language: 'fake-lib',
+              symbols: [],
+              imports: [],
+              bindingFacts: [],
+              callFacts: [],
+            }
+          },
+          resolveImports() {
+            return {
+              importMap: new Map(),
+              fileImports: [],
+              steps: [],
+              diagnostics: [],
+            }
+          },
+          buildRelations() {
+            return []
+          },
+        }
+
+        const session = new InMemoryIndexSession()
+        const draft = fakeAdapter.analyzeFile('test.fake', 'dummy', {
+          session,
+          workspaceName: 'ws',
+        })
+
+        expect(draft.symbols).toEqual([])
+        expect(session.parserResources.size).toBe(1)
+        expect(disposed).toBe(false)
+
+        const closeResult = session.parserResources.close()
+        expect(closeResult.registered).toBe(1)
+        expect(closeResult.failures).toEqual([])
+        expect(session.parserResources.size).toBe(0)
+        expect(disposed).toBe(true)
       })
     })
   })

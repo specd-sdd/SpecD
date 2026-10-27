@@ -273,22 +273,104 @@ The SDK provides pure projection utilities that map SQLite canonical identifiers
 - `toProjectRelativePath(config, canonicalPath)`: Resolves `<workspace>:<relPath>` against `config.projectRoot` and the workspace's declared `codeRoot`.
 - `splitWorkspaceIdentity(canonicalPath)`: Purely decomposes a canonical identity string into `{ workspace, relPath }`.
 
+#### Process-Isolated Indexing (`runIsolatedGraphIndex`)
+
 `runIsolatedGraphIndex` is the SDK re-export for a host that needs to run a trusted,
 installed graph-index task in a child process. The host supplies a graph storage root,
 an absolute task path or `file:` URL, JSON-serializable input, and optionally receives
-ordered progress values. Code Graph acquires and releases the shared writer lock,
-launches and supervises the child, validates IPC, and forwards `SIGINT`/`SIGTERM` only
-for the active run. Typed worker failures are re-exported alongside the function.
+ordered progress and activity events. Code Graph acquires and releases the shared writer lock,
+launches and supervises the child with piped stdio and `--expose-gc`, validates IPC, and
+forwards `SIGINT`/`SIGTERM` only for the active run.
+
+```typescript
+import { runIsolatedGraphIndex, GraphIndexWorkerEvent, GraphIndexWorkerError } from '@specd/sdk'
+
+const result = await runIsolatedGraphIndex({
+  storageRoot: '.specd/config/graph',
+  taskModulePath: '/path/to/task.mjs',
+  input: { force: false },
+  onProgress: (progress) => console.log('Progress:', progress),
+  onEvent: (event: GraphIndexWorkerEvent) => {
+    switch (event.kind) {
+      case 'activity':
+        // Activity heartbeat from worker (e.g. file item)
+        break
+      case 'worker-silent':
+        // Emitted when worker produces no IPC activity for >= 10s
+        console.warn(`Worker silent for ${event.silentForMs}ms on ${event.item}`)
+        break
+      case 'stale-lock-recovered':
+        // Emitted when a stale writer lock was safely removed
+        console.warn(`Recovered stale lock at ${event.lockPath}`)
+        break
+    }
+  },
+})
+```
+
+##### Worker Failure Classification & Diagnostics
+
+When the child process encounters an unrecoverable failure, `runIsolatedGraphIndex` rejects with a typed `GraphIndexWorkerError` instance carrying `diagnostics: GraphIndexWorkerDiagnostics`:
+
+- **`cause: GraphIndexFailureCause`**: Classified cause of failure:
+  - `'start-failed'`: Child failed to spawn or fork, or its IPC channel could not be established.
+  - `'task-contract'`: Task module missing required export or returned invalid structure.
+  - `'task-error'`: Task threw an unhandled exception during execution.
+  - `'protocol'`: Invalid, late or duplicate IPC message, or a host progress or event callback that threw.
+  - `'cancelled'`: Process was interrupted by a signal that the supervisor forwarded.
+  - `'resource-limit'`: Child terminated after V8 reported memory exhaustion on its standard error.
+  - `'native-crash'`: Process crashed in a native addon / tree-sitter binding (`SIGSEGV`, `SIGBUS`, `SIGILL`, `SIGABRT`, or a Windows access-violation or abort exit code).
+  - `'exited'`: Any other exit without a valid terminal message.
+- **`lastActivity`**: `{ item: string, agoMs: number } | null` identifying the last task item processed before failure.
+- **`stdoutTail`**: Trailing output (up to 16 KiB) captured from child `stdout`.
+- **`stderrTail`**: Trailing output (up to 16 KiB) captured from child `stderr`.
+
+#### Project Graph Indexing (`runIndexProjectGraph`)
 
 The task itself can call `runIndexProjectGraph` after reconstructing the intended SDK
 context. This separates parent-side isolation from child-side project orchestration.
 The SDK intentionally does not expose raw lock acquisition, lock paths or leases,
 handoff tokens, child bootstrap controls, or raw IPC envelopes.
 
-For a transient `runIndexProjectGraph({ force: true })` call, the SDK may repair a
-typed `GraphStorageRecoveryRequiredError` exactly once: it closes the failed transient
-provider, recreates closed derived storage, and retries open. Healthy force runs are
-logical full rebuilds and do not physically recreate storage. Non-forced calls,
+`runIndexProjectGraph` supports fine-grained typed indexing events via `onEvent`:
+
+```typescript
+import { runIndexProjectGraph, IndexEvent } from '@specd/sdk'
+
+const indexResult = await runIndexProjectGraph({
+  host,
+  force: false,
+  onEvent: (event: IndexEvent) => {
+    switch (event.kind) {
+      case 'file-activity':
+        // { kind: 'file-activity', file: { workspace, path, sizeBytes } }
+        break
+      case 'file-skipped':
+        // { kind: 'file-skipped', file: { workspace, path, sizeBytes }, reason: 'file-too-large' }
+        break
+      case 'resource-disposal-failed':
+        // { kind: 'resource-disposal-failed', resourceIndex, message }
+        break
+    }
+  },
+})
+
+// Result includes file size gating fields:
+console.log('Skipped files:', indexResult.filesSkippedForSize)
+console.log('Largest skipped:', indexResult.largestSkippedForSize)
+console.log('Exempt files analysed:', indexResult.sizeExemptAnalysed)
+console.log('Failures:', indexResult.errors) // files or specs that failed
+console.log('Diagnostics:', indexResult.diagnostics) // package-resolution problems, not failures
+```
+
+For a transient `runIndexProjectGraph` call, the SDK may repair a typed
+`GraphStorageRecoveryRequiredError` exactly once: it closes the failed transient
+provider, recreates closed derived storage, and retries open. With `force: true` it
+repairs any typed recoverable open failure; without `force` it repairs only an
+incompatible schema (`SCHEMA_INCOMPATIBLE`), because that store cannot be read at all.
+A derivation mismatch detected before any write is repaired the same way, by recreating
+the closed store once and indexing it empty. Healthy force runs are logical full
+rebuilds and do not physically recreate storage. Other typed failures without `force`,
 explicit providers, recovery failures, second-open failures, and unrelated errors do
 not retry or receive deletion authority.
 
@@ -383,7 +465,8 @@ The SDK root exports explicit symbols from the curated `@specd/core` and `@specd
 - `createDefaultConfigLoader`, `createConfigWriter`, `createKernel`, kernel-equivalent `createX` factories, and repository factories
 - Standalone `createX` factories (e.g. `createGetStatus`, `createResolveSchema`) for hosts that need a single use case without `createKernel`
 - Host orchestration: `openSpecdHost`, `withOpenGraphProvider`, `buildProjectStatusSnapshot`, `runIndexProjectGraph`, `runIsolatedGraphIndex`, `buildImplementationReview`, `runGraphSearch`, `runGraphHotspots`, `runGraphImpact`, `toProjectRelativePath`, `splitWorkspaceIdentity`
-- Isolated worker contracts and typed failures: `GraphIndexJsonValue`, `GraphIndexTask`, `RunIsolatedGraphIndexInput`, `GraphIndexWorkerStartError`, `GraphIndexTaskContractError`, `GraphIndexTaskExecutionError`, `GraphIndexWorkerProtocolError`, `GraphIndexWorkerExitError`, `GraphIndexWorkerSignalError`, and `GraphIndexProgressHandlerError`
+- Isolated worker contracts, diagnostics, and typed failures: `GraphIndexJsonValue`, `GraphIndexTask`, `RunIsolatedGraphIndexInput`, `GraphIndexWorkerStartError`, `GraphIndexTaskContractError`, `GraphIndexTaskExecutionError`, `GraphIndexWorkerProtocolError`, `GraphIndexWorkerExitError`, `GraphIndexWorkerSignalError`, `GraphIndexProgressHandlerError`, `GraphIndexWorkerError`, `GraphIndexWorkerEvent`, `GraphIndexFailureCause`, `GraphIndexWorkerDiagnostics`
+- Index events and size gating: `IndexEvent`, `FileActivityEvent`, `FileSkippedEvent`, `ResourceDisposalFailedEvent`, `IndexEventReceiver`, `SizeSkippedFile`, `SizeExemptFile`, `DEFAULT_MAX_FILE_BYTES`
 - Graph helpers: `createGetGraphHealth`, `GetGraphHealthResult`, `IndexResult`, `HotspotResult`, `GraphProviderStaleError`, `GraphStorageRecoveryRequiredError`, `GraphStoreRecreateRequiresClosedError`
 - `SDK_VERSION`, `CORE_VERSION`, `CODE_GRAPH_VERSION`
 

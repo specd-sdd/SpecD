@@ -35,6 +35,11 @@ interface NormalizedWorkspaceFingerprint {
   readonly allowedPaths: readonly string[]
   readonly excludePaths: readonly string[]
   readonly respectGitignore: boolean
+  readonly maxFileBytes: number
+  readonly largeFilePaths: {
+    readonly project: readonly string[]
+    readonly workspace: readonly string[]
+  }
   readonly resolutionInputs: readonly ResolutionInputFingerprint[]
 }
 
@@ -71,6 +76,11 @@ function normalizeWorkspaceFingerprintInput(
       allowedPaths: wsGraph?.allowedPaths ? [...wsGraph.allowedPaths] : [],
       excludePaths: wsGraph?.excludePaths ? [...wsGraph.excludePaths] : [],
       respectGitignore: wsGraph?.respectGitignore ?? true,
+      maxFileBytes: wsGraph?.maxFileBytes ?? effectiveGraphConfig.rootMaxFileBytes,
+      largeFilePaths: {
+        project: wsGraph?.projectLargeFilePaths ? [...wsGraph.projectLargeFilePaths] : [],
+        workspace: wsGraph?.workspaceLargeFilePaths ? [...wsGraph.workspaceLargeFilePaths] : [],
+      },
       resolutionInputs: discoverResolutionInputs(
         projectRoot,
         ws.codeRoot,
@@ -108,6 +118,8 @@ export function computeGraphFingerprint(input: GraphFingerprintInput): string {
       includePaths: effectiveGraphConfig.includePaths,
       globalExcludePaths: effectiveGraphConfig.globalExcludePaths,
       syntheticSpecExcludePaths: effectiveGraphConfig.syntheticSpecExcludePaths,
+      rootMaxFileBytes: effectiveGraphConfig.rootMaxFileBytes,
+      rootLargeFilePaths: effectiveGraphConfig.rootLargeFilePaths,
     },
   })
   return createHash('sha256').update(payload).digest('hex')
@@ -143,6 +155,11 @@ export function computeWorkspaceFingerprint(
     allowedPaths: wsGraph?.allowedPaths ? [...wsGraph.allowedPaths] : [],
     excludePaths: wsGraph?.excludePaths ? [...wsGraph.excludePaths] : [],
     respectGitignore: wsGraph?.respectGitignore ?? true,
+    maxFileBytes: wsGraph?.maxFileBytes ?? effectiveGraphConfig.rootMaxFileBytes,
+    largeFilePaths: {
+      project: wsGraph?.projectLargeFilePaths ? [...wsGraph.projectLargeFilePaths] : [],
+      workspace: wsGraph?.workspaceLargeFilePaths ? [...wsGraph.workspaceLargeFilePaths] : [],
+    },
     resolutionInputs: discoverResolutionInputs(
       projectRoot,
       workspace.codeRoot,
@@ -181,6 +198,8 @@ export function computeRootFingerprint(
     root: {
       includePaths: effectiveGraphConfig.includePaths,
       excludePaths: effectiveGraphConfig.rootExcludePaths,
+      maxFileBytes: effectiveGraphConfig.rootMaxFileBytes,
+      largeFilePaths: effectiveGraphConfig.rootLargeFilePaths,
     },
     workspaces: workspaces.map((workspace) => ({
       name: workspace.name,

@@ -33,6 +33,7 @@ describe('runGraphIndexTask', () => {
         index: { force: true },
       },
       vi.fn(),
+      vi.fn(),
     )
     expect(openSpecdHost).toHaveBeenCalledWith({
       configPath: '/repo/specd.yaml',
@@ -54,6 +55,7 @@ describe('runGraphIndexTask', () => {
         index: { force: false },
       },
       vi.fn(),
+      vi.fn(),
     )
     expect(openSpecdHost).toHaveBeenCalledTimes(1)
     expect(openSpecdHost).toHaveBeenCalledWith({
@@ -73,6 +75,7 @@ describe('runGraphIndexTask', () => {
           context: { mode: 'discovered', startDir: '/repo/packages/app' },
           index: { force: false },
         },
+        vi.fn(),
         vi.fn(),
       ),
     ).rejects.toBe(failure)
@@ -94,6 +97,7 @@ describe('runGraphIndexTask', () => {
         index: { force: false, excludePaths: ['a'] },
       },
       emit,
+      vi.fn(),
     )
     expect(createBootstrapGraphConfig).toHaveBeenCalledWith({
       projectRoot: '/repo',
@@ -111,6 +115,102 @@ describe('runGraphIndexTask', () => {
     const progress = vi.mocked(runIndexProjectGraph).mock.calls[0]?.[1]?.onProgress
     progress?.(25, 'parse')
     expect(emit).toHaveBeenCalledWith({ percent: 25, phase: 'parse' })
+  })
+
+  it('routes file-activity events below 32768 bytes to announce with mandatory: false', async () => {
+    const host = {} as never
+    const emit = vi.fn()
+    const announce = vi.fn()
+    vi.mocked(createBootstrapGraphConfig).mockReturnValue({} as never)
+    vi.mocked(createSdkContext).mockResolvedValue(host)
+    vi.mocked(runIndexProjectGraph).mockResolvedValue({ filesIndexed: 1 } as never)
+
+    await runGraphIndexTask(
+      {
+        context: { mode: 'bootstrap', projectRoot: '/repo', vcsRoot: '/repo/.git' },
+        index: { force: false },
+      },
+      emit,
+      announce,
+    )
+
+    const onEvent = vi.mocked(runIndexProjectGraph).mock.calls[0]?.[1]?.onEvent
+    onEvent?.({
+      kind: 'file-activity',
+      filePath: '/repo/src/small.ts',
+      sizeBytes: 1024,
+      index: 1,
+      total: 10,
+    })
+
+    expect(announce).toHaveBeenCalledWith('/repo/src/small.ts', { mandatory: false })
+    expect(emit).not.toHaveBeenCalled()
+  })
+
+  it('routes file-activity events at or above 32768 bytes to announce with mandatory: true', async () => {
+    const host = {} as never
+    const emit = vi.fn()
+    const announce = vi.fn()
+    vi.mocked(createBootstrapGraphConfig).mockReturnValue({} as never)
+    vi.mocked(createSdkContext).mockResolvedValue(host)
+    vi.mocked(runIndexProjectGraph).mockResolvedValue({ filesIndexed: 1 } as never)
+
+    await runGraphIndexTask(
+      {
+        context: { mode: 'bootstrap', projectRoot: '/repo', vcsRoot: '/repo/.git' },
+        index: { force: false },
+      },
+      emit,
+      announce,
+    )
+
+    const onEvent = vi.mocked(runIndexProjectGraph).mock.calls[0]?.[1]?.onEvent
+    onEvent?.({
+      kind: 'file-activity',
+      filePath: '/repo/src/large.ts',
+      sizeBytes: 32768,
+      index: 2,
+      total: 10,
+    })
+
+    expect(announce).toHaveBeenCalledWith('/repo/src/large.ts', { mandatory: true })
+    expect(emit).not.toHaveBeenCalled()
+  })
+
+  it('routes non-activity events to emitProgress({ event }) and ensures JSON serializability', async () => {
+    const host = {} as never
+    const emit = vi.fn()
+    const announce = vi.fn()
+    vi.mocked(createBootstrapGraphConfig).mockReturnValue({} as never)
+    vi.mocked(createSdkContext).mockResolvedValue(host)
+    vi.mocked(runIndexProjectGraph).mockResolvedValue({ filesIndexed: 1 } as never)
+
+    await runGraphIndexTask(
+      {
+        context: { mode: 'bootstrap', projectRoot: '/repo', vcsRoot: '/repo/.git' },
+        index: { force: false },
+      },
+      emit,
+      announce,
+    )
+
+    const onEvent = vi.mocked(runIndexProjectGraph).mock.calls[0]?.[1]?.onEvent
+    const skippedEvent = {
+      kind: 'file-skipped' as const,
+      filePath: '/repo/huge.ts',
+      projectRelativePath: 'huge.ts',
+      sizeBytes: 500000,
+      limitBytes: 262144,
+      reason: 'file-too-large' as const,
+    }
+    onEvent?.(skippedEvent)
+
+    expect(announce).not.toHaveBeenCalled()
+    expect(emit).toHaveBeenCalledWith({ event: skippedEvent })
+
+    // JSON serializability check
+    const serialized = JSON.stringify({ event: skippedEvent })
+    expect(JSON.parse(serialized)).toEqual({ event: skippedEvent })
   })
 
   it('keeps orchestration on the SDK boundary', () => {

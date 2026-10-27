@@ -1773,4 +1773,23 @@ class Formatter(Protocol):
     const pyiProto = pyiParserState.classes.find((c) => c.name === 'Formatter')
     expect(pyiProto?.kind).toBe(SymbolKind.Interface)
   })
+
+  describe('Parser-owned resource registration', () => {
+    it('registers SgRoot into session.parserResources and leaves no keepalive in session state', () => {
+      const pyAdapter = new PythonLanguageAdapter()
+      const session = new InMemoryIndexSession()
+      const draft = pyAdapter.analyzeFile('file.py', 'def test(): pass', {
+        session,
+        workspaceName: 'ws',
+      })
+
+      expect(draft.symbols.length).toBe(1)
+      expect(session.parserResources.size).toBe(1)
+      expect(session.getAdapterState('napi-keepalive')).toBeUndefined()
+
+      const closeResult = session.parserResources.close()
+      expect(closeResult.registered).toBe(1)
+      expect(session.parserResources.size).toBe(0)
+    })
+  })
 })

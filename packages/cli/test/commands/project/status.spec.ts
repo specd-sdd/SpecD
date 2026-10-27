@@ -59,6 +59,8 @@ function stubSnapshot(
     fingerprintMismatch: false,
     contentFresh: true,
     coverageComplete: true,
+    coverageCompleteness: 'complete',
+    coverageWarnings: [],
     coverage: {
       total: 0,
       byStatus: { indexed: 0, excluded: 0, unsupported: 0, 'parse-failed': 0, partial: 0 },
@@ -544,6 +546,8 @@ describe('project status', () => {
       fingerprintMismatch: false,
       contentFresh: true,
       coverageComplete: true,
+      coverageCompleteness: 'complete',
+      coverageWarnings: [],
       coverage: {
         total: 0,
         byStatus: { indexed: 0, excluded: 0, unsupported: 0, 'parse-failed': 0, partial: 0 },

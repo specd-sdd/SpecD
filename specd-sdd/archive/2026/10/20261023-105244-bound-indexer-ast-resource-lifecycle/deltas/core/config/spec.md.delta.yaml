@@ -1,0 +1,72 @@
+- op: modified
+  description: List the new project-level fields next to the existing ones
+  selector:
+    type: section
+    matches: 'Requirement: Project-level graph configuration'
+  content: |
+    `specd.yaml` MAY include a `graph` section for project-global graph settings.
+
+    - **`includePaths`** — optional array of glob patterns (relative to project root) to discover project-global files outside workspace-owned graph identities (for example `docs/**`, `package.json`).
+    - **`excludePaths`** — optional array of gitignore-syntax patterns to exclude from file/document discovery globally.
+    - **`testPaths`** — optional array of gitignore-syntax patterns identifying test and verification files. When omitted, the built-in defaults apply: `['**/*.spec.*', '**/*.test.*', '**/test/**', '**/tests/**', '**/__tests__/**', '*_test.*']`.
+    - **`ignorePaths`** — optional array of gitignore-syntax patterns identifying auxiliary files (fixtures, static mocks, dev/scratch scripts). When omitted, defaults to an empty array (`[]`).
+    - **`maxFileBytes`** — optional non-negative integer, the per-file size limit defined by Requirement: Graph file size limit.
+    - **`largeFilePaths`** — optional array of gitignore-syntax patterns, relative to the project root, of files exempt from that limit.
+
+    Resources discovered via `graph.includePaths` SHALL be assigned to the reserved `root:` graph namespace only when they are not already owned by a configured workspace `codeRoot`.
+
+    `graph.excludePaths` SHALL apply to project-global discovery and workspace discovery alike. Workspace-level graph filters MAY add additional restrictions, but they MUST NOT remove or override global exclusions.
+
+    Categorization precedence applies across all indexed files:
+
+    1. An exclusion via `excludePaths` or `.gitignore` has absolute priority (file is not read or indexed).
+    2. If the file matches `ignorePaths` (project or workspace level), it is categorized as `ignored`.
+    3. If the file matches `testPaths` (project or workspace level), it is categorized as `test`.
+    4. Otherwise, the file is categorized as `source`.
+
+- op: added
+  description: Workspace-level size limit fields
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Workspace-level graph configuration'
+    after:
+      type: paragraph
+      contains: 'Patterns are evaluated relative to the workspace'
+  content: |
+    **`graph.maxFileBytes`** (non-negative integer) — optional per-workspace override of the project-level per-file size limit, as defined by Requirement: Graph file size limit.
+
+    **`graph.largeFilePaths`** (string array, gitignore-syntax) — optional patterns relative to the workspace's `codeRoot` of files exempt from the size limit. They are added to the project-level `graph.largeFilePaths`.
+
+- op: added
+  description: Contract of the size limit and its exemption
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Project-level graph configuration'
+  content: |
+    ### Requirement: Graph file size limit
+
+    The `graph` section of `specd.yaml` and the `graph` block of each workspace MAY declare the per-file size limit used by the code graph indexer:
+
+    ```yaml
+    graph:
+      maxFileBytes: 262144      # optional; bytes; 0 disables the limit
+      largeFilePaths:           # optional; gitignore-syntax, relative to the project root
+        - app/controllers/legacy_controller.php
+    workspaces:
+      backend:
+        graph:
+          maxFileBytes: 1048576 # optional; replaces the project value for this workspace
+          largeFilePaths:       # optional; relative to this workspace's codeRoot; added to the project ones
+            - controllers/default/**
+    ```
+
+    - **`maxFileBytes`** MUST be a non-negative integer. A negative number, a non-integer, or a non-number value MUST be rejected by startup validation as a configuration error. The value `0` means that no limit applies. When the value is declared at neither level, the configuration exposes the field as absent and the code graph applies its built-in default of 262144 bytes (256 KiB).
+    - A workspace `maxFileBytes` REPLACES the project-level value for files owned by that workspace.
+    - **`largeFilePaths`** is an array of gitignore-syntax patterns that supports negation with `!` within the same list. The project-level patterns are evaluated relative to the project root and the workspace patterns relative to the workspace's `codeRoot`; the effective exemptions of a workspace are both sets together.
+    - A file matched by `largeFilePaths` is exempt from the size limit only. The exemption MUST NOT cause a file excluded by `excludePaths`, `allowedPaths`, or `.gitignore`, or by the binary file filter, to be indexed.
+    - Both fields follow the layer merge semantics of the configuration cascade: a scalar from a later layer wins and arrays append.

@@ -35,6 +35,12 @@ export function buildProjectGraphConfig(
     ignorePaths: [
       ...(overrides.ignorePaths ?? config.graph?.ignorePaths ?? DEFAULT_GRAPH_IGNORE_PATHS),
     ],
+    ...(config.graph?.maxFileBytes !== undefined
+      ? { maxFileBytes: config.graph.maxFileBytes }
+      : {}),
+    ...(config.graph?.largeFilePaths !== undefined
+      ? { largeFilePaths: [...config.graph.largeFilePaths] }
+      : {}),
     workspaces: new Map(
       config.workspaces.map((workspace) => [
         workspace.name,
@@ -50,6 +56,12 @@ export function buildProjectGraphConfig(
             : {}),
           ...(workspace.graph?.ignorePaths !== undefined
             ? { ignorePaths: [...workspace.graph.ignorePaths] }
+            : {}),
+          ...(workspace.graph?.maxFileBytes !== undefined
+            ? { maxFileBytes: workspace.graph.maxFileBytes }
+            : {}),
+          ...(workspace.graph?.largeFilePaths !== undefined
+            ? { largeFilePaths: [...workspace.graph.largeFilePaths] }
             : {}),
           respectGitignore: workspace.graph?.respectGitignore ?? true,
         },

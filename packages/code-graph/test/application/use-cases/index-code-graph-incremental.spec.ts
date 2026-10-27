@@ -270,4 +270,130 @@ class Consumer {
       await store.close()
     })
   })
+
+  describe('Scenario: Size limit in incremental runs and dependents', () => {
+    it('removes an indexed file when it grows past the limit and counts it in filesRemoved', async () => {
+      const projectDir = join(tempDir, 'growing-file-project')
+      writeFiles(projectDir, {
+        'src/growing.ts': 'export const growing = 1;\n',
+      })
+
+      const store = new InMemoryGraphStore(projectDir)
+      await store.open()
+      const tsAdapter = new TypeScriptLanguageAdapter()
+
+      const initialResult = await indexWorkspace(store, tsAdapter, projectDir)
+      expect(initialResult.filesIndexed).toBe(1)
+      expect(initialResult.filesRemoved).toBe(0)
+      expect(initialResult.filesSkippedForSize).toBe(0)
+
+      const symbolsInitial = await store.findSymbols({ name: 'growing' })
+      expect(symbolsInitial).toHaveLength(1)
+
+      // Grow the file past default limit (300 KiB)
+      writeFiles(projectDir, {
+        'src/growing.ts': 'export const growing = 1;\n'.padEnd(300 * 1024, ' '),
+      })
+
+      const secondResult = await indexWorkspace(store, tsAdapter, projectDir)
+      expect(secondResult.filesRemoved).toBe(1)
+      expect(secondResult.filesSkippedForSize).toBe(1)
+
+      // Its nodes and symbols were removed
+      const symbolsAfter = await store.findSymbols({ name: 'growing' })
+      expect(symbolsAfter).toHaveLength(0)
+
+      await store.close()
+    })
+
+    it('indexes a previously skipped oversized file when it shrinks within the limit', async () => {
+      const projectDir = join(tempDir, 'shrinking-file-project')
+      writeFiles(projectDir, {
+        'src/shrinking.ts': 'export const shrunk = 42;\n'.padEnd(300 * 1024, ' '),
+      })
+
+      const store = new InMemoryGraphStore(projectDir)
+      await store.open()
+      const tsAdapter = new TypeScriptLanguageAdapter()
+
+      const initialResult = await indexWorkspace(store, tsAdapter, projectDir)
+      expect(initialResult.filesIndexed).toBe(0)
+      expect(initialResult.filesSkippedForSize).toBe(1)
+
+      // Shrink within limit
+      writeFiles(projectDir, {
+        'src/shrinking.ts': 'export const shrunk = 42;\n',
+      })
+
+      const secondResult = await indexWorkspace(store, tsAdapter, projectDir)
+      expect(secondResult.filesIndexed).toBe(1)
+      expect(secondResult.filesSkippedForSize).toBe(0)
+
+      const symbols = await store.findSymbols({ name: 'shrunk' })
+      expect(symbols).toHaveLength(1)
+
+      await store.close()
+    })
+
+    it('triggers a full rebuild when the size limit configuration is raised', async () => {
+      const projectDir = join(tempDir, 'rebuild-limit-project')
+      writeFiles(projectDir, {
+        'src/big.ts': 'export const big = 99;\n'.padEnd(300 * 1024, ' '),
+      })
+
+      const store = new InMemoryGraphStore(projectDir)
+      await store.open()
+      const registry = new AdapterRegistry()
+      registry.register(new TypeScriptLanguageAdapter())
+      const indexer = new IndexCodeGraph(
+        store,
+        registry,
+        emptyResolutionManifestSource,
+        emptyRepositoryRootSource,
+        new NodeWorkspaceAccessibilitySource(),
+      )
+
+      const baseOptions = makeOptions(projectDir)
+      const initialResult = await indexer.execute(baseOptions)
+      expect(initialResult.filesSkippedForSize).toBe(1)
+      expect(initialResult.filesIndexed).toBe(0)
+
+      // Second run: raise limit to 500 KiB
+      const raisedOptions: IndexOptions = {
+        ...baseOptions,
+        graphConfig: {
+          ...baseOptions.graphConfig,
+          maxFileBytes: 500 * 1024,
+        },
+      }
+      const secondResult = await indexer.execute(raisedOptions)
+      expect(secondResult.fullRebuild).toBe(true)
+      expect(secondResult.filesIndexed).toBe(1)
+      expect(secondResult.filesSkippedForSize).toBe(0)
+
+      await store.close()
+    })
+
+    it('leaves import of an oversized module unresolved with coverage reason file-too-large', async () => {
+      const projectDir = join(tempDir, 'import-oversized-project')
+      writeFiles(projectDir, {
+        'src/importer.ts': `import { val } from './oversized';\nexport const res = val;\n`,
+        'src/oversized.ts': `export const val = 123;\n`.padEnd(300 * 1024, ' '),
+      })
+
+      const store = new InMemoryGraphStore(projectDir)
+      await store.open()
+      const tsAdapter = new TypeScriptLanguageAdapter()
+
+      const result = await indexWorkspace(store, tsAdapter, projectDir)
+      expect(result.filesIndexed).toBe(1) // only importer.ts
+      expect(result.filesSkippedForSize).toBe(1)
+
+      const [oversizedCoverage] = await store.findIndexCoverage(['main:src/oversized.ts'])
+      expect(oversizedCoverage).toBeDefined()
+      expect(oversizedCoverage?.reason).toBe('file-too-large')
+
+      await store.close()
+    })
+  })
 })
