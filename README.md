@@ -223,7 +223,7 @@ Then launch your agent and run the skill:
 
 **Requirements**
 
-- Node.js >= 20
+- Node.js >= 22
 - pnpm >= 10
 
 Install dependencies and run quality checks:

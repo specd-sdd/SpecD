@@ -58,6 +58,29 @@ resolved config and decide how to present them.
 
 Config **reads** go through `kernel.project.getConfig`. Config **writes** (`initProject`, `addPlugin`, `removePlugin`) use `createConfigWriter()` from `@specd/sdk` — not the kernel.
 
+### Closing a host
+
+`SdkHostContext` is `AsyncDisposable`. `dispose()` (aliased by `[Symbol.asyncDispose]`) delegates to `kernel.dispose()`, so repeated and concurrent calls share one disposal and inherit its rules (reverse order, failure isolation with `AggregateError`, bounded timeout):
+
+```typescript
+import { openSpecdHost } from '@specd/sdk'
+
+{
+  await using host = await openSpecdHost()
+  // ...use host.kernel...
+} // host.dispose() runs here
+
+// or, without `using`:
+const host = await openSpecdHost()
+try {
+  // ...
+} finally {
+  await host.dispose()
+}
+```
+
+`dispose()` does **not** close `CodeGraphProvider` instances created through `createGraphProvider()`: whoever creates a provider closes it (for example with `withOpenGraphProvider`). Requires Node.js >= 22.
+
 ## Graph lifecycle
 
 ```typescript

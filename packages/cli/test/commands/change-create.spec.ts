@@ -13,6 +13,7 @@ import {
   captureStdout,
   captureStderr,
   ExitSentinel,
+  makeMockHost,
 } from './helpers.js'
 
 vi.mock('../../src/helpers/cli-context.js', async (importOriginal) => {
@@ -37,7 +38,9 @@ import { buildCliKernelOptions } from '../../src/helpers/cli-context.js'
 function setup(configOverrides: Record<string, unknown> = {}) {
   const config = makeMockConfig(configOverrides)
   const kernel = makeMockKernel()
-  vi.mocked(resolveCliContext).mockResolvedValue({ config, configFilePath: null, kernel })
+  vi.mocked(resolveCliContext).mockResolvedValue(
+    makeMockHost({ config, configFilePath: null, kernel }),
+  )
   const stdout = captureStdout()
   const stderr = captureStderr()
   mockProcessExit()
@@ -414,11 +417,13 @@ describe('Integration (real kernel)', () => {
       invalidation: DEFAULT_INVALIDATION_POLICY,
     }
     kernel = await createKernel(config, buildCliKernelOptions())
-    vi.mocked(resolveCliContext).mockResolvedValue({
-      config,
-      configFilePath: config.configPath,
-      kernel,
-    })
+    vi.mocked(resolveCliContext).mockResolvedValue(
+      makeMockHost({
+        config,
+        configFilePath: config.configPath,
+        kernel,
+      }),
+    )
     mockProcessExit()
   })
 

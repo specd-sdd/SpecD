@@ -9,6 +9,7 @@ import {
   parseWorkflowPolicyFlag,
   resolveCreateInvalidationPolicy,
 } from './_invalidation-flags.js'
+import { CliExitError } from '../../helpers/cli-exit-error.js'
 
 /**
  * Registers the `change create` subcommand on the given parent command.
@@ -71,7 +72,7 @@ JSON/TOON output schema:
             for (const msg of readOnlyErrors) {
               process.stderr.write(`error: ${msg}\n`)
             }
-            process.exit(1)
+            throw new CliExitError(1)
           }
 
           const specIds = parsedSpecs.map((p) => p.specId)

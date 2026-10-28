@@ -323,16 +323,123 @@
 
 ### Requirement: Kernel is a plain object, not a class
 
-#### Scenario: Kernel has no methods or lifecycle
+#### Scenario: Kernel exposes dispose as its only lifecycle operation
 
 - **WHEN** the kernel object is inspected
-- **THEN** it has no `dispose()`, `shutdown()`, `initialize()`, or similar lifecycle methods
+- **THEN** it has `dispose()` and `[Symbol.asyncDispose]()`
+- **AND** it has no `initialize()`, `shutdown()` or similar lifecycle method
 - **AND** it has no event emitter or observable properties
 
-#### Scenario: Kernel is immutable after creation
+#### Scenario: Use cases are immutable after creation
 
 - **WHEN** `createKernel(config)` returns
-- **THEN** the kernel object and its nested groups are not expected to change — there is no `addUseCase()` or `removeUseCase()` mechanism
+- **THEN** the set of use cases is not expected to change — there is no `addUseCase()` or `removeUseCase()` mechanism
+
+### Requirement: Kernel disposal
+
+#### Scenario: Disposers run in reverse registration order
+
+- **GIVEN** a kernel created with disposers `a`, `b` and `c` in that order
+- **WHEN** `kernel.dispose()` is awaited
+- **THEN** the disposers run as `c`, `b`, `a`
+- **AND** each one finishes before the next starts
+
+#### Scenario: Symbol.asyncDispose is an alias
+
+- **GIVEN** a kernel created with one disposer
+- **WHEN** the kernel is closed through `await using` or by calling `kernel[Symbol.asyncDispose]()`
+- **THEN** the disposer runs exactly as it would through `kernel.dispose()`
+
+#### Scenario: Repeated and concurrent calls share one disposal
+
+- **GIVEN** a kernel created with one disposer
+- **WHEN** `dispose()` is called twice concurrently and once more after it settles
+- **THEN** all three calls return the same promise
+- **AND** the disposer ran exactly once
+
+#### Scenario: A failing disposer does not stop the others
+
+- **GIVEN** disposers `a`, `b` and `c`, where `b` rejects
+- **WHEN** `kernel.dispose()` is awaited
+- **THEN** `c`, `b` and `a` all ran
+- **AND** `dispose()` rejects with an `AggregateError` whose `errors` contain one `DisposerFailedError` for `b`
+- **AND** that error has the message `Disposer 'b' failed` and the original failure as `cause`
+
+#### Scenario: A rejected disposal stays rejected on later calls
+
+- **GIVEN** a kernel whose disposer `b` rejects and `dispose()` has already rejected
+- **WHEN** `dispose()` is called again
+- **THEN** it returns the same rejected promise
+- **AND** no disposer runs a second time
+
+#### Scenario: A hanging disposer is abandoned after the timeout
+
+- **GIVEN** a disposer that never settles followed by a healthy disposer
+- **WHEN** `kernel.dispose()` is awaited and 5000 ms elapse
+- **THEN** a warning naming the hanging disposer is logged through the ambient `Logger`
+- **AND** the healthy disposer still runs
+- **AND** `dispose()` resolves without including the timeout in an `AggregateError`
+
+#### Scenario: The timeout does not keep the process alive
+
+- **GIVEN** a disposer that is awaiting its timeout
+- **WHEN** the event loop has no other work
+- **THEN** the pending timeout timer does not keep the process alive
+
+#### Scenario: No disposers
+
+- **GIVEN** a kernel created without `disposers`
+- **WHEN** `kernel.dispose()` is awaited
+- **THEN** it resolves without doing any work
+
+### Requirement: KernelOptions accepts named disposers
+
+#### Scenario: Disposers are accepted in order
+
+- **GIVEN** `KernelOptions.disposers` with entries `a` then `b`
+- **WHEN** `createKernel(config, options)` succeeds
+- **THEN** the kernel owns both disposers and runs `b` before `a` on dispose
+
+#### Scenario: Empty name is rejected
+
+- **GIVEN** a disposer entry with an empty `name`
+- **WHEN** `createKernel(config, options)` processes the options
+- **THEN** construction fails with an `InvalidDisposerError`
+
+#### Scenario: Non-callable dispose is rejected
+
+- **GIVEN** a disposer entry whose `dispose` is not a function
+- **WHEN** `createKernel(config, options)` processes the options
+- **THEN** construction fails with an `InvalidDisposerError`
+- **AND** no disposer has run before the failure is reported
+
+#### Scenario: Duplicate name is rejected
+
+- **GIVEN** two disposer entries named `plugins`
+- **WHEN** `createKernel(config, options)` processes the options
+- **THEN** construction fails with a `RegistryConflictError` for the category `disposers`
+
+### Requirement: Failed construction releases registered disposers
+
+#### Scenario: Disposers run when construction fails
+
+- **GIVEN** `KernelOptions.disposers` with entries `a` and `b`
+- **AND** kernel construction fails for another reason
+- **WHEN** `createKernel(config, options)` rejects
+- **THEN** `b` and `a` have run, in that order, before the rejection reaches the caller
+
+#### Scenario: The original error is preserved
+
+- **GIVEN** construction fails and one of the supplied disposers also rejects
+- **WHEN** `createKernel(config, options)` rejects
+- **THEN** the rejection is the original construction error
+- **AND** the disposer failure is reported as a warning through the ambient `Logger`
+
+#### Scenario: Conflicting entries still release well-formed ones
+
+- **GIVEN** two disposer entries with the same name plus a third well-formed entry
+- **WHEN** `createKernel(config, options)` rejects with a `RegistryConflictError`
+- **THEN** every well-formed entry has been released exactly once
 
 ### Requirement: Kernel is a facade over composition-owned registry primitives
 

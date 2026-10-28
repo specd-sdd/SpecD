@@ -5,6 +5,7 @@ import {
   makeMockKernel,
   makeProgram,
   mockProcessExit,
+  makeMockHost,
 } from './helpers.js'
 
 vi.mock('../../src/helpers/cli-context.js', () => ({
@@ -64,16 +65,18 @@ import { registerPluginsUpdate } from '../../src/commands/plugins/update.js'
 
 function setup(configOverrides: Parameters<typeof makeMockConfig>[0] = {}) {
   const kernel = makeMockKernel()
-  vi.mocked(resolveCliContext).mockResolvedValue({
-    config: makeMockConfig({
-      plugins: {
-        agents: [{ name: '@specd/plugin-agent-claude' }, { name: '@specd/plugin-agent-copilot' }],
-      },
-      ...configOverrides,
+  vi.mocked(resolveCliContext).mockResolvedValue(
+    makeMockHost({
+      config: makeMockConfig({
+        plugins: {
+          agents: [{ name: '@specd/plugin-agent-claude' }, { name: '@specd/plugin-agent-copilot' }],
+        },
+        ...configOverrides,
+      }),
+      configFilePath: '/project/specd.yaml',
+      kernel,
     }),
-    configFilePath: '/project/specd.yaml',
-    kernel,
-  })
+  )
   const stdout = captureStdout()
   mockProcessExit()
   return { stdout }

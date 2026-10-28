@@ -10,6 +10,7 @@ import {
   makeProgram,
   mockProcessExit,
   captureStdout,
+  makeMockHost,
 } from './helpers.js'
 
 vi.mock('../../src/helpers/cli-context.js', () => ({
@@ -48,11 +49,13 @@ function makeCliArgs(...args: string[]): string[] {
 function setup() {
   const config = makeMockConfig()
   const kernel = makeMockKernel()
-  vi.mocked(resolveCliContext).mockResolvedValue({
-    config,
-    configFilePath: null,
-    kernel,
-  })
+  vi.mocked(resolveCliContext).mockResolvedValue(
+    makeMockHost({
+      config,
+      configFilePath: null,
+      kernel,
+    }),
+  )
   const stdout = captureStdout()
   const stderr = captureStderr()
   mockProcessExit()

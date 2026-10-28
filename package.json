@@ -24,7 +24,7 @@
     "web:test": "pnpm --filter @specd/public-web test",
     "web:typecheck": "pnpm --filter @specd/public-web typecheck",
     "preflight": "pnpm preflight:check && pnpm preflight:typecheck && pnpm preflight:build && pnpm preflight:test && pnpm preflight:changeset",
-    "preflight:check": "node dev/scripts/preflight-check.js",
+    "preflight:check": "node dev/scripts/preflight-check.js && node dev/scripts/check-engines.js",
     "preflight:typecheck": "turbo typecheck --filter=!@specd/public-web",
     "preflight:build": "turbo build --filter=!@specd/public-web",
     "preflight:test": "pnpm test",

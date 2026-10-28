@@ -40,7 +40,7 @@ JSON/TOON output schema:
       if (opts.config !== undefined && opts.path !== undefined) {
         cliError('--config and --path are mutually exclusive', opts.format, 1)
       }
-      const { config, kernel } = await resolveGraphCliContext({
+      const { config, host } = await resolveGraphCliContext({
         configPath: opts.config,
         repoPath: opts.path,
       }).catch((err: unknown) =>
@@ -149,7 +149,7 @@ JSON/TOON output schema:
             output(health, fmt)
           }
         },
-        { kernel },
+        { host },
       )
     })
 }

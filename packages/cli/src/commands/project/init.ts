@@ -9,6 +9,7 @@ import { collect } from '../../helpers/collect.js'
 import { fileExists } from '../../helpers/file-exists.js'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { installPluginsWithKernel } from '../plugins/install.js'
+import { CliExitError } from '../../helpers/cli-exit-error.js'
 
 const AVAILABLE_AGENT_PLUGINS = [
   '@specd/plugin-agent-claude',
@@ -122,7 +123,7 @@ export function registerProjectInit(parent: Command): void {
           }
 
           if (installed.hasErrors) {
-            process.exit(1)
+            throw new CliExitError(1)
           }
         } catch (error) {
           handleError(error, opts.format)
@@ -178,7 +179,7 @@ async function runInteractiveInit(options: {
   })
   if (isCancel(schema)) {
     outro('Cancelled.')
-    process.exit(0)
+    throw new CliExitError(0)
   }
 
   const workspace = await text({
@@ -191,7 +192,7 @@ async function runInteractiveInit(options: {
   })
   if (isCancel(workspace)) {
     outro('Cancelled.')
-    process.exit(0)
+    throw new CliExitError(0)
   }
 
   const workspacePath = await text({
@@ -201,7 +202,7 @@ async function runInteractiveInit(options: {
   })
   if (isCancel(workspacePath)) {
     outro('Cancelled.')
-    process.exit(0)
+    throw new CliExitError(0)
   }
 
   const selectedPlugins = await multiselect({
@@ -211,7 +212,7 @@ async function runInteractiveInit(options: {
   })
   if (isCancel(selectedPlugins)) {
     outro('Cancelled.')
-    process.exit(0)
+    throw new CliExitError(0)
   }
 
   const overwriteNeeded = await fileExists(defaultConfigPath)
@@ -222,7 +223,7 @@ async function runInteractiveInit(options: {
     })
     if (isCancel(overwrite) || !overwrite) {
       outro('Cancelled.')
-      process.exit(0)
+      throw new CliExitError(0)
     }
     force = true
   }
@@ -262,6 +263,6 @@ async function runInteractiveInit(options: {
   }
 
   if (installed.hasErrors) {
-    process.exit(1)
+    throw new CliExitError(1)
   }
 }

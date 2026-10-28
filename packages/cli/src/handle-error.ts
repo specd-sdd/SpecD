@@ -8,6 +8,7 @@ import {
   HistoricalImplementationGuardError,
 } from '@specd/sdk'
 import { output } from './formatter.js'
+import { CliExitError } from './helpers/cli-exit-error.js'
 
 /**
  *
@@ -23,7 +24,7 @@ interface CliErrorOptions {
  * Exits with a CLI-level error. Writes a prefixed message to stderr and,
  * when format is `json` or `toon`, also emits a structured error to stdout.
  *
- * Use this instead of raw `process.stderr.write` + `process.exit()` so
+ * Use this instead of raw `process.stderr.write` + a process exit so
  * that programmatic consumers always receive structured error output.
  *
  * @param message - Human-readable error description (without `error:`/`fatal:` prefix)
@@ -31,6 +32,7 @@ interface CliErrorOptions {
  * @param exitCode - The exit code to use (default: 1)
  * @param code - Machine-readable error code (default: `'CLI_ERROR'`)
  * @param options - Optional extra fields
+ * @throws {CliExitError} Always, carrying `exitCode`; the entrypoint ends the process after cleanup
  */
 export function cliError(
   message: string,
@@ -51,7 +53,7 @@ export function cliError(
     }
     output(payload, format)
   }
-  process.exit(exitCode)
+  throw new CliExitError(exitCode)
 }
 
 /**
@@ -157,13 +159,18 @@ function isSpecdErrorLike(err: unknown): err is SpecdErrorLike {
  * - `2` — hook failure
  * - `3` — system/schema error or unexpected error
  *
- * This function never returns.
+ * This function never returns: it throws a `CliExitError` and the entrypoint ends the process.
  *
  * @param err - The caught error
  * @param format - Optional output format; when `json` or `toon`, a structured error is also written to stdout
- * @returns Never. Always terminates the process with the mapped exit code.
+ * @returns Never. Always ends by throwing a `CliExitError` with the mapped exit code.
+ * @throws {CliExitError} Always; the entrypoint ends the process with its code after cleanup
  */
 export function handleError(err: unknown, format?: string): never {
+  // A CliExitError raised by a nested cliError must pass through untouched: reformatting it
+  // would print a second message and change the exit code.
+  if (err instanceof CliExitError) throw err
+
   // Known domain/application errors — all extend SpecdError with a machine-readable code
   if (isSpecdErrorLike(err)) {
     const code = err.code
@@ -204,10 +211,10 @@ export function handleError(err: unknown, format?: string): never {
   if (err instanceof Error) {
     Logger.error('CLI command failed with unexpected error', { format }, err)
     process.stderr.write(`fatal: ${err.message}\n${debug && err.stack ? err.stack + '\n' : ''}`)
-    process.exit(3)
+    throw new CliExitError(3)
   }
 
   Logger.error('CLI command failed with non-error throw', { format, value: String(err) })
   process.stderr.write(`fatal: unexpected error\n${debug ? String(err) + '\n' : ''}`)
-  process.exit(3)
+  throw new CliExitError(3)
 }

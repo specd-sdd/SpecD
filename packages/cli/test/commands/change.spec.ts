@@ -16,6 +16,7 @@ import {
   mockProcessExit,
   captureStdout,
   captureStderr,
+  makeMockHost,
 } from './helpers.js'
 
 // Module mocks — hoisted by vitest
@@ -41,11 +42,13 @@ import { registerDraftsRestore } from '../../src/commands/drafts/restore.js'
 function setup() {
   const config = makeMockConfig()
   const kernel = makeMockKernel()
-  vi.mocked(resolveCliContext).mockResolvedValue({
-    config: config,
-    configFilePath: null,
-    kernel: kernel,
-  })
+  vi.mocked(resolveCliContext).mockResolvedValue(
+    makeMockHost({
+      config: config,
+      configFilePath: null,
+      kernel: kernel,
+    }),
+  )
   vi.mocked(enrichImplementationTracking).mockResolvedValue({
     trackedFiles: [],
     links: [],
@@ -743,7 +746,9 @@ describe('change transition', () => {
   it('does not pass approval flags to transition execute (baked at kernel construction)', async () => {
     const config = makeMockConfig({ approvals: { spec: true, signoff: false } })
     const kernel = makeMockKernel()
-    vi.mocked(resolveCliContext).mockResolvedValue({ config, configFilePath: null, kernel })
+    vi.mocked(resolveCliContext).mockResolvedValue(
+      makeMockHost({ config, configFilePath: null, kernel }),
+    )
     captureStdout()
     captureStderr()
     mockProcessExit()

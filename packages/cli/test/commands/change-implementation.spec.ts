@@ -7,6 +7,7 @@ import {
   makeProgram,
   mockProcessExit,
   ExitSentinel,
+  makeMockHost,
 } from './helpers.js'
 
 vi.mock('../../src/helpers/cli-context.js', () => ({
@@ -27,11 +28,13 @@ afterEach(() => vi.restoreAllMocks())
 describe('change implementation', () => {
   it('review shows stale symbols and out-of-scope sidecar preview', async () => {
     const kernel = makeMockKernel()
-    vi.mocked(resolveCliContext).mockResolvedValue({
-      config: makeMockConfig(),
-      configFilePath: null,
-      kernel,
-    })
+    vi.mocked(resolveCliContext).mockResolvedValue(
+      makeMockHost({
+        config: makeMockConfig(),
+        configFilePath: null,
+        kernel,
+      }),
+    )
     kernel.changes.getImplementationReview.execute.mockResolvedValue({
       specIds: ['core:change'],
       implementationTracking: {
@@ -76,11 +79,13 @@ describe('change implementation', () => {
 
   it('add fails when the implementation file does not exist', async () => {
     const kernel = makeMockKernel()
-    vi.mocked(resolveCliContext).mockResolvedValue({
-      config: makeMockConfig(),
-      configFilePath: null,
-      kernel,
-    })
+    vi.mocked(resolveCliContext).mockResolvedValue(
+      makeMockHost({
+        config: makeMockConfig(),
+        configFilePath: null,
+        kernel,
+      }),
+    )
     kernel.changes.updateImplementationTracking.execute.mockRejectedValue(
       new ImplementationFileNotFoundError('missing.ts'),
     )
@@ -113,11 +118,13 @@ describe('change implementation', () => {
 
   it('resolve supports comma-separated file lists', async () => {
     const kernel = makeMockKernel()
-    vi.mocked(resolveCliContext).mockResolvedValue({
-      config: makeMockConfig(),
-      configFilePath: null,
-      kernel,
-    })
+    vi.mocked(resolveCliContext).mockResolvedValue(
+      makeMockHost({
+        config: makeMockConfig(),
+        configFilePath: null,
+        kernel,
+      }),
+    )
 
     const program = makeProgram()
     registerChangeImplementation(program.command('change'))
@@ -141,11 +148,13 @@ describe('change implementation', () => {
 
   it('ignore fails when any file in a comma-separated list is missing and untracked', async () => {
     const kernel = makeMockKernel()
-    vi.mocked(resolveCliContext).mockResolvedValue({
-      config: makeMockConfig(),
-      configFilePath: null,
-      kernel,
-    })
+    vi.mocked(resolveCliContext).mockResolvedValue(
+      makeMockHost({
+        config: makeMockConfig(),
+        configFilePath: null,
+        kernel,
+      }),
+    )
     kernel.changes.updateImplementationTracking.execute.mockRejectedValueOnce(
       new ImplementationFileNotFoundError('missing.ts'),
     )
@@ -176,11 +185,13 @@ describe('change implementation', () => {
 
   it('review displays removed tracked files', async () => {
     const kernel = makeMockKernel()
-    vi.mocked(resolveCliContext).mockResolvedValue({
-      config: makeMockConfig(),
-      configFilePath: null,
-      kernel,
-    })
+    vi.mocked(resolveCliContext).mockResolvedValue(
+      makeMockHost({
+        config: makeMockConfig(),
+        configFilePath: null,
+        kernel,
+      }),
+    )
     kernel.changes.getImplementationReview.execute.mockResolvedValue({
       specIds: [],
       implementationTracking: {
@@ -215,11 +226,13 @@ describe('change implementation', () => {
 
   it('unresolve calls updateImplementationTracking with unresolve action', async () => {
     const kernel = makeMockKernel()
-    vi.mocked(resolveCliContext).mockResolvedValue({
-      config: makeMockConfig(),
-      configFilePath: null,
-      kernel,
-    })
+    vi.mocked(resolveCliContext).mockResolvedValue(
+      makeMockHost({
+        config: makeMockConfig(),
+        configFilePath: null,
+        kernel,
+      }),
+    )
     kernel.changes.updateImplementationTracking.execute.mockResolvedValue({
       implementationTracking: {
         trackedFiles: [{ file: 'src/foo.ts', state: 'open' }],
@@ -247,11 +260,13 @@ describe('change implementation', () => {
 
   it('start calls updateImplementationTracking with start action and formats text', async () => {
     const kernel = makeMockKernel()
-    vi.mocked(resolveCliContext).mockResolvedValue({
-      config: makeMockConfig(),
-      configFilePath: null,
-      kernel,
-    })
+    vi.mocked(resolveCliContext).mockResolvedValue(
+      makeMockHost({
+        config: makeMockConfig(),
+        configFilePath: null,
+        kernel,
+      }),
+    )
     kernel.changes.updateImplementationTracking.execute.mockResolvedValue({
       implementationTracking: {
         trackedFiles: [],

@@ -16,12 +16,21 @@ import {
 
 /**
  * Host context with a wired kernel and graph-provider factory bound to one config.
+ *
+ * The context is `AsyncDisposable`: `await using host = await openSpecdHost()` releases it
+ * when the scope exits. Disposal delegates to the kernel and does not close graph providers
+ * created through `createGraphProvider()`; callers own what they create.
  */
-export interface SdkHostContext {
+export interface SdkHostContext extends AsyncDisposable {
   /** Wired specd kernel for lifecycle and project queries. */
   readonly kernel: Kernel
   /** Creates a new {@link CodeGraphProvider} for the host config. */
   readonly createGraphProvider: () => CodeGraphProvider
+  /**
+   * Releases the kernel's disposers. Idempotent: repeated and concurrent calls share one
+   * promise (see `Kernel.dispose`).
+   */
+  readonly dispose: () => Promise<void>
 }
 
 /**
@@ -71,16 +80,19 @@ export interface OpenSpecdHostResult extends SdkHostContext {
  *
  * @param config - Resolved project configuration
  * @param options - Optional SDK-owned kernel and graph composition overrides
- * @returns Kernel plus graph-provider factory sharing the same config
+ * @returns Kernel plus graph-provider factory sharing the same config, with disposal members
  */
 export async function createSdkContext(
   config: SpecdConfig,
   options?: SdkContextOptions,
 ): Promise<SdkHostContext> {
   const kernel = await createKernel(config, options?.kernel)
+  const dispose = (): Promise<void> => kernel.dispose()
   return {
     kernel,
     createGraphProvider: () => createCodeGraphProvider(config, options?.graph),
+    dispose,
+    [Symbol.asyncDispose]: dispose,
   }
 }
 

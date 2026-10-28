@@ -8,6 +8,7 @@ import {
   mockProcessExit,
   captureStdout,
   captureStderr,
+  makeMockHost,
 } from '../helpers.js'
 
 vi.mock('../../../src/helpers/cli-context.js', () => ({
@@ -21,11 +22,13 @@ import { registerChangeApprove } from '../../../src/commands/change/approve.js'
 function setup() {
   const config = makeMockConfig({ approvals: { spec: true, signoff: true } })
   const kernel = makeMockKernel()
-  vi.mocked(resolveCliContext).mockResolvedValue({
-    config: config,
-    configFilePath: null,
-    kernel: kernel,
-  })
+  vi.mocked(resolveCliContext).mockResolvedValue(
+    makeMockHost({
+      config: config,
+      configFilePath: null,
+      kernel: kernel,
+    }),
+  )
   kernel.changes.status.execute.mockResolvedValue({
     change: makeMockChange({ name: 'my-change', state: 'ready' }),
     artifactStatuses: [],

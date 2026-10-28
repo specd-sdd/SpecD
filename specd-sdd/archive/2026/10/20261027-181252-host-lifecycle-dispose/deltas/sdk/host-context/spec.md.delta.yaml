@@ -1,0 +1,72 @@
+- op: modified
+  description: 'SdkHostContext becomes AsyncDisposable and exposes dispose().'
+  selector:
+    type: section
+    matches: 'Requirement: SdkHostContext shape'
+  content: |
+    SdkHostContext SHALL be a readonly object that also implements `AsyncDisposable`:
+
+    ```ts
+    interface SdkHostContext extends AsyncDisposable {
+      readonly kernel: Kernel
+      readonly createGraphProvider: () => CodeGraphProvider
+      readonly dispose: () => Promise<void>
+    }
+    ```
+
+    The context MUST NOT store a duplicate copy of `SpecdConfig`. Config reads MUST go through `kernel.project.getConfig.execute()`.
+
+    The graph-provider factory MUST remain synchronous and MUST return a fresh `CodeGraphProvider` instance on every call.
+- op: modified
+  description: 'createSdkContext returns the disposal members, delegating to the kernel.'
+  selector:
+    type: section
+    matches: 'Requirement: createSdkContext'
+  content: |
+    `createSdkContext(config: SpecdConfig, options?: SdkContextOptions): Promise<SdkHostContext>` SHALL:
+
+    1. Await `createKernel(config, options?.kernel)` from `@specd/core`
+    2. Return `{ kernel, createGraphProvider: () => createCodeGraphProvider(config, options?.graph), dispose, [Symbol.asyncDispose]: dispose }`, where `dispose` delegates to `kernel.dispose()`
+
+    `SdkContextOptions` SHALL be an SDK-owned bootstrap shape:
+
+    ```ts
+    interface SdkContextOptions {
+      readonly kernel?: KernelOptions
+      readonly graph?: CodeGraphCompositionOptions
+    }
+    ```
+
+    `createGraphProvider` MUST close over the same `config` instance passed to `createKernel`.
+
+    When `options?.graph` is omitted, `createGraphProvider()` MUST preserve the default `@specd/code-graph` composition behavior.
+- op: added
+  description: 'Host disposal contract.'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: openSpecdHost'
+  content: |
+    ### Requirement: Host disposal
+
+    `SdkHostContext.dispose()` SHALL delegate to `kernel.dispose()` and return its promise, so repeated and concurrent calls share one disposal and inherit the semantics defined by [`core:kernel`](../../../../specs/core/kernel/spec.md) (reverse order, failure isolation with `AggregateError`, bounded timeout). `[Symbol.asyncDispose]` SHALL be the same function as `dispose`.
+
+    Because `openSpecdHost` spreads the context into its result, `OpenSpecdHostResult` SHALL carry `dispose` and `[Symbol.asyncDispose]`, and `await using host = await openSpecdHost(input)` SHALL release the host when the scope exits.
+
+    `dispose()` MUST NOT close `CodeGraphProvider` instances created through `createGraphProvider()`: callers own what they create and release it themselves (for example with `withOpenGraphProvider`).
+
+    A context SHALL only dispose a kernel it created. The SDK MUST NOT expose an API that wraps a kernel created elsewhere into an `SdkHostContext`.
+- op: modified
+  description: 'Add the builder dependency used by disposer registration.'
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`sdk:composition`](../composition/spec.md) — package placement and export surface
+    - [`core:kernel`](../../../../specs/core/kernel/spec.md) — `Kernel` type, `createKernel` and `dispose()`
+    - [`core:kernel-builder`](../../../../specs/core/kernel-builder/spec.md) — `registerDisposer`, through which disposers reach the kernel that `dispose()` releases
+    - [`core:composition`](../../../../specs/core/composition/spec.md) — `createDefaultConfigLoader` factory
+    - [`code-graph:composition`](../../../../specs/code-graph/composition/spec.md) — `CodeGraphCompositionOptions` and `createCodeGraphProvider(...)`

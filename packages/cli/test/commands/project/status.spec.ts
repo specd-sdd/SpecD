@@ -6,6 +6,7 @@ import {
   mockProcessExit,
   captureStdout,
   captureStderr,
+  makeMockHost,
 } from '../helpers.js'
 
 vi.mock('@specd/sdk', async () => {
@@ -90,12 +91,14 @@ function stubSnapshot(
 function setup() {
   const config = makeMockConfig()
   const kernel = makeMockKernel()
-  vi.mocked(openSpecdHost).mockResolvedValue({
-    config,
-    configFilePath: null,
-    kernel,
-    createGraphProvider: vi.fn(),
-  })
+  vi.mocked(openSpecdHost).mockResolvedValue(
+    makeMockHost({
+      config,
+      configFilePath: null,
+      kernel,
+      createGraphProvider: vi.fn(),
+    }),
+  )
   stubSnapshot(kernel)
   const stdout = captureStdout()
   const stderr = captureStderr()

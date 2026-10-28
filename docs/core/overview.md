@@ -240,6 +240,24 @@ Everything exported is a domain type (entity, value object, error, service), an 
 
 `createKernelBuilder` and `KernelBuilder` are exported from `@specd/core/extensions`, not from the root `@specd/core` barrel.
 
+### Kernel disposal
+
+`Kernel` is `AsyncDisposable`: `kernel.dispose()` (aliased by `kernel[Symbol.asyncDispose]`) runs the cleanup work registered through `KernelOptions.disposers`, or `KernelBuilder.registerDisposer(name, dispose)` when using the builder. A disposer is a named, opaque action (`KernelDisposer`) that registers cleanup for a resource that exists before the kernel, for example something a host initialised while composing it.
+
+- Disposers run in **reverse registration order**, one at a time.
+- One failing disposer does not stop the others; after all have run, `dispose()` rejects with an `AggregateError` whose `errors` are `DisposerFailedError` entries (one per failure, in execution order).
+- Each disposer is bounded by a fixed 5000 ms timeout; a hanging disposer is abandoned with a logged warning and does not count as a failure.
+- `dispose()` is idempotent: repeated and concurrent calls share one promise and each disposer runs once. After the first call the behaviour of other kernel members is unspecified.
+- If `createKernel` (or `build()`) fails, the supplied disposers are released in reverse order before the original error propagates.
+
+```typescript
+const kernel = await createKernelBuilder(config)
+  .registerDisposer('plugins', async () => session.close())
+  .build()
+
+await kernel.dispose() // or: await using kernel = await createKernel(config)
+```
+
 **From the composition layer — repository and schema factories:**
 
 | Export                      | Kind      | Description                                                                        |

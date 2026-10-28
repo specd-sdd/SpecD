@@ -11,6 +11,7 @@ import { output, parseFormat, serializeOutput, type OutputFormat } from '../../f
 import { handleError, cliError } from '../../handle-error.js'
 import { parseCommaSeparatedValues } from '../../helpers/parse-comma-values.js'
 import { createCheckProgressPresenter } from './_check-progress-presenter.js'
+import { CliExitError } from '../../helpers/cli-exit-error.js'
 
 const VALID_ARCHIVE_HOOK_PHASES = new Set<ArchiveHookPhaseSelector>(['pre', 'post', 'all'])
 
@@ -178,7 +179,7 @@ JSON/TOON output schema:
                   ? '\nUse --skip-checks spec.overlap to proceed despite overlap.\n'
                   : ''),
             )
-            process.exit(1)
+            throw new CliExitError(1)
           }
           if (err instanceof CheckPredicateFailedError && opts.format === 'text') {
             const lines = [
@@ -190,7 +191,7 @@ JSON/TOON output schema:
                 : []),
             ]
             process.stderr.write(`${lines.join('\n')}\n`)
-            process.exit(1)
+            throw new CliExitError(1)
           }
           handleError(err, opts.format)
         }

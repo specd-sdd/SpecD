@@ -3,6 +3,7 @@ import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
 import { updatePluginsWithKernel } from '../plugins/update.js'
+import { CliExitError } from '../../helpers/cli-exit-error.js'
 
 /**
  * Registers the `project update` subcommand on the given parent command.
@@ -61,7 +62,7 @@ JSON/TOON output schema:
         }
 
         if (result.hasErrors) {
-          process.exit(1)
+          throw new CliExitError(1)
         }
       } catch (err) {
         handleError(err, opts.format)

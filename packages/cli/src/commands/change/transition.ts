@@ -23,6 +23,7 @@ import {
   publicVerificationEvidence,
   validityTextLines,
 } from './_validity-present.js'
+import { CliExitError } from '../../helpers/cli-exit-error.js'
 
 /**
  * Writes one structured stream record for machine-readable transition output.
@@ -413,7 +414,7 @@ JSON/TOON output schema:
 
               if (fmt === 'text') {
                 writeTextRepairGuide(err, status)
-                process.exit(1)
+                throw new CliExitError(1)
               } else {
                 writeStructuredRecord(fmt, {
                   stream: 'change-transition',
@@ -431,7 +432,7 @@ JSON/TOON output schema:
                     },
                   },
                 })
-                process.exit(1)
+                throw new CliExitError(1)
               }
             }
             throw err

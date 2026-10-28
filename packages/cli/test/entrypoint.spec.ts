@@ -6,6 +6,7 @@ import {
   mockProcessExit,
   captureStdout,
   captureStderr,
+  makeMockHost,
 } from './commands/helpers.js'
 import { renderBanner } from '../src/banner.js'
 import { CLI_VERSION, CODE_GRAPH_VERSION, CORE_VERSION, SDK_VERSION } from '../src/version.js'
@@ -235,17 +236,21 @@ describe('auto-dashboard default action', () => {
       },
     })
 
-    vi.mocked(resolveCliContext).mockResolvedValue({
-      config: config,
-      configFilePath: null,
-      kernel: kernel,
-    })
-    vi.mocked(openSpecdHost).mockResolvedValue({
-      config,
-      configFilePath: '/project/specd.yaml',
-      kernel,
-      createGraphProvider: vi.fn(),
-    })
+    vi.mocked(resolveCliContext).mockResolvedValue(
+      makeMockHost({
+        config: config,
+        configFilePath: null,
+        kernel: kernel,
+      }),
+    )
+    vi.mocked(openSpecdHost).mockResolvedValue(
+      makeMockHost({
+        config,
+        configFilePath: '/project/specd.yaml',
+        kernel,
+        createGraphProvider: vi.fn(),
+      }),
+    )
     const snapshot: BuildProjectStatusSnapshotResult = {
       summary: {
         activeCount: 0,

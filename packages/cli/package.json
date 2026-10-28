@@ -12,6 +12,9 @@
   "bin": {
     "specd": "./dist/index.js"
   },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "build": "tsup src/index.ts src/graph-index-task.ts --format esm --clean",
     "build:dev": "tsup src/index.ts src/graph-index-task.ts --format esm --sourcemap --clean",

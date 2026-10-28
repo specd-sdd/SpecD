@@ -7,6 +7,7 @@ import {
   makeMockKernel,
   makeProgram,
   mockProcessExit,
+  makeMockHost,
 } from './helpers.js'
 
 const mockInstall = vi.fn().mockResolvedValue({ success: true, message: 'ok' })
@@ -87,11 +88,13 @@ import { registerPluginsUninstall } from '../../src/commands/plugins/uninstall.j
 function setup(configOverrides: Parameters<typeof makeMockConfig>[0] = {}) {
   const kernel = makeMockKernel()
   const config = makeMockConfig(configOverrides)
-  vi.mocked(resolveCliContext).mockResolvedValue({
-    config,
-    configFilePath: '/project/specd.yaml',
-    kernel,
-  })
+  vi.mocked(resolveCliContext).mockResolvedValue(
+    makeMockHost({
+      config,
+      configFilePath: '/project/specd.yaml',
+      kernel,
+    }),
+  )
   const stdout = captureStdout()
   const stderr = captureStderr()
   mockProcessExit()

@@ -9,6 +9,9 @@
     "dist/"
   ],
   "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
   "dependencies": {
     "@ast-grep/lang-go": "^0.0.5",
     "@ast-grep/lang-php": "^0.0.6",

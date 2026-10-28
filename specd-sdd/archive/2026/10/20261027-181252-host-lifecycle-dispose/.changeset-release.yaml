@@ -1,0 +1,7 @@
+releases:
+  core:kernel: minor
+  core:kernel-builder: minor
+  sdk:host-context: minor
+  cli:host-context: minor
+  cli:entrypoint: minor
+  default:_global/conventions: patch

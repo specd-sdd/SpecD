@@ -8,6 +8,8 @@
 import type { Stats } from 'node:fs'
 import { vi } from 'vitest'
 import { Command } from 'commander'
+import { CliExitError } from '../../src/helpers/cli-exit-error.js'
+import { type CliContext } from '../../src/helpers/cli-context-types.js'
 import {
   DEFAULT_INVALIDATION_POLICY,
   type SpecdConfig,
@@ -46,6 +48,9 @@ export class ExitSentinel extends Error {
   }
 }
 
+/** The real `parseAsync`, captured once so repeated `mockProcessExit()` calls never wrap a wrapper. */
+const ORIGINAL_PARSE_ASYNC = Command.prototype.parseAsync
+
 /**
  * Replaces `process.exit` with a spy that throws an {@link ExitSentinel}
  * instead of silently continuing execution. Call in `beforeEach` or a
@@ -55,6 +60,36 @@ export function mockProcessExit(): void {
   vi.spyOn(process, 'exit').mockImplementation(((code: number) => {
     throw new ExitSentinel(code)
   }) as never)
+
+  // Mirror the entrypoint (`run()`): a `CliExitError` that reaches `parseAsync` ends the
+  // process with its exit code, which here is the mocked `process.exit`.
+  vi.spyOn(Command.prototype, 'parseAsync').mockImplementation(async function (
+    this: Command,
+    ...args: Parameters<Command['parseAsync']>
+  ) {
+    try {
+      return await ORIGINAL_PARSE_ASYNC.apply(this, args)
+    } catch (error) {
+      if (error instanceof CliExitError) process.exit(error.exitCode)
+      throw error
+    }
+  })
+}
+
+/**
+ * Runs a command action the way the entrypoint does: awaits `fn` and turns a thrown
+ * `CliExitError` into a call to the (mocked) `process.exit`.
+ *
+ * @param fn - Code under test that may throw a `CliExitError`
+ * @returns Whatever `fn` resolves to
+ */
+export async function runCommand<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn()
+  } catch (error) {
+    if (error instanceof CliExitError) process.exit(error.exitCode)
+    throw error
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -262,6 +297,25 @@ export type VerificationKernelMethods = {
   startVerification: { execute: ReturnType<typeof vi.fn> }
   completeVerification: { execute: ReturnType<typeof vi.fn> }
   invalidateVerification: { execute: ReturnType<typeof vi.fn> }
+}
+
+/**
+ * Builds a complete mock `CliContext` (the SDK host plus config): `createGraphProvider` and the
+ * disposal members are Vitest mocks, so tests can assert on them.
+ *
+ * @param overrides - Fields to override on the default mock host
+ * @returns A mock host usable wherever a `CliContext` is expected
+ */
+export function makeMockHost(overrides: Partial<CliContext> = {}): CliContext {
+  return {
+    config: makeMockConfig(),
+    configFilePath: null,
+    kernel: makeMockKernel(),
+    createGraphProvider: vi.fn(),
+    dispose: vi.fn(async () => {}),
+    [Symbol.asyncDispose]: vi.fn(async () => {}),
+    ...overrides,
+  } as CliContext
 }
 
 /** Kernel mock including verification methods. */

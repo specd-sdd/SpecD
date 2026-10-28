@@ -357,6 +357,38 @@ import { WorkspaceNotFoundError } from '@specd/core'
 
 ---
 
+### InvalidDisposerError
+
+**Code:** `'INVALID_DISPOSER'`
+
+Thrown when a kernel disposer entry is malformed: an empty or non-string `name`, or a `dispose` that is not callable. Two entries sharing a name raise `RegistryConflictError` for the `disposers` registry instead.
+
+```typescript
+import { InvalidDisposerError } from '@specd/core'
+
+// Message: "Invalid kernel disposer: name must be a non-empty string"
+```
+
+**Thrown by:** `createKernel` and `KernelBuilder.registerDisposer`.
+
+---
+
+### DisposerFailedError
+
+**Code:** `'DISPOSER_FAILED'`
+
+Wraps the failure of one kernel disposer. `disposerName` holds the registered name and `cause` the original failure. Instances are never thrown on their own: `Kernel.dispose()` collects them in the `errors` of an `AggregateError`.
+
+```typescript
+import { DisposerFailedError } from '@specd/core'
+
+// Message: "Disposer '<name>' failed"
+```
+
+**Thrown by:** `Kernel.dispose()` (inside an `AggregateError`).
+
+---
+
 ### ExtractorTransformError
 
 **Code:** `'EXTRACTOR_TRANSFORM_ERROR'`

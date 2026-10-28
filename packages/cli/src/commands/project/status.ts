@@ -1,6 +1,7 @@
-import { buildProjectStatusSnapshot, openSpecdHost } from '@specd/sdk'
+import { buildProjectStatusSnapshot } from '@specd/sdk'
 import { type Command } from 'commander'
 import { buildCliKernelOptions } from '../../helpers/cli-context.js'
+import { openCliHost } from '../../helpers/cli-host.js'
 import { handleError } from '../../handle-error.js'
 import { output, parseFormat } from '../../formatter.js'
 
@@ -53,7 +54,7 @@ JSON/TOON output schema:
     .action(async (opts: ProjectStatusOptions) => {
       try {
         const fmt = parseFormat(opts.format)
-        const host = await openSpecdHost({
+        const host = await openCliHost({
           ...(opts.config !== undefined ? { configPath: opts.config } : {}),
           options: {
             kernel: buildCliKernelOptions(),

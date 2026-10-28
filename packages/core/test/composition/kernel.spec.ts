@@ -11,6 +11,10 @@ import {
 } from '../../src/domain/errors/check-registry-errors.js'
 import { InvalidStateTransitionError } from '../../src/domain/errors/invalid-state-transition-error.js'
 import { createKernel } from '../../src/composition/kernel.js'
+import { KERNEL_DISPOSER_TIMEOUT_MS } from '../../src/composition/kernel-disposal.js'
+import { Logger } from '../../src/application/logger.js'
+import { InvalidDisposerError } from '../../src/application/errors/invalid-disposer-error.js'
+import { DisposerFailedError } from '../../src/application/errors/disposer-failed-error.js'
 import { createResolveChangeSchema } from '../../src/composition/use-cases/resolve-change-schema.js'
 import { makeSchema } from '../application/use-cases/helpers.js'
 import { ResolveChangeSchema } from '../../src/application/services/resolve-change-schema.js'
@@ -492,5 +496,274 @@ describe('createKernel', () => {
     })
     expect(resolved.schema).toBe(fixture)
     expect(resolved.warnings).toEqual([])
+  })
+})
+
+/**
+ * Builds a config whose spec storage adapter is not registered, so kernel construction fails.
+ *
+ * @returns A config that makes `createKernel` reject
+ */
+async function makeBrokenConfig(): Promise<SpecdConfig> {
+  const config = await makeConfig()
+  const [workspace] = config.workspaces
+  if (workspace === undefined) throw new Error('fixture has no workspace')
+  return {
+    ...config,
+    workspaces: [
+      { ...workspace, specsAdapter: { adapter: 'does-not-exist', config: { path: '/nowhere' } } },
+    ],
+  }
+}
+
+describe('createKernel disposal', () => {
+  it('exposes dispose as its only lifecycle operation', async () => {
+    const kernel = await createKernel(await makeConfig())
+    const record = kernel as unknown as Record<string | symbol, unknown>
+
+    expect(typeof record['dispose']).toBe('function')
+    expect(typeof record[Symbol.asyncDispose]).toBe('function')
+    expect(record['initialize']).toBeUndefined()
+    expect(record['shutdown']).toBeUndefined()
+    expect(record['on']).toBeUndefined()
+    expect(record['addUseCase']).toBeUndefined()
+    expect(record['removeUseCase']).toBeUndefined()
+  })
+
+  it('treats Symbol.asyncDispose as an alias and supports await using', async () => {
+    const disposed = vi.fn()
+    const config = await makeConfig()
+    {
+      await using kernel = await createKernel(config, {
+        disposers: [{ name: 'a', dispose: disposed }],
+      })
+      expect(kernel[Symbol.asyncDispose]).toBe(kernel.dispose)
+      expect(disposed).not.toHaveBeenCalled()
+    }
+    expect(disposed).toHaveBeenCalledTimes(1)
+  })
+
+  it('shares one promise across repeated and concurrent dispose calls', async () => {
+    const disposed = vi.fn()
+    const kernel = await createKernel(await makeConfig(), {
+      disposers: [{ name: 'a', dispose: disposed }],
+    })
+
+    const first = kernel.dispose()
+    const second = kernel.dispose()
+    await first
+    const third = kernel.dispose()
+
+    expect(second).toBe(first)
+    expect(third).toBe(first)
+    expect(disposed).toHaveBeenCalledTimes(1)
+  })
+
+  it('runs the supplied disposers in reverse order and isolates failures', async () => {
+    const order: string[] = []
+    const kernel = await createKernel(await makeConfig(), {
+      disposers: [
+        { name: 'a', dispose: () => void order.push('a') },
+        {
+          name: 'b',
+          dispose: () => {
+            order.push('b')
+            throw new Error('boom')
+          },
+        },
+        { name: 'c', dispose: () => void order.push('c') },
+      ],
+    })
+
+    const failure = await kernel.dispose().then(
+      () => undefined,
+      (error: unknown) => error,
+    )
+
+    expect(order).toEqual(['c', 'b', 'a'])
+    expect(failure).toBeInstanceOf(AggregateError)
+    const [only] = (failure as AggregateError).errors as DisposerFailedError[]
+    expect(only?.message).toBe("Disposer 'b' failed")
+  })
+
+  it('resolves dispose for a kernel without disposers', async () => {
+    const kernel = await createKernel(await makeConfig())
+    await expect(kernel.dispose()).resolves.toBeUndefined()
+  })
+
+  it('rejects an empty disposer name', async () => {
+    await expect(
+      createKernel(await makeConfig(), { disposers: [{ name: '', dispose: () => {} }] }),
+    ).rejects.toBeInstanceOf(InvalidDisposerError)
+  })
+
+  it('rejects a non-callable dispose before any disposer runs', async () => {
+    const first = vi.fn()
+
+    await expect(
+      createKernel(await makeConfig(), {
+        disposers: [
+          { name: 'a', dispose: first },
+          { name: 'broken', dispose: undefined as never },
+        ],
+      }),
+    ).rejects.toBeInstanceOf(InvalidDisposerError)
+
+    // The well-formed sibling is released once by the failed-construction path, not run earlier.
+    expect(first).toHaveBeenCalledTimes(1)
+  })
+
+  it('reports each failed disposer as a DisposerFailedError with the original failure as cause', async () => {
+    const original = new Error('boom')
+    const kernel = await createKernel(await makeConfig(), {
+      disposers: [
+        {
+          name: 'bad',
+          dispose: () => {
+            throw original
+          },
+        },
+      ],
+    })
+
+    const failure = (await kernel.dispose().then(
+      () => undefined,
+      (error: unknown) => error,
+    )) as AggregateError
+
+    const [only] = failure.errors as DisposerFailedError[]
+    expect(only).toBeInstanceOf(DisposerFailedError)
+    expect(only?.cause).toBe(original)
+  })
+
+  it('never throws synchronously, even when a disposer throws synchronously', async () => {
+    const kernel = await createKernel(await makeConfig(), {
+      disposers: [
+        {
+          name: 'bad',
+          dispose: () => {
+            throw new Error('sync boom')
+          },
+        },
+      ],
+    })
+
+    let pending: Promise<void> | undefined
+    expect(() => {
+      pending = kernel.dispose()
+    }).not.toThrow()
+    expect(pending).toBeInstanceOf(Promise)
+    await expect(pending).rejects.toBeInstanceOf(AggregateError)
+  })
+
+  it('keeps a rejected disposal rejected on later calls without rerunning disposers', async () => {
+    const dispose = vi.fn(() => {
+      throw new Error('boom')
+    })
+    const kernel = await createKernel(await makeConfig(), { disposers: [{ name: 'bad', dispose }] })
+
+    const first = kernel.dispose()
+    await expect(first).rejects.toBeInstanceOf(AggregateError)
+    const second = kernel.dispose()
+
+    expect(second).toBe(first)
+    await expect(second).rejects.toBeInstanceOf(AggregateError)
+    expect(dispose).toHaveBeenCalledTimes(1)
+  })
+
+  it('abandons a hanging disposer after the timeout through kernel.dispose and logs a warning', async () => {
+    vi.useFakeTimers()
+    try {
+      const warn = vi.spyOn(Logger, 'warn').mockImplementation(() => {})
+      const healthy = vi.fn()
+      const kernel = await createKernel(await makeConfig(), {
+        disposers: [
+          { name: 'healthy', dispose: healthy },
+          { name: 'hanging', dispose: () => new Promise<void>(() => {}) },
+        ],
+      })
+
+      const disposed = kernel.dispose()
+      await vi.advanceTimersByTimeAsync(KERNEL_DISPOSER_TIMEOUT_MS)
+
+      await expect(disposed).resolves.toBeUndefined()
+      expect(healthy).toHaveBeenCalledTimes(1)
+      expect(warn.mock.calls.some((call) => String(call[0]).includes('hanging'))).toBe(true)
+      warn.mockRestore()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('rejects a duplicate disposer name with a RegistryConflictError', async () => {
+    await expect(
+      createKernel(await makeConfig(), {
+        disposers: [
+          { name: 'plugins', dispose: () => {} },
+          { name: 'plugins', dispose: () => {} },
+        ],
+      }),
+    ).rejects.toBeInstanceOf(RegistryConflictError)
+  })
+
+  it('releases the disposers in reverse order when construction fails', async () => {
+    const order: string[] = []
+
+    await expect(
+      createKernel(await makeBrokenConfig(), {
+        disposers: [
+          { name: 'a', dispose: () => void order.push('a') },
+          { name: 'b', dispose: () => void order.push('b') },
+        ],
+      }),
+    ).rejects.toThrow()
+
+    expect(order).toEqual(['b', 'a'])
+  })
+
+  it('keeps the original construction error when a disposer also fails', async () => {
+    const warn = vi.spyOn(Logger, 'warn').mockImplementation(() => {})
+    const broken = await makeBrokenConfig()
+    const baseline = await createKernel(broken).then(
+      () => undefined,
+      (error: unknown) => error as Error,
+    )
+
+    const failure = await createKernel(broken, {
+      disposers: [
+        {
+          name: 'bad',
+          dispose: () => {
+            throw new Error('cleanup failed')
+          },
+        },
+      ],
+    }).then(
+      () => undefined,
+      (error: unknown) => error as Error,
+    )
+
+    expect(baseline).toBeInstanceOf(Error)
+    expect(failure).toBeInstanceOf(Error)
+    expect(failure?.message).toBe(baseline?.message)
+    expect(failure).not.toBeInstanceOf(AggregateError)
+    expect(warn).toHaveBeenCalled()
+    warn.mockRestore()
+  })
+
+  it('still releases well-formed entries once when entries conflict', async () => {
+    const good = vi.fn()
+
+    await expect(
+      createKernel(await makeConfig(), {
+        disposers: [
+          { name: 'dup', dispose: () => {} },
+          { name: 'dup', dispose: () => {} },
+          { name: 'good', dispose: good },
+        ],
+      }),
+    ).rejects.toBeInstanceOf(RegistryConflictError)
+
+    expect(good).toHaveBeenCalledTimes(1)
   })
 })

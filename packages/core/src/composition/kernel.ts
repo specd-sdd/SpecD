@@ -186,11 +186,21 @@ import {
 import { createValidateSchema, resolveValidateSchemaDeps } from './use-cases/validate-schema.js'
 import { createValidateSpecs, resolveValidateSpecsDeps } from './use-cases/validate-specs.js'
 import { type CompositionRegistryView } from './composition-registries.js'
+import {
+  createDispose,
+  releaseAfterFailedConstruction,
+  validateDisposers,
+  type KernelDisposer,
+} from './kernel-disposal.js'
 
 /**
  * All use cases instantiated from a single `SpecdConfig`, grouped by domain area.
+ *
+ * The kernel is also `AsyncDisposable`: `dispose()` (aliased by `[Symbol.asyncDispose]`)
+ * runs the disposers supplied through {@link KernelOptions.disposers}. After the first call
+ * the kernel is closed and the behaviour of its other members is unspecified.
  */
-export interface Kernel {
+export interface Kernel extends AsyncDisposable {
   registry: CompositionRegistryView
   schemas: SchemaRegistry
   changes: {
@@ -267,21 +277,59 @@ export interface Kernel {
     getMetadata: GetProjectMetadata
     updateMetadata: UpdateProjectMetadata
   }
+  /**
+   * Releases everything registered through `KernelOptions.disposers`, in reverse
+   * registration order. Idempotent: repeated and concurrent calls share one promise.
+   *
+   * @returns Resolves when all disposers ran and none failed
+   * @throws {AggregateError} When at least one disposer failed (`DisposerFailedError` entries)
+   */
+  dispose(): Promise<void>
 }
 
 /** Options for {@link createKernel}. */
 export interface KernelOptions extends CompositionResolutionOptions {
   readonly additionalDestinations?: readonly LogDestination[]
+  /** Named cleanup work the kernel runs on dispose (reverse registration order). */
+  readonly disposers?: readonly KernelDisposer[]
 }
 
 /**
  * Factory function that creates and wires a new {@link Kernel} instance.
  *
+ * When construction fails, the disposers supplied in `options.disposers` are released
+ * (reverse order) before the original error propagates, so a half-started host leaks nothing.
+ *
  * @param config - Resolved project configuration
  * @param options - Optional kernel options
  * @returns The fully-wired specd kernel
+ * @throws {InvalidDisposerError} When a disposer entry is malformed
+ * @throws {RegistryConflictError} When two disposers share a name
  */
 export async function createKernel(config: SpecdConfig, options?: KernelOptions): Promise<Kernel> {
+  const disposers = options?.disposers ?? []
+  try {
+    validateDisposers(disposers)
+    return await buildKernel(config, options, disposers)
+  } catch (error) {
+    await releaseAfterFailedConstruction(disposers)
+    throw error
+  }
+}
+
+/**
+ * Wires all use cases for {@link createKernel}.
+ *
+ * @param config - Resolved project configuration
+ * @param options - Optional kernel options
+ * @param disposers - Validated disposers owned by the kernel once it is built
+ * @returns The fully-wired specd kernel
+ */
+async function buildKernel(
+  config: SpecdConfig,
+  options: KernelOptions | undefined,
+  disposers: readonly KernelDisposer[],
+): Promise<Kernel> {
   const logDir = path.join(config.configPath, 'log')
   const logFilePath = path.join(logDir, 'specd.log')
   await fs.mkdir(logDir, { recursive: true })
@@ -421,9 +469,13 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
     resolveUpdateProjectMetadataDeps(resolver),
   )
 
+  const dispose = createDispose(disposers)
+
   return {
     registry: resolver.registry,
     schemas,
+    dispose,
+    [Symbol.asyncDispose]: dispose,
     changes: {
       repo: changesRepo,
       archiveRepo,

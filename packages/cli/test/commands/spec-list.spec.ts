@@ -8,6 +8,7 @@ import {
   captureStderr,
   mockProcessExit,
   DEFAULT_LIST_LIMIT,
+  makeMockHost,
 } from './helpers.js'
 
 function makeMultiWorkspaceConfig() {
@@ -62,11 +63,13 @@ function setup() {
       specRepo: { count: vi.fn().mockResolvedValue(3) },
     },
   ])
-  vi.mocked(resolveCliContext).mockResolvedValue({
-    config: config,
-    configFilePath: null,
-    kernel: kernel,
-  })
+  vi.mocked(resolveCliContext).mockResolvedValue(
+    makeMockHost({
+      config: config,
+      configFilePath: null,
+      kernel: kernel,
+    }),
+  )
   const stdout = captureStdout()
   return { config, kernel, stdout }
 }
@@ -140,11 +143,13 @@ describe('spec list --workspace', () => {
         specRepo: { count: vi.fn().mockResolvedValue(0) },
       },
     ])
-    vi.mocked(resolveCliContext).mockResolvedValue({
-      config: config,
-      configFilePath: null,
-      kernel: kernel,
-    })
+    vi.mocked(resolveCliContext).mockResolvedValue(
+      makeMockHost({
+        config: config,
+        configFilePath: null,
+        kernel: kernel,
+      }),
+    )
     kernel.specs.list.execute.mockResolvedValue(makeListSpecsResult([]))
 
     const program = makeProgram()
@@ -176,11 +181,13 @@ describe('spec list --workspace', () => {
         specRepo: { count: vi.fn().mockResolvedValue(0) },
       },
     ])
-    vi.mocked(resolveCliContext).mockResolvedValue({
-      config: config,
-      configFilePath: null,
-      kernel: kernel,
-    })
+    vi.mocked(resolveCliContext).mockResolvedValue(
+      makeMockHost({
+        config: config,
+        configFilePath: null,
+        kernel: kernel,
+      }),
+    )
     kernel.specs.list.execute.mockResolvedValue(makeListSpecsResult([]))
 
     const program = makeProgram()
@@ -221,11 +228,13 @@ describe('spec list --workspace', () => {
         specRepo: { count: vi.fn().mockResolvedValue(1) },
       },
     ])
-    vi.mocked(resolveCliContext).mockResolvedValue({
-      config: config,
-      configFilePath: null,
-      kernel: kernel,
-    })
+    vi.mocked(resolveCliContext).mockResolvedValue(
+      makeMockHost({
+        config: config,
+        configFilePath: null,
+        kernel: kernel,
+      }),
+    )
     kernel.specs.list.execute.mockResolvedValue(makeListSpecsResult([multiEntries[0]!]))
 
     const stdout = captureStdout()
@@ -258,11 +267,13 @@ describe('spec list --workspace', () => {
         specRepo: { count: vi.fn().mockResolvedValue(1) },
       },
     ])
-    vi.mocked(resolveCliContext).mockResolvedValue({
-      config: config,
-      configFilePath: null,
-      kernel: kernel,
-    })
+    vi.mocked(resolveCliContext).mockResolvedValue(
+      makeMockHost({
+        config: config,
+        configFilePath: null,
+        kernel: kernel,
+      }),
+    )
     kernel.specs.list.execute.mockResolvedValue(makeListSpecsResult([multiEntries[0]!]))
 
     const stdout = captureStdout()
@@ -456,11 +467,13 @@ describe('spec list --count', () => {
         specRepo: { count: vi.fn().mockResolvedValue(1) },
       },
     ])
-    vi.mocked(resolveCliContext).mockResolvedValue({
-      config: config,
-      configFilePath: null,
-      kernel: kernel,
-    })
+    vi.mocked(resolveCliContext).mockResolvedValue(
+      makeMockHost({
+        config: config,
+        configFilePath: null,
+        kernel: kernel,
+      }),
+    )
     kernel.specs.list.execute.mockResolvedValue(makeListSpecsResult(multiEntries))
 
     const stdout = captureStdout()
@@ -494,11 +507,13 @@ describe('spec list --count', () => {
         specRepo: { count: vi.fn().mockResolvedValue(1) },
       },
     ])
-    vi.mocked(resolveCliContext).mockResolvedValue({
-      config: config,
-      configFilePath: null,
-      kernel: kernel,
-    })
+    vi.mocked(resolveCliContext).mockResolvedValue(
+      makeMockHost({
+        config: config,
+        configFilePath: null,
+        kernel: kernel,
+      }),
+    )
     kernel.specs.list.execute.mockResolvedValue(makeListSpecsResult([multiEntries[0]!]))
 
     const stdout = captureStdout()
@@ -529,11 +544,13 @@ describe('spec list --count', () => {
         specRepo: { count: vi.fn().mockResolvedValue(1) },
       },
     ])
-    vi.mocked(resolveCliContext).mockResolvedValue({
-      config: config,
-      configFilePath: null,
-      kernel: kernel,
-    })
+    vi.mocked(resolveCliContext).mockResolvedValue(
+      makeMockHost({
+        config: config,
+        configFilePath: null,
+        kernel: kernel,
+      }),
+    )
     kernel.specs.list.execute.mockResolvedValue(makeListSpecsResult(multiEntries))
 
     const stdout = captureStdout()
@@ -570,11 +587,13 @@ describe('spec list --count', () => {
         specRepo: { count: vi.fn().mockResolvedValue(1) },
       },
     ])
-    vi.mocked(resolveCliContext).mockResolvedValue({
-      config: config,
-      configFilePath: null,
-      kernel: kernel,
-    })
+    vi.mocked(resolveCliContext).mockResolvedValue(
+      makeMockHost({
+        config: config,
+        configFilePath: null,
+        kernel: kernel,
+      }),
+    )
     kernel.specs.list.execute.mockResolvedValue(makeListSpecsResult([multiEntries[0]!]))
 
     const stdout = captureStdout()

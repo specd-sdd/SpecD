@@ -6,11 +6,16 @@
   "dependsOn": [
     "core:kernel",
     "core:composition",
-    "default:_global/architecture",
     "core:composition-resolver",
-    "core:materialize-spec-metadata"
+    "core:materialize-spec-metadata",
+    "default:_global/architecture"
   ],
-  "implementation": [],
+  "implementation": [
+    {
+      "file": "core:src/composition/kernel-builder.ts",
+      "symbols": ["createKernelBuilder", "KernelBuilder"]
+    }
+  ],
   "optimizations": {
     "optimizedDescription": {
       "value": "Fluent kernel builder: accumulate additive KernelOptions registries; build() ≡ createKernel.",

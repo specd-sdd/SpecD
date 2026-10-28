@@ -8,12 +8,13 @@ Hosts need one call that loads project config, builds the kernel, and exposes a 
 
 ### Requirement: SdkHostContext shape
 
-SdkHostContext SHALL be a readonly object:
+SdkHostContext SHALL be a readonly object that also implements `AsyncDisposable`:
 
 ```ts
-interface SdkHostContext {
+interface SdkHostContext extends AsyncDisposable {
   readonly kernel: Kernel
   readonly createGraphProvider: () => CodeGraphProvider
+  readonly dispose: () => Promise<void>
 }
 ```
 
@@ -26,7 +27,7 @@ The graph-provider factory MUST remain synchronous and MUST return a fresh `Code
 `createSdkContext(config: SpecdConfig, options?: SdkContextOptions): Promise<SdkHostContext>` SHALL:
 
 1. Await `createKernel(config, options?.kernel)` from `@specd/core`
-2. Return `{ kernel, createGraphProvider: () => createCodeGraphProvider(config, options?.graph) }`
+2. Return `{ kernel, createGraphProvider: () => createCodeGraphProvider(config, options?.graph), dispose, [Symbol.asyncDispose]: dispose }`, where `dispose` delegates to `kernel.dispose()`
 
 `SdkContextOptions` SHALL be an SDK-owned bootstrap shape:
 
@@ -59,6 +60,16 @@ Configuration warnings exposed through `SpecdConfig.warnings` SHALL remain attac
 
 `OpenSpecdHostInput` SHALL also support `allowBootstrapFallback?: boolean`, defaulting to `false`. When it is `true` and discovery from `startDir` (or `process.cwd()`) finds no configuration, `openSpecdHost` SHALL resolve the VCS root and construct a synthetic graph-capable configuration for that root. It MUST preserve the normal error when no VCS root can be resolved, and it MUST NOT apply this fallback to an explicit `configPath` request.
 
+### Requirement: Host disposal
+
+`SdkHostContext.dispose()` SHALL delegate to `kernel.dispose()` and return its promise, so repeated and concurrent calls share one disposal and inherit the semantics defined by [`core:kernel`](../../../../specs/core/kernel/spec.md) (reverse order, failure isolation with `AggregateError`, bounded timeout). `[Symbol.asyncDispose]` SHALL be the same function as `dispose`.
+
+Because `openSpecdHost` spreads the context into its result, `OpenSpecdHostResult` SHALL carry `dispose` and `[Symbol.asyncDispose]`, and `await using host = await openSpecdHost(input)` SHALL release the host when the scope exits.
+
+`dispose()` MUST NOT close `CodeGraphProvider` instances created through `createGraphProvider()`: callers own what they create and release it themselves (for example with `withOpenGraphProvider`).
+
+A context SHALL only dispose a kernel it created. The SDK MUST NOT expose an API that wraps a kernel created elsewhere into an `SdkHostContext`.
+
 ### Requirement: Config mutation boundary
 
 Host context bootstrap MUST NOT perform config file writes. `initProject`, `addPlugin`, and `removePlugin` remain on `createConfigWriter()` — not on `SdkHostContext` or `kernel.project`.
@@ -66,6 +77,7 @@ Host context bootstrap MUST NOT perform config file writes. `initProject`, `addP
 ## Spec Dependencies
 
 - [`sdk:composition`](../composition/spec.md) — package placement and export surface
-- [`core:kernel`](../../../../specs/core/kernel/spec.md) — `Kernel` type and `createKernel`
+- [`core:kernel`](../../../../specs/core/kernel/spec.md) — `Kernel` type, `createKernel` and `dispose()`
+- [`core:kernel-builder`](../../../../specs/core/kernel-builder/spec.md) — `registerDisposer`, through which disposers reach the kernel that `dispose()` releases
 - [`core:composition`](../../../../specs/core/composition/spec.md) — `createDefaultConfigLoader` factory
 - [`code-graph:composition`](../../../../specs/code-graph/composition/spec.md) — `CodeGraphCompositionOptions` and `createCodeGraphProvider(...)`

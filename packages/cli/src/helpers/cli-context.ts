@@ -1,13 +1,8 @@
 import { fileURLToPath } from 'node:url'
 import * as path from 'node:path'
-import {
-  openSpecdHost,
-  type KernelOptions,
-  type LogDestination,
-  type LogEntry,
-  type LogLevel,
-} from '@specd/sdk'
+import { type KernelOptions, type LogDestination, type LogEntry, type LogLevel } from '@specd/sdk'
 import type { CliContext } from './cli-context-types.js'
+import { openCliHost } from './cli-host.js'
 
 export type { CliContext } from './cli-context-types.js'
 
@@ -90,7 +85,7 @@ export async function resolveCliContext(options?: {
   configPath?: string | undefined
   onLog?: ((entry: LogEntry) => void) | undefined
 }): Promise<CliContext> {
-  const host = await openSpecdHost({
+  const host = await openCliHost({
     ...(options?.configPath !== undefined ? { configPath: options.configPath } : {}),
     options: {
       kernel: buildCliKernelOptions({ onLog: options?.onLog }),
@@ -102,9 +97,5 @@ export async function resolveCliContext(options?: {
       console.warn(`warning: ${warning}`)
     }
   }
-  return {
-    config: host.config,
-    configFilePath: host.configFilePath,
-    kernel: host.kernel,
-  }
+  return host
 }

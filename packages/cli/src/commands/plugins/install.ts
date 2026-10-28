@@ -11,6 +11,7 @@ import {
   createPluginLoader,
   type InstallPluginOutput,
 } from '@specd/plugin-manager'
+import { CliExitError } from '../../helpers/cli-exit-error.js'
 
 /**
  * One plugin-install command result entry.
@@ -134,7 +135,7 @@ export function registerPluginsInstall(parent: Command): void {
 
         renderInstallOutput(result, fmt)
         if (result.hasErrors) {
-          process.exit(1)
+          throw new CliExitError(1)
         }
       } catch (error) {
         handleError(error, opts.format)

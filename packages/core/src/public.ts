@@ -2,6 +2,7 @@ import { createRequire } from 'module'
 
 // Bootstrap
 export { createKernel, type Kernel, type KernelOptions } from './composition/kernel.js'
+export { type KernelDisposer } from './composition/kernel-disposal.js'
 export { createKernelBuilder, type KernelBuilder } from './composition/kernel-builder.js'
 export { type PluginCheckRegistration } from './composition/composition-registries.js'
 export {
@@ -457,6 +458,8 @@ export {
   type ReconciledOperation,
   type ReconciledOperationBlockedInput,
   SchemaProviderIdentityMismatchError,
+  InvalidDisposerError,
+  DisposerFailedError,
 } from './application/errors/index.js'
 
 // Domain entities

@@ -24,7 +24,7 @@ afterEach(() => vi.clearAllMocks())
 
 describe('runGraphIndexTask', () => {
   it('reconstructs configured CLI context and indexes once', async () => {
-    const host = {} as never
+    const host = { dispose: vi.fn(async () => {}) } as never
     vi.mocked(openSpecdHost).mockResolvedValue(host)
     vi.mocked(runIndexProjectGraph).mockResolvedValue({ filesIndexed: 1 } as never)
     const output = await runGraphIndexTask(
@@ -43,9 +43,43 @@ describe('runGraphIndexTask', () => {
     expect(output).toEqual({ filesIndexed: 1 })
   })
 
+  it('disposes the host it opened after a successful run', async () => {
+    const dispose = vi.fn(async () => {})
+    vi.mocked(openSpecdHost).mockResolvedValue({ dispose } as never)
+    vi.mocked(runIndexProjectGraph).mockResolvedValue({ filesIndexed: 1 } as never)
+
+    await runGraphIndexTask(
+      {
+        context: { mode: 'configured', configFilePath: '/repo/specd.yaml' },
+        index: { force: false },
+      },
+      vi.fn(),
+    )
+
+    expect(dispose).toHaveBeenCalledTimes(1)
+  })
+
+  it('disposes the host it opened when indexing fails', async () => {
+    const dispose = vi.fn(async () => {})
+    vi.mocked(openSpecdHost).mockResolvedValue({ dispose } as never)
+    vi.mocked(runIndexProjectGraph).mockRejectedValue(new Error('index failed'))
+
+    await expect(
+      runGraphIndexTask(
+        {
+          context: { mode: 'configured', configFilePath: '/repo/specd.yaml' },
+          index: { force: false },
+        },
+        vi.fn(),
+      ),
+    ).rejects.toThrow('index failed')
+
+    expect(dispose).toHaveBeenCalledTimes(1)
+  })
+
   it('reconstructs bootstrap context and forwards options/progress unchanged', async () => {
     const config = {} as never
-    const host = {} as never
+    const host = { dispose: vi.fn(async () => {}) } as never
     const emit = vi.fn()
     vi.mocked(createBootstrapGraphConfig).mockReturnValue(config)
     vi.mocked(createSdkContext).mockResolvedValue(host)

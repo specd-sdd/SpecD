@@ -10,6 +10,7 @@ import { runIsolatedGraphIndex } from '@specd/sdk'
 import { registerGraphIndex } from '../../src/commands/graph/index-graph.js'
 import * as resolveContext from '../../src/commands/graph/resolve-graph-cli-context.js'
 import {
+  captureStderr,
   captureStdout,
   ExitSentinel,
   makeMockConfig,
@@ -69,6 +70,7 @@ function setup(mode: 'configured' | 'bootstrap' = 'configured') {
     config,
     configFilePath: mode === 'configured' ? '/project/specd.yaml' : null,
     kernel: null,
+    host: null,
     projectRoot: '/project',
     vcsRoot: '/project',
   })
@@ -101,6 +103,29 @@ describe('graph index', () => {
     expect(
       (vi.mocked(runIsolatedGraphIndex).mock.calls[0]?.[0].taskModule as URL).pathname,
     ).toContain('graph-index-task.js')
+  })
+
+  it('ends a successful run with exit code 0 and reports no error', async () => {
+    setup()
+    const stderr = captureStderr()
+
+    await run(makeIndexProgram(), '--format', 'json')
+
+    expect(process.exit).toHaveBeenCalledTimes(1)
+    expect(process.exit).toHaveBeenCalledWith(0)
+    expect(stderr()).toBe('')
+  })
+
+  it('ends a failed run with exit code 3 and one error message', async () => {
+    setup()
+    vi.mocked(runIsolatedGraphIndex).mockRejectedValue(new Error('index exploded'))
+    const stderr = captureStderr()
+
+    await run(makeIndexProgram(), '--format', 'json')
+
+    expect(process.exit).toHaveBeenCalledTimes(1)
+    expect(process.exit).toHaveBeenCalledWith(3)
+    expect(stderr().match(/index exploded/g)).toHaveLength(1)
   })
 
   it('uses an exact bootstrap descriptor and only supplies progress for text output', async () => {

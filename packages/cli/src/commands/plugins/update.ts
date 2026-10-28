@@ -5,6 +5,7 @@ import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat, type OutputFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
 import { getDeclaredPlugins } from './get-declared-plugins.js'
+import { CliExitError } from '../../helpers/cli-exit-error.js'
 
 /**
  * One plugin-update command result entry.
@@ -117,7 +118,7 @@ export function registerPluginsUpdate(parent: Command): void {
 
         renderUpdateOutput(result, fmt)
         if (result.hasErrors) {
-          process.exit(1)
+          throw new CliExitError(1)
         }
       } catch (error) {
         handleError(error, opts.format)

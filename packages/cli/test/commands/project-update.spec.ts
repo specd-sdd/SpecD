@@ -6,6 +6,7 @@ import {
   makeMockKernel,
   makeProgram,
   mockProcessExit,
+  makeMockHost,
 } from './helpers.js'
 
 vi.mock('../../src/helpers/cli-context.js', () => ({
@@ -21,11 +22,13 @@ import { updatePluginsWithKernel } from '../../src/commands/plugins/update.js'
 import { registerProjectUpdate } from '../../src/commands/project/update.js'
 
 function setup() {
-  vi.mocked(resolveCliContext).mockResolvedValue({
-    config: makeMockConfig(),
-    configFilePath: '/project/specd.yaml',
-    kernel: makeMockKernel(),
-  })
+  vi.mocked(resolveCliContext).mockResolvedValue(
+    makeMockHost({
+      config: makeMockConfig(),
+      configFilePath: '/project/specd.yaml',
+      kernel: makeMockKernel(),
+    }),
+  )
   const stdout = captureStdout()
   const stderr = captureStderr()
   mockProcessExit()

@@ -10,6 +10,19 @@ specd [--config <path>] [-v|--verbose] <command> [options]
 
 When `specd` is invoked with no subcommand and a `specd.yaml` is discoverable from the current directory, the project dashboard is shown automatically. If no config is found, the help text is printed instead.
 
+### Exit codes
+
+| Code | Meaning                                                                                             |
+| ---- | --------------------------------------------------------------------------------------------------- |
+| 0    | Success                                                                                             |
+| 1    | User or domain error (change not found, invalid state transition, validation failure, config error) |
+| 2    | Hook failure (a `run:` hook exited with a non-zero status)                                          |
+| 3    | System error (unhandled exception, I/O error, schema resolution failure)                            |
+| 130  | Interrupted by `SIGINT` (Ctrl-C)                                                                    |
+| 143  | Terminated by `SIGTERM`                                                                             |
+
+Before the process ends, on every path, the CLI releases the resources it opened. Pressing Ctrl-C (or sending `SIGTERM`) runs that cleanup first and then exits with 130 (or 143); a second signal while cleanup is still running exits immediately. Cleanup failures are printed as `warning: cleanup failed: …` on stderr and never change the exit code.
+
 **Global options:**
 
 | Option                      | Description                                                                                 |

@@ -31,8 +31,19 @@ The builder SHALL expose fluent registration methods for each additive registry 
 - external hook runner registration
 - VCS provider registration
 - actor provider registration
+- disposer registration (`registerDisposer`)
 
 Each registration method SHALL return the builder itself so callers can chain registrations conditionally and ergonomically.
+
+### Requirement: Builder registers named disposers
+
+The builder SHALL expose `registerDisposer(name: string, dispose: () => void | Promise<void>)`, which returns the builder. It SHALL accumulate disposers in call order into the `disposers` entry of the kernel options used by `build()`, with the semantics defined by [`core:kernel`](../kernel/spec.md).
+
+An empty `name` or a non-callable `dispose` MUST be rejected with an `InvalidDisposerError` when it is registered. A `name` that is already registered MUST be rejected with a `RegistryConflictError` for the category `disposers`, consistent with the other registrations. The builder treats every disposer as opaque.
+
+### Requirement: Builder hands disposers to the kernel
+
+When `build()` succeeds, the accumulated disposers belong to the kernel and `kernel.dispose()` SHALL run them; the builder itself MUST NOT run them. When `build()` fails, the builder SHALL rely on the failure semantics of `createKernel` (the supplied disposers are run in reverse order before the error propagates). Because `build()` is equivalent to `createKernel(config, options)`, a kernel produced by the builder and a kernel produced from equivalent options SHALL dispose identically.
 
 ### Requirement: Builder builds kernels with createKernel-equivalent semantics
 

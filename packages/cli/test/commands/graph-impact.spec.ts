@@ -54,6 +54,7 @@ function setup() {
     config,
     configFilePath: '/project/specd.yaml',
     kernel: null,
+    host: null,
     projectRoot: '/project',
     vcsRoot: '/project',
   })

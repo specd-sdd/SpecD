@@ -3,6 +3,7 @@ import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat, serializeOutput, type OutputFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
 import { createHookProgressPresenter } from './_hook-progress-presenter.js'
+import { CliExitError } from '../../helpers/cli-exit-error.js'
 
 const TEXT_SUMMARY_TAIL_LINES = 10
 
@@ -232,8 +233,7 @@ JSON/TOON output schema:
                 event: { type: 'complete', result: jsonResult },
               })
             }
-            process.exit(2)
-            return
+            throw new CliExitError(2)
           }
 
           // Success

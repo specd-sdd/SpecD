@@ -1,4 +1,5 @@
 import { type ArtifactParser } from '../application/ports/artifact-parser.js'
+import { InvalidDisposerError } from '../application/errors/invalid-disposer-error.js'
 import { RegistryConflictError } from '../application/errors/registry-conflict-error.js'
 import { type ExternalHookRunner } from '../application/ports/external-hook-runner.js'
 import { type SpecdConfig } from '../application/specd-config.js'
@@ -22,6 +23,7 @@ import {
   type PluginCheckDefaultBinding,
 } from './composition-registries.js'
 import { createKernel, type Kernel, type KernelOptions } from './kernel.js'
+import { type KernelDisposer } from './kernel-disposal.js'
 
 /**
  * Mutable working state used internally by {@link createKernelBuilder}.
@@ -38,6 +40,7 @@ interface KernelBuilderState {
   readonly actorProviders: ActorProvider[]
   readonly externalHookRunners: ExternalHookRunner[]
   readonly checks: PluginCheckRegistration[]
+  readonly disposers: KernelDisposer[]
   readonly repositories: {
     changes?: ChangeRepository
     archive?: ArchiveRepository
@@ -185,6 +188,21 @@ export interface KernelBuilder {
   ): this
 
   /**
+   * Registers a named cleanup action for a resource that exists before the kernel.
+   *
+   * On a successful `build()` the disposer belongs to the kernel and `kernel.dispose()`
+   * runs it; the builder never runs it. On a failed `build()`, `createKernel` releases the
+   * registered disposers in reverse order before the error propagates.
+   *
+   * @param name - Non-empty name, unique per builder; used in warnings and aggregated errors
+   * @param dispose - Cleanup work, synchronous or asynchronous
+   * @returns The same builder for fluent chaining
+   * @throws {InvalidDisposerError} When `name` is empty
+   * @throws {RegistryConflictError} When `name` is already registered
+   */
+  registerDisposer(name: string, dispose: () => void | Promise<void>): this
+
+  /**
    * Builds the final kernel using the accumulated additive registrations.
    *
    * @returns A kernel equivalent to `createKernel(config, accumulatedOptions)`
@@ -241,6 +259,7 @@ function cloneOptions(base?: Partial<KernelOptions>): KernelBuilderState {
     actorProviders: [...(base?.actorProviders ?? [])],
     externalHookRunners: [...(base?.externalHookRunners ?? [])],
     checks: [...(base?.checks ?? [])],
+    disposers: [...(base?.disposers ?? [])],
     repositories: {
       ...(base?.repositories ?? {}),
     },
@@ -280,6 +299,7 @@ function toKernelOptions(state: KernelBuilderState): KernelOptions {
       ? { externalHookRunners: [...state.externalHookRunners] }
       : {}),
     ...(state.checks.length > 0 ? { checks: [...state.checks] } : {}),
+    ...(state.disposers.length > 0 ? { disposers: [...state.disposers] } : {}),
     ...(state.repositories && Object.keys(state.repositories).length > 0
       ? { repositories: { ...state.repositories } }
       : {}),
@@ -411,6 +431,20 @@ export function createKernelBuilder(
         ...(defaultBindings !== undefined ? { defaultBindings } : {}),
         ...(checkOptions !== undefined ? { options: checkOptions } : {}),
       })
+      return builder
+    },
+
+    registerDisposer(name: string, dispose: () => void | Promise<void>): KernelBuilder {
+      if (typeof name !== 'string' || name === '') {
+        throw new InvalidDisposerError('name must be a non-empty string')
+      }
+      if (typeof dispose !== 'function') {
+        throw new InvalidDisposerError(`disposer '${name}' must have a callable dispose`)
+      }
+      if (options.disposers.some((existing) => existing.name === name)) {
+        throw new RegistryConflictError('disposers', name)
+      }
+      options.disposers.push({ name, dispose })
       return builder
     },
 

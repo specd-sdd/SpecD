@@ -16,6 +16,9 @@
       "types": "./dist/index.d.ts"
     }
   },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "build": "node --import tsx ../../dev/scripts/sync-plugin-manifests.ts packages/plugin-agent-copilot && tsup src/index.ts --format esm --dts --clean",
     "dev": "tsup src/index.ts --format esm --dts --watch",

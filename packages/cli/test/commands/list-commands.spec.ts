@@ -17,6 +17,7 @@ import {
   mockProcessExit,
   captureStdout,
   captureStderr,
+  makeMockHost,
 } from './helpers.js'
 
 vi.mock('../../src/helpers/cli-context.js', () => ({
@@ -37,11 +38,13 @@ import { registerSpecList } from '../../src/commands/spec/list.js'
 function setup() {
   const config = makeMockConfig()
   const kernel = makeMockKernel()
-  vi.mocked(resolveCliContext).mockResolvedValue({
-    config: config,
-    configFilePath: null,
-    kernel: kernel,
-  })
+  vi.mocked(resolveCliContext).mockResolvedValue(
+    makeMockHost({
+      config: config,
+      configFilePath: null,
+      kernel: kernel,
+    }),
+  )
   const stdout = captureStdout()
   const stderr = captureStderr()
   mockProcessExit()
@@ -691,7 +694,9 @@ describe('spec list', () => {
     const config = makeMockConfig({ workspaces: [] })
     const kernel = makeMockKernel()
     kernel.project.listWorkspaces.execute.mockResolvedValue([])
-    vi.mocked(resolveCliContext).mockResolvedValue({ config, configFilePath: null, kernel })
+    vi.mocked(resolveCliContext).mockResolvedValue(
+      makeMockHost({ config, configFilePath: null, kernel }),
+    )
     const stdout = captureStdout()
     captureStderr()
     mockProcessExit()

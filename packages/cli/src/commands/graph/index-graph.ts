@@ -12,6 +12,7 @@ import type {
 import { output, parseFormat } from '../../formatter.js'
 import { cliError } from '../../handle-error.js'
 import { resolveGraphCliContext } from './resolve-graph-cli-context.js'
+import { CliExitError } from '../../helpers/cli-exit-error.js'
 
 /**
  * Registers the `graph index` command.
@@ -134,10 +135,11 @@ JSON/TOON output schema:
           } else {
             output(result, fmt)
           }
-          process.exit(0)
         } catch (err) {
           cliError(err instanceof Error ? err.message : 'indexing failed', opts.format, 3)
         }
+        // Reached only when indexing succeeded: end the process explicitly after cleanup.
+        throw new CliExitError(0)
       },
     )
 }

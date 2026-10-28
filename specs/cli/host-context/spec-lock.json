@@ -3,14 +3,31 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": ["cli:entrypoint", "sdk:host-context", "sdk:composition"],
+  "dependsOn": ["cli:entrypoint", "sdk:host-context", "sdk:composition", "core:kernel"],
   "implementation": [
+    {
+      "file": "cli:src/helpers/cli-host.ts",
+      "symbols": ["openCliHost"]
+    },
+    {
+      "file": "cli:src/helpers/cli-cleanup.ts",
+      "symbols": ["registerCliCleanup", "runCliCleanup"]
+    },
     {
       "file": "cli:src/helpers/cli-context.ts",
       "symbols": ["resolveCliContext"]
     },
     {
-      "file": "cli:test/helpers/cli-context.spec.ts"
+      "file": "cli:src/helpers/cli-context-types.ts",
+      "symbols": ["CliContext"]
+    },
+    {
+      "file": "cli:src/graph-index-task.ts",
+      "symbols": ["runGraphIndexTask"]
+    },
+    {
+      "file": "cli:src/commands/graph/with-provider.ts",
+      "symbols": ["withProvider"]
     }
   ],
   "optimizations": {

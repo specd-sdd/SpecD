@@ -9,6 +9,9 @@
     "dist/"
   ],
   "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
   "dependencies": {
     "@specd/code-graph": "workspace:*",
     "@specd/core": "workspace:*"

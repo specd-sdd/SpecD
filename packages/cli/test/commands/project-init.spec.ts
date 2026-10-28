@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { captureStdout, makeMockConfig, makeProgram, mockProcessExit } from './helpers.js'
+import {
+  captureStdout,
+  makeMockConfig,
+  makeProgram,
+  mockProcessExit,
+  makeMockHost,
+} from './helpers.js'
 
 const mockInitProject = vi.fn().mockResolvedValue({
   configPath: '/project/specd.yaml',
@@ -48,11 +54,13 @@ function setup() {
     workspaces: ['default'],
     metadataCachePath: '.specd/metadata',
   })
-  vi.mocked(resolveCliContext).mockResolvedValue({
-    config: makeMockConfig(),
-    configFilePath: '/project/specd.yaml',
-    kernel: makeMockKernel(),
-  })
+  vi.mocked(resolveCliContext).mockResolvedValue(
+    makeMockHost({
+      config: makeMockConfig(),
+      configFilePath: '/project/specd.yaml',
+      kernel: makeMockKernel(),
+    }),
+  )
   vi.mocked(installPluginsWithKernel).mockResolvedValue({
     plugins: [],
     hasErrors: false,

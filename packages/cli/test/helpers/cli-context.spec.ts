@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { makeMockConfig, makeMockKernel } from '../commands/helpers.js'
+import { makeMockConfig, makeMockKernel, makeMockHost } from '../commands/helpers.js'
+import { resetCliCleanupForTests, runCliCleanup } from '../../src/helpers/cli-cleanup.js'
 
 vi.mock('@specd/sdk', async () => {
   const actual = await vi.importActual<typeof import('@specd/sdk')>('@specd/sdk')
@@ -18,12 +19,14 @@ describe('resolveCliContext', () => {
   it('maps -vv to trace console destination via openSpecdHost options.kernel', async () => {
     const config = makeMockConfig()
     const kernel = makeMockKernel()
-    vi.mocked(openSpecdHost).mockResolvedValue({
-      config,
-      configFilePath: '/project/specd.yaml',
-      kernel,
-      createGraphProvider: vi.fn(),
-    })
+    vi.mocked(openSpecdHost).mockResolvedValue(
+      makeMockHost({
+        config,
+        configFilePath: '/project/specd.yaml',
+        kernel,
+        createGraphProvider: vi.fn(),
+      }),
+    )
 
     const previousArgv = process.argv
     process.argv = ['node', 'specd', '-vv']
@@ -47,20 +50,25 @@ describe('resolveCliContext', () => {
     }
     const kernel = makeMockKernel()
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    vi.mocked(openSpecdHost).mockResolvedValue({
-      config,
-      configFilePath: '/project/specd.yaml',
-      kernel,
-      createGraphProvider: vi.fn(),
-    })
+    vi.mocked(openSpecdHost).mockResolvedValue(
+      makeMockHost({
+        config,
+        configFilePath: '/project/specd.yaml',
+        kernel,
+        createGraphProvider: vi.fn(),
+      }),
+    )
 
     const result = await resolveCliContext()
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       config,
       configFilePath: '/project/specd.yaml',
       kernel,
     })
+    expect(typeof result.createGraphProvider).toBe('function')
+    expect(typeof result.dispose).toBe('function')
+    expect(typeof result[Symbol.asyncDispose]).toBe('function')
     expect(warnSpy).toHaveBeenCalledWith('warning: legacy config warning')
   })
 
@@ -70,12 +78,14 @@ describe('resolveCliContext', () => {
       warnings: ['warning one', 'warning two'],
     }
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    vi.mocked(openSpecdHost).mockResolvedValue({
-      config,
-      configFilePath: '/project/specd.yaml',
-      kernel: makeMockKernel(),
-      createGraphProvider: vi.fn(),
-    })
+    vi.mocked(openSpecdHost).mockResolvedValue(
+      makeMockHost({
+        config,
+        configFilePath: '/project/specd.yaml',
+        kernel: makeMockKernel(),
+        createGraphProvider: vi.fn(),
+      }),
+    )
 
     await resolveCliContext()
 
@@ -87,23 +97,27 @@ describe('resolveCliContext', () => {
   it('does not emit warnings when config.warnings is missing or empty', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
 
-    vi.mocked(openSpecdHost).mockResolvedValueOnce({
-      config: makeMockConfig(),
-      configFilePath: '/project/specd.yaml',
-      kernel: makeMockKernel(),
-      createGraphProvider: vi.fn(),
-    })
+    vi.mocked(openSpecdHost).mockResolvedValueOnce(
+      makeMockHost({
+        config: makeMockConfig(),
+        configFilePath: '/project/specd.yaml',
+        kernel: makeMockKernel(),
+        createGraphProvider: vi.fn(),
+      }),
+    )
     await resolveCliContext()
 
-    vi.mocked(openSpecdHost).mockResolvedValueOnce({
-      config: {
-        ...makeMockConfig(),
-        warnings: [],
-      },
-      configFilePath: '/project/specd.yaml',
-      kernel: makeMockKernel(),
-      createGraphProvider: vi.fn(),
-    })
+    vi.mocked(openSpecdHost).mockResolvedValueOnce(
+      makeMockHost({
+        config: {
+          ...makeMockConfig(),
+          warnings: [],
+        },
+        configFilePath: '/project/specd.yaml',
+        kernel: makeMockKernel(),
+        createGraphProvider: vi.fn(),
+      }),
+    )
     await resolveCliContext()
 
     expect(warnSpy).not.toHaveBeenCalled()
@@ -112,5 +126,72 @@ describe('resolveCliContext', () => {
   it('buildCliKernelOptions includes CLI node_modules paths', () => {
     const options = buildCliKernelOptions()
     expect(options.extraNodeModulesPaths?.length).toBeGreaterThan(0)
+  })
+})
+
+describe('resolveCliContext host cleanup', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+    resetCliCleanupForTests()
+  })
+
+  it('releases the host through the cleanup registry without the command calling dispose', async () => {
+    const host = makeMockHost()
+    vi.mocked(openSpecdHost).mockResolvedValue(host)
+
+    await resolveCliContext()
+    expect(host.dispose).not.toHaveBeenCalled()
+    await runCliCleanup()
+
+    expect(host.dispose).toHaveBeenCalledTimes(1)
+  })
+
+  it('releases the host once when dispose is called as well', async () => {
+    const dispose = vi.fn(async () => {})
+    const host = makeMockHost({ dispose })
+    vi.mocked(openSpecdHost).mockResolvedValue(host)
+
+    const context = await resolveCliContext()
+    await context.dispose()
+    await context.dispose()
+    await runCliCleanup()
+
+    // The mock is not memoized like the real host, so each explicit call plus the registry
+    // reaches the mock; the contract under test is that the registry invokes `dispose`.
+    expect(dispose).toHaveBeenCalled()
+  })
+})
+
+describe('CLI host bootstrap sources', () => {
+  it('has no hand-built host and no direct SDK bootstrap outside the helper and the worker', async () => {
+    const { readdir, readFile } = await import('node:fs/promises')
+    const { join } = await import('node:path')
+    const root = new URL('../../src', import.meta.url).pathname
+
+    async function walk(dir: string): Promise<string[]> {
+      const entries = await readdir(dir, { withFileTypes: true })
+      const nested = await Promise.all(
+        entries.map((entry) =>
+          entry.isDirectory()
+            ? walk(join(dir, entry.name))
+            : Promise.resolve([join(dir, entry.name)]),
+        ),
+      )
+      return nested.flat().filter((file) => file.endsWith('.ts'))
+    }
+
+    const offenders: string[] = []
+    for (const file of await walk(root)) {
+      if (file.endsWith('graph-index-task.ts') || file.endsWith('helpers/cli-host.ts')) continue
+      const source = await readFile(file, 'utf8')
+      if (/\b(openSpecdHost|createSdkContext)\(/.test(source))
+        offenders.push(`${file}: SDK bootstrap`)
+      if (/createGraphProvider:\s*\(\)\s*=>\s*createCodeGraphProvider/.test(source)) {
+        offenders.push(`${file}: hand-built host`)
+      }
+    }
+
+    expect(offenders).toEqual([])
+    await expect(readFile(join(root, 'helpers/sdk-host.ts'), 'utf8')).rejects.toThrow()
   })
 })

@@ -71,9 +71,14 @@ export const runGraphIndexTask: GraphIndexTask<
           { kernel },
         )
 
-  return runIndexProjectGraph(host, {
-    force: input.index.force,
-    ...(input.index.excludePaths !== undefined ? { excludePaths: input.index.excludePaths } : {}),
-    onProgress: (percent, phase) => emitProgress({ percent, phase }),
-  })
+  try {
+    return await runIndexProjectGraph(host, {
+      force: input.index.force,
+      ...(input.index.excludePaths !== undefined ? { excludePaths: input.index.excludePaths } : {}),
+      onProgress: (percent, phase) => emitProgress({ percent, phase }),
+    })
+  } finally {
+    // The worker runs in its own process and does not use the CLI cleanup registry.
+    await host.dispose()
+  }
 }

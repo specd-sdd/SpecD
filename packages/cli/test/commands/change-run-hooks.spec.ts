@@ -5,6 +5,7 @@ import {
   mockProcessExit,
   captureStdout,
   captureStderr,
+  makeMockHost,
 } from './helpers.js'
 
 vi.mock('../../src/helpers/cli-context.js', () => ({
@@ -16,11 +17,13 @@ import { registerChangeRunHooks } from '../../src/commands/change/run-hooks.js'
 
 function setup() {
   const kernel = makeMockKernel()
-  vi.mocked(resolveCliContext).mockResolvedValue({
-    config: {} as never,
-    configFilePath: null,
-    kernel,
-  })
+  vi.mocked(resolveCliContext).mockResolvedValue(
+    makeMockHost({
+      config: {} as never,
+      configFilePath: null,
+      kernel,
+    }),
+  )
   const stdout = captureStdout()
   const stderr = captureStderr()
   mockProcessExit()
@@ -284,7 +287,8 @@ describe('change run-hooks', () => {
       ])
       .catch(() => {})
 
-    expect(stderr()).toContain('fatal: process.exit(2)')
+    expect(process.exit).toHaveBeenCalledWith(2)
+    expect(stderr()).not.toContain('fatal:')
     const lines = stdout()
       .trim()
       .split('\n')

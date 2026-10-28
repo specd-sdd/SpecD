@@ -71,7 +71,30 @@
     "core:get-project-summary",
     "core:actor-resolver"
   ],
-  "implementation": [],
+  "implementation": [
+    {
+      "file": "core:src/composition/kernel.ts",
+      "symbols": ["createKernel", "Kernel", "KernelOptions"]
+    },
+    {
+      "file": "core:src/composition/kernel-disposal.ts",
+      "symbols": [
+        "runDisposers",
+        "createDispose",
+        "validateDisposers",
+        "releaseAfterFailedConstruction",
+        "KernelDisposer"
+      ]
+    },
+    {
+      "file": "core:src/application/errors/disposer-failed-error.ts",
+      "symbols": ["DisposerFailedError"]
+    },
+    {
+      "file": "core:src/application/errors/invalid-disposer-error.ts",
+      "symbols": ["InvalidDisposerError"]
+    }
+  ],
   "optimizations": {
     "optimizedDescription": {
       "value": "Immutable Kernel facade wires grouped domain use cases; ConfigWriter separately owns configuration mutation.",

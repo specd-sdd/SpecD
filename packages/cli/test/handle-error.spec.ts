@@ -27,7 +27,8 @@ import {
   ArchiveDependencyMismatchError,
   type LoggerPort,
 } from '@specd/sdk'
-import { handleError } from '../src/handle-error.js'
+import { handleError, cliError } from '../src/handle-error.js'
+import { CliExitError } from '../src/helpers/cli-exit-error.js'
 import { CliValidationError, InvalidFormatError } from '../src/errors/index.js'
 import { mockProcessExit, ExitSentinel } from './commands/helpers.js'
 
@@ -36,10 +37,23 @@ function capturedStderr(): string {
   return (spy.mock.calls as [string][]).map(([s]) => s).join('')
 }
 
+/**
+ * Calls `handleError` and, like the entrypoint, turns the `CliExitError` it throws into a
+ * call to the mocked `process.exit` so exit-code assertions stay readable.
+ *
+ * @param err - Error to hand to `handleError`
+ * @param format - Optional `--format` value
+ */
 function callHandleError(err: unknown, format?: string): void {
   try {
     handleError(err, format)
   } catch (e) {
+    try {
+      if (e instanceof CliExitError) process.exit(e.exitCode)
+    } catch (sentinel) {
+      if (sentinel instanceof ExitSentinel) return
+      throw sentinel
+    }
     if (e instanceof ExitSentinel) return
     throw e
   }
@@ -289,5 +303,69 @@ describe('handleError — structured error output', () => {
     callHandleError('raw string', 'json')
     expect(capturedStdout()).toBe('')
     expect(capturedStderr()).toMatch(/^fatal:/)
+  })
+})
+
+describe('exit signalling without process.exit', () => {
+  beforeEach(() => {
+    mockProcessExit()
+    vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('cliError writes its output and throws a CliExitError without calling process.exit', () => {
+    let thrown: unknown
+    try {
+      cliError('something failed', undefined, 1)
+    } catch (e) {
+      thrown = e
+    }
+
+    expect(thrown).toBeInstanceOf(CliExitError)
+    expect((thrown as CliExitError).exitCode).toBe(1)
+    expect(process.exit).not.toHaveBeenCalled()
+    expect(capturedStderr()).toContain('error: something failed')
+  })
+
+  it('handleError throws a CliExitError carrying the exit code for a domain error', () => {
+    let thrown: unknown
+    try {
+      handleError(new ChangeNotFoundError('my-change'))
+    } catch (e) {
+      thrown = e
+    }
+
+    expect(thrown).toBeInstanceOf(CliExitError)
+    expect((thrown as CliExitError).exitCode).toBe(1)
+    expect(process.exit).not.toHaveBeenCalled()
+  })
+
+  it('handleError rethrows a CliExitError unchanged and prints nothing', () => {
+    const original = new CliExitError(2)
+    let thrown: unknown
+    try {
+      handleError(original)
+    } catch (e) {
+      thrown = e
+    }
+
+    expect(thrown).toBe(original)
+    expect(capturedStderr()).toBe('')
+  })
+
+  it('handleError turns an unexpected error into CliExitError(3)', () => {
+    let thrown: unknown
+    try {
+      handleError(new Error('unexpected'))
+    } catch (e) {
+      thrown = e
+    }
+
+    expect(thrown).toBeInstanceOf(CliExitError)
+    expect((thrown as CliExitError).exitCode).toBe(3)
+    expect(capturedStderr()).toContain('fatal: unexpected')
   })
 })

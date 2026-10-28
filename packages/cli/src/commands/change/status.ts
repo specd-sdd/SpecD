@@ -10,7 +10,6 @@ import {
   validityTextLines,
 } from './_validity-present.js'
 import { enrichImplementationTracking } from './_implementation-tracking.js'
-import { resolveSdkHostContext } from '../../helpers/sdk-host.js'
 import { resolveChangeSchemaForCli } from '../../helpers/change-schema.js'
 
 /** Schema metadata attached to lifecycle evaluation. */
@@ -136,7 +135,8 @@ JSON/TOON output schema:
     .action(
       async (name: string, opts: { format: string; implementation?: boolean; config?: string }) => {
         try {
-          const { config, kernel } = await resolveCliContext({ configPath: opts.config })
+          const host = await resolveCliContext({ configPath: opts.config })
+          const { kernel } = host
           const statusResult = await kernel.changes.status.execute({
             name,
           })
@@ -205,7 +205,7 @@ JSON/TOON output schema:
           const change = statusResult.change!
           const { artifactStatuses, lifecycle, review, blockers, nextAction } = statusResult
           const implementationTracking = opts.implementation
-            ? await enrichImplementationTracking(await resolveSdkHostContext(config, kernel), name)
+            ? await enrichImplementationTracking(host, name)
             : undefined
 
           const fmt = parseFormat(opts.format)

@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { type SpecdConfig } from '@specd/core'
 
-const mockKernel = { id: 'kernel' }
+const kernelDispose = vi.fn(async () => {})
+const mockKernel = { id: 'kernel', dispose: kernelDispose }
 const mockProviderA = { id: 'provider-a' }
 const mockProviderB = { id: 'provider-b' }
 let providerCallCount = 0
@@ -174,5 +175,100 @@ describe('openSpecdHost', () => {
     expect(createCodeGraphProvider).toHaveBeenCalledWith(syntheticConfig, {
       graphStoreId: 'sqlite',
     })
+  })
+
+  it('never falls back to a synthetic host when an explicit configPath cannot be loaded', async () => {
+    load.mockRejectedValue(new ConfigNotFoundError('missing config'))
+
+    await expect(
+      openSpecdHost({ configPath: '/tmp/project/specd.yaml', allowBootstrapFallback: true }),
+    ).rejects.toBeInstanceOf(ConfigNotFoundError)
+
+    expect(createVcsAdapter).not.toHaveBeenCalled()
+    expect(createBootstrapGraphConfig).not.toHaveBeenCalled()
+  })
+})
+
+describe('host disposal', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    providerCallCount = 0
+    load.mockResolvedValue(sampleConfig)
+    resolvePath.mockResolvedValue('/tmp/project/specd.yaml')
+  })
+
+  it('exposes kernel, provider factory and disposal members without a top-level config', async () => {
+    const ctx = await createSdkContext(sampleConfig)
+
+    expect(Object.keys(ctx).sort()).toEqual(['createGraphProvider', 'dispose', 'kernel'])
+    expect(typeof ctx[Symbol.asyncDispose]).toBe('function')
+    expect('config' in ctx).toBe(false)
+  })
+
+  it('exposes no config mutation methods on the host context', async () => {
+    const ctx = (await createSdkContext(sampleConfig)) as unknown as Record<string, unknown>
+
+    expect(ctx['initProject']).toBeUndefined()
+    expect(ctx['addPlugin']).toBeUndefined()
+    expect(ctx['removePlugin']).toBeUndefined()
+  })
+
+  it('delegates dispose to the kernel and aliases Symbol.asyncDispose', async () => {
+    const ctx = await createSdkContext(sampleConfig)
+
+    await ctx.dispose()
+
+    expect(kernelDispose).toHaveBeenCalledTimes(1)
+    expect(ctx[Symbol.asyncDispose]).toBe(ctx.dispose)
+  })
+
+  it('returns the kernel disposal promise on repeated calls', async () => {
+    const shared = Promise.resolve()
+    kernelDispose.mockReturnValue(shared)
+    const ctx = await createSdkContext(sampleConfig)
+
+    expect(ctx.dispose()).toBe(shared)
+    expect(ctx.dispose()).toBe(shared)
+  })
+
+  it('releases the host when an await using scope exits', async () => {
+    {
+      await using host = await openSpecdHost()
+      expect(host.kernel).toBe(mockKernel)
+      expect(kernelDispose).not.toHaveBeenCalled()
+    }
+
+    expect(kernelDispose).toHaveBeenCalledTimes(1)
+  })
+
+  it('carries the disposal members through the openSpecdHost spread', async () => {
+    const host = await openSpecdHost()
+
+    expect(typeof host.dispose).toBe('function')
+    expect(typeof host[Symbol.asyncDispose]).toBe('function')
+  })
+
+  it('does not close graph providers created by the host', async () => {
+    const provider = { close: vi.fn(async () => {}) }
+    createCodeGraphProvider.mockReturnValueOnce(provider as never)
+    const host = await openSpecdHost()
+    host.createGraphProvider()
+
+    await host.dispose()
+
+    expect(provider.close).not.toHaveBeenCalled()
+  })
+
+  it('exposes no API that wraps a foreign kernel into a host context', async () => {
+    const { readFile } = await import('node:fs/promises')
+    const barrel = await readFile(new URL('../../src/index.ts', import.meta.url), 'utf8')
+    const contextFactories = [
+      ...barrel.matchAll(/\b(create\w*Context|open\w*Host|\w*[Ww]rap\w*Kernel\w*)\b/g),
+    ]
+      .map((match) => match[1])
+      .filter((name, index, all) => all.indexOf(name) === index)
+      .sort()
+
+    expect(contextFactories).toEqual(['createSdkContext', 'openSpecdHost'])
   })
 })

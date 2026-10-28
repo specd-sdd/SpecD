@@ -9,6 +9,9 @@
     "schema.yaml",
     "templates/"
   ],
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "release:publish": "npm publish --access public"
   }

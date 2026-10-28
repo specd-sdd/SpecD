@@ -36,8 +36,35 @@ Normal output (tables, structured text, success messages) is written to stdout. 
 | 1    | User or domain error (change not found, invalid state transition, validation failure, config error) |
 | 2    | Hook failure (a `run:` hook exited with a non-zero status)                                          |
 | 3    | System error (unhandled exception, I/O error, schema resolution failure)                            |
+| 130  | Interrupted by `SIGINT`                                                                             |
+| 143  | Terminated by `SIGTERM`                                                                             |
 
-No other exit codes are used. When a hook fails, the hook's own stdout/stderr is forwarded verbatim and `specd` exits with code 2.
+No other exit codes are used. Codes 130 and 143 are used only when the process is stopped by a signal, after CLI cleanup has run (or been abandoned by a second signal). When a hook fails, the hook's own stdout/stderr is forwarded verbatim and `specd` exits with code 2.
+
+### Requirement: Cleanup runs before the process exits
+
+Only the entrypoint SHALL terminate the process. Command handlers and shared helpers (including `cliError` and `handleError`) MUST NOT call `process.exit`. A helper that needs to end the run SHALL emit its output and throw a `CliExitError` that carries the exit code; its return type remains `never`.
+
+On every exit path the entrypoint SHALL await `runCliCleanup()` (see [`cli:host-context`](../host-context/spec.md)) before the process ends: after normal completion, after a `CliExitError`, and after any other rejection. The exit code used SHALL be the one carried by the `CliExitError`, the code chosen by the unhandled-error handler (3), or the value of `process.exitCode` when a command set it, defaulting to 0.
+
+If reporting a failure itself fails (the error handler throws something other than a `CliExitError`), the entrypoint SHALL still await `runCliCleanup()` and end the process with exit code 3; the run MUST NOT end as an unhandled rejection.
+
+A command that catches errors generically MUST NOT swallow a `CliExitError`; it SHALL rethrow it unchanged.
+
+### Requirement: Signal handling
+
+The executable entrypoint (not `createProgram`, which stays side-effect free) SHALL install handlers for `SIGINT` and `SIGTERM`. On the first signal it SHALL run `runCliCleanup()` and then exit with 130 (`SIGINT`) or 143 (`SIGTERM`). On a second signal received while cleanup is running it SHALL exit immediately without waiting, using the exit code of the **first** signal received (a `SIGINT` followed by a `SIGTERM` exits with 130; a `SIGTERM` followed by a `SIGINT` exits with 143).
+
+The handlers SHALL coexist with the cancellation handling of interactive prompts: while a prompt is active it keeps its own `SIGINT` behaviour. The `SIGTERM` handler is installed on every platform; on platforms without a real `SIGTERM` (Windows) the operating system never delivers it, so only `SIGINT` is relied upon there.
+
+### Requirement: Process exit grace period
+
+After `runCliCleanup()` has settled on the normal completion path, the entrypoint SHALL NOT call `process.exit` while the process can end by itself. It SHALL arm two timers that MUST NOT keep the process alive (`unref`), so they only fire when something else (an open handle) is keeping it running:
+
+- After 1000 ms (`CLI_EXIT_HINT_MS`) the entrypoint SHALL write a `warning:` line to stderr saying it is waiting for open handles to close and when the exit will be forced. When the runtime exposes active resource information, the line SHALL include the resource types still open.
+- After 5000 ms (`CLI_EXIT_FORCE_MS`) the entrypoint SHALL write a `warning:` line to stderr saying the process did not exit after cleanup and that the exit is being forced, and SHALL then call `process.exit` with the exit code the run would have used.
+
+These warnings MUST go to stderr only and MUST NOT change the exit code. When the process ends by itself before 1000 ms nothing is written. A handle left open after cleanup is a defect of whatever opened it, not of the entrypoint.
 
 ### Requirement: Error message format
 

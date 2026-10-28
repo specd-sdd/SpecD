@@ -4,7 +4,6 @@ import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
 import { enrichImplementationTracking } from './_implementation-tracking.js'
-import { resolveSdkHostContext } from '../../helpers/sdk-host.js'
 
 /**
  * Registers the `change implementation` command group.
@@ -174,8 +173,7 @@ async function renderImplementationState(
   opts: { format: string; config?: string },
 ): Promise<void> {
   try {
-    const { config, kernel } = await resolveCliContext({ configPath: opts.config })
-    const host = await resolveSdkHostContext(config, kernel)
+    const host = await resolveCliContext({ configPath: opts.config })
     const enriched = await enrichImplementationTracking(host, name)
     const outOfScopeSpecIds = [...new Set(enriched.links.map((link) => link.specId))].filter(
       (specId) => !(enriched.specIds ?? []).includes(specId),

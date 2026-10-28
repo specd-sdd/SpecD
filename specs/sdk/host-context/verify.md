@@ -4,11 +4,17 @@
 
 ### Requirement: SdkHostContext shape
 
-#### Scenario: Context exposes kernel and provider factory only
+#### Scenario: Context exposes kernel, provider factory and disposal only
 
 - **WHEN** `createSdkContext` returns a context
-- **THEN** it has `kernel` and `createGraphProvider` properties
+- **THEN** it has `kernel`, `createGraphProvider`, `dispose` and `[Symbol.asyncDispose]` properties
 - **AND** it does not expose a top-level `config` field duplicating kernel state
+
+#### Scenario: Context is async-disposable
+
+- **WHEN** a caller writes `await using ctx = await createSdkContext(config)`
+- **THEN** the context satisfies `AsyncDisposable`
+- **AND** leaving the scope calls `ctx[Symbol.asyncDispose]()`
 
 ### Requirement: createSdkContext
 
@@ -27,6 +33,12 @@
 
 - **WHEN** `createGraphProvider()` is called twice on the same context
 - **THEN** two distinct `CodeGraphProvider` instances are returned
+
+#### Scenario: Context disposal delegates to the kernel
+
+- **WHEN** `await createSdkContext(config)` returns a context
+- **THEN** `context.dispose` delegates to `kernel.dispose()`
+- **AND** `context[Symbol.asyncDispose]` is the same function as `context.dispose`
 
 ### Requirement: openSpecdHost
 
@@ -85,6 +97,36 @@
 - **WHEN** openSpecdHost({ configPath, allowBootstrapFallback: true }) cannot load configPath
 - **THEN** the explicit configuration error propagates
 - **AND** no synthetic fallback is created
+
+### Requirement: Host disposal
+
+#### Scenario: dispose shares the kernel disposal
+
+- **GIVEN** a host whose kernel has registered disposers
+- **WHEN** `host.dispose()` is called twice
+- **THEN** both calls return the kernel's disposal promise
+- **AND** each disposer ran exactly once
+
+#### Scenario: await using releases the host
+
+- **WHEN** a caller writes `await using host = await openSpecdHost(input)` and the scope exits
+- **THEN** `host[Symbol.asyncDispose]()` runs and the kernel's disposers have run
+
+#### Scenario: openSpecdHost result carries disposal members
+
+- **WHEN** `openSpecdHost` resolves
+- **THEN** the result has `dispose` and `[Symbol.asyncDispose]`
+
+#### Scenario: Graph providers are not closed by dispose
+
+- **GIVEN** a provider returned by `host.createGraphProvider()`
+- **WHEN** `host.dispose()` is awaited
+- **THEN** the provider's `close()` was not called by the host
+
+#### Scenario: No API wraps a foreign kernel
+
+- **WHEN** the SDK public surface is inspected
+- **THEN** it exposes no function that builds an `SdkHostContext` around a kernel created elsewhere
 
 ### Requirement: Config mutation boundary
 

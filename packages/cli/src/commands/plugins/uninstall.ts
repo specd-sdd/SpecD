@@ -4,6 +4,7 @@ import { LoadPlugin, UninstallPlugin, createPluginLoader } from '@specd/plugin-m
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat, type OutputFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
+import { CliExitError } from '../../helpers/cli-exit-error.js'
 
 /**
  * One plugin-uninstall result entry.
@@ -67,7 +68,7 @@ export function registerPluginsUninstall(parent: Command): void {
 
         renderUninstallOutput(plugins, fmt)
         if (hasErrors) {
-          process.exit(1)
+          throw new CliExitError(1)
         }
       } catch (error) {
         handleError(error, opts.format)

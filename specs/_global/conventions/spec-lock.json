@@ -4,7 +4,11 @@
     "version": 1
   },
   "dependsOn": ["default:_global/error-handling-conventions"],
-  "implementation": [],
+  "implementation": [
+    {
+      "file": "default:dev/scripts/check-engines.js"
+    }
+  ],
   "optimizations": {
     "optimizedDescription": {
       "value": "TypeScript monorepo conventions: strict mode, ESM-only, named exports, kebab-case files, SpecdError hierarchy, lazy metadata loading.",
