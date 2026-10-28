@@ -1,0 +1,160 @@
+- op: modified
+  description: Workspace exemptions are project-relative
+  selector:
+    type: section
+    matches: 'Scenario: A workspace-level exemption applies from the code root'
+  rename: 'Scenario: A workspace-level exemption applies from the project root'
+  content: |
+    - **GIVEN** a workspace with `codeRoot` `packages/api` and `largeFilePaths` entry `packages/api/generated/**`
+    - **WHEN** the indexer processes an oversized file at `packages/api/generated/schema.ts`
+    - **THEN** the file is analysed
+
+- op: added
+  description: Fingerprint and semantics scenarios
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Discovery fingerprint uses effective config'
+  content: |
+    #### Scenario: Path-semantics marker forces a rebuild of an older index
+
+    - **GIVEN** an index persisted under `codeRoot`-relative semantics and an unchanged `specd.yaml`
+    - **WHEN** the indexer computes the fingerprint under project-relative semantics
+    - **THEN** the fingerprint differs from the persisted one
+    - **AND** the run is a full rebuild with a mismatch reason
+
+    #### Scenario: Changing a workspace testPaths or ignorePaths changes the fingerprint
+
+    - **GIVEN** two runs where the effective `testPaths` or `ignorePaths` of one workspace differ
+    - **WHEN** the indexer computes the fingerprint for each run
+    - **THEN** the fingerprints differ
+
+    #### Scenario: Changing a workspace codeRoot path changes the fingerprint
+
+    - **GIVEN** two runs where a workspace's project-relative `codeRoot` differs
+    - **WHEN** the indexer computes the fingerprint for each run
+    - **THEN** the fingerprints differ
+
+- op: added
+  description: Scenarios for project-relative path evaluation
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Multi-workspace file discovery'
+  content: |
+    ### Requirement: Project-relative path evaluation
+
+    #### Scenario: Anchored global pattern excludes inside a nested workspace
+
+    - **GIVEN** project `graph.excludePaths: ['/app/vendors/*', '!/app/vendors/iccms', '!/app/vendors/iccms/**']` and workspace `backend` with `codeRoot` `app`
+    - **WHEN** the indexer discovers the files of `backend`
+    - **THEN** `backend:vendors/iccms/utils.php` is discovered
+    - **AND** `backend:vendors/other/x.php` is not discovered
+
+    #### Scenario: Directory pruning uses the project-relative path
+
+    - **GIVEN** `app/tmp/` in the global exclusions and workspace `backend` with `codeRoot` `app`
+    - **WHEN** discovery walks `app/tmp`
+    - **THEN** the directory is pruned and none of its files is read
+
+    #### Scenario: Global layer wins over workspace negation
+
+    - **GIVEN** a path excluded by project `graph.excludePaths` and re-included by a workspace `!` negation
+    - **WHEN** the workspace is discovered
+    - **THEN** the path is not discovered
+
+    #### Scenario: Synthetic spec-root exclusion cannot be negated by a workspace
+
+    - **GIVEN** a filesystem-backed spec root and a workspace `!` negation covering it
+    - **WHEN** the workspace is discovered
+    - **THEN** the spec root files are not discovered as files or documents
+
+    #### Scenario: Categorization uses the project-relative path
+
+    - **GIVEN** project `ignorePaths: ['app/fixtures/**']` and a file `app/fixtures/a.php` in workspace `backend` (`codeRoot` `app`)
+    - **WHEN** the file is categorized
+    - **THEN** its category is `ignored`
+    - **AND** its persisted identity is `backend:fixtures/a.php`
+
+    #### Scenario: Default test patterns behave as before
+
+    - **GIVEN** the built-in `testPaths` and files `packages/core/src/a.spec.ts` and `packages/core/test/b.ts`
+    - **WHEN** they are categorized in workspace `core`
+    - **THEN** both are `test`
+
+    #### Scenario: Built-in default exclusions behave as before
+
+    - **GIVEN** no configured `excludePaths` and `packages/core/node_modules/x/index.js`
+    - **WHEN** workspace `core` is discovered
+    - **THEN** the file is not discovered
+
+    #### Scenario: Code root outside the project root
+
+    - **GIVEN** a workspace with `codeRoot` outside the project root and an anchored global pattern
+    - **WHEN** the workspace is discovered
+    - **THEN** the run does not fail and the anchored pattern does not match its files
+
+    #### Scenario: Visibility and health agree with indexing
+
+    - **GIVEN** a file excluded only through a project-relative pattern
+    - **WHEN** graph input visibility and graph health evaluate it
+    - **THEN** both report it as excluded, as the indexer does
+
+    #### Scenario: Health applies the size gate like indexing
+
+    - **GIVEN** an oversized, non-exempt file that the indexer skips for size
+    - **WHEN** graph health compares discovered content with the indexed content
+    - **THEN** the file is not counted as discovered content, so health does not report content as not fresh because of it
+
+    #### Scenario: Repository .gitignore applies below the VCS root
+
+    - **GIVEN** a `.gitignore` at the VCS root ignoring `*.log` and a `codeRoot` below the VCS root containing `a.log`
+    - **WHEN** the files of the workspace are discovered
+    - **THEN** `a.log` is excluded by that `.gitignore` and `graph why` reports the `.gitignore` file and line
+
+    #### Scenario: Explained decision equals indexing decision
+
+    - **GIVEN** a path and a configuration
+    - **WHEN** the evaluation functions return the decision with its winning rule
+    - **THEN** the decision equals the one used by an indexing run for that path
+
+- op: added
+  description: Overlap diagnostic scenarios
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Project-relative path evaluation'
+  content: |
+    ### Requirement: Workspace overlap diagnostic
+
+    #### Scenario: File kept by two workspaces
+
+    - **GIVEN** workspaces `backend` (`codeRoot` `app`) and `backoffice` (`codeRoot` `app/webroot`) with no excludes separating `app/webroot/iccomp.php`
+    - **WHEN** the indexer runs
+    - **THEN** the file is indexed as `backend:webroot/iccomp.php` and `backoffice:iccomp.php`
+    - **AND** the result contains a diagnostic with `projectRelativePath` `app/webroot/iccomp.php` and owners `backend` and `backoffice`
+    - **AND** the run succeeds
+
+    #### Scenario: Partitioning by excludes yields no diagnostic
+
+    - **GIVEN** two workspaces sharing one `codeRoot`, one keeping only `src/**` and the other only `tests/**` through `excludePaths`
+    - **WHEN** the indexer runs
+    - **THEN** no overlap diagnostic is reported
+
+    #### Scenario: Diagnostics are bounded
+
+    - **GIVEN** more overlapping files than the diagnostic list limit
+    - **WHEN** the indexer runs
+    - **THEN** the list is truncated and the total count is still reported
+
+    #### Scenario: Overlap does not change incremental behaviour
+
+    - **GIVEN** an overlapping file whose content is unchanged
+    - **WHEN** an incremental run happens
+    - **THEN** the file is skipped as usual and the diagnostic is still reported

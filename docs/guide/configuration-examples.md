@@ -232,7 +232,7 @@ storage:
 - **`prefix: _global`:** Specs located under `specs/_global/architecture.md` are referenced with ID `default:_global/architecture`.
 - **Targeted context filters:** When `core` is active in a change, its `composition` specs are automatically pulled into context.
 - **Yearly and monthly archive folders:** Changes archive into `.specd/archive/2026/09/20260924-143511-my-change/`.
-- **File size limits and large file exemptions:** `graph.maxFileBytes` configures a project-level limit (default `262144` = 256 KiB) to protect indexing memory. Oversized files are skipped with reason `file-too-large`. Workspaces can override the threshold (e.g. `core` overrides `maxFileBytes: 524288`) and exempt oversized files with `graph.largeFilePaths` (resolved relative to project root at project level, or relative to workspace `codeRoot` in workspace graph blocks).
+- **File size limits and large file exemptions:** `graph.maxFileBytes` configures a project-level limit (default `262144` = 256 KiB) to protect indexing memory. Oversized files are skipped with reason `file-too-large`. Workspaces can override the threshold (e.g. `core` overrides `maxFileBytes: 524288`) and exempt oversized files with `graph.largeFilePaths` (resolved relative to the project root at project level and in workspace graph blocks).
 
 ---
 
@@ -548,7 +548,7 @@ workspaces:
     graph:
       # Workspace file size limit override (replaces project limit for this workspace):
       maxFileBytes: 524288 # 512 KiB
-      # Gitignore-syntax patterns relative to codeRoot exempt from size limit:
+      # Gitignore-syntax patterns relative to the project root exempt from size limit:
       largeFilePaths:
         - 'src/generated/ast-tokens.ts'
 

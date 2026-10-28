@@ -90,6 +90,13 @@
 - **WHEN** IndexOptions contains a single workspace
 - **THEN** the indexer SHALL behave identically to multi-workspace with one entry
 
+#### Scenario: discoverFiles receives the project-relative base
+
+- **GIVEN** workspace `backend` with `codeRoot` `/project/app` and project root `/project`
+- **WHEN** the indexer discovers the files of `backend`
+- **THEN** `discoverFiles` is called with the `codeRoot` and `pathBase` `app`
+- **AND** it still returns paths relative to `codeRoot`
+
 ### Requirement: Project-relative file lookup
 
 #### Scenario: Unprefixed selector resolves through projectRelativePath
@@ -113,6 +120,32 @@
 - **AND** file `core:src/index.ts` is indexed with `projectRelativePath` `../../packages/core/src/index.ts`
 - **WHEN** a CLI command resolves `../../packages/core/src/index.ts`
 - **THEN** it resolves the canonical file `core:src/index.ts`
+
+### Requirement: Workspace ownership is decided by discovery rules
+
+#### Scenario: Workspace filters match the project-relative path
+
+- **GIVEN** workspace `core` with `codeRoot` `packages/core` and `excludePaths: ['packages/core/dist/']`
+- **WHEN** `packages/core/dist/a.js` is discovered
+- **THEN** it is excluded
+
+#### Scenario: Nested code roots are not ranked
+
+- **GIVEN** workspaces `backend` (`app`) and `backoffice` (`app/webroot`) and a file passing discovery in both
+- **WHEN** owners are determined
+- **THEN** both are owners and neither is primary
+
+#### Scenario: Shared code root partitioned by excludes
+
+- **GIVEN** two workspaces with the same `codeRoot`, each excluding the files of the other
+- **WHEN** owners are determined for a file of the first
+- **THEN** only the first workspace is an owner
+
+#### Scenario: Overlapping owners do not fail indexing
+
+- **GIVEN** a path that passes discovery in two workspaces
+- **WHEN** the indexer runs
+- **THEN** it is persisted under both identities and reported as an overlap warning
 
 ### Requirement: Spec resolution via SpecRepository
 
@@ -220,9 +253,9 @@
 
 - **GIVEN** `SpecdWorkspaceConfig.graph.excludePaths` is `[".specd/*", "!.specd/metadata/"]`
 - **AND** `SpecdWorkspaceConfig.graph.respectGitignore` is `false`
-- **WHEN** `buildWorkspaceTargets()` constructs the `WorkspaceIndexTarget`
-- **THEN** `WorkspaceIndexTarget.excludePaths` is `[".specd/*", "!.specd/metadata/"]`
-- **AND** `WorkspaceIndexTarget.respectGitignore` is `false`
+- **WHEN** `buildProjectGraphConfig()` builds the graph configuration
+- **THEN** the workspace entry of `ProjectGraphConfig.workspaces` has `excludePaths` `[".specd/*", "!.specd/metadata/"]`
+- **AND** `respectGitignore` `false`
 
 ### Requirement: Per-workspace IndexResult breakdown
 
@@ -254,6 +287,18 @@
 - **WHEN** file discovery runs for that workspace
 - **THEN** `.log` files are not excluded by gitignore rules
 - **AND** no `.gitignore` file is read during the walk
+
+#### Scenario: A negation cannot re-include below an excluded directory
+
+- **GIVEN** a `.gitignore` at the VCS root ignoring `build/` and a nearer `.gitignore` containing `!build/keep.txt`
+- **WHEN** `build/keep.txt` is evaluated
+- **THEN** it stays excluded because its parent directory is excluded
+
+#### Scenario: Intermediate .gitignore files apply
+
+- **GIVEN** a `.gitignore` in `/project/packages` ignoring `*.gen.ts`, `codeRoot` `/project/packages/core` and VCS root `/project`
+- **WHEN** the files of the workspace are discovered
+- **THEN** `/project/packages/core/a.gen.ts` is excluded by that `.gitignore`
 
 ### Backward compatibility
 

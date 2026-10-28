@@ -269,7 +269,25 @@ Both the `default` and `core` workspaces are active for that change. Context com
 Workspaces can customize code graph discovery and indexing limits relative to their own `codeRoot`:
 
 - **`maxFileBytes`**: Overrides the project-level file size limit (default `262144` bytes = 256 KiB) specifically for files inside this workspace. Files strictly exceeding this threshold are skipped during code graph indexing with reason `file-too-large`. Setting `maxFileBytes: 0` disables the size limit entirely for this workspace.
-- **`largeFilePaths`**: A list of gitignore-syntax pattern strings evaluated **relative to the workspace `codeRoot`** (in contrast to project-level `graph.largeFilePaths` which resolve relative to the project root). Oversized files matching these patterns are indexed despite exceeding `maxFileBytes`. An exemption only bypasses the size limit; matching files must still satisfy `allowedPaths`, `excludePaths`, gitignore rules, and binary content detection. Workspace exemptions are additive over project-level exemptions.
+- **Nested workspaces:** all `graph` patterns are project-relative, so a pattern means the same thing in the global and in any workspace list. For `backend` (`codeRoot: app`) and `backoffice` (`codeRoot: app/webroot`) partition the tree with the same project-relative form:
+
+  ```yaml
+  graph:
+    excludePaths:
+      - /app/vendors/*
+      - '!/app/vendors/iccms'
+      - '!/app/vendors/iccms/**'
+  workspaces:
+    backend:
+      codeRoot: app
+      graph:
+        excludePaths:
+          - app/webroot/
+  ```
+
+  A workspace `!` negation can never re-include a path the global list excluded. Use `specd graph why <path>` to check the result.
+
+- **`largeFilePaths`**: A list of gitignore-syntax pattern strings evaluated **relative to the project root**, like every other `graph` path and pattern. Oversized files matching these patterns are indexed despite exceeding `maxFileBytes`. An exemption only bypasses the size limit; matching files must still satisfy `allowedPaths`, `excludePaths`, gitignore rules, and binary content detection. Workspace exemptions are additive over project-level exemptions.
 
 ```yaml
 workspaces:

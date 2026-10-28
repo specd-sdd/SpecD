@@ -1,6 +1,4 @@
 import {
-  createSdkContext,
-  createCodeGraphProvider,
   withOpenGraphProvider,
   type CodeGraphProvider,
   type Kernel,
@@ -8,7 +6,7 @@ import {
   type SpecdConfig,
 } from '@specd/sdk'
 import { handleError } from '../../handle-error.js'
-import { buildCliKernelOptions } from '../../helpers/cli-context.js'
+import { createGraphHostContext } from './host-context.js'
 
 /** The CodeGraphProvider instance type. */
 type Provider = CodeGraphProvider
@@ -34,11 +32,7 @@ export async function withProvider(
     readonly kernel?: Kernel | null
   },
 ): Promise<void> {
-  const ctx =
-    options?.host ??
-    (options?.kernel !== undefined && options.kernel !== null
-      ? { kernel: options.kernel, createGraphProvider: () => createCodeGraphProvider(config) }
-      : await createSdkContext(config, { kernel: buildCliKernelOptions() }))
+  const ctx = options?.host ?? (await createGraphHostContext(config, options?.kernel))
 
   try {
     await withOpenGraphProvider(ctx, fn, {

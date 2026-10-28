@@ -345,6 +345,33 @@ describe('CodeGraphProvider', () => {
     await provider.close()
   })
 
+  it('explainPath explains a path with the provider injected', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-explain-'))
+    writeFileSync(join(tempDir, 'a.ts'), 'export const a = 1\n')
+    const config = createBootstrapGraphConfig({ projectRoot: tempDir, vcsRoot: tempDir })
+    const provider = createCodeGraphProvider(config)
+    await provider.open()
+
+    const result = await provider.explainPath('a.ts')
+
+    expect(result.projectRelativePath).toBe('a.ts')
+    expect(result.verdict).toBe('indexable')
+    // inGraph is read through the same provider: nothing is indexed yet
+    expect(result.candidates[0]?.inGraph).toBe(false)
+    await provider.close()
+  })
+
+  it('explainPath without a SpecdConfig throws GRAPH_WHY_REQUIRES_CONFIG', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-explain-nocfg-'))
+    const provider = createCodeGraphProvider({ storagePath: tempDir, projectRoot: tempDir })
+    await provider.open()
+
+    await expect(provider.explainPath('a.ts')).rejects.toMatchObject({
+      code: 'GRAPH_WHY_REQUIRES_CONFIG',
+    })
+    await provider.close()
+  })
+
   it('keeps reader availability locked while an index lease is held', async () => {
     tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-reader-lock-'))
     const provider = createCodeGraphProvider({ storagePath: tempDir, projectRoot: tempDir })

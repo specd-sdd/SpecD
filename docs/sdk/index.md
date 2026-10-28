@@ -136,6 +136,7 @@ Both are pure synchronous functions: no I/O, no kernel access, no process side e
 | `buildImplementationReview`  | Core raw tracking + one Code Graph resolution batch                                                    |
 | `runGraphSearch`             | Multi-modal graph search with provider lifecycle and `projectRelativePath` projection                  |
 | `runGraphHotspots`           | Architectural hotspot ranking with provider lifecycle and `projectRelativePath` projection             |
+| `runGraphWhy`                | Explains why a path is excluded, classified or indexed (`ExplainGraphPath`) with provider lifecycle    |
 | `runGraphImpact`             | Target/multi-target blast radius impact analysis with `projectRelativePath` projection                 |
 | `toProjectRelativePath`      | Pure projection mapping canonical graph paths (`<workspace>:<relPath>`) to project-root relative paths |
 
@@ -455,6 +456,7 @@ them in the SDK or CLI.
 | `graph index`                     | `runIsolatedGraphIndex` → packaged task → `runIndexProjectGraph` |
 | `graph search`                    | `runGraphSearch`                                                 |
 | `graph hotspots`                  | `runGraphHotspots`                                               |
+| `graph why`                       | `runGraphWhy`                                                    |
 | `graph impact`                    | `runGraphImpact`                                                 |
 | `changes implementation` / status | `buildImplementationReview`                                      |
 
@@ -464,7 +466,7 @@ The SDK root exports explicit symbols from the curated `@specd/core` and `@specd
 
 - `createDefaultConfigLoader`, `createConfigWriter`, `createKernel`, kernel-equivalent `createX` factories, and repository factories
 - Standalone `createX` factories (e.g. `createGetStatus`, `createResolveSchema`) for hosts that need a single use case without `createKernel`
-- Host orchestration: `openSpecdHost`, `withOpenGraphProvider`, `buildProjectStatusSnapshot`, `runIndexProjectGraph`, `runIsolatedGraphIndex`, `buildImplementationReview`, `runGraphSearch`, `runGraphHotspots`, `runGraphImpact`, `toProjectRelativePath`, `splitWorkspaceIdentity`
+- Host orchestration: `openSpecdHost`, `withOpenGraphProvider`, `buildProjectStatusSnapshot`, `runIndexProjectGraph`, `runIsolatedGraphIndex`, `buildImplementationReview`, `runGraphSearch`, `runGraphHotspots`, `runGraphWhy`, `runGraphImpact`, `toProjectRelativePath`, `splitWorkspaceIdentity`
 - Isolated worker contracts, diagnostics, and typed failures: `GraphIndexJsonValue`, `GraphIndexTask`, `RunIsolatedGraphIndexInput`, `GraphIndexWorkerStartError`, `GraphIndexTaskContractError`, `GraphIndexTaskExecutionError`, `GraphIndexWorkerProtocolError`, `GraphIndexWorkerExitError`, `GraphIndexWorkerSignalError`, `GraphIndexProgressHandlerError`, `GraphIndexWorkerError`, `GraphIndexWorkerEvent`, `GraphIndexFailureCause`, `GraphIndexWorkerDiagnostics`
 - Index events and size gating: `IndexEvent`, `FileActivityEvent`, `FileSkippedEvent`, `ResourceDisposalFailedEvent`, `IndexEventReceiver`, `SizeSkippedFile`, `SizeExemptFile`, `DEFAULT_MAX_FILE_BYTES`
 - Graph helpers: `createGetGraphHealth`, `GetGraphHealthResult`, `IndexResult`, `HotspotResult`, `GraphProviderStaleError`, `GraphStorageRecoveryRequiredError`, `GraphStoreRecreateRequiresClosedError`

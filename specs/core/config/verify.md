@@ -268,6 +268,85 @@
 - **THEN** `SpecdWorkspaceConfig.graph.testPaths` contains `["**/*.spec.ts"]`
 - **AND** `SpecdWorkspaceConfig.graph.ignorePaths` contains `["fixtures/**"]`
 
+### Requirement: Project-relative graph path semantics
+
+#### Scenario: Anchored workspace pattern is written against the project root
+
+- **GIVEN** a workspace `backend` with `codeRoot: app` and `graph.excludePaths: ['/app/vendors/*', 'app/tmp/']`
+- **WHEN** the file `app/vendors/lib.php` and the file `app/tmp/cache.dat` are evaluated for `backend`
+- **THEN** both are excluded
+- **AND** the file `app/other/vendors/lib.php` is not excluded by those patterns
+
+#### Scenario: Coderoot-relative form no longer matches
+
+- **GIVEN** a workspace `backend` with `codeRoot: app` and `graph.excludePaths: ['/vendors/*']`
+- **WHEN** the file `app/vendors/lib.php` is evaluated
+- **THEN** it is not excluded by that pattern, because `/vendors/*` refers to `<projectRoot>/vendors/*`
+
+#### Scenario: Same pattern means the same file in global and workspace discovery
+
+- **GIVEN** the project `graph.excludePaths` contains `/app/vendors/*` and `!/app/vendors/iccms`
+- **WHEN** project-global discovery and the discovery of workspace `backend` (`codeRoot: app`) evaluate `app/vendors/iccms/utils.php`
+- **THEN** both reach the same decision
+
+#### Scenario: Unanchored patterns keep matching at any depth
+
+- **GIVEN** `graph.testPaths: ['*.spec.ts']` at project level
+- **WHEN** `packages/core/src/a.spec.ts` is categorized
+- **THEN** it matches
+
+#### Scenario: Workspace testPaths and ignorePaths are project-relative
+
+- **GIVEN** workspace `core` with `codeRoot: packages/core` and `graph.ignorePaths: ['packages/core/fixtures/**']`
+- **WHEN** `packages/core/fixtures/a.ts` is categorized
+- **THEN** it is `ignored`
+
+#### Scenario: allowedPaths are project-relative globs
+
+- **GIVEN** workspace `core` with `codeRoot: packages/core` and `graph.allowedPaths: ['packages/core/src/**']`
+- **WHEN** `packages/core/src/a.ts` and `packages/core/test/b.ts` are discovered
+- **THEN** only `packages/core/src/a.ts` is kept
+
+#### Scenario: Global exclusion cannot be re-included by a workspace negation
+
+- **GIVEN** project `graph.excludePaths: ['app/vendors/*']` and workspace `backend` with `graph.excludePaths: ['!app/vendors/iccms']`
+- **WHEN** `app/vendors/iccms/utils.php` is evaluated for `backend`
+- **THEN** it is excluded by the global layer
+- **AND** the workspace negation has no effect on it
+
+#### Scenario: Workspace negation only reverses earlier workspace patterns
+
+- **GIVEN** workspace `backend` with `graph.excludePaths: ['app/gen/**', '!app/gen/keep.php']` and no matching global pattern
+- **WHEN** `app/gen/keep.php` and `app/gen/other.php` are evaluated
+- **THEN** `app/gen/keep.php` is not excluded
+- **AND** `app/gen/other.php` is excluded
+
+#### Scenario: Nested workspaces and the same project-relative pattern
+
+- **GIVEN** workspaces `backend` (`codeRoot: app`) and `backoffice` (`codeRoot: app/webroot`), and `app/webroot/js/astrack/` in `backoffice` `graph.excludePaths`
+- **WHEN** `app/webroot/js/astrack/a.js` is evaluated for `backoffice`
+- **THEN** it is excluded
+
+#### Scenario: Code root outside the project root
+
+- **GIVEN** a workspace whose `codeRoot` is `../shared`
+- **WHEN** its files are evaluated
+- **THEN** anchored project-relative patterns do not match them
+- **AND** unanchored patterns are matched against the path below `codeRoot`
+- **AND** no configuration error is raised
+
+#### Scenario: gitignore keeps absolute priority
+
+- **GIVEN** `respectGitignore: true` and a `.gitignore` that ignores `app/build.log`
+- **WHEN** a negation `!app/build.log` is present in either exclusion layer
+- **THEN** the file remains excluded
+
+#### Scenario: No migration of earlier semantics
+
+- **GIVEN** a configuration written for `codeRoot`-relative workspace patterns
+- **WHEN** the configuration is loaded
+- **THEN** it loads without a warning and the patterns are interpreted as project-relative
+
 ### Requirement: Project-level graph configuration
 
 #### Scenario: Project graph include paths discovered
@@ -343,7 +422,7 @@
 
 - **GIVEN** a project `largeFilePaths` entry and a workspace `largeFilePaths` entry
 - **WHEN** the configuration is loaded
-- **THEN** both entries are exposed, each with its own base directory
+- **THEN** both entries are exposed, and both are interpreted relative to the project root
 
 #### Scenario: Negation within the list is supported
 

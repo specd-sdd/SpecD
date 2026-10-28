@@ -1,5 +1,10 @@
 import { statSync } from 'node:fs'
-import ignore, { type Ignore } from 'ignore'
+import {
+  createPathRuleSet,
+  isOutsideProject,
+  type PathRuleMatch,
+  type PathRuleSet,
+} from '../../domain/services/project-path-rules.js'
 import { type EffectiveGraphConfig } from '../use-cases/_shared/resolve-effective-graph-config.js'
 
 /**
@@ -7,7 +12,12 @@ import { type EffectiveGraphConfig } from '../use-cases/_shared/resolve-effectiv
  */
 export type FileSizeDecision =
   | { readonly kind: 'within-limit'; readonly sizeBytes: number | null }
-  | { readonly kind: 'exempt'; readonly sizeBytes: number }
+  | {
+      readonly kind: 'exempt'
+      readonly sizeBytes: number
+      /** Exemption pattern that matched. */
+      readonly exemptionRule?: PathRuleMatch
+    }
   | { readonly kind: 'skip'; readonly sizeBytes: number; readonly limitBytes: number }
 
 /**
@@ -29,24 +39,6 @@ export interface FileSizeGateInput {
 export interface FileSizeGate {
   /** Decides once per file; the caller keeps the size from the decision. */
   decide(input: FileSizeGateInput): FileSizeDecision
-}
-
-/**
- * Creates an Ignore matcher for a list of patterns, ignoring invalid ones.
- *
- * @param patterns - Gitignore-syntax patterns.
- * @returns Configured Ignore instance.
- */
-function createMatcher(patterns: readonly string[]): Ignore {
-  const ig = ignore()
-  for (const pattern of patterns) {
-    try {
-      ig.add(pattern)
-    } catch {
-      // invalid patterns are dropped silently consistent with excludePaths
-    }
-  }
-  return ig
 }
 
 /**
@@ -91,33 +83,31 @@ export function createFileSizeGate(
   effective: EffectiveGraphConfig,
   readSize: (absolutePath: string) => number | null = defaultReadSize,
 ): FileSizeGate {
-  let projectMatcher: Ignore | undefined
-  const workspaceMatchers = new Map<string, Ignore>()
+  const ruleSets = new Map<string, PathRuleSet>()
 
-  const getProjectMatcher = (): Ignore => {
-    if (projectMatcher === undefined) {
-      projectMatcher = createMatcher(effective.rootLargeFilePaths)
+  /**
+   * Returns the cached rule set for one list and subject kind.
+   * @param key - Cache key.
+   * @param patterns - Ordered patterns.
+   * @param outside - Whether the subject is relative to a code root outside the project.
+   * @returns The rule set.
+   */
+  const getRuleSet = (key: string, patterns: readonly string[], outside: boolean): PathRuleSet => {
+    let set = ruleSets.get(key)
+    if (set === undefined) {
+      set = createPathRuleSet(patterns, outside ? '../' : '')
+      ruleSets.set(key, set)
     }
-    return projectMatcher
-  }
-
-  const getWorkspaceMatcher = (workspaceName: string): Ignore => {
-    let matcher = workspaceMatchers.get(workspaceName)
-    if (matcher === undefined) {
-      const wsConfig = effective.workspaces.get(workspaceName)
-      matcher = createMatcher(wsConfig?.workspaceLargeFilePaths ?? [])
-      workspaceMatchers.set(workspaceName, matcher)
-    }
-    return matcher
+    return set
   }
 
   return {
     decide(input: FileSizeGateInput): FileSizeDecision {
       const isRoot = input.workspaceName === 'root'
+      const wsConfig = isRoot ? undefined : effective.workspaces.get(input.workspaceName)
       const limit = isRoot
         ? effective.rootMaxFileBytes
-        : (effective.workspaces.get(input.workspaceName)?.maxFileBytes ??
-          effective.rootMaxFileBytes)
+        : (wsConfig?.maxFileBytes ?? effective.rootMaxFileBytes)
 
       const size = readSize(input.absolutePath)
       if (size === null) {
@@ -128,24 +118,30 @@ export function createFileSizeGate(
         return { kind: 'within-limit', sizeBytes: size }
       }
 
-      // Check project-level exemption
+      // Both exemption lists match the project-relative path; outside the project the
+      // code-root-relative path is the subject and root-anchored patterns are dropped.
       const cleanProjectRel = cleanPathForIgnore(input.projectRelativePath)
-      if (!cleanProjectRel.startsWith('../') && cleanProjectRel !== '..') {
-        if (cleanProjectRel !== '' && getProjectMatcher().ignores(cleanProjectRel)) {
-          return { kind: 'exempt', sizeBytes: size }
-        }
-      }
+      const outside = isOutsideProject(cleanProjectRel)
+      const subject = outside ? cleanPathForIgnore(input.relativeToCodeRoot) : cleanProjectRel
 
-      // Check workspace-level exemption (if not root)
-      if (!isRoot) {
-        const cleanWorkspaceRel = cleanPathForIgnore(input.relativeToCodeRoot)
-        if (
-          !cleanWorkspaceRel.startsWith('../') &&
-          cleanWorkspaceRel !== '..' &&
-          cleanWorkspaceRel !== ''
-        ) {
-          if (getWorkspaceMatcher(input.workspaceName).ignores(cleanWorkspaceRel)) {
-            return { kind: 'exempt', sizeBytes: size }
+      if (subject !== '' && !isOutsideProject(subject)) {
+        const lists: Array<[string, readonly string[]]> = [
+          [`project:${outside}`, effective.rootLargeFilePaths],
+        ]
+        if (!isRoot) {
+          lists.push([
+            `ws:${input.workspaceName}:${outside}`,
+            wsConfig?.workspaceLargeFilePaths ?? [],
+          ])
+        }
+        for (const [key, patterns] of lists) {
+          const result = getRuleSet(key, patterns, outside).test(subject, false)
+          if (result.ignored) {
+            return {
+              kind: 'exempt',
+              sizeBytes: size,
+              ...(result.rule !== null ? { exemptionRule: result.rule } : {}),
+            }
           }
         }
       }

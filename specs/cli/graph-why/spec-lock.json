@@ -1,0 +1,20 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["sdk:run-graph-why", "cli:entrypoint", "core:config"],
+  "implementation": [
+    {
+      "file": "cli:src/commands/graph/why.ts",
+      "symbols": ["registerGraphWhy", "renderGraphWhyText"]
+    },
+    {
+      "file": "cli:src/program.ts"
+    },
+    {
+      "file": "cli:src/commands/graph/host-context.ts",
+      "symbols": ["createGraphHostContext"]
+    }
+  ]
+}

@@ -65,7 +65,7 @@ export interface ProjectGraphConfig {
     string,
     {
       /**
-       * Optional graph-visible include patterns (glob-syntax) relative to codeRoot.
+       * Optional graph-visible include patterns (glob-syntax) relative to the project root.
        * When set, only matching paths are eligible for indexing from this workspace.
        */
       readonly allowedPaths?: readonly string[]
@@ -100,7 +100,7 @@ export interface ProjectGraphConfig {
       readonly maxFileBytes?: number
 
       /**
-       * Gitignore-syntax exemption patterns relative to the workspace codeRoot.
+       * Gitignore-syntax exemption patterns relative to the project root.
        * Added to the project-level largeFilePaths set.
        */
       readonly largeFilePaths?: readonly string[]

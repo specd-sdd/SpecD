@@ -4,16 +4,14 @@ import {
   type RiskLevel,
   SymbolKind,
   runGraphHotspots,
-  createSdkContext,
-  createCodeGraphProvider,
   type SdkHostContext,
 } from '@specd/sdk'
 import { output, parseFormat } from '../../formatter.js'
 import { cliError } from '../../handle-error.js'
-import { buildCliKernelOptions } from '../../helpers/cli-context.js'
 import { parseGraphKinds } from './parse-graph-kinds.js'
 import { parseFileCategories } from './parse-file-categories.js'
 import { resolveGraphCliContext } from './resolve-graph-cli-context.js'
+import { createGraphHostContext } from './host-context.js'
 import { withProvider } from './with-provider.js'
 import { warnGraphStale } from './warn-graph-staleness.js'
 import { formatOmissionNotice } from './format-omission-notice.js'
@@ -199,10 +197,7 @@ Exclude examples:
               }
             }
 
-            const hostContext: SdkHostContext =
-              kernel !== null
-                ? { kernel, createGraphProvider: () => createCodeGraphProvider(config) }
-                : await createSdkContext(config, { kernel: buildCliKernelOptions() })
+            const hostContext: SdkHostContext = await createGraphHostContext(config, kernel)
 
             const result = await runGraphHotspots(hostContext, {
               ...(opts.workspace ? { workspace: opts.workspace } : {}),

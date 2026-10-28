@@ -35,7 +35,7 @@ The following flags apply to all `specd` commands:
 | `specd specs`                     | Search, inspect, validate, and manage project specifications.                                                              | [Specs Reference](./specs.md)         |
 | `specd project` (or `specd init`) | Project initialization, workspace context compilation, and dashboard.                                                      | [Project Reference](./project.md)     |
 | `specd schema`                    | Inspect, extend, fork, and validate workflow schemas.                                                                      | [Schema Reference](./schema.md)       |
-| `specd graph`                     | Index codebase, analyze blast-radius impact, find hotspots, and search symbols.                                            | [Graph Reference](./graph.md)         |
+| `specd graph`                     | Index codebase, analyze blast-radius impact, find hotspots, search symbols, and explain path decisions (`graph why`).      | [Graph Reference](./graph.md)         |
 | `specd config`                    | Inspect resolved configuration cascade and active settings.                                                                | [Config Reference](./config.md)       |
 | `specd storage`                   | Rebuild internal index caches and workspaces storage.                                                                      | [Storage Reference](./storage.md)     |
 | `specd plugins`                   | Install, inspect, update, and manage agent and workflow plugins.                                                           | [Plugins Reference](./plugins.md)     |

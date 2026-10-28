@@ -125,15 +125,19 @@ function discoverFiles(
 
 #### Options (`DiscoverFilesOptions`)
 
-| Field              | Type                | Required | Description                                                                   |
-| :----------------- | :------------------ | :------- | :---------------------------------------------------------------------------- |
-| `excludePaths`     | `readonly string[]` | no       | Gitignore-syntax exclusion rules replacing defaults entirely.                 |
-| `respectGitignore` | `boolean`           | no       | Whether to load and respect local `.gitignore` files (defaults to `true`).    |
-| `allowedPaths`     | `readonly string[]` | no       | Glob-syntax inclusion rules (when present, only matching paths are returned). |
+| Field                   | Type                | Required | Description                                                                                                                        |
+| :---------------------- | :------------------ | :------- | :--------------------------------------------------------------------------------------------------------------------------------- |
+| `excludePaths`          | `readonly string[]` | no       | Global exclusion layer: gitignore-syntax rules replacing defaults entirely, matched against the project-relative subject.          |
+| `workspaceExcludePaths` | `readonly string[]` | no       | Workspace exclusion layer, evaluated after `excludePaths`; its `!` negations cannot re-include what the global layer excluded.     |
+| `pathBase`              | `string`            | no       | Project-relative directory of `root` (`''` when `root` is the project root). Patterns are matched against `pathBase + '/' + path`. |
+| `respectGitignore`      | `boolean`           | no       | Whether to load and respect local `.gitignore` files (defaults to `true`).                                                         |
+| `allowedPaths`          | `readonly string[]` | no       | Glob-syntax inclusion rules, project-relative (when present, only matching paths are returned).                                    |
 
 #### Returns: `string[]`
 
 An array of absolute paths to discovered files.
+
+`createDiscoveryEvaluator(root, options)` exposes the per-entry decision (`included`, or `excluded` with the stage `gitignore`, `global-exclude`, `workspace-exclude` or `allowed-paths`, the deciding rule and, for `.gitignore`, its project-relative file and line). `discoverFiles` and `ExplainGraphPath` share it, so an explanation cannot drift from indexing.
 
 ---
 
@@ -164,6 +168,12 @@ const health = await createGetGraphHealth().execute({
 Returns `GraphStatistics` fields plus `stale`, `currentRef`, and `fingerprintMismatch`.
 
 **Consumers:** `specd graph stats`, `project status --graph`, SDK `buildProjectStatusSnapshot`.
+
+### ExplainGraphPath
+
+Explains why one path is excluded, classified or indexed, running the same evaluation functions as the indexer (`createDiscoveryEvaluator`, `createFileSizeGate`, `explainFileCategory`). Created with `createExplainGraphPath()` and reached from hosts through `CodeGraphProvider.explainPath(path)` or `runGraphWhy` in `@specd/sdk`. Input is a project-relative path, an absolute path or `workspace:path`. The result (`ExplainGraphPathResult`) lists one candidate per workspace whose code root contains the path, each with eight ordered steps (`binary-extension`, `gitignore`, `global-exclude`, `workspace-exclude`, `allowed-paths`, `size-limit`, `category`, `adapter`), the candidate verdict, category, node kind and `inGraph`, plus top-level `verdict`, `owners` and `diagnostics`. It never writes to the graph or the filesystem. Errors: `UNKNOWN_WORKSPACE`, `INVALID_GRAPH_WHY_PATH`, and `GRAPH_WHY_REQUIRES_CONFIG` when the provider has no `specd.yaml`.
+
+`IndexResult` also carries `workspaceOverlaps` (up to 25 `{ projectRelativePath, workspaces }`) and `workspaceOverlapCount` for files kept by more than one workspace in the run.
 
 ### IndexProjectGraph
 

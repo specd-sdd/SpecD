@@ -15,7 +15,8 @@ import { type GraphStore, type ReferenceFactsWrite } from '../../domain/ports/gr
 import { ResolveSymbolReference } from './resolve-symbol-reference.js'
 import { asGraphStore, SessionReferenceStore } from '../services/session-reference-store.js'
 import { type FileNode, createFileNode } from '../../domain/value-objects/file-node.js'
-import { classifyFileCategory } from '../../domain/services/classify-file-category.js'
+import { explainFileCategory } from '../../domain/services/classify-file-category.js'
+import { buildPathSubject } from '../../domain/services/project-path-rules.js'
 import { type DocumentNode, createDocumentNode } from '../../domain/value-objects/document-node.js'
 import { type SymbolNode } from '../../domain/value-objects/symbol-node.js'
 import { SymbolKind } from '../../domain/value-objects/symbol-kind.js'
@@ -29,6 +30,8 @@ import {
 import {
   IMPORT_DIAGNOSTIC_SAMPLE_LIMIT,
   SIZE_SKIP_LIST_LIMIT,
+  WORKSPACE_OVERLAP_LIST_LIMIT,
+  type WorkspaceOverlap,
   type ImportDiagnosticSummary,
   type IndexResult,
   type IndexError,
@@ -73,6 +76,7 @@ import {
   toPortableGraphPath,
 } from '../../domain/services/split-workspace-identity.js'
 import { computeContentHash } from './compute-content-hash.js'
+import { decodeTextualContent } from '../services/decode-textual-content.js'
 import { InMemoryIndexSession } from './in-memory-index-session.js'
 import {
   projectSpecCoverage,
@@ -279,113 +283,6 @@ function readFilesAndSymbolsStageChunk(
 }
 
 /**
- * Attempts to decode a buffer as supported textual content.
- * @param content - Raw file content.
- * @returns Decoded text when the content should be treated as a document.
- */
-function decodeTextualContent(content: Buffer): string | null {
-  if (content.length === 0) {
-    return ''
-  }
-
-  if (content[0] === 0xef && content[1] === 0xbb && content[2] === 0xbf) {
-    return new TextDecoder('utf-8', { fatal: true }).decode(content)
-  }
-
-  if (content[0] === 0xff && content[1] === 0xfe) {
-    return new TextDecoder('utf-16le', { fatal: true }).decode(content)
-  }
-
-  if (content[0] === 0xfe && content[1] === 0xff) {
-    return decodeUtf16Be(content)
-  }
-
-  try {
-    const decoded = new TextDecoder('utf-8', { fatal: true }).decode(content)
-    if (!(content.includes(0) && decoded.includes('\u0000'))) {
-      return decoded
-    }
-  } catch {
-    // Fall through to the remaining encoding probes.
-  }
-
-  if (looksLikeUtf16Le(content)) {
-    try {
-      return new TextDecoder('utf-16le', { fatal: true }).decode(content)
-    } catch {
-      // Fall through to the remaining checks.
-    }
-  }
-
-  if (looksLikeUtf16Be(content)) {
-    try {
-      return decodeUtf16Be(content)
-    } catch {
-      // Fall through to the remaining checks.
-    }
-  }
-
-  if (!content.includes(0)) {
-    try {
-      return new TextDecoder('windows-1252', { fatal: true }).decode(content)
-    } catch {
-      return null
-    }
-  }
-
-  return null
-}
-
-/**
- * Decodes a UTF-16BE buffer by swapping byte order before decoding.
- * @param content - Raw file content.
- * @returns Decoded text.
- */
-function decodeUtf16Be(content: Buffer): string {
-  const normalized =
-    content.length % 2 === 0 ? Buffer.from(content) : Buffer.concat([content, Buffer.from([0])])
-  normalized.swap16()
-  return new TextDecoder('utf-16le', { fatal: true }).decode(normalized)
-}
-
-/**
- * Returns whether content matches the common UTF-16LE null-byte pattern.
- * @param content - Raw file content.
- * @returns True when odd bytes are predominantly NUL.
- */
-function looksLikeUtf16Le(content: Buffer): boolean {
-  return hasMostlyNullBytesAtParity(content, 1)
-}
-
-/**
- * Returns whether content matches the common UTF-16BE null-byte pattern.
- * @param content - Raw file content.
- * @returns True when even bytes are predominantly NUL.
- */
-function looksLikeUtf16Be(content: Buffer): boolean {
-  return hasMostlyNullBytesAtParity(content, 0)
-}
-
-/**
- * Checks whether one byte parity contains a dominant number of NUL bytes.
- * @param content - Raw file content.
- * @param parity - Byte parity to inspect.
- * @returns True when the sampled parity is mostly NUL.
- */
-function hasMostlyNullBytesAtParity(content: Buffer, parity: 0 | 1): boolean {
-  let samples = 0
-  let nulls = 0
-  for (let index = parity; index < content.length; index += 2) {
-    samples++
-    if (content[index] === 0) {
-      nulls++
-    }
-  }
-
-  return samples > 0 && nulls / samples >= 0.6
-}
-
-/**
  * Reads a staged relations chunk.
  * @param stageDir - Run-local staging directory.
  * @param filename - Chunk filename.
@@ -554,13 +451,22 @@ export class IndexCodeGraph {
       const sizeSkipped = new Map<string, SizeSkippedFile>()
       const sizeExempt = new Map<string, SizeExemptFile>()
 
+      // Physical files kept by discovery, keyed by project-relative path (overlap diagnostic)
+      const overlapOwners = new Map<string, string[]>()
+
       // 1. Workspace Discovery
       for (const ws of options.workspaces) {
         const wsGraph = effectiveGraphConfig.workspaces.get(ws.name)
         const discovered = discoverFiles(ws.codeRoot, undefined, {
           respectGitignore: wsGraph?.respectGitignore ?? true,
           vcsRoot: options.vcsRoot,
-          ...(wsGraph?.excludePaths !== undefined ? { excludePaths: wsGraph.excludePaths } : {}),
+          ...(wsGraph !== undefined
+            ? {
+                excludePaths: wsGraph.globalExcludePaths,
+                workspaceExcludePaths: wsGraph.workspaceExcludePaths,
+                pathBase: wsGraph.pathBase,
+              }
+            : {}),
           ...(wsGraph?.allowedPaths ? { allowedPaths: wsGraph.allowedPaths } : {}),
         })
 
@@ -580,6 +486,9 @@ export class IndexCodeGraph {
           const absPath = join(ws.codeRoot, relPath)
           const rawProjectRel = toPortableGraphPath(relative(options.projectRoot, absPath))
           const projectRel = rawProjectRel.startsWith('./') ? rawProjectRel.slice(2) : rawProjectRel
+          const owners = overlapOwners.get(projectRel)
+          if (owners === undefined) overlapOwners.set(projectRel, [ws.name])
+          else owners.push(ws.name)
 
           const decision = sizeGate.decide({
             workspaceName: ws.name,
@@ -1318,20 +1227,42 @@ export class IndexCodeGraph {
 
             const finalDraft = draft
 
-            const wsConfig = options.graphConfig.workspaces?.get(wsName)
-            const effectiveTestPatterns = [
-              ...(options.graphConfig.testPaths ?? DEFAULT_GRAPH_TEST_PATHS),
-              ...(wsConfig?.testPaths ?? []),
-            ]
-            const effectiveIgnorePatterns = [
-              ...(options.graphConfig.ignorePaths ?? DEFAULT_GRAPH_IGNORE_PATHS),
-              ...(wsConfig?.ignorePaths ?? []),
-            ]
-            const category = classifyFileCategory(
-              relPath,
-              effectiveTestPatterns,
-              effectiveIgnorePatterns,
-            )
+            const wsEffective = effectiveGraphConfig.workspaces.get(wsName)
+            const pathBase = wsEffective?.pathBase ?? ''
+            const category = explainFileCategory(
+              buildPathSubject(pathBase, relPath),
+              pathBase,
+              [
+                {
+                  level: 'project',
+                  key: 'graph.ignorePaths',
+                  patterns:
+                    wsEffective?.projectIgnorePaths ??
+                    options.graphConfig.ignorePaths ??
+                    DEFAULT_GRAPH_IGNORE_PATHS,
+                },
+                {
+                  level: 'workspace',
+                  key: 'graph.ignorePaths',
+                  patterns: wsEffective?.workspaceIgnorePaths ?? [],
+                },
+              ],
+              [
+                {
+                  level: 'project',
+                  key: 'graph.testPaths',
+                  patterns:
+                    wsEffective?.projectTestPaths ??
+                    options.graphConfig.testPaths ??
+                    DEFAULT_GRAPH_TEST_PATHS,
+                },
+                {
+                  level: 'workspace',
+                  key: 'graph.testPaths',
+                  patterns: wsEffective?.workspaceTestPaths ?? [],
+                },
+              ],
+            ).category
 
             session.registerFile({
               filePath: prefixedPath,
@@ -2219,6 +2150,12 @@ export class IndexCodeGraph {
         (a, b) => b.sizeBytes - a.sizeBytes || compareCodeUnits(a.filePath, b.filePath),
       )
 
+      const overlaps: WorkspaceOverlap[] = []
+      for (const [projectRelativePath, owners] of overlapOwners) {
+        if (owners.length >= 2) overlaps.push({ projectRelativePath, workspaces: owners })
+      }
+      overlaps.sort((a, b) => compareCodeUnits(a.projectRelativePath, b.projectRelativePath))
+
       return {
         filesDiscovered: allDiscoveredPaths.length + sizeSkipped.size,
         filesIndexed: filesIndexed + documentsIndexed,
@@ -2228,6 +2165,8 @@ export class IndexCodeGraph {
         filesSkippedForSize: sizeSkipped.size,
         largestSkippedForSize: sortedLargestSkipped,
         sizeExemptAnalysed: sortedSizeExempt,
+        workspaceOverlaps: overlaps.slice(0, WORKSPACE_OVERLAP_LIST_LIMIT),
+        workspaceOverlapCount: overlaps.length,
         specsDiscovered: totalSpecsToProcess,
         specsIndexed,
         errors: errors.filter(

@@ -746,7 +746,7 @@ interface WorkspaceGraphConfig {
 ```
 
 - **`maxFileBytes`**: Non-negative integer specifying the maximum file size in bytes for indexing code and documents (default `262144` = 256 KiB). Files strictly exceeding this threshold are skipped with reason `file-too-large` unless exempt. Setting `0` disables size gating.
-- **`largeFilePaths`**: Array of gitignore-syntax patterns exempting matching files from the file size limit. At project level, patterns resolve relative to `projectRoot`. At workspace level, patterns resolve relative to workspace `codeRoot` and are additive over project-level exemptions.
+- **`largeFilePaths`**: Array of gitignore-syntax patterns exempting matching files from the file size limit. At project level and at workspace level, patterns resolve relative to `projectRoot`; workspace exemptions are additive over project-level exemptions.
 
 **Throws:** `ConfigValidationError` when no config file is found or the YAML is invalid.
 

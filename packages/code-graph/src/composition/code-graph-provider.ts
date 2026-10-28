@@ -77,6 +77,12 @@ import {
   type GetGraphHealthResult,
 } from '../application/use-cases/get-graph-health.js'
 import {
+  ExplainGraphPath,
+  type ExplainGraphPathInput,
+  type ExplainGraphPathResult,
+} from '../application/use-cases/explain-graph-path.js'
+import { GraphWhyRequiresConfigError } from '../domain/errors/graph-why-requires-config-error.js'
+import {
   SearchCodeGraph,
   type ReferenceAwareSymbolResult,
   type SearchCodeGraphInput,
@@ -130,6 +136,13 @@ export interface CodeGraphProvider {
   getCoveringSpecsForSymbol(symbolId: string): Promise<Relation[]>
   getStatistics(): Promise<GraphStatistics>
   getGraphHealth(): Promise<GetGraphHealthResult>
+  /**
+   * Explains why a path is excluded, classified or indexed, using the indexer's own evaluation.
+   * @param path - Project-relative path, absolute path, or `workspace:path`.
+   * @returns The structured explanation.
+   * @throws {GraphWhyRequiresConfigError} When the provider was created without a project configuration.
+   */
+  explainPath(path: string): Promise<ExplainGraphPathResult>
   resolveSymbolReference(
     input: ResolveSymbolReferenceInput,
     health?: GetGraphHealthResult,
@@ -228,6 +241,9 @@ export class CodeGraphProviderImpl implements CodeGraphProvider {
    * @param graphHealth.input - Config-bound health input excluding the provider.
    * @param registry - Adapter registry shared by indexing and resolution.
    * @param onWarning - Optional host receiver for non-fatal warnings such as stale lock recovery.
+   * @param explainPathComposition - Optional provider-owned path-explanation composition.
+   * @param explainPathComposition.useCase - Canonical explanation use case.
+   * @param explainPathComposition.input - Config-bound explanation input excluding provider and path.
    */
   constructor(
     private readonly store: GraphStore,
@@ -239,6 +255,10 @@ export class CodeGraphProviderImpl implements CodeGraphProvider {
     },
     private readonly registry?: AdapterRegistryPort,
     private readonly onWarning?: (message: string) => void,
+    private readonly explainPathComposition?: {
+      readonly useCase: ExplainGraphPath
+      readonly input: Omit<ExplainGraphPathInput, 'provider' | 'path'>
+    },
   ) {
     this.resolver = new ResolveSymbolReference(
       store,
@@ -668,6 +688,22 @@ export class CodeGraphProviderImpl implements CodeGraphProvider {
     return this.graphHealth.useCase.execute({
       ...this.graphHealth.input,
       provider: this,
+    })
+  }
+
+  /**
+   * Explains why a path is excluded, classified or indexed.
+   * @param path - Project-relative path, absolute path, or `workspace:path`.
+   * @returns The structured explanation.
+   * @throws {GraphWhyRequiresConfigError} When the provider has no project configuration.
+   */
+  async explainPath(path: string): Promise<ExplainGraphPathResult> {
+    if (this.explainPathComposition === undefined) throw new GraphWhyRequiresConfigError()
+    await this.assertAvailable()
+    return this.explainPathComposition.useCase.execute({
+      ...this.explainPathComposition.input,
+      provider: this,
+      path,
     })
   }
 

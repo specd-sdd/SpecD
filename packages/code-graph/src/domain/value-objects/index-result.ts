@@ -96,6 +96,17 @@ export const IMPORT_DIAGNOSTIC_SAMPLE_LIMIT = 20
 /** Maximum number of size-skipped files reported in largestSkippedForSize. */
 export const SIZE_SKIP_LIST_LIMIT = 25
 
+/** Maximum number of workspace overlaps reported in `workspaceOverlaps`. */
+export const WORKSPACE_OVERLAP_LIST_LIMIT = 25
+
+/** A physical file kept by more than one workspace in the same run. */
+export interface WorkspaceOverlap {
+  /** Project-relative path of the physical file. */
+  readonly projectRelativePath: string
+  /** Owning workspaces in configuration order (at least two). */
+  readonly workspaces: readonly string[]
+}
+
 /**
  * Summary of an indexing operation including counts and errors.
  */
@@ -115,6 +126,10 @@ export interface IndexResult {
    * run did not need to analyse again because their content was unchanged.
    */
   readonly sizeExemptAnalysed: readonly SizeExemptFile[]
+  /** Up to {@link WORKSPACE_OVERLAP_LIST_LIMIT} files kept by more than one workspace, sorted by `projectRelativePath` ascending. */
+  readonly workspaceOverlaps: readonly WorkspaceOverlap[]
+  /** Total number of overlapping files, including those omitted from `workspaceOverlaps`. */
+  readonly workspaceOverlapCount: number
   readonly specsDiscovered: number
   readonly specsIndexed: number
   /** Files or specs that failed to produce their indexed content. */

@@ -14,6 +14,7 @@ import {
 import { GraphStoreRegistryError } from '../domain/errors/graph-store-registry-error.js'
 import { createSqliteGraphStoreFactory } from './create-sqlite-graph-store-factory.js'
 import { createGetGraphHealth } from './use-cases/get-graph-health.js'
+import { createExplainGraphPath } from './use-cases/explain-graph-path.js'
 import { readInstalledCodeGraphVersion } from '../application/use-cases/_shared/installed-code-graph-version.js'
 import { NodeResolutionManifestSource } from '../infrastructure/fs/node-resolution-manifest-source.js'
 import { VcsRepositoryRootSource } from '../infrastructure/vcs/vcs-repository-root-source.js'
@@ -75,6 +76,22 @@ export function createCodeGraphProvider(
     new NodeWorkspaceAccessibilitySource(),
   )
 
+  const workspaceTargets = isSpecdConfig(options)
+    ? options.workspaces.map(
+        (workspace): WorkspaceIndexTarget => ({
+          name: workspace.name,
+          prefix: workspace.prefix ?? null,
+          codeRoot: workspace.codeRoot,
+          ownership: workspace.ownership,
+          isExternal: workspace.isExternal,
+          // Fingerprinting also derives deterministic exclusions from the spec root.
+          specRepo: {
+            specsPath: workspace.specsPath,
+          } as WorkspaceIndexTarget['specRepo'],
+        }),
+      )
+    : undefined
+
   const graphHealth = isSpecdConfig(options)
     ? {
         useCase: createGetGraphHealth(),
@@ -83,19 +100,18 @@ export function createCodeGraphProvider(
           codeGraphVersion: readInstalledCodeGraphVersion(),
           adapters: registry.getAdapters(),
           manifestSource,
-          workspaces: options.workspaces.map(
-            (workspace): WorkspaceIndexTarget => ({
-              name: workspace.name,
-              prefix: workspace.prefix ?? null,
-              codeRoot: workspace.codeRoot,
-              ownership: workspace.ownership,
-              isExternal: workspace.isExternal,
-              // Fingerprinting also derives deterministic exclusions from the spec root.
-              specRepo: {
-                specsPath: workspace.specsPath,
-              } as WorkspaceIndexTarget['specRepo'],
-            }),
-          ),
+          workspaces: workspaceTargets ?? [],
+        },
+      }
+    : undefined
+
+  const explainPath = isSpecdConfig(options)
+    ? {
+        useCase: createExplainGraphPath(),
+        input: {
+          config: options,
+          workspaces: workspaceTargets ?? [],
+          adapters: registry.getAdapters(),
         },
       }
     : undefined
@@ -107,6 +123,7 @@ export function createCodeGraphProvider(
     graphHealth,
     registry,
     graphOptions?.onWarning,
+    explainPath,
   )
 }
 

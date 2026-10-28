@@ -3,16 +3,14 @@ import {
   type FileCategory,
   type SearchCategory,
   runGraphSearch,
-  createSdkContext,
-  createCodeGraphProvider,
   type SdkHostContext,
 } from '@specd/sdk'
 import { output, parseFormat } from '../../formatter.js'
 import { cliError } from '../../handle-error.js'
-import { buildCliKernelOptions } from '../../helpers/cli-context.js'
 import { parseGraphKinds } from './parse-graph-kinds.js'
 import { parseFileCategories } from './parse-file-categories.js'
 import { resolveGraphCliContext } from './resolve-graph-cli-context.js'
+import { createGraphHostContext } from './host-context.js'
 import { withProvider } from './with-provider.js'
 import { normalizeSnippet } from './normalize-snippet.js'
 import { splitWorkspaceIdentity } from './resolve-impact-file-selectors.js'
@@ -268,10 +266,7 @@ Exclude examples:
                   ...(opts.specs ? (['specs'] as const) : []),
                   ...(opts.documents ? (['documents'] as const) : []),
                 ]
-            const hostContext: SdkHostContext =
-              kernel !== null
-                ? { kernel, createGraphProvider: () => createCodeGraphProvider(config) }
-                : await createSdkContext(config, { kernel: buildCliKernelOptions() })
+            const hostContext: SdkHostContext = await createGraphHostContext(config, kernel)
 
             const result = await runGraphSearch(hostContext, {
               query,

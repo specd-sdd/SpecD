@@ -40,6 +40,29 @@ export {
 } from './application/use-cases/get-graph-health.js'
 export { createGetGraphHealth } from './composition/use-cases/get-graph-health.js'
 export {
+  ExplainGraphPath,
+  type ExplainGraphPathInput,
+  type ExplainGraphPathResult,
+  type ExplainStage,
+  type ExplainOutcome,
+  type ExplainRuleLayer,
+  type ExplainRuleOrigin,
+  type ExplainRule,
+  type ExplainStep,
+  type CandidateVerdict,
+  type ExplainVerdict,
+  type ExplainDiagnosticCode,
+  type ExplainCandidate,
+  type ExplainDiagnostic,
+} from './application/use-cases/explain-graph-path.js'
+export { createExplainGraphPath } from './composition/use-cases/explain-graph-path.js'
+export { PATH_SEMANTICS_MARKER } from './application/use-cases/_shared/compute-graph-fingerprint.js'
+export {
+  UnknownWorkspaceError,
+  InvalidGraphWhyPathError,
+  GraphWhyRequiresConfigError,
+} from './domain/errors/index.js'
+export {
   IndexProjectGraph,
   type IndexProjectGraphInput,
 } from './application/use-cases/index-project-graph.js'
@@ -172,6 +195,7 @@ export {
   type IndexCoverageDiagnostic,
   type IndexRunCoverageSummary,
   type ImportDiagnosticSummary,
+  type WorkspaceOverlap,
 } from './domain/value-objects/index-result.js'
 
 // Traversal types
@@ -228,11 +252,29 @@ export type {
 // Discovery
 export {
   DEFAULT_EXCLUDE_PATHS,
+  createDiscoveryEvaluator,
   type DiscoverFilesOptions,
+  type DiscoveryDecision,
+  type DiscoveryEvaluator,
 } from './application/use-cases/discover-files.js'
 
 // Domain services
-export { classifyFileCategory } from './domain/services/classify-file-category.js'
+export {
+  classifyFileCategory,
+  explainFileCategory,
+  type CategoryPatternSource,
+  type FileCategoryExplanation,
+} from './domain/services/classify-file-category.js'
+export {
+  buildPathSubject,
+  computePathBase,
+  createPathRuleSet,
+  isOutsideProject,
+  isRootAnchoredPattern,
+  type PathRuleMatch,
+  type PathRuleResult,
+  type PathRuleSet,
+} from './domain/services/project-path-rules.js'
 export { expandSymbolName } from './domain/services/expand-symbol-name.js'
 export { expandSearchQuery, expandSearchToken } from './domain/services/expand-search-query.js'
 export { isGraphStale } from './domain/services/is-graph-stale.js'

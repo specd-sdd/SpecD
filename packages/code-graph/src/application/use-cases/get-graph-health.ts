@@ -22,6 +22,7 @@ import { buildProjectGraphConfig } from '../services/build-project-graph-config.
 import { computeContentHash } from './compute-content-hash.js'
 import { resolveEffectiveGraphConfig } from './_shared/resolve-effective-graph-config.js'
 import { discoverFiles } from './discover-files.js'
+import { createFileSizeGate } from '../services/file-size-gate.js'
 import {
   buildGraphInputVisibilitySnapshot,
   rebaseRepositoryPath,
@@ -696,6 +697,7 @@ async function compareIndexedContent(
       graphConfig,
     )
     const discovered = new Map<string, string>()
+    const sizeGate = createFileSizeGate(effective)
     let inspectionFailed = false
     const onInspectionError = (): void => {
       inspectionFailed = true
@@ -706,8 +708,12 @@ async function compareIndexedContent(
       for (const relPath of discoverFiles(workspace.codeRoot, undefined, {
         respectGitignore: workspaceGraph?.respectGitignore ?? true,
         vcsRoot,
-        ...(workspaceGraph?.excludePaths !== undefined
-          ? { excludePaths: workspaceGraph.excludePaths }
+        ...(workspaceGraph !== undefined
+          ? {
+              excludePaths: workspaceGraph.globalExcludePaths,
+              workspaceExcludePaths: workspaceGraph.workspaceExcludePaths,
+              pathBase: workspaceGraph.pathBase,
+            }
           : {}),
         ...(workspaceGraph?.allowedPaths !== undefined
           ? { allowedPaths: workspaceGraph.allowedPaths }
@@ -715,14 +721,22 @@ async function compareIndexedContent(
         onInspectionError,
       })) {
         const absolutePath = join(workspace.codeRoot, relPath)
-        const projectRelativePath = relative(input.config.projectRoot, absolutePath).replaceAll(
+        const rawProjectRelativePath = relative(input.config.projectRoot, absolutePath).replaceAll(
           '\\',
           '/',
         )
-        discovered.set(
-          projectRelativePath.startsWith('./') ? projectRelativePath.slice(2) : projectRelativePath,
+        const projectRelativePath = rawProjectRelativePath.startsWith('./')
+          ? rawProjectRelativePath.slice(2)
+          : rawProjectRelativePath
+        // Files skipped for size are not indexed content, exactly as in indexing.
+        const sizeDecision = sizeGate.decide({
+          workspaceName: workspace.name,
+          relativeToCodeRoot: relPath,
+          projectRelativePath,
           absolutePath,
-        )
+        })
+        if (sizeDecision.kind === 'skip') continue
+        discovered.set(projectRelativePath, absolutePath)
       }
     }
 
@@ -739,7 +753,15 @@ async function compareIndexedContent(
         ) {
           continue
         }
-        discovered.set(relPath.replaceAll('\\', '/'), absolutePath)
+        const rootRelativePath = relPath.replaceAll('\\', '/')
+        const rootDecision = sizeGate.decide({
+          workspaceName: 'root',
+          relativeToCodeRoot: rootRelativePath,
+          projectRelativePath: rootRelativePath,
+          absolutePath,
+        })
+        if (rootDecision.kind === 'skip') continue
+        discovered.set(rootRelativePath, absolutePath)
       }
     }
 

@@ -63,25 +63,26 @@ export interface SpecdWorkspaceGraphConfig {
    */
   readonly respectGitignore?: boolean
   /**
-   * Gitignore-syntax exclusion patterns applied during file discovery.
-   * Supports `!` negation. These patterns are additive on top of the
-   * project-global graph exclusion set.
+   * Gitignore-syntax exclusion patterns applied during file discovery, relative to the
+   * project root (not to `codeRoot`). Supports `!` negation. They form the workspace
+   * layer, evaluated after the project-global exclusion set: a `!` negation only reverses
+   * earlier workspace patterns and can never re-include a path the global set excluded.
    */
   readonly excludePaths?: readonly string[]
   /**
    * Optional graph-visible include surface inside the workspace `codeRoot`.
    *
-   * Paths are gitignore-syntax patterns relative to `codeRoot`. They affect
+   * Paths are glob patterns relative to the project root. They affect
    * graph indexing only and do not change workspace ownership semantics.
    */
   readonly allowedPaths?: readonly string[]
   /**
-   * Gitignore-syntax test file patterns.
+   * Gitignore-syntax test file patterns, relative to the project root.
    * Additive on top of project-level testPaths.
    */
   readonly testPaths?: readonly string[]
   /**
-   * Gitignore-syntax ignored file patterns.
+   * Gitignore-syntax ignored file patterns, relative to the project root.
    * Additive on top of project-level ignorePaths.
    */
   readonly ignorePaths?: readonly string[]
@@ -94,7 +95,7 @@ export interface SpecdWorkspaceGraphConfig {
    */
   readonly maxFileBytes?: number
   /**
-   * Gitignore-syntax exemption patterns evaluated relative to the workspace `codeRoot`.
+   * Gitignore-syntax exemption patterns evaluated relative to the project root.
    * Files matching these patterns are analysed even if their size exceeds `maxFileBytes`.
    * Added to the project-level `graph.largeFilePaths` list.
    */
@@ -140,7 +141,7 @@ export interface SpecdGraphConfig {
   /**
    * Gitignore-syntax exemption patterns evaluated relative to the project root.
    * Files matching these patterns are analysed even if their size exceeds `maxFileBytes`.
-   * Workspace-level `largeFilePaths` patterns are evaluated relative to their `codeRoot` and appended to this list.
+   * Workspace-level `largeFilePaths` patterns are also evaluated relative to the project root and are added to this list.
    */
   readonly largeFilePaths?: readonly string[]
 }

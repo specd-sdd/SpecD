@@ -162,6 +162,40 @@ describe('Workspace indexing', () => {
     expect(second.filesIndexed).toBeGreaterThan(0)
   })
 
+  it('given a changed workspace testPaths, when indexing again, then the run is a full rebuild with the fingerprint reason', async () => {
+    const wsDir = createWorkspaceDir(tempDir, 'ws', {
+      'src/code.ts': 'export const value = 1',
+    })
+    const indexer = createIndexer(store, registry, emptyResolutionManifestSource)
+    const base: Omit<IndexOptions, 'graphConfig'> = {
+      projectRoot: tempDir,
+      vcsRoot: tempDir,
+      workspaces: [
+        {
+          name: 'ws',
+          prefix: null,
+          codeRoot: wsDir,
+          specRepo: makeMockRepo(),
+          ownership: 'owned',
+          isExternal: false,
+        },
+      ],
+    }
+    const withTests = (testPaths: string[]): IndexOptions => ({
+      ...base,
+      graphConfig: { includePaths: [], workspaces: new Map([['ws', { testPaths }]]) },
+    })
+
+    await indexer.execute(withTests(['ws/a/**']))
+    const unchanged = await indexer.execute(withTests(['ws/a/**']))
+    expect(unchanged.fullRebuild).toBe(false)
+
+    const changed = await indexer.execute(withTests(['ws/b/**']))
+    expect(changed.fullRebuild).toBe(true)
+    expect(changed.fullRebuildReason).toBe(FULL_REBUILD_FINGERPRINT_REASON)
+    expect(changed.filesSkipped).toBe(0)
+  })
+
   it('persists one durable coverage outcome for every considered source target', async () => {
     const wsDir = createWorkspaceDir(tempDir, 'ws', {
       'src/code.ts': 'export const value = 1',

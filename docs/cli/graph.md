@@ -16,6 +16,7 @@ specd graph search <query> [options]
 specd graph impact [options]
 specd graph hotspots [options]
 specd graph stats [options]
+specd graph why <path> [options]
 ```
 
 ---
@@ -30,15 +31,18 @@ specd graph index [options]
 
 ### Options
 
-| Option                        | Description                                                       |
-| ----------------------------- | ----------------------------------------------------------------- |
-| `--force`                     | Force a full rebuild of the code graph, reprocessing every input. |
-| `--config <path>`             | Path to configuration file. Mutually exclusive with `--path`.     |
-| `--path <path>`               | Repository root bootstrap path (ignores discovered config).       |
-| `--format <text\|json\|toon>` | Output format (`text`, `json`, `toon`).                           |
+| Option                        | Description                                                                                   |
+| ----------------------------- | --------------------------------------------------------------------------------------------- |
+| `--force`                     | Force a full rebuild of the code graph, reprocessing every input.                             |
+| `--exclude-path <glob...>`    | Gitignore-syntax patterns, relative to the project root, added to the global exclusion layer. |
+| `--config <path>`             | Path to configuration file. Mutually exclusive with `--path`.                                 |
+| `--path <path>`               | Repository root bootstrap path (ignores discovered config).                                   |
+| `--format <text\|json\|toon>` | Output format (`text`, `json`, `toon`).                                                       |
 
 ### Output & Behavior
 
+- **Project-relative paths:** Every path and pattern in the `graph` section of `specd.yaml` (project and workspace level) is interpreted relative to the **project root**, never to a workspace `codeRoot`. A pattern such as `/app/vendors/*` therefore means the same file in global and workspace discovery. Global `excludePaths` are evaluated first and a workspace `!` negation cannot re-include something the global layer excluded; `.gitignore` files keep absolute priority. Run `specd graph why <path>` to see which rule decides a path.
+- **Workspace overlap warning:** When one physical file is kept by more than one workspace in the same run, the file is still indexed under every owning workspace identity, and the run reports it. In `text` format an overlap section prints the count, up to ten `projectRelativePath — workspaces` lines, a `... and N more` line, and a hint to review `excludePaths`/`allowedPaths` and run `specd graph why <path>`. In `json` and `toon` formats the result carries `workspaceOverlaps` (`Array<{ projectRelativePath, workspaces }>`, at most 25 entries sorted by path) and `workspaceOverlapCount` (exact total). Nothing is printed when there are no overlaps.
 - **File Size Gating & Summary:** Files larger than the effective `maxFileBytes` (default: 256 KiB) are skipped during indexing with coverage reason `file-too-large`.
   - In `text` format, a size-skip section lists the largest skipped files with their sizes (capped at 10 items, followed by `... and N more`), a ready-to-paste `graph.largeFilePaths` snippet (root-level files are anchored with a leading `/` so that they match only that file), and the option to raise `graph.maxFileBytes` (`0` disables the limit).
   - In `json` and `toon` formats, result objects include:
@@ -253,3 +257,76 @@ Text output prints `coverage: complete with warnings (N file(s) skipped: file-to
 | `0`          | Success.                                                          |
 | `1`          | Command execution error, missing index, or invalid query options. |
 | `GRAPH_BUSY` | Another indexing process currently holds the writer lock.         |
+
+---
+
+## graph why
+
+Explain why a path is excluded from, classified in, or indexed by the code graph.
+
+```bash
+specd graph why <path> [--config <path> | --path <path>] [--format text|json|toon]
+```
+
+`<path>` is required and can be a project-relative path (`packages/core/src/index.ts`), an absolute path (converted to project-relative), or a workspace-qualified path `workspace:path` (for example `core:src/index.ts`), which pins the evaluation to that workspace.
+
+The command runs the same evaluation the indexer uses and reports, for every workspace whose code root contains the path, the decisive rule at each step, in indexer order: `binary-extension`, `gitignore`, `global-exclude`, `workspace-exclude`, `allowed-paths`, `size-limit`, `category`, `adapter`. Evaluation stops at the first exclusion; later steps are `not-applicable`. Configured patterns are interpreted relative to the project root. Diagnostics are printed after all candidates in text output. The result also states whether the node is currently in the graph (`inGraph`, which compares with the last index and may be out of date).
+
+### Options
+
+| Option                        | Description                                                   |
+| ----------------------------- | ------------------------------------------------------------- |
+| `--config <path>`             | Path to configuration file. Mutually exclusive with `--path`. |
+| `--path <path>`               | Repository root bootstrap path (ignores discovered config).   |
+| `--format <text\|json\|toon>` | Output format (`text`, `json`, `toon`).                       |
+
+### Output fields
+
+| Field                 | Description                                                                                                                         |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `input`               | The path exactly as given.                                                                                                          |
+| `projectRelativePath` | The path relative to the project root.                                                                                              |
+| `verdict`             | `indexable`, `not-indexed` (candidates exist but none indexes it) or `not-in-scope` (no workspace and no `includePaths` covers it). |
+| `owners`              | Names of the candidates that index the path (`root` for project-global files).                                                      |
+| `candidates`          | One evaluation per candidate: `workspace`, `identity`, `verdict`, `category`, `kind`, `steps`, `inGraph`.                           |
+| `diagnostics`         | `PATH_NOT_FOUND`, `CODE_ROOT_OUTSIDE_PROJECT`, `PATH_OUTSIDE_PROJECT`, `MULTIPLE_OWNERS`.                                           |
+
+Each step has `stage`, `outcome` (`matched`, `passed`, `not-applicable`) and, when a rule decided it, `rule` (`pattern`, `negated`, `origin` with `layer`, `workspace`, `key` and, for `.gitignore`, `sourceFile` and `line`). When a global exclusion prevented a workspace negation from re-including a path, `global-exclude` carries `detail.workspaceNegationBlocked: true` and text output says so.
+
+### Examples
+
+An excluded path:
+
+```text
+$ specd graph why app/vendors/other/x.php
+app/vendors/other/x.php
+verdict: not-indexed   owners: none
+
+backend:vendors/other/x.php  [excluded]  category: -  kind: -  inGraph: no
+  - binary-extension: passed
+  - gitignore: passed
+  - global-exclude: matched — /app/vendors/* (pattern) from global graph.excludePaths
+  - workspace-exclude: not-applicable
+  ...
+```
+
+An indexable path:
+
+```text
+$ specd graph why packages/core/src/index.ts
+packages/core/src/index.ts
+verdict: indexable   owners: core
+
+core:src/index.ts  [indexable]  category: source  kind: file  inGraph: yes
+  - global-exclude: passed
+  - size-limit: passed size=2048 limit=262144
+  - category: passed category=source
+  - adapter: passed kind=file language=typescript
+```
+
+### Exit Codes
+
+| Exit Code | Condition                                                                                  |
+| --------- | ------------------------------------------------------------------------------------------ |
+| `0`       | An explanation was produced, whatever the verdict.                                         |
+| `1`       | Missing configuration, `UNKNOWN_WORKSPACE`, `INVALID_GRAPH_WHY_PATH`, or provider failure. |

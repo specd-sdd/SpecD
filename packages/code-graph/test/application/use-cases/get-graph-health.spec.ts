@@ -34,6 +34,7 @@ import { GraphProviderStaleError } from '../../../src/domain/errors/graph-provid
 import { IndexCoverageStatus } from '../../../src/domain/value-objects/index-session.js'
 import { FreshnessState } from '../../../src/domain/value-objects/indexed-input-freshness.js'
 import { createFileNode } from '../../../src/domain/value-objects/file-node.js'
+import { computeContentHash } from '../../../src/application/use-cases/compute-content-hash.js'
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
@@ -253,6 +254,72 @@ describe('GetGraphHealth', () => {
     expect(result.reasonCodes).toContain('CONTENT_UNKNOWN')
     expect(result.schemaCompatible).toBe(true)
     expect(result.generationCurrent).toBe(true)
+  })
+
+  describe('content comparison agrees with indexing', () => {
+    const run = async (
+      files: Record<string, string>,
+      extraConfig: Partial<SpecdConfig> = {},
+    ): Promise<Awaited<ReturnType<GetGraphHealth['execute']>>> => {
+      const projectRoot = mkdtempSync(join(tmpdir(), 'specd-health-agree-'))
+      const codeRoot = join(projectRoot, 'packages/core')
+      for (const [relative, content] of Object.entries(files)) {
+        mkdirSync(join(codeRoot, relative, '..'), { recursive: true })
+        writeFileSync(join(codeRoot, relative), content)
+      }
+      createVcsAdapter.mockRejectedValue(new Error('no vcs'))
+      const source = 'export const value = 1\n'
+      const provider = {
+        ...makeProvider(),
+        getAllFiles: vi.fn().mockResolvedValue([
+          createFileNode({
+            path: 'core:src/index.ts',
+            projectRelativePath: 'packages/core/src/index.ts',
+            language: 'typescript',
+            contentHash: computeContentHash(source),
+            workspace: 'core',
+          }),
+        ]),
+        getAllDocuments: vi.fn().mockResolvedValue([]),
+      } as unknown as CodeGraphHostPort
+      try {
+        return await getGraphHealth().execute({
+          config: { ...config, ...extraConfig, projectRoot } as SpecdConfig,
+          provider,
+          codeGraphVersion,
+          workspaces: [{ ...mockWorkspace, codeRoot }],
+        })
+      } finally {
+        rmSync(projectRoot, { recursive: true, force: true })
+      }
+    }
+
+    it('Given an oversized non-exempt file that indexing skips, then content is still fresh', async () => {
+      const result = await run({
+        'src/index.ts': 'export const value = 1\n',
+        'src/big.ts': 'export const b = 1\n'.padEnd(300 * 1024, ' '),
+      })
+      expect(result.contentFresh).toBe(true)
+    })
+
+    it('Given a file excluded only by a project-relative pattern, then content is still fresh', async () => {
+      const result = await run(
+        {
+          'src/index.ts': 'export const value = 1\n',
+          'src/generated/out.ts': 'export const g = 1\n',
+        },
+        { graph: { excludePaths: ['packages/core/src/generated/'] } },
+      )
+      expect(result.contentFresh).toBe(true)
+    })
+
+    it('Given an extra visible file, then content is not fresh', async () => {
+      const result = await run({
+        'src/index.ts': 'export const value = 1\n',
+        'src/extra.ts': 'export const e = 1\n',
+      })
+      expect(result.contentFresh).toBe(false)
+    })
   })
 
   it('keeps content inspection failures unknown instead of marking the graph dirty', async () => {

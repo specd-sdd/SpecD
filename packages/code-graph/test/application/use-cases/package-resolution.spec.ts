@@ -66,7 +66,7 @@ describe('Package resolution end-to-end integration', () => {
       projectRoot: tempDir,
       vcsRoot: tempDir,
       workspaces: [workspace('graph', graphDir), workspace('app', appDir)],
-      graphConfig: { includePaths: [], testPaths: ['test/**'], workspaces: new Map() },
+      graphConfig: { includePaths: [], testPaths: ['**/test/**'], workspaces: new Map() },
     }
   }
 
@@ -334,7 +334,7 @@ describe('Package resolution end-to-end integration', () => {
           workspace('php-pkg', phpPkgDir),
           workspace('php-app', phpAppDir),
         ],
-        graphConfig: { includePaths: [], testPaths: ['test/**'], workspaces: new Map() },
+        graphConfig: { includePaths: [], testPaths: ['**/test/**'], workspaces: new Map() },
       }
 
       const indexer = new IndexCodeGraph(
@@ -492,7 +492,7 @@ describe('Package resolution end-to-end integration', () => {
         projectRoot: tempDir,
         vcsRoot: tempDir,
         workspaces: [workspace],
-        graphConfig: { includePaths: [], testPaths: ['tests/**'], workspaces: new Map() },
+        graphConfig: { includePaths: [], testPaths: ['**/tests/**'], workspaces: new Map() },
       }
 
       const indexer = new IndexCodeGraph(

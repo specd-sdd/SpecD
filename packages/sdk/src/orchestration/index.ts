@@ -41,6 +41,7 @@ export {
   type RunGraphHotspotsResult,
   type ProjectedHotspotEntry,
 } from './run-graph-hotspots.js'
+export { runGraphWhy, type RunGraphWhyInput, type RunGraphWhyResult } from './run-graph-why.js'
 export {
   runGraphImpact,
   GraphSelectorError,

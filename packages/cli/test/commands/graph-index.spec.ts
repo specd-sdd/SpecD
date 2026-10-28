@@ -28,6 +28,8 @@ const result = {
   filesSkippedForSize: 0,
   largestSkippedForSize: [],
   sizeExemptAnalysed: [],
+  workspaceOverlaps: [],
+  workspaceOverlapCount: 0,
   specsDiscovered: 3,
   specsIndexed: 3,
   errors: [{ filePath: 'bad.ts', message: 'parse error' }],
@@ -224,6 +226,8 @@ describe('graph index', () => {
         },
       ],
       sizeExemptAnalysed: [],
+      workspaceOverlaps: [],
+      workspaceOverlapCount: 0,
     })
     const stdout = captureStdout()
     await run(makeIndexProgram())
@@ -257,6 +261,8 @@ describe('graph index', () => {
       filesSkippedForSize: 12,
       largestSkippedForSize: skippedList,
       sizeExemptAnalysed: [],
+      workspaceOverlaps: [],
+      workspaceOverlapCount: 0,
     })
     const stdout = captureStdout()
     await run(makeIndexProgram())
@@ -266,6 +272,85 @@ describe('graph index', () => {
     expect(output).toContain('src/file-0.ts')
     expect(output).toContain('src/file-9.ts')
     expect(output).toContain('... and 2 more')
+  })
+
+  it('accumulates repeated --exclude-path flags into the global layer', async () => {
+    setup()
+    await run(makeIndexProgram(), '--exclude-path', 'app/tmp/', '--exclude-path', 'app/cache/')
+    expect(runIsolatedGraphIndex).toHaveBeenCalledWith(
+      expect.objectContaining({
+        taskInput: expect.objectContaining({
+          index: expect.objectContaining({ excludePaths: ['app/tmp/', 'app/cache/'] }),
+        }),
+      }),
+    )
+  })
+
+  it('renders the workspace overlap warning for three overlaps', async () => {
+    setup()
+    vi.mocked(runIsolatedGraphIndex).mockResolvedValueOnce({
+      ...result,
+      workspaceOverlapCount: 3,
+      workspaceOverlaps: ['a.ts', 'b.ts', 'c.ts'].map((name) => ({
+        projectRelativePath: `app/${name}`,
+        workspaces: ['backend', 'backoffice'],
+      })),
+    })
+    const stdout = captureStdout()
+    await run(makeIndexProgram())
+
+    const output = stdout()
+    expect(output).toContain('workspace overlap: 3 file(s) are indexed by more than one workspace')
+    expect(output).toContain('app/a.ts — backend, backoffice')
+    expect(output).toContain('app/c.ts — backend, backoffice')
+    expect(output).toContain('specd graph why <path>')
+    expect(output).toContain('graph.excludePaths')
+  })
+
+  it('lists ten overlaps and counts the rest', async () => {
+    setup()
+    vi.mocked(runIsolatedGraphIndex).mockResolvedValueOnce({
+      ...result,
+      workspaceOverlapCount: 14,
+      workspaceOverlaps: Array.from({ length: 14 }, (_, i) => ({
+        projectRelativePath: `app/f${String(i).padStart(2, '0')}.ts`,
+        workspaces: ['backend', 'backoffice'],
+      })),
+    })
+    const stdout = captureStdout()
+    await run(makeIndexProgram())
+
+    const output = stdout()
+    expect(output).toContain('app/f09.ts')
+    expect(output).not.toContain('app/f10.ts')
+    expect(output).toContain('... and 4 more')
+  })
+
+  it('prints no overlap section when there are none', async () => {
+    setup()
+    const stdout = captureStdout()
+    await run(makeIndexProgram())
+    expect(stdout()).not.toContain('workspace overlap')
+  })
+
+  it('carries the overlap diagnostics in json and toon output', async () => {
+    setup()
+    const overlapResult = {
+      ...result,
+      workspaceOverlapCount: 1,
+      workspaceOverlaps: [
+        { projectRelativePath: 'app/a.ts', workspaces: ['backend', 'backoffice'] },
+      ],
+    }
+    vi.mocked(runIsolatedGraphIndex).mockResolvedValueOnce(overlapResult)
+    const json = captureStdout()
+    await run(makeIndexProgram(), '--format', 'json')
+    expect(JSON.parse(json())).toMatchObject({
+      workspaceOverlapCount: 1,
+      workspaceOverlaps: [
+        { projectRelativePath: 'app/a.ts', workspaces: ['backend', 'backoffice'] },
+      ],
+    })
   })
 
   it('renders separate exempt list when sizeExemptAnalysed is present', async () => {
@@ -357,6 +442,8 @@ describe('graph index', () => {
         },
       ],
       sizeExemptAnalysed: [],
+      workspaceOverlaps: [],
+      workspaceOverlapCount: 0,
     })
     const stdout = captureStdout()
     await run(makeIndexProgram(), '--format', 'json')
@@ -486,6 +573,8 @@ describe('graph index', () => {
         },
       ],
       sizeExemptAnalysed: [],
+      workspaceOverlaps: [],
+      workspaceOverlapCount: 0,
     })
     const stdout = captureStdout()
 

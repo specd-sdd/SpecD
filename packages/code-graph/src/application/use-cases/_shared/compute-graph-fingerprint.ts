@@ -9,6 +9,12 @@ import {
 } from '../../ports/resolution-manifest-source.js'
 import { resolveEffectiveGraphConfig } from './resolve-effective-graph-config.js'
 
+/**
+ * Marker for the reference root of graph path patterns. Bump it whenever the root that
+ * `graph.*` patterns are matched against changes, so older indexes are rebuilt.
+ */
+export const PATH_SEMANTICS_MARKER = 'project-relative-v1'
+
 /** Visible full-rebuild reason when the derivation fingerprint differs. */
 export const FULL_REBUILD_FINGERPRINT_REASON =
   'Graph derivation fingerprint mismatch — code-graph version, workspace configuration, or resolution manifest content changed'
@@ -33,7 +39,16 @@ interface NormalizedWorkspaceFingerprint {
   readonly name: string
   readonly codeRoot: string
   readonly allowedPaths: readonly string[]
-  readonly excludePaths: readonly string[]
+  readonly globalExcludePaths: readonly string[]
+  readonly workspaceExcludePaths: readonly string[]
+  readonly testPaths: {
+    readonly project: readonly string[]
+    readonly workspace: readonly string[]
+  }
+  readonly ignorePaths: {
+    readonly project: readonly string[]
+    readonly workspace: readonly string[]
+  }
   readonly respectGitignore: boolean
   readonly maxFileBytes: number
   readonly largeFilePaths: {
@@ -74,7 +89,16 @@ function normalizeWorkspaceFingerprintInput(
       name: ws.name,
       codeRoot: normalizeRelativePath(projectRoot, ws.codeRoot),
       allowedPaths: wsGraph?.allowedPaths ? [...wsGraph.allowedPaths] : [],
-      excludePaths: wsGraph?.excludePaths ? [...wsGraph.excludePaths] : [],
+      globalExcludePaths: wsGraph ? [...wsGraph.globalExcludePaths] : [],
+      workspaceExcludePaths: wsGraph ? [...wsGraph.workspaceExcludePaths] : [],
+      testPaths: {
+        project: wsGraph ? [...wsGraph.projectTestPaths] : [],
+        workspace: wsGraph ? [...wsGraph.workspaceTestPaths] : [],
+      },
+      ignorePaths: {
+        project: wsGraph ? [...wsGraph.projectIgnorePaths] : [],
+        workspace: wsGraph ? [...wsGraph.workspaceIgnorePaths] : [],
+      },
       respectGitignore: wsGraph?.respectGitignore ?? true,
       maxFileBytes: wsGraph?.maxFileBytes ?? effectiveGraphConfig.rootMaxFileBytes,
       largeFilePaths: {
@@ -115,6 +139,7 @@ export function computeGraphFingerprint(input: GraphFingerprintInput): string {
     v: input.codeGraphVersion,
     w: normalized,
     g: {
+      pathSemantics: PATH_SEMANTICS_MARKER,
       includePaths: effectiveGraphConfig.includePaths,
       globalExcludePaths: effectiveGraphConfig.globalExcludePaths,
       syntheticSpecExcludePaths: effectiveGraphConfig.syntheticSpecExcludePaths,
@@ -153,7 +178,16 @@ export function computeWorkspaceFingerprint(
     name: workspace.name,
     codeRoot: normalizeRelativePath(projectRoot, workspace.codeRoot),
     allowedPaths: wsGraph?.allowedPaths ? [...wsGraph.allowedPaths] : [],
-    excludePaths: wsGraph?.excludePaths ? [...wsGraph.excludePaths] : [],
+    globalExcludePaths: wsGraph ? [...wsGraph.globalExcludePaths] : [],
+    workspaceExcludePaths: wsGraph ? [...wsGraph.workspaceExcludePaths] : [],
+    testPaths: {
+      project: wsGraph ? [...wsGraph.projectTestPaths] : [],
+      workspace: wsGraph ? [...wsGraph.workspaceTestPaths] : [],
+    },
+    ignorePaths: {
+      project: wsGraph ? [...wsGraph.projectIgnorePaths] : [],
+      workspace: wsGraph ? [...wsGraph.workspaceIgnorePaths] : [],
+    },
     respectGitignore: wsGraph?.respectGitignore ?? true,
     maxFileBytes: wsGraph?.maxFileBytes ?? effectiveGraphConfig.rootMaxFileBytes,
     largeFilePaths: {
@@ -168,7 +202,11 @@ export function computeWorkspaceFingerprint(
       source,
     ),
   }
-  const payload = JSON.stringify({ v: codeGraphVersion, w: [normalized] })
+  const payload = JSON.stringify({
+    v: codeGraphVersion,
+    g: { pathSemantics: PATH_SEMANTICS_MARKER },
+    w: [normalized],
+  })
   return createHash('sha256').update(payload).digest('hex')
 }
 
@@ -195,6 +233,7 @@ export function computeRootFingerprint(
   const effectiveGraphConfig = resolveEffectiveGraphConfig(projectRoot, workspaces, graphConfig)
   const payload = JSON.stringify({
     v: codeGraphVersion,
+    g: { pathSemantics: PATH_SEMANTICS_MARKER },
     root: {
       includePaths: effectiveGraphConfig.includePaths,
       excludePaths: effectiveGraphConfig.rootExcludePaths,

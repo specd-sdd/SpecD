@@ -80,6 +80,7 @@ import { registerSchemaValidate } from './commands/schema/validate.js'
 // graph
 import { registerGraphIndex } from './commands/graph/index-graph.js'
 import { registerGraphStats } from './commands/graph/stats.js'
+import { registerGraphWhy } from './commands/graph/why.js'
 import { registerGraphImpact } from './commands/graph/impact.js'
 import { registerGraphSearch } from './commands/graph/search.js'
 import { registerGraphHotspots } from './commands/graph/hotspots.js'
@@ -248,6 +249,7 @@ export function createProgram(): Command {
   const graphCmd = program.command('graph').description('Code graph intelligence')
   registerGraphIndex(graphCmd)
   registerGraphStats(graphCmd)
+  registerGraphWhy(graphCmd)
   registerGraphImpact(graphCmd)
   registerGraphSearch(graphCmd)
   registerGraphHotspots(graphCmd)

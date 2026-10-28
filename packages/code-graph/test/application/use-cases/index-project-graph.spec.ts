@@ -13,6 +13,8 @@ const INDEX_RESULT: IndexResult = {
   filesSkippedForSize: 0,
   largestSkippedForSize: [],
   sizeExemptAnalysed: [],
+  workspaceOverlaps: [],
+  workspaceOverlapCount: 0,
   specsDiscovered: 0,
   specsIndexed: 0,
   errors: [],

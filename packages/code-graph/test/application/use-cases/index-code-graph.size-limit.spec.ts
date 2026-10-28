@@ -463,9 +463,9 @@ describe('IndexCodeGraph - file size limits', () => {
         'src/other.ts': 'export const o = 1;'.padEnd(300 * 1024, ' '),
       })
 
-      // When the workspace declares its own exemption relative to its code root
+      // When the workspace declares its own exemption relative to the project root
       const result = await run(wsDir, {
-        workspaces: new Map([['ws', { largeFilePaths: ['gen/**'] }]]),
+        workspaces: new Map([['ws', { largeFilePaths: ['ws/gen/**'] }]]),
       })
 
       // Then only the matching file is analysed
@@ -485,7 +485,7 @@ describe('IndexCodeGraph - file size limits', () => {
       // When the project and the workspace each declare an exemption
       const result = await run(wsDir, {
         largeFilePaths: ['ws/src/by-project.ts'],
-        workspaces: new Map([['ws', { largeFilePaths: ['gen/**'] }]]),
+        workspaces: new Map([['ws', { largeFilePaths: ['ws/gen/**'] }]]),
       })
 
       // Then both matched files are analysed and the other one is skipped

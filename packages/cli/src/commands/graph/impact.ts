@@ -4,13 +4,12 @@ import {
   createCodeGraphProvider,
   type FileCategory,
   runGraphImpact,
-  createSdkContext,
   type SdkHostContext,
 } from '@specd/sdk'
 import { cliError } from '../../handle-error.js'
 import { output, parseFormat } from '../../formatter.js'
-import { buildCliKernelOptions } from '../../helpers/cli-context.js'
 import { resolveGraphCliContext } from './resolve-graph-cli-context.js'
+import { createGraphHostContext } from './host-context.js'
 import { withProvider } from './with-provider.js'
 import { warnGraphStale } from './warn-graph-staleness.js'
 import { formatOmissionNotice } from './format-omission-notice.js'
@@ -449,10 +448,7 @@ JSON/TOON output schema:
             1,
           ),
         )
-        const hostContext: SdkHostContext =
-          kernel !== null
-            ? { kernel, createGraphProvider: () => createCodeGraphProvider(config) }
-            : await createSdkContext(config, { kernel: buildCliKernelOptions() })
+        const hostContext: SdkHostContext = await createGraphHostContext(config, kernel)
 
         await withProvider(
           config,

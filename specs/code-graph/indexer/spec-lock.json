@@ -17,84 +17,44 @@
   ],
   "implementation": [
     {
-      "file": "code-graph:src/domain/value-objects/parser-resource-scope.ts",
-      "symbols": [
-        "ParserResourceDisposer",
-        "ParserResourceDisposalFailure",
-        "ParserResourceCloseResult",
-        "ParserResourceScope"
-      ]
-    },
-    {
-      "file": "code-graph:src/domain/value-objects/index-event.ts",
-      "symbols": [
-        "FileActivityEvent",
-        "FileSkippedEvent",
-        "ResourceDisposalFailedEvent",
-        "IndexEvent",
-        "IndexEventReceiver",
-        "SizeSkippedFile",
-        "SizeExemptFile"
-      ]
-    },
-    {
-      "file": "code-graph:src/domain/value-objects/index-session.ts",
-      "symbols": ["IndexSession"]
-    },
-    {
-      "file": "code-graph:src/domain/value-objects/index-options.ts",
-      "symbols": ["ProjectGraphConfig", "IndexOptions"]
-    },
-    {
-      "file": "code-graph:src/domain/value-objects/index-result.ts",
-      "symbols": ["SIZE_SKIP_LIST_LIMIT", "IndexResult"]
-    },
-    {
-      "file": "code-graph:src/domain/value-objects/index.ts"
-    },
-    {
-      "file": "code-graph:src/domain/index.ts"
-    },
-    {
-      "file": "code-graph:src/application/use-cases/in-memory-parser-resource-scope.ts",
-      "symbols": ["InMemoryParserResourceScope"]
-    },
-    {
-      "file": "code-graph:src/application/use-cases/in-memory-index-session.ts",
-      "symbols": ["InMemoryIndexSession"]
-    },
-    {
-      "file": "code-graph:src/application/services/request-garbage-collection.ts",
-      "symbols": ["requestGarbageCollection"]
-    },
-    {
-      "file": "code-graph:src/application/services/close-parser-resource-epoch.ts",
-      "symbols": ["closeParserResourceEpoch"]
-    },
-    {
-      "file": "code-graph:src/application/use-cases/_shared/resolve-effective-graph-config.ts",
-      "symbols": [
-        "DEFAULT_MAX_FILE_BYTES",
-        "EffectiveWorkspaceGraphConfig",
-        "EffectiveGraphConfig",
-        "resolveEffectiveGraphConfig"
-      ]
-    },
-    {
-      "file": "code-graph:src/application/services/build-project-graph-config.ts",
-      "symbols": ["buildProjectGraphConfig"]
+      "file": "code-graph:src/application/use-cases/discover-files.ts",
+      "symbols": ["createDiscoveryEvaluator", "discoverFiles", "DiscoverFilesOptions"]
     },
     {
       "file": "code-graph:src/application/services/file-size-gate.ts",
       "symbols": ["createFileSizeGate"]
     },
     {
-      "file": "code-graph:src/application/services/graph-input-visibility.ts",
-      "symbols": ["buildGraphInputVisibilitySnapshot"]
+      "file": "code-graph:src/domain/services/classify-file-category.ts",
+      "symbols": ["explainFileCategory", "classifyFileCategory"]
     },
     {
       "file": "code-graph:src/application/use-cases/index-code-graph.ts",
       "symbols": ["IndexCodeGraph"]
+    },
+    {
+      "file": "code-graph:src/domain/value-objects/index-result.ts",
+      "symbols": ["IndexResult", "WorkspaceOverlap", "WORKSPACE_OVERLAP_LIST_LIMIT"]
+    },
+    {
+      "file": "code-graph:src/application/use-cases/_shared/compute-graph-fingerprint.ts",
+      "symbols": ["PATH_SEMANTICS_MARKER", "computeGraphFingerprint", "computeWorkspaceFingerprint"]
+    },
+    {
+      "file": "code-graph:src/application/use-cases/get-graph-health.ts",
+      "symbols": ["GetGraphHealth"]
+    },
+    {
+      "file": "code-graph:src/application/services/graph-input-visibility.ts",
+      "symbols": ["buildGraphInputVisibilitySnapshot"]
+    },
+    {
+      "file": "code-graph:src/application/services/decode-textual-content.ts",
+      "symbols": ["decodeTextualContent"]
+    },
+    {
+      "file": "code-graph:src/domain/value-objects/index-options.ts",
+      "symbols": ["ProjectGraphConfig"]
     }
   ],
   "optimizations": {

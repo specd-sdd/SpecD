@@ -1,0 +1,1403 @@
+{
+  "name": "project-relative-graph-paths",
+  "createdAt": "2026-10-26T18:35:21.115Z",
+  "updatedAt": "2026-10-28T08:50:03.642Z",
+  "description": "Interprets every path and pattern in specd.yaml relative to the project root across all graph keys and levels, so a pattern always refers to the same file wherever it is evaluated. Workspace-local excludes can no longer override global ones. Adds a graph why command (cli -> sdk -> code-graph ExplainGraphPath) that reports which rule excludes or classifies a path, using the same evaluation functions as the indexer.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "core:config",
+    "code-graph:indexer",
+    "code-graph:workspace-integration",
+    "cli:graph-index",
+    "code-graph:explain-graph-path",
+    "sdk:run-graph-why",
+    "cli:graph-why"
+  ],
+  "specDependsOn": {
+    "core:config": ["core:vcs-adapter-port", "default:_global/architecture"],
+    "code-graph:indexer": [
+      "code-graph:graph-store",
+      "code-graph:language-adapter",
+      "code-graph:symbol-model",
+      "code-graph:workspace-integration",
+      "core:config",
+      "core:spec-repository-port",
+      "core:list-workspaces",
+      "code-graph:document-model",
+      "core:get-spec-metadata",
+      "code-graph:sqlite-graph-store"
+    ],
+    "code-graph:workspace-integration": ["core:config"],
+    "cli:graph-index": [
+      "cli:entrypoint",
+      "core:config",
+      "core:list-workspaces",
+      "sdk:run-index-project-graph",
+      "sdk:host-context",
+      "code-graph:isolated-index-worker",
+      "core:config-loader"
+    ],
+    "code-graph:explain-graph-path": [
+      "core:config",
+      "code-graph:indexer",
+      "code-graph:workspace-integration"
+    ],
+    "sdk:run-graph-why": [
+      "code-graph:explain-graph-path",
+      "sdk:host-context",
+      "sdk:with-open-graph-provider"
+    ],
+    "cli:graph-why": ["sdk:run-graph-why", "cli:entrypoint", "core:config"]
+  },
+  "invalidationPolicy": "downstream",
+  "implementationTrackingStartedAt": "2026-10-27T17:21:06.186Z",
+  "trackedImplementationFiles": [
+    {
+      "file": "EXPLORATION_CODE_GRAPH_FLOWS.md",
+      "state": "ignored"
+    },
+    {
+      "file": "EXPLORATION_GRAPH_CLI_OUTPUT_OPTIMIZATION.md",
+      "state": "ignored"
+    },
+    {
+      "file": "EXPLORATION_KERNEL_PLUGINS.md",
+      "state": "ignored"
+    },
+    {
+      "file": "SpecD — Análisis de identidad LogicalSymbol dependencias y casos de uso.md",
+      "state": "ignored"
+    },
+    {
+      "file": "dev/scripts/graph-file-doc.js",
+      "state": "ignored"
+    },
+    {
+      "file": "dev/scripts/spec-metadata-diff-poc/index.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "dev/scripts/spec-metadata-diff-poc/vcs-spec-repository.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "dev/scripts/spec-metadata-diff-poc/working-copy-spec-repository.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "dev/scripts/symbol-inspect-poc.mjs",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/domain/services/project-path-rules.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/use-cases/_shared/resolve-effective-graph-config.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/use-cases/discover-files.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/services/file-size-gate.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/services/classify-file-category.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/use-cases/index-code-graph.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/index-result.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/use-cases/_shared/compute-graph-fingerprint.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/use-cases/get-graph-health.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/services/graph-input-visibility.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/use-cases/explain-graph-path.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/composition/use-cases/explain-graph-path.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/errors/unknown-workspace-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/errors/invalid-graph-why-path-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/errors/graph-why-requires-config-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/ports/code-graph-host-port.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/composition/code-graph-provider.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/composition/create-code-graph-provider.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/orchestration/run-graph-why.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/orchestration/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/why.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/program.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/index-graph.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/cli/cli-reference.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/cli/graph.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/cli/index.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/code-graph/use-cases.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/core/ports.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/guide/code-graph.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/guide/configuration-examples.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/guide/configuration.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/guide/workspaces.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/sdk/index.md",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/graph-index.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/graph-stats.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/graph-why.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/guide-sdk/guide-sdk.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/errors/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/services/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/public.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/services/file-size-gate.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/compute-graph-fingerprint.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/discover-files.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/explain-graph-path.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/index-code-graph.package-imports.languages.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/index-code-graph.package-imports.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/index-code-graph.project-relative.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/index-code-graph.size-limit.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/index-project-graph.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/package-resolution.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/resolve-effective-graph-config.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/barrel.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/composition/code-graph-provider.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/domain/services/classify-file-category.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/domain/services/project-path-rules.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/generated/guides-sdk.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/generated/guides.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/test/integration/sdk-catalog.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/test/orchestration/run-graph-impact.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/test/orchestration/run-graph-why.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/specd-config.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/index-options.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/get-graph-health.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/workspace-indexing.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/services/decode-textual-content.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/host-context.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/hotspots.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/impact.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/search.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/with-provider.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/graph-why-errors.spec.ts",
+      "state": "resolved"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "code-graph:workspace-integration",
+      "file": "packages/code-graph/src/application/use-cases/_shared/resolve-effective-graph-config.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["resolveEffectiveGraphConfig", "EffectiveWorkspaceGraphConfig"]
+    },
+    {
+      "specId": "code-graph:indexer",
+      "file": "packages/code-graph/src/application/use-cases/discover-files.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createDiscoveryEvaluator", "discoverFiles", "DiscoverFilesOptions"]
+    },
+    {
+      "specId": "code-graph:workspace-integration",
+      "file": "packages/code-graph/src/application/use-cases/discover-files.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["discoverFiles"]
+    },
+    {
+      "specId": "code-graph:indexer",
+      "file": "packages/code-graph/src/application/services/file-size-gate.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createFileSizeGate"]
+    },
+    {
+      "specId": "code-graph:indexer",
+      "file": "packages/code-graph/src/domain/services/classify-file-category.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["explainFileCategory", "classifyFileCategory"]
+    },
+    {
+      "specId": "code-graph:indexer",
+      "file": "packages/code-graph/src/application/use-cases/index-code-graph.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["IndexCodeGraph"]
+    },
+    {
+      "specId": "code-graph:workspace-integration",
+      "file": "packages/code-graph/src/application/use-cases/index-code-graph.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["IndexCodeGraph"]
+    },
+    {
+      "specId": "code-graph:indexer",
+      "file": "packages/code-graph/src/domain/value-objects/index-result.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["IndexResult", "WorkspaceOverlap", "WORKSPACE_OVERLAP_LIST_LIMIT"]
+    },
+    {
+      "specId": "code-graph:indexer",
+      "file": "packages/code-graph/src/application/use-cases/_shared/compute-graph-fingerprint.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["PATH_SEMANTICS_MARKER", "computeGraphFingerprint", "computeWorkspaceFingerprint"]
+    },
+    {
+      "specId": "code-graph:indexer",
+      "file": "packages/code-graph/src/application/use-cases/get-graph-health.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["GetGraphHealth"]
+    },
+    {
+      "specId": "code-graph:indexer",
+      "file": "packages/code-graph/src/application/services/graph-input-visibility.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["buildGraphInputVisibilitySnapshot"]
+    },
+    {
+      "specId": "code-graph:explain-graph-path",
+      "file": "packages/code-graph/src/application/use-cases/explain-graph-path.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["ExplainGraphPath", "ExplainGraphPathResult", "ExplainGraphPathInput"]
+    },
+    {
+      "specId": "code-graph:explain-graph-path",
+      "file": "packages/code-graph/src/composition/use-cases/explain-graph-path.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createExplainGraphPath"]
+    },
+    {
+      "specId": "code-graph:explain-graph-path",
+      "file": "packages/code-graph/src/domain/errors/unknown-workspace-error.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["UnknownWorkspaceError"]
+    },
+    {
+      "specId": "code-graph:explain-graph-path",
+      "file": "packages/code-graph/src/domain/errors/invalid-graph-why-path-error.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["InvalidGraphWhyPathError"]
+    },
+    {
+      "specId": "code-graph:explain-graph-path",
+      "file": "packages/code-graph/src/domain/errors/graph-why-requires-config-error.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["GraphWhyRequiresConfigError"]
+    },
+    {
+      "specId": "code-graph:explain-graph-path",
+      "file": "packages/code-graph/src/application/ports/code-graph-host-port.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["CodeGraphHostPort"]
+    },
+    {
+      "specId": "code-graph:explain-graph-path",
+      "file": "packages/code-graph/src/composition/code-graph-provider.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["CodeGraphProvider", "CodeGraphProviderImpl"]
+    },
+    {
+      "specId": "code-graph:explain-graph-path",
+      "file": "packages/code-graph/src/composition/create-code-graph-provider.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createCodeGraphProvider"]
+    },
+    {
+      "specId": "sdk:run-graph-why",
+      "file": "packages/sdk/src/orchestration/run-graph-why.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["runGraphWhy", "RunGraphWhyInput", "RunGraphWhyResult"]
+    },
+    {
+      "specId": "sdk:run-graph-why",
+      "file": "packages/sdk/src/orchestration/index.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "sdk:run-graph-why",
+      "file": "packages/sdk/src/index.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:graph-why",
+      "file": "packages/cli/src/commands/graph/why.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["registerGraphWhy", "renderGraphWhyText"]
+    },
+    {
+      "specId": "cli:graph-why",
+      "file": "packages/cli/src/program.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:graph-index",
+      "file": "packages/cli/src/commands/graph/index-graph.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:config",
+      "file": "packages/core/src/application/specd-config.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["SpecdWorkspaceGraphConfig"]
+    },
+    {
+      "specId": "code-graph:explain-graph-path",
+      "file": "packages/code-graph/src/application/services/decode-textual-content.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["decodeTextualContent"]
+    },
+    {
+      "specId": "code-graph:indexer",
+      "file": "packages/code-graph/src/application/services/decode-textual-content.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["decodeTextualContent"]
+    },
+    {
+      "specId": "cli:graph-why",
+      "file": "packages/cli/src/commands/graph/host-context.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createGraphHostContext"]
+    },
+    {
+      "specId": "code-graph:workspace-integration",
+      "file": "packages/code-graph/src/domain/services/project-path-rules.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "isOutsideProject",
+        "computePathBase",
+        "isRootAnchoredPattern",
+        "buildPathSubject",
+        "createPathRuleSet"
+      ]
+    },
+    {
+      "specId": "code-graph:indexer",
+      "file": "packages/code-graph/src/domain/value-objects/index-options.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["ProjectGraphConfig"]
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:bc3d3705577d16852542a851a052bebc889b17c605e0c081f2e571c1cbd4795b"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:config",
+          "filename": "deltas/core/config/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:7011d6cc6c1f5a919b79c0844acc2c0a866748fb3b07449144ac095488b6a833"
+        },
+        {
+          "key": "code-graph:indexer",
+          "filename": "deltas/code-graph/indexer/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:0c171f4b506971da4d3f11b22b38246dd254a7c02a90c14566a3b1f1f5ad7279"
+        },
+        {
+          "key": "code-graph:workspace-integration",
+          "filename": "deltas/code-graph/workspace-integration/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:e66685695a030e770427dc73133ea7862b3950345921c5859f7ba03a5c3366ec"
+        },
+        {
+          "key": "cli:graph-index",
+          "filename": "deltas/cli/graph-index/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c83aba2fe6b3d4e8d921c57175f66adfe7bed6f607b0c33861a3d27fea0956a7"
+        },
+        {
+          "key": "code-graph:explain-graph-path",
+          "filename": "specs/code-graph/explain-graph-path/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:6e9da045b6d67e64ad0b2920346f7af196c1ae4bc26179f3f8f389091b8836e1"
+        },
+        {
+          "key": "sdk:run-graph-why",
+          "filename": "specs/sdk/run-graph-why/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:ed664a8ef1d34e726e8ca050b37aac07c7e9f24cce3d11f2f4757e56c7f03e63"
+        },
+        {
+          "key": "cli:graph-why",
+          "filename": "specs/cli/graph-why/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:f813147c5c3ded5209078daa0c7a43b40cbb5c6335b7f88d2e8e17a6034321f3"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:config",
+          "filename": "deltas/core/config/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c280317e031843a4167862f0c59c06c804bf9bdc843747d8646cd8c5c17a15de"
+        },
+        {
+          "key": "code-graph:indexer",
+          "filename": "deltas/code-graph/indexer/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:7b817aa5a724ffe82f1c5138eff52ec21aa47b1e62216f95d4f1f79942ef0e4d"
+        },
+        {
+          "key": "code-graph:workspace-integration",
+          "filename": "deltas/code-graph/workspace-integration/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:4fd00d666ad0be199ad94e05e5494b1644ec51aef53984b1d821917613681b87"
+        },
+        {
+          "key": "cli:graph-index",
+          "filename": "deltas/cli/graph-index/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:0e75e86d1e9b44cf27859abb386bf782462f99698152f439489ead3645d565f1"
+        },
+        {
+          "key": "code-graph:explain-graph-path",
+          "filename": "specs/code-graph/explain-graph-path/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:75d6e1e08a2fea6230a26ceffa41766d193dd55eff7eb393864599761ca5dc80"
+        },
+        {
+          "key": "sdk:run-graph-why",
+          "filename": "specs/sdk/run-graph-why/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:4ba33d0c03408c4f016a109636aea8435d644263ce4c9d448f6bcc7402480956"
+        },
+        {
+          "key": "cli:graph-why",
+          "filename": "specs/cli/graph-why/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:aa0a7f313e4e24c3e9726d8cc272cac8308a8cf029e415f7738b993b5d3b2c01"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:e1bef11c764491009ca7265c6afc66d5a361a27e05d138b8a2f5d433c519c8b0"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "verify", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:6dc7e7cf9a57651d44c392d819a99c2d5a0c360feed0bc209f9bad0cd5370f9e"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-10-26T18:35:21.115Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": [
+        "core:config",
+        "code-graph:indexer",
+        "code-graph:workspace-integration",
+        "cli:graph-index",
+        "code-graph:explain-graph-path",
+        "sdk:run-graph-why",
+        "cli:graph-why"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-26T18:35:21.134Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "core:config"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:indexer"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:workspace-integration"
+        },
+        {
+          "type": "specs",
+          "key": "cli:graph-index"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:explain-graph-path"
+        },
+        {
+          "type": "specs",
+          "key": "sdk:run-graph-why"
+        },
+        {
+          "type": "specs",
+          "key": "cli:graph-why"
+        },
+        {
+          "type": "verify",
+          "key": "core:config"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:indexer"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:workspace-integration"
+        },
+        {
+          "type": "verify",
+          "key": "cli:graph-index"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:explain-graph-path"
+        },
+        {
+          "type": "verify",
+          "key": "sdk:run-graph-why"
+        },
+        {
+          "type": "verify",
+          "key": "cli:graph-why"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-27T11:13:34.697Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'bound-indexer-ast-resource-lifecycle' was archived with overlapping specs: cli:graph-index, code-graph:indexer, core:config",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:config", "code-graph:indexer", "cli:graph-index"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:config", "code-graph:indexer", "cli:graph-index"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-27T11:13:34.697Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-27T13:24:46.722Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:config",
+            "code-graph:indexer",
+            "code-graph:workspace-integration",
+            "cli:graph-index",
+            "code-graph:explain-graph-path",
+            "sdk:run-graph-why",
+            "cli:graph-why"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:config",
+            "code-graph:indexer",
+            "code-graph:workspace-integration",
+            "cli:graph-index",
+            "code-graph:explain-graph-path",
+            "sdk:run-graph-why",
+            "cli:graph-why"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-27T13:36:20.574Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:graph-index, cli:graph-why, code-graph:explain-graph-path, code-graph:indexer, code-graph:workspace-integration]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:graph-index",
+            "cli:graph-why",
+            "code-graph:explain-graph-path",
+            "code-graph:indexer",
+            "code-graph:workspace-integration"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:config",
+            "code-graph:indexer",
+            "code-graph:workspace-integration",
+            "cli:graph-index",
+            "code-graph:explain-graph-path",
+            "sdk:run-graph-why",
+            "cli:graph-why"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-27T15:33:06.841Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [code-graph:explain-graph-path]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:explain-graph-path"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:config",
+            "code-graph:indexer",
+            "code-graph:workspace-integration",
+            "cli:graph-index",
+            "code-graph:explain-graph-path",
+            "sdk:run-graph-why",
+            "cli:graph-why"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-27T15:44:43.621Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [code-graph:explain-graph-path]; verify [code-graph:explain-graph-path]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:explain-graph-path"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:explain-graph-path"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-27T17:20:09.288Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-27T17:21:06.186Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-27T18:31:34.625Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-27T18:48:31.338Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:config",
+            "code-graph:indexer",
+            "code-graph:workspace-integration",
+            "cli:graph-index",
+            "code-graph:explain-graph-path",
+            "sdk:run-graph-why",
+            "cli:graph-why"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:config",
+            "code-graph:indexer",
+            "code-graph:workspace-integration",
+            "cli:graph-index",
+            "code-graph:explain-graph-path",
+            "sdk:run-graph-why",
+            "cli:graph-why"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-27T18:48:31.338Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-27T19:23:12.600Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-27T19:23:14.649Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-27T20:00:52.761Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-27T20:12:40.310Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:config",
+            "code-graph:indexer",
+            "code-graph:workspace-integration",
+            "cli:graph-index",
+            "code-graph:explain-graph-path",
+            "sdk:run-graph-why",
+            "cli:graph-why"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:config",
+            "code-graph:indexer",
+            "code-graph:workspace-integration",
+            "cli:graph-index",
+            "code-graph:explain-graph-path",
+            "sdk:run-graph-why",
+            "cli:graph-why"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-27T20:12:40.310Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-27T20:20:54.010Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-27T20:20:59.165Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-27T20:50:34.218Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-28T06:30:24.494Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:config",
+            "code-graph:indexer",
+            "code-graph:workspace-integration",
+            "cli:graph-index",
+            "code-graph:explain-graph-path",
+            "sdk:run-graph-why",
+            "cli:graph-why"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:config",
+            "code-graph:indexer",
+            "code-graph:workspace-integration",
+            "cli:graph-index",
+            "code-graph:explain-graph-path",
+            "sdk:run-graph-why",
+            "cli:graph-why"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-28T06:30:24.494Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-28T06:31:43.873Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-28T06:31:48.916Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-28T07:35:02.898Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-28T08:02:13.880Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-28T08:02:22.116Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-10-28T08:22:49.057Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "description": "Interprets every path and pattern in specd.yaml relative to the project root across all graph keys and levels, so a pattern always refers to the same file wherever it is evaluated. Workspace-local excludes can no longer override global ones. Adds a graph why command (cli -> sdk -> code-graph ExplainGraphPath) that reports which rule excludes or classifies a path, using the same evaluation functions as the indexer."
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-10-28T08:41:11.964Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Implementation link \"core:config\" points outside workspace \"core\" codeRoot.",
+      "commitStarted": false
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-28T08:50:03.635Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-10-28T08:50:04.016Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

@@ -14,16 +14,7 @@
   ],
   "implementation": [
     {
-      "file": "cli:src/graph-index-task.ts"
-    },
-    {
-      "file": "cli:src/commands/graph/index-graph.ts",
-      "symbols": [
-        "toLargeFilePathsEntry",
-        "yamlScalar",
-        "escapeGitignorePattern",
-        "formatTextIndexResult"
-      ]
+      "file": "cli:src/commands/graph/index-graph.ts"
     }
   ],
   "optimizations": {

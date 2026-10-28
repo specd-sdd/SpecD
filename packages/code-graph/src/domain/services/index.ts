@@ -13,4 +13,19 @@ export {
   type ScopedBindingEnvironment,
   type SymbolLookup,
 } from './scoped-binding-environment.js'
-export { classifyFileCategory } from './classify-file-category.js'
+export {
+  classifyFileCategory,
+  explainFileCategory,
+  type CategoryPatternSource,
+  type FileCategoryExplanation,
+} from './classify-file-category.js'
+export {
+  buildPathSubject,
+  computePathBase,
+  createPathRuleSet,
+  isOutsideProject,
+  isRootAnchoredPattern,
+  type PathRuleMatch,
+  type PathRuleResult,
+  type PathRuleSet,
+} from './project-path-rules.js'

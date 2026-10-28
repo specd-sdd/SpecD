@@ -18,7 +18,13 @@ function makeEffectiveConfig(overrides?: Partial<EffectiveGraphConfig>): Effecti
       [
         'app',
         {
-          excludePaths: [],
+          pathBase: '',
+          globalExcludePaths: [],
+          workspaceExcludePaths: [],
+          projectTestPaths: [],
+          workspaceTestPaths: [],
+          projectIgnorePaths: [],
+          workspaceIgnorePaths: [],
           respectGitignore: true,
           maxFileBytes: DEFAULT_MAX_FILE_BYTES,
           projectLargeFilePaths: [],
@@ -63,7 +69,13 @@ describe('createFileSizeGate', () => {
         [
           'app',
           {
-            excludePaths: [],
+            pathBase: '',
+            globalExcludePaths: [],
+            workspaceExcludePaths: [],
+            projectTestPaths: [],
+            workspaceTestPaths: [],
+            projectIgnorePaths: [],
+            workspaceIgnorePaths: [],
             respectGitignore: true,
             maxFileBytes: 0,
             projectLargeFilePaths: [],
@@ -90,7 +102,13 @@ describe('createFileSizeGate', () => {
         [
           'custom-ws',
           {
-            excludePaths: [],
+            pathBase: '',
+            globalExcludePaths: [],
+            workspaceExcludePaths: [],
+            projectTestPaths: [],
+            workspaceTestPaths: [],
+            projectIgnorePaths: [],
+            workspaceIgnorePaths: [],
             respectGitignore: true,
             maxFileBytes: 500_000,
             projectLargeFilePaths: [],
@@ -166,7 +184,11 @@ describe('createFileSizeGate', () => {
       projectRelativePath: 'packages/app/src/generated/schema.ts',
       absolutePath: '/repo/packages/app/src/generated/schema.ts',
     })
-    expect(exempt).toEqual({ kind: 'exempt', sizeBytes: 500_000 })
+    expect(exempt).toEqual({
+      kind: 'exempt',
+      sizeBytes: 500_000,
+      exemptionRule: { pattern: 'packages/app/src/generated/**', negated: false },
+    })
 
     const notExempt = gate.decide({
       workspaceName: 'app',
@@ -181,17 +203,23 @@ describe('createFileSizeGate', () => {
     })
   })
 
-  it('exempts oversized file matching workspace-level largeFilePaths evaluated relative to codeRoot', () => {
+  it('exempts oversized file matching workspace-level largeFilePaths evaluated relative to the project root', () => {
     const config = makeEffectiveConfig({
       workspaces: new Map<string, EffectiveWorkspaceGraphConfig>([
         [
           'app',
           {
-            excludePaths: [],
+            pathBase: '',
+            globalExcludePaths: [],
+            workspaceExcludePaths: [],
+            projectTestPaths: [],
+            workspaceTestPaths: [],
+            projectIgnorePaths: [],
+            workspaceIgnorePaths: [],
             respectGitignore: true,
             maxFileBytes: 262144,
             projectLargeFilePaths: [],
-            workspaceLargeFilePaths: ['vendor/bundle.js'],
+            workspaceLargeFilePaths: ['packages/app/vendor/bundle.js'],
           },
         ],
       ]),
@@ -204,7 +232,11 @@ describe('createFileSizeGate', () => {
       projectRelativePath: 'packages/app/vendor/bundle.js',
       absolutePath: '/repo/packages/app/vendor/bundle.js',
     })
-    expect(exempt).toEqual({ kind: 'exempt', sizeBytes: 800_000 })
+    expect(exempt).toEqual({
+      kind: 'exempt',
+      sizeBytes: 800_000,
+      exemptionRule: { pattern: 'packages/app/vendor/bundle.js', negated: false },
+    })
   })
 
   it('exempts via union of project and workspace exemption patterns', () => {
@@ -214,7 +246,13 @@ describe('createFileSizeGate', () => {
         [
           'app',
           {
-            excludePaths: [],
+            pathBase: '',
+            globalExcludePaths: [],
+            workspaceExcludePaths: [],
+            projectTestPaths: [],
+            workspaceTestPaths: [],
+            projectIgnorePaths: [],
+            workspaceIgnorePaths: [],
             respectGitignore: true,
             maxFileBytes: 262144,
             projectLargeFilePaths: ['packages/app/project-exempt.ts'],
@@ -265,9 +303,37 @@ describe('createFileSizeGate', () => {
     expect(unexempt.kind).toBe('skip')
   })
 
-  it('rejects ../ project paths from matching project-level exemptions', () => {
+  it('falls back to the code-root path outside the project and drops root-anchored patterns', () => {
+    const anchored = createFileSizeGate(
+      makeEffectiveConfig({ rootLargeFilePaths: ['outside/**'] }),
+      () => 500_000,
+    )
+    expect(
+      anchored.decide({
+        workspaceName: 'app',
+        relativeToCodeRoot: 'outside/file.ts',
+        projectRelativePath: '../outside/file.ts',
+        absolutePath: '/outside/file.ts',
+      }).kind,
+    ).toBe('skip')
+
+    const unanchored = createFileSizeGate(
+      makeEffectiveConfig({ rootLargeFilePaths: ['*.ts'] }),
+      () => 500_000,
+    )
+    expect(
+      unanchored.decide({
+        workspaceName: 'app',
+        relativeToCodeRoot: 'file.ts',
+        projectRelativePath: '../outside/file.ts',
+        absolutePath: '/outside/file.ts',
+      }).kind,
+    ).toBe('exempt')
+  })
+
+  it('rejects ../ project paths from matching anchored project-level exemptions', () => {
     const config = makeEffectiveConfig({
-      rootLargeFilePaths: ['**'],
+      rootLargeFilePaths: ['outside/file.ts'],
     })
     const gate = createFileSizeGate(config, () => 500_000)
 
@@ -304,7 +370,13 @@ describe('createFileSizeGate', () => {
         [
           'app',
           {
-            excludePaths: [],
+            pathBase: '',
+            globalExcludePaths: [],
+            workspaceExcludePaths: [],
+            projectTestPaths: [],
+            workspaceTestPaths: [],
+            projectIgnorePaths: [],
+            workspaceIgnorePaths: [],
             respectGitignore: true,
             maxFileBytes: 100,
             projectLargeFilePaths: [],

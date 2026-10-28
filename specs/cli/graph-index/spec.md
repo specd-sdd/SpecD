@@ -17,7 +17,7 @@ specd graph index [--force] [--exclude-path <pattern>...] [--config <path> | --p
 - If a typed recoverable storage-open failure occurs, `--force` also authorizes the
   SDK use case to recreate closed storage and retry once; it does not authorize
   deletion for ordinary open failures.
-- `--exclude-path <pattern>` is optional and repeatable.
+- `--exclude-path <pattern>` is optional and repeatable. Each pattern is gitignore-syntax and relative to the project root, like every path in `specd.yaml`; it is added to the global exclusion layer and cannot be negated by workspace `excludePaths`.
 - `--config <path>` and `--path <path>` remain mutually exclusive.
 - `--format text|json|toon` defaults to text.
 
@@ -111,6 +111,12 @@ When the result reports `sizeExemptAnalysed` entries, `text` mode SHALL list the
 
 The section MUST NOT appear when no file was skipped for size and no exempt file exceeded the limit, so the output of runs without those conditions is unchanged. In `json` and `toon` mode the data is output as part of the `IndexResult` and no hint text is added. The command MUST NOT modify `specd.yaml`.
 
+### Requirement: Workspace overlap warning
+
+When the result reports workspace overlaps (`workspaceOverlapCount` greater than zero, with the bounded list `workspaceOverlaps`), `text` mode SHALL print a warning section stating how many physical files are owned by more than one workspace, listing at most ten (project-relative path and owning workspaces) followed by a line with the remaining count, and hinting that the `excludePaths` or `allowedPaths` of the workspaces probably do not partition the files and that `specd graph why <path>` explains each case.
+
+The section MUST NOT appear when there are no overlaps, and the exit status is unchanged. In `json` and `toon` mode `workspaceOverlaps` and `workspaceOverlapCount` are output as part of the `IndexResult` with no hint text.
+
 ### Requirement: Worker diagnostics presentation
 
 In `text` mode the CLI SHALL render the typed events it receives from the SDK without altering the structured modes. When a `worker-silent` event arrives, the CLI SHALL print a warning to standard error that names the last announced file and the silent duration, and SHALL suggest `graph.excludePaths` (or a lower `graph.maxFileBytes`) for that file. The most recent `file-activity` event MAY be used to enrich the progress detail.
@@ -141,23 +147,24 @@ Per-file indexing errors (parse failures, unsupported syntax) do not cause a non
 
 ### Requirement: CLI reference documentation
 
-The `specd graph` command group SHALL be fully documented in `docs/cli/cli-reference.md` under a `## graph` section. The reference MUST cover all five subcommands: `index`, `search`, `hotspots`, `stats`, and `impact`.
+The `specd graph` command group SHALL be fully documented in `docs/cli/cli-reference.md` under a `## graph` section. The reference MUST cover all six subcommands: `index`, `search`, `hotspots`, `stats`, `impact`, and `why`.
 
 For `graph index`, the documentation MUST include:
 
 - Full command signature with all flags
-- Description of `--exclude-path` flag: repeatable, gitignore-syntax, merges on top of config's `graph.excludePaths`
+- Description of `--exclude-path` flag: repeatable, gitignore-syntax, project-relative, merges into the global exclusion layer on top of config's `graph.excludePaths`
 - Description of `--config` and `--path` behavior, including that they are mutually exclusive
 - Description of bootstrap mode and no-config fallback as setup/bootstrap mechanisms rather than the normal configured mode
 - Description of `graph.excludePaths` and `graph.respectGitignore` workspace config fields and their effect on indexing
+- Description of the project-relative interpretation of every graph path and pattern at project and workspace level, of the non-overridable global exclusion layer, and a pointer to `graph why` for diagnosing a path
 - Description of `graph.maxFileBytes` and `graph.largeFilePaths` (project and workspace scope, the 256 KiB default, `0` disabling the limit, how workspace values combine with the project ones) and of the size-skip summary and hint
 - Description of the failure causes and diagnostics printed by `graph index`
 - The built-in default exclusion list (applied when `graph.excludePaths` is not configured)
 - Replace semantics: specifying `graph.excludePaths` replaces built-in defaults
-- Example showing how to re-include a subdirectory of an otherwise-excluded dir using negation
+- Example showing how to re-include a subdirectory of an otherwise-excluded dir using negation, with project-relative patterns
 - Example showing how to index a specific large file by listing it in `graph.largeFilePaths`
 
-For each other subcommand (`search`, `hotspots`, `stats`, `impact`), the documentation MUST include: command signature, flag descriptions, at least one usage example, and the graph CLI context model (`--config`, `--path`, bootstrap-only fallback semantics) when the command supports those flags.
+For each other subcommand (`search`, `hotspots`, `stats`, `impact`, `why`), the documentation MUST include: command signature, flag descriptions, at least one usage example, and the graph CLI context model (`--config`, `--path`, bootstrap-only fallback semantics) when the command supports those flags.
 
 ### Requirement: Visible incompatibility repair
 

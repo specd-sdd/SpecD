@@ -48,8 +48,12 @@ export function buildGraphInputVisibilitySnapshot(
     for (const relativePath of discoverFiles(workspace.codeRoot, undefined, {
       respectGitignore: workspaceGraph?.respectGitignore ?? true,
       vcsRoot,
-      ...(workspaceGraph?.excludePaths !== undefined
-        ? { excludePaths: workspaceGraph.excludePaths }
+      ...(workspaceGraph !== undefined
+        ? {
+            excludePaths: workspaceGraph.globalExcludePaths,
+            workspaceExcludePaths: workspaceGraph.workspaceExcludePaths,
+            pathBase: workspaceGraph.pathBase,
+          }
         : {}),
       ...(workspaceGraph?.allowedPaths !== undefined
         ? { allowedPaths: workspaceGraph.allowedPaths }

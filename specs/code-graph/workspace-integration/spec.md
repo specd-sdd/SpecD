@@ -47,7 +47,7 @@ Spec IDs use the format `{workspace}:{specPath}` (e.g. `core:change`, `default:_
 
 For each workspace with a `codeRoot`, the indexer SHALL discover files starting from the workspace's `codeRoot` (an absolute path). The `codeRoot` is provided by `SpecdWorkspaceConfig.codeRoot` from the specd configuration.
 
-Files are discovered per workspace and their paths are prefixed with the workspace name before being stored in the graph. The `discoverFiles` function itself has no workspace knowledge — it accepts a root directory and returns paths relative to that root.
+Files are discovered per workspace and their paths are prefixed with the workspace name before being stored in the graph. The `discoverFiles` function itself has no workspace knowledge — it accepts a root directory, returns paths relative to that root, and receives the project-relative directory of that root (`pathBase`) so that configured patterns, which are project-relative, are matched against `pathBase` joined with the path below the root. The indexer derives `pathBase` as the path from the project root to the workspace `codeRoot`.
 
 ### Requirement: Project-relative file lookup
 
@@ -61,6 +61,14 @@ For a configured project:
 4. CLI commands and tool hosts that accept file selectors MAY use this field to resolve inputs that do not include a `{workspace}:` prefix.
 
 This lookup is in addition to canonical workspace-prefixed graph identity; it does not replace it.
+
+### Requirement: Workspace ownership is decided by discovery rules
+
+Workspace-level `graph` filters (`allowedPaths`, `excludePaths`, `testPaths`, `ignorePaths`, `largeFilePaths`, `maxFileBytes`) apply to the files a workspace owns. They are matched against the file's `projectRelativePath` (see `core:config` Requirement: Project-relative graph path semantics), not against the path below `codeRoot`.
+
+A workspace is a **candidate** for a physical path when its `codeRoot` contains the path. A candidate is an **owner** of the path when the path passes that workspace's discovery (`.gitignore`, global and workspace exclusions, `allowedPaths`). Candidates are not ranked by `codeRoot` depth or by configuration order: workspaces may legitimately share or nest `codeRoot` values when their `excludePaths` and `allowedPaths` partition the files between them.
+
+A physical path with more than one owner is persisted under one identity per owner and is a probable misconfiguration of `specd.yaml`. It SHALL be reported as a workspace-overlap warning by the indexer (Requirement: Workspace overlap diagnostic in `code-graph:indexer`) and SHALL NOT make indexing fail.
 
 ### Requirement: Spec resolution via SpecRepository
 
@@ -102,17 +110,25 @@ A package-specifier import never resolves through a file classified as a test: t
 
 ### Requirement: WorkspaceIndexTarget
 
-`IndexOptions` SHALL accept the orchestrated project structure and graph-specific configuration:
+`IndexOptions` SHALL accept the orchestrated project structure and graph-specific configuration. Every path and pattern in `ProjectGraphConfig` is relative to the project root:
 
 ```ts
 interface ProjectGraphConfig {
   readonly includePaths?: readonly string[]
   readonly excludePaths?: readonly string[]
+  readonly testPaths?: readonly string[]
+  readonly ignorePaths?: readonly string[]
+  readonly maxFileBytes?: number
+  readonly largeFilePaths?: readonly string[]
   readonly workspaces?: ReadonlyMap<
     string,
     {
       readonly allowedPaths?: readonly string[]
       readonly excludePaths?: readonly string[]
+      readonly testPaths?: readonly string[]
+      readonly ignorePaths?: readonly string[]
+      readonly maxFileBytes?: number
+      readonly largeFilePaths?: readonly string[]
       readonly respectGitignore?: boolean
     }
   >
@@ -161,10 +177,11 @@ When discovering files from a `codeRoot`, `.gitignore` handling is controlled by
 When `respectGitignore` is `true`:
 
 1. Use the provided `vcsRoot` in options, which is resolved upstream from `VcsAdapter.rootDir()`.
-2. When `vcsRoot` is non-null, load `.gitignore` from that VCS root.
+2. When `vcsRoot` is non-null, load `.gitignore` from that VCS root and from every directory between the VCS root and the `codeRoot`, then from the `codeRoot` itself.
 3. Load any `.gitignore` files found in subdirectories during the walk.
-4. Apply rules relative to the directory containing each `.gitignore`.
+4. Apply rules relative to the directory containing each `.gitignore`, including the files above the `codeRoot`, whose rules are matched against the path below their own directory.
 5. `.gitignore` exclusions have absolute priority — `excludePaths` cannot re-include gitignored files.
+6. As in git, a path cannot be re-included by a negation when one of its parent directories is excluded, whichever `.gitignore` excluded it.
 
 When `vcsRoot` is `null`:
 
@@ -190,9 +207,10 @@ Exact graph file selectors SHALL normalize canonical workspace-relative paths, c
 
 - `@specd/code-graph` depends on `@specd/core` as a runtime dependency (types, domain services)
 - Single `.specd/code-graph.lbug` file for the whole project
-- The `discoverFiles` function remains workspace-agnostic — workspace prefixing and project-relative path derivation happen in the indexer
+- The `discoverFiles` function remains workspace-agnostic — workspace prefixing, `pathBase` and project-relative path derivation happen in the indexer
 - Spec resolution uses `SpecRepository` exclusively — no filesystem fallback
 - Existing graph stores are incompatible when file identity metadata changes (for example replacing `configRelativePath` with `projectRelativePath`) — a full rebuild is required after upgrading
+- Existing graph stores built under `codeRoot`-relative path-pattern semantics are rebuilt when the path-semantics marker of the discovery fingerprint differs
 
 ## Examples
 

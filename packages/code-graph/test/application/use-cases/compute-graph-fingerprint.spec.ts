@@ -11,7 +11,10 @@ import {
   serializeFingerprintMap,
   computeWorkspaceFingerprint,
   computeRootFingerprint,
+  PATH_SEMANTICS_MARKER,
 } from '../../../src/application/use-cases/_shared/compute-graph-fingerprint.js'
+import { type ProjectWorkspace } from '@specd/core'
+import { type ProjectGraphConfig } from '../../../src/domain/value-objects/index-options.js'
 import { type ResolutionManifestSource } from '../../../src/application/ports/resolution-manifest-source.js'
 import { CODE_GRAPH_VERSION } from '../../../src/index.js'
 import { type LanguageAdapter } from '../../../src/domain/value-objects/language-adapter.js'
@@ -643,5 +646,96 @@ describe('Fingerprint logic', () => {
       repoRoot,
     )
     expect(exemptionChangedRootFp).not.toBe(baseRootFp)
+  })
+})
+
+describe('Fingerprint path semantics', () => {
+  const fpWorkspace = (codeRoot: string): ProjectWorkspace => ({
+    name: 'app',
+    prefix: null,
+    codeRoot,
+    isExternal: false,
+    ownership: 'owned',
+    specRepo: { specsPath: undefined } as unknown as ProjectWorkspace['specRepo'],
+  })
+  const compute = (
+    graphConfig: ProjectGraphConfig,
+    codeRoot = '/repo/app',
+    version = '1.0.0',
+  ): string => {
+    const workspace = fpWorkspace(codeRoot)
+    return computeWorkspaceFingerprint(version, '/repo', workspace, [workspace], graphConfig)
+  }
+
+  it('Given a changed workspace testPaths, then the fingerprint changes', () => {
+    const base = compute({ workspaces: new Map([['app', { testPaths: ['app/a/**'] }]]) })
+    const changed = compute({ workspaces: new Map([['app', { testPaths: ['app/b/**'] }]]) })
+    expect(changed).not.toBe(base)
+  })
+
+  it('Given a changed workspace ignorePaths, then the fingerprint changes', () => {
+    const base = compute({ workspaces: new Map([['app', { ignorePaths: ['app/a/**'] }]]) })
+    const changed = compute({ workspaces: new Map([['app', { ignorePaths: ['app/b/**'] }]]) })
+    expect(changed).not.toBe(base)
+  })
+
+  it('Given a changed workspace codeRoot, then the fingerprint changes', () => {
+    expect(compute({}, '/repo/app')).not.toBe(compute({}, '/repo/other'))
+  })
+
+  it('Given the path-semantics marker, then it is part of the fingerprint payload', () => {
+    expect(PATH_SEMANTICS_MARKER).toBe('project-relative-v1')
+    const expectedWithout = createHash('sha256')
+      .update(JSON.stringify({ v: '1.0.0', g: {}, w: [] }))
+      .digest('hex')
+    expect(compute({})).not.toBe(expectedWithout)
+    const sourceText = readFileSync(
+      join(packageRoot, 'src/application/use-cases/_shared/compute-graph-fingerprint.ts'),
+      'utf8',
+    )
+    expect(
+      sourceText.match(/pathSemantics: PATH_SEMANTICS_MARKER/g)?.length,
+    ).toBeGreaterThanOrEqual(3)
+  })
+
+  it('Given a stored fingerprint computed without the marker, then a mismatch is detected', () => {
+    const workspace = fpWorkspace('/repo/app')
+    const graphConfig: ProjectGraphConfig = {}
+    const current = computeWorkspaceFingerprint(
+      '1.0.0',
+      '/repo',
+      workspace,
+      [workspace],
+      graphConfig,
+    )
+    const legacy = createHash('sha256')
+      .update(JSON.stringify({ v: '1.0.0', w: [{ name: 'app', codeRoot: 'app' }] }))
+      .digest('hex')
+    const root = computeRootFingerprint('1.0.0', '/repo', [workspace], graphConfig)
+
+    expect(
+      detectFingerprintMismatch(
+        new Map([
+          ['app', current],
+          ['root', root],
+        ]),
+        '1.0.0',
+        '/repo',
+        [workspace],
+        graphConfig,
+      ),
+    ).toBe(false)
+    expect(
+      detectFingerprintMismatch(
+        new Map([
+          ['app', legacy],
+          ['root', root],
+        ]),
+        '1.0.0',
+        '/repo',
+        [workspace],
+        graphConfig,
+      ),
+    ).toBe(true)
   })
 })

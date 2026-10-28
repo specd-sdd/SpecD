@@ -15,6 +15,9 @@ import { cliError } from '../../handle-error.js'
 import { resolveGraphCliContext } from './resolve-graph-cli-context.js'
 
 /** Maximum number of skipped files listed in CLI text output. */
+/** Maximum number of workspace overlaps listed in text output. */
+const CLI_OVERLAP_LIST_MAX = 10
+
 const CLI_SIZE_SKIP_LIST_MAX = 10
 
 /**
@@ -68,7 +71,7 @@ export function registerGraphIndex(parent: Command): void {
     .addOption(
       new Option(
         '--exclude-path <glob...>',
-        'one or more global paths to exclude from the index',
+        'one or more gitignore-syntax patterns, relative to the project root, added to the global exclusion layer',
       ).argParser((val, prev: string[]) => (prev ?? []).concat(val.split(','))),
     )
     .option('--config <path>', 'path to specd.yaml')
@@ -351,6 +354,22 @@ export function formatTextIndexResult(result: RunIndexProjectGraphResult): strin
     }
     lines.push('  or raise graph.maxFileBytes (0 disables the limit).')
     lines.push('  large files cost roughly 3 KB of memory per source byte while they are analysed.')
+  }
+
+  if (result.workspaceOverlapCount > 0) {
+    lines.push(
+      `  workspace overlap: ${String(result.workspaceOverlapCount)} file(s) are indexed by more than one workspace`,
+    )
+    const listedOverlaps = result.workspaceOverlaps.slice(0, CLI_OVERLAP_LIST_MAX)
+    for (const overlap of listedOverlaps) {
+      lines.push(`    ${overlap.projectRelativePath} — ${overlap.workspaces.join(', ')}`)
+    }
+    if (result.workspaceOverlapCount > listedOverlaps.length) {
+      lines.push(`    ... and ${String(result.workspaceOverlapCount - listedOverlaps.length)} more`)
+    }
+    lines.push(
+      '  review graph.excludePaths and workspace allowedPaths/excludePaths, and run `specd graph why <path>` to see which workspaces index a file.',
+    )
   }
 
   if (result.sizeExemptAnalysed.length > 0) {

@@ -73,8 +73,11 @@ The effective fingerprint inputs MUST include:
 - each workspace's `excludePaths`
 - each workspace's `respectGitignore`
 - each workspace's effective `maxFileBytes` (the workspace value, otherwise the project value, otherwise the default)
-- each workspace's effective `largeFilePaths` (the project patterns and the workspace patterns, kept as two lists in the fingerprint because they are evaluated against different roots)
+- each workspace's effective `largeFilePaths` (the project patterns and the workspace patterns, kept as two lists in the fingerprint; both are project-relative)
+- the effective `testPaths` and `ignorePaths` of each workspace (project patterns and workspace patterns, kept as two lists)
+- each workspace's project-relative `codeRoot` (its path from the project root)
 - any synthetic exclusions derived from filesystem-backed repository `specsPath` roots
+- a path-semantics marker identifying the project-relative evaluation defined by Requirement: Project-relative path evaluation. The marker MUST change whenever the reference root of any configured path or pattern changes, so that an index built under earlier semantics is fully rebuilt even though `specd.yaml` is unchanged
 - the newline-normalized resolution-manifest hashes from Requirement: Adapter-sourced resolution fingerprint
 
 ### Requirement: Adapter-sourced resolution fingerprint
@@ -98,8 +101,8 @@ The indexer SHALL discover files from two sources:
 **1. Workspace Discovery**
 For each `ProjectWorkspace` provided in options:
 
-- Resolve one effective exclusion set composed of global `graph.excludePaths`, repository-derived spec-root exclusions, and the workspace's `excludePaths`
-- Call `discoverFiles` on `codeRoot`, filtered by the workspace's `allowedPaths` (if configured)
+- Resolve the global exclusion layer (global `graph.excludePaths` and repository-derived spec-root exclusions) and the workspace exclusion layer (the workspace's `excludePaths`), kept separate as in Requirement: Project-relative path evaluation
+- Call `discoverFiles` on `codeRoot` with the project-relative base of that `codeRoot`, filtered by the workspace's `allowedPaths` (if configured, project-relative globs)
 - Prefix each path with `{workspaceName}:`
 - Diff against the store filtered by workspace prefix
 
@@ -124,8 +127,33 @@ Textual fallback SHALL decode document content using this policy:
 `discoverFiles` accepts a root directory plus exclusion options:
 
 - **`respectGitignore`** (default `true`): when `true`, `.gitignore` files are loaded hierarchically and applied with absolute priority.
-- **`excludePaths`** (default: built-in list): gitignore-syntax patterns applied as an additional exclusion layer. Built-in default excludes MUST include `.git/`, `.hg/`, and `.svn/`.
+- **`excludePaths`** (default: built-in list): gitignore-syntax patterns applied as an additional exclusion layer, evaluated against the project-relative path. Built-in default excludes MUST include `.git/`, `.hg/`, and `.svn/`.
+- **`pathBase`** (project-relative directory of the discovery root, default empty): the path from the project root to the discovery root. Patterns are matched against `pathBase` joined with the path below the discovery root.
 - **`vcsRoot`** (`string | null`): the root directory of the VCS repository, resolved upstream from `VcsAdapter.rootDir()` and used to bound hierarchical `.gitignore` searches. Callers MUST pass `null` explicitly when no repository root exists. `discoverFiles` MUST NOT probe for repository markers on its own.
+
+### Requirement: Project-relative path evaluation
+
+The indexer SHALL evaluate every configured path and pattern (`graph.includePaths`, `graph.excludePaths`, `allowedPaths`, `testPaths`, `ignorePaths`, `largeFilePaths`, at project and workspace level) against the file's project-relative path, as defined by `core:config` Requirement: Project-relative graph path semantics. The `codeRoot`-relative path remains the persisted file identity (`{workspaceName}:{path}`); it MUST NOT be used as the matching subject.
+
+- Workspace discovery SHALL walk `codeRoot` but match patterns against `join(relative(projectRoot, codeRoot), pathBelowCodeRoot)`, including when pruning directories during the walk. A pattern that excludes a directory project-relative MUST prune that directory.
+- Exclusion SHALL be evaluated in two non-interchangeable layers, in this order: (1) the global layer: project `graph.excludePaths` (or the built-in defaults) plus the synthetic spec-root exclusions; (2) the workspace layer: the workspace's `excludePaths`. A path excluded by layer 1 SHALL NOT be re-included by any pattern of layer 2, including `!` negations. A `!` negation reverses only earlier patterns of its own list.
+- `.gitignore` retains absolute priority over both layers when `respectGitignore` is `true`.
+- Categorization (`ignored`, `test`, `source`) SHALL match project-level and workspace-level `ignorePaths` and `testPaths` against the project-relative path. The default test patterns remain valid because they are unanchored.
+- The size-limit exemption SHALL match both project-level and workspace-level `largeFilePaths` against the project-relative path.
+- When a workspace's `codeRoot` is outside the project root, the project-relative path starts with `../`; anchored project-relative patterns SHALL NOT match, unanchored patterns match against the path below `codeRoot`, and the run SHALL NOT fail for that reason.
+- Category lists are evaluated as one ordered list per kind (`ignorePaths`, then `testPaths`; project patterns first, then workspace patterns), so a workspace `!` negation can cancel a project pattern of the same kind; `largeFilePaths` lists are evaluated separately and an exemption from either list applies.
+- Graph input visibility and graph health SHALL use the same effective configuration and the same evaluation as indexing, so freshness and health agree with what the indexer reads.
+- The decision for a file SHALL be obtainable together with the winning rule and its origin (`.gitignore`, global layer, synthetic spec-root, workspace layer, `allowedPaths`, size gate, category rule) through the same evaluation functions used for indexing, so that path explanation reuses indexing logic rather than reimplementing it.
+
+### Requirement: Workspace overlap diagnostic
+
+When the same physical file is discovered and kept by more than one workspace (it passes discovery in each, so it receives one graph identity per workspace), the indexer SHALL record a workspace-overlap diagnostic instead of staying silent.
+
+- A diagnostic carries the `projectRelativePath` and the names of all owning workspaces.
+- The index result SHALL expose the diagnostics as a stable list together with their total count, bounded in size like other diagnostic lists, so that a large overlap does not grow the result without limit.
+- The diagnostic is a warning. It MUST NOT fail the run, change what is indexed, or alter incremental behaviour.
+- A file excluded by every workspace but one, or discovered by only one workspace, produces no diagnostic.
+- Hosts that render the diagnostic SHALL state that overlapping ownership usually means the `excludePaths` or `allowedPaths` of the workspaces do not partition the files, and name `graph why <path>` as the way to inspect it. The result itself carries only structured data.
 
 ### Requirement: Portable graph paths
 
@@ -169,7 +197,7 @@ The effective limit for a file SHALL be the `maxFileBytes` of the workspace that
 
 The size SHALL be the size in bytes on disk, obtained from the filesystem metadata, decided once per file from a single filesystem-metadata request made before any content is read, and reused by every phase that needs the size decision. Other phases MAY request metadata for their own purposes, such as change detection. Discovery rules (`excludePaths`, `allowedPaths`, gitignore, and the binary file filter) SHALL be applied first; the size check applies only to files that discovery keeps.
 
-A file is exempt when it matches the effective `largeFilePaths`: the project-level patterns, evaluated relative to the project root, together with the patterns of the owning workspace, evaluated relative to its `codeRoot`. The exemption applies only to the size limit and MUST NOT make a file that discovery rules exclude become indexed.
+A file is exempt when it matches the effective `largeFilePaths`: the project-level patterns together with the patterns of the owning workspace, both evaluated against the file's project-relative path. The exemption applies only to the size limit and MUST NOT make a file that discovery rules exclude become indexed.
 
 A file skipped for size SHALL be recorded in index coverage with status `unsupported` and reason `file-too-large`; the persisted coverage carries no size or limit, because those are reported by the run result and the `file-skipped` event of the run that skipped the file. A lookup addressed to such a file SHALL report it as not indexed, and absence claims that could depend on it SHALL be treated as unproven: graph health reports the coverage as `complete-with-warnings` as defined by `code-graph:get-graph-health`. No file node, document node, symbol, or relation SHALL be created for it.
 
@@ -327,15 +355,19 @@ Only infrastructure-level errors (e.g. store connection lost, disk full) may abo
 - **`filesSkippedForSize`** — files not indexed because they exceeded the effective size limit and were not exempt
 - **`largestSkippedForSize`** — a bounded list of the largest of those files, in descending size order and then by path, each `{ filePath, projectRelativePath, sizeBytes, limitBytes }`; the list MUST hold at least ten entries when that many exist
 - **`sizeExemptAnalysed`** — the files that exceeded the effective size limit but were analysed because they are exempt, each `{ filePath, projectRelativePath, sizeBytes }`
+- **`workspaceOverlaps`** — a list of at most 25 files kept by more than one workspace in the run, each `{ projectRelativePath, workspaces }`, sorted by `projectRelativePath`
+- **`workspaceOverlapCount`** — the exact number of overlapping files, including those omitted from `workspaceOverlaps`
 - **`specsDiscovered`** — total spec directories found
 - **`specsIndexed`** — specs that were new or changed and successfully processed
 - **`errors`** — array of `{ filePath: string; message: string }` for files or specs that failed to produce their indexed content
-- **`diagnostics`** — array of `{ filePath: string; message: string }` for problems found while resolving packages or linking re-exports (a package identity declared by several workspaces, an inaccessible workspace root, an adapter that failed to prepare or link). A diagnostic does not mean that a file or spec failed: the run completed and every resource it produced is valid
+- **`diagnostics`** — array of `{ filePath: string; message: string }` for problems found while resolving packages or linking re-exports (a package identity declared by several workspaces, an inaccessible workspace root, an adapter that failed to prepare or link). A diagnostic does not mean that a file or spec failed.
 - **`duration`** — elapsed time in milliseconds
 - **`workspaces`** — per-workspace breakdown array of `{ name, filesDiscovered, filesIndexed, filesSkipped, filesRemoved, specsDiscovered, specsIndexed }`
 - **`vcsRef`** — the VCS ref that was persisted, or `null` if none was provided
 - **`graphFingerprint`** — the fingerprint persisted for the completed run
 - **`fullRebuildReason`** — `null` for a normal incremental run, or a human-readable reason when the run escalated to a full rebuild because the stored fingerprint no longer matched
+
+The result also carries the coverage, phase-metrics and import-diagnostic summaries defined by their own requirements.
 
 ### Requirement: Spec dependency indexing
 
@@ -432,10 +464,11 @@ To find the importers of a changed entry, the closure SHALL read only persisted 
 ## Constraints
 
 - The `GraphStore` must be opened before calling the use case — the indexer does not manage store lifecycle
-- Discovery always uses forward-slash-normalized workspace-relative paths
+- Discovery always uses forward-slash-normalized paths; configured patterns are matched against the project-relative path, and persisted identities use the `codeRoot`-relative path
 - When `excludePaths` is not provided, built-in default patterns apply (node_modules/, .git/, .specd/, dist/, build/, coverage/, .next/, .nuxt/)
 - When `excludePaths` is provided, it replaces built-in defaults entirely — no merging occurs
-- When `respectGitignore` is `true`, `.gitignore` exclusions have absolute priority and cannot be overridden by `excludePaths` patterns
+- When `respectGitignore` is `true`, `.gitignore` exclusions have absolute priority and cannot be overridden by `excludePaths` patterns of either layer
+- Global exclusions (project `excludePaths`, synthetic spec-root exclusions) cannot be overridden by workspace `excludePaths`, including `!` negations
 - Pass 2 depends on Pass 1 completing for all files — they are not interleaved per file
 - Per-file errors are collected, not thrown — only infrastructure errors abort the run
 - Spec indexing uses the workspace's `specs()` callback exclusively — no filesystem fallback

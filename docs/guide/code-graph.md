@@ -95,7 +95,17 @@ To keep worker indexing memory bounded and predictable:
 
   Structured formats (`--format json` and `--format toon`) report `filesSkippedForSize`, `largestSkippedForSize`, and `sizeExemptAnalysed`.
 
-- **Indexing a Large File Anyway:** To exempt a specific oversized file from the size gate without disabling limits globally, add its path to `graph.largeFilePaths` in `specd.yaml` (relative to project root at project level, or relative to `codeRoot` inside a workspace block). An exemption only bypasses the file size threshold; the file must still satisfy gitignore, `excludePaths`, `allowedPaths`, and binary file checks. To disable file size gating entirely, set `maxFileBytes: 0`.
+- **Indexing a Large File Anyway:** To exempt a specific oversized file from the size gate without disabling limits globally, add its path to `graph.largeFilePaths` in `specd.yaml` (always relative to the project root, at project level and inside a workspace block). An exemption only bypasses the file size threshold; the file must still satisfy gitignore, `excludePaths`, `allowedPaths`, and binary file checks. To disable file size gating entirely, set `maxFileBytes: 0`.
+
+### Understanding Why a File Is (Not) Indexed (`specd graph why`)
+
+Every path and pattern in the `graph` section of `specd.yaml` is interpreted relative to the project root, never to a workspace `codeRoot`. When a file is missing from the graph, or shows an unexpected category, run:
+
+```bash
+specd graph why app/vendors/other/x.php
+```
+
+The command prints the verdict, the workspaces that own the path, and for each one the rule that decided every step (gitignore, global exclusions, workspace exclusions, `allowedPaths`, size limit, category, language adapter), including where the rule was declared. If a file is kept by more than one workspace (for example nested workspaces without partitioning excludes), `specd graph index` prints a workspace overlap warning and `graph why` reports `MULTIPLE_OWNERS`; the file is still indexed once per owning workspace.
 
 ### Inspecting Graph Statistics & Freshness (`specd graph stats`)
 

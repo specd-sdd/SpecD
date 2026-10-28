@@ -112,6 +112,7 @@ function setup(
       ...statOverrides,
     }),
     getGraphHealth: vi.fn(),
+    explainPath: vi.fn(),
   }
   vi.mocked(withOpenGraphProvider).mockImplementation(async (_host, fn) => {
     await fn(mockProvider as never)

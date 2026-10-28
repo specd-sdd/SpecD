@@ -92,7 +92,7 @@ describe('IndexCodeGraph package imports', () => {
       projectRoot: tempDir,
       vcsRoot: tempDir,
       workspaces: [workspace('graph', graphDir), workspace('app', appDir)],
-      graphConfig: { includePaths: [], testPaths: ['test/**'], workspaces: new Map() },
+      graphConfig: { includePaths: [], testPaths: ['**/test/**'], workspaces: new Map() },
     }
   }
 

@@ -10,6 +10,13 @@
 - **THEN** it accepts no positional arguments
 - **AND** output format defaults to text
 
+#### Scenario: --exclude-path is project-relative and global
+
+- **GIVEN** `graph index --exclude-path 'app/tmp/'` and a workspace `backend` with `codeRoot` `app`
+- **WHEN** the index runs
+- **THEN** `app/tmp/` is excluded for `backend` and in project-global discovery
+- **AND** a workspace `!app/tmp/` does not re-include it
+
 ### Requirement: Output format
 
 #### Scenario: Text output shows summary including documents
@@ -84,6 +91,35 @@
 - **GIVEN** a run that skipped files
 - **WHEN** the command finishes
 - **THEN** `specd.yaml` is unchanged
+
+### Requirement: Workspace overlap warning
+
+#### Scenario: Warning in text mode
+
+- **GIVEN** the result reports overlap diagnostics for 3 files
+- **WHEN** `graph index` renders in text mode
+- **THEN** a warning section states 3 files owned by more than one workspace
+- **AND** lists each path with its workspaces
+- **AND** suggests `excludePaths`/`allowedPaths` and `specd graph why <path>`
+- **AND** the exit status is unchanged
+
+#### Scenario: More than ten overlaps
+
+- **GIVEN** 14 overlap diagnostics
+- **WHEN** text mode renders
+- **THEN** ten are listed followed by a line stating 4 more
+
+#### Scenario: No overlap, no section
+
+- **GIVEN** no overlap diagnostics
+- **WHEN** text mode renders
+- **THEN** no overlap section appears
+
+#### Scenario: Structured modes carry the diagnostics
+
+- **GIVEN** overlap diagnostics
+- **WHEN** `--format json` or `toon` is used
+- **THEN** the diagnostics are part of the `IndexResult` and no hint text is added
 
 ### Requirement: Worker diagnostics presentation
 

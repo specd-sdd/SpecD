@@ -1256,7 +1256,7 @@ Results also report size gating metrics: `filesSkippedForSize` (count of skipped
 first, at most 25) and `sizeExemptAnalysed` (array of `{ filePath, projectRelativePath, sizeBytes }`
 for oversized files indexed under exemption). In text output, skipped files are summarized with
 formatted byte sizes and an actionable `graph.largeFilePaths` YAML snippet (root-level files are
-anchored with a leading `/`).
+anchored with a leading `/`). All `graph` patterns in `specd.yaml` are interpreted relative to the project root; when one physical file is kept by more than one workspace the run reports `workspaceOverlaps` / `workspaceOverlapCount` (and an overlap section in text output) and `specd graph why <path>` shows the owners.
 
 Code Graph owns the shared writer lock and the process-isolated worker used for every
 production index run. The CLI supplies its trusted packaged task through the SDK and
@@ -1271,13 +1271,13 @@ Worker failures exit with code 3 and report structured diagnostics: failure caus
 `task-contract`, `task-error`, `protocol`, `cancelled`, `native-crash`, `resource-limit`,
 `exited`), last activity item and time ago, and trailing 16 KiB tails of child stdout and stderr.
 
-| Option                      | Description                                                                                    |
-| --------------------------- | ---------------------------------------------------------------------------------------------- |
-| `--force`                   | Logically rebuild every selected graph input; typed incompatible storage may be repaired once. |
-| `--config <path>`           | Config file path. Mutually exclusive with `--path`.                                            |
-| `--path <path>`             | Repository root bootstrap path. Ignores any discovered config.                                 |
-| `--exclude-path <pattern>`  | Gitignore-syntax pattern to exclude (repeatable; merges with config).                          |
-| `--format text\|json\|toon` | Output format.                                                                                 |
+| Option                      | Description                                                                                                                                                    |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--force`                   | Logically rebuild every selected graph input; typed incompatible storage may be repaired once.                                                                 |
+| `--config <path>`           | Config file path. Mutually exclusive with `--path`.                                                                                                            |
+| `--path <path>`             | Repository root bootstrap path. Ignores any discovered config.                                                                                                 |
+| `--exclude-path <pattern>`  | Gitignore-syntax pattern, relative to the project root, added to the global exclusion layer (repeatable; comma-separated values accepted; merges with config). |
+| `--format text\|json\|toon` | Output format.                                                                                                                                                 |
 
 #### Config fields: `graph.includePaths`, `graph.excludePaths`, `graph.respectGitignore`, `graph.maxFileBytes`, `graph.largeFilePaths`, and `workspace.graph.allowedPaths`
 
@@ -1290,14 +1290,14 @@ workspaces:
     graph:
       respectGitignore: true # optional; default: true
       maxFileBytes: 262144 # optional; override limit in bytes (0 disables limit)
-      largeFilePaths: # optional; size exemptions relative to codeRoot
+      largeFilePaths: # optional; size exemptions relative to the project root
         - 'src/generated/ast-tokens.ts'
       excludePaths: # optional; gitignore-syntax, supports ! negation
         - node_modules/
         - dist/
         - .specd/*
         - '!.specd/metadata/' # re-include .specd/metadata/ despite the wildcard above
-      allowedPaths: # optional; gitignore-syntax include surface relative to codeRoot
+      allowedPaths: # optional; gitignore-syntax include surface relative to the project root
         - src/**
         - package.json
 graph:
@@ -1332,7 +1332,7 @@ Filesystem-backed spec roots are excluded automatically from file/document disco
 
 #### `--exclude-path` merging
 
-CLI `--exclude-path` flags merge (append) on top of the effective exclusion list — either `graph.excludePaths` from config or the built-in defaults when config is absent. They never reduce the exclusion set. This flag may be repeated:
+CLI `--exclude-path` flags merge (append) on top of the effective exclusion list — either `graph.excludePaths` from config or the built-in defaults when config is absent. They never reduce the exclusion set. Patterns are relative to the project root and join the global exclusion layer, so a workspace-level `!` negation cannot re-include them. This flag may be repeated, and one flag may carry several comma-separated patterns:
 
 ```
 specd graph index --exclude-path "packages/generated/*" --exclude-path "tmp/"
@@ -1606,6 +1606,67 @@ Print graph stats in TOON format:
 
 ```
 specd graph stats --format toon
+```
+
+---
+
+### graph why
+
+```
+specd graph why <path> [options]
+```
+
+Explain why a path is excluded, classified or indexed. `<path>` is a project-relative path, an absolute path (converted to project-relative) or `workspace:path`. For each workspace whose code root contains the path the command reports, in indexer order, the decisive rule of `binary-extension`, `gitignore`, `global-exclude`, `workspace-exclude`, `allowed-paths`, `size-limit`, `category` and `adapter`, with the rule's origin (layer, workspace, configuration key, and for `.gitignore` the file and line). Configured graph patterns are interpreted relative to the project root. Exit status is `0` whenever an explanation is produced, including for excluded paths.
+
+JSON and TOON output carry `input`, `projectRelativePath`, `verdict` (`indexable`, `not-indexed`, `not-in-scope`), `owners`, `candidates` (each with `workspace`, `identity`, `verdict`, `category`, `kind`, `steps`, `inGraph`) and `diagnostics` (`PATH_NOT_FOUND`, `CODE_ROOT_OUTSIDE_PROJECT`, `PATH_OUTSIDE_PROJECT`, `MULTIPLE_OWNERS`).
+
+| Option                      | Description                                                    |
+| --------------------------- | -------------------------------------------------------------- |
+| `--config <path>`           | Config file path. Mutually exclusive with `--path`.            |
+| `--path <path>`             | Repository root bootstrap path. Ignores any discovered config. |
+| `--format text\|json\|toon` | Output format.                                                 |
+
+#### Examples
+
+Explain an excluded path (shows the matching pattern, its layer and configuration key):
+
+```
+specd graph why app/vendors/other/x.php
+```
+
+```text
+app/vendors/other/x.php
+verdict: not-indexed   owners: none
+
+backend:vendors/other/x.php  [excluded]  category: -  kind: -  inGraph: no
+  - binary-extension: passed
+  - gitignore: passed
+  - global-exclude: matched — /app/vendors/* (pattern) from global graph.excludePaths
+  - workspace-exclude: not-applicable
+  - allowed-paths: not-applicable
+  - size-limit: not-applicable
+  - category: not-applicable
+  - adapter: not-applicable
+```
+
+Explain a path in a specific workspace, as structured data:
+
+```
+specd graph why core:src/index.ts --format toon
+```
+
+Explain an indexable path (text output; diagnostics, when present, are printed after all candidates):
+
+```text
+$ specd graph why packages/core/src/index.ts
+packages/core/src/index.ts
+verdict: indexable   owners: core
+
+core:src/index.ts  [indexable]  category: source  kind: file  inGraph: yes
+  - global-exclude: passed
+  - size-limit: passed size=2048 limit=262144
+  - category: passed category=source
+  - adapter: passed kind=file language=typescript
 ```
 
 ---

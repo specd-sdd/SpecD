@@ -202,7 +202,7 @@ workspaces:
 
 ### Requirement: Workspace-level graph configuration
 
-Each workspace entry in `specd.yaml` MAY declare an optional `graph` block controlling how the code graph indexer discovers files for that workspace:
+Each workspace entry in `specd.yaml` MAY declare an optional `graph` block controlling how the code graph indexer discovers files for that workspace. All paths and patterns in this block are project-root-relative, as defined by Requirement: Project-relative graph path semantics:
 
 ```yaml
 workspaces:
@@ -210,36 +210,40 @@ workspaces:
     codeRoot: ./
     graph:
       respectGitignore: true # optional; default: true
-      allowedPaths: # optional; only files matching these patterns are indexed
+      allowedPaths: # optional; project-relative globs; only matching files are indexed
         - src/**
-      excludePaths: # optional; gitignore-syntax, supports negation with !
+      excludePaths: # optional; project-relative, gitignore-syntax, supports negation with !
         - .specd/*
         - '!.specd/metadata/'
-      testPaths: # optional; gitignore-syntax, classifies matching files as 'test'
+      testPaths: # optional; project-relative, gitignore-syntax, classifies matching files as 'test'
         - '**/*.spec.ts'
-      ignorePaths: # optional; gitignore-syntax, classifies matching files as 'ignored'
+      ignorePaths: # optional; project-relative, gitignore-syntax, classifies matching files as 'ignored'
         - 'fixtures/**'
   core:
     codeRoot: packages/core
     graph:
       excludePaths:
-        - dist/
+        - packages/core/dist/
 ```
 
-**`graph.allowedPaths`** (string array, glob-syntax) — optional patterns relative to `codeRoot`. If specified, only files matching these patterns SHALL be indexed for this workspace.
+**`graph.allowedPaths`** (string array, glob-syntax) — optional patterns relative to the project root. If specified, only files owned by this workspace whose project-relative path matches these patterns SHALL be indexed for this workspace.
 
 **`graph.respectGitignore`** (boolean, default `true`) — whether `.gitignore` files are loaded and applied during file discovery for this workspace.
 
-- When `true` (default): `.gitignore` rules are loaded hierarchically (git root → codeRoot → subdirectories during walk) and applied with **absolute priority**. No pattern in `excludePaths` can re-include a file that `.gitignore` excludes.
+- When `true` (default): `.gitignore` rules are loaded hierarchically (git root → every directory between the git root and `codeRoot` → `codeRoot` → subdirectories during walk) and applied with **absolute priority**. No pattern in `excludePaths` can re-include a file that `.gitignore` excludes.
 - When `false`: `.gitignore` files are not loaded. Only `excludePaths` governs file exclusion.
 
-**`graph.excludePaths`** (string array, gitignore-syntax) — additional exclusion rules applied on top of `.gitignore` (or as the sole ruleset when `respectGitignore` is `false`). Patterns follow `.gitignore` format and support negation with `!`.
+**`graph.excludePaths`** (string array, gitignore-syntax, project-relative) — additional exclusion rules applied on top of `.gitignore` (or as the sole ruleset when `respectGitignore` is `false`). Patterns follow `.gitignore` format and support negation with `!`.
+
+Workspace `excludePaths` form a layer separate from the global exclusion layer (project `graph.excludePaths` plus repository-derived spec-root exclusions). A file excluded by the global layer SHALL stay excluded: a workspace pattern, including a `!` negation, MUST NOT re-include it. A negation in the workspace list only reverses workspace-list patterns that precede it.
 
 When `graph.excludePaths` is **not** specified, the following built-in defaults apply:
 
 ```
 node_modules/
 .git/
+.hg/
+.svn/
 .specd/
 dist/
 build/
@@ -250,15 +254,28 @@ coverage/
 
 When `graph.excludePaths` **is** specified, it **replaces** the built-in defaults entirely. The user takes full ownership — built-in patterns are not merged.
 
-**`graph.testPaths`** (string array, gitignore-syntax) — optional workspace-specific patterns identifying test and verification files. Evaluated relative to the workspace's `codeRoot`. When present, these patterns supplement the project-level `graph.testPaths` for this workspace.
+**`graph.testPaths`** (string array, gitignore-syntax, project-relative) — optional workspace-specific patterns identifying test and verification files. When present, these patterns supplement the project-level `graph.testPaths` for files owned by this workspace.
 
-**`graph.ignorePaths`** (string array, gitignore-syntax) — optional workspace-specific patterns identifying auxiliary files (fixtures, static mocks, scratch scripts). Evaluated relative to the workspace's `codeRoot`. When present, these patterns supplement the project-level `graph.ignorePaths` for this workspace.
-
-Patterns are evaluated relative to the workspace's `codeRoot`.
+**`graph.ignorePaths`** (string array, gitignore-syntax, project-relative) — optional workspace-specific patterns identifying auxiliary files (fixtures, static mocks, scratch scripts). When present, these patterns supplement the project-level `graph.ignorePaths` for files owned by this workspace.
 
 **`graph.maxFileBytes`** (non-negative integer) — optional per-workspace override of the project-level per-file size limit, as defined by Requirement: Graph file size limit.
 
-**`graph.largeFilePaths`** (string array, gitignore-syntax) — optional patterns relative to the workspace's `codeRoot` of files exempt from the size limit. They are added to the project-level `graph.largeFilePaths`.
+**`graph.largeFilePaths`** (string array, gitignore-syntax, project-relative) — optional patterns of files exempt from the size limit. They are added to the project-level `graph.largeFilePaths`.
+
+### Requirement: Project-relative graph path semantics
+
+Every path and pattern declared under `graph` at project level and under `workspaces.<name>.graph` at workspace level SHALL be interpreted relative to the project root (the directory containing `specd.yaml`), with no exception per key and no exception per level. This applies to `includePaths`, `excludePaths`, `allowedPaths`, `testPaths`, `ignorePaths`, and `largeFilePaths`.
+
+- The project-relative path of a file is its path from the project root, using `/` as separator, without a leading `./` or `/`. For a file at `<codeRoot>/<rel>`, it is the path of `<codeRoot>/<rel>` relative to the project root.
+- A pattern with a leading `/` or an internal `/` is anchored at the project root. For example, `/app/vendors/*` and `app/tmp/` refer to `<projectRoot>/app/vendors/*` and `<projectRoot>/app/tmp/` regardless of which workspace owns the matched file.
+- A workspace-level pattern is therefore NOT relative to that workspace's `codeRoot`. A workspace `graph` block restricts which files the pattern applies to (only files owned by the workspace) but never changes the path the pattern is written against.
+- Unanchored patterns (no `/` other than a trailing one, for example `*.spec.ts`, `node_modules/`) keep their gitignore meaning of matching at any depth.
+- The interpretation SHALL be identical in project-global discovery and in workspace discovery, and across indexing, graph input visibility, graph health and path explanation.
+- When a file's project-relative path starts with `../` (its `codeRoot` is outside the project root), project-relative anchored patterns cannot match it. Unanchored patterns are matched against the path below the `codeRoot`. This situation SHALL NOT be treated as a configuration error.
+- `.gitignore` handling is unchanged: its rules keep their own hierarchical semantics relative to the `.gitignore` file location and retain absolute priority when `respectGitignore` is `true`.
+- Absolute paths are not valid in these keys; workspace `codeRoot` and storage `path` keys keep their existing definition (relative to the directory containing `specd.yaml`).
+
+Configurations written for earlier `codeRoot`-relative workspace semantics are NOT migrated or warned about; no compatibility switch exists.
 
 ### Requirement: Storage configuration
 
@@ -585,18 +602,20 @@ These warnings MUST be non-fatal diagnostics about configuration shape or compat
 
 ### Requirement: Project-level graph configuration
 
-`specd.yaml` MAY include a `graph` section for project-global graph settings.
+`specd.yaml` MAY include a `graph` section for project-global graph settings. Every path and pattern is relative to the project root (Requirement: Project-relative graph path semantics).
 
 - **`includePaths`** — optional array of glob patterns (relative to project root) to discover project-global files outside workspace-owned graph identities (for example `docs/**`, `package.json`).
-- **`excludePaths`** — optional array of gitignore-syntax patterns to exclude from file/document discovery globally.
-- **`testPaths`** — optional array of gitignore-syntax patterns identifying test and verification files. When omitted, the built-in defaults apply: `['**/*.spec.*', '**/*.test.*', '**/test/**', '**/tests/**', '**/__tests__/**', '*_test.*']`.
-- **`ignorePaths`** — optional array of gitignore-syntax patterns identifying auxiliary files (fixtures, static mocks, dev/scratch scripts). When omitted, defaults to an empty array (`[]`).
+- **`excludePaths`** — optional array of project-relative gitignore-syntax patterns to exclude from file/document discovery globally, in project-global discovery and in every workspace's discovery.
+- **`testPaths`** — optional array of project-relative gitignore-syntax patterns identifying test and verification files. When omitted, the built-in defaults apply: `['**/*.spec.*', '**/*.test.*', '**/test/**', '**/tests/**', '**/__tests__/**', '*_test.*']`.
+- **`ignorePaths`** — optional array of project-relative gitignore-syntax patterns identifying auxiliary files (fixtures, static mocks, dev/scratch scripts). When omitted, defaults to an empty array (`[]`).
 - **`maxFileBytes`** — optional non-negative integer, the per-file size limit defined by Requirement: Graph file size limit.
-- **`largeFilePaths`** — optional array of gitignore-syntax patterns, relative to the project root, of files exempt from that limit.
+- **`largeFilePaths`** — optional array of project-relative gitignore-syntax patterns of files exempt from that limit.
 
 Resources discovered via `graph.includePaths` SHALL be assigned to the reserved `root:` graph namespace only when they are not already owned by a configured workspace `codeRoot`.
 
-`graph.excludePaths` SHALL apply to project-global discovery and workspace discovery alike. Workspace-level graph filters MAY add additional restrictions, but they MUST NOT remove or override global exclusions.
+`graph.excludePaths` SHALL apply to project-global discovery and workspace discovery alike, evaluated against the same project-relative path in both. Workspace-level graph filters MAY add additional restrictions, but they MUST NOT remove or override global exclusions; global exclusions are evaluated as a layer that workspace patterns cannot negate.
+
+Project-level `testPaths` and `ignorePaths` apply to every workspace's files, matched against the file's project-relative path, and are combined with the workspace-level lists of the owning workspace: for each kind the two lists are evaluated as one ordered list (project patterns first), so a workspace `!` negation can cancel a project pattern of the same kind. `largeFilePaths` lists are instead evaluated separately and a file is exempt when either list matches, so a workspace `!` negation cannot cancel a project-level exemption.
 
 Categorization precedence applies across all indexed files:
 
@@ -616,15 +635,16 @@ graph:
     - app/controllers/legacy_controller.php
 workspaces:
   backend:
+    codeRoot: app
     graph:
       maxFileBytes: 1048576 # optional; replaces the project value for this workspace
-      largeFilePaths: # optional; relative to this workspace's codeRoot; added to the project ones
-        - controllers/default/**
+      largeFilePaths: # optional; also relative to the project root; added to the project ones
+        - app/controllers/default/**
 ```
 
 - **`maxFileBytes`** MUST be a non-negative integer. A negative number, a non-integer, or a non-number value MUST be rejected by startup validation as a configuration error. The value `0` means that no limit applies. When the value is declared at neither level, the configuration exposes the field as absent and the code graph applies its built-in default of 262144 bytes (256 KiB).
 - A workspace `maxFileBytes` REPLACES the project-level value for files owned by that workspace.
-- **`largeFilePaths`** is an array of gitignore-syntax patterns that supports negation with `!` within the same list. The project-level patterns are evaluated relative to the project root and the workspace patterns relative to the workspace's `codeRoot`; the effective exemptions of a workspace are both sets together.
+- **`largeFilePaths`** is an array of gitignore-syntax patterns that supports negation with `!` within the same list. Project-level and workspace-level patterns are both evaluated relative to the project root; the effective exemptions of a workspace are both sets together.
 - A file matched by `largeFilePaths` is exempt from the size limit only. The exemption MUST NOT cause a file excluded by `excludePaths`, `allowedPaths`, or `.gitignore`, or by the binary file filter, to be indexed.
 - Both fields follow the layer merge semantics of the configuration cascade: a scalar from a later layer wins and arrays append.
 

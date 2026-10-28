@@ -37,6 +37,7 @@ function createMockGraphProvider(overrides: Partial<CodeGraphProvider>): CodeGra
     getCoveringSpecsForSymbol: vi.fn(),
     getStatistics: vi.fn(),
     getGraphHealth: vi.fn(),
+    explainPath: vi.fn(),
     resolveSymbolReference: vi.fn(),
     resolveSymbolReferences: vi.fn(),
     getExactPublicBinding: vi.fn(),

@@ -21,6 +21,8 @@ import { type IndexCoverage } from '../../domain/value-objects/index-session.js'
  */
 export interface CodeGraphHostPort {
   getStatistics(): Promise<GraphStatistics>
+  getFile?(path: string): Promise<FileNode | undefined>
+  getDocument?(path: string): Promise<DocumentNode | undefined>
   getAllFiles?(): Promise<FileNode[]>
   getAllDocuments?(): Promise<DocumentNode[]>
   getAllSpecs?(): Promise<SpecNode[]>

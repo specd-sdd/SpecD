@@ -37,6 +37,8 @@ export {
   type ImportDiagnosticSummary,
   IMPORT_DIAGNOSTIC_SAMPLE_LIMIT,
   SIZE_SKIP_LIST_LIMIT,
+  WORKSPACE_OVERLAP_LIST_LIMIT,
+  type WorkspaceOverlap,
 } from './index-result.js'
 export {
   type ParserResourceDisposer,

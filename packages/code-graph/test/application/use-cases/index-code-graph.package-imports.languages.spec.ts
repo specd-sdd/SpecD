@@ -76,7 +76,7 @@ describe('IndexCodeGraph package imports by language', () => {
       projectRoot: tempDir,
       vcsRoot: tempDir,
       workspaces: [workspace(provider), workspace(consumer)],
-      graphConfig: { includePaths: [], testPaths: ['tests/**'], workspaces: new Map() },
+      graphConfig: { includePaths: [], testPaths: ['**/tests/**'], workspaces: new Map() },
     })
     return { store, relations: store.allRelationsForTest(), result }
   }

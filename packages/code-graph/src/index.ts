@@ -74,6 +74,29 @@ export {
 } from './application/use-cases/get-graph-health.js'
 export { createGetGraphHealth } from './composition/use-cases/get-graph-health.js'
 export {
+  ExplainGraphPath,
+  type ExplainGraphPathInput,
+  type ExplainGraphPathResult,
+  type ExplainStage,
+  type ExplainOutcome,
+  type ExplainRuleLayer,
+  type ExplainRuleOrigin,
+  type ExplainRule,
+  type ExplainStep,
+  type CandidateVerdict,
+  type ExplainVerdict,
+  type ExplainDiagnosticCode,
+  type ExplainCandidate,
+  type ExplainDiagnostic,
+} from './application/use-cases/explain-graph-path.js'
+export { createExplainGraphPath } from './composition/use-cases/explain-graph-path.js'
+export { PATH_SEMANTICS_MARKER } from './application/use-cases/_shared/compute-graph-fingerprint.js'
+export {
+  UnknownWorkspaceError,
+  InvalidGraphWhyPathError,
+  GraphWhyRequiresConfigError,
+} from './domain/errors/index.js'
+export {
   IndexProjectGraph,
   type IndexProjectGraphInput,
 } from './application/use-cases/index-project-graph.js'
@@ -183,6 +206,7 @@ export {
   type IndexCoverageDiagnosticReason,
   type IndexCoverageDiagnostic,
   type IndexRunCoverageSummary,
+  type WorkspaceOverlap,
 } from './domain/value-objects/index-result.js'
 export {
   type IndexSession,
@@ -250,7 +274,10 @@ export type {
 // Discovery
 export {
   DEFAULT_EXCLUDE_PATHS,
+  createDiscoveryEvaluator,
   type DiscoverFilesOptions,
+  type DiscoveryDecision,
+  type DiscoveryEvaluator,
 } from './application/use-cases/discover-files.js'
 
 // Domain services

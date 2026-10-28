@@ -6,8 +6,26 @@
   "dependsOn": ["core:config"],
   "implementation": [
     {
-      "file": "code-graph:src/application/services/package-import-resolver.ts",
-      "symbols": ["PackageImportResolver"]
+      "file": "code-graph:src/application/use-cases/_shared/resolve-effective-graph-config.ts",
+      "symbols": ["resolveEffectiveGraphConfig", "EffectiveWorkspaceGraphConfig"]
+    },
+    {
+      "file": "code-graph:src/application/use-cases/discover-files.ts",
+      "symbols": ["discoverFiles"]
+    },
+    {
+      "file": "code-graph:src/application/use-cases/index-code-graph.ts",
+      "symbols": ["IndexCodeGraph"]
+    },
+    {
+      "file": "code-graph:src/domain/services/project-path-rules.ts",
+      "symbols": [
+        "isOutsideProject",
+        "computePathBase",
+        "isRootAnchoredPattern",
+        "buildPathSubject",
+        "createPathRuleSet"
+      ]
     }
   ],
   "optimizations": {

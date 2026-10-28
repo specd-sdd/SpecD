@@ -1,5 +1,10 @@
 import { relative } from 'node:path'
-import { type ProjectWorkspace } from '@specd/core'
+import {
+  type ProjectWorkspace,
+  DEFAULT_GRAPH_IGNORE_PATHS,
+  DEFAULT_GRAPH_TEST_PATHS,
+} from '@specd/core'
+import { computePathBase } from '../../../domain/services/project-path-rules.js'
 import { type ProjectGraphConfig } from '../../../domain/value-objects/index-options.js'
 import { DEFAULT_EXCLUDE_PATHS } from '../discover-files.js'
 
@@ -10,17 +15,29 @@ export const DEFAULT_MAX_FILE_BYTES = 262144
 
 /** Effective workspace discovery settings after global resolution. */
 export interface EffectiveWorkspaceGraphConfig {
-  /** Optional include filters relative to the workspace code root. */
+  /** Optional include filters, project-relative. */
   readonly allowedPaths?: readonly string[]
-  /** Final exclusion list applied to this workspace discovery run. */
-  readonly excludePaths: readonly string[]
+  /** Project-relative directory of the workspace code root (`''` when equal to the project root). */
+  readonly pathBase: string
+  /** Global exclusion layer: project excludes (or built-in defaults) plus synthetic spec-root exclusions, project-relative. */
+  readonly globalExcludePaths: readonly string[]
+  /** Workspace exclusion layer: the workspace's own `excludePaths`, project-relative. */
+  readonly workspaceExcludePaths: readonly string[]
+  /** Project-level test patterns (built-in defaults when the project declares none), project-relative. */
+  readonly projectTestPaths: readonly string[]
+  /** Workspace-level test patterns, project-relative. */
+  readonly workspaceTestPaths: readonly string[]
+  /** Project-level ignore patterns (built-in defaults when the project declares none), project-relative. */
+  readonly projectIgnorePaths: readonly string[]
+  /** Workspace-level ignore patterns, project-relative. */
+  readonly workspaceIgnorePaths: readonly string[]
   /** Whether `.gitignore` files remain active for this workspace. */
   readonly respectGitignore: boolean
   /** Effective per-file limit in bytes; 0 means no limit. Workspace value, else project value, else DEFAULT_MAX_FILE_BYTES. */
   readonly maxFileBytes: number
   /** Project-level exemption patterns, evaluated relative to the project root. */
   readonly projectLargeFilePaths: readonly string[]
-  /** Workspace-level exemption patterns, evaluated relative to the workspace code root. */
+  /** Workspace-level exemption patterns, evaluated relative to the project root. */
   readonly workspaceLargeFilePaths: readonly string[]
 }
 
@@ -116,11 +133,13 @@ export function resolveEffectiveGraphConfig(
             ...(workspaceGraph?.allowedPaths !== undefined
               ? { allowedPaths: [...workspaceGraph.allowedPaths] }
               : {}),
-            excludePaths: [
-              ...globalExcludePaths,
-              ...syntheticSpecExcludePaths,
-              ...(workspaceGraph?.excludePaths ?? []),
-            ],
+            pathBase: computePathBase(projectRoot, workspace.codeRoot),
+            globalExcludePaths: rootExcludePaths,
+            workspaceExcludePaths: [...(workspaceGraph?.excludePaths ?? [])],
+            projectTestPaths: [...(graphConfig.testPaths ?? DEFAULT_GRAPH_TEST_PATHS)],
+            workspaceTestPaths: [...(workspaceGraph?.testPaths ?? [])],
+            projectIgnorePaths: [...(graphConfig.ignorePaths ?? DEFAULT_GRAPH_IGNORE_PATHS)],
+            workspaceIgnorePaths: [...(workspaceGraph?.ignorePaths ?? [])],
             respectGitignore: workspaceGraph?.respectGitignore ?? true,
             maxFileBytes,
             projectLargeFilePaths: rootLargeFilePaths,
