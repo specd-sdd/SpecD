@@ -36,7 +36,19 @@ The adapter SHALL provide the `packageResolution` facet. `identity` SHALL read t
 
 A Go import resolves to a package, not to a symbol. The adapter SHALL obtain the package files through the shared helper `packageEntryFiles` and add every entry file to the file-level dependencies of the importing file. An import that cannot be resolved yields no dependency and a diagnostic with the reason reported by the helper.
 
-Resolving a qualified selector such as `pkg.Name` to a symbol across packages is not supported and remains unsupported coverage; the adapter MUST NOT guess it and MUST NOT search symbols by name in the target workspace.
+Every resolved package import that is not blank and not a dot import SHALL bind a namespace name in the importing file, used to read qualified selectors such as `pkg.Name`. The namespace name SHALL be, in this order:
+
+1. the explicit alias, when the import has one;
+2. otherwise the package name declared by the `package` clause of the indexed non-test entry files of the target package, when all of those entry files declare the same name;
+3. otherwise the last segment of the import path.
+
+The declared package name MUST be read from the indexed analysis of the entry files and MUST NOT require any filesystem read. If two imports of the same file would bind the same namespace name, neither binds it, because the name is ambiguous.
+
+A namespace name that is also bound by a lexical binding in scope at a selector is shadowed there and MUST NOT be treated as the package at that selector. The lexical bindings that shadow are: receivers, named parameters and named results (scoped to the function body, so the type expressions of the signature itself still resolve the package), local `var`, `const`, and `type` declarations including grouped ones, short variable declarations, `range` variables, variables declared in an `if`, `for`, or `switch` initializer, and type-switch bindings. A lexical binding shadows only from the point where Go scoping makes it visible to the end of its block: a reference that precedes the declaration in the same block still resolves the package.
+
+The resolution step returned by the helper SHALL be anchored on the file-scope Namespace local binding of the import itself, whatever namespace name was chosen, so that a declared-name or versioned import such as `.../go-auth` or `.../auth/v2` contributes its step like any other import.
+
+A qualified selector `ns.Name` whose `ns` is a namespace name of the file SHALL be resolved through the shared helper `resolvePackageExport` with the import specifier, the exported name, and the symbol spaces defined in "Scoped bindings, selectors, construction, and types". Only names beginning with an uppercase Unicode letter can resolve; a lowercase name stays unresolved. The adapter MUST NOT guess a selector that the helper leaves unresolved and MUST NOT search symbols by name in the target workspace.
 
 ### Requirement: Resolution manifests
 
@@ -58,7 +70,17 @@ The adapter SHALL emit deterministic facts for import aliases, function scopes, 
 
 In `buildRelations()`, the adapter SHALL build concrete `CALLS` relations connecting callers to target functions and receiver methods. Resolved imported packages SHALL be returned from `resolveImports()` so the indexer derives the file-level `IMPORTS` relations.
 
-Unresolved selectors, reflection, interface dispatch without a proven concrete target, generic/type-set choices lacking instantiated context, and values requiring interprocedural flow SHALL not produce guessed relations.
+The adapter SHALL emit a qualified reference fact (see `code-graph:symbol-model`) for each `ident.Name` selector whose operand is a single identifier, in these positions:
+
+- `call`: the function operand of a call expression, as in `models.NewUser()`, including an explicitly instantiated generic function such as `models.Map[int](x)`;
+- `construct`: the type of a composite literal, as in `models.User{}`; the qualifier MUST be retained and MUST NOT be reduced to the member name;
+- `type`: a type expression of a parameter, result, field, variable, constant, type declaration, or type argument, as in `var u models.User`.
+
+For facts of every kind, `sourceSymbolId` SHALL be the innermost declaration whose range contains the reference, using one containment rule for all kinds: functions, methods, type declarations, struct fields, and package-level variables and constants all qualify. A reference inside a package-level `var x = models.New()` therefore has the variable `x` as its source. The lexical shadowing rule of "Package identity, exports, and imports" applies uniformly to facts of kind `call`, `construct`, and `type`, so a shadowed qualifier never resolves as the package for any kind.
+
+The adapter SHALL resolve those facts as defined by "Qualified reference resolution" in `code-graph:language-adapter`. The symbol spaces requested from `resolvePackageExport` SHALL be the `value` space for kind `call` and the `type` space for kinds `construct` and `type`.
+
+A selector whose operand is a receiver, local variable, field, or any value rather than a namespace name of the file produces no qualified reference relation. Unresolved selectors, reflection, interface dispatch without a proven concrete target, generic/type-set choices lacking instantiated context, and values requiring interprocedural flow SHALL not produce guessed relations.
 
 ### Requirement: Go caller containment and declaration classification
 

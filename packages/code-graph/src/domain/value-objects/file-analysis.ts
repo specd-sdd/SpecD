@@ -4,6 +4,7 @@ import { type SymbolNode } from './symbol-node.js'
 import { type ImportDeclaration } from './import-declaration.js'
 import { type BindingFact } from './binding-fact.js'
 import { type CallFact } from './call-fact.js'
+import { type QualifiedReferenceFact } from './qualified-reference-fact.js'
 import { type ReferenceFacts } from './symbol-reference.js'
 
 /**
@@ -40,6 +41,8 @@ export interface FileAnalysisDraft {
   readonly callFacts: readonly CallFact[]
   /** Optional language-semantic reference facts, additive to legacy nodes and relations. */
   readonly referenceFacts?: ReferenceFacts
+  /** Optional syntactic evidence of `qualifier.name` references (see QualifiedReferenceFact). */
+  readonly qualifiedReferenceFacts?: readonly QualifiedReferenceFact[]
   readonly parserState?: ParserState
 }
 

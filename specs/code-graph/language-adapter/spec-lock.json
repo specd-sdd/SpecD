@@ -4,7 +4,15 @@
     "version": 1
   },
   "dependsOn": ["code-graph:symbol-model"],
-  "implementation": [],
+  "implementation": [
+    {
+      "file": "code-graph:src/domain/value-objects/language-adapter.ts",
+      "symbols": ["ResolvedImports"]
+    },
+    {
+      "file": "code-graph:test/infrastructure/tree-sitter/language-adapter-conformance.spec.ts"
+    }
+  ],
   "optimizations": {
     "optimizedDescription": {
       "value": "Deterministic adapter contract for complete parser facts, exact ranges, imports, bindings, hierarchy, and language-owned resolution.",

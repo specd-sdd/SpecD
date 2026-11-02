@@ -219,6 +219,22 @@ Scoped binding and call resolution SHALL NOT persist symbol-to-symbol dependency
 
 Unresolved binding facts and call facts SHALL NOT create speculative graph edges. They MAY be preserved as non-persisted diagnostics or debug metadata for tests and troubleshooting.
 
+### Requirement: Qualified reference facts
+
+`FileAnalysisDraft` and `FileAnalysis` SHALL accept an optional `qualifiedReferenceFacts` collection. An absent collection is equivalent to an empty one, and an adapter that does not emit qualified references remains valid and MUST NOT be required to change.
+
+A qualified reference fact records a name written as `qualifier.name` in source, where the qualifier is a single identifier. It MUST carry:
+
+- **`qualifier`** — the identifier before the dot, exactly as written
+- **`name`** — the identifier after the dot, exactly as written
+- **`kind`** — one of `call`, `construct`, or `type`, naming the position where the reference occurs
+- **`sourceSymbolId`** — the innermost declaration whose complete parser-derived range contains the reference, when one exists
+- **`location`** — the parser-derived source location of the reference
+
+A qualified reference fact is evidence of syntax only. It MUST NOT by itself imply a relation or a target; whether `qualifier` names an imported namespace, and what `name` resolves to, is decided by the resolution defined in `code-graph:language-adapter`.
+
+Qualified reference facts SHALL be plain immutable data, MUST NOT retain AST nodes or parser objects, and MUST NOT require changes to persisted symbol IDs, relation IDs, or graph-store schemas.
+
 ### Requirement: Immutability
 
 All model types — `FileNode`, `SymbolNode`, `Relation`, and any aggregate containing them — SHALL be immutable value objects. Properties MUST be `readonly`. Mutations to the graph happen exclusively through the `GraphStore` port's atomic upsert operations, which replace entire file-scoped slices. There is no in-place mutation API.

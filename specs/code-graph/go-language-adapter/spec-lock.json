@@ -11,7 +11,23 @@
   "implementation": [
     {
       "file": "code-graph:src/infrastructure/tree-sitter/go-language-adapter.ts",
-      "symbols": ["GoLanguageAdapter"]
+      "symbols": [
+        "GoLanguageAdapter",
+        "extractQualifiedReferences",
+        "callSelector",
+        "isGoShadowedByEnclosingScope",
+        "createGoLexicalBindingIndex",
+        "goNamespaceBindings"
+      ]
+    },
+    {
+      "file": "code-graph:test/infrastructure/tree-sitter/go-language-adapter.spec.ts"
+    },
+    {
+      "file": "code-graph:test/integration/go-selectors-python-reexports.spec.ts"
+    },
+    {
+      "file": "code-graph:test/application/use-cases/index-code-graph.package-imports.languages.spec.ts"
     }
   ],
   "optimizations": {

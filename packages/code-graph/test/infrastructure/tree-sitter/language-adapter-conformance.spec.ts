@@ -6,7 +6,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AdapterRegistry } from '../../../src/infrastructure/tree-sitter/adapter-registry.js'
 import { TypeScriptLanguageAdapter } from '../../../src/infrastructure/tree-sitter/typescript-language-adapter.js'
 import { PythonLanguageAdapter } from '../../../src/infrastructure/tree-sitter/python-language-adapter.js'
-import { GoLanguageAdapter } from '../../../src/infrastructure/tree-sitter/go-language-adapter.js'
+import {
+  GO_MODULE_OFFSETS_KEY,
+  GoLanguageAdapter,
+} from '../../../src/infrastructure/tree-sitter/go-language-adapter.js'
 import { PhpLanguageAdapter } from '../../../src/infrastructure/tree-sitter/php-language-adapter.js'
 import { InMemoryIndexSession } from '../../../src/application/use-cases/in-memory-index-session.js'
 import {
@@ -1703,5 +1706,127 @@ describe('LanguageAdapter Conformance Suite', () => {
         expect(disposed).toBe(true)
       })
     })
+  })
+})
+
+describe('qualified reference fields stay optional', () => {
+  const cases: { language: string; adapter: LanguageAdapter; filePath: string; content: string }[] =
+    [
+      {
+        language: 'typescript',
+        adapter: new TypeScriptLanguageAdapter(),
+        filePath: 'ws:main.ts',
+        content: 'export const value = 1\n',
+      },
+      {
+        language: 'php',
+        adapter: new PhpLanguageAdapter(),
+        filePath: 'ws:main.php',
+        content: '<?php\nclass User {}\n',
+      },
+      {
+        language: 'python',
+        adapter: new PythonLanguageAdapter(),
+        filePath: 'ws:main.py',
+        content: 'class User:\n    pass\n',
+      },
+    ]
+
+  it.each(cases)(
+    'given a $language file, when it is analyzed and resolved, then the new fields are absent',
+    ({ adapter, filePath, content, language }) => {
+      const session = new InMemoryIndexSession()
+      session.registerFile({
+        filePath,
+        projectRelativePath: filePath.slice(filePath.indexOf(':') + 1),
+        language,
+        contentHash: 'hash',
+        workspace: 'ws',
+      })
+      const draft = adapter.analyzeFile(filePath, content, { session, workspaceName: 'ws' })
+      const analysis = session.registerAnalysis({ filePath, analysis: draft })
+      const resolved = adapter.resolveImports(
+        analysis,
+        createImportResolutionContext({ session }, adapter),
+      )
+
+      expect(draft.qualifiedReferenceFacts).toBeUndefined()
+      expect(resolved.qualifiedTargets).toBeUndefined()
+    },
+  )
+})
+
+describe('Go last-segment fallback reads no files', () => {
+  it('given unindexed entries, when the last segment is the qualifier, then nothing is resolved and no file is read', () => {
+    const adapter = new GoLanguageAdapter()
+    const session = new InMemoryIndexSession()
+    const filePath = 'ws:main.go'
+    session.registerFile({
+      filePath,
+      projectRelativePath: 'main.go',
+      language: 'go',
+      contentHash: 'hash',
+      workspace: 'ws',
+    })
+    const analysis = session.registerAnalysis({
+      filePath,
+      analysis: adapter.analyzeFile(
+        filePath,
+        'package main\nimport "example.com/app/pkg/models"\nfunc main() { _ = models.User{} }\n',
+        { session, workspaceName: 'ws' },
+      ),
+    })
+    session.setAdapterState(GO_MODULE_OFFSETS_KEY, new Map([['ws', '']]))
+    const before = vi.mocked(readFileSync).mock.calls.length
+    const resolved = adapter.resolveImports(
+      analysis,
+      createImportResolutionContext(
+        { session, packageToWorkspace: new Map([['example.com/app', 'ws']]) },
+        adapter,
+      ),
+    )
+
+    expect(analysis.qualifiedReferenceFacts?.[0]?.qualifier).toBe('models')
+    expect(resolved.qualifiedTargets?.size).toBe(0)
+    expect(vi.mocked(readFileSync).mock.calls.length).toBe(before)
+  })
+
+  it('given indexed entries whose package clauses disagree, when the last segment is the qualifier, then the fallback reads no file', () => {
+    const adapter = new GoLanguageAdapter()
+    const session = new InMemoryIndexSession()
+    const register = (filePath: string, code: string): void => {
+      session.registerFile({
+        filePath,
+        projectRelativePath: filePath.slice(filePath.indexOf(':') + 1),
+        language: 'go',
+        contentHash: 'hash',
+        workspace: 'ws',
+      })
+      session.registerAnalysis({
+        filePath,
+        analysis: adapter.analyzeFile(filePath, code, { session, workspaceName: 'ws' }),
+      })
+    }
+    register('ws:pkg/models/a.go', 'package models\ntype User struct{}\n')
+    register('ws:pkg/models/b.go', 'package main\n')
+    register(
+      'ws:main.go',
+      'package main\nimport "example.com/app/pkg/models"\nfunc main() { _ = models.User{} }\n',
+    )
+    const importing = session.getAnalysis('ws:main.go')
+    expect(importing).toBeDefined()
+    session.setAdapterState(GO_MODULE_OFFSETS_KEY, new Map([['ws', '']]))
+    const before = vi.mocked(readFileSync).mock.calls.length
+    const resolved = adapter.resolveImports(
+      importing!,
+      createImportResolutionContext(
+        { session, packageToWorkspace: new Map([['example.com/app', 'ws']]) },
+        adapter,
+      ),
+    )
+
+    expect(importing?.qualifiedReferenceFacts?.[0]?.qualifier).toBe('models')
+    expect(resolved.qualifiedTargets?.size).toBe(1)
+    expect(vi.mocked(readFileSync).mock.calls.length).toBe(before)
   })
 })

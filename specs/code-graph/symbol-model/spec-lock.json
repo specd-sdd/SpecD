@@ -10,8 +10,27 @@
   ],
   "implementation": [
     {
-      "file": "code-graph:src/domain/value-objects/file-node.ts",
-      "symbols": ["createFileNode", "FileNode"]
+      "file": "code-graph:src/domain/value-objects/qualified-reference-fact.ts",
+      "symbols": ["QualifiedReferenceKind", "QualifiedReferenceFact", "qualifiedReferenceKey"]
+    },
+    {
+      "file": "code-graph:src/domain/value-objects/file-analysis.ts",
+      "symbols": ["FileAnalysisDraft"]
+    },
+    {
+      "file": "code-graph:test/domain/value-objects/qualified-reference-fact.spec.ts"
+    },
+    {
+      "file": "code-graph:src/domain/value-objects/index.ts"
+    },
+    {
+      "file": "code-graph:src/index.ts"
+    },
+    {
+      "file": "code-graph:src/public.ts"
+    },
+    {
+      "file": "code-graph:test/barrel.spec.ts"
     }
   ],
   "optimizations": {

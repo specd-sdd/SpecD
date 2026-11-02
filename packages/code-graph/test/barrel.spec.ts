@@ -209,6 +209,7 @@ describe('@specd/code-graph barrel', () => {
       'BulkSessionStateError',
       'CODE_GRAPH_VERSION',
       'CallForm',
+      'QualifiedReferenceKind',
       'DEFAULT_EXCLUDE_PATHS',
       'DEFAULT_HOTSPOT_KINDS',
       'DEFAULT_MAX_FILE_BYTES',
@@ -298,6 +299,7 @@ describe('@specd/code-graph barrel', () => {
       'normalizeFileSelectorPath',
       'parseFingerprintMap',
       'parseLogicalSymbol',
+      'qualifiedReferenceKey',
       'runIsolatedGraphIndex',
       'serializeFingerprintMap',
     ]

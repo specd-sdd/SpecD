@@ -19,6 +19,9 @@ import { RelationType } from '../../domain/value-objects/relation-type.js'
 import {
   type ImportDiagnostic,
   type PackageResolutionFacet,
+  type ReExportLinkContext,
+  type ReExportLinkingFacet,
+  type ReExportLinkResult,
   type RelativeImportResolutionFacet,
   type SymbolReferenceSyntaxFacet,
 } from '../../domain/value-objects/language-adapter-facets.js'
@@ -45,6 +48,7 @@ import {
   MemberKind,
   type MemberSemantics,
   SymbolSpace,
+  type PublicBinding,
   type ResolutionStep,
   createLocalBinding,
   createPublicBinding,
@@ -415,6 +419,41 @@ function collectByKind(node: SgNode, kinds: Set<string>, results: SgNode[]): voi
 }
 
 /**
+ * Candidate files for one Python module path under a package root.
+ * @param root - Workspace-prefixed directory of the top-level package.
+ * @param modulePath - Module path under that root, using `/`, or empty for the package itself.
+ * @returns Candidate file paths, most specific file forms first.
+ */
+function pythonModuleCandidates(root: string, modulePath: string): string[] {
+  if (modulePath === '') {
+    return [`${root}/__init__.py`, `${root}/__init__.pyi`]
+  }
+  return [
+    `${root}/${modulePath}.py`,
+    `${root}/${modulePath}.pyi`,
+    `${root}/${modulePath}/__init__.py`,
+    `${root}/${modulePath}/__init__.pyi`,
+  ]
+}
+
+/**
+ * Top-level package directory that contains an entry file.
+ * @param entryPath - Workspace-prefixed package entry.
+ * @param firstSegment - First dotted segment of an absolute import.
+ * @returns `<workspace>:src/<segment>` or `<workspace>:<segment>`, or undefined when the entry is outside that package.
+ */
+function pythonTopLevelPackageDir(entryPath: string, firstSegment: string): string | undefined {
+  const identity = splitWorkspaceIdentity(entryPath)
+  if (identity === null || firstSegment.length === 0) return undefined
+  for (const root of [`src/${firstSegment}`, firstSegment]) {
+    if (identity.relativePath === root || identity.relativePath.startsWith(`${root}/`)) {
+      return `${identity.workspace}:${root}`
+    }
+  }
+  return undefined
+}
+
+/**
  * Converts an AST node range into a source location.
  * @param node - AST node to locate.
  * @param filePath - Workspace-prefixed source path.
@@ -492,6 +531,30 @@ interface PythonFieldTypeFact {
   readonly typeName: string
 }
 
+/** One `from` import at module level of a package entry that can publish a name. */
+interface PythonReExportInfo {
+  /** Number of leading dots; 0 for an absolute import. */
+  readonly level: number
+  /** Dotted module text after the dots; empty for `from . import x`. */
+  readonly module: string
+  /** Name imported from the module. */
+  readonly importedName: string
+  /** Name bound in the entry file (alias when present, otherwise importedName). */
+  readonly boundName: string
+}
+
+/** Classification of `__all__` in one Python module. */
+interface PythonAllInfo {
+  /**
+   * `absent`: no `__all__`.
+   * `static`: module-level list, parenthesized tuple, or unparenthesized tuple of plain strings.
+   * `dynamic`: anything else, including bytes literals.
+   */
+  readonly kind: 'absent' | 'static' | 'dynamic'
+  /** Listed names when kind is `static`; empty otherwise. */
+  readonly names: readonly string[]
+}
+
 /**
  * Parser state representation for Python.
  */
@@ -499,6 +562,10 @@ interface PythonParserState {
   readonly kind: 'python'
   readonly classes: readonly SerializedPythonClassInfo[]
   readonly fieldTypes?: readonly PythonFieldTypeFact[]
+  /** Direct module-level `from` imports. Present only for package entry files. */
+  readonly reExports?: readonly PythonReExportInfo[]
+  /** `__all__` classification. Present only for package entry files. */
+  readonly allExport?: PythonAllInfo
 }
 
 /**
@@ -523,16 +590,7 @@ export class PythonLanguageAdapter implements LanguageAdapter {
         `${request.workspace}:src/${topLevel}`,
         `${request.workspace}:${topLevel}`,
       ]) {
-        if (rest.length === 0) {
-          candidates.push(`${root}/__init__.py`, `${root}/__init__.pyi`)
-        } else {
-          candidates.push(
-            `${root}/${modulePath}.py`,
-            `${root}/${modulePath}.pyi`,
-            `${root}/${modulePath}/__init__.py`,
-            `${root}/${modulePath}/__init__.pyi`,
-          )
-        }
+        candidates.push(...pythonModuleCandidates(root, modulePath))
       }
       const indexed = candidates.filter(
         (candidate) => request.session.getFileId(candidate) !== undefined,
@@ -583,6 +641,14 @@ export class PythonLanguageAdapter implements LanguageAdapter {
    */
   get symbolReferenceSyntax(): SymbolReferenceSyntaxFacet {
     return this.symbolReferenceSyntaxFacet
+  }
+
+  /**
+   * Named re-export routes through package entry files.
+   * @returns The facet this adapter provides.
+   */
+  get reExportLinking(): ReExportLinkingFacet {
+    return { link: (context) => this.linkReExports(context) }
   }
 
   /**
@@ -880,6 +946,9 @@ export class PythonLanguageAdapter implements LanguageAdapter {
       imports,
       classes,
     )
+    const entryFacts = /(^|\/)__init__\.pyi?$/.test(filePath)
+      ? this.extractReExports(root)
+      : undefined
     return {
       language: 'python',
       symbols: withEnclosingTypeParents(symbols),
@@ -891,8 +960,317 @@ export class PythonLanguageAdapter implements LanguageAdapter {
         kind: 'python',
         classes: serializedClasses,
         fieldTypes,
+        ...(entryFacts !== undefined
+          ? { reExports: entryFacts.reExports, allExport: entryFacts.allExport }
+          : {}),
       },
     }
+  }
+
+  /**
+   * Collects module-level re-export routes and classifies `__all__`.
+   * Only direct children of the module are routes. `from . import name` is recorded
+   * with an empty module and is not a source route. Nested and conditional imports are ignored.
+   * @param root - Parsed module root.
+   * @returns Routes and the `__all__` classification.
+   */
+  private extractReExports(root: SgNode): {
+    readonly reExports: PythonReExportInfo[]
+    readonly allExport: PythonAllInfo
+  } {
+    const reExports: PythonReExportInfo[] = []
+    for (const child of root.children()) {
+      if (nodeKind(child) !== 'import_from_statement') continue
+      if (child.children().some((item) => nodeKind(item) === 'wildcard_import')) continue
+      const moduleNode = child.field('module_name')
+      const moduleText = moduleNode?.text() ?? ''
+      const dots = /^\.*/.exec(moduleText)?.[0].length ?? 0
+      const module = moduleText.slice(dots)
+      const moduleId = moduleNode?.id()
+      let seenImportKeyword = false
+      for (const nameChild of child.children()) {
+        if (!nameChild.isNamed() && nameChild.text() === 'import') {
+          seenImportKeyword = true
+          continue
+        }
+        if (!seenImportKeyword) continue
+        if (nodeKind(nameChild) === 'dotted_name') {
+          if (nameChild.id() === moduleId) continue
+          const importedName = nameChild.text()
+          if (importedName.length === 0) continue
+          reExports.push({ level: dots, module, importedName, boundName: importedName })
+        } else if (nodeKind(nameChild) === 'aliased_import') {
+          const imported = nameChild.field('name') ?? nameChild.child(0)
+          const alias = nameChild.field('alias')
+          const importedName = imported?.text() ?? ''
+          if (importedName.length === 0) continue
+          reExports.push({
+            level: dots,
+            module,
+            importedName,
+            boundName: alias?.text() || importedName,
+          })
+        }
+      }
+    }
+    return { reExports, allExport: this.classifyPythonAll(root) }
+  }
+
+  /**
+   * Classifies every `__all__` reference in a module.
+   * A read such as `"X" in __all__` is dynamic: the public list cannot be proven.
+   * Annotated assignments stay static because they are still `assignment` nodes.
+   * An unparenthesized tuple (`__all__ = "A", "B"`) is an `expression_list` and stays static.
+   * A bytes literal is not a plain string, so it makes the list dynamic.
+   * @param root - Parsed module root.
+   * @returns Absent, static, or dynamic.
+   */
+  private classifyPythonAll(root: SgNode): PythonAllInfo {
+    const names: string[] = []
+    let seen = false
+    let dynamic = false
+    const visit = (node: SgNode): void => {
+      if (nodeKind(node) === 'identifier' && node.text() === '__all__') {
+        seen = true
+        const parent = node.parent()
+        const collected = parent ? this.staticAllNames(parent) : undefined
+        if (collected === undefined) dynamic = true
+        else names.push(...collected)
+      }
+      for (const child of node.children()) visit(child)
+    }
+    visit(root)
+    if (!seen) return { kind: 'absent', names: [] }
+    if (dynamic) return { kind: 'dynamic', names: [] }
+    const unique: string[] = []
+    const used = new Set<string>()
+    for (const name of names) {
+      if (used.has(name)) continue
+      used.add(name)
+      unique.push(name)
+    }
+    return { kind: 'static', names: unique }
+  }
+
+  /**
+   * Reads literal names from a module-level `__all__` assignment.
+   * @param assignment - Parent of an `__all__` identifier.
+   * @returns Listed names, or undefined when the assignment is not a static module-level update.
+   */
+  private staticAllNames(assignment: SgNode): readonly string[] | undefined {
+    const kind = nodeKind(assignment)
+    if (kind !== 'assignment' && kind !== 'augmented_assignment') return undefined
+    const statement = assignment.parent()
+    const moduleNode =
+      statement && nodeKind(statement) === 'expression_statement' ? statement.parent() : statement
+    if (!moduleNode || nodeKind(moduleNode) !== 'module') return undefined
+    if (kind === 'augmented_assignment') {
+      const operator = assignment
+        .children()
+        .find((child) => !child.isNamed())
+        ?.text()
+      if (operator !== '+=') return undefined
+    }
+    const right = assignment.field('right')
+    if (!right) return undefined
+    return this.staticStringCollection(right)
+  }
+
+  /**
+   * Reads a list, parenthesized tuple, unparenthesized tuple, or `+` concatenation of plain string literals.
+   * @param node - Right-hand side.
+   * @returns String values, or undefined when any element is not a plain literal.
+   */
+  private staticStringCollection(node: SgNode): readonly string[] | undefined {
+    const kind = nodeKind(node)
+    if (kind === 'list' || kind === 'tuple' || kind === 'expression_list') {
+      const names: string[] = []
+      for (const child of node.children()) {
+        if (!child.isNamed()) continue
+        const value = this.plainPythonString(child)
+        if (value === undefined) return undefined
+        names.push(value)
+      }
+      return names
+    }
+    if (kind === 'binary_operator') {
+      const operator = node
+        .children()
+        .find((child) => !child.isNamed())
+        ?.text()
+      if (operator !== '+') return undefined
+      const left = node.field('left')
+      const right = node.field('right')
+      if (!left || !right) return undefined
+      const leftNames = this.staticStringCollection(left)
+      const rightNames = this.staticStringCollection(right)
+      if (!leftNames || !rightNames) return undefined
+      return [...leftNames, ...rightNames]
+    }
+    return undefined
+  }
+
+  /**
+   * Returns the text of a non-interpolated string literal.
+   * Bytes literals (`b"..."`, `br"..."`) are rejected so `__all__` stays dynamic.
+   * @param node - Candidate string node.
+   * @returns The literal contents, or undefined.
+   */
+  private plainPythonString(node: SgNode): string | undefined {
+    if (nodeKind(node) !== 'string') return undefined
+    const start = node.children().find((child) => nodeKind(child) === 'string_start')
+    if (start !== undefined && /b/i.test(start.text())) return undefined
+    if (node.children().some((child) => nodeKind(child) === 'interpolation')) return undefined
+    const contents = node.children().filter((child) => nodeKind(child) === 'string_content')
+    if (contents.length !== 1) return undefined
+    return contents[0]?.text()
+  }
+
+  /**
+   * Publishes names that package entry files re-export through static imports.
+   * An `__init__.pyi` whose `__init__.py` sibling is indexed is not an entry.
+   * @param context - Session and package map used to resolve absolute routes.
+   * @returns Bindings and steps that did not already exist.
+   */
+  private linkReExports(context: ReExportLinkContext): ReExportLinkResult {
+    const session = context.session
+    const files = [...session.getAllFilePaths()]
+      .sort()
+      .map((filePath) => {
+        if (
+          filePath.endsWith('__init__.pyi') &&
+          session.getFileId(filePath.slice(0, -1)) !== undefined
+        ) {
+          return undefined
+        }
+        const state = session.getAnalysis(filePath)?.parserState
+        if (state?.kind !== 'python') return undefined
+        const python = state as unknown as PythonParserState
+        if (python.reExports === undefined || python.reExports.length === 0) return undefined
+        if (python.allExport?.kind === 'dynamic') return undefined
+        return { filePath, reExports: python.reExports, allExport: python.allExport }
+      })
+      .filter((entry): entry is NonNullable<typeof entry> => entry !== undefined)
+
+    const created = new Map<string, PublicBinding>()
+    const emitted: PublicBinding[] = []
+    const steps: ResolutionStep[] = []
+    const lookup = (
+      surface: string,
+      name: string,
+      space: SymbolSpace,
+    ): readonly PublicBinding[] => {
+      const local = created.get(`${surface}\u0000${name}\u0000${space}`)
+      const stored = session.findPublicBindings(surface, name, space)
+      return local === undefined ? stored : [...stored, local]
+    }
+
+    let guard = files.length + 1
+    let added = true
+    while (added && guard > 0) {
+      added = false
+      guard -= 1
+      for (const file of files) {
+        const allowed =
+          file.allExport?.kind === 'static' ? new Set(file.allExport.names) : undefined
+        const surfaceF = file.filePath.replace(/(?:\/__init__)?\.pyi?$/, '')
+        for (const route of file.reExports) {
+          if (allowed !== undefined && !allowed.has(route.boundName)) continue
+          const source = this.resolvePythonRoute(
+            session,
+            file.filePath,
+            route,
+            context.packageToWorkspace,
+          )
+          if (source === undefined) continue
+          const surfaceS = source.replace(/(?:\/__init__)?\.pyi?$/, '')
+          for (const space of [SymbolSpace.Value, SymbolSpace.Type]) {
+            const matches = lookup(surfaceS, route.importedName, space).filter(
+              (binding) => binding.targetId !== undefined,
+            )
+            const targets = new Set(matches.map((binding) => binding.targetId))
+            if (targets.size !== 1) continue
+            const targetId = [...targets][0]
+            if (targetId === undefined) continue
+            const already = session
+              .findPublicBindings(surfaceF, route.boundName, space)
+              .some((binding) => binding.targetId === targetId)
+            const key = `${surfaceF}\u0000${route.boundName}\u0000${space}`
+            if (already || created.has(key)) continue
+            const binding = createPublicBinding({
+              surface: surfaceF,
+              exportedName: route.boundName,
+              space,
+              targetId,
+            })
+            created.set(key, binding)
+            emitted.push(binding)
+            steps.push({ fromId: binding.id, toId: targetId, kind: 're-export:named' })
+            added = true
+          }
+        }
+      }
+    }
+
+    return {
+      publicBindings: [...emitted].sort((left, right) => left.id.localeCompare(right.id)),
+      steps,
+    }
+  }
+
+  /**
+   * Resolves one re-export route to exactly one indexed source file.
+   * Relative routes use `relativeImportResolution`. Absolute routes use `packageResolution.entrySurface`
+   * and stay inside the top-level package directory that contains the entry.
+   * `from . import name` has an empty module and is not a route.
+   * @param session - Session used to keep indexed candidates.
+   * @param entryPath - Package entry that wrote the route.
+   * @param route - Route to resolve.
+   * @param packageToWorkspace - Package identity to owning workspace.
+   * @returns The source file, or undefined when the route is not a unique in-package file.
+   */
+  private resolvePythonRoute(
+    session: IndexSession,
+    entryPath: string,
+    route: PythonReExportInfo,
+    packageToWorkspace: ReadonlyMap<string, string>,
+  ): string | undefined {
+    let candidates: string[]
+    if (route.level > 0) {
+      if (route.module.length === 0) return undefined
+      const resolved = this.relativeImportResolution.resolve(
+        entryPath,
+        '.'.repeat(route.level) + route.module,
+      )
+      candidates = typeof resolved === 'string' ? [resolved] : [...resolved]
+    } else {
+      const first = route.module.split('.')[0]
+      if (first === undefined || first.length === 0) return undefined
+      const packageName = this.packageResolution.matchSpecifier(
+        route.module,
+        [...packageToWorkspace.keys()],
+        session,
+      )
+      if (packageName === undefined) return undefined
+      const workspace = packageToWorkspace.get(packageName)
+      const packageDir = pythonTopLevelPackageDir(entryPath, first)
+      if (workspace === undefined || packageDir === undefined) return undefined
+      const prefix = `${packageDir}/`
+      candidates = this.packageResolution
+        .entrySurface({
+          specifier: route.module,
+          packageName,
+          workspace,
+          session,
+        })
+        .map((entry) => entry.filePath)
+        .filter((filePath) => filePath === packageDir || filePath.startsWith(prefix))
+    }
+    const indexed = candidates.filter((candidate) => session.getFileId(candidate) !== undefined)
+    const kept = indexed.filter(
+      (candidate) => !candidate.endsWith('.pyi') || !indexed.includes(candidate.slice(0, -1)),
+    )
+    return kept.length === 1 ? kept[0] : undefined
   }
 
   /**

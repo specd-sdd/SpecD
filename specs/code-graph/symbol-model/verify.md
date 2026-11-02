@@ -346,6 +346,27 @@
 - **WHEN** scoped binding resolution runs
 - **THEN** no persisted relation is emitted for that unresolved type
 
+### Requirement: Qualified reference facts
+
+#### Scenario: Absent collection equals empty
+
+- **GIVEN** an adapter that emits no `qualifiedReferenceFacts`
+- **WHEN** its draft is registered
+- **THEN** the analysis is valid and behaves as if the collection were empty
+
+#### Scenario: Fact carries syntax only
+
+- **GIVEN** `models.User` appears in a type position
+- **WHEN** the fact is emitted
+- **THEN** it carries qualifier, name, kind `type`, source symbol, and location
+- **AND** it names no target and creates no relation
+
+#### Scenario: Fact is plain data
+
+- **GIVEN** a registered analysis with qualified reference facts
+- **WHEN** it is serialized
+- **THEN** it contains no parser objects and persisted IDs and schemas are unchanged
+
 ### Requirement: Immutability
 
 #### Scenario: FileNode properties are readonly

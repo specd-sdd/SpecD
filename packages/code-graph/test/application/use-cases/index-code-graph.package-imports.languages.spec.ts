@@ -81,7 +81,7 @@ describe('IndexCodeGraph package imports by language', () => {
     return { store, relations: store.allRelationsForTest(), result }
   }
 
-  it('Given a Python package in another workspace, when a name is imported from its module, then the binding, step and IMPORTS cross the workspace and a re-imported alias stays unresolved', async () => {
+  it('Given a Python package in another workspace, when a name is imported from its module, then the binding, step and IMPORTS cross the workspace and a re-imported alias resolves', async () => {
     write(join(tempDir, 'auth'), {
       'pyproject.toml': '[project]\nname = "acme-auth"\n',
       'src/acme_auth/__init__.py': 'from .models import User\n',
@@ -103,7 +103,7 @@ describe('IndexCodeGraph package imports by language', () => {
       (binding) => binding.filePath === 'app:src/app/main.py' && binding.localName === 'ViaInit',
     )
     expect(bound?.targetId).toContain('auth')
-    expect(viaInit?.targetId).toBeUndefined()
+    expect(viaInit?.targetId).toBe(bound?.targetId)
     expect(facts.steps.some((step) => step.kind === 'import:package')).toBe(true)
     expect(
       relations.some(
@@ -164,11 +164,11 @@ describe('IndexCodeGraph package imports by language', () => {
     expect(
       relations.some(
         (r) =>
+          r.type === 'CONSTRUCTS' &&
           r.source.startsWith('app:main.go:') &&
-          r.target.startsWith('auth:') &&
-          r.type !== 'IMPORTS',
+          r.target.startsWith('auth:models/user.go:'),
       ),
-    ).toBe(false)
+    ).toBe(true)
   })
 
   it('Given a PHP class in another workspace, when it is imported by its qualified name, then the type use crosses the workspace and a same short name elsewhere is not used', async () => {

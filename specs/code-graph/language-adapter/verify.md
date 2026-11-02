@@ -556,6 +556,51 @@
 - **WHEN** `analyzeFile()` extracts call facts and `buildRelations()` runs
 - **THEN** no `CALLS` relation is created for that call
 
+### Requirement: Qualified reference resolution
+
+#### Scenario: Resolved fact produces the relation of its kind
+
+- **GIVEN** qualified reference facts of kinds `call`, `construct`, and `type` whose qualifier is a bound namespace and whose names the helper resolves
+- **WHEN** relations are built
+- **THEN** the relations are `CALLS`, `CONSTRUCTS`, and `USES_TYPE` respectively
+- **AND** the helper's resolution step is contributed
+
+#### Scenario: Unresolved fact is dropped silently
+
+- **GIVEN** a fact for which the helper returns `not-exported`, `ambiguous`, `package-unknown`, or `no-entry-surface`
+- **WHEN** relations are built
+- **THEN** no relation is produced and no indexing failure is recorded
+
+#### Scenario: Shadowed qualifier does not resolve
+
+- **GIVEN** a lexical binding named like the namespace in scope at the reference
+- **WHEN** relations are built
+- **THEN** the fact does not resolve
+
+#### Scenario: No name search is performed
+
+- **GIVEN** a name that exists elsewhere in the target workspace but is not exported by the entry surface
+- **WHEN** the fact is resolved
+- **THEN** it stays unresolved
+
+#### Scenario: Namespace without a local binding contributes no step
+
+- **GIVEN** a resolved fact whose namespace has no file-scope local binding
+- **WHEN** imports are resolved
+- **THEN** the relation target is returned and no resolution step is contributed
+
+#### Scenario: Missing source symbol blocks every kind
+
+- **GIVEN** `call`, `construct`, and `type` facts without `sourceSymbolId`
+- **WHEN** relations are built
+- **THEN** no relation is produced for any of them
+
+#### Scenario: Repeated references produce one relation
+
+- **GIVEN** two `call` facts with the same source and the same resolved target
+- **WHEN** relations are built
+- **THEN** exactly one `CALLS` relation exists for that pair
+
 ### Requirement: Semantic caller containment
 
 #### Scenario: Preceding non-callable cannot usurp the caller

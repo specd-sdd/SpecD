@@ -1792,4 +1792,498 @@ class Formatter(Protocol):
       expect(session.parserResources.size).toBe(0)
     })
   })
+
+  describe('package re-export routes', () => {
+    /**
+     * Registers one Python file and its analysis.
+     * @param session - Session that receives the file.
+     * @param filePath - Workspace-prefixed path.
+     * @param code - Source text.
+     * @returns The registered analysis.
+     */
+    function register(session: InMemoryIndexSession, filePath: string, code: string): FileAnalysis {
+      session.registerFile({
+        filePath,
+        projectRelativePath: filePath.slice(filePath.indexOf(':') + 1),
+        language: 'python',
+        contentHash: 'hash',
+        workspace: 'ws',
+      })
+      return session.registerAnalysis({
+        filePath,
+        analysis: baseAdapter.analyzeFile(filePath, code, { session, workspaceName: 'ws' }),
+      })
+    }
+
+    /**
+     * Runs re-export linking and returns the published names.
+     * @param session - Session with entry analyses.
+     * @returns Exported names of the new bindings.
+     */
+    function published(
+      session: InMemoryIndexSession,
+      packageToWorkspace: ReadonlyMap<string, string> = new Map(),
+    ): string[] {
+      return baseAdapter.reExportLinking
+        .link({ session, packageToWorkspace })
+        .publicBindings.map((binding) => `${binding.surface} ${binding.exportedName}`)
+    }
+
+    it('given a relative route, when linking runs, then the entry publishes the imported name', () => {
+      const session = new InMemoryIndexSession()
+      const models = register(session, 'ws:src/acme_auth/models.py', 'class User:\n    pass\n')
+      register(session, 'ws:src/acme_auth/__init__.py', 'from .models import User\n')
+      const userId = models.referenceFacts?.publicBindings.find(
+        (binding) => binding.exportedName === 'User',
+      )?.targetId
+      const linked = baseAdapter.reExportLinking.link({ session, packageToWorkspace: new Map() })
+
+      expect(published(session)).toContain('ws:src/acme_auth User')
+      expect(
+        linked.publicBindings.find((binding) => binding.exportedName === 'User')?.targetId,
+      ).toBe(userId)
+    })
+
+    it('given an absolute import inside the src layout, when linking runs, then it is a route', () => {
+      const session = new InMemoryIndexSession()
+      const models = register(session, 'ws:src/acme_auth/models.py', 'class User:\n    pass\n')
+      register(session, 'ws:src/acme_auth/__init__.py', 'from acme_auth.models import User\n')
+      const userId = models.referenceFacts?.publicBindings.find(
+        (binding) => binding.exportedName === 'User',
+      )?.targetId
+      const linked = baseAdapter.reExportLinking.link({
+        session,
+        packageToWorkspace: new Map([['acme_auth', 'ws']]),
+      })
+
+      expect(published(session, new Map([['acme_auth', 'ws']]))).toContain('ws:src/acme_auth User')
+      expect(
+        linked.publicBindings.find((binding) => binding.exportedName === 'User')?.targetId,
+      ).toBe(userId)
+    })
+
+    it('given an absolute import that leaves the package, when linking runs, then it is not a route', () => {
+      const session = new InMemoryIndexSession()
+      register(session, 'ws:src/other/models.py', 'class User:\n    pass\n')
+      register(session, 'ws:src/acme_auth/__init__.py', 'from other.models import User\n')
+
+      expect(published(session, new Map([['other', 'ws']]))).toEqual([])
+    })
+
+    it('given an alias, when linking runs, then the alias is published', () => {
+      const session = new InMemoryIndexSession()
+      register(session, 'ws:src/acme_auth/models.py', 'class User:\n    pass\n')
+      register(session, 'ws:src/acme_auth/__init__.py', 'from .models import User as Person\n')
+
+      expect(published(session)).toContain('ws:src/acme_auth Person')
+      expect(published(session).some((item) => item.endsWith(' User'))).toBe(false)
+    })
+
+    it('given a chain, when linking runs, then the outer entry keeps the final target', () => {
+      const session = new InMemoryIndexSession()
+      register(session, 'ws:src/acme_auth/models.py', 'class User:\n    pass\n')
+      register(session, 'ws:src/acme_auth/sub/__init__.py', 'from .models import User\n')
+      const source = register(session, 'ws:src/acme_auth/sub/models.py', 'class User:\n    pass\n')
+      register(session, 'ws:src/acme_auth/__init__.py', 'from .sub import User\n')
+      const userId = source.referenceFacts?.publicBindings.find(
+        (binding) => binding.exportedName === 'User',
+      )?.targetId
+      const linked = baseAdapter.reExportLinking.link({ session, packageToWorkspace: new Map() })
+      const outer = linked.publicBindings.find(
+        (binding) => binding.surface === 'ws:src/acme_auth' && binding.exportedName === 'User',
+      )
+      const inner = linked.publicBindings.find(
+        (binding) => binding.surface === 'ws:src/acme_auth/sub' && binding.exportedName === 'User',
+      )
+
+      expect(outer?.targetId).toBe(userId)
+      expect(inner?.targetId).toBe(userId)
+    })
+
+    it('given a cycle, a nested import, a conditional import, a wildcard, and a plain import, when linking runs, then nothing is published', () => {
+      const session = new InMemoryIndexSession()
+      register(session, 'ws:src/cycle/__init__.py', 'from .other import User\n')
+      register(session, 'ws:src/cycle/other.py', 'from . import User\n')
+      register(
+        session,
+        'ws:src/nested/__init__.py',
+        'def load():\n    from .models import User\nif True:\n    from .models import User\nfrom .models import *\nimport models\n',
+      )
+      register(session, 'ws:src/nested/models.py', 'class User:\n    pass\n')
+
+      expect(published(session)).toEqual([])
+    })
+
+    it('given a static __all__, when linking runs, then only listed routes are published and declarations stay', () => {
+      const session = new InMemoryIndexSession()
+      register(
+        session,
+        'ws:src/acme_auth/models.py',
+        'class User:\n    pass\nclass Admin:\n    pass\n',
+      )
+      const entry = register(
+        session,
+        'ws:src/acme_auth/__init__.py',
+        'from .models import User, Admin\nclass Local:\n    pass\n__all__ = ["User"]\n',
+      )
+      const linked = baseAdapter.reExportLinking.link({ session, packageToWorkspace: new Map() })
+
+      expect(linked.publicBindings.map((binding) => binding.exportedName)).toEqual(['User'])
+      expect(entry.referenceFacts?.publicBindings.map((binding) => binding.exportedName)).toContain(
+        'Local',
+      )
+    })
+
+    it('given concatenation and +=, when __all__ is classified, then both are static', () => {
+      const session = new InMemoryIndexSession()
+      register(
+        session,
+        'ws:src/acme_auth/models.py',
+        'class User:\n    pass\nclass Admin:\n    pass\nclass Extra:\n    pass\n',
+      )
+      register(
+        session,
+        'ws:src/acme_auth/__init__.py',
+        'from .models import User, Admin, Extra\n__all__ = ["User"] + ["Extra"]\n__all__ += ["Admin"]\n',
+      )
+
+      expect(published(session).sort()).toEqual([
+        'ws:src/acme_auth Admin',
+        'ws:src/acme_auth Extra',
+        'ws:src/acme_auth User',
+      ])
+    })
+
+    it('given a dynamic __all__, when linking runs, then no route is published', () => {
+      const session = new InMemoryIndexSession()
+      register(session, 'ws:src/acme_auth/models.py', 'class User:\n    pass\n')
+      register(
+        session,
+        'ws:src/acme_auth/__init__.py',
+        'from .models import User\n__all__.append("User")\n',
+      )
+
+      expect(published(session)).toEqual([])
+    })
+
+    it('given a listed name with no route, when linking runs, then no binding is created for it', () => {
+      const session = new InMemoryIndexSession()
+      register(session, 'ws:src/acme_auth/__init__.py', '__all__ = ["Missing"]\n')
+
+      expect(published(session)).toEqual([])
+    })
+
+    it('given a re-exported name, when a package import resolves, then the step is import:package and a non-route stays unresolved', () => {
+      const session = new InMemoryIndexSession()
+      register(session, 'ws:src/acme_auth/models.py', 'class User:\n    pass\n')
+      register(session, 'ws:src/acme_auth/__init__.py', 'from .models import User\n')
+      const consumer = register(
+        session,
+        'ws:src/app/main.py',
+        'from acme_auth import User\nfrom acme_auth import Hidden\n',
+      )
+      session.addReferenceFacts(
+        baseAdapter.reExportLinking.link({ session, packageToWorkspace: new Map() }),
+      )
+      const resolved = baseAdapter.resolveImports(
+        consumer,
+        createImportResolutionContext(
+          { session, packageToWorkspace: new Map([['acme-auth', 'ws']]) },
+          baseAdapter,
+        ),
+      )
+
+      expect(resolved.importMap.has('User')).toBe(true)
+      expect(resolved.importMap.has('Hidden')).toBe(false)
+      expect(resolved.steps.some((step) => step.kind === 'import:package')).toBe(true)
+    })
+
+    it('given a sub-package absolute sibling import, when linking runs, then the sibling is a route', () => {
+      const session = new InMemoryIndexSession()
+      register(session, 'ws:src/acme_auth/models.py', 'class User:\n    pass\n')
+      register(session, 'ws:src/acme_auth/sub/__init__.py', 'from acme_auth.models import User\n')
+
+      expect(published(session, new Map([['acme_auth', 'ws']]))).toContain(
+        'ws:src/acme_auth/sub User',
+      )
+    })
+
+    it('given a stub entry, when linking runs, then the relative route is published', () => {
+      const session = new InMemoryIndexSession()
+      register(session, 'ws:src/acme_auth/models.py', 'class User:\n    pass\n')
+      register(session, 'ws:src/acme_auth/__init__.pyi', 'from .models import User\n')
+
+      expect(published(session)).toContain('ws:src/acme_auth User')
+    })
+
+    it('given a tuple __all__, when linking runs, then only the listed route is published', () => {
+      const session = new InMemoryIndexSession()
+      register(
+        session,
+        'ws:src/acme_auth/models.py',
+        'class User:\n    pass\nclass Admin:\n    pass\n',
+      )
+      register(
+        session,
+        'ws:src/acme_auth/__init__.py',
+        'from .models import User, Admin\n__all__ = ("User",)\n',
+      )
+
+      expect(published(session)).toEqual(['ws:src/acme_auth User'])
+    })
+
+    it('given an annotated __all__, when linking runs, then the listed route is published', () => {
+      const session = new InMemoryIndexSession()
+      register(session, 'ws:src/acme_auth/models.py', 'class User:\n    pass\n')
+      register(
+        session,
+        'ws:src/acme_auth/__init__.py',
+        'from .models import User\n__all__: list[str] = ["User"]\n',
+      )
+
+      expect(published(session)).toEqual(['ws:src/acme_auth User'])
+    })
+
+    it('given a function-nested import, when linking runs, then nothing is published', () => {
+      const session = new InMemoryIndexSession()
+      register(session, 'ws:src/acme_auth/models.py', 'class User:\n    pass\n')
+      register(
+        session,
+        'ws:src/acme_auth/__init__.py',
+        'def load():\n    from .models import User\n',
+      )
+
+      expect(published(session)).toEqual([])
+    })
+
+    it('given an import inside if TYPE_CHECKING, when linking runs, then nothing is published', () => {
+      const session = new InMemoryIndexSession()
+      register(session, 'ws:src/acme_auth/models.py', 'class User:\n    pass\n')
+      register(
+        session,
+        'ws:src/acme_auth/__init__.py',
+        'if TYPE_CHECKING:\n    from .models import User\n',
+      )
+
+      expect(published(session)).toEqual([])
+    })
+
+    it('given an import inside try, when linking runs, then nothing is published', () => {
+      const session = new InMemoryIndexSession()
+      register(session, 'ws:src/acme_auth/models.py', 'class User:\n    pass\n')
+      register(
+        session,
+        'ws:src/acme_auth/__init__.py',
+        'try:\n    from .models import User\nexcept Exception:\n    pass\n',
+      )
+
+      expect(published(session)).toEqual([])
+    })
+
+    it('given from . import name, when linking runs, then nothing is published', () => {
+      const session = new InMemoryIndexSession()
+      register(session, 'ws:src/acme_auth/models.py', 'class User:\n    pass\n')
+      register(session, 'ws:src/acme_auth/__init__.py', 'from . import models\n')
+
+      expect(published(session)).toEqual([])
+    })
+
+    it('given a read of __all__, when linking runs, then no route is published', () => {
+      const session = new InMemoryIndexSession()
+      register(session, 'ws:src/acme_auth/models.py', 'class User:\n    pass\n')
+      register(
+        session,
+        'ws:src/acme_auth/__init__.py',
+        'from .models import User\nif "User" in __all__:\n    pass\n',
+      )
+
+      expect(published(session)).toEqual([])
+    })
+
+    it('given a stub declaration, when the file is analyzed, then the name stays addressable', () => {
+      const session = new InMemoryIndexSession()
+      const entry = register(session, 'ws:src/acme_auth/__init__.pyi', 'class User:\n    pass\n')
+
+      expect(entry.referenceFacts?.publicBindings.map((binding) => binding.exportedName)).toEqual([
+        'User',
+      ])
+      expect(published(session)).toEqual([])
+    })
+
+    it('given declaration conventions, when linking runs, then underscore names stay unpublished', () => {
+      const session = new InMemoryIndexSession()
+      const entry = register(
+        session,
+        'ws:src/acme_auth/__init__.py',
+        'class Visible:\n    pass\ndef _hidden():\n    pass\n',
+      )
+
+      expect(entry.referenceFacts?.publicBindings.map((binding) => binding.exportedName)).toEqual([
+        'Visible',
+      ])
+      expect(published(session)).toEqual([])
+    })
+
+    it('given two entry files that import each other, when linking runs, then the cycle publishes nothing', () => {
+      const session = new InMemoryIndexSession()
+      const left = register(session, 'ws:src/cycle/a/__init__.py', 'from ..b import User\n')
+      const right = register(session, 'ws:src/cycle/b/__init__.py', 'from ..a import User\n')
+
+      expect(left.parserState).toMatchObject({
+        reExports: [expect.objectContaining({ importedName: 'User', boundName: 'User' })],
+      })
+      expect(right.parserState).toMatchObject({
+        reExports: [expect.objectContaining({ importedName: 'User', boundName: 'User' })],
+      })
+      expect(published(session)).toEqual([])
+    })
+
+    it.each([
+      ['extend', 'from .models import User\n__all__.extend(["User"])\n'],
+      ['a comprehension', 'from .models import User\n__all__ = [name for name in ("User",)]\n'],
+      ['append', 'from .models import User\n__all__.append("User")\n'],
+      ['a non-literal element', 'from .models import User\n__all__ = ["User", name]\n'],
+    ])(
+      'given __all__ built by %s, when linking runs, then no route is published',
+      (_label, code) => {
+        const session = new InMemoryIndexSession()
+        register(session, 'ws:src/acme_auth/models.py', 'class User:\n    pass\n')
+        register(session, 'ws:src/acme_auth/__init__.py', code)
+
+        expect(published(session)).toEqual([])
+      },
+    )
+
+    it('given an unparenthesized tuple __all__, when linking runs, then only the listed routes are published', () => {
+      const session = new InMemoryIndexSession()
+      register(
+        session,
+        'ws:src/acme_auth/models.py',
+        'class User:\n    pass\nclass Admin:\n    pass\n',
+      )
+      register(
+        session,
+        'ws:src/acme_auth/__init__.py',
+        'from .models import User, Admin\n__all__ = "User",\n',
+      )
+
+      expect(published(session)).toEqual(['ws:src/acme_auth User'])
+    })
+
+    it('given a bytes literal in __all__, when linking runs, then no route is published', () => {
+      const session = new InMemoryIndexSession()
+      register(session, 'ws:src/acme_auth/models.py', 'class User:\n    pass\n')
+      register(
+        session,
+        'ws:src/acme_auth/__init__.py',
+        'from .models import User\n__all__ = [b"User"]\n',
+      )
+
+      expect(published(session)).toEqual([])
+    })
+
+    it('given a plain import beside a from-import of the submodule, when the consumer resolves, then the submodule file is a dependency and no symbol route is published', () => {
+      const session = new InMemoryIndexSession()
+      register(session, 'ws:src/acme_auth/models.py', 'class User:\n    pass\n')
+      register(session, 'ws:src/acme_auth/__init__.py', 'import acme_auth.models\n')
+      const consumer = register(session, 'ws:src/app/main.py', 'from acme_auth import models\n')
+      session.addReferenceFacts(
+        baseAdapter.reExportLinking.link({
+          session,
+          packageToWorkspace: new Map([['acme_auth', 'ws']]),
+        }),
+      )
+      const resolved = baseAdapter.resolveImports(
+        consumer,
+        createImportResolutionContext(
+          { session, packageToWorkspace: new Map([['acme_auth', 'ws']]) },
+          baseAdapter,
+        ),
+      )
+
+      expect(published(session)).toEqual([])
+      expect(resolved.importMap.has('models')).toBe(false)
+      expect(resolved.fileImports).toContain('ws:src/acme_auth/models.py')
+    })
+
+    it('given an import alias that is not a route, when the file is analyzed, then the alias stays a local binding', () => {
+      const session = new InMemoryIndexSession()
+      const entry = register(
+        session,
+        'ws:src/acme_auth/__init__.py',
+        'from other.models import User as Person\nclass Visible:\n    pass\n',
+      )
+
+      expect(entry.referenceFacts?.publicBindings.map((binding) => binding.exportedName)).toEqual([
+        'Visible',
+      ])
+      expect(
+        entry.referenceFacts?.localBindings.find((binding) => binding.localName === 'Person')
+          ?.targetId,
+      ).toBeUndefined()
+      expect(published(session, new Map([['other', 'ws']]))).toEqual([])
+    })
+
+    it('given a stub entry and an absolute route, when linking runs, then the route is published', () => {
+      const session = new InMemoryIndexSession()
+      const models = register(session, 'ws:src/acme_auth/models.py', 'class User:\n    pass\n')
+      register(session, 'ws:src/acme_auth/__init__.pyi', 'from acme_auth.models import User\n')
+      const userId = models.referenceFacts?.publicBindings.find(
+        (binding) => binding.exportedName === 'User',
+      )?.targetId
+      const linked = baseAdapter.reExportLinking.link({
+        session,
+        packageToWorkspace: new Map([['acme_auth', 'ws']]),
+      })
+
+      expect(linked.publicBindings.map((binding) => binding.exportedName)).toEqual(['User'])
+      expect(linked.publicBindings[0]?.targetId).toBe(userId)
+    })
+
+    it('given an indexed source twin, when the stub also has routes, then only the source file is linked', () => {
+      const session = new InMemoryIndexSession()
+      register(
+        session,
+        'ws:src/acme_auth/models.py',
+        'class User:\n    pass\nclass Admin:\n    pass\n',
+      )
+      register(session, 'ws:src/acme_auth/__init__.py', 'from .models import User\n')
+      register(session, 'ws:src/acme_auth/__init__.pyi', 'from .models import Admin\n')
+
+      expect(published(session)).toEqual(['ws:src/acme_auth User'])
+    })
+
+    it('given a module file and a package of the same name, when a route names it, then the route is ambiguous', () => {
+      const session = new InMemoryIndexSession()
+      register(session, 'ws:src/acme_auth/models.py', 'class User:\n    pass\n')
+      register(session, 'ws:src/acme_auth/models/__init__.py', 'class Admin:\n    pass\n')
+      register(session, 'ws:src/acme_auth/__init__.py', 'from .models import User\n')
+
+      expect(published(session)).toEqual([])
+    })
+
+    it('given a resolved import without a local binding, when imports resolve, then no import:package step is added', () => {
+      const session = new InMemoryIndexSession()
+      register(session, 'ws:src/acme_auth/models.py', 'class User:\n    pass\n')
+      register(session, 'ws:src/acme_auth/__init__.py', 'from .models import User\n')
+      const consumer = register(session, 'ws:src/app/main.py', 'from acme_auth import User\n')
+      session.addReferenceFacts(
+        baseAdapter.reExportLinking.link({ session, packageToWorkspace: new Map() }),
+      )
+      const stripped: FileAnalysis = {
+        ...consumer,
+        referenceFacts: { ...consumer.referenceFacts!, localBindings: [] },
+      }
+      const resolved = baseAdapter.resolveImports(
+        stripped,
+        createImportResolutionContext(
+          { session, packageToWorkspace: new Map([['acme-auth', 'ws']]) },
+          baseAdapter,
+        ),
+      )
+
+      expect(resolved.importMap.has('User')).toBe(true)
+      expect(resolved.steps.filter((step) => step.kind === 'import:package')).toEqual([])
+    })
+  })
 })

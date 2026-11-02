@@ -176,6 +176,11 @@ export {
   type CallFact,
   type ResolvedDependency,
 } from './domain/value-objects/call-fact.js'
+export {
+  QualifiedReferenceKind,
+  type QualifiedReferenceFact,
+  qualifiedReferenceKey,
+} from './domain/value-objects/qualified-reference-fact.js'
 
 // Indexer types
 export {

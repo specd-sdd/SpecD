@@ -77,6 +77,11 @@ export interface ResolvedImports {
   readonly steps: readonly ResolutionStep[]
   /** Non-persisted records of package imports that stayed unresolved. */
   readonly diagnostics: readonly ImportDiagnostic[]
+  /**
+   * Resolved targets of qualified reference facts, keyed by `qualifiedReferenceKey(fact)`.
+   * The value is the target symbol id. An absent map is equivalent to an empty one.
+   */
+  readonly qualifiedTargets?: ReadonlyMap<string, string>
 }
 
 /**

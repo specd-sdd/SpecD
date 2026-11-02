@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from 'vitest'
+import { describe, it, expect, afterEach, vi } from 'vitest'
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
@@ -15,7 +15,7 @@ import {
   type StructuralWorkKind,
   type StructuralWorkObserver,
 } from '../../../src/infrastructure/tree-sitter/reference-fact-helpers.js'
-import { MemberKind } from '../../../src/domain/value-objects/symbol-reference.js'
+import { MemberKind, SymbolSpace } from '../../../src/domain/value-objects/symbol-reference.js'
 import { SymbolKind } from '../../../src/domain/value-objects/symbol-kind.js'
 import { RelationType } from '../../../src/domain/value-objects/relation-type.js'
 import { ImportDeclarationKind } from '../../../src/domain/value-objects/import-declaration-kind.js'
@@ -24,6 +24,7 @@ import {
   type BindingFact,
 } from '../../../src/domain/value-objects/binding-fact.js'
 import { CallForm, type CallFact } from '../../../src/domain/value-objects/call-fact.js'
+import { qualifiedReferenceKey } from '../../../src/domain/value-objects/qualified-reference-fact.js'
 import { type SourceRange, type SymbolNode } from '../../../src/domain/value-objects/symbol-node.js'
 import { type Relation } from '../../../src/domain/value-objects/relation.js'
 import { type ImportDeclaration } from '../../../src/domain/value-objects/import-declaration.js'
@@ -1872,6 +1873,754 @@ func HelperFunction() {
       const closeResult = session.parserResources.close()
       expect(closeResult.registered).toBe(1)
       expect(session.parserResources.size).toBe(0)
+    })
+  })
+
+  describe('qualified package selectors', () => {
+    /**
+     * Registers one Go file and its analysis.
+     * @param session - Session that receives the file.
+     * @param filePath - Workspace-prefixed path.
+     * @param code - Source text.
+     * @param workspace - Workspace name.
+     * @returns The registered analysis.
+     */
+    function register(
+      session: InMemoryIndexSession,
+      filePath: string,
+      code: string,
+      workspace: string,
+    ): FileAnalysis {
+      session.registerFile({
+        filePath,
+        projectRelativePath: filePath.slice(filePath.indexOf(':') + 1),
+        language: 'go',
+        contentHash: 'hash',
+        workspace,
+      })
+      return session.registerAnalysis({
+        filePath,
+        analysis: baseAdapter.analyzeFile(filePath, code, { session, workspaceName: workspace }),
+      })
+    }
+
+    /**
+     * Resolves imports for an analysis against the packages the test declares.
+     * @param session - Session holding analyses and the module offset map.
+     * @param analysis - Importing file.
+     * @param packages - Module path to workspace name.
+     * @returns Resolved imports.
+     */
+    function resolve(
+      session: InMemoryIndexSession,
+      analysis: FileAnalysis,
+      packages: ReadonlyMap<string, string>,
+    ) {
+      const offsets = new Map<string, string>()
+      for (const workspace of packages.values()) offsets.set(workspace, '')
+      session.setAdapterState(GO_MODULE_OFFSETS_KEY, offsets)
+      return baseAdapter.resolveImports(
+        analysis,
+        createImportResolutionContext(
+          { session, packageToWorkspace: new Map(packages) },
+          baseAdapter,
+        ),
+      )
+    }
+
+    it('given an explicit alias, when a selector uses it, then the alias is the namespace name', () => {
+      const session = new InMemoryIndexSession()
+      register(session, 'auth:models/user.go', 'package models\nfunc NewUser() {}\n', 'auth')
+      const analysis = register(
+        session,
+        'app:main.go',
+        'package main\nimport auth "github.com/acme/auth/models"\nfunc main() { auth.NewUser() }\n',
+        'app',
+      )
+      const resolved = resolve(session, analysis, new Map([['github.com/acme/auth', 'auth']]))
+      const fact = analysis.qualifiedReferenceFacts?.find((item) => item.kind === 'call')
+
+      expect(fact?.qualifier).toBe('auth')
+      expect(fact?.name).toBe('NewUser')
+      expect(resolved.qualifiedTargets?.get(qualifiedReferenceKey(fact!))).toBeDefined()
+    })
+
+    it('given a path whose last segment differs from the package clause, when the clause agrees, then the declared name wins', () => {
+      const session = new InMemoryIndexSession()
+      register(session, 'auth:user.go', 'package auth\ntype User struct{}\n', 'auth')
+      const analysis = register(
+        session,
+        'app:main.go',
+        'package main\nimport "github.com/acme/go-auth"\nfunc main() { _ = auth.User{} }\n',
+        'app',
+      )
+      const resolved = resolve(session, analysis, new Map([['github.com/acme/go-auth', 'auth']]))
+      const fact = analysis.qualifiedReferenceFacts?.find((item) => item.kind === 'construct')
+
+      expect(fact?.qualifier).toBe('auth')
+      expect(resolved.qualifiedTargets?.size).toBe(1)
+    })
+
+    it('given a /v2 import path, when the package clause is auth, then selectors use auth', () => {
+      const session = new InMemoryIndexSession()
+      register(session, 'auth:user.go', 'package auth\ntype User struct{}\n', 'auth')
+      const analysis = register(
+        session,
+        'app:main.go',
+        'package main\nimport "github.com/acme/auth/v2"\nvar current auth.User\n',
+        'app',
+      )
+      const resolved = resolve(session, analysis, new Map([['github.com/acme/auth/v2', 'auth']]))
+
+      expect(analysis.qualifiedReferenceFacts?.some((item) => item.qualifier === 'v2')).toBe(false)
+      expect(resolved.qualifiedTargets?.size).toBe(1)
+    })
+
+    it('given entries that declare different package names, when a selector uses the last segment, then that name resolves', () => {
+      const session = new InMemoryIndexSession()
+      register(session, 'ws:pkg/models/a.go', 'package models\ntype User struct{}\n', 'ws')
+      register(session, 'ws:pkg/models/b.go', 'package main\n', 'ws')
+      const analysis = register(
+        session,
+        'ws:main.go',
+        'package main\nimport "example.com/app/pkg/models"\nfunc main() { _ = models.User{} }\n',
+        'ws',
+      )
+      const resolved = resolve(session, analysis, new Map([['example.com/app', 'ws']]))
+
+      expect(resolved.qualifiedTargets?.size).toBe(1)
+    })
+
+    it('given blank and dot imports, when selectors use a name, then nothing is bound', () => {
+      const session = new InMemoryIndexSession()
+      register(session, 'ws:pkg/helpers/a.go', 'package helpers\nfunc Name() {}\n', 'ws')
+      register(session, 'auth:user.go', 'package auth\nfunc NewUser() {}\n', 'auth')
+      const analysis = register(
+        session,
+        'ws:main.go',
+        'package main\nimport (\n  . "example.com/app/pkg/helpers"\n  _ "example.com/app/pkg/helpers"\n  "github.com/acme/auth"\n)\nfunc main() {\n  helpers.Name()\n  auth.NewUser()\n}\n',
+        'ws',
+      )
+      const resolved = resolve(
+        session,
+        analysis,
+        new Map([
+          ['example.com/app', 'ws'],
+          ['github.com/acme/auth', 'auth'],
+        ]),
+      )
+
+      expect(
+        [...(resolved.qualifiedTargets?.keys() ?? [])].some((key) => key.includes('helpers.Name')),
+      ).toBe(false)
+      expect(resolved.qualifiedTargets?.size).toBe(1)
+      expect(
+        [...(resolved.qualifiedTargets?.keys() ?? [])].some((key) => key.includes('auth.NewUser')),
+      ).toBe(true)
+    })
+
+    it('given a qualified call, construct, and type, when relations are built, then each reaches the exported symbol', () => {
+      const session = new InMemoryIndexSession()
+      const provider = register(
+        session,
+        'auth:user.go',
+        'package auth\ntype User struct{}\nfunc NewUser() {}\n',
+        'auth',
+      )
+      const analysis = register(
+        session,
+        'app:main.go',
+        'package main\nimport "github.com/acme/auth"\nvar current auth.User\nfunc main(user auth.User) auth.User {\n  auth.NewUser()\n  _ = auth.User{}\n  return user\n}\n',
+        'app',
+      )
+      const resolved = resolve(session, analysis, new Map([['github.com/acme/auth', 'auth']]))
+      const relations = baseAdapter.buildRelations(analysis, { session, resolvedImports: resolved })
+      const user = provider.symbols.find((symbol) => symbol.name === 'User')!
+      const factory = provider.symbols.find((symbol) => symbol.name === 'NewUser')!
+      const main = analysis.symbols.find((symbol) => symbol.name === 'main')!
+      const current = analysis.symbols.find((symbol) => symbol.name === 'current')!
+
+      expect(relations).toContainEqual(
+        expect.objectContaining({ type: RelationType.Calls, source: main.id, target: factory.id }),
+      )
+      expect(relations).toContainEqual(
+        expect.objectContaining({
+          type: RelationType.Constructs,
+          source: main.id,
+          target: user.id,
+        }),
+      )
+      expect(relations).toContainEqual(
+        expect.objectContaining({ type: RelationType.UsesType, source: main.id, target: user.id }),
+      )
+      expect(relations).toContainEqual(
+        expect.objectContaining({
+          type: RelationType.UsesType,
+          source: current.id,
+          target: user.id,
+        }),
+      )
+      expect(resolved.steps.some((step) => step.kind === 'import:package')).toBe(true)
+    })
+
+    it('given an unexported name, a shadowed qualifier, a value selector, and an unknown package, when resolved, then no qualified relation is produced', () => {
+      const session = new InMemoryIndexSession()
+      register(session, 'auth:user.go', 'package auth\nfunc newUser() {}\nfunc Save() {}\n', 'auth')
+      const analysis = register(
+        session,
+        'app:main.go',
+        'package main\nimport "github.com/acme/auth"\nfunc shadowed(auth int) { auth.NewUser() }\nfunc main() {\n  auth.newUser()\n  var u struct{}\n  u.Save()\n  fmt.Println()\n}\n',
+        'app',
+      )
+      const resolved = resolve(session, analysis, new Map([['github.com/acme/auth', 'auth']]))
+      const relations = baseAdapter.buildRelations(analysis, { session, resolvedImports: resolved })
+
+      expect(analysis.qualifiedReferenceFacts?.some((item) => item.name === 'NewUser')).toBe(false)
+      expect(relations.filter((relation) => relation.type === RelationType.Calls)).toHaveLength(0)
+      expect(resolved.diagnostics.some((item) => item.specifier === 'fmt')).toBe(false)
+    })
+
+    it('given a field type in another workspace, when relations are built, then USES_TYPE crosses the workspace', () => {
+      const session = new InMemoryIndexSession()
+      const provider = register(
+        session,
+        'auth:user.go',
+        'package auth\ntype User struct{}\n',
+        'auth',
+      )
+      const analysis = register(
+        session,
+        'app:main.go',
+        'package main\nimport "github.com/acme/auth"\ntype Service struct { User auth.User }\n',
+        'app',
+      )
+      const resolved = resolve(session, analysis, new Map([['github.com/acme/auth', 'auth']]))
+      const relations = baseAdapter.buildRelations(analysis, { session, resolvedImports: resolved })
+      const field = analysis.symbols.find((symbol) => symbol.name === 'User')!
+      const user = provider.symbols.find((symbol) => symbol.name === 'User')!
+
+      expect(relations).toContainEqual(
+        expect.objectContaining({
+          type: RelationType.UsesType,
+          source: field.id,
+          target: user.id,
+        }),
+      )
+    })
+
+    it('given an explicit alias, when the path-derived name is also used, then only the alias resolves', () => {
+      const session = new InMemoryIndexSession()
+      register(session, 'auth:models/user.go', 'package models\nfunc NewUser() {}\n', 'auth')
+      const analysis = register(
+        session,
+        'app:main.go',
+        'package main\nimport auth "github.com/acme/auth/models"\nfunc main() { auth.NewUser(); models.NewUser() }\n',
+        'app',
+      )
+      const resolved = resolve(session, analysis, new Map([['github.com/acme/auth', 'auth']]))
+      const alias = analysis.qualifiedReferenceFacts?.find((item) => item.qualifier === 'auth')
+
+      expect(analysis.qualifiedReferenceFacts?.some((item) => item.qualifier === 'models')).toBe(
+        true,
+      )
+      expect(resolved.qualifiedTargets?.size).toBe(1)
+      expect(resolved.qualifiedTargets?.get(qualifiedReferenceKey(alias!))).toBeDefined()
+    })
+
+    it('given a shadowed construct and type, when facts are extracted, then neither fact is emitted', () => {
+      const session = new InMemoryIndexSession()
+      const analysis = register(
+        session,
+        'app:main.go',
+        'package main\nimport "github.com/acme/auth"\nfunc shadowed(auth int) {\n  _ = auth.User{}\n  var current auth.User\n}\n',
+        'app',
+      )
+
+      expect(analysis.qualifiedReferenceFacts ?? []).toEqual([])
+    })
+
+    it('given a local var that shadows the import, when a call is extracted, then no call fact is emitted', () => {
+      const session = new InMemoryIndexSession()
+      const analysis = register(
+        session,
+        'app:main.go',
+        'package main\nimport "github.com/acme/auth"\nfunc main() {\n  auth := 1\n  auth.NewUser()\n  _ = auth\n}\n',
+        'app',
+      )
+
+      expect(analysis.qualifiedReferenceFacts?.some((item) => item.kind === 'call')).toBe(false)
+    })
+
+    it('given result, const, type-declaration, and type-argument positions, when relations are built, then each USES_TYPE reaches User', () => {
+      const session = new InMemoryIndexSession()
+      const provider = register(
+        session,
+        'auth:user.go',
+        'package auth\ntype User struct{}\n',
+        'auth',
+      )
+      const analysis = register(
+        session,
+        'app:main.go',
+        'package main\nimport "github.com/acme/auth"\ntype Alias auth.User\ntype Box[T any] struct{}\nconst label auth.User = 0\nfunc result() auth.User { return result() }\nvar boxed Box[auth.User]\n',
+        'app',
+      )
+      const resolved = resolve(session, analysis, new Map([['github.com/acme/auth', 'auth']]))
+      const relations = baseAdapter.buildRelations(analysis, { session, resolvedImports: resolved })
+      const user = provider.symbols.find((symbol) => symbol.name === 'User')!
+      const uses = (name: string): boolean => {
+        const source = analysis.symbols.find((symbol) => symbol.name === name)
+        return relations.some(
+          (relation) =>
+            relation.type === RelationType.UsesType &&
+            relation.source === source?.id &&
+            relation.target === user.id,
+        )
+      }
+
+      expect(uses('Alias')).toBe(true)
+      expect(uses('label')).toBe(true)
+      expect(uses('result')).toBe(true)
+      expect(uses('boxed')).toBe(true)
+    })
+
+    it('given an uppercase name the package does not export, when it is called, then the call is dropped', () => {
+      const session = new InMemoryIndexSession()
+      register(session, 'auth:user.go', 'package auth\nfunc NewUser() {}\n', 'auth')
+      register(session, 'app:other.go', 'package main\nfunc Missing() {}\n', 'app')
+      const analysis = register(
+        session,
+        'app:main.go',
+        'package main\nimport "github.com/acme/auth"\nfunc main() { auth.Missing() }\n',
+        'app',
+      )
+      const searched = vi.spyOn(session, 'findSymbolsByName')
+      const resolved = resolve(session, analysis, new Map([['github.com/acme/auth', 'auth']]))
+      const relations = baseAdapter.buildRelations(analysis, { session, resolvedImports: resolved })
+
+      expect(resolved.qualifiedTargets?.size).toBe(0)
+      expect(resolved.diagnostics.some((item) => item.exportedName === 'Missing')).toBe(false)
+      expect(relations.filter((relation) => relation.type === RelationType.Calls)).toHaveLength(0)
+      expect(searched).not.toHaveBeenCalled()
+      searched.mockRestore()
+    })
+
+    it('given a package-level initializer, when relations are built, then the variable is the source', () => {
+      const session = new InMemoryIndexSession()
+      const provider = register(
+        session,
+        'auth:user.go',
+        'package auth\ntype User struct{}\nfunc NewUser() {}\n',
+        'auth',
+      )
+      const analysis = register(
+        session,
+        'app:main.go',
+        'package main\nimport "github.com/acme/auth"\nvar current = auth.NewUser()\nvar value = auth.User{}\n',
+        'app',
+      )
+      const resolved = resolve(session, analysis, new Map([['github.com/acme/auth', 'auth']]))
+      const relations = baseAdapter.buildRelations(analysis, { session, resolvedImports: resolved })
+      const current = analysis.symbols.find((symbol) => symbol.name === 'current')!
+      const value = analysis.symbols.find((symbol) => symbol.name === 'value')!
+      const factory = provider.symbols.find((symbol) => symbol.name === 'NewUser')!
+      const user = provider.symbols.find((symbol) => symbol.name === 'User')!
+      const call = analysis.qualifiedReferenceFacts?.find((item) => item.kind === 'call')
+      const construct = analysis.qualifiedReferenceFacts?.find((item) => item.kind === 'construct')
+
+      expect(call?.sourceSymbolId).toBe(current.id)
+      expect(construct?.sourceSymbolId).toBe(value.id)
+      expect(relations).toContainEqual(
+        expect.objectContaining({
+          type: RelationType.Calls,
+          source: current.id,
+          target: factory.id,
+        }),
+      )
+      expect(relations).toContainEqual(
+        expect.objectContaining({
+          type: RelationType.Constructs,
+          source: value.id,
+          target: user.id,
+        }),
+      )
+    })
+
+    it('given an instantiated generic call, when facts are extracted, then a call fact names the selector', () => {
+      const session = new InMemoryIndexSession()
+      const provider = register(session, 'auth:user.go', 'package auth\nfunc Fn() {}\n', 'auth')
+      const analysis = register(
+        session,
+        'app:main.go',
+        'package main\nimport "github.com/acme/auth"\nfunc main() { auth.Fn[int]() }\n',
+        'app',
+      )
+      const resolved = resolve(session, analysis, new Map([['github.com/acme/auth', 'auth']]))
+      const relations = baseAdapter.buildRelations(analysis, { session, resolvedImports: resolved })
+      const fact = analysis.qualifiedReferenceFacts?.find((item) => item.kind === 'call')
+      const main = analysis.symbols.find((symbol) => symbol.name === 'main')!
+      const fn = provider.symbols.find((symbol) => symbol.name === 'Fn')!
+
+      expect(fact?.qualifier).toBe('auth')
+      expect(fact?.name).toBe('Fn')
+      expect(relations).toContainEqual(
+        expect.objectContaining({ type: RelationType.Calls, source: main.id, target: fn.id }),
+      )
+    })
+
+    it('given an unknown package, when a selector is used, then the import is external and no relation is produced', () => {
+      const session = new InMemoryIndexSession()
+      const analysis = register(
+        session,
+        'app:main.go',
+        'package main\nimport "example.com/missing"\nfunc main() { missing.Name() }\n',
+        'app',
+      )
+      const resolved = resolve(session, analysis, new Map())
+      const relations = baseAdapter.buildRelations(analysis, { session, resolvedImports: resolved })
+
+      expect(resolved.diagnostics).toContainEqual(
+        expect.objectContaining({ specifier: 'example.com/missing', reason: 'package-unknown' }),
+      )
+      expect(resolved.qualifiedTargets?.size).toBe(0)
+      expect(relations.filter((relation) => relation.type === RelationType.Calls)).toHaveLength(0)
+    })
+
+    it('given a namespace without a local binding, when the export resolves, then no step is added', () => {
+      const session = new InMemoryIndexSession()
+      const provider = register(
+        session,
+        'auth:user.go',
+        'package auth\nfunc NewUser() {}\n',
+        'auth',
+      )
+      const analysis = register(
+        session,
+        'app:main.go',
+        'package main\nimport "github.com/acme/auth"\nfunc main() { auth.NewUser() }\n',
+        'app',
+      )
+      const stripped: FileAnalysis = {
+        ...analysis,
+        referenceFacts: {
+          ...analysis.referenceFacts!,
+          localBindings: [],
+        },
+      }
+      const resolved = resolve(session, stripped, new Map([['github.com/acme/auth', 'auth']]))
+      const factory = provider.symbols.find((symbol) => symbol.name === 'NewUser')!
+
+      expect(resolved.qualifiedTargets?.size).toBe(1)
+      expect([...resolved.qualifiedTargets!.values()]).toEqual([factory.id])
+      expect(resolved.steps).toEqual([])
+    })
+
+    it('given a fact without a source symbol, when relations are built, then call, construct, and type are blocked', () => {
+      const session = new InMemoryIndexSession()
+      register(
+        session,
+        'auth:user.go',
+        'package auth\ntype User struct{}\nfunc NewUser() {}\n',
+        'auth',
+      )
+      const analysis = register(
+        session,
+        'app:main.go',
+        'package main\nimport "github.com/acme/auth"\nvar current auth.User\nfunc main() {\n  auth.NewUser()\n  _ = auth.User{}\n}\n',
+        'app',
+      )
+      const resolved = resolve(session, analysis, new Map([['github.com/acme/auth', 'auth']]))
+      const bare: FileAnalysis = {
+        ...analysis,
+        qualifiedReferenceFacts: (analysis.qualifiedReferenceFacts ?? []).map((item) => ({
+          ...item,
+          sourceSymbolId: undefined,
+        })),
+      }
+      const relations = baseAdapter.buildRelations(bare, { session, resolvedImports: resolved })
+
+      expect(resolved.qualifiedTargets?.size).toBe(3)
+      expect(
+        relations.some(
+          (relation) =>
+            relation.type === RelationType.Calls ||
+            relation.type === RelationType.Constructs ||
+            relation.type === RelationType.UsesType,
+        ),
+      ).toBe(false)
+    })
+
+    it.each(['ambiguous', 'no-entry-surface', 'not-exported'] as const)(
+      'given helper status %s, when a selector is resolved, then there is no relation and no failure',
+      (reason) => {
+        const session = new InMemoryIndexSession()
+        register(session, 'auth:user.go', 'package auth\nfunc NewUser() {}\n', 'auth')
+        const analysis = register(
+          session,
+          'app:main.go',
+          'package main\nimport "github.com/acme/auth"\nfunc main() { auth.NewUser() }\n',
+          'app',
+        )
+        const offsets = new Map<string, string>([
+          ['auth', ''],
+          ['app', ''],
+        ])
+        session.setAdapterState(GO_MODULE_OFFSETS_KEY, offsets)
+        const resolved = baseAdapter.resolveImports(
+          analysis,
+          createImportResolutionContext({
+            session,
+            packageEntryFiles: () => ({
+              status: 'resolved',
+              packageName: 'github.com/acme/auth',
+              workspace: 'auth',
+              entries: [{ filePath: 'auth:user.go', surface: 'auth:' }],
+            }),
+            resolvePackageExport: () => ({ status: 'unresolved', reason }),
+          }),
+        )
+        const relations = baseAdapter.buildRelations(analysis, {
+          session,
+          resolvedImports: resolved,
+        })
+
+        expect(resolved.qualifiedTargets?.size).toBe(0)
+        expect(resolved.diagnostics).toEqual([])
+        expect(relations.filter((relation) => relation.type === RelationType.Calls)).toHaveLength(0)
+      },
+    )
+
+    it.each([
+      [
+        'named result',
+        'package main\nimport "github.com/acme/auth"\nfunc f() (auth int) { auth.NewUser() }\n',
+        'NewUser',
+      ],
+      [
+        'grouped var',
+        'package main\nimport "github.com/acme/auth"\nfunc main() {\n  var (\n    auth int\n  )\n  auth.NewUser()\n}\n',
+        'NewUser',
+      ],
+      [
+        'range clause',
+        'package main\nimport "github.com/acme/auth"\nfunc main() {\n  for _, auth := range xs {\n    auth.NewUser()\n  }\n}\n',
+        'NewUser',
+      ],
+      [
+        'if initializer',
+        'package main\nimport "github.com/acme/auth"\nfunc main() {\n  if auth := 1; true {\n    auth.NewUser()\n  }\n}\n',
+        'NewUser',
+      ],
+      [
+        'type switch',
+        'package main\nimport "github.com/acme/auth"\nfunc main() {\n  switch auth := v.(type) {\n  default:\n    auth.NewUser()\n  }\n}\n',
+        'NewUser',
+      ],
+      [
+        'local type',
+        'package main\nimport "github.com/acme/auth"\nfunc main() {\n  type auth int\n  var current auth.User\n}\n',
+        'User',
+      ],
+    ])(
+      'given a qualifier shadowed by a %s, when facts are extracted, then no qualified fact is emitted',
+      (_label, code, name) => {
+        const session = new InMemoryIndexSession()
+        register(
+          session,
+          'auth:user.go',
+          'package auth\ntype User struct{}\nfunc NewUser() {}\n',
+          'auth',
+        )
+        const analysis = register(session, 'app:main.go', code, 'app')
+
+        expect(analysis.qualifiedReferenceFacts?.some((item) => item.name === name)).toBe(false)
+      },
+    )
+
+    it('given a use before a short declaration, when facts are extracted, then the package still resolves', () => {
+      const session = new InMemoryIndexSession()
+      register(session, 'auth:user.go', 'package auth\ntype User struct{}\n', 'auth')
+      const analysis = register(
+        session,
+        'app:main.go',
+        'package main\nimport "github.com/acme/auth"\nfunc main() {\n  _ = auth.User{}\n  auth := 1\n  _ = auth\n}\n',
+        'app',
+      )
+      const resolved = resolve(session, analysis, new Map([['github.com/acme/auth', 'auth']]))
+
+      expect(analysis.qualifiedReferenceFacts?.some((item) => item.kind === 'construct')).toBe(true)
+      expect(resolved.qualifiedTargets?.size).toBe(1)
+    })
+
+    it('given a parameter with the package name, when the signature uses that package, then the signature type still resolves', () => {
+      const session = new InMemoryIndexSession()
+      register(session, 'auth:user.go', 'package auth\ntype User struct{}\n', 'auth')
+      const analysis = register(
+        session,
+        'app:main.go',
+        'package main\nimport "github.com/acme/auth"\nfunc f(auth int) auth.User {\n  return auth.User{}\n}\n',
+        'app',
+      )
+      const resolved = resolve(session, analysis, new Map([['github.com/acme/auth', 'auth']]))
+      const signature = analysis.qualifiedReferenceFacts?.filter((item) => item.kind === 'type')
+      const body = analysis.qualifiedReferenceFacts?.filter((item) => item.kind === 'construct')
+
+      expect(signature).toHaveLength(1)
+      expect(body).toHaveLength(0)
+      expect(resolved.qualifiedTargets?.size).toBe(1)
+    })
+
+    it('given a declared package name, when the export resolves, then the step is anchored on the import binding', () => {
+      const session = new InMemoryIndexSession()
+      register(session, 'auth:user.go', 'package auth\ntype User struct{}\n', 'auth')
+      const analysis = register(
+        session,
+        'app:main.go',
+        'package main\nimport "github.com/acme/go-auth"\nfunc main() { _ = auth.User{} }\n',
+        'app',
+      )
+      const resolved = resolve(session, analysis, new Map([['github.com/acme/go-auth', 'auth']]))
+      const anchor = analysis.referenceFacts?.localBindings.find(
+        (item) => item.localName === 'go-auth',
+      )
+
+      expect(anchor).toBeDefined()
+      expect(resolved.steps).toContainEqual(
+        expect.objectContaining({ fromId: anchor?.id, kind: 'import:package' }),
+      )
+    })
+
+    it('given a /v2 import, when the export resolves, then the step is anchored on the v2 binding', () => {
+      const session = new InMemoryIndexSession()
+      register(session, 'auth:user.go', 'package auth\ntype User struct{}\n', 'auth')
+      const analysis = register(
+        session,
+        'app:main.go',
+        'package main\nimport "github.com/acme/auth/v2"\nvar current auth.User\n',
+        'app',
+      )
+      const resolved = resolve(session, analysis, new Map([['github.com/acme/auth/v2', 'auth']]))
+      const anchor = analysis.referenceFacts?.localBindings.find((item) => item.localName === 'v2')
+
+      expect(anchor).toBeDefined()
+      expect(resolved.steps).toContainEqual(
+        expect.objectContaining({ fromId: anchor?.id, kind: 'import:package' }),
+      )
+    })
+
+    it('given two imports that choose the same namespace, when a selector uses it, then neither binds', () => {
+      const session = new InMemoryIndexSession()
+      register(session, 'a:user.go', 'package auth\ntype User struct{}\n', 'a')
+      register(session, 'b:user.go', 'package auth\ntype User struct{}\n', 'b')
+      const analysis = register(
+        session,
+        'app:main.go',
+        'package main\nimport (\n  "github.com/acme/auth"\n  "github.com/acme/go-auth"\n)\nfunc main() { _ = auth.User{} }\n',
+        'app',
+      )
+      const resolved = resolve(
+        session,
+        analysis,
+        new Map([
+          ['github.com/acme/auth', 'a'],
+          ['github.com/acme/go-auth', 'b'],
+        ]),
+      )
+
+      expect(resolved.qualifiedTargets?.size).toBe(0)
+      expect(resolved.steps.filter((step) => step.kind === 'import:package')).toEqual([])
+    })
+
+    it('given an instantiated composite literal, when facts are extracted, then a construct fact names the selector', () => {
+      const session = new InMemoryIndexSession()
+      register(session, 'auth:box.go', 'package auth\ntype Box struct{}\n', 'auth')
+      const analysis = register(
+        session,
+        'app:main.go',
+        'package main\nimport "github.com/acme/auth"\nfunc main() { _ = auth.Box[int]{} }\n',
+        'app',
+      )
+
+      const fact = analysis.qualifiedReferenceFacts?.find((item) => item.kind === 'construct')
+      expect(fact?.qualifier).toBe('auth')
+      expect(fact?.name).toBe('Box')
+      expect(
+        analysis.qualifiedReferenceFacts?.some(
+          (item) => item.kind === 'type' && item.name === 'Box',
+        ),
+      ).toBe(false)
+    })
+
+    it('given call, construct, and type facts, when they are resolved, then each kind requests its own space', () => {
+      const session = new InMemoryIndexSession()
+      register(
+        session,
+        'auth:user.go',
+        'package auth\ntype User struct{}\nfunc NewUser() {}\n',
+        'auth',
+      )
+      const analysis = register(
+        session,
+        'app:main.go',
+        'package main\nimport "github.com/acme/auth"\nvar current auth.User\nfunc main() {\n  auth.NewUser()\n  _ = auth.User{}\n}\n',
+        'app',
+      )
+      const seen: string[][] = []
+      const context = createImportResolutionContext(
+        { session, packageToWorkspace: new Map([['github.com/acme/auth', 'auth']]) },
+        baseAdapter,
+      )
+      session.setAdapterState(
+        GO_MODULE_OFFSETS_KEY,
+        new Map([
+          ['auth', ''],
+          ['app', ''],
+        ]),
+      )
+      baseAdapter.resolveImports(analysis, {
+        ...context,
+        resolvePackageExport: (request) => {
+          seen.push([...request.spaces])
+          return context.resolvePackageExport(request)
+        },
+      })
+
+      expect(seen).toContainEqual([SymbolSpace.Value])
+      expect(seen).toContainEqual([SymbolSpace.Type])
+      expect(
+        seen.filter((spaces) => spaces.length === 1 && spaces[0] === SymbolSpace.Value),
+      ).toHaveLength(1)
+      expect(seen.filter((spaces) => spaces[0] === SymbolSpace.Type).length).toBeGreaterThan(0)
+      expect(seen.every((spaces) => spaces[0] !== SymbolSpace.Value || spaces.length === 1)).toBe(
+        true,
+      )
+    })
+
+    it('given the same qualified call twice, when relations are built, then one CALLS relation is emitted', () => {
+      const session = new InMemoryIndexSession()
+      const provider = register(
+        session,
+        'auth:user.go',
+        'package auth\nfunc NewUser() {}\n',
+        'auth',
+      )
+      const analysis = register(
+        session,
+        'app:main.go',
+        'package main\nimport "github.com/acme/auth"\nfunc main() {\n  auth.NewUser()\n  auth.NewUser()\n}\n',
+        'app',
+      )
+      const resolved = resolve(session, analysis, new Map([['github.com/acme/auth', 'auth']]))
+      const relations = baseAdapter.buildRelations(analysis, { session, resolvedImports: resolved })
+      const factory = provider.symbols.find((symbol) => symbol.name === 'NewUser')!
+      const calls = relations.filter(
+        (relation) => relation.type === RelationType.Calls && relation.target === factory.id,
+      )
+
+      expect(analysis.qualifiedReferenceFacts?.filter((item) => item.kind === 'call')).toHaveLength(
+        2,
+      )
+      expect(calls).toHaveLength(1)
     })
   })
 })

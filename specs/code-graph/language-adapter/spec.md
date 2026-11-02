@@ -210,6 +210,22 @@ For `CALLS` relations, the adapter MUST extract deterministic call facts during 
 
 Calls to identifiers that cannot be resolved deterministically (e.g. unresolved global built-ins, ambiguous member expressions, dynamic expressions) SHALL be silently dropped — no relation is created, no error is thrown.
 
+### Requirement: Qualified reference resolution
+
+An adapter that emits `qualifiedReferenceFacts` (see `code-graph:symbol-model`) SHALL resolve them in `resolveImports()`, where `ImportResolutionContext` exposes the shared package import helpers, and SHALL build the relations in `buildRelations()` from the targets that `resolveImports()` returned. It MUST NOT search symbols by name.
+
+A qualified reference fact resolves only when all of these hold:
+
+- its `qualifier` is a namespace name bound by a resolved package import of the same file, as defined by the adapter's own specification;
+- no lexical binding in scope at the reference shadows that name;
+- `resolvePackageExport` resolves `name` for the import's specifier, using the symbol spaces the adapter derives from the fact `kind`.
+
+`ResolvedImports` SHALL carry an optional `qualifiedTargets` map from the identity of a qualified reference fact to the symbol id of its resolved target. An absent map is equivalent to an empty one, so adapters that resolve no qualified references are unchanged.
+
+A resolved fact SHALL produce `CALLS` for kind `call`, `CONSTRUCTS` for kind `construct`, and `USES_TYPE` for kind `type`, targeting the logical target returned by the helper, and SHALL contribute the resolution step returned by the helper when the step's `fromId` is a retained local binding of the file; a namespace without such a binding contributes no step, because the indexer drops steps with an unknown `fromId`. The relation MUST be deduplicated with relations from other facts for the same source and target.
+
+A fact that does not resolve SHALL be silently dropped: no relation, no guessed target, and no error. Resolution failures of the helper (`package-unknown`, `no-entry-surface`, `not-exported`, `ambiguous`) MUST NOT be reported as indexing failures for a qualified reference. A fact whose `sourceSymbolId` is absent SHALL NOT produce a relation, whatever its kind. A relation of a given kind SHALL be built at most once for the same source and target, however many facts support it.
+
 ### Requirement: Semantic caller containment
 
 A `CallFact.callerSymbolId` SHALL identify the innermost language-approved executable declaration whose complete parser-derived range contains the call expression. Containment MUST compare both line and column coordinates using the shared half-open range convention, including when declarations and calls occur on the same line.

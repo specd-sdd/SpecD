@@ -98,6 +98,11 @@ export {
 } from './binding-fact.js'
 export { CallForm, type CallFact, type ResolvedDependency } from './call-fact.js'
 export {
+  QualifiedReferenceKind,
+  type QualifiedReferenceFact,
+  qualifiedReferenceKey,
+} from './qualified-reference-fact.js'
+export {
   type FileAnalysisDraft,
   type FileAnalysis,
   type ParserState,
