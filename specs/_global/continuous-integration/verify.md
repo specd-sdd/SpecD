@@ -20,6 +20,20 @@
 - **WHEN** GitHub aggregates the workflow
 - **THEN** the check is failing
 
+### Requirement: The matrix enforces the cross-platform contract
+
+#### Scenario: Failure only on one operating system
+
+- **GIVEN** a test passes on macOS and Ubuntu and fails on Windows
+- **WHEN** the pull request is prepared for merge
+- **THEN** the code is fixed under `_global/cross-platform`
+- **AND** the runner is not excluded, the test is not skipped, and no workflow step masks the failure
+
+#### Scenario: Merge blocked by a red runner
+
+- **WHEN** any of the three runners fails
+- **THEN** the pull request does not merge
+
 ### Requirement: When the workflow runs
 
 #### Scenario: A pull request starts the workflow

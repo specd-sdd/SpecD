@@ -3,15 +3,12 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": ["default:_global/architecture", "default:_global/conventions"],
-  "implementation": [
-    {
-      "file": "default:specd-sdd/changes/20260925-213024-posix-windows-test-compatibility/deltas/default/_global/testing/spec.md.delta.yaml"
-    },
-    {
-      "file": "default:specd-sdd/changes/20260925-213024-posix-windows-test-compatibility/deltas/default/_global/testing/verify.md.delta.yaml"
-    }
+  "dependsOn": [
+    "default:_global/architecture",
+    "default:_global/conventions",
+    "default:_global/cross-platform"
   ],
+  "implementation": [],
   "optimizations": {
     "optimizedDescription": {
       "value": "Vitest: unit tests mock ports; integration uses os.tmpdir(); POSIX+Windows path/shell/CRLF-safe. No snapshots.",

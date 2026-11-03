@@ -46,6 +46,10 @@ Filesystem tests MUST locate temporary directories with `os.tmpdir()` and MUST b
 
 A test that needs an unreadable file MUST NOT use `chmod 0o000` as that condition on Windows. The setup MUST produce a file the Windows process cannot read, or the scenario MUST be skipped where that permission bit has no effect.
 
+### Requirement: Tests verify the cross-platform contract
+
+The POSIX and Windows rules in this spec apply to test code, and tests MUST also verify the production rules defined by `_global/cross-platform`. Code that handles paths, names reaching disk, line endings, external processes, permissions, or file replacement MUST have tests that exercise the platform-specific branch, using `path.win32` or a stubbed `process.platform` when the host cannot run it natively. Production portability rules MUST NOT be redefined here; this spec keeps only test-specific rules and `_global/cross-platform` remains the single source for production rules.
+
 ### Requirement: Test naming
 
 Test files use the `.spec.ts` suffix and match the name of the source file they test (`change.ts` → `change.spec.ts`). Test descriptions follow the pattern `"given <state>, when <action>, then <outcome>"` for behaviour tests. Setup/teardown helpers are named `setup<Thing>` and `cleanup<Thing>`.
@@ -72,3 +76,4 @@ Snapshot tests are forbidden. Assertions must be explicit and readable without a
 
 - [`default:_global/architecture`](../architecture/spec.md) — layer boundaries determine what is unit-testable vs integration-testable
 - [`default:_global/conventions`](../conventions/spec.md) — ESM-only constraint is the reason Vitest is used over Jest
+- [`default:_global/cross-platform`](../cross-platform/spec.md) — production portability rules that these tests must verify
