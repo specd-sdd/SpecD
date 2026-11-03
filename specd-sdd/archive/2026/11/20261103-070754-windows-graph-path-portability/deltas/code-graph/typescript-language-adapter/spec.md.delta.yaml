@@ -1,0 +1,26 @@
+- op: modified
+  description: Relative import resolution must treat backslash as a separator
+  selector:
+    type: section
+    matches: 'Requirement: Imports, exports, and public bindings'
+  content: |
+    The adapter SHALL extract named, default, namespace, type-only, side-effect, and aliased static imports; literal `import()` and literal `require()` dependencies; ESM declarations and export clauses; CommonJS exports; named re-exports; and star re-exports. Non-literal dynamic imports and requires SHALL be dropped.
+
+    Public bindings SHALL preserve public surface, exported name, symbol space, canonical target when known, and each independent re-export route. A named or star barrel route SHALL be linked by the `reExportLinking` facet after Pass 1 and before imports are resolved, without collapsing competing routes that occupy the same public slot. Type-only syntax SHALL not be promoted to a value binding without evidence. Relative imports SHALL consider TypeScript/JavaScript extension and index-file candidates through the `relativeImportResolution` facet. Relative import path resolution SHALL portable-normalize the importing file path and the specifier (treat `\` as a separator) before segment walks, consistent with `code-graph:graph-path-identity`.
+
+    A non-relative import SHALL resolve through the shared package import helpers: the adapter calls `packageEntryFiles` for the specifier and `resolvePackageExport` for each imported name, and it sets the local binding from the result. A default package import adds a file dependency on the entry files and binds the local name to the entry file's default export declaration when exactly one exists; otherwise it stays a file dependency only. A namespace package import adds a file dependency on the entry files and binds no declaration (its local name already exists as an unresolved local binding). Neither calls `resolvePackageExport`, because they name no export. A side-effect package import depends on the entry file. The adapter MUST NOT search symbols by name in the target workspace, and a name not published by the entry surface stays unresolved.
+
+    Imports declared type-only (`import type { X }` and `import { type X }`) SHALL be marked type-only on the import declaration, and a type-only name SHALL be looked up only in the type space. Any other named import is looked up in the value space and the type space. A type-only default import (`import type X from`) SHALL bind the local name only to a default export in the type space and MUST NOT bind a value declaration.
+
+    A named or star re-export SHALL also be a file dependency of the re-exporting file on the module it re-exports: a relative re-export that resolves to exactly one indexed file depends on that file, and a package re-export depends on the entry files of that package. This lets the incremental closure re-link a barrel when a re-exported module changes. A relative re-export that resolves to several indexed files adds no dependency.
+
+- op: modified
+  description: Depend on graph-path-identity for portable relative imports
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - `code-graph:language-adapter` — common adapter port, analysis phases, and capability contract
+    - `code-graph:symbol-model` — logical symbols, owners, bindings, ranges, and provenance vocabulary
+    - `code-graph:workspace-integration` — workspace, package, and path boundaries
+    - [`code-graph:graph-path-identity`](../graph-path-identity/spec.md) — portable normalize for relative import path walks

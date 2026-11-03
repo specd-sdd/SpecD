@@ -6,12 +6,22 @@
   "dependsOn": [
     "code-graph:language-adapter",
     "code-graph:symbol-model",
-    "code-graph:workspace-integration"
+    "code-graph:workspace-integration",
+    "code-graph:graph-path-identity"
   ],
   "implementation": [
     {
-      "file": "code-graph:src/infrastructure/tree-sitter/php-language-adapter.ts",
-      "symbols": ["PhpLanguageAdapter"]
+      "file": "code-graph:src/domain/services/split-workspace-identity.ts",
+      "symbols": ["resolveGraphPath", "isUncPath", "isAbsoluteGraphFilesystemPath"]
+    },
+    {
+      "file": "code-graph:test/domain/services/split-workspace-identity.spec.ts"
+    },
+    {
+      "file": "code-graph:src/infrastructure/tree-sitter/php-language-adapter.ts"
+    },
+    {
+      "file": "code-graph:test/infrastructure/tree-sitter/php-language-adapter.spec.ts"
     }
   ],
   "optimizations": {

@@ -1,0 +1,77 @@
+- op: modified
+  description: Strengthen drive-letter outside-project spelling on every host including Windows same-volume temps
+  selector:
+    type: section
+    matches: 'Requirement: Use case contract'
+  content: |
+    #### Scenario: Project-relative input
+
+    - **GIVEN** workspace `core` with `codeRoot` `packages/core`
+    - **WHEN** `execute` receives `packages/core/src/a.ts`
+    - **THEN** the result `projectRelativePath` is `packages/core/src/a.ts` and the candidate identity is `core:src/a.ts`
+
+    #### Scenario: Absolute input is converted
+
+    - **GIVEN** project root `/project`
+    - **WHEN** `execute` receives `/project/packages/core/src/a.ts`
+    - **THEN** the result is the same as for `packages/core/src/a.ts`
+
+    #### Scenario: Absolute input outside the project
+
+    - **WHEN** `execute` receives a non-drive absolute path outside the project root that no workspace contains
+    - **THEN** `projectRelativePath` starts with `../` and the result carries `PATH_OUTSIDE_PROJECT`
+
+    #### Scenario: Workspace-qualified input pins the candidate
+
+    - **GIVEN** workspaces `backend` (`app`) and `backoffice` (`app/webroot`)
+    - **WHEN** `execute` receives `backoffice:iccomp.php`
+    - **THEN** the only candidate is `backoffice` and `projectRelativePath` is `app/webroot/iccomp.php`
+
+    #### Scenario: Unknown workspace
+
+    - **WHEN** `execute` receives `nope:src/a.ts`
+    - **THEN** it fails with a `SpecdError` coded `UNKNOWN_WORKSPACE`
+
+    #### Scenario: Drive-letter path is not a workspace path
+
+    - **WHEN** `execute` receives `C:/project/src/a.ts`
+    - **THEN** it is treated as an absolute path and not as workspace `C`
+
+    #### Scenario: Backslash and drive-letter inputs on any host
+
+    - **WHEN** `execute` receives `app\src\a.ts` or `C:\other\a.ts`
+    - **THEN** the first is explained as `app/src/a.ts` and the second as an absolute path outside the project, on every host
+
+    #### Scenario: Drive-letter outside keeps portable absolute spelling on Windows same-volume projects
+
+    - **GIVEN** a project root under a Windows temp path on the same volume as `C:\`
+    - **WHEN** `execute` receives `C:\other\a.ts`
+    - **THEN** `projectRelativePath` is `C:/other/a.ts`
+    - **AND** the result carries `PATH_OUTSIDE_PROJECT`
+    - **AND** `projectRelativePath` MUST NOT be a deep `../` walk such as `../../../../other/a.ts`
+
+    #### Scenario: Path does not exist
+
+    - **WHEN** `execute` receives a path that is not on disk
+    - **THEN** the result carries `PATH_NOT_FOUND`, rule steps are still evaluated, and `size-limit` and `adapter` are `not-applicable`
+
+    #### Scenario: Empty or escaping input
+
+    - **WHEN** `execute` receives an empty path, or `backend:../x.ts` whose path escapes the `codeRoot`
+    - **THEN** it fails with `INVALID_GRAPH_WHY_PATH`
+
+    #### Scenario: Path equal to a code root
+
+    - **WHEN** `execute` receives the path of a `codeRoot`
+    - **THEN** it returns an evaluation without pattern stages instead of failing
+
+    #### Scenario: Provider without configuration
+
+    - **GIVEN** a provider created without a project configuration
+    - **WHEN** it is asked to explain a path
+    - **THEN** it fails with `GRAPH_WHY_REQUIRES_CONFIG`
+
+    #### Scenario: No side effects
+
+    - **WHEN** `execute` runs
+    - **THEN** no graph write, file write or configuration change occurs

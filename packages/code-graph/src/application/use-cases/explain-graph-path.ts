@@ -271,11 +271,14 @@ export class ExplainGraphPath {
     let pinned: WorkspaceIndexTarget | undefined
     const colon = raw.indexOf(':')
     const slash = raw.indexOf('/')
-    // A Windows drive path is absolute on every host; on POSIX it can never lie inside the project.
-    const foreignDrivePath = isDrivePath(raw) && process.platform !== 'win32'
+    // A Windows drive path is absolute on every host. On POSIX it can never lie inside the
+    // project; on Windows it may share a volume with a temp project root and must still keep
+    // its absolute portable spelling when outside the project (not a deep `../` walk).
+    const drivePathInput = isDrivePath(raw)
+    const foreignDrivePath = drivePathInput && process.platform !== 'win32'
     if (foreignDrivePath) {
-      abs = raw.replaceAll('\\', '/')
-    } else if (isAbsolute(raw) || isDrivePath(raw)) {
+      abs = toPortableGraphPath(raw)
+    } else if (isAbsolute(raw) || drivePathInput) {
       abs = resolve(raw)
     } else if (colon > 0 && (slash === -1 || colon < slash)) {
       const name = raw.slice(0, colon)
@@ -294,7 +297,11 @@ export class ExplainGraphPath {
     }
 
     // 2. Project-relative path
-    const projectRelativePath = foreignDrivePath ? abs : stripDot(relative(projectRoot, abs))
+    const relativeToProject = stripDot(relative(projectRoot, abs))
+    const projectRelativePath =
+      foreignDrivePath || (drivePathInput && isOutsideProject(relativeToProject))
+        ? toPortableGraphPath(abs)
+        : relativeToProject
 
     // 3. VCS root
     let vcsRoot: string | null = null
@@ -313,7 +320,7 @@ export class ExplainGraphPath {
     const candidateWorkspaces =
       pinned !== undefined
         ? [pinned]
-        : foreignDrivePath
+        : foreignDrivePath || (drivePathInput && isOutsideProject(relativeToProject))
           ? []
           : input.workspaces.filter((workspace) => isWithinCodeRoot(abs, workspace.codeRoot))
     for (const workspace of candidateWorkspaces) {

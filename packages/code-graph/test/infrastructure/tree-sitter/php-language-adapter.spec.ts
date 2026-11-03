@@ -2,6 +2,7 @@ import { describe, it, expect, afterEach, vi } from 'vitest'
 import fs from 'node:fs'
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync, realpathSync } from 'node:fs'
 import { join, resolve } from 'node:path'
+import { toPortableGraphPath } from '../../../src/domain/services/split-workspace-identity.js'
 import { tmpdir } from 'node:os'
 import { PhpLanguageAdapter } from '../../../src/infrastructure/tree-sitter/php-language-adapter.js'
 import { SymbolKind } from '../../../src/domain/value-objects/symbol-kind.js'
@@ -831,7 +832,30 @@ class ArticlesController {
     it('require_once with relative string literal emits IMPORTS when the target is indexed', () => {
       const root = join(tmpdir(), 'php-require')
       const filePath = join(root, 'app', 'controllers', 'PostsController.php')
-      const targetPath = resolve(root, 'app', 'models', 'Post.php')
+      const targetPath = toPortableGraphPath(resolve(root, 'app', 'models', 'Post.php'))
+      const content = `<?php\nrequire_once '../models/Post.php';`
+      const targetSymbols = adapter.extractSymbols(targetPath, '<?php\nclass Post {}')
+      const relations = adapter.extractRelations(filePath, content, targetSymbols, new Map())
+      const importsRels = relations.filter((r: Relation) => r.type === RelationType.Imports)
+      expect(importsRels).toHaveLength(1)
+      expect(importsRels[0]!.target).toBe(targetPath)
+    })
+
+    it('require_once from a Windows drive absolute importer emits portable IMPORTS on any host', () => {
+      const filePath =
+        'C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\php-require\\app\\controllers\\PostsController.php'
+      const targetPath = 'C:/Users/RUNNER~1/AppData/Local/Temp/php-require/app/models/Post.php'
+      const content = `<?php\nrequire_once '../models/Post.php';`
+      const targetSymbols = adapter.extractSymbols(targetPath, '<?php\nclass Post {}')
+      const relations = adapter.extractRelations(filePath, content, targetSymbols, new Map())
+      const importsRels = relations.filter((r: Relation) => r.type === RelationType.Imports)
+      expect(importsRels).toHaveLength(1)
+      expect(importsRels[0]!.target).toBe(targetPath)
+    })
+
+    it('require_once from a UNC absolute importer emits portable IMPORTS on any host', () => {
+      const filePath = '\\\\server\\share\\app\\controllers\\PostsController.php'
+      const targetPath = '//server/share/app/models/Post.php'
       const content = `<?php\nrequire_once '../models/Post.php';`
       const targetSymbols = adapter.extractSymbols(targetPath, '<?php\nclass Post {}')
       const relations = adapter.extractRelations(filePath, content, targetSymbols, new Map())
@@ -851,7 +875,7 @@ class ArticlesController {
     it('include with relative path emits IMPORTS when the target is indexed', () => {
       const root = join(tmpdir(), 'php-include')
       const filePath = join(root, 'app', 'bootstrap.php')
-      const targetPath = resolve(root, 'app', 'helpers', 'url_helper.php')
+      const targetPath = toPortableGraphPath(resolve(root, 'app', 'helpers', 'url_helper.php'))
       const content = `<?php\ninclude 'helpers/url_helper.php';`
       const targetSymbols = adapter.extractSymbols(targetPath, '<?php\nfunction url_helper() {}')
       const relations = adapter.extractRelations(filePath, content, targetSymbols, new Map())
@@ -875,7 +899,7 @@ class ArticlesController {
     it('require_once alongside use statements produces only the resolved require relation', () => {
       const root = join(tmpdir(), 'php-require-use')
       const filePath = join(root, 'app', 'controllers', 'PostsController.php')
-      const targetPath = join(root, 'app', 'controllers', 'bootstrap.php')
+      const targetPath = toPortableGraphPath(join(root, 'app', 'controllers', 'bootstrap.php'))
       const content = `<?php\nuse App\\Models\\User;\nrequire_once 'bootstrap.php';`
       const targetSymbols = adapter.extractSymbols(targetPath, '<?php\nfunction boot() {}')
       const relations = adapter.extractRelations(filePath, content, targetSymbols, new Map())

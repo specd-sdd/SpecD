@@ -236,6 +236,19 @@
 - **THEN** only the literal resolved target produces imports and scoped aliases
 - **AND** aliases do not leak into another method
 
+#### Scenario: Relative require against an absolute Windows importer emits portable IMPORTS
+
+- **GIVEN** an absolute Windows drive importer and an indexed target under a relative `require_once`
+- **WHEN** relations are built
+- **THEN** exactly one `IMPORTS` relation targets the portable `/` path of the indexed file
+- **AND** a backslash-only resolved path MUST NOT miss `getFileId`
+
+#### Scenario: Relative require against a UNC importer emits portable IMPORTS
+
+- **GIVEN** a UNC absolute importer and an indexed target under a relative `require_once`
+- **WHEN** relations are built
+- **THEN** exactly one `IMPORTS` relation targets the portable `//server/share/...` path
+
 ### Requirement: Scoped bindings, calls, types, and construction
 
 #### Scenario: Explicit instance call is proven without container guessing

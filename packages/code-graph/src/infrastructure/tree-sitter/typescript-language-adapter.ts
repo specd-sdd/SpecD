@@ -30,7 +30,10 @@ import {
   type ReExportLinkingFacet,
 } from '../../domain/value-objects/language-adapter-facets.js'
 import { canonical, findPackageManifest } from './find-manifest-field.js'
-import { splitWorkspaceIdentity } from '../../domain/services/split-workspace-identity.js'
+import {
+  splitWorkspaceIdentity,
+  toPortableGraphPath,
+} from '../../domain/services/split-workspace-identity.js'
 import {
   parseDottedMemberReference,
   renderDottedMemberReference,
@@ -3279,10 +3282,11 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
   private resolveRelativeImportPath(fromFile: string, specifier: string): string | string[] {
     const identity = splitWorkspaceIdentity(fromFile)
     const wsPrefix = identity === null ? '' : `${identity.workspace}:`
-    const relFile = identity === null ? fromFile : identity.relativePath
+    const relFile = toPortableGraphPath(identity === null ? fromFile : identity.relativePath)
+    const portableSpecifier = toPortableGraphPath(specifier)
 
     const relDir = relFile.substring(0, relFile.lastIndexOf('/'))
-    const parts = specifier.split('/')
+    const parts = portableSpecifier.split('/')
     const segments = relDir ? relDir.split('/') : []
 
     for (const part of parts) {

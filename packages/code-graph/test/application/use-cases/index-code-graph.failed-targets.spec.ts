@@ -220,20 +220,26 @@ describe('IndexCodeGraph - failed targets and freshness', () => {
     expect(byId.get('ws:src/extra.tst')).toBe(computeContentHash('let c = 3'))
   })
 
-  it('reports a file that cannot be read for hashing once and as parse-failed', async () => {
-    // Given a file without read permission
-    failing = new Set()
-    chmodSync(join(wsDir, 'src', 'bad.tst'), 0o000)
+  // chmod(0o000) does not make files unreadable on Windows (and is a no-op as root).
+  // Platform-noop skip only — never used for path-identity / separator bugs.
+  // ESM named imports prevent spying on readFileSync; Unix chmod covers the product path.
+  it.skipIf(process.platform === 'win32' || process.getuid?.() === 0)(
+    'reports a file that cannot be read for hashing once and as parse-failed',
+    async () => {
+      // Given a file without read permission
+      failing = new Set()
+      chmodSync(join(wsDir, 'src', 'bad.tst'), 0o000)
 
-    // When the run completes
-    const result = await run()
-    chmodSync(join(wsDir, 'src', 'bad.tst'), 0o644)
+      // When the run completes
+      const result = await run()
+      chmodSync(join(wsDir, 'src', 'bad.tst'), 0o644)
 
-    // Then there is one error for that path and its coverage is parse-failed
-    expect(result.errors.filter((error) => error.filePath === 'ws:src/bad.tst')).toHaveLength(1)
-    const [coverage] = await store.findIndexCoverage(['ws:src/bad.tst'])
-    expect(coverage?.status).toBe(IndexCoverageStatus.ParseFailed)
-  })
+      // Then there is one error for that path and its coverage is parse-failed
+      expect(result.errors.filter((error) => error.filePath === 'ws:src/bad.tst')).toHaveLength(1)
+      const [coverage] = await store.findIndexCoverage(['ws:src/bad.tst'])
+      expect(coverage?.status).toBe(IndexCoverageStatus.ParseFailed)
+    },
+  )
 
   it('keeps the latches and the previous observations when the run does not commit', async () => {
     // Given an indexed workspace with its latches set

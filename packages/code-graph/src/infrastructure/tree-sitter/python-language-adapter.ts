@@ -26,7 +26,10 @@ import {
   type SymbolReferenceSyntaxFacet,
 } from '../../domain/value-objects/language-adapter-facets.js'
 import { findPackageManifest } from './find-manifest-field.js'
-import { splitWorkspaceIdentity } from '../../domain/services/split-workspace-identity.js'
+import {
+  splitWorkspaceIdentity,
+  toPortableGraphPath,
+} from '../../domain/services/split-workspace-identity.js'
 import {
   parseDottedMemberReference,
   renderDottedMemberReference,
@@ -2467,14 +2470,15 @@ export class PythonLanguageAdapter implements LanguageAdapter {
     // Separate workspace prefix (e.g. "core:src/models/user.py" → "core:", "src/models/user.py")
     const identity = splitWorkspaceIdentity(fromFile)
     const wsPrefix = identity === null ? '' : `${identity.workspace}:`
-    const relFile = identity === null ? fromFile : identity.relativePath
+    const relFile = toPortableGraphPath(identity === null ? fromFile : identity.relativePath)
+    const portableSpecifier = toPortableGraphPath(specifier)
 
     const relDir = relFile.substring(0, relFile.lastIndexOf('/'))
     const segments = relDir ? relDir.split('/') : []
 
     // Count leading dots: first dot = current dir, each extra dot = go up
     let dots = 0
-    while (dots < specifier.length && specifier[dots] === '.') dots++
+    while (dots < portableSpecifier.length && portableSpecifier[dots] === '.') dots++
 
     // Go up (dots - 1) levels: first dot is the relative marker (current dir)
     for (let i = 1; i < dots; i++) {
@@ -2482,7 +2486,7 @@ export class PythonLanguageAdapter implements LanguageAdapter {
     }
 
     // Remaining part after the dots is the module path
-    const modulePart = specifier.substring(dots)
+    const modulePart = portableSpecifier.substring(dots)
     if (modulePart) {
       for (const part of modulePart.split('.')) {
         segments.push(part)

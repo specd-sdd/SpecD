@@ -20,7 +20,10 @@ import {
   type SymbolReferenceSyntaxFacet,
 } from '../../domain/value-objects/language-adapter-facets.js'
 import { canonical, findPackageManifest } from './find-manifest-field.js'
-import { splitWorkspaceIdentity } from '../../domain/services/split-workspace-identity.js'
+import {
+  splitWorkspaceIdentity,
+  toPortableGraphPath,
+} from '../../domain/services/split-workspace-identity.js'
 import {
   parseDottedMemberReference,
   renderDottedMemberReference,
@@ -557,14 +560,15 @@ function goPackageFiles(
   if (directories === undefined) {
     directories = new Map<string, string[]>()
     for (const filePath of [...session.getAllFilePaths()].sort()) {
-      if (!filePath.endsWith('.go') || filePath.endsWith('_test.go')) continue
-      const separator = filePath.lastIndexOf('/')
+      const portable = toPortableGraphPath(filePath)
+      if (!portable.endsWith('.go') || portable.endsWith('_test.go')) continue
+      const separator = portable.lastIndexOf('/')
       const directory =
         separator === -1
-          ? filePath.slice(0, filePath.indexOf(':') + 1)
-          : filePath.slice(0, separator)
+          ? portable.slice(0, portable.indexOf(':') + 1)
+          : portable.slice(0, separator)
       const files = directories.get(directory) ?? []
-      files.push(filePath)
+      files.push(portable)
       directories.set(directory, files)
     }
     session.setAdapterState(GO_PACKAGE_DIRECTORIES_KEY, directories)
@@ -621,9 +625,10 @@ interface GoReceiverFacts {
  * @returns Directory surface, including a workspace-root surface when needed.
  */
 function goPackageSurface(filePath: string): string {
-  const slash = filePath.lastIndexOf('/')
-  if (slash >= 0) return filePath.slice(0, slash)
-  const identity = splitWorkspaceIdentity(filePath)
+  const portable = toPortableGraphPath(filePath)
+  const slash = portable.lastIndexOf('/')
+  if (slash >= 0) return portable.slice(0, slash)
+  const identity = splitWorkspaceIdentity(portable)
   return identity === null ? '.' : `${identity.workspace}:`
 }
 

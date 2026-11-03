@@ -10,10 +10,10 @@ When a file is missing from, or unexpectedly present in, the code graph, users m
 
 `ExplainGraphPath.execute(input)` SHALL accept a path and the effective project graph configuration, and return an `ExplainGraphPathResult` without modifying the graph store, the filesystem, or `specd.yaml`.
 
-- `input.path` MUST accept a project-relative path, an absolute path (converted to project-relative before evaluation), or a workspace-qualified path `workspace:path` where `path` is relative to that workspace's `codeRoot` and the workspace name restricts the candidates to that workspace.
-- A drive-letter input on a POSIX host is reported with its normalized absolute spelling (forward slashes) as `projectRelativePath`. A single-letter workspace name is ambiguous with a drive only when the path after the colon starts with `/` or `\`; write `c:src/a.ts`, not `c:/src/a.ts`, for such a workspace.
-- Inputs MUST be normalized to forward slashes without a leading `./`, on every host: backslashes in a relative input are treated as separators, and a Windows drive-letter path is recognised as absolute even on a POSIX host (it is then outside the project). Drive-letter paths MUST NOT be parsed as `workspace:path`.
-- An absolute path outside the project root SHALL be converted to a project-relative path starting with `../`.
+- `input.path` MUST accept a project-relative path, an absolute path (converted to project-relative before evaluation when it lies inside the project), or a workspace-qualified path `workspace:path` where `path` is relative to that workspace's `codeRoot` and the workspace name restricts the candidates to that workspace.
+- A Windows drive-letter path is recognised as absolute on every host. When that drive-letter path lies outside the project, `projectRelativePath` SHALL be its normalized absolute spelling with forward slashes (for example `C:/other/a.ts`), including on Windows hosts where the project shares the same volume (for example a temp project root). A single-letter workspace name is ambiguous with a drive only when the path after the colon starts with `/` or `\`; write `c:src/a.ts`, not `c:/src/a.ts`, for such a workspace.
+- Inputs MUST be normalized to forward slashes without a leading `./`, on every host: backslashes in a relative input are treated as separators. Drive-letter paths MUST NOT be parsed as `workspace:path`.
+- A non-drive absolute path outside the project root SHALL be converted to a project-relative path starting with `../`.
 - The path need not exist on disk. When it does not, the result SHALL carry the diagnostic `PATH_NOT_FOUND` and rule evaluation SHALL still be performed on the path text; the size and adapter steps are reported as `not-applicable`.
 - A `workspace:path` whose workspace is not configured SHALL fail with a `SpecdError` coded `UNKNOWN_WORKSPACE`.
 - An empty input, or a `workspace:path` whose path escapes that workspace's `codeRoot`, SHALL fail with a `SpecdError` coded `INVALID_GRAPH_WHY_PATH`. A path equal to a `codeRoot` (or to the project root) is explained as a directory without evaluating patterns.
@@ -96,3 +96,4 @@ Diagnostics do not change the verdict.
 - `core:config` — project-relative path semantics, graph keys and layering
 - `code-graph:indexer` — evaluation functions and project-relative path evaluation shared with indexing
 - `code-graph:workspace-integration` — identities, `projectRelativePath`, ownership decided by discovery rules
+- [`code-graph:graph-path-identity`](../graph-path-identity/spec.md) — portable absolute spelling for drive-letter and UNC outsides

@@ -1,0 +1,2 @@
+- op: no-op
+  description: Existing import scenarios remain valid; backslash portability of relative resolve is covered by code-graph:graph-path-identity verify and adapter unit tests.

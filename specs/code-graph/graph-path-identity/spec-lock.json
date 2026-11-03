@@ -1,0 +1,29 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["code-graph:symbol-model"],
+  "implementation": [
+    {
+      "file": "code-graph:src/domain/services/split-workspace-identity.ts",
+      "symbols": [
+        "resolveGraphPath",
+        "isUncPath",
+        "isAbsoluteGraphFilesystemPath",
+        "toPortableGraphPath",
+        "isDriveLetterPath",
+        "splitWorkspaceIdentity"
+      ]
+    },
+    {
+      "file": "code-graph:test/domain/services/split-workspace-identity.spec.ts"
+    },
+    {
+      "file": "code-graph:src/infrastructure/tree-sitter/go-language-adapter.ts"
+    },
+    {
+      "file": "code-graph:test/application/use-cases/index-code-graph.failed-targets.spec.ts"
+    }
+  ]
+}

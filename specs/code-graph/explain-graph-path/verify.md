@@ -18,7 +18,7 @@
 
 #### Scenario: Absolute input outside the project
 
-- **WHEN** `execute` receives an absolute path outside the project root that no workspace contains
+- **WHEN** `execute` receives a non-drive absolute path outside the project root that no workspace contains
 - **THEN** `projectRelativePath` starts with `../` and the result carries `PATH_OUTSIDE_PROJECT`
 
 #### Scenario: Workspace-qualified input pins the candidate
@@ -41,6 +41,14 @@
 
 - **WHEN** `execute` receives `app\src\a.ts` or `C:\other\a.ts`
 - **THEN** the first is explained as `app/src/a.ts` and the second as an absolute path outside the project, on every host
+
+#### Scenario: Drive-letter outside keeps portable absolute spelling on Windows same-volume projects
+
+- **GIVEN** a project root under a Windows temp path on the same volume as `C:\`
+- **WHEN** `execute` receives `C:\other\a.ts`
+- **THEN** `projectRelativePath` is `C:/other/a.ts`
+- **AND** the result carries `PATH_OUTSIDE_PROJECT`
+- **AND** `projectRelativePath` MUST NOT be a deep `../` walk such as `../../../../other/a.ts`
 
 #### Scenario: Path does not exist
 

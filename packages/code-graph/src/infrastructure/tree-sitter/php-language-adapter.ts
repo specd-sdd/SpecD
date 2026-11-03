@@ -28,7 +28,12 @@ import { type Relation, createRelation } from '../../domain/value-objects/relati
 import { SymbolKind } from '../../domain/value-objects/symbol-kind.js'
 import { RelationType } from '../../domain/value-objects/relation-type.js'
 import { canonical, findPackageManifest, type ManifestInspection } from './find-manifest-field.js'
-import { splitWorkspaceIdentity } from '../../domain/services/split-workspace-identity.js'
+import {
+  isAbsoluteGraphFilesystemPath,
+  resolveGraphPath,
+  splitWorkspaceIdentity,
+  toPortableGraphPath,
+} from '../../domain/services/split-workspace-identity.js'
 import {
   parseDottedMemberReference,
   renderDottedMemberReference,
@@ -214,8 +219,8 @@ function getCakeTargetCandidates(
   return relCandidates.map((candidate) =>
     prefix
       ? `${prefix}${candidate}`
-      : path.isAbsolute(rawPath)
-        ? path.resolve(path.dirname(rawPath), '..', candidate)
+      : isAbsoluteGraphFilesystemPath(rawPath)
+        ? resolveGraphPath(filePath, `../${candidate}`)
         : candidate,
   )
 }
@@ -245,8 +250,8 @@ function getCodeIgniterTargetCandidates(
   return relCandidates.map((candidate) =>
     prefix
       ? `${prefix}${candidate}`
-      : path.isAbsolute(rawPath)
-        ? path.resolve(path.dirname(rawPath), '..', candidate)
+      : isAbsoluteGraphFilesystemPath(rawPath)
+        ? resolveGraphPath(filePath, `../${candidate}`)
         : candidate,
   )
 }
@@ -317,32 +322,15 @@ function extractComment(node: SgNode): string | undefined {
 
 /**
  * Splits a workspace-prefixed file path into prefix and relative/absolute path.
+ * Absolute filesystem paths (POSIX, drive-letter, UNC) are returned without a workspace prefix.
  * @param filePath - The file path to split.
  * @returns Prefix and normalized path portion.
  */
 function splitWorkspacePath(filePath: string): { prefix: string; path: string } {
-  if (filePath.startsWith('/')) return { prefix: '', path: filePath }
+  if (isAbsoluteGraphFilesystemPath(filePath)) return { prefix: '', path: filePath }
   const identity = splitWorkspaceIdentity(filePath)
   if (identity === null) return { prefix: '', path: filePath }
   return { prefix: `${identity.workspace}:`, path: identity.relativePath }
-}
-
-/**
- * Resolves a path relative to a source file while preserving workspace prefixes.
- * @param fromFile - The source file path.
- * @param target - The relative or absolute target path.
- * @returns The resolved path.
- */
-function resolveFromFilePath(fromFile: string, target: string): string {
-  if (target.startsWith('/')) return target
-
-  const { prefix, path: rawPath } = splitWorkspacePath(fromFile)
-  if (path.isAbsolute(rawPath)) {
-    return path.resolve(path.dirname(rawPath), target)
-  }
-
-  const resolved = path.posix.normalize(path.posix.join(path.posix.dirname(rawPath), target))
-  return `${prefix}${resolved}`
 }
 
 /**
@@ -605,7 +593,7 @@ function inspectComposerManifest(
       )
       const existing = prefixDirs.get(prefix) ?? []
       for (const relDir of dirs) {
-        const abs = canonical(path.resolve(manifestDir, relDir))
+        const abs = toPortableGraphPath(canonical(path.resolve(manifestDir, relDir)))
         if (!existing.includes(abs)) existing.push(abs)
       }
       prefixDirs.set(prefix, existing)
@@ -617,7 +605,7 @@ function inspectComposerManifest(
       )
       const existing = prefixDirs.get(prefix) ?? []
       for (const relDir of dirs) {
-        const abs = canonical(path.resolve(manifestDir, relDir))
+        const abs = toPortableGraphPath(canonical(path.resolve(manifestDir, relDir)))
         autoloadDevDirs.add(abs)
         if (!existing.includes(abs)) existing.push(abs)
       }
@@ -2322,7 +2310,7 @@ export class PhpLanguageAdapter implements LanguageAdapter {
       return undefined
     }
 
-    const canonicalCodeRoot = canonical(codeRoot)
+    const canonicalCodeRoot = toPortableGraphPath(canonical(codeRoot))
     const data: ComposerManifestData = {
       packageRoot: result.match.packageRoot,
       canonicalCodeRoot,
@@ -2456,8 +2444,9 @@ export class PhpLanguageAdapter implements LanguageAdapter {
     const entries: PackageEntry[] = []
     const canonicalOwnerRoot = manifest?.canonicalCodeRoot ?? owner.codeRoot
     for (const absolute of this.resolveQualifiedNameCandidates(name, map)) {
-      const rel = path.relative(canonicalOwnerRoot, absolute).split(path.sep).join('/')
-      if (rel.startsWith('..') || path.isAbsolute(rel)) continue
+      const rel = toPortableGraphPath(path.relative(canonicalOwnerRoot, absolute))
+      if (rel.startsWith('..') || path.isAbsolute(rel) || isAbsoluteGraphFilesystemPath(rel))
+        continue
       const filePath = `${owner.workspace}:${rel}`
       entries.push({ filePath, surface: filePath })
     }
@@ -2514,15 +2503,18 @@ export class PhpLanguageAdapter implements LanguageAdapter {
     const canonicalCodeRoot = manifest?.canonicalCodeRoot ?? codeRoot
 
     for (const absolute of this.resolveQualifiedNameCandidates(qualifiedName, map)) {
-      const rel = path.relative(canonicalCodeRoot, absolute).split(path.sep).join('/')
-      if (rel.startsWith('..') || path.isAbsolute(rel)) continue
+      const rel = toPortableGraphPath(path.relative(canonicalCodeRoot, absolute))
+      if (rel.startsWith('..') || path.isAbsolute(rel) || isAbsoluteGraphFilesystemPath(rel))
+        continue
       const targetId = `${workspace}:${rel}`
       if (session.getFileId(targetId) === undefined) continue
 
       const targetCategory = session.getFileCategory(targetId)
       const inAutoloadDev = [...autoloadDevDirs].some((devDir) => {
-        const dRel = path.relative(devDir, absolute)
-        return !dRel.startsWith('..') && !path.isAbsolute(dRel)
+        const dRel = toPortableGraphPath(path.relative(devDir, absolute))
+        return (
+          !dRel.startsWith('..') && !path.isAbsolute(dRel) && !isAbsoluteGraphFilesystemPath(dRel)
+        )
       })
       if (!isImportingTest && (targetCategory === 'test' || inAutoloadDev)) {
         if (out !== undefined) out.excludedForNonTest = true
@@ -2546,8 +2538,8 @@ export class PhpLanguageAdapter implements LanguageAdapter {
     const candidates: string[] = []
     for (const [prefix, dir] of map) {
       if (qualifiedName.startsWith(prefix)) {
-        const relative = qualifiedName.slice(prefix.length).replace(/\\/g, path.sep)
-        candidates.push(path.join(dir, relative + '.php'))
+        const relative = qualifiedName.slice(prefix.length).replaceAll('\\', '/')
+        candidates.push(toPortableGraphPath(path.join(dir, `${relative}.php`)))
       }
     }
     return candidates
@@ -2582,7 +2574,7 @@ export class PhpLanguageAdapter implements LanguageAdapter {
           if (ck === 'string' || ck === 'encapsed_string') {
             const value = child.text().replace(/^['"]|['"]$/g, '')
             if (value && !value.includes('$') && !value.includes("' .") && !value.includes('" .')) {
-              const target = resolveFromFilePath(filePath, value)
+              const target = resolveGraphPath(filePath, value)
               const key = `${filePath}->${target}`
               if (!seen.has(key)) {
                 seen.add(key)
@@ -3008,10 +3000,11 @@ export class PhpLanguageAdapter implements LanguageAdapter {
   private resolveRelativeImportPath(fromFile: string, specifier: string): string | string[] {
     const identity = splitWorkspaceIdentity(fromFile)
     const wsPrefix = identity === null ? '' : `${identity.workspace}:`
-    const relFile = identity === null ? fromFile : identity.relativePath
+    const relFile = toPortableGraphPath(identity === null ? fromFile : identity.relativePath)
+    const portableSpecifier = toPortableGraphPath(specifier)
 
     const relDir = relFile.substring(0, relFile.lastIndexOf('/'))
-    const parts = specifier.split('/')
+    const parts = portableSpecifier.split('/')
     const segments = relDir ? relDir.split('/') : []
 
     for (const part of parts) {

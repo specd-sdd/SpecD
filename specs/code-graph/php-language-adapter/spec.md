@@ -64,6 +64,10 @@ That basename covers both the Composer package `name` and the PSR-4 map the adap
 
 The adapter SHALL extract literal `require`, `require_once`, `include`, and `include_once` dependencies and SHALL drop variable or concatenated expressions unless a registered deterministic rule proves a concrete path. It SHALL retain the current registry-based framework loader support, including the statically recognized CakePHP, CodeIgniter, Yii, Laravel, Symfony, Zend, and equivalent configured class-literal or loader patterns.
 
+Resolved require/include targets and absolute filesystem CakePHP/CodeIgniter candidate paths SHALL be produced through `resolveGraphPath` (or an equivalent that satisfies `code-graph:graph-path-identity`) so that relation targets use portable `/` separators and match indexed file identities from `createSymbolNode` / session `getFileId` on every host, including Windows drive and UNC absolute importers.
+
+Absolute directories prepared from Composer PSR-4 manifests and used for qualified-name candidate construction or indexed-file lookup SHALL be stored and compared in portable `/` form.
+
 Loader facts SHALL produce `IMPORTS` and receiver bindings only when their literal value and indexed candidate paths prove a target. Loaded-instance aliases, explicit constructed instances, and method-local assignments MAY produce `CALLS` within the proven lexical scope. Aliases MUST NOT leak across methods. Runtime service identifiers, arbitrary container lookups, variable loader arguments, and unrelated same-shaped calls SHALL be dropped.
 
 ### Requirement: Scoped bindings, calls, types, and construction
@@ -115,3 +119,4 @@ Parser-specific state returned from analysis SHALL contain only compact facts co
 - `code-graph:language-adapter` — common adapter port, phases, and capability contract
 - `code-graph:symbol-model` — logical symbols, owners, bindings, ranges, and hierarchy evidence
 - `code-graph:workspace-integration` — workspace, Composer package, and path boundaries
+- [`code-graph:graph-path-identity`](../graph-path-identity/spec.md) — portable resolve for require/include and absolute loader candidates

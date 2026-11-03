@@ -1,0 +1,25 @@
+- op: modified
+  description: Add portable require/include IMPORTS scenarios for absolute Windows and UNC importers
+  selector:
+    type: section
+    matches: 'Requirement: Static and framework dependency facts'
+  content: |
+    #### Scenario: Literal loader stays scoped while dynamic loader is dropped
+
+    - **GIVEN** a registered literal framework loader and a variable-argument lookalike
+    - **WHEN** dependency and alias facts are built
+    - **THEN** only the literal resolved target produces imports and scoped aliases
+    - **AND** aliases do not leak into another method
+
+    #### Scenario: Relative require against an absolute Windows importer emits portable IMPORTS
+
+    - **GIVEN** an absolute Windows drive importer and an indexed target under a relative `require_once`
+    - **WHEN** relations are built
+    - **THEN** exactly one `IMPORTS` relation targets the portable `/` path of the indexed file
+    - **AND** a backslash-only resolved path MUST NOT miss `getFileId`
+
+    #### Scenario: Relative require against a UNC importer emits portable IMPORTS
+
+    - **GIVEN** a UNC absolute importer and an indexed target under a relative `require_once`
+    - **WHEN** relations are built
+    - **THEN** exactly one `IMPORTS` relation targets the portable `//server/share/...` path

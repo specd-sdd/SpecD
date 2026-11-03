@@ -6,12 +6,13 @@
   "dependsOn": [
     "code-graph:language-adapter",
     "code-graph:symbol-model",
-    "code-graph:workspace-integration"
+    "code-graph:workspace-integration",
+    "code-graph:graph-path-identity"
   ],
   "implementation": [
     {
       "file": "code-graph:src/infrastructure/tree-sitter/typescript-language-adapter.ts",
-      "symbols": ["TypeScriptLanguageAdapter"]
+      "symbols": ["resolveRelativeImportPath"]
     }
   ],
   "optimizations": {

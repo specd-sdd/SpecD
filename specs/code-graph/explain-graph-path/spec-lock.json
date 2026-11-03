@@ -3,43 +3,16 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": ["core:config", "code-graph:indexer", "code-graph:workspace-integration"],
+  "dependsOn": [
+    "core:config",
+    "code-graph:indexer",
+    "code-graph:workspace-integration",
+    "code-graph:graph-path-identity"
+  ],
   "implementation": [
     {
       "file": "code-graph:src/application/use-cases/explain-graph-path.ts",
-      "symbols": ["ExplainGraphPath", "ExplainGraphPathResult", "ExplainGraphPathInput"]
-    },
-    {
-      "file": "code-graph:src/composition/use-cases/explain-graph-path.ts",
-      "symbols": ["createExplainGraphPath"]
-    },
-    {
-      "file": "code-graph:src/domain/errors/unknown-workspace-error.ts",
-      "symbols": ["UnknownWorkspaceError"]
-    },
-    {
-      "file": "code-graph:src/domain/errors/invalid-graph-why-path-error.ts",
-      "symbols": ["InvalidGraphWhyPathError"]
-    },
-    {
-      "file": "code-graph:src/domain/errors/graph-why-requires-config-error.ts",
-      "symbols": ["GraphWhyRequiresConfigError"]
-    },
-    {
-      "file": "code-graph:src/application/ports/code-graph-host-port.ts",
-      "symbols": ["CodeGraphHostPort"]
-    },
-    {
-      "file": "code-graph:src/composition/code-graph-provider.ts",
-      "symbols": ["CodeGraphProvider", "CodeGraphProviderImpl"]
-    },
-    {
-      "file": "code-graph:src/composition/create-code-graph-provider.ts",
-      "symbols": ["createCodeGraphProvider"]
-    },
-    {
-      "file": "code-graph:src/application/services/decode-textual-content.ts",
-      "symbols": ["decodeTextualContent"]
+      "symbols": ["ExplainGraphPath"]
     }
   ]
 }
