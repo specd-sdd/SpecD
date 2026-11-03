@@ -7,38 +7,32 @@
   "implementation": [
     {
       "file": "guide:scripts/guide-bundler.ts",
-      "symbols": ["compileCollections", "compileGuide", "parseFrontmatter"]
+      "symbols": [
+        "toPosixPath",
+        "isPathInside",
+        "compareStrings",
+        "compileGuide",
+        "collectMarkdownFiles",
+        "compileCollections"
+      ]
     },
     {
       "file": "guide:scripts/sdk-api-generator.ts",
-      "symbols": ["generateSdkApiTopics", "loadApiEntryPoints"]
+      "symbols": [
+        "resolveSourcePath",
+        "isDeclaredInWorkspace",
+        "generateSdkApiTopics",
+        "buildTopicNameIndex"
+      ]
     },
     {
-      "file": "guide:test/unit/infrastructure/bundle.test.ts"
-    },
-    {
-      "file": "guide:README.md"
-    },
-    {
-      "file": "guide:scripts/markdown-formatter.ts",
-      "symbols": ["formatGeneratedBody"]
-    },
-    {
-      "file": "guide:package.json"
-    },
-    {
-      "file": "guide:scripts/bundle-guides.ts",
-      "symbols": ["bundleAllCollections"]
-    },
-    {
-      "file": "guide:src/infrastructure/adapters/prebundled-guide-catalog-adapter.ts",
-      "symbols": ["loadCatalog"]
-    },
-    {
-      "file": "guide:src/infrastructure/index.ts"
+      "file": "guide:test/unit/scripts/path-normalization.spec.ts"
     },
     {
       "file": "guide:test/integration/sdk-catalog.spec.ts"
+    },
+    {
+      "file": "guide:test/unit/scripts/typedoc-entrypoints.spec.ts"
     }
   ]
 }

@@ -1,0 +1,485 @@
+{
+  "name": "cross-platform-guide-bundler",
+  "createdAt": "2026-10-19T06:03:09.803Z",
+  "updatedAt": "2026-11-03T03:55:02.145Z",
+  "description": "Fix Windows CI failures in @specd/guide by normalizing TypeDoc entrypoints and all guide topic/source paths to POSIX. Add separator-independent workspace membership checks so API topic generation works on Windows and macOS/Linux alike. Update guide:bundle-guides with the cross-platform requirements and verification scenarios.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": ["guide:bundle-guides"],
+  "specDependsOn": {
+    "guide:bundle-guides": ["guide:conventions", "guide:guide-model"]
+  },
+  "invalidationPolicy": "downstream",
+  "implementationTrackingStartedAt": "2026-11-02T19:39:43.868Z",
+  "trackedImplementationFiles": [
+    {
+      "file": "EXPLORATION_CODE_GRAPH_FLOWS.md",
+      "state": "ignored"
+    },
+    {
+      "file": "EXPLORATION_GRAPH_CLI_OUTPUT_OPTIMIZATION.md",
+      "state": "ignored"
+    },
+    {
+      "file": "EXPLORATION_KERNEL_PLUGINS.md",
+      "state": "ignored"
+    },
+    {
+      "file": "SpecD — Análisis de identidad LogicalSymbol dependencias y casos de uso.md",
+      "state": "ignored"
+    },
+    {
+      "file": "dev/scripts/graph-file-doc.js",
+      "state": "ignored"
+    },
+    {
+      "file": "dev/scripts/spec-metadata-diff-poc/index.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "dev/scripts/spec-metadata-diff-poc/vcs-spec-repository.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "dev/scripts/spec-metadata-diff-poc/working-copy-spec-repository.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "dev/scripts/symbol-inspect-poc.mjs",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/guide/conventions/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/guide/guide-model/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/guide/scripts/guide-bundler.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/scripts/sdk-api-generator.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/test/unit/scripts/path-normalization.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/test/integration/sdk-catalog.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/test/unit/scripts/typedoc-entrypoints.spec.ts",
+      "state": "resolved"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "guide:bundle-guides",
+      "file": "packages/guide/scripts/guide-bundler.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "toPosixPath",
+        "isPathInside",
+        "compareStrings",
+        "compileGuide",
+        "collectMarkdownFiles",
+        "compileCollections"
+      ]
+    },
+    {
+      "specId": "guide:bundle-guides",
+      "file": "packages/guide/scripts/sdk-api-generator.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "resolveSourcePath",
+        "isDeclaredInWorkspace",
+        "generateSdkApiTopics",
+        "buildTopicNameIndex"
+      ]
+    },
+    {
+      "specId": "guide:bundle-guides",
+      "file": "packages/guide/test/unit/scripts/path-normalization.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "guide:bundle-guides",
+      "file": "packages/guide/test/integration/sdk-catalog.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "guide:bundle-guides",
+      "file": "packages/guide/test/unit/scripts/typedoc-entrypoints.spec.ts",
+      "fileLinkExplicit": true
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:3ce673dd142fc3dd5bb9ce993baa30cd65cdc55c95100fbee8eec26c506e1c14"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "guide:bundle-guides",
+          "filename": "deltas/guide/bundle-guides/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:caa8a7d661b98162adc4c8d11b598cbe21eab14724b3d510d14c5a31b856bbb4"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "guide:bundle-guides",
+          "filename": "deltas/guide/bundle-guides/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:15f6b5b5c3ede3f2b5a475494761b5f2489ea0e7b9abbffac99f0fb8108bc2ee"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:641bf5f090fe7a6de73fcc9d1076c1a507200fafc36a5e2d90706169e7cc9c3c"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "verify", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:6707312f7928efa0cdc0717c66c07d1ddcebf71e12808741392010107d12c6ba"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-10-19T06:03:09.803Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": ["guide:bundle-guides"],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-19T06:03:09.817Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "guide:bundle-guides"
+        },
+        {
+          "type": "verify",
+          "key": "guide:bundle-guides"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-19T06:18:46.894Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-22T07:09:11.924Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-26T18:29:40.907Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [guide:bundle-guides]; verify [guide:bundle-guides]; design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["guide:bundle-guides"]
+        },
+        {
+          "type": "verify",
+          "files": ["guide:bundle-guides"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-26T18:29:40.907Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-11-02T19:34:54.049Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["guide:bundle-guides"]
+        },
+        {
+          "type": "verify",
+          "files": ["guide:bundle-guides"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-02T19:37:44.720Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-11-02T19:38:56.758Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-02T19:38:56.758Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-02T19:39:03.957Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-02T19:39:43.868Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-02T21:13:58.557Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-02T21:18:08.830Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-02T22:24:14.021Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-03T03:49:24.511Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-03T03:49:33.202Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-11-03T03:54:54.132Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "description": "Fix Windows CI failures in @specd/guide by normalizing TypeDoc entrypoints and all guide topic/source paths to POSIX. Add separator-independent workspace membership checks so API topic generation works on Windows and macOS/Linux alike. Update guide:bundle-guides with the cross-platform requirements and verification scenarios."
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-03T03:55:02.144Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-11-03T03:55:02.247Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

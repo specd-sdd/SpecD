@@ -317,3 +317,22 @@ describe('Catalog isolation', () => {
     expect(sdkCount).toBeGreaterThan(userCount * 10)
   })
 })
+
+describe('POSIX catalog paths', () => {
+  it('emits topic identifiers and source paths without backslashes', () => {
+    // GIVEN the catalogs emitted by the package build
+    // WHEN every topic is inspected
+    // THEN neither topic nor sourcePath contains a backslash
+    const files = ['generated/guides.json', 'generated/guides-sdk.json'] as const
+    for (const file of files) {
+      const parsed = JSON.parse(readFileSync(join(packageRoot, file), 'utf8')) as {
+        catalog: ReadonlyArray<{ topic: string; sourcePath: string }>
+      }
+      expect(parsed.catalog.length).toBeGreaterThan(0)
+      for (const entry of parsed.catalog) {
+        expect(entry.topic).not.toContain('\\')
+        expect(entry.sourcePath).not.toContain('\\')
+      }
+    }
+  })
+})

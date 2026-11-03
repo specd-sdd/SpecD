@@ -1,6 +1,6 @@
 import * as fs from 'node:fs'
 import * as path from 'node:path'
-import { extractSections } from './guide-bundler.js'
+import { extractSections, isPathInside, toPosixPath } from './guide-bundler.js'
 import { formatGeneratedBody } from './markdown-formatter.js'
 import type { GuideTopic } from '../src/domain/models/index.js'
 
@@ -1151,16 +1151,21 @@ function renderImportStatement(
  * @param repoRoot - Absolute repository root.
  * @returns Repository-relative declaration path, or an empty string when unavailable.
  */
-function resolveSourcePath(reflection: FlatReflection, repoRoot: string): string {
+export function resolveSourcePath(reflection: FlatReflection, repoRoot: string): string {
   const fullFileName = reflection.sources?.[0]?.fullFileName ?? reflection.sources?.[0]?.fileName
   if (!fullFileName) {
     return ''
   }
-  const relative = path.relative(repoRoot, path.resolve(repoRoot, fullFileName))
-  if (relative.startsWith('..') || path.isAbsolute(relative)) {
-    return fullFileName
+  const relative = toPosixPath(path.relative(repoRoot, path.resolve(repoRoot, fullFileName)))
+  if (
+    relative === '..' ||
+    relative.startsWith('../') ||
+    path.isAbsolute(relative) ||
+    /^[A-Za-z]:\//.test(relative)
+  ) {
+    return toPosixPath(fullFileName)
   }
-  return relative.split(path.sep).join('/')
+  return relative
 }
 
 /**
@@ -1188,7 +1193,7 @@ function isDeclaredInWorkspace(
   if (fullFileName === undefined) {
     return true
   }
-  return packageRoots.some((root) => fullFileName.startsWith(`${root}${path.sep}`))
+  return packageRoots.some((root) => isPathInside(root, fullFileName))
 }
 
 /**
@@ -1258,7 +1263,7 @@ export async function generateSdkApiTopics(repoRoot: string): Promise<GuideTopic
     const packageRoot = path.dirname(path.dirname(entryPath))
     const application = await typedoc.Application.bootstrapWithPlugins({
       ...baseOptions,
-      entryPoints: [entryPath],
+      entryPoints: [toPosixPath(entryPath)],
     })
 
     const project = await application.convert()
@@ -1356,7 +1361,6 @@ function buildTopicNameIndex(
   >()
 
   for (const { entryPoint, packageRoot, byKind } of converted) {
-    const prefix = `${packageRoot}${path.sep}`
     for (const spec of ADDRESSABLE_KINDS) {
       for (const reflection of byKind.get(spec.kind) ?? []) {
         // The declaration's own absolute path is compared against the package root here.
@@ -1368,7 +1372,7 @@ function buildTopicNameIndex(
         list.push({
           topic: `${entryPoint.id}:${spec.directory}/${reflection.name}`,
           collection: entryPoint.id,
-          declared: fullFileName !== undefined && fullFileName.startsWith(prefix),
+          declared: fullFileName !== undefined && isPathInside(packageRoot, fullFileName),
         })
         candidates.set(reflection.name, list)
       }

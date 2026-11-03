@@ -45,6 +45,42 @@
 - **AND** it MUST NOT read a pre-generated or gitignored artifact from another workspace
 - **AND** it MUST apply options equivalent to the public site's `typedoc.json`
 
+#### Scenario: TypeDoc entrypoint paths are normalized to POSIX format
+
+- **GIVEN** curated API entrypoints resolved on an operating system using backslash path separators
+- **WHEN** TypeDoc is invoked by the bundler
+- **THEN** the entrypoint paths passed to TypeDoc MUST use forward slashes (`/`)
+- **AND** TypeDoc MUST NOT emit glob escaping errors
+- **AND** documented symbols from those entrypoints MUST be converted successfully
+
+#### Scenario: Workspace membership is independent of the path separator
+
+- **GIVEN** a package root `D:\a\repo\packages\sdk` and a declaration path `D:/a/repo/packages/sdk/src/index.ts` reported with forward slashes
+- **WHEN** the bundler classifies the reflection as declared in the workspace
+- **THEN** it MUST be classified as declared
+- **AND** the result MUST be the same when the declaration path uses backslashes or a different drive-letter case (`d:/a/repo/...`)
+
+#### Scenario: Sibling directory sharing a root prefix is not a member
+
+- **GIVEN** a package root `packages/sdk` and a declaration path `packages/sdk-extra/src/index.ts`
+- **WHEN** the bundler classifies the reflection as declared in the workspace
+- **THEN** it MUST NOT be classified as declared in `packages/sdk`
+
+#### Scenario: Source path outside the repository is normalized
+
+- **GIVEN** a declaration located outside the repository root, with a path containing backslashes
+- **WHEN** its `sourcePath` is resolved
+- **THEN** the resulting `sourcePath` MUST use forward slashes
+- **AND** it MUST NOT contain backslashes (`\`)
+
+#### Scenario: Emitted topic identifiers and source paths strictly use POSIX forward slashes
+
+- **GIVEN** a guide topic compiled from a nested markdown document or a generated API symbol on any operating system
+- **WHEN** the catalog is emitted
+- **THEN** the `topic` field MUST use forward slashes (`/`) as subdirectory and kind separators
+- **AND** the `sourcePath` field MUST use forward slashes (`/`)
+- **AND** neither field MUST contain backslashes (`\`)
+
 #### Scenario: Each documented symbol becomes an addressable topic
 
 - **GIVEN** TypeDoc reports the documented class `ArtifactDag` in the `sdk` entry point

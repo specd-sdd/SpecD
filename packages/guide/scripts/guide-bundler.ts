@@ -173,6 +173,65 @@ export function extractSections(content: string): GuideSection[] {
 }
 
 /**
+ * Normalizes any filesystem path to POSIX forward slashes.
+ *
+ * Every backslash is replaced with `/`. Required before passing paths to TypeDoc (which
+ * parses entry points as globs and rejects `\`) and before building deterministic topic
+ * identifiers and source paths. Idempotent; returns `''` for `''`.
+ *
+ * @param filePath - Path to normalize.
+ * @returns The path with all backslashes converted to forward slashes.
+ */
+export function toPosixPath(filePath: string): string {
+  return filePath.replace(/\\/g, '/')
+}
+
+/**
+ * Tells whether `file` lies inside `root`, independently of the host path separator.
+ *
+ * Both arguments are normalized with {@link toPosixPath}. Repeated slashes are collapsed
+ * except for a leading `//` (UNC). The match requires a path-segment boundary: the root
+ * itself and any descendant match, a sibling sharing the root as a name prefix does not.
+ * When both paths start with a drive letter (`X:/`), the comparison is case-insensitive;
+ * otherwise it is case-sensitive.
+ *
+ * @param root - Package or directory root, absolute.
+ * @param file - Absolute path to test.
+ * @returns `true` when `file` equals `root` or is a descendant of it.
+ */
+export function isPathInside(root: string, file: string): boolean {
+  const normalize = (value: string): string => {
+    const posix = toPosixPath(value)
+    const unc = posix.startsWith('//')
+    const collapsed = posix.replace(/\/{2,}/g, '/')
+    const base = unc ? `/${collapsed}` : collapsed
+    return base.length > 1 && base.endsWith('/') ? base.slice(0, -1) : base
+  }
+  const drive = /^[A-Za-z]:(\/|$)/
+  let normalizedRoot = normalize(root)
+  let normalizedFile = normalize(file)
+  if (drive.test(normalizedRoot) && drive.test(normalizedFile)) {
+    normalizedRoot = normalizedRoot.toLowerCase()
+    normalizedFile = normalizedFile.toLowerCase()
+  }
+  if (normalizedRoot === '') return normalizedFile === ''
+  if (normalizedFile === normalizedRoot) return true
+  const prefix = normalizedRoot.endsWith('/') ? normalizedRoot : `${normalizedRoot}/`
+  return normalizedFile.startsWith(prefix)
+}
+
+/**
+ * Compares two strings by UTF-16 code unit so catalog ordering does not depend on locale.
+ *
+ * @param left - First string.
+ * @param right - Second string.
+ * @returns Negative when `left` sorts first, positive when `right` sorts first, otherwise zero.
+ */
+function compareStrings(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0
+}
+
+/**
  * Compiles a single markdown guide into a GuideTopic domain entity.
  *
  * @param collection - Collection the document belongs to.
@@ -191,9 +250,10 @@ export function compileGuide(
     throw new Error(`Guide collection '${collection}' must not contain ':'`)
   }
   const { frontmatter, body } = parseFrontmatter(content, filePath)
-  const topic = relativePath.replace(/\.md$/, '').toLowerCase()
+  const posixRelativePath = toPosixPath(relativePath)
+  const topic = posixRelativePath.replace(/\.md$/, '').toLowerCase()
   if (topic.includes(':')) {
-    throw new Error(`Guide topic '${relativePath}' must not contain ':'`)
+    throw new Error(`Guide topic '${posixRelativePath}' must not contain ':'`)
   }
   const cleanBody = body.replace(/^\r?\n/, '')
   const lines = cleanBody.split(/\r?\n/)
@@ -205,7 +265,7 @@ export function compileGuide(
     title: frontmatter.title,
     description: frontmatter.description,
     order: frontmatter.sidebar_position,
-    sourcePath: relativePath,
+    sourcePath: posixRelativePath,
     content: cleanBody,
     lineCount: lines.length,
     byteLength: Buffer.byteLength(cleanBody, 'utf-8'),
@@ -254,7 +314,9 @@ export function collectMarkdownFiles(root: string): string[] {
   }
 
   walk(root)
-  return results.sort()
+  return results.sort((left, right) =>
+    compareStrings(toPosixPath(path.relative(root, left)), toPosixPath(path.relative(root, right))),
+  )
 }
 
 /**
@@ -281,7 +343,7 @@ export function compileCollections(
       compileGuide(
         config.collection,
         file,
-        path.relative(config.root, file).split(path.sep).join('/'),
+        toPosixPath(path.relative(config.root, file)),
         fs.readFileSync(file, 'utf-8'),
       ),
     )
