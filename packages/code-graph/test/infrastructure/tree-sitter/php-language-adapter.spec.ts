@@ -2453,8 +2453,8 @@ describe('PHP framework loader families', () => {
       const entries = state?.psr4ByCodeRoot.get(tempDir)
       expect(entries).toBeDefined()
       expect(entries).toEqual([
-        ['App\\', join(canonicalTemp, 'src')],
-        ['App\\', join(canonicalTemp, 'tests')],
+        ['App\\', toPortableGraphPath(join(canonicalTemp, 'src'))],
+        ['App\\', toPortableGraphPath(join(canonicalTemp, 'tests'))],
       ])
     })
 
